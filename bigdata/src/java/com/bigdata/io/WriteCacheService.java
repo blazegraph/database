@@ -29,6 +29,7 @@ package com.bigdata.io;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
+import java.util.LinkedList;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,7 +40,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -133,9 +133,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo test @ nbuffers=1 and nbuffers=2 which are the most stressful
- *       conditions.
- * 
  * @todo There needs to be a unit test which verifies overwrite of a record in
  *       the {@link WriteCache}. It is possible for this to occur with the
  *       {@link RWStore} (highly unlikely, but possible).
@@ -154,10 +151,9 @@ abstract public class WriteCacheService implements IWriteCache {
             .getLogger(WriteCacheService.class);
 
     /**
-     * <code>true</code> until the service is shutdown (actually, until a
-     * request is made to shutdown the service).
+     * <code>true</code> until the service is {@link #close() closed}.
      */
-    final private AtomicBoolean open = new AtomicBoolean(true);
+    private volatile boolean open = true;
 
     /**
      * <code>true</code> iff record level checksums are enabled.
@@ -206,8 +202,8 @@ abstract public class WriteCacheService implements IWriteCache {
     final private Condition cleanListNotEmpty = cleanListLock.newCondition();
     
     /**
-     * The read lock allows concurrent {@link #acquire()}s while the write lock
-     * prevents {@link #acquire()} when we must either reset the
+     * The read lock allows concurrent {@link #acquireForWriter()}s while the write lock
+     * prevents {@link #acquireForWriter()} when we must either reset the
      * {@link #current} cache buffer or change the {@link #current} reference.
      * E.g., {@link #flush(boolean, long, TimeUnit)}.
      */
@@ -450,11 +446,10 @@ abstract public class WriteCacheService implements IWriteCache {
                     }
 
                     /*
-                     * Add to the cleanList IFF this is our cache buffer (versus
-                     * a caller's buffer wrapped as a WriteCache by write()).
+                     * Add to the cleanList (all buffers are our buffers).
                      */
-                    for (WriteCache t : buffers) {
-                        if (t == cache) {
+//                    for (WriteCache t : buffers) {
+//                        if (t == cache) {
                             cleanListLock.lockInterruptibly();
                             try {
                                 cleanList.add(cache);
@@ -462,9 +457,9 @@ abstract public class WriteCacheService implements IWriteCache {
                             } finally {
                                 cleanListLock.unlock();
                             }
-                            break;
-                        }
-                    }
+//                            break;
+//                        }
+//                    }
 
                 } catch (InterruptedException t) {
                     /*
@@ -551,14 +546,21 @@ abstract public class WriteCacheService implements IWriteCache {
         final WriteLock writeLock = lock.writeLock();
         writeLock.lockInterruptibly();
         try {
-            // reset dirty cache buffers.
+            if(!open) {
+                // Reset can not recover from close().
+                throw new IllegalStateException();
+            }
+            // drain the dirty list.
             dirtyListLock.lockInterruptibly();
             try {
-                while (!dirtyList.isEmpty()) {
-                    final WriteCache t = dirtyList.take();
-                    t.resetWith(recordMap);
-                }
+                dirtyList.drainTo(new LinkedList<WriteCache>());
+//                while (!dirtyList.isEmpty()) {
+//                    final WriteCache t = dirtyList.take();
+//                    t.resetWith(recordMap);
+//                }
+                // @todo signal anyone waiting on any dirtyList Condition?
                 dirtyListEmpty.signalAll();
+//                dirtyListNotEmpty.signalAll();
             } finally {
                 dirtyListLock.unlock();
             }
@@ -566,6 +568,7 @@ abstract public class WriteCacheService implements IWriteCache {
             cleanListLock.lockInterruptibly();
             try {
                 for (WriteCache t : buffers) {
+                    t.resetWith(recordMap); // reset buffer & service map.
                     cleanList.put(t);
                 }
                 cleanListNotEmpty.signalAll();
@@ -582,11 +585,17 @@ abstract public class WriteCacheService implements IWriteCache {
     }
 
     public void close() throws InterruptedException {
+        /*
+         * Note: The write lock prevents concurrent close by another thread and
+         * is also required for the operations we take on the dirtyList, the
+         * cleanList, and current.
+         */
         final WriteLock writeLock = lock.writeLock();
-        writeLock.lock(); // Note: not interruptible in close()
+        writeLock.lockInterruptibly();
         try {
-            if (!open.get()) {
-                // Already closed.
+
+            if (!open) {
+                // Already closed, so this is a NOP.
                 return;
             }
 
@@ -613,7 +622,7 @@ abstract public class WriteCacheService implements IWriteCache {
             try {
                 while (!dirtyList.isEmpty()) {
                     final WriteCache t = dirtyList.take();
-                    t.resetWith(recordMap);
+                    t.resetWith(recordMap); // @todo reset() probably not required.
                     t.close();
                 }
                 dirtyListEmpty.signalAll();
@@ -636,13 +645,13 @@ abstract public class WriteCacheService implements IWriteCache {
             final WriteCache t = current.getAndSet(null);
             if (t != null) {
                 if (!t.isEmpty()) {
-                    t.resetWith(recordMap);
+                    t.resetWith(recordMap);//@todo reset probably not required.
                 }
                 t.close();
             }
 
             // Closed.
-            open.set(false);
+            open = false;
 
         } finally {
             writeLock.unlock();
@@ -662,16 +671,29 @@ abstract public class WriteCacheService implements IWriteCache {
     }
 
     /**
+     * This method is called ONLY by write threads and verifies that the service
+     * is {@link #open}, that the {@link WriteTask} has not been {@link #halt
+     * halted}, and that the {@link WriteTask} is still executing (in case any
+     * uncaught errors are thrown out of {@link WriteTask#call()}.
+     * <p>
+     * Note: {@link #read(long)} DOES NOT throw an exception if the service is
+     * closed, asynchronously closed, or even just plain dead. It just returns
+     * <code>null</code> to indicate that the desired record is not available
+     * from the cache.
+     * 
      * @throws IllegalStateException
      *             if the service is closed.
-     * @throws IllegalStateException
-     *             if the write task has failed.
+     * @throws RuntimeException
+     *             if the {@link WriteTask} has failed.
      */
-    protected void assertOpen() {
+    private void assertOpenForWriter() {
 
-        if (!open.get())
+        if (!open)
             throw new IllegalStateException();
 
+        if (halt)
+            throw new RuntimeException(firstCause.get());
+        
         if (localWriteFuture.isDone()) {
 
             /*
@@ -685,25 +707,27 @@ abstract public class WriteCacheService implements IWriteCache {
 
             } catch (Throwable t) {
 
-                throw new IllegalStateException(t);
+                throw new RuntimeException(t);
 
             }
 
         }
 
     }
-    
+
     /**
-     * Return the current buffer. The caller may read or write on the buffer.
-     * Once they are done, the caller MUST call {@link #release()}.
+     * Return the current buffer to a write thread. Once they are done, the
+     * caller MUST call {@link #release()}.
      * 
      * @return The buffer.
      * 
      * @throws InterruptedException
      * @throws IllegalStateException
      *             if the {@link WriteCacheService} is closed.
+     * @throws RuntimeException
+     *             if the service has been {@link #halt halted}
      */
-    private WriteCache acquire() throws InterruptedException,
+    private WriteCache acquireForWriter() throws InterruptedException,
             IllegalStateException {
 
         final ReadLock readLock = lock.readLock();
@@ -712,11 +736,14 @@ abstract public class WriteCacheService implements IWriteCache {
         
         try {
 
-            assertOpen();
+            /*
+             * We only want to throw errors from the WriteTask out of write()
+             * and flush(). However, this method is NOT invoked by read() which
+             * uses a different non-blocking protocol to access the record if it
+             * is in a cache buffer.
+             */
+            assertOpenForWriter();
 
-            if (halt)
-                throw new RuntimeException(firstCause.get());
-            
             /*
              * Note: acquire() does not block since it holds the ReadLock.
              * Methods which change [current] MUST hold the WriteLock across
@@ -807,14 +834,14 @@ abstract public class WriteCacheService implements IWriteCache {
      * @see #dirtyList
      * @see #dirtyListEmpty
      * 
-     * @todo flush() is designed to block concurrent writes() in order to give
-     *       us clean decision boundaries for the HA write pipeline and also to
-     *       simplify the internal locking design. Once we get HA worked out
-     *       cleanly we should explore whether or not we can relax this
-     *       constraint such that writes can run concurrently with flush(). That
-     *       would have somewhat higher throughput since mutable B+Tree
-     *       evictions would no longer cause concurrent tasks to block during
-     *       the commit protocol or the file extent protocol.
+     * @todo Note: flush() is currently designed to block concurrent writes() in
+     *       order to give us clean decision boundaries for the HA write
+     *       pipeline and also to simplify the internal locking design. Once we
+     *       get HA worked out cleanly we should explore whether or not we can
+     *       relax this constraint such that writes can run concurrently with
+     *       flush(). That would have somewhat higher throughput since mutable
+     *       B+Tree evictions would no longer cause concurrent tasks to block
+     *       during the commit protocol or the file extent protocol.
      */
     public boolean flush(final boolean force, final long timeout,
             final TimeUnit units) throws TimeoutException, InterruptedException {
@@ -929,9 +956,10 @@ abstract public class WriteCacheService implements IWriteCache {
     public boolean write(final long offset, final ByteBuffer data, final int chk)
             throws InterruptedException, IllegalStateException {
 
-    	if (log.isInfoEnabled()) {
-    		log.info("offset: " + offset + ", length: " + data.limit());
-    	}
+        if (log.isInfoEnabled()) {
+            log.info("offset: " + offset + ", length: " + data.limit()
+                    + ", chk=" + chk+", useChecksum="+useChecksum);
+        }
     	
         if (offset < 0)
             throw new IllegalArgumentException();
@@ -950,9 +978,6 @@ abstract public class WriteCacheService implements IWriteCache {
             throw new IllegalArgumentException(
                     AbstractBufferStrategy.ERR_BUFFER_EMPTY);
 
-        if (!open.get())
-            throw new IllegalStateException();
-
         if (nwrite > capacity) {
 
             /*
@@ -970,7 +995,7 @@ abstract public class WriteCacheService implements IWriteCache {
          */
         {
 
-            final WriteCache cache = acquire();
+            final WriteCache cache = acquireForWriter();
 
             try {
 
@@ -991,6 +1016,11 @@ abstract public class WriteCacheService implements IWriteCache {
                      * Note: put() SHOULD return non-null further down in this
                      * method since we will always be looking at a new buffer in
                      * those code paths.
+                     * 
+                     * FIXME The first paragraph above does not seem to be
+                     * correct to me and is inconsistent with throwing an
+                     * assertion if put() returns non-null (which is what we are
+                     * doing immediately below this comment).
                      */
                     if (recordMap.put(offset, cache) != null) {
                         throw new AssertionError(
@@ -1035,7 +1065,7 @@ abstract public class WriteCacheService implements IWriteCache {
                  */
 
                 // Acquire a buffer. Maybe the same one, maybe different.
-                WriteCache cache = acquire();
+                WriteCache cache = acquireForWriter();
 
                 try {
 
@@ -1214,7 +1244,8 @@ abstract public class WriteCacheService implements IWriteCache {
             IllegalStateException {
 
         if (log.isInfoEnabled()) {
-            log.info("offset: " + offset + ", length: " + data.limit());
+            log.info("offset: " + offset + ", length: " + data.limit()
+                    + ", chk=" + chk + ", useChecksum=" + useChecksum);
         }
         
         if (offset < 0)
@@ -1226,16 +1257,14 @@ abstract public class WriteCacheService implements IWriteCache {
 
         // #of bytes in the record.
         final int remaining = data.remaining();
-
-//        // #of bytes to be written.
-//        final int nwrite = remaining + (useChecksum ? 4 : 0);
         
         if (remaining == 0)
             throw new IllegalArgumentException(
                     AbstractBufferStrategy.ERR_BUFFER_EMPTY);
 
-        if (!open.get())
-            throw new IllegalStateException();
+        // Small records should not take this code path.
+        if (remaining < capacity)
+            throw new RuntimeException();
 
         /*
          * Put as much into each WriteCache instance as well fit, then transfer
@@ -1272,7 +1301,7 @@ abstract public class WriteCacheService implements IWriteCache {
             int r = remaining;
             while (r > 0) {
                 // Acquire a buffer.
-                final WriteCache cache = acquire();
+                final WriteCache cache = acquireForWriter();
                 try {
                     // #of bytes to copy onto the write cache.
                     final int ncpy = Math.min(r, cache.remaining());
@@ -1302,7 +1331,7 @@ abstract public class WriteCacheService implements IWriteCache {
              */
             if (useChecksum) {
                 // Acquire a buffer.
-                final WriteCache cache = acquire();
+                final WriteCache cache = acquireForWriter();
                 try {
                     // Allocate a small buffer
                     final ByteBuffer t = ByteBuffer.allocate(4);
@@ -1311,7 +1340,8 @@ abstract public class WriteCacheService implements IWriteCache {
                     // Prepare for reading.
                     t.flip();
                     // Note: [t] _is_ the checksum.
-                    if (!cache.write(offset+p, t, chk, false/*writeChecksum*/))
+                    if (!cache
+                            .write(offset + p, t, chk, false/* writeChecksum */))
                         throw new AssertionError();
                 } finally {
                     release();
@@ -1322,7 +1352,7 @@ abstract public class WriteCacheService implements IWriteCache {
              * the dirty list since the caller MUST be able to read the record
              * back from the file by the time this method returns.
              */
-            final WriteCache cache = acquire();
+            final WriteCache cache = acquireForWriter();
             try {
                 if (!cache.isEmpty()) {
                     moveBufferToDirtyList();
@@ -1452,12 +1482,10 @@ abstract public class WriteCacheService implements IWriteCache {
             if (halt)
                 throw new RuntimeException(firstCause.get());
 
-            // Take a buffer from the cleanList (guaranteed
-            // avail).
+            // Take a buffer from the cleanList (guaranteed avail).
             final WriteCache newBuffer = cleanList.take();
 
-            // Clear the state on the new buffer and remove from
-            // cacheService map
+            // Clear state on new buffer and remove from cacheService map
             newBuffer.resetWith(recordMap);
 
             // Set it as the new buffer.
@@ -1472,21 +1500,24 @@ abstract public class WriteCacheService implements IWriteCache {
         }
 
     }
-    
+
     /**
      * This is a non-blocking query of all write cache buffers (current, clean
      * and dirty).
      * <p>
-     * This implementation DOES NOT throw an {@link IllegalStateException} for
-     * an asynchronous close. Instead it just returns <code>null</code> to
-     * indicate a cache miss.
+     * This implementation DOES NOT throw an {@link IllegalStateException} if
+     * the service is already closed NOR if there is an asynchronous close of
+     * the service. Instead it just returns <code>null</code> to indicate a
+     * cache miss.
      */
     public ByteBuffer read(final long offset) throws InterruptedException,
             ChecksumError {
 
-        if (!open.get()) {
-
-            // Not open.
+        if (!open) {
+            /*
+             * Not open. Return [null] rather than throwing an exception per the
+             * contract for this implementation.
+             */
             return null;
             
         }

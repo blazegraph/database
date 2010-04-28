@@ -110,7 +110,14 @@ public class TestAll extends TestCase {
 
         suite.addTest( TestDiskJournal.suite() );
 
-        suite.addTest( TestWORMStrategy.suite() );
+        /*
+         * WORMStrategy test suites.
+         * 
+         * @todo Also test w/o checksums for backwards compatibility?
+         */
+        suite.addTest(TestWORMStrategy.suite()); // w/ cache.
+        suite.addTest(TestWORMStrategyNoCache.suite()); // w/o cache.
+        suite.addTest(TestWORMStrategyOneCacheBuffer.suite()); // minimal cache.
 
         suite.addTest( com.bigdata.rwstore.TestAll.suite() );
 

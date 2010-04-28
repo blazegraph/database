@@ -139,7 +139,7 @@ public class TestAbort extends ProxyTestCase<Journal> {
         }
         
     }
-        
+
     /**
      * Test of abort semantics when registering named {@link BTree}s (this tests
      * the integration of {@link Name2Addr} with abort).
@@ -281,4 +281,20 @@ public class TestAbort extends ProxyTestCase<Journal> {
 
     }
 
+    /**
+     * Run {@link #test_abort()} a bunch of times to look for path dependent
+     * problems.
+     */
+    public void test_stressTestAbort() {
+
+        final int LIMIT = 100;
+
+        for (int i = 0; i < LIMIT; i++) {
+
+            test_abort();
+
+        }
+
+    }
+    
 }

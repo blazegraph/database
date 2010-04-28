@@ -427,7 +427,12 @@ abstract public class AbstractRawStoreTestCase extends TestCase3 {
          */
         assertEquals(0,actual.position());
         assertEquals(expected.length,actual.limit());
-        assertEquals(actual.limit(),actual.capacity());
+        /*
+         * Note: Assertion is violated when cache is disabled and checksums
+         * are in use because the returned buffer may be a slice on a larger
+         * buffer which also includes the trailing checksum field.
+         */
+//        assertEquals(actual.limit(),actual.capacity());
         
         } finally {
 
