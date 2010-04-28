@@ -141,27 +141,4 @@ public class RWWriteCacheService extends WriteCacheService {
 	    
     }
 
-	/**
-	 * Called to check if a write has already been flushed.  This is only made if a write has been made to
-	 * previously committed data (in the current RW session)
-	 * 
-	 * If dirt writeCaches are flushed in order then it does not matter, however, if we want to be able to combine
-	 * writeCaches then it makes sense that there are no duplicate writes.
-	 * 
-	 * On reflection this is more likely needed since for the RWStore, depending on session parameters, the same
-	 * cached area could be overwritten. We could still maintain multiple writes but we need a guarantee of order
-	 * when retrieving data from the write cache (newest first).
-	 * 
-	 * So the question is, whether it is better to keep cache consistent or to constrain with read order.
-
-	 * @param addr the address to check
-	 */
-	public void clearWrite(long addr) {
-		WriteCache cache = recordMap.get(addr);
-		if (cache != null) {
-			cache.clearAddrMap(addr);
-			recordMap.remove(addr);
-		}
-	}
-
 }

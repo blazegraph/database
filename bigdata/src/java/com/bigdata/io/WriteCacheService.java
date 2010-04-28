@@ -58,7 +58,6 @@ import com.bigdata.journal.ha.Quorum;
 import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rwstore.RWStore;
-import com.bigdata.rwstore.RWWriteCacheService;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -300,12 +299,8 @@ abstract public class WriteCacheService implements IWriteCache {
     /**
      * A map from the offset of the record on the backing file to the cache
      * buffer on which that record was written.
-     * 
-     * FIXME This field probably should be private.
-     * {@link RWWriteCacheService#clearWrite(long)} currently uses this field,
-     * but I do not believe that it does so in a safe manner.
      */
-    final protected ConcurrentMap<Long/* offset */, WriteCache> recordMap;
+    final private ConcurrentMap<Long/* offset */, WriteCache> recordMap;
 
     /**
      * An immutable array of the {@link WriteCache} buffer objects owned by the
@@ -407,6 +402,14 @@ abstract public class WriteCacheService implements IWriteCache {
      */
     private class WriteTask implements Callable<Void> {
 
+        /**
+         * @todo Since we hold the dirtyListLock whenever we are writing out a
+         *       cache buffer, is it possible for the {@link WriteCacheService}
+         *       to use more than 2 or 3 buffers? If not, then reduce the #of
+         *       buffers allocated. [We need to be holding the dirtyListLock in
+         *       order to generate various signals required by the rest of the
+         *       {@link WriteCacheService}.]
+         */
         public Void call() throws Exception {
             while (true) {
                 assert !halt;
@@ -1075,26 +1078,6 @@ abstract public class WriteCacheService implements IWriteCache {
                 // write on the cache.
                 if (cache.write(offset, data, chk)) {
 
-                    /*
-                     * Note: We MUST use put() here rather than putIfAbsent()
-                     * and the return value MAY be non-null. This condition
-                     * arises when there exists a record on a clean buffer which
-                     * was part of an aborted write set. Such records may be
-                     * rewritten following the abort. Since the record was
-                     * already laid down on the backing channel, there is no
-                     * point clearing it from the clean write cache buffers,
-                     * which would require us to track all records in a given
-                     * write set (not very scalable).
-                     * 
-                     * Note: put() SHOULD return non-null further down in this
-                     * method since we will always be looking at a new buffer in
-                     * those code paths.
-                     * 
-                     * FIXME The first paragraph above does not seem to be
-                     * correct to me and is inconsistent with throwing an
-                     * assertion if put() returns non-null (which is what we are
-                     * doing immediately below this comment).
-                     */
                     if (recordMap.put(offset, cache) != null) {
                         throw new AssertionError(
                                 "Record already in cache: offset=" + offset);
@@ -1613,6 +1596,43 @@ abstract public class WriteCacheService implements IWriteCache {
 
         return cache.read(off.longValue());
 
+    }
+
+    /**
+     * Called to check if a write has already been flushed. This is only made if
+     * a write has been made to previously committed data (in the current RW
+     * session)
+     * 
+     * If dirt writeCaches are flushed in order then it does not matter,
+     * however, if we want to be able to combine writeCaches then it makes sense
+     * that there are no duplicate writes.
+     * 
+     * On reflection this is more likely needed since for the RWStore, depending
+     * on session parameters, the same cached area could be overwritten. We
+     * could still maintain multiple writes but we need a guarantee of order
+     * when retrieving data from the write cache (newest first).
+     * 
+     * So the question is, whether it is better to keep cache consistent or to
+     * constrain with read order.
+     * 
+     * @param offset
+     *            the address to check
+     */
+    public void clearWrite(final long offset) {
+        try {
+            final WriteCache cache = recordMap.remove(offset);
+            if (cache == null)
+                return;
+            final WriteCache current = acquireForWriter();
+            try {
+                if (cache == current)
+                    cache.clearAddrMap(offset);
+            } finally {
+                release();
+            }
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 }
