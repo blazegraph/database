@@ -181,6 +181,14 @@ abstract public class WriteCacheService implements IWriteCache {
     final private ExecutorService remoteWriteService;
 
     /**
+     * The {@link Future} of the task running on the {@link #remoteWriteService}.
+     * 
+     * @see WriteTask
+     * @see #reset()
+     */
+    private volatile Future<?> remoteWriteFuture = null;
+    
+    /**
      * A list of clean buffers. By clean, we mean not needing to be written.
      * Once a dirty write cache has been flushed, it is placed onto the
      * {@link #cleanList}. Clean buffers can be taken at any time for us as the
@@ -429,11 +437,9 @@ abstract public class WriteCacheService implements IWriteCache {
                         dirtyListEmpty.signalAll();
                     }
 
-                    Future<?> remoteWriteFuture = null;
-
                     if (remoteWriteService != null) {
                         // Start downstream IOs (network IO).
-                        remoteWriteService.submit(cache
+                        remoteWriteFuture = remoteWriteService.submit(cache
                                 .getDownstreamWriteRunnable(quorumManager));
                     }
 
@@ -448,18 +454,25 @@ abstract public class WriteCacheService implements IWriteCache {
                     /*
                      * Add to the cleanList (all buffers are our buffers).
                      */
-//                    for (WriteCache t : buffers) {
-//                        if (t == cache) {
-                            cleanListLock.lockInterruptibly();
-                            try {
-                                cleanList.add(cache);
-                                cleanListNotEmpty.signalAll();
-                            } finally {
-                                cleanListLock.unlock();
-                            }
-//                            break;
-//                        }
-//                    }
+                    cleanListLock.lockInterruptibly();
+                    try {
+                        cleanList.add(cache);
+                        /*
+                         * Since we a holding the lock for both the clean and
+                         * the dirty buffer, make sure that the sizes of these
+                         * two lists are LTE to the #of buffers (one buffer may
+                         * be on [current] as well).
+                         */
+                        assert dirtyList.size() + cleanList.size() <= buffers.length : "#dirty="
+                                + dirtyList.size()
+                                + ", #clean="
+                                + cleanList.size()
+                                + ", #buffers="
+                                + buffers.length;
+                        cleanListNotEmpty.signalAll();
+                    } finally {
+                        cleanListLock.unlock();
+                    }
 
                 } catch (InterruptedException t) {
                     /*
@@ -467,6 +480,9 @@ abstract public class WriteCacheService implements IWriteCache {
                      * Future, so this interrupt is a clear signal that the
                      * write cache service is closing down.
                      */
+                    if (remoteWriteFuture != null)
+                        remoteWriteFuture
+                                .cancel(true/* mayInterruptIfRunning */);
                     return null;
                 } catch (Throwable t) {
                     /*
@@ -481,6 +497,11 @@ abstract public class WriteCacheService implements IWriteCache {
                      * in [buffers] and reset() is written in terms of [buffers]
                      * precisely so we do not loose buffers here.
                      */
+                    if (remoteWriteFuture != null) {
+                        // Interrupt any network IO
+                        remoteWriteFuture
+                                .cancel(true/* mayInterruptIfRunning */);
+                    }
                     if(firstCause.compareAndSet(null/*expect*/, t/*update*/)) {
                         halt = true;
                     }
@@ -507,11 +528,11 @@ abstract public class WriteCacheService implements IWriteCache {
                     dirtyListLock.unlock();
                 }
 
-            }// while(true)
+            } // while(true)
 
-        }
+        } // call()
 
-    }
+    } // class WriteTask
 
     /**
      * Factory for {@link WriteCache} implementations.
@@ -550,35 +571,64 @@ abstract public class WriteCacheService implements IWriteCache {
                 // Reset can not recover from close().
                 throw new IllegalStateException();
             }
+
+            // cancel the current WriteTask.
+            localWriteFuture.cancel(true/* mayInterruptIfRunning */);
+            if (remoteWriteFuture != null) {
+                remoteWriteFuture.cancel(true/* mayInterruptIfRunning */);
+            }
+
             // drain the dirty list.
             dirtyListLock.lockInterruptibly();
             try {
                 dirtyList.drainTo(new LinkedList<WriteCache>());
-//                while (!dirtyList.isEmpty()) {
-//                    final WriteCache t = dirtyList.take();
-//                    t.resetWith(recordMap);
-//                }
-                // @todo signal anyone waiting on any dirtyList Condition?
                 dirtyListEmpty.signalAll();
-//                dirtyListNotEmpty.signalAll();
+                dirtyListNotEmpty.signalAll(); // NB: you must verify Condition once signaled!
             } finally {
                 dirtyListLock.unlock();
             }
+            
             // re-populate the clean list with our buffers.
             cleanListLock.lockInterruptibly();
             try {
-                for (WriteCache t : buffers) {
-                    t.resetWith(recordMap); // reset buffer & service map.
-                    cleanList.put(t);
-                }
+                cleanList.drainTo(new LinkedList<WriteCache>());
                 cleanListNotEmpty.signalAll();
             } finally {
                 cleanListLock.unlock();
             }
-            // Restart the WriteTask.
-            if (localWriteFuture.isDone()) {
-                localWriteFuture = localWriteService.submit(new WriteTask());
+            
+            // reset each buffer.
+            for(WriteCache t : buffers) {
+                t.reset();
             }
+            
+            // re-populate the clean list with N-1 of our buffers
+            for (int i = 0; i < buffers.length - 1; i++) {
+                cleanList.put(buffers[i]);
+            }
+            
+            // clear the service record map.
+            recordMap.clear();
+            
+            // set the current buffer.
+            current.set(buffers[buffers.length - 1]);
+
+            // Restart the WriteTask.
+            try {
+                localWriteFuture.get();
+            } catch (Throwable t) {
+                // ignored.
+            }
+            if (remoteWriteFuture != null) {
+                try {
+                    remoteWriteFuture.get();
+                } catch (Throwable t) {
+                    // ignored.
+                }
+            }
+            localWriteFuture = localWriteService.submit(new WriteTask());
+            remoteWriteFuture = null;
+            
         } finally {
             writeLock.unlock();
         }
@@ -620,12 +670,9 @@ abstract public class WriteCacheService implements IWriteCache {
             // reset buffers on the dirtyList.
             dirtyListLock.lockInterruptibly();
             try {
-                while (!dirtyList.isEmpty()) {
-                    final WriteCache t = dirtyList.take();
-                    t.resetWith(recordMap); // @todo reset() probably not required.
-                    t.close();
-                }
+                dirtyList.drainTo(new LinkedList<WriteCache>());
                 dirtyListEmpty.signalAll();
+                dirtyListNotEmpty.signalAll();
             } finally {
                 dirtyListLock.unlock();
             }
@@ -633,23 +680,22 @@ abstract public class WriteCacheService implements IWriteCache {
             // close() buffers on the cleanList.
             cleanListLock.lockInterruptibly();
             try {
-                while(!cleanList.isEmpty()) {
-                    final WriteCache t = cleanList.take();
-                    t.close();
-                }
+                cleanList.drainTo(new LinkedList<WriteCache>());
             } finally {
                 cleanListLock.unlock();
             }
 
-            // close() the current buffer.
-            final WriteCache t = current.getAndSet(null);
-            if (t != null) {
-                if (!t.isEmpty()) {
-                    t.resetWith(recordMap);//@todo reset probably not required.
-                }
+            // close all buffers.
+            for(WriteCache t : buffers) {
                 t.close();
             }
 
+            // clear reference to the current buffer.
+            current.getAndSet(null);
+            
+            // clear the service record map.
+            recordMap.clear();
+            
             // Closed.
             open = false;
 
