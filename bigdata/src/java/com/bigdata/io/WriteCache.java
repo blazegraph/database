@@ -109,16 +109,6 @@ abstract public class WriteCache implements IWriteCache {
 	 */
 	final private AtomicReference<ByteBuffer> buf;
 
-//    /**
-//     * This latch tracks the number of read-locks on the buffer. It is
-//     * incremented by {@link #acquire()} and decremented by {@link #release()}.
-//     * 
-//     * @todo The {@link #latch} is not really necessary. It appears to simply
-//     *       replace practice of leaving the {@link ReadLock} locked in
-//     *       {@link #acquire()} and unlocking it in {@link #release()}.
-//     */
-//	final private Latch latch = new Latch();
-
 	/**
 	 * The read lock allows concurrent {@link #acquire()}s while the write lock
 	 * prevents {@link #acquire()} during critical sections such as
@@ -1106,6 +1096,9 @@ abstract public class WriteCache implements IWriteCache {
      *         context of a single writer thread (all of the counters for
      *         writing on the backing channel). So, different solutions might
      *         work for different counters.
+     *         <p>
+     *         Added thread-safety is required for: nhit, nmiss. The rest should
+     *         be Ok.
      */
     public static class WriteCacheCounters {
 

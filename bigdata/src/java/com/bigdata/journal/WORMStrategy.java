@@ -773,14 +773,13 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         root.attach(storeCounters.get().getCounters());
 
-        // FIXME WriteCacheService counters
-//        if (writeCacheService != null) {
-//
-//            final CounterSet tmp = root.makePath("writeCache");
-//
-//            tmp.attach(writeCacheService.getCounters());
-//
-//        }
+        if (writeCacheService != null) {
+
+            final CounterSet tmp = root.makePath("writeCache");
+
+            tmp.attach(writeCacheService.getCounters());
+
+        }
         
         return root;
 
