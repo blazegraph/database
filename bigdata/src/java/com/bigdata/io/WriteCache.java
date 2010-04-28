@@ -576,25 +576,24 @@ abstract public class WriteCache implements IWriteCache {
              * Add metadata for the record so it can be read back from the
              * cache.
              */
-            if (log.isTraceEnabled()) {
-                log.trace("offset=" + offset + ", pos=" + pos + ", nwrite="
-                        + nwrite + ", writeChecksum=" + writeChecksum
-                        + ", useChecksum=" + useChecksum);
-            }
             if (recordMap.put(Long.valueOf(offset), new RecordMetadata(offset,
                     pos, nwrite)) != null) {
-
                 /*
                  * Note: This exception indicates that the abort protocol did
                  * not reset() the current write cache before new writes were
                  * laid down onto the buffer.
                  */
-
                 throw new AssertionError(
                         "Record exists for offset in cache: offset=" + offset);
-
 			}
 
+            if (log.isTraceEnabled()) { // @todo rather than hashCode() set a buffer# on each WriteCache instance.
+                log.trace("offset=" + offset + ", pos=" + pos + ", nwrite="
+                        + nwrite + ", writeChecksum=" + writeChecksum
+                        + ", useChecksum=" + useChecksum + ", nrecords="
+                        + recordMap.size() + ", hashCode=" + hashCode());
+            }
+            
 			return true;
 
 		} finally {
@@ -1485,9 +1484,10 @@ abstract public class WriteCache implements IWriteCache {
 	public void resetWith(final ConcurrentMap<Long, WriteCache> serviceRecordMap) throws InterruptedException {
 	    final Iterator<Long> entries = recordMap.keySet().iterator();
 		if (entries.hasNext()) {
-			if (log.isInfoEnabled())
-				log.info("resetting existing WriteCache: " + hashCode());
-		
+            if (log.isInfoEnabled())
+                log.info("resetting existing WriteCache: nrecords="
+                        + recordMap.size() + ", hashCode=" + hashCode());
+
 			while (entries.hasNext()) {
 				final Long addr = entries.next();
 				// System.out.println("Removing address: " + addr + " from " + hashCode());
@@ -1496,7 +1496,7 @@ abstract public class WriteCache implements IWriteCache {
 			
 		} else {
 			if (log.isInfoEnabled())
-				log.info("clean WriteCache: " + hashCode()); // debug to see recycling
+				log.info("clean WriteCache: hashCode=" + hashCode()); // debug to see recycling
 			if (m_written) {
 				log.warn("Written WriteCache but with no records");
 			}
