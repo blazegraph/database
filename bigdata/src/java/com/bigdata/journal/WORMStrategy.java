@@ -863,7 +863,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                             final IReopenChannel<? extends Channel> opener)
                             throws InterruptedException {
                         return new WriteCacheImpl(0/* baseOffset */,
-                                null/* buf */, useChecksum,
+                                buf, useChecksum,
                                 (IReopenChannel<FileChannel>) opener);
                     }
                 };
@@ -1688,7 +1688,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
          * (this is adjusted for the root blocks).
          */
 
-        final long pos = offset + headerSize;
+        final long pos = headerSize + offset;
 
         final int nwrites;
         try {

@@ -991,11 +991,6 @@ abstract public class WriteCacheService implements IWriteCache {
              */
             try {
 
-                // A singleton map for that record.
-                final Map<Long, RecordMetadata> recordMap = Collections
-                        .singletonMap(offset, new RecordMetadata(offset,
-                                0/* bufferOffset */, nwrite));
-
                 /*
                  * Wrap the caller's record as a ByteBuffer.
                  * 
@@ -1005,7 +1000,7 @@ abstract public class WriteCacheService implements IWriteCache {
                 final ByteBuffer t;
                 if(useChecksum) {
                     // Allocate a larger buffer
-                    t = ByteBuffer.allocate(data.remaining() + 4);
+                    t = ByteBuffer.allocate(nwrite);
                     // Copy the caller's data.
                     t.put(data);
                     // Add in the record checksum.
@@ -1028,6 +1023,12 @@ abstract public class WriteCacheService implements IWriteCache {
                  * added anything to [tmp] but instead initialized it with the
                  * data already in the buffer.
                  */
+
+                // A singleton map for that record.
+                final Map<Long, RecordMetadata> recordMap = Collections
+                        .singletonMap(offset, new RecordMetadata(offset,
+                                0/* bufferOffset */, nwrite));
+
                 if (!tmp.writeOnChannel(t, offset/* firstOffset */, recordMap,
                         Long.MAX_VALUE/* nanos */))
                     throw new RuntimeException();

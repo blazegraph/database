@@ -473,8 +473,10 @@ abstract public class WriteCache implements IWriteCache {
     	if (m_written) { // should be clean, NO WAY should this be written to!
     		log.warn("Writing to CLEAN cache: " + hashCode());
     	}
-		if (data == null)
-			throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_NULL);
+
+    	if (data == null)
+            throw new IllegalArgumentException(
+                    AbstractBufferStrategy.ERR_BUFFER_NULL);
 
 		final WriteCacheCounters counters = this.counters.get();
 		
