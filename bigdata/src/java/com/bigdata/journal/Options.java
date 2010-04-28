@@ -531,7 +531,7 @@ public interface Options {
      * 
      *  @see #WRITE_CACHE_BUFFER_COUNT
      */
-    String DEFAULT_WRITE_CACHE_BUFFER_COUNT = "3";
+    String DEFAULT_WRITE_CACHE_BUFFER_COUNT = "6";
     
     /**
      * The default for {@link #READ_CACHE_CAPACITY}.

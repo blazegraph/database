@@ -825,7 +825,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         this.quorumManager = quorumManager;
 
-        this.useChecksums = fileMetadata.useChecksums; //FIXME useChecksums.
+        this.useChecksums = fileMetadata.useChecksums;
         
         /*
          * Enable the write cache?
@@ -879,8 +879,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         System.err.println("WARNING: alpha impl: "
                 + this.getClass().getName()
                 + (writeCacheService != null ? " : writeCacheBuffers="
-                        + fileMetadata.writeCacheBufferCount
-                        + ", useChecksums=" + useChecksums : ""));
+                        + fileMetadata.writeCacheBufferCount : " : No cache")
+                + ", useChecksums=" + useChecksums);
 
     }
 
@@ -906,8 +906,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         @Override
         protected boolean writeOnChannel(final ByteBuffer data,
                 final long firstOffset,
-                final Map<Long, RecordMetadata> recordMap, final long nanos)
-                throws InterruptedException, IOException {
+                final Map<Long, RecordMetadata> recordMapIsIgnored,
+                final long nanos) throws InterruptedException, IOException {
 
             final long begin = System.nanoTime();
             
@@ -924,7 +924,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             try {
 
                 remaining -= (System.nanoTime() - begin);
-                
+
+                final int dpos = data.position();
                 final int nbytes = data.remaining();
 
                 /*
@@ -940,6 +941,13 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 counters.bytesWritten += nbytes;
                 counters.elapsedWriteNanos += (System.nanoTime() - begin);
 
+                if (WriteCache.log.isTraceEnabled()) {
+                    WriteCache.log.trace("wroteOnDisk: dpos=" + dpos
+                            + ", nbytes=" + nbytes + ", firstOffset="
+                            + firstOffset + ", nrecords="
+                            + recordMapIsIgnored.size());
+                }
+                
                 return true;
                 
             } finally {
@@ -1216,7 +1224,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
                     // FIXME If HA, then read on the quorum.
 
-                    throw new ChecksumError();
+                    throw new ChecksumError("offset=" + offset + ", nbytes="
+                            + nbytes);
 
                 }
 
@@ -1516,11 +1525,9 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                             final ByteBuffer b = _checkbuf;
                             b.clear();
                             b.putInt(chk);
+                            b.flip();
                             writeOnDisk(b, offset + remaining);
                         }
-
-                        if (log.isTraceEnabled())
-                            log.trace("diskWrite: addr=" + toString(addr));
 
                     } finally {
 

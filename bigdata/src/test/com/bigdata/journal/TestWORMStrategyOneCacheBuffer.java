@@ -35,44 +35,45 @@ import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.io.WriteCache;
 import com.bigdata.rawstore.IRawStore;
 
 /**
- * Test suite for {@link WORMStrategy} journal.
+ * Test suite for {@link WORMStrategy} journals which runs with a single
+ * {@link WriteCache} buffer. The purpose of this version of the test suite is
+ * to look for deadlocks or other problems related to having a single
+ * {@link WriteCache} buffer.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @see TestWORMStrategyNoCache
- * @see TestWORMStrategyOneCacheBuffer
  */
-public class TestWORMStrategy extends AbstractJournalTestCase {
+public class TestWORMStrategyOneCacheBuffer extends AbstractJournalTestCase {
 
-    public TestWORMStrategy() {
+    public TestWORMStrategyOneCacheBuffer() {
         super();
     }
 
-    public TestWORMStrategy(String name) {
+    public TestWORMStrategyOneCacheBuffer(String name) {
         super(name);
     }
 
     public static Test suite() {
 
-        final TestWORMStrategy delegate = new TestWORMStrategy(); // !!!! THIS CLASS !!!!
+        final TestWORMStrategyOneCacheBuffer delegate = new TestWORMStrategyOneCacheBuffer(); // !!!! THIS CLASS !!!!
 
         /*
          * Use a proxy test suite and specify the delegate.
          */
 
         final ProxyTestSuite suite = new ProxyTestSuite(delegate,
-                "DiskWORM Journal Test Suite");
+                "DiskWORM Journal Test Suite One Cache Buffer");
 
         /*
          * List any non-proxied tests (typically bootstrapping tests).
          */
         
         // tests defined by this class.
-        suite.addTestSuite(TestWORMStrategy.class);
+        suite.addTestSuite(TestWORMStrategyOneCacheBuffer.class);
 
         // test suite for the IRawStore api.
         suite.addTestSuite(TestRawStore.class);
@@ -109,6 +110,9 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
 
         properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
                 + writeCacheEnabled);
+
+        properties.setProperty(Options.WRITE_CACHE_BUFFER_COUNT, ""
+                + writeCacheBufferCount);
 
         return properties;
 
@@ -171,6 +175,9 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
 
         properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
                 + writeCacheEnabled);
+
+        properties.setProperty(Options.WRITE_CACHE_BUFFER_COUNT, ""
+                + writeCacheBufferCount);
 
         final Journal journal = new Journal(properties);
 
@@ -240,6 +247,9 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
             properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
                     + writeCacheEnabled);
 
+            properties.setProperty(Options.WRITE_CACHE_BUFFER_COUNT, ""
+                    + writeCacheBufferCount);
+
             return new Journal(properties).getBufferStrategy();
 
         }
@@ -275,6 +285,9 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
 
             properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
                     + writeCacheEnabled);
+
+            properties.setProperty(Options.WRITE_CACHE_BUFFER_COUNT, ""
+                    + writeCacheBufferCount);
 
             return new Journal(properties).getBufferStrategy();
 
@@ -312,6 +325,9 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
             properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
                     + writeCacheEnabled);
 
+            properties.setProperty(Options.WRITE_CACHE_BUFFER_COUNT, ""
+                    + writeCacheBufferCount);
+
             /*
              * The following two properties are dialed way down in order to
              * raise the probability that we will observe the following error
@@ -340,10 +356,14 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
     }
 
     /**
-     * The write cache is enabled for this version of the test suite and the
-     * default #of write cache buffers will be used as specified by
-     * {@link Options#DEFAULT_WRITE_CACHE_BUFFER_COUNT}.
+     * Cache is enabled.
      */
     private static final boolean writeCacheEnabled = true;
+
+    /**
+     * Only one cache buffer.
+     */
+    private static final int writeCacheBufferCount = 1;
     
 }
+    

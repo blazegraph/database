@@ -521,9 +521,9 @@ abstract public class WriteCache implements IWriteCache {
 		    final int remaining = data.remaining();
 		    
 			// The #of bytes to transfer into the write cache.
-            final int nbytes = remaining + (writeChecksum && useChecksum ? 4 : 0);
+            final int nwrite = remaining + (writeChecksum && useChecksum ? 4 : 0);
 
-			if (nbytes > capacity) {
+			if (nwrite > capacity) {
 			    // This is more bytes than the total capacity of the buffer.
                 throw new IllegalArgumentException(
                         AbstractBufferStrategy.ERR_BUFFER_OVERRUN);
@@ -543,10 +543,10 @@ abstract public class WriteCache implements IWriteCache {
 			final int pos;
 			synchronized (tmp) {
 
-				// the position() at which the record is cached.
+				// the position() at which the record is cached in the buffer.
 				pos = tmp.position();
 
-				if (pos + nbytes > capacity) {
+				if (pos + nwrite > capacity) {
 
 					/*
 					 * There is not enough room left in the write cache for this
@@ -568,7 +568,7 @@ abstract public class WriteCache implements IWriteCache {
 				firstOffset.compareAndSet(-1L/* expect */, offset/* update */);
 
                 counters.naccept++;
-                counters.bytesAccepted += nbytes;
+                counters.bytesAccepted += nwrite;
 
 			}
 
@@ -576,9 +576,13 @@ abstract public class WriteCache implements IWriteCache {
              * Add metadata for the record so it can be read back from the
              * cache.
              */
-			// System.out.println("WriteCache, to: " + pos + ", " + nbytes + ", thread: " + Thread.currentThread().getId());
+            if (log.isTraceEnabled()) {
+                log.trace("offset=" + offset + ", pos=" + pos + ", nwrite="
+                        + nwrite + ", writeChecksum=" + writeChecksum
+                        + ", useChecksum=" + useChecksum);
+            }
             if (recordMap.put(Long.valueOf(offset), new RecordMetadata(offset,
-                    pos, nbytes)) != null) {
+                    pos, nwrite)) != null) {
 
                 /*
                  * Note: This exception indicates that the abort protocol did
@@ -799,17 +803,6 @@ abstract public class WriteCache implements IWriteCache {
 
 		try {
 
-		    counters.nflush++;
-		    
-//			// remaining := (total - elapsed).
-//			remaining = nanos - (System.nanoTime() - begin);
-//
-//			if (!latch.await(remaining, TimeUnit.NANOSECONDS)) {
-//
-//				throw new TimeoutException();
-//
-//			}
-
 			final ByteBuffer tmp = this.buf.get();
 
 			if (tmp == null)
@@ -818,6 +811,11 @@ abstract public class WriteCache implements IWriteCache {
 			// #of bytes to write on the disk.
 			final int nbytes = tmp.position();
 
+            if (log.isTraceEnabled()) {
+                log.trace("nbytes=" + nbytes + ", firstOffset="
+                        + getFirstOffset() + ", nflush=" + counters.nflush);
+            }
+               
 			if (nbytes == 0) {
 
 				// NOP.
@@ -845,6 +843,8 @@ abstract public class WriteCache implements IWriteCache {
                 // write the data on the disk file.
                 final boolean ret = writeOnChannel(view, getFirstOffset(),
                         Collections.unmodifiableMap(recordMap), remaining);
+
+                counters.nflush++;
 
                 if (ret && reset) {
 

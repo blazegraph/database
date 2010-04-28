@@ -35,44 +35,47 @@ import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.journal.ha.TestHAWORMStrategy;
 import com.bigdata.rawstore.IRawStore;
 
 /**
- * Test suite for {@link WORMStrategy} journal.
+ * Test suite for {@link WORMStrategy} journal with the write cache disabled.
+ * The purpose of this version of the test suite is to look for problems related
+ * to operation when caching is disabled.
+ * <p>
+ * Note: The HA journal requires that cache be enabled. However, the HA journal
+ * is tested by a different test suite. See {@link TestHAWORMStrategy}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @see TestWORMStrategyNoCache
- * @see TestWORMStrategyOneCacheBuffer
  */
-public class TestWORMStrategy extends AbstractJournalTestCase {
+public class TestWORMStrategyNoCache extends AbstractJournalTestCase {
 
-    public TestWORMStrategy() {
+    public TestWORMStrategyNoCache() {
         super();
     }
 
-    public TestWORMStrategy(String name) {
+    public TestWORMStrategyNoCache(String name) {
         super(name);
     }
 
     public static Test suite() {
 
-        final TestWORMStrategy delegate = new TestWORMStrategy(); // !!!! THIS CLASS !!!!
+        final TestWORMStrategyNoCache delegate = new TestWORMStrategyNoCache(); // !!!! THIS CLASS !!!!
 
         /*
          * Use a proxy test suite and specify the delegate.
          */
 
         final ProxyTestSuite suite = new ProxyTestSuite(delegate,
-                "DiskWORM Journal Test Suite");
+                "DiskWORM Journal Test Suite No Cache");
 
         /*
          * List any non-proxied tests (typically bootstrapping tests).
          */
         
         // tests defined by this class.
-        suite.addTestSuite(TestWORMStrategy.class);
+        suite.addTestSuite(TestWORMStrategyNoCache.class);
 
         // test suite for the IRawStore api.
         suite.addTestSuite(TestRawStore.class);
@@ -340,10 +343,9 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
     }
 
     /**
-     * The write cache is enabled for this version of the test suite and the
-     * default #of write cache buffers will be used as specified by
-     * {@link Options#DEFAULT_WRITE_CACHE_BUFFER_COUNT}.
+     * Caching is disabled for this version of the {@link WORMStrategy} test
+     * suite.
      */
-    private static final boolean writeCacheEnabled = true;
+    private static final boolean writeCacheEnabled = false;
     
 }
