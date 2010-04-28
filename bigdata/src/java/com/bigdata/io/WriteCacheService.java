@@ -29,8 +29,6 @@ package com.bigdata.io;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
-import java.util.Collections;
-import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -53,7 +51,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.io.WriteCache.RecordMetadata;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.WORMStrategy;
@@ -468,12 +465,6 @@ abstract public class WriteCacheService implements IWriteCache {
                             break;
                         }
                     }
-                    /*
-                     * FIXME signal caller waiting on their wrapper buffer to be
-                     * flushed in write(). We need to do this in a finally {}
-                     * clause or (perhaps) in reset() since they need to wake up
-                     * whether or not the buffer gets written out successfully.
-                     */
 
                 } catch (InterruptedException t) {
                     /*
@@ -965,87 +956,17 @@ abstract public class WriteCacheService implements IWriteCache {
         if (nwrite > capacity) {
 
             /*
-             * Write the record onto the file at that offset. This operation is
-             * synchronous (to protect the ByteBuffer from concurrent
-             * modification by the caller). It will block until the record has
-             * been written.
-             * 
-             * Note: Code below will take an empty buffer and put this record
-             * onto it, so we do not have starvation even if the caller's record
-             * would completely fill a cache buffer.
-             * 
-             * FIXME Do the write pipeline for this buffer as well by dropping
-             * the caller's buffer onto the dirtyList and await some buffer
-             * specific condition until that buffer has been written through.
-             * This ensures that we have strong boundary conditions for HA and
-             * that the write goes through the write replication pipeline when
-             * HA is enabled.
-             * 
-             * FIXME We may need to use the DirectBufferPool here in order to
-             * avoid effective leaks of direct ByteBuffers, but the
-             * DirectBufferPool tends to be what we use for the WriteCache
-             * buffers, so we are really stuck on this code path unless the
-             * capacity of the buffers in the DirectBufferPool is increased,
-             * thus moving the write to another code path. Maybe add a counter
-             * for this code path?
+             * Handle large records.
              */
-            try {
-
-                /*
-                 * Wrap the caller's record as a ByteBuffer.
-                 * 
-                 * Note: This code path must add the checksum to the record if
-                 * checksums are enabled.
-                 */
-                final ByteBuffer t;
-                if(useChecksum) {
-                    // Allocate a larger buffer
-                    t = ByteBuffer.allocate(nwrite);
-                    // Copy the caller's data.
-                    t.put(data);
-                    // Add in the record checksum.
-                    t.putInt(chk);
-                    // Prepare for reading.
-                    t.flip();
-                } else {
-                    // just use the caller's data.
-                    t = data;
-                }
-                
-                final WriteCache tmp = newWriteCache(t, useChecksum, opener);
-
-                /*
-                 * Write the record on the channel using write cache factory.
-                 * 
-                 * Note: We need to pass in the offset of the sole record in
-                 * order to have it written at the correct offset in the backing
-                 * file (getFirstOffset() on [tmp] will be -1L since we never
-                 * added anything to [tmp] but instead initialized it with the
-                 * data already in the buffer.
-                 */
-
-                // A singleton map for that record.
-                final Map<Long, RecordMetadata> recordMap = Collections
-                        .singletonMap(offset, new RecordMetadata(offset,
-                                0/* bufferOffset */, nwrite));
-
-                if (!tmp.writeOnChannel(t, offset/* firstOffset */, recordMap,
-                        Long.MAX_VALUE/* nanos */))
-                    throw new RuntimeException();
-
-                return true;
-
-            } catch (Throwable e) {
-
-                throw new RuntimeException(e);
-
-            }
-
+            return writeLargeRecord(offset, data, chk);
+            
         }
 
         /*
          * The record can fit into a cache instance, so try and acquire one and
          * write the record onto it.
+         * 
+         * @todo this could be refactored to use moveBufferToDirtyList()
          */
         {
 
@@ -1242,6 +1163,316 @@ abstract public class WriteCacheService implements IWriteCache {
 
     }
 
+    /**
+     * Write a record whose size (when combined with the optional checksum) is
+     * larger than the capacity of an individual {@link WriteCache} buffer. This
+     * operation is synchronous (to protect the ByteBuffer from concurrent
+     * modification by the caller). It will block until the record has been
+     * written.
+     * <p>
+     * This implementation will write the record onto a sequence of
+     * {@link WriteCache} objects and wait until all of those objects have been
+     * written through to the backing file and the optional HA write pipeline. A
+     * checksum will be appended after the last chunk of the record. This
+     * strategy works for the WORM since the bytes will be laid out in a
+     * contiguous region on the disk.
+     * <p>
+     * Note: For the WORM, this code MUST NOT allow the writes to proceed out of
+     * order or the data will not be laid out correctly on the disk !!!
+     * <p>
+     * Note: The RW store MUST NOT permit individual allocations whose size on
+     * the disk is greater than the capacity of an individual {@link WriteCache}
+     * buffer (@todo Or is this Ok? Perhaps it is if the RW store holds a lock
+     * across the write for a large record? Maybe if we also add a low-level
+     * method for inserting an entry into the record map?)
+     * <p>
+     * Note: This method DOES NOT register the record with the shared
+     * {@link #recordMap}. Since the record spans multiple {@link WriteCache}
+     * objects it can not be directly recovered without reading it from the
+     * backing file.
+     * 
+     * <h2>Dialog on large records</h2>
+     * 
+     * It seems to me that the RW store is designed to break up large records
+     * into multiple allocations. If we constrain the size of the largest
+     * allocation slot on the RW store to be the capacity of a WriteCache buffer
+     * (including the bytes for the checksum and other record level metadata)
+     * then we do not have a problem with breaking up large records for it in
+     * the WriteCacheService and it will automatically benefit from HA using the
+     * write replication logic.
+     * <p>
+     * The WORM does not have these limits on the allocation size, so it seems
+     * likely that breaking it up across multiple WriteCache buffer instances
+     * would have to be done inside of the WriteCacheService in order to prevent
+     * checksums from being interleaved with each WriteCache worth of data it
+     * emits for a large record. We can't raise this out of the
+     * WriteCacheService because the large record would not be replicated for
+     * HA.
+     */
+    protected boolean writeLargeRecord(final long offset,
+            final ByteBuffer data, final int chk) throws InterruptedException,
+            IllegalStateException {
+
+        if (log.isInfoEnabled()) {
+            log.info("offset: " + offset + ", length: " + data.limit());
+        }
+        
+        if (offset < 0)
+            throw new IllegalArgumentException();
+
+        if (data == null)
+            throw new IllegalArgumentException(
+                    AbstractBufferStrategy.ERR_BUFFER_NULL);
+
+        // #of bytes in the record.
+        final int remaining = data.remaining();
+
+//        // #of bytes to be written.
+//        final int nwrite = remaining + (useChecksum ? 4 : 0);
+        
+        if (remaining == 0)
+            throw new IllegalArgumentException(
+                    AbstractBufferStrategy.ERR_BUFFER_EMPTY);
+
+        if (!open.get())
+            throw new IllegalStateException();
+
+        /*
+         * Put as much into each WriteCache instance as well fit, then transfer
+         * the WriteCache onto the dirtyList, take a new WriteCache from the
+         * cleanList, and continue until all data as been transferred. If
+         * checksums are enabled, add a 4 byte checksum afterwards.
+         * 
+         * Note: We hold the WriteLock across this operation since we will be
+         * changing out [current] each time it fills up. This has the
+         * side-effect of guaranteeing that the writes are emitted without
+         * intervening writes of other record.
+         * 
+         * while(r > 0) {
+         * 
+         * cache = acquire();
+         * 
+         * copy up to [r] bytes into the buffer.
+         * 
+         * if the buffer is full, then transfer it to the dirty list.
+         * 
+         * release()
+         * 
+         * }
+         * 
+         * write checksum on buffer
+         */
+
+        final Lock writeLock = lock.writeLock();
+        writeLock.lockInterruptibly();
+        try {
+            // the offset of the next byte to transfer to a cache buffer.
+            int p = 0;
+            // #of bytes remaining in the large record (w/o the checksum).
+            int r = remaining;
+            while (r > 0) {
+                // Acquire a buffer.
+                final WriteCache cache = acquire();
+                try {
+                    // #of bytes to copy onto the write cache.
+                    final int ncpy = Math.min(r, cache.remaining());
+                    if (ncpy > 0) {
+                        // create view of the data to be copied.
+                        final ByteBuffer tmp = data.duplicate();
+                        tmp.limit(p + ncpy);
+                        tmp.position(p);
+                        // Note: For WORM, this MUST NOT add the checksum except
+                        // for the last chunk!
+                        if (!cache
+                                .write(offset + p, tmp, chk, false/* writeChecksum */))
+                            throw new AssertionError();
+                        r -= ncpy;
+                        p += ncpy;
+                    }
+                    if (cache.remaining() == 0) {
+                        moveBufferToDirtyList();
+                    }
+                } finally {
+                    release();
+                }
+            } // while( remaining > 0 )
+            /*
+             * Now we need to write out the optional checksum. We do not have to
+             * flush this write through. The buffer can remain partly full.
+             */
+            if (useChecksum) {
+                // Acquire a buffer.
+                final WriteCache cache = acquire();
+                try {
+                    // Allocate a small buffer
+                    final ByteBuffer t = ByteBuffer.allocate(4);
+                    // Add in the record checksum.
+                    t.putInt(chk);
+                    // Prepare for reading.
+                    t.flip();
+                    // Note: [t] _is_ the checksum.
+                    if (!cache.write(offset+p, t, chk, false/*writeChecksum*/))
+                        throw new AssertionError();
+                } finally {
+                    release();
+                }
+            }
+            /*
+             * If the current cache buffer is dirty then we need to move it to
+             * the dirty list since the caller MUST be able to read the record
+             * back from the file by the time this method returns.
+             */
+            final WriteCache cache = acquire();
+            try {
+                if (!cache.isEmpty()) {
+                    moveBufferToDirtyList();
+                }
+            } finally {
+                release();
+            }
+            /*
+             * In order to guarantee that the caller can read the record back
+             * from the file we now flush the dirty list to the backing store.
+             * When this method returns, the record will be on the disk and can
+             * be read back safely from the disk.
+             */
+            flush(false/*force*/);
+            // done.
+            return true;
+        } finally {
+            writeLock.unlock();
+        }
+        
+//        try {
+//
+//            /*
+//             * Wrap the caller's record as a ByteBuffer.
+//             * 
+//             * Note: This code path must add the checksum to the record if
+//             * checksums are enabled.
+//             */
+//            final ByteBuffer t;
+//            if(useChecksum) {
+//                // Allocate a larger buffer
+//                t = ByteBuffer.allocate(nwrite);
+//                // Copy the caller's data.
+//                t.put(data);
+//                // Add in the record checksum.
+//                t.putInt(chk);
+//                // Prepare for reading.
+//                t.flip();
+//            } else {
+//                // just use the caller's data.
+//                t = data;
+//            }
+//            
+//            final WriteCache tmp = newWriteCache(t, useChecksum, opener);
+//
+//            /*
+//             * Write the record on the channel using write cache factory.
+//             * 
+//             * Note: We need to pass in the offset of the sole record in
+//             * order to have it written at the correct offset in the backing
+//             * file (getFirstOffset() on [tmp] will be -1L since we never
+//             * added anything to [tmp] but instead initialized it with the
+//             * data already in the buffer.
+//             */
+//
+//            // A singleton map for that record.
+//            final Map<Long, RecordMetadata> recordMap = Collections
+//                    .singletonMap(offset, new RecordMetadata(offset,
+//                            0/* bufferOffset */, nwrite));
+//
+//            if (!tmp.writeOnChannel(t, offset/* firstOffset */, recordMap,
+//                    Long.MAX_VALUE/* nanos */))
+//                throw new RuntimeException();
+//
+//            return true;
+//
+//        } catch (Throwable e) {
+//
+//            throw new RuntimeException(e);
+//
+//        }
+
+    }
+
+    /**
+     * Move the {@link #current} buffer to the dirty list and await a clean
+     * buffer. The clean buffer is set as the {@link #current} buffer and
+     * returned to the caller.
+     * <p>
+     * Note: If there is buffer available on the {@link #cleanList} then this
+     * method can return immediately. Otherwise, this method will block until
+     * a clean buffer becomes available.
+     * 
+     * @return A clean buffer.
+     * 
+     * @throws InterruptedException
+     * @throws IllegalMonitorStateException
+     *             unless the current thread is holding the {@link WriteLock}
+     *             for {@link #lock}.
+     */
+    private WriteCache moveBufferToDirtyList() throws InterruptedException {
+        
+        if(!lock.isWriteLockedByCurrentThread())
+            throw new IllegalMonitorStateException();
+        
+        final WriteCache cache = current.get();
+        assert cache != null;
+        /*
+         * Note: The lock here is required to give flush() atomic
+         * semantics with regard to the set of dirty write buffers
+         * when flush() gained the writeLock [in fact, we only need
+         * the dirtyListLock for the dirtyListEmpty Condition].
+         */
+        dirtyListLock.lockInterruptibly();
+        try {
+            dirtyList.add(cache);
+            dirtyListNotEmpty.signalAll();
+        } finally {
+            dirtyListLock.unlock();
+        }
+
+        /*
+         * Take the buffer from the cleanList and set it has the
+         * [current] buffer.
+         * 
+         * Note: We use the [cleanListNotEmpty] Condition so we can
+         * notice a [halt].
+         */
+        cleanListLock.lockInterruptibly();
+
+        try {
+
+            while (cleanList.isEmpty() && !halt) {
+                cleanListNotEmpty.await();
+            }
+
+            if (halt)
+                throw new RuntimeException(firstCause.get());
+
+            // Take a buffer from the cleanList (guaranteed
+            // avail).
+            final WriteCache newBuffer = cleanList.take();
+
+            // Clear the state on the new buffer and remove from
+            // cacheService map
+            newBuffer.resetWith(recordMap);
+
+            // Set it as the new buffer.
+            current.set(newBuffer);
+
+            return newBuffer;
+            
+        } finally {
+
+            cleanListLock.unlock();
+
+        }
+
+    }
+    
     /**
      * This is a non-blocking query of all write cache buffers (current, clean
      * and dirty).

@@ -443,6 +443,22 @@ abstract public class WriteCache implements IWriteCache {
 
 	}
 
+    /**
+     * Return the #of bytes remaining in the buffer.
+     * <p>
+     * Note: in order to rely on this value the caller MUST have exclusive
+     * access to the buffer. This API does not provide the means for acquiring
+     * that exclusive access. This is something that the caller has to arrange
+     * for themselves, which is why this is a package private method.
+     */
+	final int remaining() {
+
+	    final int remaining = capacity - buf.get().position();
+        
+        return remaining;
+	    
+	}
+
 	/**
 	 * The capacity of the buffer.
 	 */
@@ -467,6 +483,24 @@ abstract public class WriteCache implements IWriteCache {
     public boolean write(final long offset, final ByteBuffer data, final int chk)
             throws InterruptedException {
 
+        return write(offset, data, chk, true/* writeChecksum */);
+
+    }
+
+    /**
+     * 
+     * @param offset
+     * @param data
+     * @param chk
+     * @param writeChecksum
+     *            The checksum is appended to the record IFF this argument is
+     *            <code>true</code> and checksums are in use.
+     * @return
+     * @throws InterruptedException
+     */
+    boolean write(final long offset, final ByteBuffer data, final int chk,
+            boolean writeChecksum) throws InterruptedException {
+
         // Note: The offset MAY be zero. This allows for stores without any
 		// header block.
 
@@ -487,7 +521,7 @@ abstract public class WriteCache implements IWriteCache {
 		    final int remaining = data.remaining();
 		    
 			// The #of bytes to transfer into the write cache.
-            final int nbytes = remaining + (useChecksum ? 4 : 0);
+            final int nbytes = remaining + (writeChecksum && useChecksum ? 4 : 0);
 
 			if (nbytes > capacity) {
 			    // This is more bytes than the total capacity of the buffer.
@@ -526,7 +560,7 @@ abstract public class WriteCache implements IWriteCache {
 				// copy the record into the cache, updating position() as we go.
 				tmp.put(data);
 				// write checksum - if any
-                if (useChecksum) {
+                if (writeChecksum && useChecksum) {
                     tmp.putInt(chk);
                 }
 
