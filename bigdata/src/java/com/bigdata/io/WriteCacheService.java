@@ -574,7 +574,12 @@ abstract public class WriteCacheService implements IWriteCache {
             localWriteFuture.cancel(true/* mayInterruptIfRunning */);
             final Future<?> rwf = remoteWriteFuture;
             if (rwf != null) {
-                rwf.cancel(true/* mayInterruptIfRunning */);
+                // Note: Cancel of remote Future is RMI!
+                try {
+                    rwf.cancel(true/* mayInterruptIfRunning */);
+                } catch (Throwable t) {
+                    log.warn(t, t);
+                }
             }
 
             // drain the dirty list.
@@ -587,13 +592,24 @@ abstract public class WriteCacheService implements IWriteCache {
                 dirtyListLock.unlock();
             }
             
-            // re-populate the clean list with our buffers.
+            // drain the clean list.
             cleanListLock.lockInterruptibly();
             try {
                 cleanList.drainTo(new LinkedList<WriteCache>());
                 cleanListNotEmpty.signalAll();
             } finally {
                 cleanListLock.unlock();
+            }
+            
+            /*
+             * Now that we have sent all the signal()s we know how to send, go
+             * ahead and wait for the WriteTask to notice and terminate.
+             */
+            try {
+                // wait for it 
+                localWriteFuture.get();
+            } catch (Throwable t) {
+                // ignored.
             }
             
             // reset each buffer.
@@ -612,19 +628,22 @@ abstract public class WriteCacheService implements IWriteCache {
             // set the current buffer.
             current.set(buffers[buffers.length - 1]);
 
-            // Restart the WriteTask.
-            try {
-                localWriteFuture.get();
-            } catch (Throwable t) {
-                // ignored.
-            }
-            if (rwf != null) {
-                try {
-                    rwf.get();
-                } catch (Throwable t) {
-                    // ignored.
-                }
-            }
+            /*
+             * Restart the WriteTask
+             * 
+             * Note: don't do Future#get() for the remote Future. The task was
+             * cancelled above and we don't want to wait on RMI (for the remote
+             * Future). The remote service will have to handle any problems on
+             * its end when resynchronizing if it was disconnected and did not
+             * see our cancel() message.
+             */
+//            if (rwf != null) {
+//                try {
+//                    rwf.get();
+//                } catch (Throwable t) {
+//                    // ignored.
+//                }
+//            }
             this.localWriteFuture = localWriteService.submit(new WriteTask());
             this.remoteWriteFuture = null;
             
@@ -652,7 +671,12 @@ abstract public class WriteCacheService implements IWriteCache {
             localWriteFuture.cancel(true/* mayInterruptIfRunning */);
             final Future<?> rwf = remoteWriteFuture;
             if (rwf != null) {
-                rwf.cancel(true/* mayInterruptIfRunning */);
+                // Note: Cancel of remote Future is RMI!
+                try {
+                    rwf.cancel(true/* mayInterruptIfRunning */);
+                } catch (Throwable t) {
+                    log.warn(t, t);
+                }
             }
 
             // Immediate shutdown of the write service.
