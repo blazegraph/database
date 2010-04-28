@@ -52,7 +52,7 @@ public class MockQuorumManager implements QuorumManager {
         this.k = stores.length;
         this.index = index;
         this.stores = stores;
-        this.quorum = newQuorum(index,stores);
+        this.quorum = newQuorum(index, stores);
 
         // Start the quorum as met on token ZERO (0).
         token = 0L;

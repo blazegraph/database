@@ -33,6 +33,8 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
+import com.bigdata.journal.ProxyTestCase;
+
 /**
  * Aggregates all tests into something approximately increasing dependency
  * order. Most of the tests that are aggregated are proxied test suites and will
@@ -78,7 +80,7 @@ public class TestJournalHA extends TestCase {
          * 1. bootstrap 3 journals in a specified failover chain and demonstrate
          * pipelined writes and the commit protocol.
          */
-//        suite.addTestSuite(TestHAWritePipeline.class);
+        suite.addTestSuite(TestHAWritePipeline.class);
 
         /*
          * 2. bootstrap 3 journals in a specified failover chain, pipeline some

@@ -35,6 +35,7 @@ import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.io.WriteCacheService;
 import com.bigdata.journal.AbstractInterruptsTestCase;
 import com.bigdata.journal.AbstractMRMWTestCase;
 import com.bigdata.journal.AbstractMROWTestCase;
@@ -47,7 +48,7 @@ import com.bigdata.journal.WORMStrategy;
 import com.bigdata.rawstore.IRawStore;
 
 /**
- * Test suite for {@link BufferMode#DiskWORM} journals.
+ * Test suite for highly available {@link WORMStrategy} journals.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -71,7 +72,7 @@ public class TestHAWORMStrategy extends AbstractHAJournalTestCase {
          */
 
         final ProxyTestSuite suite = new ProxyTestSuite(delegate,
-                "DiskWORM HA Journal Test Suite");
+                "WORM HA Journal Test Suite");
 
         /*
          * List any non-proxied tests (typically bootstrapping tests).
@@ -360,21 +361,10 @@ public class TestHAWORMStrategy extends AbstractHAJournalTestCase {
     }
 
     /**
-     * Note: The write cache is allocated by the {@link WORMStrategy} from
-     * the {@link DirectBufferPool} and should be released back to that pool as
-     * well, so the size of the {@link DirectBufferPool} SHOULD NOT grow as we
-     * run these tests. If it does, then there is probably a unit test which is
-     * not tearing down its {@link Journal} correctly.
+     * Note: HA requires the use of the write cache. It is the
+     * {@link WriteCacheService} which provides the write replication mechanism
+     * for HA.
      */
-//    /**
-//     * Note: Since the write cache is a direct ByteBuffer we have to make it
-//     * very small (or disable it entirely) when running the test suite or the
-//     * JVM will run out of memory - this is exactly the same (Sun) bug which
-//     * motivates us to reuse the same ByteBuffer when we overflow a journal
-//     * using a write cache. Since small write caches are disallowed, we wind up
-//     * testing with the write cache disabled!
-//     */
     private static final boolean writeCacheEnabled = true;
     
 }
-    

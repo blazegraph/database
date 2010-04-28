@@ -187,7 +187,7 @@ public interface Quorum {
      * @param commitTime
      *            The commit time that assigned to the new commit point.
      */
-    void commit2Phase(long commitTime) throws IOException;
+    void commit2Phase(long commitTime) throws IOException, InterruptedException;
 
     /**
      * Send a message to each member of the quorum telling it to discard its
@@ -195,6 +195,6 @@ public interface Quorum {
      * not observed the corresponding "prepare" message then it should ignore
      * this message.
      */
-    void abort2Phase() throws IOException;
+    void abort2Phase() throws IOException, InterruptedException;
 
 }
