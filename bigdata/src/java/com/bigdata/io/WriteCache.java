@@ -1618,15 +1618,17 @@ abstract public class WriteCache implements IWriteCache {
 		ObjectOutputStream outstr = out.getOutputStream();
 		sendRecordMap(outstr);
 		
+		log.info("Acquiring Buffer");
 		ByteBuffer tmp = acquire();
 		try {
 			outstr.writeInt(tmp.position());
-			out.getChannel().write(tmp);
+			out.write(tmp);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		} finally {
 			release();
 		}
+		log.info("sendTo: done");
 	}
 
 	/**
@@ -1644,25 +1646,45 @@ abstract public class WriteCache implements IWriteCache {
 	 * @throws IllegalStateException 
 	 */
 	public void receiveAndForward(ObjectSocketChannelStream in, ObjectSocketChannelStream out) throws IllegalStateException, InterruptedException {
+		log.info("receiveRecordMap from " + in);
 		receiveRecordMap(in.getInputStream());
 		
-		ByteBuffer tmp = acquire();
 		try {
-			int sze = in.getInputStream().readInt();
-			tmp.position(0);
-			tmp.limit(sze);
-			in.getChannel().read(tmp);
+			ObjectInputStream instr = in.getInputStream();
+			int sze = instr.readInt();
+			
+			final byte[] buf = in.readByteArray(sze);
+			
+			this.writeRaw(0, buf, sze);
+			
+			// in.getChannel().read(tmp);
 			
 			if (out != null) {
-				sendRecordMap(out.getOutputStream());
+				ObjectOutputStream outstr = out.getOutputStream();
+				sendRecordMap(outstr);
 				
-				out.getChannel().write(tmp);
+				// would be nice to be able to send to the channel
+				// BUT this dual mode approach causes problem with current naive ObjectStreams
+				if (false) {
+					// out.getChannel().write(tmp);
+				} else {
+					outstr.writeInt(sze);
+					outstr.write(buf, 0, sze);
+				}
 			}
+			
+			// now should flush the WriteCache, but leave control to caller
 		} catch (IOException e) {
+			e.printStackTrace();
+			
 			throw new RuntimeException(e);
-		} finally {
-			release();
 		}
+		log.info("receiveAndForward done");
+		
+	}
+
+	private void writeRaw(int i, byte[] buf2, int sze) {
+		// TODO Auto-generated method stub
 		
 	}
 
@@ -1673,33 +1695,45 @@ abstract public class WriteCache implements IWriteCache {
 	private void sendRecordMap(ObjectOutputStream out) {
 		Collection<RecordMetadata> data = recordMap.values();
 		try {
+			log.info("sendRecordMap, size: " + data.size());
 			out.writeInt(data.size());
 			Iterator<RecordMetadata> values = data.iterator();
 			while (values.hasNext()) {
 				RecordMetadata md = values.next();
+				log.info("sendRecordMap, entry: " + md);
 				out.writeLong(md.fileOffset);
 				out.writeInt(md.bufferOffset);
 				out.writeInt(md.recordLength);
+				log.info("sendRecordMap, entry: done");
 			}
 		} catch (IOException e) {
+			e.printStackTrace();
 			throw new RuntimeException(e);
 		}
 	}
 
 	private void receiveRecordMap(ObjectInputStream in) {
 		try {
+			log.info("receiveRecordMap: start");
 			int mapsize = in.readInt();
+			log.info("receiveRecordMap, size: " + mapsize);
 			while (mapsize-- > 0) {
 				long fileOffset = in.readLong();
 				int bufferOffset = in.readInt();
 				int recordLength = in.readInt();
 				
+				log.info("receiveRecordMap - entry fileOffset: " + fileOffset + ", bufferOffset: " + bufferOffset + ", recordLength: " + recordLength);
+
 				recordMap.put(fileOffset, new RecordMetadata(fileOffset, bufferOffset, recordLength));
 				if (recordMap.size() == 1) {
 					firstOffset.set(fileOffset);
 				}
 			}
 		} catch (IOException e) {
+			e.printStackTrace();
+			throw new RuntimeException(e);
+		} catch (Throwable e) {
+			e.printStackTrace();
 			throw new RuntimeException(e);
 		}
 		
