@@ -52,6 +52,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.Instrument;
+import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.WriteCache.WriteCacheCounters;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.RWStrategy;
@@ -351,7 +353,7 @@ abstract public class WriteCacheService implements IWriteCache {
         cleanList = new LinkedBlockingQueue<WriteCache>();
         
         buffers = new WriteCache[nbuffers];
-
+        
         // N-1 WriteCache instances.
         for (int i = 0; i < nbuffers - 1; i++) {
 
@@ -373,6 +375,7 @@ abstract public class WriteCacheService implements IWriteCache {
         for (int i = 0; i < buffers.length; i++) {
             buffers[i].setCounters(counters);
         }
+        counters.nbuffers = nbuffers;
         this.counters = new AtomicReference<WriteCacheServiceCounters>(counters);
         
         // assume capacity is the same for each buffer instance.
@@ -412,6 +415,19 @@ abstract public class WriteCacheService implements IWriteCache {
     private class WriteTask implements Callable<Void> {
 
         /**
+         * Note: If there is an error in this thread then it needs to be
+         * propagated to the threads write()ing on the cache or awaiting flush()
+         * and from there back to the caller and an abort(). We do not need to
+         * bother the readers since the read() methods all allow for concurrent
+         * close() and will return null rather than bad data. The reprovisioning
+         * of the write cache service (e.g., by reset()) must hold the writeLock
+         * so as to occur when there are no outstanding reads executing against
+         * the write cache service.
+         * 
+         * @todo The quorum token should be passed into the
+         *       {@link WriteCacheService} so we can assert that the quorum is
+         *       still valid.
+         * 
          * @todo Since we hold the dirtyListLock whenever we are writing out a
          *       cache buffer, is it possible for the {@link WriteCacheService}
          *       to use more than 2 or 3 buffers? If not, then reduce the #of
@@ -422,38 +438,41 @@ abstract public class WriteCacheService implements IWriteCache {
         public Void call() throws Exception {
             while (true) {
                 assert !halt;
-                dirtyListLock.lockInterruptibly();
                 try {
                     /*
-                     * Note: If there is an error in this thread then it needs
-                     * to be propagated to the threads write()ing on the cache
-                     * or awaiting flush() and from there back to the caller and
-                     * an abort(). We do not need to bother the readers since
-                     * the read() methods all allow for concurrent close() and
-                     * will return null rather than bad data. The reprovisioning
-                     * of the write cache service (e.g., by reset()) must hold
-                     * the writeLock so as to occur when there are no
-                     * outstanding reads executing against the write cache
-                     * service.
+                     * Get a dirty cache buffer.
                      */
-                    while (dirtyList.isEmpty() && !halt) {
-                        dirtyListNotEmpty.await();
-                    }
-                    if (halt)
-                        throw new RuntimeException(firstCause.get());
-                    
-                    // Guaranteed available.
-                    final WriteCache cache = dirtyList.take();
+                    final WriteCache cache;
+                    dirtyListLock.lockInterruptibly();
+                    try {
+                        while (dirtyList.isEmpty() && !halt) {
+                            dirtyListNotEmpty.await();
+                        }
+                        if (halt)
+                            throw new RuntimeException(firstCause.get());
 
-                    if (dirtyList.isEmpty()) {
-                        /*
-                         * Signal Condition when we release the dirtyListLock.
-                         */
-                        dirtyListEmpty.signalAll();
+                        // update counters.
+                        final WriteCacheServiceCounters c = counters.get();
+                        c.ndirty = dirtyList.size();
+                        if (c.maxdirty < c.ndirty)
+                            c.maxdirty = c.ndirty;
+
+                        // Guaranteed available.
+                        cache = dirtyList.take();
+
+                        if (dirtyList.isEmpty()) {
+                            /*
+                             * Signal Condition when we release the
+                             * dirtyListLock.
+                             */
+                            dirtyListEmpty.signalAll();
+                        }
+                    } finally {
+                        dirtyListLock.unlock();
                     }
 
+                    // Start downstream IOs (network IO) iff highly availably.
                     if (remoteWriteService != null) {
-                        // Start downstream IOs (network IO).
                         final Runnable r = cache
                                 .getDownstreamWriteRunnable(quorumManager);
                         if (r == null)
@@ -461,13 +480,21 @@ abstract public class WriteCacheService implements IWriteCache {
                         remoteWriteFuture = remoteWriteService.submit(r);
                     }
 
-                    // Do the local IOs.
+                    /*
+                     * Do the local IOs.
+                     * 
+                     * Note: This will not throw out an InterruptedException
+                     * unless this thread is actually interrupted. The local
+                     * storage managers all trap asynchronous close exceptions
+                     * arising from the interrupt of a concurrent IO operation
+                     * and retry until they succeed.
+                     */
                     cache.flush(false/* force */);
 
+                    // Wait for the downstream IOs to finish.
                     {
                         final Future<?> tmp = remoteWriteFuture;
                         if (tmp != null) {
-                            // Wait for the downstream IOs to finish.
                             tmp.get();
                         }
                     }
@@ -478,19 +505,8 @@ abstract public class WriteCacheService implements IWriteCache {
                     cleanListLock.lockInterruptibly();
                     try {
                         cleanList.add(cache);
-                        /*
-                         * Since we a holding the lock for both the clean and
-                         * the dirty buffer, make sure that the sizes of these
-                         * two lists are LTE to the #of buffers (one buffer may
-                         * be on [current] as well).
-                         */
-                        assert dirtyList.size() + cleanList.size() <= buffers.length : "#dirty="
-                                + dirtyList.size()
-                                + ", #clean="
-                                + cleanList.size()
-                                + ", #buffers="
-                                + buffers.length;
                         cleanListNotEmpty.signalAll();
+                        counters.get().nclean = dirtyList.size();
                     } finally {
                         cleanListLock.unlock();
                     }
@@ -523,8 +539,13 @@ abstract public class WriteCacheService implements IWriteCache {
                      * Conditions. They need to notice the change in [halt]
                      * and wrap and rethrow [firstCause].
                      */
-                    dirtyListEmpty.signalAll();
-                    dirtyListNotEmpty.signalAll();
+                    dirtyListLock.lock();
+                    try {
+                        dirtyListEmpty.signalAll();
+                        dirtyListNotEmpty.signalAll();
+                    } finally {
+                        dirtyListLock.unlock();
+                    }
                     cleanListLock.lock();
                     try {
                         cleanListNotEmpty.signalAll();
@@ -537,8 +558,6 @@ abstract public class WriteCacheService implements IWriteCache {
                      * reset.
                      */
                     return null;
-                } finally {
-                    dirtyListLock.unlock();
                 }
 
             } // while(true)
@@ -661,6 +680,8 @@ abstract public class WriteCacheService implements IWriteCache {
 //            }
             this.localWriteFuture = localWriteService.submit(new WriteTask());
             this.remoteWriteFuture = null;
+            
+            counters.get().nreset++;
             
         } finally {
             writeLock.unlock();
@@ -1650,13 +1671,66 @@ abstract public class WriteCacheService implements IWriteCache {
     /**
      * Performance counters for the {@link WriteCacheService}.
      * 
-     * @todo extend to capture things which are specific to the service, to the
-     *       HA write pipeline, to quorum behavior, etc.
-     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      */
     public static class WriteCacheServiceCounters extends WriteCacheCounters {
+        
+        /** #of configured buffers (immutable). */
+        public int nbuffers;
+        
+        /** #of dirty buffers (instantaneous). */
+        public int ndirty;
+
+        /**
+         * The maximum #of dirty buffers observed by the {@link WriteTask} (its
+         * maximum observed backlog).
+         */
+        public int maxdirty;
+
+        /** #of clean buffers (instantaneous). */
+        public int nclean;
+
+        /**
+         * #of times the {@link WriteCacheService} was reset (typically to
+         * handle an error condition).
+         */
+        public long nreset;
+        
+        public CounterSet getCounters() {
+
+            final CounterSet root = super.getCounters();
+
+            root.addCounter("nbuffers",
+                    new OneShotInstrument<Integer>(nbuffers));
+            
+            root.addCounter("ndirty", new Instrument<Integer>() {
+                public void sample() {
+                    setValue(ndirty);
+                }
+            });
+
+            root.addCounter("maxDirty", new Instrument<Integer>() {
+                public void sample() {
+                    setValue(ndirty);
+                }
+            });
+
+            root.addCounter("nclean", new Instrument<Integer>() {
+                public void sample() {
+                    setValue(nclean);
+                }
+            });
+
+            root.addCounter("nreset", new Instrument<Long>() {
+                public void sample() {
+                    setValue(nreset);
+                }
+            });
+
+            return root;
+        
+        }
         
     } // class WriteCacheServiceCounters
 
