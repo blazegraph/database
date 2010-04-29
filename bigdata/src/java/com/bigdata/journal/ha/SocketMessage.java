@@ -36,6 +36,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 
+import org.apache.log4j.Logger;
+
+import com.bigdata.io.ObjectSocketChannelStream;
 import com.bigdata.io.WriteCache;
 import com.bigdata.io.WriteCache.RecordMetadata;
 
@@ -52,20 +55,18 @@ import com.bigdata.io.WriteCache.RecordMetadata;
 
 public abstract class SocketMessage<T> implements Externalizable {
 
+	protected static final Logger log = Logger.getLogger(SocketMessage.class);
+
 	public void apply(T client) {
 		
 	}
 	
 	@Override
 	public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-		// TODO Auto-generated method stub
-		
 	}
 
 	@Override
 	public void writeExternal(ObjectOutput out) throws IOException {
-		// TODO Auto-generated method stub
-		
 	}
 	
 	/**
@@ -75,96 +76,144 @@ public abstract class SocketMessage<T> implements Externalizable {
 	 * The message will pass data on to the next service in the chain if present, and write data
 	 * to the WriteCache of the local service.
 	 */
-	static class HAWriteMessage extends SocketMessage<IFoo> {
-		Collection<RecordMetadata> map;
+	static class HAWriteMessage extends SocketMessage<IHAClient> {
 		WriteCache wc;
 		
 		public HAWriteMessage() {}
 		
 		public HAWriteMessage(WriteCache wc) {
+			if (wc == null) {
+				throw new IllegalArgumentException("Null WriteCache");
+			}
 			this.wc = wc;
 		}
+		
+		public void send(ObjectSocketChannelStream ostr) {
+			if (wc == null) {
+				throw new IllegalStateException("send cannot be called with no WriteCache");
+			}
 
-		public void setRecordMap(Collection<RecordMetadata> map) {
-			this.map = map;
+			try {
+				ostr.getOutputStream().writeObject(this);
+				
+				wc.sendTo(ostr);
+				
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			} catch (IllegalStateException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			
-			// TODO: ensure sort map on offset of entries - for DiskWORM there should be but a single entry
 		}
 		
 		@Override
 		public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-			map = new ArrayList<RecordMetadata>();
-			
-			int entries = in.readInt();
-			for (int i = 0; i < entries; i++) {
-				long fileOffset = in.readLong();
-				int bufferOffset = in.readInt();
-				int recordLength = in.readInt();
-				
-				map.add(new RecordMetadata(fileOffset, bufferOffset, recordLength));
-			}
 		}
 
 		@Override
 		public void writeExternal(ObjectOutput out) throws IOException {
-			if (map == null) {
-				throw new IllegalStateException("HAWriteMessage expects valid RecordMetaData");
-			}
-			out.writeInt(map.size());
-			Iterator<RecordMetadata> entries = map.iterator();
-			while (entries.hasNext()) {
-				RecordMetadata entry = entries.next();
-				
-				out.writeLong(entry.fileOffset);
-				out.writeInt(entry.bufferOffset);
-				out.writeInt(entry.recordLength);
-			}
 		}
 
-		public void apply(IFoo client) {
-			ObjectInputStream in = client.getInputStream(); // retrieve input stream
+		/**
+		 * For the WriteMessage
+		 */
+		public void apply(IHAClient client) {
+			ObjectSocketChannelStream in = client.getInputSocket(); // retrieve input stream
 			
-			WriteCache wc = client.getWriteCache();
-			ObjectOutputStream out = client.getNextStream();
+			wc = client.getWriteCache();
+			ObjectSocketChannelStream out = client.getNextSocket();
 			
 			if (out != null) {
 				try {
 					// send this message object
-					out.writeObject(this);
+					out.getOutputStream().writeObject(this);
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}				
 			}
 			try {
-				wc.setRecordMap(map);
-				
-				int len = in.readInt();
-				if (len > 0) {
-					if (out != null) {
-						out.writeInt(len);
-					}
-					int bytesRem = len;
-					int rdlen = 2048;
-					byte[] buf = new byte[rdlen];
-					while (bytesRem > 0) {
-						if (bytesRem > rdlen) {
-							rdlen = bytesRem;
-						}
-						
-						int chklen = in.read(buf, 0, rdlen);
-						assert(chklen == rdlen);
-						
-						if (out != null) {
-							out.write(buf, 0, rdlen);
-						}
-						
-						bytesRem -= rdlen;
-					}
-				}
-			} catch (IOException ioe) {
-				
+				log.info("Calling receiveAndForward");
+				wc.receiveAndForward(in, out);
+			} catch (Exception ioe) {
+				ioe.printStackTrace();
 			}			
+			log.info("HAWritemessage apply: done");
+		}
+	}
+
+	/**
+	 * The HATruncateMessage send a request to truncate the file on the SocketStream.
+	 * 
+	 * The message will pass data on to the next service in the chain if present.
+	 */
+	static class HATruncateMessage extends SocketMessage<IHAClient> {
+		long extent;
+		
+		public HATruncateMessage() {}
+		
+		public HATruncateMessage(long extent) {
+			this.extent = extent;
+		}
+		
+		public void send(ObjectSocketChannelStream ostr) {
+			try {
+				System.out.println("HATruncateMessage send");
+				ostr.getOutputStream().writeObject(this);				
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			} catch (IllegalStateException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+		}
+		
+		@Override
+		public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+			extent = in.readLong();
+		}
+
+		@Override
+		public void writeExternal(ObjectOutput out) throws IOException {
+			log.info("HATruncateMessagem writeExternal");
+			out.writeLong(extent);
+		}
+
+		/**
+		 * For the WriteMessage
+		 */
+		public void apply(IHAClient client) {			
+			ObjectSocketChannelStream out = client.getNextSocket();
+			
+			if (out != null) {
+				try {
+					// send this message object
+					out.getOutputStream().writeObject(this);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}				
+			}
+			try {
+				System.out.println("Truncating file " + extent);
+				log.info("Truncating file");
+				client.truncate(extent);
+			} catch (Exception ioe) {
+				ioe.printStackTrace();
+			}			
+		}
+	}
+	
+	public void send(ObjectOutputStream ostr) {
+		try {
+			ostr.writeObject(this);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
 		}
 	}
 	

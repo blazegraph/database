@@ -27,19 +27,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal.ha;
 
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.OutputStream;
-
+import com.bigdata.io.ObjectSocketChannelStream;
 import com.bigdata.io.WriteCache;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IFoo {
+public interface IHAClient {
 
-	ObjectOutputStream getNextStream();
+	ObjectSocketChannelStream getNextSocket();
 
 	WriteCache getWriteCache();
 
@@ -47,5 +44,13 @@ public interface IFoo {
 	 * Retrieves the input stream from which messages are deserialized.  This allows messages to access
 	 * their stream when applying their behaviour.
 	 */
-	ObjectInputStream getInputStream();
+	ObjectSocketChannelStream getInputSocket();
+	
+	void setInputSocket(ObjectSocketChannelStream in);
+
+	/**
+	 * 
+	 * @param extent
+	 */
+	void truncate(long extent);
 }
