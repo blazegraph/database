@@ -82,7 +82,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 		
 		m_rb = fileMetadata.rootBlock;
 
-		m_store = new RWStore(m_fmv, false); // not read-only for now
+		m_store = new RWStore(m_fmv, false, quorumManager); // not read-only for now
 		
 		m_rb0 = copyRootBlock(true);
 		m_rb1 = copyRootBlock(false);
@@ -475,7 +475,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 
 			m_store.close();
 			m_fileMetadata.raf = new RandomAccessFile(m_fileMetadata.file, m_fileMetadata.fileMode);
-			m_store = new RWStore(m_fmv, false); // never read-only for now
+			m_store = new RWStore(m_fmv, false, m_quorumManager); // never read-only for now
 			m_needsReopen = false;
 		} catch (Throwable t) {
 			t.printStackTrace();

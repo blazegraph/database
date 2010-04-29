@@ -30,6 +30,7 @@ package com.bigdata.io;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Collection;
@@ -46,6 +47,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.zip.Adler32;
 
 import org.apache.log4j.Logger;
 
@@ -101,6 +103,9 @@ abstract public class WriteCache implements IWriteCache {
 
 	protected static final Logger log = Logger.getLogger(WriteCache.class);
 
+	/**
+	 * <code>true</code> iff per-record checksums are being maintained.
+	 */
 	private final boolean useChecksum;
 	
 	/**
@@ -286,6 +291,25 @@ abstract public class WriteCache implements IWriteCache {
 	final private boolean releaseBuffer;
 
     /**
+     * A private instance used to compute the checksum of all data in the
+     * current {@link #buf}. This is enabled for the high availability write
+     * replication pipeline. The checksum over the entire {@link #buf} is
+     * necessary in this context to ensure that the receiver can verify the
+     * contents of the {@link #buf}.  The per-record checksums CAN NOT be used
+     * for this purpose since large records may be broken across 
+     */
+    final private ChecksumHelper checker;
+    
+    /**
+     * The then current extent of the backing file as of the last record written
+     * onto the cache before it was written onto the write replication pipeline.
+     * The receiver is responsible for adjusting its local file size to match.
+     * 
+     * @see WriteCacheService#setExtent(long)
+     */
+    private long fileExtent;
+
+    /**
      * Create a {@link WriteCache} from either a caller supplied buffer or a
      * direct {@link ByteBuffer} allocated from the {@link DirectBufferPool}.
      * <p>
@@ -309,21 +333,21 @@ abstract public class WriteCache implements IWriteCache {
      *            When <code>null</code> a buffer will be allocated for you from
      *            the {@link DirectBufferPool}. Buffers allocated on your behalf
      *            will be automatically released by {@link #close()}.
+     * @param scatteredWrites
+     *            <code>true</code> iff the implementation uses scattered
+     *            writes. The RW store uses scattered writes since its updates
+     *            are written to different parts of the backing file. The WORM
+     *            store does not since all updates are written to the end of the
+     *            user extent in the backing file.
      * @param useChecksum
      *            <code>true</code> iff the write cache will store the caller's
      *            checksum for a record and validate it on read.
      * 
      * @throws InterruptedException
      */
-    public WriteCache(final ByteBuffer buf, final boolean useChecksum)
-            throws InterruptedException {
-
-        this(buf, false/* scatteredWrites */, useChecksum);
-
-    }
-
     public WriteCache(ByteBuffer buf, final boolean scatteredWrites,
-            final boolean useChecksum) throws InterruptedException {
+            final boolean useChecksum, final boolean isHighlyAvailable)
+            throws InterruptedException {
 
         if (buf == null) {
 
@@ -337,7 +361,18 @@ abstract public class WriteCache implements IWriteCache {
 
         }
 
+//        if (quorumManager == null)
+//            throw new IllegalArgumentException();
+        
+//        this.quorumManager = quorumManager;
+        
         this.useChecksum = useChecksum;
+
+        if (isHighlyAvailable) {
+            checker = new ChecksumHelper();
+        } else {
+            checker = null;
+        }
         
 		// save reference to the write cache.
 		this.buf = new AtomicReference<ByteBuffer>(buf);
@@ -458,6 +493,55 @@ abstract public class WriteCache implements IWriteCache {
 	}
 
     /**
+     * Set the current extent of the backing file on the {@link WriteCache}
+     * object. When used as part of an HA write pipeline, the receiver is
+     * responsible for adjusting its local file size to match the file extent in
+     * each {@link WriteCache} message.
+     * 
+     * @param fileExtent
+     *            The current extent of the file.
+     
+     * @throws IllegalArgumentException
+     *             if the file extent is negative.
+     * 
+     * @see WriteCacheService#setExtent(long)
+     */
+    public void setFileExtent(final long fileExtent) {
+
+        if (fileExtent < 0L)
+            throw new IllegalArgumentException();
+        
+        this.fileExtent = fileExtent;
+
+	}
+
+    public long getFileExtent() {
+        
+        return fileExtent;
+        
+    }
+
+    /**
+     * Return the checksum of all data written into the backing buffer for this
+     * {@link WriteCache} instance since it was last {@link #reset()}.
+     * 
+     * @return The running checksum of the data written into the backing buffer.
+     * 
+     * @throws UnsupportedOperationException
+     *             if the {@link WriteCache} is not maintaining this checksum
+     *             (i.e., if <code>isHighlyAvailable := false</code> was
+     *             specified to the constructor).
+     */
+    public int getWholeBufferChecksum() {
+        
+        if(checker == null)
+            throw new UnsupportedOperationException();
+        
+        return checker.getChecksum();
+        
+    }
+    
+    /**
      * {@inheritDoc}
      * 
      * @throws IllegalStateException
@@ -547,10 +631,19 @@ abstract public class WriteCache implements IWriteCache {
 				}
 
 				// copy the record into the cache, updating position() as we go.
+                if (checker != null) {
+                    // update the checksum (no side-effects on [data])
+                    checker.update(data);
+                }
 				tmp.put(data);
+
 				// write checksum - if any
                 if (writeChecksum && useChecksum) {
                     tmp.putInt(chk);
+                    if (checker != null) {
+                        // update the running checksum to include this too.
+                        checker.update(chk);
+                    }
                 }
 
 				// set while synchronized since no contention.
@@ -1039,6 +1132,14 @@ abstract public class WriteCache implements IWriteCache {
 		// position := 0; limit := capacity.
 		tmp.clear();
 
+        if (checker != null) {
+
+            // reset the running checksum of the data written onto the backing
+            // buffer.
+            checker.reset();
+            
+		}
+		
 		// Martyn: I moved your debug flag here so it is always cleared by reset().
         m_written = false;
         
@@ -1285,10 +1386,11 @@ abstract public class WriteCache implements IWriteCache {
 		 */
         public FileChannelWriteCache(final long baseOffset,
                 final ByteBuffer buf, final boolean useChecksum,
+                final boolean isHighlyAvailable,
                 final IReopenChannel<FileChannel> opener)
                 throws InterruptedException {
 
-			super(buf, useChecksum);
+			super(buf, false/*scatteredWrites*/, useChecksum, isHighlyAvailable);
 
 			if (baseOffset < 0)
 				throw new IllegalArgumentException();
@@ -1365,10 +1467,11 @@ abstract public class WriteCache implements IWriteCache {
 		 */
         public FileChannelScatteredWriteCache(final ByteBuffer buf,
                 final boolean useChecksum,
+                final boolean isHighlyAvailable,
                 final IReopenChannel<FileChannel> opener)
                 throws InterruptedException {
 
-            super(buf, useChecksum);
+            super(buf, true/* scatteredWrites */, useChecksum, isHighlyAvailable);
 
 			if (opener == null)
 				throw new IllegalArgumentException();
@@ -1457,14 +1560,21 @@ abstract public class WriteCache implements IWriteCache {
 
 	boolean m_written = false;
 
-	/**
-	 * Called to clear the WriteCacheService map of references to this WriteCache.
-	 * 
-	 * @param recordMap the map of the WriteCacheService that associates an address with a WriteCache
-	 * @throws InterruptedException 
-	 */
-	public void resetWith(final ConcurrentMap<Long, WriteCache> serviceRecordMap) throws InterruptedException {
-	    final Iterator<Long> entries = recordMap.keySet().iterator();
+    /**
+     * Called to clear the WriteCacheService map of references to this
+     * WriteCache.
+     * 
+     * @param recordMap
+     *            the map of the WriteCacheService that associates an address
+     *            with a WriteCache
+     * @param fileExtent
+     *            the current extent of the backing file.
+     * @throws InterruptedException
+     */
+    public void resetWith(
+            final ConcurrentMap<Long, WriteCache> serviceRecordMap,
+            final long fileExtent) throws InterruptedException {
+        final Iterator<Long> entries = recordMap.keySet().iterator();
 		if (entries.hasNext()) {
             if (log.isInfoEnabled())
                 log.info("resetting existing WriteCache: nrecords="
@@ -1485,6 +1595,9 @@ abstract public class WriteCache implements IWriteCache {
 		}
 		
 		reset(); // must ensure reset state even if cache already empty
+
+		setFileExtent(fileExtent);
+		
 	}
 
 	public void setRecordMap(Collection<RecordMetadata> map) {
@@ -1591,4 +1704,128 @@ abstract public class WriteCache implements IWriteCache {
 		}
 		
 	}
+
+    /**
+     * Checksum helper computes the running checksum from series of
+     * {@link ByteBuffer}s and <code>int</code> checksum values as written onto
+     * the backing byte buffer for a {@link WriteCache} instance.
+     */
+	private static class ChecksumHelper {
+	   
+	    /**
+	     * Private helper object.
+	     */
+	    private final Adler32 chk = new Adler32();
+
+        /**
+         * A private buffer used to format the per-record checksums when they
+         * need to be combined with the records written onto the write cache
+         * for a total checksum over the write cache contents.
+         */
+	    final private ByteBuffer chkbuf = ByteBuffer.allocate(4);
+
+        /**
+         * Reset the checksum.
+         */
+	    public void reset() {
+
+	        chk.reset();
+            
+	    }
+
+	    /**
+	     * Return the Alder checksum, which is a 32bit value.
+	     */
+	    public int getChecksum() {
+	        
+	        return (int) chk.getValue();
+
+	    }
+	    
+	    /**
+	     * Compute the {@link Adler32} checksum of the buffer. The position, mark,
+	     * and limit are unchanged by this operation. The operation is optimized
+	     * when the buffer is backed by an array.
+	     * 
+	     * @param buf
+	     *            The buffer.
+	     *            
+	     * @return The checksum.
+	     */
+	    public void update(final ByteBuffer buf) {
+
+            assert buf != null;
+
+            final int pos = buf.position();
+	        final int limit = buf.limit();
+	        
+	        assert pos >= 0;
+	        assert limit > pos;
+
+	        if (buf.hasArray()) {
+
+	            /*
+	             * Optimized when the buffer is backed by an array.
+	             */
+	            
+	            final byte[] bytes = buf.array();
+	            
+	            final int len = limit - pos;
+	            
+	            if (pos > bytes.length - len) {
+	                
+	                throw new BufferUnderflowException();
+	            
+	            }
+	                
+	            chk.update(bytes, pos + buf.arrayOffset(), len);
+	            
+	        } else {
+	            
+	            for (int i = pos; i < limit; i++) {
+	                
+	                chk.update(buf.get(i));
+	                
+	            }
+	            
+	        }
+	        	        
+	    }
+
+        /**
+         * Update the running checksum to reflect the 4 byte integer.
+         * 
+         * @param v
+         *            The integer.
+         */
+	    public void update(final int v) {
+	        
+            chkbuf.clear();
+            chkbuf.putInt(v);
+            chk.update(chkbuf.array(), 0/* off */, 4/* len */);
+	        
+	    }
+	    
+//	    public void update(final byte[] buf) {
+//
+//	        update(buf, 0, buf.length);
+//	        
+//	    }
+//
+//	    public void update(final byte[] buf, int sze) {
+//	        
+//	        update(buf, 0, sze);
+//	        
+//	    }
+//	    
+//	    public void update(final byte[] buf, int off, int sze) {
+//	        
+//	        assert buf != null;
+//
+//	        chk.update(buf, off, sze);
+//
+//	    }
+
+	}
+	
 }

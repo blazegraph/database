@@ -866,7 +866,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             try {
                 this.writeCacheService = new WriteCacheService(
                         fileMetadata.writeCacheBufferCount, useChecksums,
-                        opener, quorumManager) {
+                        extent, opener, quorumManager) {
                     @Override
                     protected WriteCache newWriteCache(final ByteBuffer buf,
                             final boolean useChecksum,
@@ -909,8 +909,9 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 final IReopenChannel<FileChannel> opener)
                 throws InterruptedException {
 
-            super(baseOffset, buf, useChecksum, opener);
-            
+            super(baseOffset, buf, useChecksum, quorumManager
+                    .isHighlyAvailable(), opener);
+
         }
 
         @Override
@@ -1914,12 +1915,22 @@ public class WORMStrategy extends AbstractBufferStrategy implements
              * FileChannelUtility. It must use the opener and retry if there is
              * a ClosedByInterruptException. [See the notes below in the catch
              * clause.]
-             * 
-             * FIXME The extent change needs to be coordinated with the write
-             * cache service in order to be replicated across the quorum.
              */
             getRandomAccessFile().setLength(newExtent);
 
+            if (writeCacheService != null) {
+                /*
+                 * Inform the write cache service that the file extent has
+                 * changed. It will propagate this message along the write
+                 * pipeline when HA is enabled.
+                 */
+                try {
+                    writeCacheService.setExtent(newExtent);
+                } catch (InterruptedException t) {
+                    throw new RuntimeException(t);
+                }
+            }
+            
             /*
              * Since we just changed the file length we force the data to disk
              * and update the file metadata. This is a relatively expensive
@@ -1937,18 +1948,24 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             if (!temporaryStore) {
 
                 /*
-                 * Note: This goes direct to FileChannel#force() in order to
-                 * avoid problems with WriteCache#writeOnChannel(). Notice that
-                 * we are holding the [extensionLock]'s WriteLock so a call to
-                 * writeOnChannel in a different thread will deadlock - and the
-                 * call will come from a different thread since
-                 * WriteCacheService#flush() waits on a WriteTask thread to
-                 * actually do the disk IO.
+                 * We need to force the file data and metadata to the disk. When
+                 * integrated with the WriteCacheService the FileChannel#force()
+                 * request will be executed in a different thread and would
+                 * deadlock unless we first release the WriteLock since
+                 * writeOnChannel needs to acquire the ReadLock to proceed.
+                 * 
+                 * We address this by doing acquiring the ReadLock (we are
+                 * already holding the WriteLock so this will not block) and
+                 * then releasing the WriteLock so other threads may now also
+                 * acquire the ReadLock.
+                 * 
+                 * Note: An alternative would be to directly invoke force(true)
+                 * on the FileChannel.
                  */
-//                opener.reopenChannel().force(true/*metadata*/);
                 extensionLock.readLock().lock();
                 extensionLock.writeLock().unlock();
                 force(true/*metadata*/);
+//              opener.reopenChannel().force(true/*metadata*/);
 
             }
 
