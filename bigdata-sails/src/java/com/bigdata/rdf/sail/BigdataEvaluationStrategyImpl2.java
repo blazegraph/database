@@ -739,10 +739,17 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         for (Map.Entry<StatementPattern, Boolean> entry : stmtPatterns
                 .entrySet()) {
             StatementPattern sp = entry.getKey();
-            IPredicate tail = generateTail(sp, entry.getValue());
+            boolean optional = entry.getValue();
+            IPredicate tail = generateTail(sp, optional);
             // encountered a value not in the database lexicon
             if (tail == null) {
-                return null;
+                if (optional) {
+                    // for optionals, just skip the tail
+                    continue;
+                } else {
+                    // for non-optionals, skip the entire rule
+                    return null;
+                }
             }
             if (tail.getSolutionExpander() instanceof FreeTextSearchExpander) {
                 searches.put(tail, sp);
