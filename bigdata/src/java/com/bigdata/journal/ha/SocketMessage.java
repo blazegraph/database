@@ -61,11 +61,11 @@ public abstract class SocketMessage<T> implements Externalizable {
 		
 	}
 	
-	@Override
+//	@Override
 	public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
 	}
 
-	@Override
+//	@Override
 	public void writeExternal(ObjectOutput out) throws IOException {
 	}
 	
