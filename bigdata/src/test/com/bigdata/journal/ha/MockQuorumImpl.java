@@ -75,8 +75,15 @@ public class MockQuorumImpl implements Quorum {
         return index == 0;
     }
 
-    public HAGlue getHAGlue(int index) {
+    public int getIndex() {
+        return index;
+    }
+    
+    public HAGlue getHAGlue(final int index) {
 
+        if (index < 0 || index >= replicationFactor())
+            throw new IndexOutOfBoundsException();
+        
         return stores[index].getHAGlue();
         
     }

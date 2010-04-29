@@ -26,6 +26,7 @@ package com.bigdata.journal.ha;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -53,14 +54,23 @@ public class HAServer extends Thread {
 	SelectionKey serverKey;
 	ServerSocketChannel server;
 
-	public HAServer(int port, IHAClient client) {
+    /**
+     * @param addr
+     *            The internet address on which the server will listen.
+     * @param port
+     *            The port that this server listens at.
+     * @param client
+     *            The object with access to the local service and the downstream
+     *            service.
+     */
+	public HAServer(InetAddress addr, int port, IHAClient client) {
 		this.port = port;
 		this.client = client;
 
 		try {
 			selector = Selector.open();
 			server = ServerSocketChannel.open();
-			server.socket().bind(new InetSocketAddress(port));
+			server.socket().bind(new InetSocketAddress(addr,port));
 			server.configureBlocking(true);
 			// serverKey = server.register(selector, SelectionKey.OP_ACCEPT);
 		} catch (IOException e) {
@@ -69,6 +79,10 @@ public class HAServer extends Thread {
 		}
 	}
 
+    /*
+     * FIXME modify to notice an interrupt() and respond by exiting run(). We
+     * need this as mechanism for tearing down the HAServer.
+     */
 	public void run() {
 		runBlock();
 	}

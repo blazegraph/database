@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.RandomAccessFile;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
@@ -353,7 +354,8 @@ public class TestSocketMessage extends TestCase {
 
 			};
 
-			HAServer server = new HAServer(port, handler);
+            HAServer server = new HAServer(InetAddress.getLocalHost(), port,
+                    handler);
 
 			server.start();
 

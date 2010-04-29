@@ -58,8 +58,12 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.WriteCache.WriteCacheCounters;
 import com.bigdata.journal.AbstractBufferStrategy;
+import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.WORMStrategy;
+import com.bigdata.journal.ha.HAGlue;
+import com.bigdata.journal.ha.HAServer;
+import com.bigdata.journal.ha.IHAClient;
 import com.bigdata.journal.ha.Quorum;
 import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rawstore.IAddressManager;
@@ -179,6 +183,14 @@ abstract public class WriteCacheService implements IWriteCache {
      */
     private Future<Void> localWriteFuture;
 
+    /**
+     * The {@link HAServer} is responsible for listening for messages from the
+     * upstream service in the write failover chain. This value will be
+     * <code>null</code> for the master since it is the first service in the
+     * chain.
+     */
+    final AtomicReference<HAServer> haServer = new AtomicReference<HAServer>();
+    
     /**
      * A single threaded service which writes dirty {@link WriteCache}s onto the
      * downstream service in the quorum.
@@ -412,25 +424,136 @@ abstract public class WriteCacheService implements IWriteCache {
             remoteWriteService = null;
         }
 
-        // save the current file exent.
+        // save the current file extent.
         this.fileExtent.set(fileExtent);
+
+        /*
+         * @todo This needs to be redone a quorum change events, but not on
+         * abort() so not in reset(). That means it probably needs to be
+         * notified of the quorum change itself.
+         * 
+         * Should the write cache service remain available if the pipeline goes
+         * down so we can execute local operations for resynchronization
+         * purposes?
+         */
+        if(quorumManager.isHighlyAvailable()) {
+
+            final int k = quorumManager.replicationFactor();
+
+            final Quorum quorum = quorumManager.getQuorum();
+
+            if (!quorum.isMaster()) {
+
+                // The index of this node in the ordered list of services in the
+                // quorum.
+                final int index = quorum.getIndex();
+
+                if (index + 1 < k) {
+
+                    final HAGlue haGlueNextService = quorum
+                            .getHAGlue(index + 1);
+
+                    haServer.set(new HAServer(haGlueNextService
+                            .getWritePipelineAddr(), haGlueNextService
+                            .getWritePipelinePort(), newHAClient()));
+
+                }
+
+            }
+
+        }
 
         // run the write task
         localWriteFuture = localWriteService.submit(newWriteTask());
 
     }
-    
+
     protected Callable<Void> newWriteTask() {
-        
-        if(quorumManager.getQuorum().isMaster()) {
+
+        // if(quorumManager.getQuorum().isMaster()) {
+
+        return new MasterWriteTask();
+
+        // } else {
+        //            
+        // return new ReceiverWriteTask();
+        //            
+        // }
+
+    }
+
+    /**
+     * Return the local object which reads from the upstream service, writes on
+     * the downstream service, and operations against the local persistence
+     * store.
+     * <p>
+     * The write replication pipeline bundles two messages together:
+     * <ol>
+     * <li>Changes in the file extent.</li>
+     * <li>Dirty {@link WriteCache} buffers.</li>
+     * </ol>
+     * When a dirty {@link WriteCache} buffer is received, the {@link IHAClient}
+     * must first ensure that the current file extent is the extent specified in
+     * the message. If the extents differ, then it must adjust it using
+     * {@link IBufferStrategy#truncate(long)}.
+     * <p>
+     * Once the file extents are in agreement, the received {@link WriteCache}
+     * is simply placed onto the dirtyList. It will be taken and eventually
+     * drained onto the local persistence store.
+     * 
+     * FIXME There are three problems with the behavior of this interface as
+     * outlined above.
+     * <p>
+     * First, {@link IBufferStrategy#truncate(long)} would recursively invoke
+     * {@link #setExtent(long)} on this {@link WriteCacheService}, which is
+     * probably NOT desired.
+     * <p>
+     * Second, the change in the file extent can not be applied until the
+     * {@link MasterWriteTask} takes the {@link WriteCache} off of the dirtyList
+     * and begins to process it.
+     * <p>
+     * Third, in order to acknowledge the receipt of the message from the
+     * upstream service, we need a means to be notified when the
+     * {@link WriteCache} has been successfully written onto both the local
+     * persistence store and the downstream service (if any). Maybe we could do
+     * this with a message counter. The counter would be new for each quorum and
+     * would be incremented for each message set. Each time the
+     * {@link WriteCache} associated with a message counter (or messageId) was
+     * fully handled (on the local store and the downstream store), this class
+     * could then ACK that message to the upstream service.  Message correlation
+     * would have to stitch that all back together.
+     * 
+     * @return
+     */
+    protected IHAClient newHAClient() {
+
+        return new IHAClient() {
             
-            return new MasterWriteTask();
+            public void truncate(long extent) {
+                // TODO Auto-generated method stub
+                
+            }
             
-        } else {
+            public void setInputSocket(ObjectSocketChannelStream in) {
+                // TODO Auto-generated method stub
+                
+            }
             
-            return new ReceiverWriteTask();
+            public WriteCache getWriteCache() {
+                // TODO Auto-generated method stub
+                return null;
+            }
             
-        }
+            public ObjectSocketChannelStream getNextSocket() {
+                // TODO Auto-generated method stub
+                return null;
+            }
+            
+            public ObjectSocketChannelStream getInputSocket() {
+                // TODO Auto-generated method stub
+                return null;
+            }
+        };
         
     }
 
@@ -458,12 +581,10 @@ abstract public class WriteCacheService implements IWriteCache {
          *       {@link WriteCacheService} so we can assert that the quorum is
          *       still valid.
          * 
-         * @todo Since we hold the dirtyListLock whenever we are writing out a
-         *       cache buffer, is it possible for the {@link WriteCacheService}
-         *       to use more than 2 or 3 buffers? If not, then reduce the #of
-         *       buffers allocated. [We need to be holding the dirtyListLock in
-         *       order to generate various signals required by the rest of the
-         *       {@link WriteCacheService}.]
+         * @todo If resynchronization rolls back the lastCommitTime for a store,
+         *       then we need to interrupt or otherwise invalidate any readers
+         *       with access to historical data which is no longer part of the
+         *       quorum.
          */
         public Void call() throws Exception {
             while (true) {
@@ -596,57 +717,45 @@ abstract public class WriteCacheService implements IWriteCache {
 
     } // class MasterWriteTask
 
-    /**
-     * The task responsible for receiving messages from the upstream service,
-     * writing onto the local backing file, and passing on the messages to the
-     * downstream {@link Quorum} member. If this is the last node in the write
-     * pipeline, then it will acknowledge the messages once it has made the
-     * changes in its local backing file.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     */
-    private class ReceiverWriteTask implements Callable<Void> {
-
-        /**
-         * Note: If there is an error in this thread then it needs to be
-         * propagated to the remote service sending messages to this service,
-         * e.g., by closing the {@link SocketChannel} used to communicate with
-         * the upstream service, and then exit. Once the existence of a problem
-         * has propagated back to the master for the quorum, it will cause the
-         * {@link MasterWriteTask} to terminate and the master will do an
-         * abort(). We do not need to bother the readers since the read()
-         * methods all allow for concurrent close().
-         * 
-         * @todo In order to recover from that abort(), the master must know
-         *       that there is a problem with the write pipeline and perhaps we
-         *       will need to renegotiate the quorum and resynchronize some
-         *       node(s) in that quorum.
-         * 
-         * @todo If resynchronization rolls back the lastCommitTime for a store,
-         *       then we need to interrupt or otherwise invalidate any readers
-         *       with access to historical data which is no longer part of the
-         *       quorum.
-         * 
-         * @todo The quorum token should be passed into the
-         *       {@link WriteCacheService} so we can assert that the quorum is
-         *       still valid.
-         * 
-         * @todo Since we hold the dirtyListLock whenever we are writing out a
-         *       cache buffer, is it possible for the {@link WriteCacheService}
-         *       to use more than 2 or 3 buffers? If not, then reduce the #of
-         *       buffers allocated. [We need to be holding the dirtyListLock in
-         *       order to generate various signals required by the rest of the
-         *       {@link WriteCacheService}.]
-         */
-        public Void call() throws Exception {
-
-            // FIXME Integrate the receiver here.
-            throw new UnsupportedOperationException();
-            
-        } // call()
-
-    } // class ReceiverWriteTask
+//    /**
+//     * The task responsible for receiving messages from the upstream service,
+//     * writing onto the local backing file, and passing on the messages to the
+//     * downstream {@link Quorum} member. If this is the last node in the write
+//     * pipeline, then it will acknowledge the messages once it has made the
+//     * changes in its local backing file.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+//     *         Thompson</a>
+//     */
+//    private class ReceiverWriteTask implements Callable<Void> {
+//
+//        /**
+//         * Note: If there is an error in this thread then it needs to be
+//         * propagated to the remote service sending messages to this service,
+//         * e.g., by closing the {@link SocketChannel} used to communicate with
+//         * the upstream service, and then exit. Once the existence of a problem
+//         * has propagated back to the master for the quorum, it will cause the
+//         * {@link MasterWriteTask} to terminate and the master will do an
+//         * abort(). We do not need to bother the readers since the read()
+//         * methods all allow for concurrent close().
+//         * 
+//         * @todo In order to recover from that abort(), the master must know
+//         *       that there is a problem with the write pipeline and perhaps we
+//         *       will need to renegotiate the quorum and resynchronize some
+//         *       node(s) in that quorum.
+//         * 
+//         * @todo The quorum token should be passed into the
+//         *       {@link WriteCacheService} so we can assert that the quorum is
+//         *       still valid.
+//         */
+//        public Void call() throws Exception {
+//
+//            // Integrate the receiver here.
+//            throw new UnsupportedOperationException();
+//            
+//        } // call()
+//
+//    } // class ReceiverWriteTask
 
     /**
      * Factory for {@link WriteCache} implementations.
@@ -766,7 +875,7 @@ abstract public class WriteCacheService implements IWriteCache {
 //                    // ignored.
 //                }
 //            }
-            this.localWriteFuture = localWriteService.submit(new MasterWriteTask());
+            this.localWriteFuture = localWriteService.submit(newWriteTask());
             this.remoteWriteFuture = null;
 
             // clear the file extent to an illegal value.
@@ -809,11 +918,9 @@ abstract public class WriteCacheService implements IWriteCache {
             // Immediate shutdown of the write service.
             localWriteService.shutdownNow();
 
+            // Immediate shutdown of the remote write service (if running).
             if (remoteWriteService != null) {
-
-                // Immediate shutdown of the write service.
                 remoteWriteService.shutdownNow();
-
             }
 
             /*
@@ -852,6 +959,13 @@ abstract public class WriteCacheService implements IWriteCache {
             
             // clear the file extent to an illegal value.
             fileExtent.set(-1L);
+
+            /*
+             * Stop the HAServer instance if one is running.
+             */
+            final HAServer haServer = this.haServer.get();
+            if (haServer != null)
+                haServer.interrupt();
 
             // Closed.
             open = false;

@@ -74,6 +74,11 @@ public class MockSingletonQuorumManager implements QuorumManager {
             return true;
         }
 
+        /** The master is always at index ZERO (0). */
+        public int getIndex() {
+            return 0;
+        }
+        
         public void abort2Phase() throws IOException {
             // TODO Auto-generated method stub
             
@@ -85,6 +90,8 @@ public class MockSingletonQuorumManager implements QuorumManager {
         }
 
         public HAGlue getHAGlue(int index) {
+            if (index < 0 || index >= replicationFactor())
+                throw new IndexOutOfBoundsException();
             // TODO Auto-generated method stub
             return null;
         }
