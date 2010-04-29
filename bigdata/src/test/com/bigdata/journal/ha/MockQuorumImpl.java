@@ -18,10 +18,17 @@ import com.bigdata.util.concurrent.ExecutionExceptions;
 
 /**
  * A mock {@link Quorum} used to configure a set of {@link Journal}s running in
- * the same JVM instance for HA unit tests without dynamic quorum events. 
+ * the same JVM instance for HA unit tests without dynamic quorum events.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo Factor a bunch of this stuff into an AbstractQuorum class which we can
+ *       use for the real implementations as well. Add getLocalHAGlue() or
+ *       getLocalService() to access the {@link HAGlue} or other interface for
+ *       the local service w/o an RMI proxy. Add method to enumerate over the
+ *       non-master {@link HAGlue} objects. Refactor the implementation to avoid
+ *       the direct references to {@link #stores}.
  */
 public class MockQuorumImpl implements Quorum {
 

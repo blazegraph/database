@@ -84,6 +84,7 @@ import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.LocalDataServiceClient;
 import com.bigdata.service.jini.JiniClient;
+import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -1930,6 +1931,18 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     public boolean isFullyBuffered() {
         
         return _bufferStrategy.isFullyBuffered();
+        
+    }
+
+    /**
+     * Return <code>true</code> if the persistence store uses record level
+     * checksums. When <code>true</code>, the store will detect bad reads by
+     * comparing the record as read from the disk against the checksum for that
+     * record.
+     */
+    public boolean useChecksum() {
+        
+        return _bufferStrategy.useChecksums();
         
     }
 
