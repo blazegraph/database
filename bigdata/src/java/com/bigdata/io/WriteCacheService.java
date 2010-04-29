@@ -1265,6 +1265,10 @@ abstract public class WriteCacheService implements IWriteCache {
         
         try {
         
+            // make a note of the current file extent.
+            this.fileExtent.set(fileExtent);
+
+            // set the current file extent on the WriteCache.
             cache.setFileExtent(fileExtent);
             
         } finally {
