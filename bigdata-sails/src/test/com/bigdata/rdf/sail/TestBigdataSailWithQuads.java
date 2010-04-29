@@ -138,6 +138,8 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
 */
         properties.setProperty(Options.QUADS_MODE, "true");
 
+        properties.setProperty(Options.TRUTH_MAINTENANCE, "false");
+
         properties.setProperty(AbstractResource.Options.NESTED_SUBQUERY, "true");
 
         return properties;
