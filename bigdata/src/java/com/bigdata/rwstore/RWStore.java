@@ -941,6 +941,7 @@ public class RWStore implements IStore {
 
 		try {
 			m_writeCache.reset(); // dirty writes are discarded
+			m_writeCache.setExtent(convertAddr(m_fileSize)); // notify of current file length.
 
 			readAllocationBlocks();
 		} catch (Exception e) {

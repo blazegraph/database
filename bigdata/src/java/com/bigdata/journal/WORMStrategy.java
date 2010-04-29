@@ -1031,6 +1031,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         if (writeCacheService != null) {
             try {
                 writeCacheService.reset();
+                writeCacheService.setExtent(extent);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
@@ -1930,7 +1931,12 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                     throw new RuntimeException(t);
                 }
             }
-            
+
+            // Update fields and counters while holding the lock.
+            this.userExtent = newUserExtent;
+            this.extent = newExtent;
+            storeCounters.get().ntruncate++;
+
             /*
              * Since we just changed the file length we force the data to disk
              * and update the file metadata. This is a relatively expensive
@@ -1968,12 +1974,6 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 //              opener.reopenChannel().force(true/*metadata*/);
 
             }
-
-            this.userExtent = newUserExtent;
-
-            this.extent = newExtent;
-
-            storeCounters.get().ntruncate++;
 
             if (WARN)
                 log.warn("newLength=" + cf.format(newExtent) + ", file="+ file);
