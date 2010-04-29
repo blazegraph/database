@@ -89,7 +89,9 @@ abstract public class AbstractHAJournalTestCase
 
         if (stores != null) {
             for (Journal store : stores) {
-                store.destroy();
+                if (store != null) {
+                    store.destroy();
+                }
             }
         }
 

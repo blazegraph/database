@@ -33,16 +33,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Random;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
-import junit.framework.TestCase2;
-
-import com.bigdata.journal.AbstractJournalTestCase;
-import com.bigdata.journal.IRootBlockView;
-import com.bigdata.journal.ha.HAGlue;
-import com.bigdata.journal.ha.Quorum;
-import com.bigdata.journal.ha.QuorumManager;
+import com.bigdata.journal.ha.MockSingletonQuorumManager;
 import com.bigdata.rwstore.RWWriteCacheService;
 import com.bigdata.util.ChecksumUtility;
 
@@ -75,26 +67,51 @@ public class TestWriteCacheService extends TestCase3 {
     
     public void test_simpleRWService() {
         
-        File file;
-		try {
+        File file = null;
+        ReopenFileChannel opener = null;
+        RWWriteCacheService writeCache = null;
+        try {
 			file = File.createTempFile(getName(), ".rw.tmp");
 
-            RWWriteCacheService writeCache = new RWWriteCacheService(5, file,
-                    null, "rw", new MockSingletonQuorumManager());
+			opener = new ReopenFileChannel(file, "rw");
+			
+			final long fileExtent = opener.reopenChannel().size();
+			
+            writeCache = new RWWriteCacheService(5, fileExtent, opener,
+                    new MockSingletonQuorumManager());
+
+            writeCache.close();
 
 		} catch (Exception e) {
 			fail("Unexpected  Exception", e);
+		} finally {
+            if (writeCache != null)
+                try {
+                    writeCache.close();
+                } catch (InterruptedException e) {
+                    log.error(e, e);
+                }
+            if (opener != null) {
+                opener.destroy();
+            }
 		}
         
     }
     
     public void test_simpleDataRWService() {
         
-        File file;
-		try {
-			file = File.createTempFile(getName(), ".rw.tmp");
+        File file = null;
+        ReopenFileChannel opener = null;
+        RWWriteCacheService writeCache = null;
+        try {
+            file = File.createTempFile(getName(), ".rw.tmp");
 
-			RWWriteCacheService writeCache = new RWWriteCacheService(5, file, null, "rw",new MockSingletonQuorumManager());
+            opener = new ReopenFileChannel(file, "rw");
+
+            final long fileExtent = opener.reopenChannel().size();
+
+            writeCache = new RWWriteCacheService(5, fileExtent, opener,
+                    new MockSingletonQuorumManager());
 			
             final ByteBuffer data1 = getRandomData();
             final long addr1 = 2048;
@@ -111,8 +128,17 @@ public class TestWriteCacheService extends TestCase3 {
             }
 		} catch (Exception e) {
 			fail("Unexpected  Exception", e);
-		}
-        
+		} finally {
+            if (writeCache != null)
+                try {
+                    writeCache.close();
+                } catch (InterruptedException e) {
+                    log.error(e, e);
+                }
+            if (opener != null) {
+                opener.destroy();
+            }
+		}        
     }
     
     private void randomizeArray(ArrayList<AllocView> allocs) {
@@ -157,12 +183,17 @@ public class TestWriteCacheService extends TestCase3 {
         randomizeArray(allocs);
         
         File file = null;
-		try {
-			file = File.createTempFile(getName(), ".rw.tmp");
+        ReopenFileChannel opener = null;
+        RWWriteCacheService writeCache = null;
+        try {
+            file = File.createTempFile(getName(), ".rw.tmp");
 
-            final ReopenFileChannel opener = new ReopenFileChannel(file, "rw");
-            RWWriteCacheService writeCache = new RWWriteCacheService(4, file,
-                    null, "rw", new MockSingletonQuorumManager());
+            opener = new ReopenFileChannel(file, "rw");
+
+            final long fileExtent = opener.reopenChannel().size();
+
+            writeCache = new RWWriteCacheService(5, fileExtent, opener,
+                    new MockSingletonQuorumManager());
 
             /*
              * First write 500 records into the cache and confirm they can all be read okay
@@ -256,14 +287,16 @@ public class TestWriteCacheService extends TestCase3 {
              	assertEquals(v.buf, opener.read(v.addr, v.buf.capacity()));     // expected, actual   	
             }
         } finally {
-
-            if (file != null && file.exists() && !file.delete()) {
-
-                log.warn("Could not delete: file=" + file);
-
+            if (writeCache != null)
+                try {
+                    writeCache.close();
+                } catch (InterruptedException e) {
+                    log.error(e, e);
+                }
+            if (opener != null) {
+                opener.destroy();
             }
-
-        }
+        }        
     }
     
     /**
@@ -437,9 +470,10 @@ public class TestWriteCacheService extends TestCase3 {
             try {
                 raf.close();
             } catch (IOException e) {
-                if (!file.delete())
-                    log.warn("Could not delete file: " + file);
+                log.error(e, e);
             }
+            if (!file.delete())
+                log.warn("Could not delete file: " + file);
         }
 
         /**
@@ -510,84 +544,5 @@ public class TestWriteCacheService extends TestCase3 {
 
     	}
     };
-
-    private static class MockSingletonQuorumManager implements QuorumManager {
-
-        final int k = 1;
-        final long token = 0L;
-
-        public void assertQuorum(long token) {
-            if (token != this.token)
-                throw new IllegalStateException();
-        }
-
-        public Quorum awaitQuorum() throws InterruptedException {
-            return quorum;
-        }
-
-        public Quorum getQuorum() {
-            return quorum;
-        }
-
-        public int replicationFactor() {
-            return k;
-        }
-
-        public void terminate() {
-            // NOP
-        }
-        
-        final Quorum quorum = new Quorum() {
-
-            public boolean isMaster() {
-                return true;
-            }
-
-            public boolean isQuorumMet() {
-                return true;
-            }
-
-            public void abort2Phase() throws IOException {
-                // TODO Auto-generated method stub
-                
-            }
-
-            public void commit2Phase(long commitTime) throws IOException {
-                // TODO Auto-generated method stub
-                
-            }
-
-            public HAGlue getHAGlue(int index) {
-                // TODO Auto-generated method stub
-                return null;
-            }
-
-            public int prepare2Phase(IRootBlockView rootBlock, long timeout,
-                    TimeUnit unit) throws InterruptedException,
-                    TimeoutException, IOException {
-                // TODO Auto-generated method stub
-                return 0;
-            }
-
-            public void readFromQuorum(long addr, ByteBuffer b) {
-                // TODO Auto-generated method stub
-                
-            }
-
-            public int replicationFactor() {
-                return k;
-            }
-
-            public int size() {
-                return 1;
-            }
-
-            public long token() {
-                return token;
-            }
-            
-        };
-        
-    }
 
 }

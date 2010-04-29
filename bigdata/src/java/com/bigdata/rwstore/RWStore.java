@@ -24,24 +24,29 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore;
 
-import java.util.*;
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.OverlappingFileLockException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.TreeSet;
 
 import org.apache.log4j.Logger;
 
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
-
-import com.bigdata.io.FixedByteArrayBuffer;
+import com.bigdata.io.IReopenChannel;
 import com.bigdata.journal.FileMetadata;
-import com.bigdata.journal.ForceEnum;
-import com.bigdata.journal.IJournal;
 import com.bigdata.journal.IRootBlockView;
-import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.RWStrategy.FileMetadataView;
+import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -194,6 +199,7 @@ public class RWStore implements IStore {
 	ArrayList m_commitList;
 
 	WriteBlock m_writes;
+	QuorumManager m_quorumManager;
 	RWWriteCacheService m_writeCache;
 
 	private void baseInit() {
@@ -226,13 +232,12 @@ public class RWStore implements IStore {
 			/**
 			 * TODO: Configure number of WriteCache buffers for WriteCacheService
 			 */
-			m_writeCache = new RWWriteCacheService(6, m_fd, m_raf, "rw");
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+            m_writeCache = new RWWriteCacheService(6, m_raf.length(),
+                    new ReopenFileChannel(m_fd, m_raf, "rw"), m_quorumManager);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
 		}
 	}
 
@@ -249,15 +254,19 @@ public class RWStore implements IStore {
 
 	// Constructor
 
-	public RWStore(FileMetadataView fileMetadataView, boolean readOnly) {
-		if (false && Config.isLockFileNeeded() && !readOnly) {
+	public RWStore(FileMetadataView fileMetadataView, boolean readOnly,
+	        QuorumManager quorumManager) {
+
+	    if (false && Config.isLockFileNeeded() && !readOnly) {
 			m_lockFile = LockFile.create(m_filename + ".lock");
 
 			if (m_lockFile == null) {
 				throw new OverlappingFileLockException();
 			}
 		}
-		
+
+        m_quorumManager = quorumManager;
+	    
 		reopen(fileMetadataView);
 	}
 
@@ -1822,4 +1831,76 @@ public class RWStore implements IStore {
 	public Allocator getAllocator(int i) {
 		return (Allocator) m_allocs.get(i);
 	}
+
+    /**
+     * Simple implementation for a {@link RandomAccessFile} to handle the direct backing store.
+     */
+    private static class ReopenFileChannel implements
+            IReopenChannel<FileChannel> {
+
+        final private File file;
+
+        private final String mode;
+
+        private volatile RandomAccessFile raf;
+
+        public ReopenFileChannel(final File file, final RandomAccessFile raf, final String mode)
+                throws IOException {
+
+            this.file = file;
+
+            this.mode = mode;
+            
+            this.raf = raf;
+
+            reopenChannel();
+
+        }
+
+        public String toString() {
+
+            return file.toString();
+
+        }
+
+//        /**
+//         * Hook used by the unit tests to destroy their test files.
+//         */
+//        public void destroy() {
+//            try {
+//                raf.close();
+//            } catch (IOException e) {
+//                if (!file.delete())
+//                    log.warn("Could not delete file: " + file);
+//            }
+//        }
+
+        synchronized public FileChannel reopenChannel() throws IOException {
+
+            if (raf != null && raf.getChannel().isOpen()) {
+
+                /*
+                 * The channel is still open. If you are allowing concurrent
+                 * reads on the channel, then this could indicate that two
+                 * readers each found the channel closed and that one was able
+                 * to re-open the channel before the other such that the channel
+                 * was open again by the time the 2nd reader got here.
+                 */
+
+                return raf.getChannel();
+
+            }
+
+            // open the file.
+            this.raf = new RandomAccessFile(file, mode);
+
+            if (log.isInfoEnabled())
+                log.info("(Re-)opened file: " + file);
+
+            return raf.getChannel();
+
+        }
+
+    };
+
 }

@@ -52,6 +52,19 @@ public interface QuorumManager {
      * available and has a minimum quorum size of <code>2</code>.
      */
     int replicationFactor();
+
+    /**
+     * Return <code>true</code> if the {@link QuorumManager} is configured for
+     * high availability. High availability exists (in principle) when the
+     * {@link QuorumManager#replicationFactor()} <em>k</em> is greater than one.
+     * High availability exists (in practice) when the {@link Quorum}
+     * {@link Quorum#isQuorumMet() is met} for a {@link QuorumManager} that is
+     * configured for high availability.
+     * 
+     * @return <code>true</code> if this {@link QuorumManager} is highly
+     *         available <em>in principle</code>
+     */
+    boolean isHighlyAvailable();
     
     /**
      * Return the current quorum (non-blocking). The quorum may or may not be

@@ -84,7 +84,6 @@ import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.LocalDataServiceClient;
 import com.bigdata.service.jini.JiniClient;
-import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -1950,14 +1949,13 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * Return <code>true</code> if the journal is configured for high
      * availability. High availability exists (in principle) when the
      * {@link QuorumManager#replicationFactor()} <em>k</em> is greater than one.
-     * See {@link #getQuorumManager()} to get more information about the actual
-     * replication count, whether this journal is part of an active quorum, etc.
      * 
      * @see #getQuorumManager()
+     * @see QuorumManager#isHighlyAvailable()
      */
     public boolean isHighlyAvailable() {
 
-        return getQuorumManager().replicationFactor() > 1;
+        return getQuorumManager().isHighlyAvailable();
         
     }
     
@@ -3608,6 +3606,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     private class SingletonQuorumManager implements QuorumManager {
 
         private final Quorum quorum = new SingletonQuorum();
+        
+        public boolean isHighlyAvailable() {
+            return false;
+        }
         
         public int replicationFactor() {
             return 1;

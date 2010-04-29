@@ -29,6 +29,7 @@ package com.bigdata.io;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
+import java.nio.channels.SocketChannel;
 import java.util.LinkedList;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -40,6 +41,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -172,7 +174,7 @@ abstract public class WriteCacheService implements IWriteCache {
     /**
      * The {@link Future} of the task running on the {@link #localWriteService}.
      * 
-     * @see WriteTask
+     * @see MasterWriteTask
      * @see #reset()
      */
     private Future<Void> localWriteFuture;
@@ -189,7 +191,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * Note: Since this is <em>volatile</em> you MUST guard against concurrent
      * clear to <code>null</code> by {@link #reset()}.
      * 
-     * @see WriteTask
+     * @see MasterWriteTask
      * @see #reset()
      */
     private volatile Future<?> remoteWriteFuture = null;
@@ -262,7 +264,7 @@ abstract public class WriteCacheService implements IWriteCache {
     final private AtomicReference<WriteCache> current = new AtomicReference<WriteCache>();
 
     /**
-     * Flag set if {@link WriteTask} encounters an error. The cause is set on
+     * Flag set if {@link MasterWriteTask} encounters an error. The cause is set on
      * {@link #firstCause} as well.
      * 
      * FIXME Error handling for this must cause the write cache service buffers
@@ -280,7 +282,7 @@ abstract public class WriteCacheService implements IWriteCache {
     private volatile boolean halt = false;
     
     /**
-     * The first cause of an error within the asynchronous {@link WriteTask}.
+     * The first cause of an error within the asynchronous {@link MasterWriteTask}.
      */
     private final AtomicReference<Throwable> firstCause = new AtomicReference<Throwable>();
         
@@ -315,12 +317,19 @@ abstract public class WriteCacheService implements IWriteCache {
     final private WriteCache[] buffers;
 
     /**
+     * The current file extent.
+     */
+    final private AtomicLong fileExtent = new AtomicLong(-1L);
+
+    /**
      * Allocates N buffers from the {@link DirectBufferPool}.
      * 
      * @param nbuffers
      *            The #of buffers to allocate.
      * @param useChecksum
      *            <code>true</code> iff record level checksums are enabled.
+     * @param fileExtent
+     *            The current extent of the backing file.
      * @param opener
      *            The object which knows how to (re-)open the channel to which
      *            cached writes are flushed.
@@ -329,11 +338,15 @@ abstract public class WriteCacheService implements IWriteCache {
      */
     public WriteCacheService(final int nbuffers,
             final boolean useChecksum,
+            final long fileExtent,
             final IReopenChannel<? extends Channel> opener,
             final QuorumManager quorumManager)
             throws InterruptedException {
 
         if (nbuffers <= 0)
+            throw new IllegalArgumentException();
+
+        if (fileExtent < 0L)
             throw new IllegalArgumentException();
 
         if (opener == null)
@@ -398,10 +411,27 @@ abstract public class WriteCacheService implements IWriteCache {
         } else {
             remoteWriteService = null;
         }
-        
-        // run the write task
-        localWriteFuture = localWriteService.submit(new WriteTask());
 
+        // save the current file exent.
+        this.fileExtent.set(fileExtent);
+
+        // run the write task
+        localWriteFuture = localWriteService.submit(newWriteTask());
+
+    }
+    
+    protected Callable<Void> newWriteTask() {
+        
+        if(quorumManager.getQuorum().isMaster()) {
+            
+            return new MasterWriteTask();
+            
+        } else {
+            
+            return new ReceiverWriteTask();
+            
+        }
+        
     }
 
     /**
@@ -412,7 +442,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      */
-    private class WriteTask implements Callable<Void> {
+    private class MasterWriteTask implements Callable<Void> {
 
         /**
          * Note: If there is an error in this thread then it needs to be
@@ -564,7 +594,59 @@ abstract public class WriteCacheService implements IWriteCache {
 
         } // call()
 
-    } // class WriteTask
+    } // class MasterWriteTask
+
+    /**
+     * The task responsible for receiving messages from the upstream service,
+     * writing onto the local backing file, and passing on the messages to the
+     * downstream {@link Quorum} member. If this is the last node in the write
+     * pipeline, then it will acknowledge the messages once it has made the
+     * changes in its local backing file.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    private class ReceiverWriteTask implements Callable<Void> {
+
+        /**
+         * Note: If there is an error in this thread then it needs to be
+         * propagated to the remote service sending messages to this service,
+         * e.g., by closing the {@link SocketChannel} used to communicate with
+         * the upstream service, and then exit. Once the existence of a problem
+         * has propagated back to the master for the quorum, it will cause the
+         * {@link MasterWriteTask} to terminate and the master will do an
+         * abort(). We do not need to bother the readers since the read()
+         * methods all allow for concurrent close().
+         * 
+         * @todo In order to recover from that abort(), the master must know
+         *       that there is a problem with the write pipeline and perhaps we
+         *       will need to renegotiate the quorum and resynchronize some
+         *       node(s) in that quorum.
+         * 
+         * @todo If resynchronization rolls back the lastCommitTime for a store,
+         *       then we need to interrupt or otherwise invalidate any readers
+         *       with access to historical data which is no longer part of the
+         *       quorum.
+         * 
+         * @todo The quorum token should be passed into the
+         *       {@link WriteCacheService} so we can assert that the quorum is
+         *       still valid.
+         * 
+         * @todo Since we hold the dirtyListLock whenever we are writing out a
+         *       cache buffer, is it possible for the {@link WriteCacheService}
+         *       to use more than 2 or 3 buffers? If not, then reduce the #of
+         *       buffers allocated. [We need to be holding the dirtyListLock in
+         *       order to generate various signals required by the rest of the
+         *       {@link WriteCacheService}.]
+         */
+        public Void call() throws Exception {
+
+            // FIXME Integrate the receiver here.
+            throw new UnsupportedOperationException();
+            
+        } // call()
+
+    } // class ReceiverWriteTask
 
     /**
      * Factory for {@link WriteCache} implementations.
@@ -594,6 +676,12 @@ abstract public class WriteCacheService implements IWriteCache {
      * this approach deliberately does not cause any buffers belonging to the
      * caller of {@link #writeChk(long, ByteBuffer, int)} to become part of the
      * {@link #cleanList}.
+     * <p>
+     * Note: <strong>You MUST set the {@link #setExtent(long) file extent}
+     * </strong> after {@link #reset() resetting} the {@link WriteCacheService}.
+     * This is necessary in order to ensure that the correct file extent is
+     * communicated along the write replication pipeline when high availability
+     * is enabled.
      */
     public void reset() throws InterruptedException {
         final WriteLock writeLock = lock.writeLock();
@@ -678,8 +766,11 @@ abstract public class WriteCacheService implements IWriteCache {
 //                    // ignored.
 //                }
 //            }
-            this.localWriteFuture = localWriteService.submit(new WriteTask());
+            this.localWriteFuture = localWriteService.submit(new MasterWriteTask());
             this.remoteWriteFuture = null;
+
+            // clear the file extent to an illegal value.
+            fileExtent.set(-1L);
             
             counters.get().nreset++;
             
@@ -759,6 +850,9 @@ abstract public class WriteCacheService implements IWriteCache {
             // clear the service record map.
             recordMap.clear();
             
+            // clear the file extent to an illegal value.
+            fileExtent.set(-1L);
+
             // Closed.
             open = false;
 
@@ -781,9 +875,9 @@ abstract public class WriteCacheService implements IWriteCache {
 
     /**
      * This method is called ONLY by write threads and verifies that the service
-     * is {@link #open}, that the {@link WriteTask} has not been {@link #halt
-     * halted}, and that the {@link WriteTask} is still executing (in case any
-     * uncaught errors are thrown out of {@link WriteTask#call()}.
+     * is {@link #open}, that the {@link MasterWriteTask} has not been {@link #halt
+     * halted}, and that the {@link MasterWriteTask} is still executing (in case any
+     * uncaught errors are thrown out of {@link MasterWriteTask#call()}.
      * <p>
      * Note: {@link #read(long)} DOES NOT throw an exception if the service is
      * closed, asynchronously closed, or even just plain dead. It just returns
@@ -793,7 +887,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * @throws IllegalStateException
      *             if the service is closed.
      * @throws RuntimeException
-     *             if the {@link WriteTask} has failed.
+     *             if the {@link MasterWriteTask} has failed.
      */
     private void assertOpenForWriter() {
 
@@ -939,7 +1033,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * resulting in a high-level abort() and {@link #reset()} of the
      * {@link WriteCacheService}.
      * 
-     * @see WriteTask
+     * @see MasterWriteTask
      * @see #dirtyList
      * @see #dirtyListEmpty
      * 
@@ -1008,7 +1102,7 @@ abstract public class WriteCacheService implements IWriteCache {
                 }
                 // Guaranteed available hence non-blocking. 
                 final WriteCache nxt = cleanList.take();
-                nxt.resetWith(recordMap);
+                nxt.resetWith(recordMap,fileExtent.get());
                 current.set(nxt);
                 return true;
             } finally {
@@ -1026,6 +1120,47 @@ abstract public class WriteCacheService implements IWriteCache {
 //
 //    }
 
+    /**
+     * Set the extent of the file on the current {@link WriteCache}. The then
+     * current value of the extent will be communicated together with the rest
+     * of the {@link WriteCache} state if it is written onto another service
+     * using the write replication pipeline (HA only). The receiver will use the
+     * value read from the {@link WriteCache} message to adjust the extent of
+     * its backing file.
+     * <p>
+     * Note: Changes in the file extent for persistence store implementations
+     * MUST (a) be mutually exclusive with reads and writes on the backing file
+     * (due to a JVM bug); and (b) force the file data and the file metadata to
+     * the disk. Thus any change in the {@link #fileExtent} MUST be followed by
+     * a {@link #flush(boolean, long, TimeUnit)}.
+     * <p>
+     * Note: You MUST set the file extent each time you invoke {@link #reset()}
+     * so the {@link WriteCacheService} is always aware of the correct file
+     * extent.
+     * 
+     * @throws InterruptedException
+     * @throws IllegalStateException
+     */
+    public void setExtent(final long fileExtent) throws IllegalStateException,
+            InterruptedException {
+
+        if (fileExtent < 0L)
+            throw new IllegalArgumentException();
+        
+        final WriteCache cache = acquireForWriter();
+        
+        try {
+        
+            cache.setFileExtent(fileExtent);
+            
+        } finally {
+            
+            release();
+            
+        }
+
+    }
+    
     /**
      * Write the record onto the cache. If the record is too large for the cache
      * buffers, then it is written synchronously onto the backing channel.
@@ -1236,7 +1371,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
                         // Clear the state on the new buffer and remove from
                         // cacheService map
-                        newBuffer.resetWith(recordMap);
+                        newBuffer.resetWith(recordMap,fileExtent.get());
 
                         // Set it as the new buffer.
                         current.set(cache = newBuffer);
@@ -1575,7 +1710,7 @@ abstract public class WriteCacheService implements IWriteCache {
             final WriteCache newBuffer = cleanList.take();
 
             // Clear state on new buffer and remove from cacheService map
-            newBuffer.resetWith(recordMap);
+            newBuffer.resetWith(recordMap,fileExtent.get());
 
             // Set it as the new buffer.
             current.set(newBuffer);
@@ -1683,7 +1818,7 @@ abstract public class WriteCacheService implements IWriteCache {
         public int ndirty;
 
         /**
-         * The maximum #of dirty buffers observed by the {@link WriteTask} (its
+         * The maximum #of dirty buffers observed by the {@link MasterWriteTask} (its
          * maximum observed backlog).
          */
         public int maxdirty;

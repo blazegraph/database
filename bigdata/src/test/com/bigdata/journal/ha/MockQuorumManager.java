@@ -46,6 +46,12 @@ public class MockQuorumManager implements QuorumManager {
         return k;
         
     }
+
+    public boolean isHighlyAvailable() {
+        
+        return k > 1;
+        
+    }
     
     public MockQuorumManager(final int index, final Journal[] stores) {
 
