@@ -326,27 +326,27 @@ public class TestSocketMessage extends TestCase {
 		try {
 			IHAClient handler = new IHAClient() {
 				ObjectSocketChannelStream input = null;
-				@Override
+//				@Override
 				public ObjectSocketChannelStream getInputSocket() {
 					return input;
 				}
 
-				@Override
+//				@Override
 				public ObjectSocketChannelStream getNextSocket() {
 					return null;
 				}
 
-				@Override
+//				@Override
 				public WriteCache getWriteCache() {
 					return cache;
 				}
 
-				@Override
+//				@Override
 				public void setInputSocket(ObjectSocketChannelStream in) {
 					input = in;
 				}
 
-				@Override
+//				@Override
 				public void truncate(long extent) {
 					System.out.println("Received truncate request");
 				}
