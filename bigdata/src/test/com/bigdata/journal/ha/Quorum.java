@@ -72,6 +72,15 @@ public interface Quorum {
     boolean isMaster();
 
     /**
+     * Return the index of this service in the ordered list of services in a met
+     * quorum.
+     * 
+     * @throws IllegalStateException
+     *             if the quorum is not met.
+     */
+    int getIndex();
+    
+    /**
      * Return the remote interface used to perform HA operations on the members
      * of quorum.
      * 

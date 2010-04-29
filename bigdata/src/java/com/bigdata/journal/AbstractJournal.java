@@ -3672,6 +3672,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             return 0;
         }
 
+        public int getIndex() {
+            return 0;
+        }
+        
         public HAGlue getHAGlue(int index) {
 
             if (index != 0)

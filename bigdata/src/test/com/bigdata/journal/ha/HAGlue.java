@@ -49,14 +49,14 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
 public interface HAGlue extends Remote {
 
     /**
-     * Return the address that will be used by the write pipeline to talk to the
-     * next service in the quorum order.
+     * Return the address at which this service will listen for write pipeline
+     * messages sent from the upstream service.
      */
     InetAddress getWritePipelineAddr();
 
     /**
-     * Return the port that will be used by the write pipeline to talk to the
-     * next service in the quorum order.
+     * Return the port at which this service will listen for write pipeline
+     * messages send from the upstream service.
      */
     int getWritePipelinePort();
     
