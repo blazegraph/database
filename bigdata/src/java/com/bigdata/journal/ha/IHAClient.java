@@ -29,6 +29,8 @@ package com.bigdata.journal.ha;
 
 import com.bigdata.io.ObjectSocketChannelStream;
 import com.bigdata.io.WriteCache;
+import com.bigdata.journal.ha.SocketMessage.AckMessage;
+import com.bigdata.journal.ha.SocketMessage.HAWriteMessage.HAWriteConfirm;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
