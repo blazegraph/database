@@ -118,7 +118,7 @@ public class TestWriteCacheService extends TestCase3 {
             {
                 assertNull(writeCache.read(addr1));
                 // write record @ addr.
-                assertTrue(writeCache.write(addr1, data1,
+                assertTrue(writeCache.write(addr1, data1.asReadOnlyBuffer(),
                         ChecksumUtility.threadChk.get().checksum(data1)));
                 // verify record @ addr can be read.
                 assertNotNull(writeCache.read(addr1));
@@ -200,7 +200,7 @@ public class TestWriteCacheService extends TestCase3 {
              */
             for (int i = 0; i < 500; i++) {
             	AllocView v = allocs.get(i);
-            	writeCache.write(v.addr, v.buf, checker.checksum(v.buf));  
+            	writeCache.write(v.addr, v.buf.asReadOnlyBuffer(), checker.checksum(v.buf));  
             	v.buf.position(0);
             }
             for (int i = 0; i < 500; i++) {
@@ -227,7 +227,7 @@ public class TestWriteCacheService extends TestCase3 {
              */
             for (int i = 500; i < 1000; i++) {
             	AllocView v = allocs.get(i);
-            	writeCache.write(v.addr, v.buf, checker.checksum(v.buf));           	
+            	writeCache.write(v.addr, v.buf.asReadOnlyBuffer(), checker.checksum(v.buf));           	
             	v.buf.position(0);
             }
             writeCache.flush(true);
@@ -242,11 +242,11 @@ public class TestWriteCacheService extends TestCase3 {
             // writeCache.reset();
             for (int i = 1000; i < 10000; i++) {
             	AllocView v = allocs.get(i);
-            	if (!writeCache.write(v.addr, v.buf, checker.checksum(v.buf))) {
+            	if (!writeCache.write(v.addr, v.buf.asReadOnlyBuffer(), checker.checksum(v.buf))) {
             		log.info("flushing and resetting writeCache");
             		writeCache.flush(false);
             		// writeCache.reset();
-            		assertTrue(writeCache.write(v.addr, v.buf, checker.checksum(v.buf)));
+            		assertTrue(writeCache.write(v.addr, v.buf.asReadOnlyBuffer(), checker.checksum(v.buf)));
             	}
             	v.buf.position(0);
            }
@@ -271,7 +271,7 @@ public class TestWriteCacheService extends TestCase3 {
         		v.buf.reset();           	
             	
         		try {
-        			writeCache.write(v.addr, v.buf, checker.checksum(v.buf));
+        			writeCache.write(v.addr, v.buf.asReadOnlyBuffer(), checker.checksum(v.buf));
         		} catch (Throwable t) {
         			assertTrue(t instanceof AssertionError);
         		}
