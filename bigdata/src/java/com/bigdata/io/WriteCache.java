@@ -1007,8 +1007,50 @@ abstract public class WriteCache implements IWriteCache {
      * downstream service in the quorum. This method is not used unless the
      * journal is highly available.
      */
-    abstract protected Runnable getDownstreamWriteRunnable(
-            QuorumManager quorumManager);
+
+    /**
+     * Return a Runnable that will send an HAWriteMessage
+     * @throws IOException 
+     */
+    protected Runnable getDownstreamWriteRunnable(QuorumManager quorumManager) throws IOException {
+        
+        final HAConnect connect = establishHAConnect(quorumManager);
+        
+        final WriteCache self = this;
+        
+        return new Runnable() {
+
+//          @Override
+            public void run() {
+                SocketMessage.HAWriteMessage msg = new SocketMessage.HAWriteMessage(self);
+                
+                connect.send(msg, true); // wait for processing - FIXME: problem with waiting at present
+            }
+            
+        };
+    }
+
+    private HAConnect m_connect = null;
+    
+    /**
+     * TODO: Should this await a quorum before attempting to connect to the downstream?
+     * 
+     * @param quorumManager
+     * @return
+     * @throws IOException 
+     */
+    private HAConnect establishHAConnect(QuorumManager quorumManager) throws IOException {
+        if (m_connect == null) {
+            Quorum quorum = quorumManager.getQuorum();
+            
+            final HAGlue glue = quorum.getHAGlue(quorum.getIndex() + 1); 
+            final InetAddress addr = glue.getWritePipelineAddr();
+            final int port = glue.getWritePipelinePort();
+            m_connect = new HAConnect(new InetSocketAddress(addr, port));
+        }
+        
+        return m_connect;
+    }
     
     /**
      * {@inheritDoc}.
@@ -1441,48 +1483,6 @@ abstract public class WriteCache implements IWriteCache {
 
             return true;
 
-		}
-
-        /**
-         * Return a Runnable that will send an HAWriteMessage
-         */
-		@Override
-		protected Runnable getDownstreamWriteRunnable(QuorumManager quorumManager) {
-			final HAConnect connect = establishHAConnect(quorumManager);
-			
-			final WriteCache self = this;
-			
-			return new Runnable() {
-
-				@Override
-				public void run() {
-					SocketMessage.HAWriteMessage msg = new SocketMessage.HAWriteMessage(self);
-					
-					connect.send(msg, true); // wait for processing - FIXME: problem with waiting at present
-				}
-				
-			};
-		}
-
-		private HAConnect m_connect = null;
-		
-		/**
-		 * TODO: Should this await a quorum before attempting to connect to the downstream?
-		 * 
-		 * @param quorumManager
-		 * @return
-		 */
-		private HAConnect establishHAConnect(QuorumManager quorumManager) {
-			if (m_connect == null) {
-				Quorum quorum = quorumManager.getQuorum();
-				
-				final HAGlue glue = quorum.getHAGlue(quorum.getIndex() + 1); 
-				final InetAddress addr = glue.getWritePipelineAddr();
-				final int port = glue.getWritePipelinePort();
-				m_connect = new HAConnect(new InetSocketAddress(addr, port));
-			}
-			
-			return m_connect;
 		}
 
 	}
