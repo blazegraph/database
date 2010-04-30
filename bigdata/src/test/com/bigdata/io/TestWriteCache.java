@@ -202,7 +202,7 @@ public class TestWriteCache extends TestCase3 {
                     // verify addr not found before write.
                     assertNull(writeCache.read(addr1));
                     // write record @ addr.
-                    assertTrue(writeCache.write(addr1, data1, no_checksum));
+                    assertTrue(writeCache.write(addr1, data1.asReadOnlyBuffer(), no_checksum));
                     // verify record @ addr can be read.
                     assertNotNull(writeCache.read(addr1));
                     // verify data read back @ addr.
@@ -223,7 +223,7 @@ public class TestWriteCache extends TestCase3 {
                     // verify addr not found before write.
                     assertNull(writeCache.read(addr2));
                     // write record @ addr.
-                    assertTrue(writeCache.write(addr2, data2, no_checksum));
+                    assertTrue(writeCache.write(addr2, data2.asReadOnlyBuffer(), no_checksum));
                     // verify record @ addr can be read.
                     assertNotNull(writeCache.read(addr2));
                     // verify data read back @ addr.
