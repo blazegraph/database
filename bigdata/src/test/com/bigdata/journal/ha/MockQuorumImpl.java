@@ -12,6 +12,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.util.concurrent.ExecutionExceptions;
@@ -88,11 +89,6 @@ public class MockQuorumImpl implements Quorum {
         
     }
 
-    public void readFromQuorum(long addr, ByteBuffer b) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException();
-    }
-
     protected void assertMaster() {
         if (!isMaster())
             throw new IllegalStateException();
@@ -167,6 +163,14 @@ public class MockQuorumImpl implements Quorum {
         assertMaster();
         
         int nyes = 0;
+        
+//        // Copy the root block into a byte[].
+//        final byte[] data;
+//        {
+//            final ByteBuffer rb = rootBlock.asReadOnlyBuffer();
+//            data = new byte[rb.limit()];
+//            rb.get(data);
+//        }
 
         final List<RunnableFuture<Boolean>> remoteFutures = new LinkedList<RunnableFuture<Boolean>>();
 
@@ -179,8 +183,7 @@ public class MockQuorumImpl implements Quorum {
             /*
              * Runnable which will execute this message on the remote service.
              */
-            final RunnableFuture<Boolean> rf = getHAGlue(i).prepare2Phase(
-                    rootBlock);
+            final RunnableFuture<Boolean> rf = getHAGlue(i).prepare2Phase(rootBlock);
 
             // add to list of futures we will check.
             remoteFutures.add(rf);
@@ -444,6 +447,66 @@ public class MockQuorumImpl implements Quorum {
             // Throw exception back to the master.
             throw new RuntimeException("remote errors: nfailures="
                     + causes.size(), new ExecutionExceptions(causes));
+        }
+
+    }
+
+    /**
+     * Handle a bad read from the local disk as identified by a checksum error
+     * on the data in the record by reading on another member of the
+     * {@link Quorum}.
+     */
+    public ByteBuffer readFromQuorum(final long addr)
+            throws InterruptedException, IOException {
+        
+        if(replicationFactor()>1) {
+
+            // This service is not configured for high availability. 
+            throw new IllegalStateException();
+            
+        }
+        
+        // The quorum must be met, in which case there will be at least 1 other
+        // node.
+        if(!isQuorumMet()) {
+            throw new IllegalStateException();
+        }
+        /*
+         * Prefer to read on the previous service in the quorum order since it
+         * will always have anything which has been written onto this service.
+         * Otherwise, read on the downstream service in the quorum order. The
+         * downstream node should also always have the record. Recent small
+         * records will still be in cache (both on this node and the downstream
+         * node) and thus should never have resulted in a read through to the
+         * disk and a ChecksumError. Large records are written directly through
+         * to the disk, but they are written through to the disk synchronously
+         * so the downstream node will always have the large record on the disk
+         * as well.
+         */
+        // The index of this service in the quorum.
+        final int indexSelf = getIndex();
+        
+        final int indexOther = indexSelf > 0 ? indexSelf - 1 : indexSelf + 1;
+        
+        // The RMI interface to the node on which we will read.
+        final HAGlue haGlue = getHAGlue(indexOther);
+
+        /*
+         * Read from that node.  The request runs in the caller's thread.
+         */
+        try {
+            
+            final RunnableFuture<ByteBuffer> rf = haGlue.readFromDisk(token(),
+                    addr);
+            
+            rf.run();
+            
+            return rf.get();
+            
+        } catch (ExecutionException e) {
+            
+            throw new RuntimeException(e);
+            
         }
 
     }

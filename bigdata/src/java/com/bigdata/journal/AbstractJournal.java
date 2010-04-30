@@ -67,6 +67,7 @@ import com.bigdata.config.LongRangeValidator;
 import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.ha.HAGlue;
 import com.bigdata.journal.ha.Quorum;
@@ -3684,15 +3685,16 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             return AbstractJournal.this.getHAGlue();
             
         }
-        
+
         /**
          * There are no other members in the quorum so failover reads are not
          * supported.
          * 
-         * @todo return false to indicate that the read operation failed?
+         * @throws IllegalStateException
+         *             always since the quorum is not highly available.
          */
-        public void readFromQuorum(long addr, ByteBuffer b) {
-           throw new UnsupportedOperationException(); 
+        public ByteBuffer readFromQuorum(long addr) {
+           throw new IllegalStateException(); 
         }
 
 //        /**
@@ -3713,8 +3715,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 final long timeout, final TimeUnit unit)
                 throws InterruptedException, TimeoutException, IOException {
             try {
-                final RunnableFuture<Boolean> f = haGlue
-                        .prepare2Phase(rootBlock);
+                final RunnableFuture<Boolean> f = haGlue.prepare2Phase(rootBlock);
                 /*
                  * Note: In order to avoid a deadlock, this must run() on the
                  * master in the caller's thread and use a local method call.
@@ -3784,13 +3785,41 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
          * The most recent prepare request.
          */
         private final AtomicReference<IRootBlockView> prepareRequest = new AtomicReference<IRootBlockView>();
-        
+
         /**
-         * @todo probably send a byte[] and then validate the root block when we
-         *       wrap it as a view.
+         * FIXME When exposed for RMI as a smart proxy, we need to send the
+         * rootBlock as a byte[] and possible also send the rootBlock0 flag
+         * (which is not part of the persistent state of the root block).
+         * 
+         * Whether or not we send the rootBlock0 flag depends on whether or not
+         * resynchronization guarantees that the root blocks (both of them) are
+         * the same for all services in the quorum.
          */
-        public RunnableFuture<Boolean> prepare2Phase(
-                final IRootBlockView rootBlock) throws IOException {
+//        // Copy the root block into a byte[].
+//        final byte[] data;
+//        {
+//            final ByteBuffer rb = rootBlock.asReadOnlyBuffer();
+//            data = new byte[rb.limit()];
+//            rb.get(data);
+//        }
+//         * Alternatate the root block based on the state of the local store NOT
+//         * the master.
+//         * 
+//         * This assumes that it is possible that resynchronization will cause
+//         * the root blocks assigned to the rootBlock0 and rootBlock1 slots to
+//         * differ from service to service in the quorum. That is Ok as long as
+//         * resynchronization does not explicitly align the root blocks across
+//         * the quorum. If it does, then we need to pass along the master's value
+//         * for the [rootBlock0] flag rather than base its value on the local
+//         * store's state.
+//         * 
+//         * final boolean rootBlock0 = _rootBlock.isRootBlock0() ? false : true;
+//         * 
+//         * // validate the root block, obtaining a view. final IRootBlockView
+//         * view = new RootBlockView(rootBlock0, ByteBuffer.wrap(rootBlock),
+//         * ChecksumUtility.threadChk.get());
+        public RunnableFuture<Boolean> prepare2Phase(final IRootBlockView rootBlock)
+                throws IOException {
 
             if (rootBlock == null)
                 throw new IllegalStateException();
@@ -3934,6 +3963,48 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 //            
 //        }
 
+        public RunnableFuture<ByteBuffer> readFromDisk(final long token,
+                final long addr) {
+
+            // Note: nbytes _includes_ the 4 byte checksum!
+            final int nbytes = getByteCount(addr);
+
+            final ByteBuffer t = ByteBuffer.allocate(nbytes-4/*noChecksum*/);
+
+            return new FutureTask<ByteBuffer>(new Runnable() {
+                public void run() {
+                    getQuorumManager().assertQuorum(token);
+                    try {
+                        /*
+                         * FIXME Recover the record from the local buffer
+                         * strategy.
+                         */ 
+                        final ByteBuffer b = DirectBufferPool.INSTANCE
+                                .acquire();
+                        try {
+                            /*
+                             * FIXME For RMI, use NIO over a direct buffer to
+                             * send the data to the caller. The caller must
+                             * receive the data, validate the checksum, and then
+                             * strip it off of the record.
+                             * 
+                             * FIXME Either readFromDisk() MUST NOT validate the
+                             * checksum since that will cause it to not be
+                             * present on the wire or it must compute and add
+                             * the checksum to the message on the wire.
+                             */
+                            throw new UnsupportedOperationException();
+                        } finally {
+                            DirectBufferPool.INSTANCE.release(b);
+                        }
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }, t/* Void */);
+            
+        }
+        
         /** Not implemented for standalone. */
         public InetAddress getWritePipelineAddr() {
             throw new UnsupportedOperationException();

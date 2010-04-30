@@ -29,6 +29,7 @@ package com.bigdata.journal.ha;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.nio.ByteBuffer;
 import java.rmi.Remote;
 import java.util.concurrent.RunnableFuture;
 
@@ -59,75 +60,27 @@ public interface HAGlue extends Remote {
      * messages send from the upstream service.
      */
     int getWritePipelinePort();
-    
-//    int getReadServicePort();
-    
-//    /**
-//     * The {@link ResourceService} used to deliver raw records to the members of
-//     * the quorum.
-//     * 
-//     * @todo Should this be the same or different from the one used to handle
-//     *       resynchronization of the entire store and used to ship index
-//     *       segment files around (for a data service). E.g., questions about
-//     *       latency, throttling, concurrency, etc. Also, this needs to read
-//     *       from and write on buffers, so the implementation needs to be a bit
-//     *       different.
-//     */
-//    ResourceService getResourceService() {
-//        throw new UnsupportedOperationException();
-//    }
-
-    /*
-     * Note: write() is handled at the WriteCache.  Entire WriteCache instances
-     * are send down a configured pipeline at a time.
-     */
-//    /**
-//     * Write a record on the failover chain. Only quorum members will accept the
-//     * write.
-//     * 
-//     * @param newaddr
-//     * @param oldaddr
-//     * @param bd
-//     * @return
-//     */
-//    public RunnableFuture<Void> write(long newaddr, long oldaddr, BufferDescriptor bd) {
-//        
-//        throw new UnsupportedOperationException();
-//        
-//    }
-
-    /*
-     * Note: Moved to the write pipeline since this is generally a response to a
-     * local event on the master when it needs to extend its storage.
-     */
-//    /*
-//     * file extension.
-//     */
-//
-//    /**
-//     * Set the file length on on the backing store for this service.
-//     * 
-//     * @param token The token for the quorum making the request.
-//     * @param extent The new extent for the backing file.
-//     */
-//    public RunnableFuture<Void> truncate(long token, long extent)
-//            throws IOException;
 
     /*
      * bad reads
      */
 
-//    /**
-//     * @todo This could be implemented over the {@link ResourceService} with
-//     *       the modification to read from and write on a {@link ByteBuffer}
-//     *       . In that case, it does not need to be a remote method call and
-//     *       could be removed from the {@link HAGlue} interface.
-//     */
-//    public RunnableFuture<Void> readFromQuorum(long addr, BufferDescriptor b)
-//            throws IOException;
+    /**
+     * Read a record from disk.
+     * 
+     * @param token
+     *            The quorum token.
+     * @param addr
+     *            The address of the record.
+     * 
+     * @return A runnable which will transfer the contents of the record into
+     *         the buffer returned by the future.
+     */
+    public RunnableFuture<ByteBuffer> readFromDisk(long token, long addr)
+            throws IOException;
     
     /*
-     * commit protocol.
+     * quorum commit protocol.
      */
 
     /**

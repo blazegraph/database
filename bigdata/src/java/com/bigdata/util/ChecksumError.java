@@ -47,4 +47,8 @@ public class ChecksumError extends RuntimeException {
         super( msg );
     }
     
+    public ChecksumError(Throwable cause) {
+        super(cause);
+    }
+
 }

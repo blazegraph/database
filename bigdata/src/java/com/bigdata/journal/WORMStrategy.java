@@ -33,7 +33,6 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -43,6 +42,7 @@ import com.bigdata.btree.BTree.Counter;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.counters.striped.StripedCounters;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.WriteCache;
@@ -280,8 +280,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     }
 
     /**
-     * Counters for {@link IRawStore} access, including operations that read or
-     * write through to the underlying media.
+     * Striped performance counters for {@link IRawStore} access, including
+     * operations that read or write through to the underlying media.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
@@ -289,148 +289,148 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * @todo report elapsed time and average latency for force, reopen, and
      *       writeRootBlock.
      * 
-     *       FIXME Counters should be thread-local or stripped with periodic
-     *       {@link #add(StoreCounters)} to the shared counters to provide
-     *       eventually consistent values with low-to-no
-     *       contention/synchronization (was counters need to be atomic if we
-     *       want to avoid the possibility of concurrent <code>x++</code>
-     *       operations failing to correctly increment <code>x</code> for each
-     *       request).
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     * @param <T>
      */
-    public static class StoreCounters {
-        
+    static public class StoreCounters<T extends StoreCounters<T>> extends
+            StripedCounters<T> {
+
         /**
          * #of read requests.
          */
-        public long nreads;
+        public volatile long nreads;
 
         /**
          * #of read requests that read through to the backing file.
          */
-        public long ndiskRead;
+        public volatile long ndiskRead;
         
         /**
          * #of bytes read.
          */
-        public long bytesRead;
+        public volatile long bytesRead;
 
         /**
          * #of bytes that have been read from the disk.
          */
-        public long bytesReadFromDisk;
-        
-        /**
-         * The size of the largest record read.
-         */
-        public long maxReadSize;
+        public volatile long bytesReadFromDisk;
         
         /**
          * Total elapsed time for reads.
          */
-        public long elapsedReadNanos;
+        public volatile long elapsedReadNanos;
 
         /**
          * Total elapsed time for reading on the disk.
          */
-        public long elapsedDiskReadNanos;
+        public volatile long elapsedDiskReadNanos;
 
         /**
          * The #of checksum errors while reading on the local disk.
          */
-        public final AtomicLong checksumErrorCount = new AtomicLong();
+        public volatile long checksumErrorCount;
         
         /**
          * #of write requests.
          */
-        public long nwrites;
+        public volatile long nwrites;
         
         /**
          * #of write requests that write through to the backing file.
          */
-        public long ndiskWrite;
+        public volatile long ndiskWrite;
 
+        /**
+         * The size of the largest record read.
+         */
+        public volatile long maxReadSize;
+        
         /**
          * The size of the largest record written.
          */
-        public long maxWriteSize;
+        public volatile long maxWriteSize;
         
         /**
          * #of bytes written.
          */
-        public long bytesWritten;
+        public volatile long bytesWritten;
         
         /**
          * #of bytes that have been written on the disk.
          */
-        public long bytesWrittenOnDisk;
+        public volatile long bytesWrittenOnDisk;
         
         /**
          * Total elapsed time for writes.
          */
-        public long elapsedWriteNanos;
+        public volatile long elapsedWriteNanos;
         
         /**
          * Total elapsed time for writing on the disk.
          */
-        public long elapsedDiskWriteNanos;
+        public volatile long elapsedDiskWriteNanos;
         
         /**
          * #of times the data were forced to the disk.
          */
-        public long nforce;
+        public volatile long nforce;
         
         /**
          * #of times the length of the file was changed (typically, extended).
          */
-        public long ntruncate;
+        public volatile long ntruncate;
         
         /**
          * #of times the file has been reopened after it was closed by an
          * interrupt.
          */
-        public long nreopen;
+        public volatile long nreopen;
         
         /**
          * #of times one of the root blocks has been written.
          */
-        public long nwriteRootBlock;
+        public volatile long nwriteRootBlock;
 
         /**
-         * Initialize a new set of counters.
+         * {@inheritDoc}
          */
         public StoreCounters() {
-            
+            super();
         }
-        
-        /**
-         * Copy ctor.
-         * @param o
-         */
-        public StoreCounters(final StoreCounters o) {
-            
-            add( o );
-            
-        }
-        
-        /**
-         * Adds counters to the current counters.
-         * 
-         * @param o
-         */
-        public void add(final StoreCounters o) {
 
+        /**
+         * {@inheritDoc}
+         */
+        public StoreCounters(final int batchSize) {
+            super(batchSize);
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        public StoreCounters(final int nstripes, final int batchSize) {
+            super(nstripes, batchSize);
+        }
+
+        @Override
+        public void add(final T o) {
+
+            super.add(o);
+            
             nreads += o.nreads;
             ndiskRead += o.ndiskRead;
             bytesRead += o.bytesRead;
             bytesReadFromDisk += o.bytesReadFromDisk;
-            maxReadSize += o.maxReadSize;
+            maxReadSize = Math.max(maxReadSize, o.maxReadSize);
             elapsedReadNanos += o.elapsedReadNanos;
             elapsedDiskReadNanos += o.elapsedDiskReadNanos;
-            checksumErrorCount.addAndGet(o.checksumErrorCount.get());
+            checksumErrorCount += o.checksumErrorCount;
 
             nwrites += o.nwrites;
             ndiskWrite += o.ndiskWrite;
-            maxWriteSize += o.maxWriteSize;
+            maxWriteSize = Math.max(maxWriteSize, o.maxWriteSize);
             bytesWritten += o.bytesWritten;
             bytesWrittenOnDisk += o.bytesWrittenOnDisk;
             elapsedWriteNanos += o.elapsedWriteNanos;
@@ -443,32 +443,25 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             
         }
 
-        /**
-         * Returns a new {@link StoreCounters} containing the current counter values
-         * minus the given counter values.
-         * 
-         * @param o
-         * 
-         * @return
-         */
-        public StoreCounters subtract(final StoreCounters o) {
+        @Override
+        public T subtract(final T o) {
 
             // make a copy of the current counters.
-            final StoreCounters t = new StoreCounters(this);
+            final T t = super.subtract(o);
             
             // subtract out the given counters.
             t.nreads -= o.nreads;
             t.ndiskRead -= o.ndiskRead;
             t.bytesRead -= o.bytesRead;
             t.bytesReadFromDisk -= o.bytesReadFromDisk;
-            t.maxReadSize -= o.maxReadSize;
+            t.maxReadSize -= o.maxReadSize; // @todo report max? min?
             t.elapsedReadNanos -= o.elapsedReadNanos;
             t.elapsedDiskReadNanos -= o.elapsedDiskReadNanos;
-            t.checksumErrorCount.addAndGet(-o.checksumErrorCount.get());
+            t.checksumErrorCount -= o.checksumErrorCount;
 
             t.nwrites -= o.nwrites;
             t.ndiskWrite -= o.ndiskWrite;
-            t.maxWriteSize -= o.maxWriteSize;
+            t.maxWriteSize -= o.maxWriteSize; // @todo report max? min?
             t.bytesWritten -= o.bytesWritten;
             t.bytesWrittenOnDisk -= o.bytesWrittenOnDisk;
             t.elapsedWriteNanos -= o.elapsedWriteNanos;
@@ -483,263 +476,273 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             
         }
         
+        @Override
+        public void clear() {
+
+            // subtract out the given counters.
+            nreads = 0;
+            ndiskRead = 0;
+            bytesRead = 0;
+            bytesReadFromDisk = 0;
+            maxReadSize = 0;
+            elapsedReadNanos = 0;
+            elapsedDiskReadNanos = 0;
+            checksumErrorCount = 0;
+
+            nwrites = 0;
+            ndiskWrite = 0;
+            maxWriteSize = 0;
+            bytesWritten = 0;
+            bytesWrittenOnDisk = 0;
+            elapsedWriteNanos = 0;
+            elapsedDiskWriteNanos = 0;
+
+            nforce = 0;
+            ntruncate = 0;
+            nreopen = 0;
+            nwriteRootBlock = 0;
+
+        }
+        
+        @Override
         public CounterSet getCounters() {
 
-            if (root == null) {
+            final CounterSet root = super.getCounters();
 
-                root = new CounterSet();
+            // IRawStore API
+            {
 
-                // IRawStore API
-                {
+                /*
+                 * reads
+                 */
 
-                    /*
-                     * reads
-                     */
+                root.addCounter("nreads", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(nreads);
+                    }
+                });
 
-                    root.addCounter("nreads", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(nreads);
-                        }
-                    });
+                root.addCounter("bytesRead", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(bytesRead);
+                    }
+                });
 
-                    root.addCounter("bytesRead", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(bytesRead);
-                        }
-                    });
+                root.addCounter("readSecs", new Instrument<Double>() {
+                    public void sample() {
+                        final double elapsedReadSecs = (elapsedReadNanos / 1000000000.);
+                        setValue(elapsedReadSecs);
+                    }
+                });
 
-                    root.addCounter("readSecs", new Instrument<Double>() {
-                        public void sample() {
-                            final double elapsedReadSecs = (elapsedReadNanos / 1000000000.);
-                            setValue(elapsedReadSecs);
-                        }
-                    });
+                root.addCounter("bytesReadPerSec", new Instrument<Double>() {
+                    public void sample() {
+                        final double readSecs = (elapsedReadNanos / 1000000000.);
+                        final double bytesReadPerSec = (readSecs == 0L ? 0d
+                                : (bytesRead / readSecs));
+                        setValue(bytesReadPerSec);
+                    }
+                });
 
-                    root.addCounter("bytesReadPerSec",
-                            new Instrument<Double>() {
-                                public void sample() {
-                                    final double readSecs = (elapsedReadNanos / 1000000000.);
-                                    final double bytesReadPerSec = (readSecs == 0L ? 0d
-                                            : (bytesRead / readSecs));
-                                    setValue(bytesReadPerSec);
-                                }
-                            });
+                root.addCounter("maxReadSize", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(maxReadSize);
+                    }
+                });
 
-                    root.addCounter("maxReadSize", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(maxReadSize);
-                        }
-                    });
+                root.addCounter("checksumErrorCount", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(checksumErrorCount);
+                    }
+                });
 
-                    root.addCounter("checksumErrorCount", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(checksumErrorCount.get());
-                        }
-                    });
+                /*
+                 * writes
+                 */
 
-                    /*
-                     * writes
-                     */
+                root.addCounter("nwrites", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(nwrites);
+                    }
+                });
 
-                    root.addCounter("nwrites", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(nwrites);
-                        }
-                    });
+                root.addCounter("bytesWritten", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(bytesWritten);
+                    }
+                });
 
-                    root.addCounter("bytesWritten", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(bytesWritten);
-                        }
-                    });
+                root.addCounter("writeSecs", new Instrument<Double>() {
+                    public void sample() {
+                        final double writeSecs = (elapsedWriteNanos / 1000000000.);
+                        setValue(writeSecs);
+                    }
+                });
 
-                    root.addCounter("writeSecs", new Instrument<Double>() {
-                        public void sample() {
-                            final double writeSecs = (elapsedWriteNanos / 1000000000.);
-                            setValue(writeSecs);
-                        }
-                    });
+                root.addCounter("bytesWrittenPerSec", new Instrument<Double>() {
+                    public void sample() {
+                        final double writeSecs = (elapsedWriteNanos / 1000000000.);
+                        final double bytesWrittenPerSec = (writeSecs == 0L ? 0d
+                                : (bytesWritten / writeSecs));
+                        setValue(bytesWrittenPerSec);
+                    }
+                });
 
-                    root.addCounter("bytesWrittenPerSec",
-                            new Instrument<Double>() {
-                                public void sample() {
-                                    final double writeSecs = (elapsedWriteNanos / 1000000000.);
-                                    final double bytesWrittenPerSec = (writeSecs == 0L ? 0d
-                                            : (bytesWritten / writeSecs));
-                                    setValue(bytesWrittenPerSec);
-                                }
-                            });
+                root.addCounter("maxWriteSize", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(maxWriteSize);
+                    }
+                });
 
-                    root.addCounter("maxWriteSize", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(maxWriteSize);
-                        }
-                    });
+            }
 
-                }
+            // disk statistics
+            {
+                final CounterSet disk = root.makePath("disk");
 
-                // disk statistics
-                {
-                    final CounterSet disk = root.makePath("disk");
+                /*
+                 * read
+                 */
 
-                    /*
-                     * read
-                     */
+                disk.addCounter("nreads", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(ndiskRead);
+                    }
+                });
 
-                    disk.addCounter("nreads", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(ndiskRead);
-                        }
-                    });
+                disk.addCounter("bytesRead", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(bytesReadFromDisk);
+                    }
+                });
 
-                    disk.addCounter("bytesRead", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(bytesReadFromDisk);
-                        }
-                    });
+                disk.addCounter("bytesPerRead", new Instrument<Double>() {
+                    public void sample() {
+                        final double bytesPerDiskRead = (ndiskRead == 0 ? 0d
+                                : (bytesReadFromDisk / (double) ndiskRead));
+                        setValue(bytesPerDiskRead);
+                    }
+                });
 
-                    disk.addCounter("bytesPerRead", new Instrument<Double>() {
-                        public void sample() {
-                            final double bytesPerDiskRead = (ndiskRead == 0 ? 0d
-                                    : (bytesReadFromDisk / (double)ndiskRead));
-                            setValue(bytesPerDiskRead);
-                        }
-                    });
+                disk.addCounter("readSecs", new Instrument<Double>() {
+                    public void sample() {
+                        final double diskReadSecs = (elapsedDiskReadNanos / 1000000000.);
+                        setValue(diskReadSecs);
+                    }
+                });
 
-                    disk.addCounter("readSecs", new Instrument<Double>() {
-                        public void sample() {
-                            final double diskReadSecs = (elapsedDiskReadNanos / 1000000000.);
-                            setValue(diskReadSecs);
-                        }
-                    });
+                disk.addCounter("bytesReadPerSec", new Instrument<Double>() {
+                    public void sample() {
+                        final double diskReadSecs = (elapsedDiskReadNanos / 1000000000.);
+                        final double bytesReadPerSec = (diskReadSecs == 0L ? 0d
+                                : bytesReadFromDisk / diskReadSecs);
+                        setValue(bytesReadPerSec);
+                    }
+                });
 
-                    disk.addCounter("bytesReadPerSec",
-                            new Instrument<Double>() {
-                                public void sample() {
-                                    final double diskReadSecs = (elapsedDiskReadNanos / 1000000000.);
-                                    final double bytesReadPerSec = (diskReadSecs == 0L ? 0d
-                                            : bytesReadFromDisk / diskReadSecs);
-                                    setValue(bytesReadPerSec);
-                                }
-                            });
+                disk.addCounter("secsPerRead", new Instrument<Double>() {
+                    public void sample() {
+                        final double diskReadSecs = (elapsedDiskReadNanos / 1000000000.);
+                        final double readLatency = (diskReadSecs == 0 ? 0d
+                                : diskReadSecs / ndiskRead);
+                        setValue(readLatency);
+                    }
+                });
 
-                    disk.addCounter("secsPerRead", new Instrument<Double>() {
-                        public void sample() {
-                            final double diskReadSecs = (elapsedDiskReadNanos / 1000000000.);
-                            final double readLatency = (diskReadSecs == 0 ? 0d
-                                    : diskReadSecs / ndiskRead);
-                            setValue(readLatency);
-                        }
-                    });
+                /*
+                 * write
+                 */
 
-                    /*
-                     * write
-                     */
+                disk.addCounter("nwrites", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(ndiskWrite);
+                    }
+                });
 
-                    disk.addCounter("nwrites", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(ndiskWrite);
-                        }
-                    });
+                disk.addCounter("bytesWritten", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(bytesWrittenOnDisk);
+                    }
+                });
 
-                    disk.addCounter("bytesWritten", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(bytesWrittenOnDisk);
-                        }
-                    });
+                disk.addCounter("bytesPerWrite", new Instrument<Double>() {
+                    public void sample() {
+                        final double bytesPerDiskWrite = (ndiskWrite == 0 ? 0d
+                                : (bytesWrittenOnDisk / (double) ndiskWrite));
+                        setValue(bytesPerDiskWrite);
+                    }
+                });
 
-                    disk.addCounter("bytesPerWrite", new Instrument<Double>() {
-                        public void sample() {
-                            final double bytesPerDiskWrite = (ndiskWrite == 0 ? 0d
-                                    : (bytesWrittenOnDisk / (double)ndiskWrite));
-                            setValue(bytesPerDiskWrite);
-                        }
-                    });
+                disk.addCounter("writeSecs", new Instrument<Double>() {
+                    public void sample() {
+                        final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
+                        setValue(diskWriteSecs);
+                    }
+                });
 
-                    disk.addCounter("writeSecs", new Instrument<Double>() {
-                        public void sample() {
-                            final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
-                            setValue(diskWriteSecs);
-                        }
-                    });
+                disk.addCounter("bytesWrittenPerSec", new Instrument<Double>() {
+                    public void sample() {
+                        final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
+                        final double bytesWrittenPerSec = (diskWriteSecs == 0L ? 0d
+                                : bytesWrittenOnDisk / diskWriteSecs);
+                        setValue(bytesWrittenPerSec);
+                    }
+                });
 
-                    disk.addCounter("bytesWrittenPerSec",
-                            new Instrument<Double>() {
-                                public void sample() {
-                                    final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
-                                    final double bytesWrittenPerSec = (diskWriteSecs == 0L ? 0d
-                                            : bytesWrittenOnDisk
-                                                    / diskWriteSecs);
-                                    setValue(bytesWrittenPerSec);
-                                }
-                            });
+                disk.addCounter("secsPerWrite", new Instrument<Double>() {
+                    public void sample() {
+                        final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
+                        final double writeLatency = (diskWriteSecs == 0 ? 0d
+                                : diskWriteSecs / ndiskWrite);
+                        setValue(writeLatency);
+                    }
+                });
 
-                    disk.addCounter("secsPerWrite", new Instrument<Double>() {
-                        public void sample() {
-                            final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
-                            final double writeLatency = (diskWriteSecs == 0 ? 0d
-                                    : diskWriteSecs / ndiskWrite);
-                            setValue(writeLatency);
-                        }
-                    });
+                /*
+                 * other
+                 */
 
-                    /*
-                     * other
-                     */
+                disk.addCounter("nforce", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(nforce);
+                    }
+                });
 
-                    disk.addCounter("nforce", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(nforce);
-                        }
-                    });
+                disk.addCounter("nextend", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(ntruncate);
+                    }
+                });
 
-                    disk.addCounter("nextend", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(ntruncate);
-                        }
-                    });
+                disk.addCounter("nreopen", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(nreopen);
+                    }
+                });
 
-                    disk.addCounter("nreopen", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(nreopen);
-                        }
-                    });
-
-                    disk.addCounter("rootBlockWrites", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(nwriteRootBlock);
-                        }
-                    });
-
-                }
+                disk.addCounter("rootBlockWrites", new Instrument<Long>() {
+                    public void sample() {
+                        setValue(nwriteRootBlock);
+                    }
+                });
 
             }
 
             return root;
 
         }
-        private CounterSet root;
         
-        /**
-         * Human readable representation of the counters.
-         */
-        public String toString() {
-
-            return getCounters().toString();
-            
-        }
-        
-    }
+    } // class StoreCounters
     
     /**
-     * Performance counters for this class.
+     * Striped performance counters for this class.
      */
-    private final AtomicReference<StoreCounters> storeCounters = new AtomicReference<StoreCounters>(new StoreCounters());
+    private final AtomicReference<StoreCounters> storeCounters = new AtomicReference<StoreCounters>();
 
     /**
-     * Returns the performance counters for the store.
+     * Returns the striped performance counters for the store.
      */
-    public StoreCounters getStoreCounters() {
+    public StoreCounters<?> getStoreCounters() {
 
         return storeCounters.get();
 
@@ -754,7 +757,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * @throws IllegalArgumentException
      *             if the argument is <code>null</code>.
      */
-    public void setStoreCounters(final StoreCounters storeCounters) {
+    public void setStoreCounters(final StoreCounters<?> storeCounters) {
 
         if (storeCounters == null)
             throw new IllegalArgumentException();
@@ -782,6 +785,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             }
         });
 
+        // attach the most recently updated values from the striped counters.
         root.attach(storeCounters.get().getCounters());
 
         if (writeCacheService != null) {
@@ -836,6 +840,9 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         this.quorumManager = quorumManager;
 
         this.useChecksums = fileMetadata.useChecksums;
+        
+        // initialize striped performance counters for this store.
+        this.storeCounters.set(new StoreCounters(10/* batchSize */));
         
         /*
          * Enable the write cache?
@@ -999,7 +1006,13 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
             }
 
-            storeCounters.get().nforce++;
+            final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
+                    .acquire();
+            try {
+                c.nforce++;
+            } finally {
+                c.release();
+            }
 
         } catch (IOException ex) {
 
@@ -1093,7 +1106,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         }
         
-        if( fileOpened && file.exists() && ! file.delete() ) {
+        if (fileOpened && file.exists() && !file.delete()) {
             
             log.warn("Could not delete file: " + file.getAbsoluteFile());
             
@@ -1114,12 +1127,88 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     }
 
     /**
+     * Extended to handle {@link ChecksumError}s by reading on another node when
+     * the {@link Quorum} (iff the quorum is highly available).
+     * <p>
+     * {@inheritDoc}
+     * 
+     * @todo hook for monitoring (nagios, etc). bad reads indicate a problem
+     *       with the disk which should be tracked over time.
+     * 
+     * @todo If we see a read error from a checksum and want to update the
+     *       record on the backing file then we would have to go around the
+     *       write cache to do a direct disk write since (at least for the WORM)
+     *       the assumption is pure append for the write cache.
+     *       <p>
+     *       An attempt to overwrite a bad record on the disk could itself be a
+     *       bad idea. If it was just a high write, then it might be Ok. But
+     *       many other kinds of errors are likely to have long pauses while the
+     *       OS attempts to get a good read/write from the file system.
+     * 
+     * @todo If the record can be successfully read from the remote quorum, then
+     *       it will generally be inserted into the {@link LRUNexus} which will
+     *       reduce the likelihood that we will attempt to read it from the
+     *       backing file "soon.
+     *       <p>
+     *       We might want to maintain a set of known bad records and fail the
+     *       node when the size of that set grows too large. That would also
+     *       help us to avoid "hanging" on a bad read when we know that we have
+     *       to get the data from another node based on past experience for that
+     *       record.
+     */
+    public ByteBuffer read(final long addr) {
+
+        try {
+            // Try reading from the disk.
+            return readFromDisk(addr);
+        } catch (ChecksumError e) {
+            /*
+             * Note: This assumes that the ChecksumError is not wrapped by
+             * another exception. If it is, then the ChecksumError would not be
+             * caught.
+             */
+            // log the error.
+            try {
+                log.error(e + " : addr=" + toString(addr), e);
+            } catch (Throwable ignored) {
+                // ignore error in logging system.
+            }
+            // update the performance counters.
+            final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
+                    .acquire();
+            try {
+                c.checksumErrorCount++;
+            } finally {
+                c.release();
+            }
+            if (quorumManager.isHighlyAvailable()) {
+                final Quorum q = quorumManager.getQuorum();
+                if (q.isQuorumMet()) {
+                    try {
+                        // Read on another node in the quorum.
+                        return q.readFromQuorum(addr);
+                    } catch (Throwable t) {
+                        throw new RuntimeException("While handling: " + e, t);
+                    }
+                }
+            }
+            // Otherwise rethrow the checksum error.
+            throw e;
+        }
+        
+    }
+
+    /**
+     * Read from the disk. This is automatically invoked by {@link #read(long)}.
+     * It is public so it may also be used to handle a {@link ChecksumError} by
+     * reading on another node in a highly available {@link Quorum}.
+     * <p>
      * Note: {@link ClosedChannelException} and
      * {@link AsynchronousCloseException} can get thrown out of this method
      * (wrapped as {@link RuntimeException}s) if a reader task is interrupted.
      */
-    public ByteBuffer read(final long addr) {
-
+    public ByteBuffer readFromDisk(final long addr) {
+        
         final long begin = System.nanoTime();
         
         if (addr == 0L)
@@ -1141,13 +1230,16 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         }
 
-        final StoreCounters storeCounters = this.storeCounters.get();
-
-        if (nbytes > storeCounters.maxReadSize) {
-
-            // @todo not atomic.
-            storeCounters.maxReadSize = nbytes;
-
+        {
+            final StoreCounters<?> storeCounters = (StoreCounters<?>) this.storeCounters
+                    .get().acquire();
+            try {
+                if (nbytes > storeCounters.maxReadSize) {
+                    storeCounters.maxReadSize = nbytes;
+                }
+            } finally {
+                storeCounters.release();
+            }
         }
 
         if (writeCacheService != null) {
@@ -1163,35 +1255,29 @@ public class WORMStrategy extends AbstractBufferStrategy implements
              */
             ByteBuffer tmp;
             try {
+                // Note: Can throw ChecksumError.
                 tmp = writeCacheService.read(offset);
-            } catch (ChecksumError e) {
-                /*
-                 * This is a bad read from the local disk as identified by a
-                 * checksum error on the data in the record.
-                 */
-                storeCounters.checksumErrorCount.incrementAndGet();
-                // FIXME If HA, then read on the quorum.
-                throw new RuntimeException(e);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
             if (tmp != null) {
-
                 /*
                  * Hit on the write cache.
                  * 
                  * Update the store counters.
                  */
-
-                storeCounters.nreads++;
-                storeCounters.bytesRead += nbytes;
-                storeCounters.elapsedReadNanos += (System.nanoTime() - begin);
-
-                if (log.isTraceEnabled())
-                    log.trace("cacheHit: addr=" + toString(addr));
-
+                final StoreCounters<?> c = (StoreCounters<?>) storeCounters
+                        .get().acquire();
+                try {
+                    c.nreads++;
+                    c.bytesRead += nbytes;
+                    c.elapsedReadNanos += (System.nanoTime() - begin);
+                } finally {
+                    c.release();
+                }
+//                if (log.isTraceEnabled())
+//                    log.trace("cacheRead: addr=" + toString(addr));
                 return tmp;
-
             }
             
         } // if(writeCacheService!=null)
@@ -1217,8 +1303,18 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 // the offset into the disk file.
                 final long pos = headerSize + offset;
 
-                storeCounters.ndiskRead += FileChannelUtility.readAll(opener,
-                        dst, pos);
+                // read on the disk.
+                final int ndiskRead = FileChannelUtility.readAll(opener, dst,
+                        pos);
+
+                // update performance counters.
+                final StoreCounters<?> c = (StoreCounters<?>) storeCounters
+                        .get().acquire();
+                try {
+                    c.ndiskRead += ndiskRead;
+                } finally {
+                    c.release();
+                }
 
             } catch (IOException ex) {
 
@@ -1238,26 +1334,26 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 dst.limit(nbytes - 4);
                 
                 if (chk != ChecksumUtility.threadChk.get().checksum(dst)) {
-                    /*
-                     * This is a bad read from the local disk as identified by a
-                     * checksum error on the data in the record.
-                     */
-                    storeCounters.checksumErrorCount.incrementAndGet();
-                    // FIXME If HA, then read on the quorum.
+                    
                     throw new ChecksumError("offset=" + offset + ", nbytes="
                             + nbytes);
+                
                 }
 
             }
             
-            /*
-             * Update counters @todo synchronized.
-             */
-            storeCounters.nreads++;
-            storeCounters.bytesRead += nbytes;
-            storeCounters.bytesReadFromDisk += nbytes;
-            storeCounters.elapsedReadNanos += (System.nanoTime() - begin);
-            storeCounters.elapsedDiskReadNanos += (System.nanoTime() - beginDisk);
+            // Update counters.
+            final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
+                    .acquire();
+            try {
+                c.nreads++;
+                c.bytesRead += nbytes;
+                c.bytesReadFromDisk += nbytes;
+                c.elapsedReadNanos += (System.nanoTime() - begin);
+                c.elapsedDiskReadNanos += (System.nanoTime() - beginDisk);
+            } finally {
+                c.release();
+            }
 
             if (log.isTraceEnabled())
                 log.trace("diskRead: addr=" + toString(addr));
@@ -1272,7 +1368,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         }
 
     }
-
+    
     /**
      * Used to re-open the {@link FileChannel} in this class.
      */
@@ -1386,7 +1482,14 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
             }
 
-            storeCounters.get().nreopen++;
+            // Update counters.
+            final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
+                    .acquire();
+            try {
+                c.nreopen++;
+            } finally {
+                c.release();
+            }
 
             return raf.getChannel();
 
@@ -1464,7 +1567,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         final long begin = System.nanoTime();
         
-        final StoreCounters storeCounters = this.storeCounters.get();
+//        final StoreCounters storeCounters = this.storeCounters.get();
 
         // get checksum for the buffer contents.
         final int chk = useChecksums ? ChecksumUtility.threadChk.get()
@@ -1555,20 +1658,23 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                     }
 
                 } // if(!wroteOnCache)
-                /*
-                 * Update counters while we are synchronized. If done outside of
-                 * the synchronization block then we need to use AtomicLongs
-                 * rather than primitive longs.
-                 */
-                storeCounters.nwrites++;
-                storeCounters.bytesWritten += nwrite;
-                storeCounters.elapsedWriteNanos += (System.nanoTime() - begin);
-                if (nwrite > storeCounters.maxWriteSize) {
-                    storeCounters.maxWriteSize = nwrite;
-                }
 
             } // synchronized(writeOnCacheLock)
-            
+
+            // Update counters.
+            final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
+                    .acquire();
+            try {
+                c.nwrites++;
+                c.bytesWritten += nwrite;
+                c.elapsedWriteNanos += (System.nanoTime() - begin);
+                if (nwrite > c.maxWriteSize) {
+                    c.maxWriteSize = nwrite;
+                }
+            } finally {
+                c.release();
+            }
+
         } catch(InterruptedException ex) {
             
             throw new RuntimeException(ex);
@@ -1687,11 +1793,6 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      *            blocks).
      * 
      * @return The #of write operations against the disk.
-     * 
-     * @todo When we see a read error from a checksum and attempt to update the
-     *       record on the disk we will have to go around the write cache to do
-     *       a direct disk write since (at least for the WORM) the assumption is
-     *       pure append for the write cache.
      */
     private int writeOnDisk(final ByteBuffer data, final long offset) {
         
@@ -1703,7 +1804,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         
         final long begin = System.nanoTime();
 
-        final StoreCounters storeCounters = this.storeCounters.get();
+//        final StoreCounters storeCounters = this.storeCounters.get();
 
         createBackingFile();
         
@@ -1731,10 +1832,17 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
             nwrites = FileChannelUtility.writeAll(opener, data, pos);
 
+            // Update counters.
             final long elapsed = (System.nanoTime() - begin);
-            storeCounters.ndiskWrite += nwrites;
-            storeCounters.bytesWrittenOnDisk += nbytes;
-            storeCounters.elapsedDiskWriteNanos += elapsed;
+            final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
+                    .acquire();
+            try {
+                c.ndiskWrite += nwrites;
+                c.bytesWrittenOnDisk += nbytes;
+                c.elapsedDiskWriteNanos += elapsed;
+            } finally {
+                c.release();
+            }
             
             if (log.isTraceEnabled()) {
                 /*
@@ -1748,10 +1856,10 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                         + TimeUnit.NANOSECONDS.toMillis(elapsed)
                         + "ms; totals: write="
                         + TimeUnit.NANOSECONDS
-                                .toMillis(storeCounters.elapsedDiskWriteNanos)
+                                .toMillis(storeCounters.get().elapsedDiskWriteNanos)
                         + "ms, read="
                         + TimeUnit.NANOSECONDS
-                                .toMillis(storeCounters.elapsedDiskReadNanos)
+                                .toMillis(storeCounters.get().elapsedDiskReadNanos)
                         + "ms");
             }
 
@@ -1861,7 +1969,14 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                     
                 }
 
-                storeCounters.get().nwriteRootBlock++;
+                // Update counters.
+                final StoreCounters<?> c = (StoreCounters<?>) storeCounters.get()
+                        .acquire();
+                try {
+                    c.nwriteRootBlock++;
+                } finally {
+                    c.release();
+                }
                 
             } finally {
 
