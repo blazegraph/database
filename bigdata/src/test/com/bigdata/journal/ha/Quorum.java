@@ -91,58 +91,6 @@ public interface Quorum {
      */
     HAGlue getHAGlue(int index);
     
-    // /**
-    // * The set of nodes which are discovered and have an agreement on the
-    // * distributed state of the journal.
-    // */
-    // ServiceID[] getServiceIDsInQuorum();
-
-    /*
-     * consider: service leave()/join()
-     * 
-     * consider: quorum met()/broken()
-     * 
-     * These might be notification messages subscribed to by the individual
-     * services.  The origin for this information is zk.
-     */
-    
-    /*
-     * Note: write() is handled at the WriteCache.  Entire WriteCache instances
-     * are send down a configured pipeline at a time.
-     */
-//    /**
-//     * Write a record on the failover chain. Only quorum members will accept the
-//     * write.
-//     * 
-//     * @param newaddr
-//     * @param oldaddr
-//     * @param bd
-//     * @return
-//     */
-//    public RunnableFuture<Void> write(long newaddr, long oldaddr, BufferDescriptor bd) {
-//        
-//        throw new UnsupportedOperationException();
-//        
-//    }
-
-    /*
-     * Note: Moved down to the write pipeline.
-     */
-//    /*
-//     * file extension.
-//     */
-//
-//    /**
-//     * Set the file length on all the services in the quorum.
-//     * <p>
-//     * Note: This method is invoked automatically by the master if the
-//     * {@link IBufferStrategy} needs to extend the file length for its managed
-//     * backing file. The hook is within the {@link IBufferStrategy}
-//     * implementation since the request to extend the file to make room for
-//     * additional writes does not go through the {@link AbstractJournal}.
-//     */
-//    void truncate(long extent);
-
     /*
      * bad reads
      */
@@ -155,10 +103,20 @@ public interface Quorum {
      * by the local disk) by reading the record from another member of the
      * quorum.
      * 
-     * @todo hook for monitoring (nagios, etc). bad reads indicate a probable
-     *       problem.
+     * @return The record.
+     * 
+     * @throws IllegalStateException
+     *             if the quorum is not highly available.
+     * @throws RuntimeException
+     *             if the quorum is highly available but the record could not be
+     *             read.
      */
-    void readFromQuorum(long addr, ByteBuffer b);
+    ByteBuffer readFromQuorum(long addr) throws InterruptedException,
+            IOException;
+
+    /*
+     * quorum commit.
+     */
 
     /**
      * Send a message to each member of the quorum instructing it to flush all

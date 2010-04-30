@@ -750,7 +750,8 @@ abstract public class WriteCache implements IWriteCache {
                 if (chk != ChecksumUtility.threadChk.get().checksum(b,
                         0/* offset */, b.length)) {
 
-                    throw new ChecksumError();
+                    // Note: [offset] is a (possibly relative) file offset.
+                    throw new ChecksumError("offset=" + offset);
 
                 }
 

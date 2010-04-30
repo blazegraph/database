@@ -96,16 +96,14 @@ public class MockSingletonQuorumManager implements QuorumManager {
             return null;
         }
 
-        public int prepare2Phase(IRootBlockView rootBlock, long timeout,
-                TimeUnit unit) throws InterruptedException,
-                TimeoutException, IOException {
+        public int prepare2Phase(IRootBlockView rootBlock, long timeout, TimeUnit unit)
+                throws InterruptedException, TimeoutException, IOException {
             // TODO Auto-generated method stub
             return 0;
         }
 
-        public void readFromQuorum(long addr, ByteBuffer b) {
-            // TODO Auto-generated method stub
-            
+        public ByteBuffer readFromQuorum(long addr) {
+            throw new IllegalStateException();
         }
 
         public int replicationFactor() {
