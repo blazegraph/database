@@ -392,7 +392,7 @@ public abstract class SocketMessage<T> implements Externalizable {
 
 	public void acknowledge(AckMessage<?,?> ack) throws IOException {
 		if (server == null) {
-			throw new IllegalStateException("No HASerevr set for this message");
+			throw new IllegalStateException("No HAServer set for this message");
 		}
 		server.acknowledge(ack);
 	}

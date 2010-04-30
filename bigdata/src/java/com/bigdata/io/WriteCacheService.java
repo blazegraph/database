@@ -63,6 +63,7 @@ import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.WORMStrategy;
+import com.bigdata.journal.StressTestConcurrentUnisolatedIndices.WriteTask;
 import com.bigdata.journal.ha.HAConnect;
 import com.bigdata.journal.ha.HAGlue;
 import com.bigdata.journal.ha.HAServer;
@@ -193,29 +194,50 @@ abstract public class WriteCacheService implements IWriteCache {
      * chain.
      */
     final AtomicReference<HAServer> haServer = new AtomicReference<HAServer>();
-    
-    final AtomicReference<HAConnect> haConnect = new AtomicReference<HAConnect>(); 
-    
+
     /**
-     * TODO: Should this await a quorum before attempting to connect to the downstream?
+     * The {@link HAConnect} is the local process used to talk to the downstream
+     * {@link HAServer} instance.
+     */
+    final AtomicReference<HAConnect> haConnect = new AtomicReference<HAConnect>();
+
+    /**
+     * TODO: Should this await a quorum before attempting to connect to the
+     * downstream?
+     * 
+     * TODO: Should this be moved to inside of the {@link WriteTask}? That way
+     * we can scope the {@link HAConnect} to the {@link WriteTask}, which seems
+     * correct.
      * 
      * @param quorumManager
      * @return
-     * @throws IOException 
+     * @throws IOException
      */
-    private HAConnect establishHAConnect(QuorumManager quorumManager) throws IOException {
-        if (haConnect.get() == null) {
-            Quorum quorum = quorumManager.getQuorum();
-            
+    private HAConnect establishHAConnect(final QuorumManager quorumManager)
+            throws IOException {
+        
+        HAConnect c = haConnect.get();
+        if (c == null) {
+            final Quorum quorum = quorumManager.getQuorum();
             final HAGlue glue = quorum.getHAGlue(quorum.getIndex() + 1); 
             final InetAddress addr = glue.getWritePipelineAddr();
             final int port = glue.getWritePipelinePort();
-            HAConnect c = new HAConnect(new InetSocketAddress(addr, port));
+            c = new HAConnect(new InetSocketAddress(addr, port));
             haConnect.set(c);
-            c.start();//FIXME how do we notice if HAConnect fails?
+            c.start();
+        } else {
+            if (!c.isAlive()) {
+                /*
+                 * Note: Throw out an exception. This is called from within
+                 * WriteTask.call(). If the HAConnect is dead then we need to
+                 * reestablish the write pipeline, so we need to abort the
+                 * current WriteTask.call(), do a high-level abort, and then
+                 * setup the WriteTask again.
+                 */
+                throw new RuntimeException("HAConnect is dead.");
+            }
         }
-        
-        return haConnect.get();
+        return c;
     }
     
     /**
@@ -442,11 +464,16 @@ abstract public class WriteCacheService implements IWriteCache {
                 .newSingleThreadExecutor(new DaemonThreadFactory(getClass()
                         .getName()));
 
-        if (quorumManager.replicationFactor() > 1) {
-            // service used to write on the downstream node in the quorum.
-            remoteWriteService = Executors
-                    .newSingleThreadExecutor(new DaemonThreadFactory(getClass()
-                            .getName()));
+        if (quorumManager.isHighlyAvailable()) {
+            final Quorum q = quorumManager.getQuorum();
+            if (q.getIndex() + 1 < q.size()) {
+                // service used to write on the downstream node in the quorum.
+                remoteWriteService = Executors
+                        .newSingleThreadExecutor(new DaemonThreadFactory(
+                                getClass().getName()));
+            } else {
+                remoteWriteService = null;
+            }
         } else {
             remoteWriteService = null;
         }
@@ -658,6 +685,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
                     // Start downstream IOs (network IO) iff highly availably.
                     if (remoteWriteService != null) {
+                        // establish connection or return existing connection.
                         final HAConnect cxn = establishHAConnect(quorumManager);
                         final Runnable r = cache
                                 .getDownstreamWriteRunnable(cxn);
@@ -847,6 +875,16 @@ abstract public class WriteCacheService implements IWriteCache {
                     log.warn(t, t);
                 }
             }
+            /*
+             * If there is an HAConnect running, then interrupt it so it will
+             * terminate.
+             */
+            {
+                final HAConnect cxn = haConnect.getAndSet(null/* clear */);
+                if (cxn != null) {
+                    cxn.interrupt();
+                }
+            }
 
             // drain the dirty list.
             dirtyListLock.lockInterruptibly();
@@ -947,6 +985,16 @@ abstract public class WriteCacheService implements IWriteCache {
                     rwf.cancel(true/* mayInterruptIfRunning */);
                 } catch (Throwable t) {
                     log.warn(t, t);
+                }
+            }
+            /*
+             * If there is an HAConnect running, then interrupt it so it will
+             * terminate.
+             */
+            {
+                final HAConnect cxn = haConnect.getAndSet(null/* clear */);
+                if (cxn != null) {
+                    cxn.interrupt();
                 }
             }
 
@@ -1054,7 +1102,7 @@ abstract public class WriteCacheService implements IWriteCache {
              */
 
             try {
-
+                // @todo don't do get() all the time...?
                 localWriteFuture.get();
 
             } catch (Throwable t) {

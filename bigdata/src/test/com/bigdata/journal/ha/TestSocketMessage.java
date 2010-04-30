@@ -294,41 +294,48 @@ public class TestSocketMessage extends TestCase3 {
 				System.out.println("Got truncate acknowledgement : " + truncateConfirm.twinId);
 			}
 		};
-//		try {
-			msg1.setHandler(whandler);
-			msg2.setHandler(thandler);
-			msg3.setHandler(whandler);
-			
-			long addr1 = 0;
-			cache1.write(addr1, data1, 0);
-			long addr2 = addr1 + data1.capacity();
-            assertTrue(cache1.write(addr2, data4, 0));
-            // verify record @ addr can be read.
-            assertNotNull(cache1.read(addr2));
-            // verify data read back @ addr.
-            // assertEquals(data4, cache1.read(addr1));            
-			
-			long addr3 = addr2 + data4.capacity();
-			cache3.write(addr3, data5, 0);
-			
-			// messages are processed in sequence, so just wait for last one
-			messenger.send(msg3);
-			messenger.send(msg1);
-			messenger.send(msg2, true);
-			
-			// Thread.sleep(2000); // give chance for messages to be processed
-	           assertNotNull(cache1.read(addr2));
-			
-			// assertEquals(data4, cache1.read(0)); // did the data get the the downstream cache?
-			ByteBuffer tst1 = cache1.read(addr2);
-			ByteBuffer tst2 = cache2.read(addr2);
-			System.out.println("tst capacity: " + tst1.capacity() + "/" + tst2.capacity());
-			// At present is a problem with WriteCache (test fails)
-			// assertEquals(data4, tst1); // did the data get the the downstream cache?
-//		} catch (InterruptedException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
-	}
+
+        msg1.setHandler(whandler);
+        msg2.setHandler(thandler);
+        msg3.setHandler(whandler);
+
+        long addr1 = 0;
+        cache1.write(addr1, data1, 0);
+        long addr2 = addr1 + data1.capacity();
+        assertTrue(cache1.write(addr2, data4, 0));
+        // verify record @ addr can be read.
+        assertNotNull(cache1.read(addr2));
+        // verify data read back @ addr.
+        // assertEquals(data4, cache1.read(addr1));
+
+        long addr3 = addr2 + data4.capacity();
+        cache3.write(addr3, data5, 0);
+
+        // messages are processed in sequence, so just wait for last one
+        messenger.send(msg3);
+        messenger.send(msg1);
+        messenger.send(msg2, true);
+
+        // Thread.sleep(2000); // give chance for messages to be processed
+        assertNotNull(cache1.read(addr2));
+
+        // assertEquals(data4, cache1.read(0)); // did the data get the the
+        // downstream cache?
+        ByteBuffer tst1 = cache1.read(addr2);
+        ByteBuffer tst2 = cache2.read(addr2);
+        System.out.println("tst capacity: " + tst1.capacity() + "/"
+                + tst2.capacity());
+        // At present is a problem with WriteCache (test fails)
+        // assertEquals(data4, tst1); // did the data get the the downstream
+        // cache?
+        
+        /*
+         * FIXME This unit test will "pass" even though the operation did not
+         * succeed. It needs to do more to verify that the state change was
+         * undertaken by all nodes.
+         */
+        fail("finish test");
+        
+    }
 
 }

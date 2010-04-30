@@ -56,11 +56,19 @@ public class HAConnect extends Thread {
 
 	private ObjectSocketChannelStream m_out = null;
 
-	public HAConnect(InetSocketAddress inetSocketAddress) throws IOException {
-	    
-	    this.inetSocketAddress = inetSocketAddress;
-	}
-	
+    /**
+     * Create a connection to a downstream service - you MUST {@link #start()}
+     * the thread.
+     * 
+     * @param inetSocketAddress
+     * @throws IOException
+     */
+    public HAConnect(final InetSocketAddress inetSocketAddress)
+            throws IOException {
+
+        this.inetSocketAddress = inetSocketAddress;
+    }
+
 	/**
 	 * Fix for deadlock bug in NIO
 	 * @param channel
@@ -132,7 +140,8 @@ public class HAConnect extends Thread {
             throw new RuntimeException(e);
             
         } finally {
-            
+
+            log.info("Shutting down.");
             if (socketChannel != null) {
                 try {
                     socketChannel.close();
@@ -140,6 +149,7 @@ public class HAConnect extends Thread {
                     log.error(e,e);
                 }
             }
+            m_out = null;
             
         }
 
@@ -155,13 +165,16 @@ public class HAConnect extends Thread {
     public void send(SocketMessage<?> msg) throws IOException,
             InterruptedException {
 
-        send(msg, false);
+        send(msg, false/* wait */);
 
 	}
 
     public void send(SocketMessage<?> msg, boolean wait) throws IOException,
             InterruptedException {
-        
+
+        if (m_out == null)
+            throw new IllegalStateException("Not running?");
+
         m_msgs.put(msg.id, msg);
 		
 		System.out.println("--------------------");
