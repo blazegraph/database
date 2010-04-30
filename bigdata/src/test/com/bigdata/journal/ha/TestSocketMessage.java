@@ -393,13 +393,12 @@ public class TestSocketMessage extends TestCase {
 			long addr3 = addr2 + data4.capacity();
 			cache3.write(addr3, data5, 0);
 			
+			// messages are processed in sequence, so just wait for last one
 			messenger.send(msg3);
 			messenger.send(msg1);
-			messenger.send(msg2);
+			messenger.send(msg2, true);
 			
-			// Now let's wait for all the messages
-
-			Thread.sleep(2000); // give chance for messages to be processed
+			// Thread.sleep(2000); // give chance for messages to be processed
 	           assertNotNull(cache1.read(addr2));
 			
 			// assertEquals(data4, cache1.read(0)); // did the data get the the downstream cache?
