@@ -30,6 +30,9 @@ package com.bigdata.io;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -56,7 +59,11 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.DiskOnlyStrategy;
+import com.bigdata.journal.ha.HAConnect;
+import com.bigdata.journal.ha.HAGlue;
+import com.bigdata.journal.ha.Quorum;
 import com.bigdata.journal.ha.QuorumManager;
+import com.bigdata.journal.ha.SocketMessage;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.RWStore;
@@ -1436,10 +1443,39 @@ abstract public class WriteCache implements IWriteCache {
 
 		}
 
+        /**
+         * Return a Runnable that will send an HAWriteMessage
+         */
 		@Override
 		protected Runnable getDownstreamWriteRunnable(QuorumManager quorumManager) {
-			// TODO Auto-generated method stub
-			return null;
+			final HAConnect connect = establishHAConnect(quorumManager);
+			
+			final WriteCache self = this;
+			
+			return new Runnable() {
+
+				@Override
+				public void run() {
+					SocketMessage.HAWriteMessage msg = new SocketMessage.HAWriteMessage(self);
+					
+					connect.send(msg, true); // wait for processing - FIXME: problem with waiting at present
+				}
+				
+			};
+		}
+
+		private HAConnect m_connect = null;
+		
+		private HAConnect establishHAConnect(QuorumManager quorumManager) {
+			if (m_connect == null) {
+				Quorum quorum = quorumManager.getQuorum();
+				
+				final HAGlue glue = quorum.getHAGlue(quorum.getIndex() + 1); 
+				final InetAddress addr = glue.getWritePipelineAddr();
+				final int port = glue.getWritePipelinePort();
+				m_connect = new HAConnect(new InetSocketAddress(addr, port));
+			}
+			return m_connect;
 		}
 
 	}
