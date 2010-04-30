@@ -26,6 +26,7 @@ package com.bigdata.journal.ha;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
@@ -38,6 +39,7 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.ObjectSocketChannelStream;
+import com.bigdata.journal.ha.SocketMessage.AckMessage;
 
 /**
  * The HAServer processes HAMessages and dispatches to a message client.
@@ -53,6 +55,8 @@ public class HAServer extends Thread {
 	Selector selector;
 	SelectionKey serverKey;
 	ServerSocketChannel server;
+
+	private ObjectSocketChannelStream str;
 
     /**
      * @param addr
@@ -71,6 +75,7 @@ public class HAServer extends Thread {
 			selector = Selector.open();
 			server = ServerSocketChannel.open();
 			server.socket().bind(new InetSocketAddress(addr,port));
+			// server.socket().bind(new InetSocketAddress(port));
 			server.configureBlocking(true);
 			// serverKey = server.register(selector, SelectionKey.OP_ACCEPT);
 		} catch (IOException e) {
@@ -94,7 +99,7 @@ public class HAServer extends Thread {
 				log.info("Accepted connection");
 				client.configureBlocking(true);
 
-				ObjectSocketChannelStream str = new ObjectSocketChannelStream(client);
+				str = new ObjectSocketChannelStream(client);
 				this.client.setInputSocket(str);
 				// Now process messages
 				ObjectInputStream instr = str.getInputStream();
@@ -102,6 +107,7 @@ public class HAServer extends Thread {
 					System.out.println("Reading next message from " + str);
 					
 					SocketMessage msg = (SocketMessage) instr.readObject();
+					msg.setHAServer(this);
 					
 					System.out.println("Applying " + msg.getClass().getName());
 					msg.apply(this.client);
@@ -170,5 +176,13 @@ public class HAServer extends Thread {
 				e.printStackTrace();
 			}
 		}
+	}
+
+	public void acknowledge(AckMessage<?, ?> ack) throws IOException {
+		System.out.println("Sending Acknowledge " + ack);
+		
+		ObjectOutputStream ostr = str.getOutputStream();
+		ostr.writeObject(ack);
+		ostr.flush();
 	}
 }

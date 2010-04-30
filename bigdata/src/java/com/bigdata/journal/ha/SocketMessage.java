@@ -35,12 +35,15 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.ObjectSocketChannelStream;
 import com.bigdata.io.WriteCache;
 import com.bigdata.io.WriteCache.RecordMetadata;
+import com.bigdata.journal.ha.SocketMessage.HAWriteMessage.HAWriteConfirm;
 
 /**
  * SocketMessage is a control message that is input from a Socket stream.
@@ -50,33 +53,126 @@ import com.bigdata.io.WriteCache.RecordMetadata;
  * This approach facillitates chaining of data, for example, a client may provide an
  * output stream to which data could be copied from the input.
  * 
+ * An HAAcknowledge message is returned for each message processed if requested.  A
+ * message handler can be registered to process the response which can be awaited by
+ * waiting on the handler that will signal itself when the callback is made:
+ * 
+ * HAMessage msg;
+ * msg.register(handler);
+ * send(msg)
+ * msg.wait();
+ * 
  * @author Martyn Cutcher
   */
 
 public abstract class SocketMessage<T> implements Externalizable {
-
+	static protected AtomicLong ids = new AtomicLong(0);
+	
 	protected static final Logger log = Logger.getLogger(SocketMessage.class);
-
-	public void apply(T client) {
-		
+	
+	long id;
+	
+	void setId() {
+		id = ids.incrementAndGet();
 	}
+	
+	ReentrantLock completeLock = new ReentrantLock();
+	
+	public void await() throws InterruptedException {
+		completeLock.lockInterruptibly();
+		try {
+			completeLock.wait();
+		} finally {
+			completeLock.unlock();
+		}
+	}
+	
+	protected void ackNotify() throws InterruptedException {
+		synchronized (completeLock) {
+			completeLock.notifyAll();
+		}
+	}
+	
+	Object handler = null;
+
+	private HAServer server;
+	void setHandler(Object handler) {
+		this.handler = handler;
+	}
+
+	public abstract void apply(T client);
 	
 //	@Override
 	public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+		id = in.readLong();
+		
+		System.out.println("Reading msg ID: " + id);
 	}
 
 //	@Override
 	public void writeExternal(ObjectOutput out) throws IOException {
+		System.out.println("Writing msg ID: " + id);
+		
+		out.writeLong(id);
 	}
 	
+	interface AckHandler { }
+	
 	/**
+	 * The AckMessage is returned to the sender and is twinned with its message source.
+	 * The HAClient, manages this twinning process, and after calling "apply" if a client
+	 * is registered, will signal the twinned message to awake any control thread awaiting
+	 * the message completion. 
+	 */
+	static abstract class AckMessage<T,M extends SocketMessage<?>> extends SocketMessage<T> {
+		
+		M src;
+		public long twinId;
+		
+		public void setMessageSource(SocketMessage<?> socketMessage) {
+			this.src = (M) socketMessage;
+		}
+		public M getMessageSource() {
+			return src;
+		}
+		
+		/**
+		 * Method delegation enables AckMessage to be treated generically and then call type specific method.
+		 * @param client
+		 */
+		@SuppressWarnings("unchecked")
+		public void processAck() {
+			apply((T) src.handler);
+			
+			try {
+				src.ackNotify();
+			} catch (InterruptedException e) {
+				e.printStackTrace(); // FIXME: not sure what to do here in general
+			}
+		}
+				
+		public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+			super.readExternal(in);
+			
+			twinId = in.readLong();
+		}
+
+//		@Override
+		public void writeExternal(ObjectOutput out) throws IOException {
+			super.writeExternal(out);
+			
+			out.writeLong(twinId);
+		}
+	}
+
+		/**
 	 * The HAWriteMessage transmits a WriteCache buffer, the record map, serialized as a set of
 	 * <offset, address, length> tuples, is included in the message.
 	 * 
 	 * The message will pass data on to the next service in the chain if present, and write data
 	 * to the WriteCache of the local service.
 	 */
-	static class HAWriteMessage extends SocketMessage<IHAClient> {
+	public static class HAWriteMessage extends SocketMessage<IHAClient> {
 		WriteCache wc;
 		
 		public HAWriteMessage() {}
@@ -86,6 +182,7 @@ public abstract class SocketMessage<T> implements Externalizable {
 				throw new IllegalArgumentException("Null WriteCache");
 			}
 			this.wc = wc;
+			setId();
 		}
 		
 		public void send(ObjectSocketChannelStream ostr) {
@@ -112,16 +209,21 @@ public abstract class SocketMessage<T> implements Externalizable {
 		
 		@Override
 		public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+			super.readExternal(in);
 		}
 
 		@Override
 		public void writeExternal(ObjectOutput out) throws IOException {
+			super.writeExternal(out);
 		}
 
 		/**
 		 * For the WriteMessage
 		 */
 		public void apply(IHAClient client) {
+			
+			HAWriteConfirm ack = new HAWriteConfirm(id);
+			
 			ObjectSocketChannelStream in = client.getInputSocket(); // retrieve input stream
 			
 			wc = client.getWriteCache();
@@ -139,10 +241,35 @@ public abstract class SocketMessage<T> implements Externalizable {
 			try {
 				log.info("Calling receiveAndForward");
 				wc.receiveAndForward(in, out);
+				
+				acknowledge(ack);
 			} catch (Exception ioe) {
 				ioe.printStackTrace();
 			}			
 			log.info("HAWritemessage apply: done");
+		}
+		
+		public interface IWriteCallback {
+
+			void ack(HAWriteConfirm writeConfirm);
+			
+		}
+		
+		static class HAWriteConfirm extends AckMessage<IWriteCallback,HAWriteMessage> {
+			
+			public HAWriteConfirm() {} // for deserialization
+
+			public HAWriteConfirm(long twinid) {
+				this.twinId = twinid;
+				setId();
+			}
+
+			@Override
+			public void apply(IWriteCallback client) {
+				if (client != null) {
+					client.ack(this);
+				}
+			}			
 		}
 	}
 
@@ -158,6 +285,7 @@ public abstract class SocketMessage<T> implements Externalizable {
 		
 		public HATruncateMessage(long extent) {
 			this.extent = extent;
+			setId();
 		}
 		
 		public void send(ObjectSocketChannelStream ostr) {
@@ -175,11 +303,15 @@ public abstract class SocketMessage<T> implements Externalizable {
 		
 		@Override
 		public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+			super.readExternal(in);
+			
 			extent = in.readLong();
 		}
 
 		@Override
 		public void writeExternal(ObjectOutput out) throws IOException {
+			super.writeExternal(out);
+			
 			log.info("HATruncateMessagem writeExternal");
 			out.writeLong(extent);
 		}
@@ -188,6 +320,8 @@ public abstract class SocketMessage<T> implements Externalizable {
 		 * For the WriteMessage
 		 */
 		public void apply(IHAClient client) {			
+			HATruncateConfirm ack = new HATruncateConfirm(id);
+
 			ObjectSocketChannelStream out = client.getNextSocket();
 			
 			if (out != null) {
@@ -203,18 +337,54 @@ public abstract class SocketMessage<T> implements Externalizable {
 				System.out.println("Truncating file " + extent);
 				log.info("Truncating file");
 				client.truncate(extent);
+				
+				acknowledge(ack);
 			} catch (Exception ioe) {
 				ioe.printStackTrace();
 			}			
 		}
 	}
 	
-	public void send(ObjectOutputStream ostr) {
+	public interface ITruncateCallback {
+
+		void ack(HATruncateConfirm writeConfirm);
+		
+	}
+	
+	static class HATruncateConfirm extends AckMessage<ITruncateCallback,HAWriteMessage> {
+		
+		public HATruncateConfirm() {} // for deserialization
+
+		public HATruncateConfirm(long twinid) {
+			this.twinId = twinid;
+			setId();
+		}
+
+		@Override
+		public void apply(ITruncateCallback client) {
+			if (client != null) {
+				client.ack(this);
+			}
+		}			
+	}
+
+	public void send(ObjectSocketChannelStream ostr) {
 		try {
 			ostr.writeObject(this);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
+	}
+
+	public void acknowledge(AckMessage<?,?> ack) throws IOException {
+		if (server == null) {
+			throw new IllegalStateException("No HASerevr set for this message");
+		}
+		server.acknowledge(ack);
+	}
+
+	public void setHAServer(HAServer server) {
+		this.server = server;
 	}
 	
 }
