@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
@@ -57,10 +58,25 @@ import com.bigdata.journal.ha.SocketMessage.HAWriteMessage.HAWriteConfirm;
  * message handler can be registered to process the response which can be awaited by
  * waiting on the handler that will signal itself when the callback is made:
  * 
- * HAMessage msg;
- * msg.register(handler);
- * send(msg)
- * msg.wait();
+ * HAWriteMessage msg;
+ * msg.register(handler); // new IWriteCallback() {.....}
+ * connect.send(msg); // HAConnect
+ * msg.await();
+ * 
+ * Since the message is sent from another thread, the caller has a choice of three options:
+ * 1) Simply fire and forget, possibly relying on another async callback process
+ * 2) Register a handler to be notified by an Ack message
+ * 3) and/or wait for a signal to be sent to the original message object by the Ack message
+ * 
+ * For a Write message the classes of interest are:
+ * HAWriteMessage - the message sent to via the HAConnect to a port server by HAServer
+ * HAWriteConfirm - returned by HAWriteMessage.apply to the HAConnect sender
+ * IWriteCallback - - optionally associated with original HAWriteMessage
+ * 
+ * For a Truncate message the classes of interest are:
+ * HATruncateMessage - the message sent to via the HAConnect to a port server by HAServer
+ * HATruncateConfirm - returned by HATruncateMessage.apply to the HAConnect sender
+ * ITruncateCallback - - optionally associated with original HATruncateMessage
  * 
  * @author Martyn Cutcher
   */
@@ -77,19 +93,23 @@ public abstract class SocketMessage<T> implements Externalizable {
 	}
 	
 	ReentrantLock completeLock = new ReentrantLock();
+	Condition waitCondition = completeLock.newCondition();
 	
 	public void await() throws InterruptedException {
 		completeLock.lockInterruptibly();
 		try {
-			completeLock.wait();
+			waitCondition.await();
 		} finally {
 			completeLock.unlock();
 		}
 	}
 	
 	protected void ackNotify() throws InterruptedException {
-		synchronized (completeLock) {
-			completeLock.notifyAll();
+		completeLock.lockInterruptibly();
+		try {
+			waitCondition.signalAll();
+		} finally {
+			completeLock.unlock();
 		}
 	}
 	
@@ -120,7 +140,7 @@ public abstract class SocketMessage<T> implements Externalizable {
 	
 	/**
 	 * The AckMessage is returned to the sender and is twinned with its message source.
-	 * The HAClient, manages this twinning process, and after calling "apply" if a client
+	 * The HAConnect manages this twinning process, and after calling "apply" if a client
 	 * is registered, will signal the twinned message to awake any control thread awaiting
 	 * the message completion. 
 	 */
@@ -142,12 +162,15 @@ public abstract class SocketMessage<T> implements Externalizable {
 		 */
 		@SuppressWarnings("unchecked")
 		public void processAck() {
-			apply((T) src.handler);
-			
 			try {
-				src.ackNotify();
-			} catch (InterruptedException e) {
-				e.printStackTrace(); // FIXME: not sure what to do here in general
+				apply((T) src.handler);
+			} finally {
+				try {
+					System.out.println("Calling ackNotify: " + this);
+					src.ackNotify();
+				} catch (InterruptedException e) {
+					e.printStackTrace(); // FIXME: not sure what to do here in general
+				}
 			}
 		}
 				
