@@ -1466,6 +1466,12 @@ abstract public class WriteCache implements IWriteCache {
 
 		private HAConnect m_connect = null;
 		
+		/**
+		 * TODO: Should this await a quorum before attempting to connect to the downstream?
+		 * 
+		 * @param quorumManager
+		 * @return
+		 */
 		private HAConnect establishHAConnect(QuorumManager quorumManager) {
 			if (m_connect == null) {
 				Quorum quorum = quorumManager.getQuorum();
@@ -1475,6 +1481,7 @@ abstract public class WriteCache implements IWriteCache {
 				final int port = glue.getWritePipelinePort();
 				m_connect = new HAConnect(new InetSocketAddress(addr, port));
 			}
+			
 			return m_connect;
 		}
 
