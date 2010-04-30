@@ -32,9 +32,10 @@ import java.nio.channels.ByteChannel;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.io.ObjectSocketChannelStream;
 import com.bigdata.journal.ha.SocketMessage.AckMessage;
-import com.bigdata.journal.ha.SocketMessage.HATruncateMessage;
 
 /**
  * HAConnect is the port class that enables messages to be sent to a downstream HAServer.
@@ -46,28 +47,18 @@ import com.bigdata.journal.ha.SocketMessage.HATruncateMessage;
  * (twin) message.
  */
 public class HAConnect extends Thread {
-	private ConcurrentHashMap<Long, SocketMessage<?>> m_msgs = new ConcurrentHashMap<Long, SocketMessage<?>>();
+    
+    protected static final Logger log = Logger.getLogger(HAConnect.class);
+
+	final private ConcurrentHashMap<Long, SocketMessage<?>> m_msgs = new ConcurrentHashMap<Long, SocketMessage<?>>();
 	
-	private ObjectSocketChannelStream m_out;
+	private final InetSocketAddress inetSocketAddress;
+
+	private ObjectSocketChannelStream m_out = null;
 
 	public HAConnect(InetSocketAddress inetSocketAddress) throws IOException {
-		SocketChannel socketChannel;
-//		try {
-			socketChannel = SocketChannel.open();
-			socketChannel.configureBlocking(true);
-
-			// Kick off connection establishment
-			// socketChannel.connect(new InetSocketAddress("localhost", port));
-			socketChannel.connect(inetSocketAddress);
-			socketChannel.finishConnect();
-			// Thread.sleep(2000);
-
-			// and set the output stream
-			m_out = new ObjectSocketChannelStream(wrapChannel(socketChannel));
-//		} catch (IOException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
+	    
+	    this.inetSocketAddress = inetSocketAddress;
 	}
 	
 	/**
@@ -95,45 +86,83 @@ public class HAConnect extends Thread {
 		};
 	}
 
-	/**
-	 * The main thread processes the AckMessages
-	 */
-	public void run() {
-		ObjectInputStream instr = m_out.getInputStream();
-		while (true) {
-			AckMessage<?, ?> msg;
-			try {
-				msg = (AckMessage<?,?>) instr.readObject();
-				
-				System.out.println("Acknowledging " + msg.getClass().getName());
-				SocketMessage<?> twin = m_msgs.get(msg.twinId);
-				msg.setMessageSource(twin);
-				msg.processAck();
-				if (twin != null) {
-					m_msgs.remove(msg.twinId);
-				}
-				
-				System.out.println("Message acknowledged");					
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (ClassNotFoundException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			
-		}
+    /**
+     * The main thread processes the AckMessages
+     */
+    public void run() {
+
+        SocketChannel socketChannel = null;
+        try {
+            socketChannel = SocketChannel.open();
+            socketChannel.configureBlocking(true);
+
+            // Kick off connection establishment
+            // socketChannel.connect(new InetSocketAddress("localhost", port));
+            socketChannel.connect(inetSocketAddress);
+            socketChannel.finishConnect();
+            // Thread.sleep(2000);
+
+            // and set the output stream
+            m_out = new ObjectSocketChannelStream(wrapChannel(socketChannel));
+
+            final ObjectInputStream instr = m_out.getInputStream();
+            while (true) {
+
+                final AckMessage<?, ?> msg = (AckMessage<?, ?>) instr
+                        .readObject();
+
+                if (log.isTraceEnabled())
+                    log.trace("Acknowledging " + msg.getClass().getName());
+
+                final SocketMessage<?> twin = m_msgs.get(msg.twinId);
+                msg.setMessageSource(twin);
+                msg.processAck();
+                if (twin != null) {
+                    m_msgs.remove(msg.twinId);
+                }
+
+                if (log.isTraceEnabled())
+                    log.trace("Message acknowledged");
+            }
+
+        } catch (Throwable e) {
+            
+            log.error(e,e);
+            
+            throw new RuntimeException(e);
+            
+        } finally {
+            
+            if (socketChannel != null) {
+                try {
+                    socketChannel.close();
+                } catch (IOException e) {
+                    log.error(e,e);
+                }
+            }
+            
+        }
+
+    }
+
+    /**
+     * Store the message in the msgs map and send it downstream. The msg.id is
+     * used later to retrieve the message to twin with the Ack
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void send(SocketMessage<?> msg) throws IOException,
+            InterruptedException {
+
+        send(msg, false);
+
 	}
 
-	/**
-	 * Store the message in the msgs map and send it downstream.  The msg.id is used later
-	 * to retrieve the message to twin with the Ack
-	 */
-	public void send(SocketMessage<?> msg) {
-		send(msg, false);
-	}
-	public void send(SocketMessage<?> msg, boolean wait) {
-		m_msgs.put(msg.id, msg);
+    public void send(SocketMessage<?> msg, boolean wait) throws IOException,
+            InterruptedException {
+        
+        m_msgs.put(msg.id, msg);
 		
 		System.out.println("--------------------");
 		System.out.println("HAConnect: sending " + msg);

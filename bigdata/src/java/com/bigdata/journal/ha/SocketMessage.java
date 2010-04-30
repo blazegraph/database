@@ -207,28 +207,20 @@ public abstract class SocketMessage<T> implements Externalizable {
 			this.wc = wc;
 			setId();
 		}
-		
-		public void send(ObjectSocketChannelStream ostr) {
-			if (wc == null) {
-				throw new IllegalStateException("send cannot be called with no WriteCache");
-			}
 
-			try {
-				ostr.getOutputStream().writeObject(this);
-				
-				wc.sendTo(ostr);
-				
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			} catch (IllegalStateException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			
-		}
+		@Override
+        public void send(ObjectSocketChannelStream ostr) throws IOException, InterruptedException {
+
+		    if (wc == null) {
+                throw new IllegalStateException(
+                        "send cannot be called with no WriteCache");
+            }
+
+            ostr.getOutputStream().writeObject(this);
+
+            wc.sendTo(ostr);
+
+        }
 		
 		@Override
 		public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
@@ -391,12 +383,11 @@ public abstract class SocketMessage<T> implements Externalizable {
 		}			
 	}
 
-	public void send(ObjectSocketChannelStream ostr) {
-		try {
-			ostr.writeObject(this);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
+    public void send(ObjectSocketChannelStream ostr) throws IOException,
+            InterruptedException {
+
+        ostr.writeObject(this);
+        
 	}
 
 	public void acknowledge(AckMessage<?,?> ack) throws IOException {

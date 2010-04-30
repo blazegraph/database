@@ -166,8 +166,6 @@ public class TestWriteCacheService extends TestCase3 {
          */
         final ByteBuffer srcBuf = getRandomData(4096);
         
-        final ByteBuffer buf = DirectBufferPool.INSTANCE.acquire();
-        
         ArrayList<AllocView> allocs = new ArrayList<AllocView>();
         int curAddr = 0;
         for (int i = 0; i < 10000; i++) {
