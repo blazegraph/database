@@ -29,7 +29,6 @@ package com.bigdata.io;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
-import java.nio.channels.SocketChannel;
 import java.util.LinkedList;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -453,9 +452,11 @@ abstract public class WriteCacheService implements IWriteCache {
                     final HAGlue haGlueNextService = quorum
                             .getHAGlue(index + 1);
 
-                    haServer.set(new HAServer(haGlueNextService
-                            .getWritePipelineAddr(), haGlueNextService
-                            .getWritePipelinePort(), newHAClient()));
+                    haServer.set(new HAServer(//
+                            haGlueNextService.getWritePipelineAddr(),//
+                            haGlueNextService.getWritePipelinePort(),//
+                            newHAClient()//
+                            ));
 
                 }
 

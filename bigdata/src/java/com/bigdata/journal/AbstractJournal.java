@@ -30,7 +30,10 @@ package com.bigdata.journal;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.net.BindException;
 import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
@@ -3594,8 +3597,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     protected HAGlue newHAGlue() {
 
-        return new BasicHAGlue();
-        
+        return new BasicHAGlue(null/* loopback addr */, 0/* anyPort */);
+
     }
 
     /**
@@ -3780,6 +3783,33 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * to support HA for the journal.
      */
     protected class BasicHAGlue implements HAGlue {
+
+        private final InetAddress writePipelineAddr;
+        private final int writePipelinePort;
+
+        /** Defaults to the loopback interface and a random open port. */
+        protected BasicHAGlue(final InetAddress writePipelineAddr,
+                final int writePipelinePort) {
+            if (writePipelineAddr == null) {
+                try {
+                    this.writePipelineAddr = InetAddress
+                            .getByAddress(new byte[] { 127, 0, 0, 1 });
+                } catch (UnknownHostException e) {
+                    throw new RuntimeException(e);
+                }
+            } else {
+                this.writePipelineAddr = writePipelineAddr;
+            }
+            if (writePipelinePort == 0) {
+                try {
+                    this.writePipelinePort = getPort(0/* suggestedPort */);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            } else {
+                this.writePipelinePort = writePipelinePort;
+            }
+        }
 
         /**
          * The most recent prepare request.
@@ -4005,16 +4035,31 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             
         }
         
-        /** Not implemented for standalone. */
         public InetAddress getWritePipelineAddr() {
-            throw new UnsupportedOperationException();
+            return writePipelineAddr;
         }
 
-        /** Not implemented for standalone. */
         public int getWritePipelinePort() {
-            throw new UnsupportedOperationException();
+            return writePipelinePort;
         }
 
     };
+
+    /**
+     * Return an open port on current machine. Try the suggested port first. If
+     * suggestedPort is zero, just select a random port
+     */
+    static protected int getPort(int suggestedPort) throws IOException {
+        ServerSocket openSocket;
+        try {
+            openSocket = new ServerSocket(suggestedPort);
+        } catch (BindException ex) {
+            // the port is busy, so look for a random open port
+            openSocket = new ServerSocket(0);
+        }
+        final int port = openSocket.getLocalPort();
+        openSocket.close();
+        return port;
+    }
 
 }
