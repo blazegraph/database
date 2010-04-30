@@ -41,6 +41,9 @@ import com.bigdata.journal.ha.SocketMessage.HATruncateMessage;
  * 
  * It's primary purpose is to manage the twinning of SocketMessages, so that AckMessages
  * are able to call the appropriate response handler and signal message completion.
+ * 
+ * Twinned messages are managed using a ConcurrentHashMap, the AckMessage holding the id of the original
+ * (twin) message.
  */
 public class HAConnect extends Thread {
 	private ConcurrentHashMap<Long, SocketMessage<?>> m_msgs = new ConcurrentHashMap<Long, SocketMessage<?>>();
@@ -127,6 +130,9 @@ public class HAConnect extends Thread {
 	 * to retrieve the message to twin with the Ack
 	 */
 	public void send(SocketMessage<?> msg) {
+		send(msg, false);
+	}
+	public void send(SocketMessage<?> msg, boolean wait) {
 		m_msgs.put(msg.id, msg);
 		
 		System.out.println("--------------------");
@@ -136,5 +142,13 @@ public class HAConnect extends Thread {
 		
 		System.out.println("HAConnect: SENT");
 		System.out.println("--------------------");
+		
+		if (wait) {
+			try {
+				msg.await();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 }
