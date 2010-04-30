@@ -36,6 +36,8 @@ import java.util.ArrayList;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
+import junit.framework.AssertionFailedError;
+
 import com.bigdata.journal.ha.MockSingletonQuorumManager;
 import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rawstore.Bytes;
@@ -874,8 +876,6 @@ public class TestWriteCache extends TestCase3 {
          */
         final ByteBuffer srcBuf = getRandomData(4096);
         
-        final ByteBuffer buf = DirectBufferPool.INSTANCE.acquire();
-        
         ArrayList<AllocView> allocs = new ArrayList<AllocView>();
         int curAddr = 0;
         for (int i = 0; i < 10000; i++) {
@@ -891,6 +891,8 @@ public class TestWriteCache extends TestCase3 {
         randomizeArray(allocs);
         
         final File file = File.createTempFile(getName(), ".tmp");
+        
+        final ByteBuffer buf = DirectBufferPool.INSTANCE.acquire();
         
         try {
 
@@ -934,12 +936,18 @@ public class TestWriteCache extends TestCase3 {
              */
             for (int i = 500; i < 1000; i++) {
             	AllocView v = allocs.get(i);
-            	writeCache.write(v.addr, v.buf.asReadOnlyBuffer(),checker.checksum(v.buf));           	
+            	writeCache.write(v.addr, v.buf.asReadOnlyBuffer(),checker.checksum(v.buf));
+            	try {
+            	    assertEquals(v.buf, opener.read(v.addr, v.buf.capacity()));     // expected, actual
+            	} catch(AssertionFailedError e) {
+                    System.err.println("ERROR: i=" + i + ", v=" + v.buf);
+                    throw e;
+            	}
             }
             writeCache.flush(true);
             for (int i = 0; i < 1000; i++) {
             	AllocView v = allocs.get(i);
-            	System.err.print(" "+i);
+//            	System.err.println(" "+i+"(v="+v.buf+")");
              	assertEquals(v.buf, opener.read(v.addr, v.buf.capacity()));     // expected, actual   	
             }
             /*
@@ -991,6 +999,8 @@ public class TestWriteCache extends TestCase3 {
             }
         } finally {
 
+            DirectBufferPool.INSTANCE.release(buf);
+            
             if (file.exists() && !file.delete()) {
 
                 log.warn("Could not delete: file=" + file);
