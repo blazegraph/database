@@ -48,13 +48,15 @@ import com.bigdata.journal.ha.SocketMessage.AckMessage;
  * 
  */
 public class HAServer extends Thread {
-	protected static final Logger log = Logger.getLogger(SocketMessage.class);
+    
+	protected static final Logger log = Logger.getLogger(HAServer.class);
 
+	final InetAddress addr;
 	final int port;
 	final IHAClient client;
-	Selector selector;
-	SelectionKey serverKey;
-	ServerSocketChannel server;
+	private Selector selector;
+	private SelectionKey serverKey;
+	private ServerSocketChannel server;
 
 	private ObjectSocketChannelStream str;
 
@@ -66,77 +68,89 @@ public class HAServer extends Thread {
      * @param client
      *            The object with access to the local service and the downstream
      *            service.
+     * @throws IOException 
      */
 	public HAServer(InetAddress addr, int port, IHAClient client) {
+	    this.addr = addr;
 		this.port = port;
 		this.client = client;
-
-		try {
-			selector = Selector.open();
-			server = ServerSocketChannel.open();
-			server.socket().bind(new InetSocketAddress(addr,port));
-			// server.socket().bind(new InetSocketAddress(port));
-			server.configureBlocking(true);
-			// serverKey = server.register(selector, SelectionKey.OP_ACCEPT);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
 	}
 
-    /*
-     * FIXME modify to notice an interrupt() and respond by exiting run(). We
-     * need this as mechanism for tearing down the HAServer.
+    public void run() {
+        try {
+            selector = Selector.open();
+            server = ServerSocketChannel.open();
+            server.socket().bind(new InetSocketAddress(addr, port));
+            // server.socket().bind(new InetSocketAddress(port));
+            server.configureBlocking(true);
+            // serverKey = server.register(selector, SelectionKey.OP_ACCEPT);
+            runBlock();
+        } catch (InterruptedException t) {
+            /*
+             * Normal shutdown.
+             */
+            log.info("Shutdown");
+        } catch (Throwable t) {
+            log.error(t, t);
+            throw new RuntimeException(t);
+        } finally {
+            if (server != null) {
+                try {
+                    server.close();
+                } catch (IOException e) {
+                    log.error(e, e);
+                }
+            }
+        }
+    }
+
+    /**
+     * Wait for a client connection. This only supports one client connection.
+     * 
+     * @throws IOException
+     * @throws InterruptedException
+     * @throws Exception
      */
-	public void run() {
-		runBlock();
-	}
+    private void runBlock() throws IOException, InterruptedException, Exception {
+        while (true) {
+            final SocketChannel client = server.accept();
+            log.info("Accepted connection");
+            client.configureBlocking(true);
 
-	private void runBlock() {
-		while (true) {
-			try {
-				SocketChannel client = server.accept();
-				log.info("Accepted connection");
-				client.configureBlocking(true);
+            str = new ObjectSocketChannelStream(client);
+            this.client.setInputSocket(str);
+            // Now process messages
+            final ObjectInputStream instr = str.getInputStream();
+            while (true) {
+                if (log.isTraceEnabled())
+                    log.trace("Reading next message from " + str);
 
-				str = new ObjectSocketChannelStream(client);
-				this.client.setInputSocket(str);
-				// Now process messages
-				ObjectInputStream instr = str.getInputStream();
-				while (true) {
-					System.out.println("Reading next message from " + str);
-					
-					SocketMessage msg = (SocketMessage) instr.readObject();
-					msg.setHAServer(this);
-					
-					System.out.println("Applying " + msg.getClass().getName());
-					msg.apply(this.client);
-					
-					System.out.println("Message applied");					
-				}
+                final SocketMessage msg = (SocketMessage) instr.readObject();
+                msg.setHAServer(this);
 
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (ClassNotFoundException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (Throwable e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		}
-	}
+                if (log.isTraceEnabled())
+                    log.trace("Applying " + msg.getClass().getName());
+                msg.apply(this.client);
 
+                if (log.isTraceEnabled())
+                    log.trace("Message applied");
+            }
+        }
+    }
+
+    /**
+     * Note: This is an alternative implementation of {@link #runBlock()} which
+     * could be developed to handle multiple client connections.
+     */
 	private void runNoBlock() {
 		while (true) {
 			try {
 				selector.select();
 
-				Set keys = selector.selectedKeys();
-				Iterator iter = keys.iterator();
+				final Set<SelectionKey> keys = selector.selectedKeys();
+				final Iterator<SelectionKey> iter = keys.iterator();
 				while (iter.hasNext()) {
-					SelectionKey key = (SelectionKey) iter.next();
+				    final SelectionKey key = (SelectionKey) iter.next();
 					iter.remove();
 
 					if (key == serverKey) {
@@ -145,7 +159,7 @@ public class HAServer extends Thread {
 							System.out.println("Accepted connection");
 							client.configureBlocking(false);
 							SelectionKey clientKey = client.register(selector, SelectionKey.OP_READ);
-							clientKey.attach(new Integer(0));
+							clientKey.attach(Integer.valueOf(0));
 						}
 					} else {
 						// Okay, not an accept so must be a READ
@@ -154,7 +168,8 @@ public class HAServer extends Thread {
 						if (!key.isReadable())
 							continue; // what was that then?
 
-						System.out.println("READ selection");
+						if(log.isTraceEnabled())
+		                    log.trace("READ selection");
 
 						ObjectSocketChannelStream str = new ObjectSocketChannelStream(client);
 
@@ -178,10 +193,12 @@ public class HAServer extends Thread {
 		}
 	}
 
-	public void acknowledge(AckMessage<?, ?> ack) throws IOException {
-		System.out.println("Sending Acknowledge " + ack);
+	public void acknowledge(final AckMessage<?, ?> ack) throws IOException {
+	    
+	    if(log.isTraceEnabled())
+            log.trace("Sending Acknowledge " + ack);
 		
-		ObjectOutputStream ostr = str.getOutputStream();
+		final ObjectOutputStream ostr = str.getOutputStream();
 		ostr.writeObject(ack);
 		ostr.flush();
 	}

@@ -30,9 +30,6 @@ package com.bigdata.io;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.net.Inet4Address;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -60,9 +57,6 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.ha.HAConnect;
-import com.bigdata.journal.ha.HAGlue;
-import com.bigdata.journal.ha.Quorum;
-import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.journal.ha.SocketMessage;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -1012,46 +1006,34 @@ abstract public class WriteCache implements IWriteCache {
      * Return a Runnable that will send an HAWriteMessage
      * @throws IOException 
      */
-    protected Runnable getDownstreamWriteRunnable(QuorumManager quorumManager) throws IOException {
-        
-        final HAConnect connect = establishHAConnect(quorumManager);
-        
+    protected Runnable getDownstreamWriteRunnable(final HAConnect connect)
+            throws IOException {
+
         final WriteCache self = this;
         
         return new Runnable() {
 
-//          @Override
             public void run() {
-                SocketMessage.HAWriteMessage msg = new SocketMessage.HAWriteMessage(self);
+
+                final SocketMessage.HAWriteMessage msg = new SocketMessage.HAWriteMessage(
+                        self);
+
+                try {
+                    
+                    // FIXME: problem with waiting at present
+                    connect.send(msg, true/*wait*/);
+                    
+                } catch (Throwable e) {
+
+                    throw new RuntimeException(e);
+                    
+                }
                 
-                connect.send(msg, true); // wait for processing - FIXME: problem with waiting at present
             }
             
         };
     }
 
-    private HAConnect m_connect = null;
-    
-    /**
-     * TODO: Should this await a quorum before attempting to connect to the downstream?
-     * 
-     * @param quorumManager
-     * @return
-     * @throws IOException 
-     */
-    private HAConnect establishHAConnect(QuorumManager quorumManager) throws IOException {
-        if (m_connect == null) {
-            Quorum quorum = quorumManager.getQuorum();
-            
-            final HAGlue glue = quorum.getHAGlue(quorum.getIndex() + 1); 
-            final InetAddress addr = glue.getWritePipelineAddr();
-            final int port = glue.getWritePipelinePort();
-            m_connect = new HAConnect(new InetSocketAddress(addr, port));
-        }
-        
-        return m_connect;
-    }
-    
     /**
      * {@inheritDoc}.
      * <p>
@@ -1579,12 +1561,6 @@ abstract public class WriteCache implements IWriteCache {
 
 		}
 
-		@Override
-		protected Runnable getDownstreamWriteRunnable(QuorumManager quorumManager) {
-			// TODO Auto-generated method stub
-			return null;
-		}
-
 	}
 
     /**
@@ -1618,6 +1594,7 @@ abstract public class WriteCache implements IWriteCache {
     public void resetWith(
             final ConcurrentMap<Long, WriteCache> serviceRecordMap,
             final long fileExtent) throws InterruptedException {
+        
         final Iterator<Long> entries = recordMap.keySet().iterator();
 		if (entries.hasNext()) {
             if (log.isInfoEnabled())
@@ -1658,17 +1635,16 @@ abstract public class WriteCache implements IWriteCache {
 	 * @throws InterruptedException 
 	 * @throws IllegalStateException 
 	 */
-	public void sendTo(ObjectSocketChannelStream out) throws IllegalStateException, InterruptedException {
-		ObjectOutputStream outstr = out.getOutputStream();
+	public void sendTo(ObjectSocketChannelStream out) throws IllegalStateException, InterruptedException, IOException {
+		
+	    final ObjectOutputStream outstr = out.getOutputStream();
 		sendRecordMap(outstr);
 		
 		log.info("Acquiring Buffer");
-		ByteBuffer tmp = acquire();
+		final ByteBuffer tmp = acquire();
 		try {
 			outstr.writeInt(tmp.position());
 			out.write(tmp);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
 		} finally {
 			release();
 		}
@@ -1689,46 +1665,47 @@ abstract public class WriteCache implements IWriteCache {
 	 * @throws InterruptedException 
 	 * @throws IllegalStateException 
 	 */
-	public void receiveAndForward(ObjectSocketChannelStream in, ObjectSocketChannelStream out) throws IllegalStateException, InterruptedException {
-		log.info("receiveRecordMap from " + in);
-		receiveRecordMap(in.getInputStream());
-		
-		try {
-			ObjectInputStream instr = in.getInputStream();
-			int sze = instr.readInt();
-			
-			final byte[] buf = in.readByteArray(sze);
-			
-			this.writeRaw(0, buf, sze);
-			
-			// in.getChannel().read(tmp);
-			
-			if (out != null) {
-				ObjectOutputStream outstr = out.getOutputStream();
-				sendRecordMap(outstr);
-				
-				// would be nice to be able to send to the channel
-				// BUT this dual mode approach causes problem with current naive ObjectStreams
-				if (false) {
-					// out.getChannel().write(tmp);
-				} else {
-					outstr.writeInt(sze);
-					outstr.write(buf, 0, sze);
-				}
-			}
-			
-			// now should flush the WriteCache, but leave control to caller
-		} catch (IOException e) {
-			e.printStackTrace();
-			
-			throw new RuntimeException(e);
-		}
-		log.info("receiveAndForward done");
+    public void receiveAndForward(ObjectSocketChannelStream in,
+            ObjectSocketChannelStream out) throws IllegalStateException,
+            InterruptedException, IOException {
+        
+        if (log.isInfoEnabled())
+            log.info("receiveRecordMap from " + in);
+        
+        receiveRecordMap(in.getInputStream());
+
+        ObjectInputStream instr = in.getInputStream();
+        int sze = instr.readInt();
+
+        final byte[] buf = in.readByteArray(sze);
+
+        this.writeRaw(0, buf, sze);
+
+        // in.getChannel().read(tmp);
+
+        if (out != null) {
+            ObjectOutputStream outstr = out.getOutputStream();
+            sendRecordMap(outstr);
+
+            // would be nice to be able to send to the channel
+            // BUT this dual mode approach causes problem with current naive
+            // ObjectStreams
+            if (false) {
+                // out.getChannel().write(tmp);
+            } else {
+                outstr.writeInt(sze);
+                outstr.write(buf, 0, sze);
+            }
+        }
+
+        // now should flush the WriteCache, but leave control to caller
+        log.info("receiveAndForward done");
 		
 	}
 
 	private void writeRaw(int i, byte[] buf2, int sze) {
 		// TODO Auto-generated method stub
+	    throw new UnsupportedOperationException();
 		
 	}
 

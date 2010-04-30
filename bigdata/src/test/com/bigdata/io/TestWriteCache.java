@@ -937,18 +937,17 @@ public class TestWriteCache extends TestCase3 {
             for (int i = 500; i < 1000; i++) {
             	AllocView v = allocs.get(i);
             	writeCache.write(v.addr, v.buf.asReadOnlyBuffer(),checker.checksum(v.buf));
-            	try {
-            	    assertEquals(v.buf, opener.read(v.addr, v.buf.capacity()));     // expected, actual
-            	} catch(AssertionFailedError e) {
-                    System.err.println("ERROR: i=" + i + ", v=" + v.buf);
-                    throw e;
-            	}
+                assertEquals(v.buf, writeCache.read(v.addr));     // expected, actual       
             }
             writeCache.flush(true);
             for (int i = 0; i < 1000; i++) {
             	AllocView v = allocs.get(i);
-//            	System.err.println(" "+i+"(v="+v.buf+")");
-             	assertEquals(v.buf, opener.read(v.addr, v.buf.capacity()));     // expected, actual   	
+                try {
+                    assertEquals(v.buf, opener.read(v.addr, v.buf.capacity()));     // expected, actual
+                } catch(AssertionFailedError e) {
+                    System.err.println("ERROR: i=" + i + ", v=" + v.buf);
+                    throw e;
+                }
             }
             /*
              * Now reset and write full 10000 records, checking for write success and if fail then flush/reset and

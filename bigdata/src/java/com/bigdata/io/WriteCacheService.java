@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.io;
 
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.util.LinkedList;
@@ -60,6 +63,7 @@ import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.WORMStrategy;
+import com.bigdata.journal.ha.HAConnect;
 import com.bigdata.journal.ha.HAGlue;
 import com.bigdata.journal.ha.HAServer;
 import com.bigdata.journal.ha.IHAClient;
@@ -189,6 +193,30 @@ abstract public class WriteCacheService implements IWriteCache {
      * chain.
      */
     final AtomicReference<HAServer> haServer = new AtomicReference<HAServer>();
+    
+    final AtomicReference<HAConnect> haConnect = new AtomicReference<HAConnect>(); 
+    
+    /**
+     * TODO: Should this await a quorum before attempting to connect to the downstream?
+     * 
+     * @param quorumManager
+     * @return
+     * @throws IOException 
+     */
+    private HAConnect establishHAConnect(QuorumManager quorumManager) throws IOException {
+        if (haConnect.get() == null) {
+            Quorum quorum = quorumManager.getQuorum();
+            
+            final HAGlue glue = quorum.getHAGlue(quorum.getIndex() + 1); 
+            final InetAddress addr = glue.getWritePipelineAddr();
+            final int port = glue.getWritePipelinePort();
+            HAConnect c = new HAConnect(new InetSocketAddress(addr, port));
+            haConnect.set(c);
+            c.start();//FIXME how do we notice if HAConnect fails?
+        }
+        
+        return haConnect.get();
+    }
     
     /**
      * A single threaded service which writes dirty {@link WriteCache}s onto the
@@ -452,11 +480,16 @@ abstract public class WriteCacheService implements IWriteCache {
                     final HAGlue haGlueNextService = quorum
                             .getHAGlue(index + 1);
 
-                    haServer.set(new HAServer(//
+                    // Our local service listening for upstream messages.
+                    final HAServer s = new HAServer(//
                             haGlueNextService.getWritePipelineAddr(),//
                             haGlueNextService.getWritePipelinePort(),//
                             newHAClient()//
-                            ));
+                            );
+                    
+                    haServer.set(s);
+
+                    s.start();
 
                 }
 
@@ -625,8 +658,9 @@ abstract public class WriteCacheService implements IWriteCache {
 
                     // Start downstream IOs (network IO) iff highly availably.
                     if (remoteWriteService != null) {
+                        final HAConnect cxn = establishHAConnect(quorumManager);
                         final Runnable r = cache
-                                .getDownstreamWriteRunnable(quorumManager);
+                                .getDownstreamWriteRunnable(cxn);
                         if (r == null)
                             throw new AssertionError();
                         remoteWriteFuture = remoteWriteService.submit(r);
