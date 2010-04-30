@@ -114,8 +114,12 @@ abstract public class AbstractHAJournalTestCase
         final int k = 3; // @todo config by Properties?
 
         stores = new Journal[k];
-        
-        for (int i = 0; i < k; i++) {
+
+        /*
+         * Note: Hacked into the reverse setup order so the WriteServiceCache
+         * can initialize using getHAGlue(index+1).
+         */
+        for (int i = k - 1; i >= 0; i--) {
 
             stores[i] = newJournal(i, properties);
 
