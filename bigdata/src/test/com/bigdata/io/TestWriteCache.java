@@ -939,6 +939,7 @@ public class TestWriteCache extends TestCase3 {
             writeCache.flush(true);
             for (int i = 0; i < 1000; i++) {
             	AllocView v = allocs.get(i);
+            	System.err.print(" "+i);
              	assertEquals(v.buf, opener.read(v.addr, v.buf.capacity()));     // expected, actual   	
             }
             /*
