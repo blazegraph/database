@@ -491,7 +491,9 @@ public class TestWriteCacheService extends TestCase3 {
             final ByteBuffer tmp = ByteBuffer.allocate(nbytes);
             
             FileChannelUtility.readAll(this, tmp, off);
-            tmp.position(0);
+            
+            // flip for reading.
+            tmp.flip();
             
             return tmp;
             
