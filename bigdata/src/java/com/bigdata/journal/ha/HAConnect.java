@@ -50,9 +50,9 @@ public class HAConnect extends Thread {
 	
 	private ObjectSocketChannelStream m_out;
 
-	public HAConnect(InetSocketAddress inetSocketAddress) {
+	public HAConnect(InetSocketAddress inetSocketAddress) throws IOException {
 		SocketChannel socketChannel;
-		try {
+//		try {
 			socketChannel = SocketChannel.open();
 			socketChannel.configureBlocking(true);
 
@@ -64,10 +64,10 @@ public class HAConnect extends Thread {
 
 			// and set the output stream
 			m_out = new ObjectSocketChannelStream(wrapChannel(socketChannel));
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+//		} catch (IOException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		}
 	}
 	
 	/**
