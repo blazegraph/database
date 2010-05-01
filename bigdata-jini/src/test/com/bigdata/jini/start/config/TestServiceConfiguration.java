@@ -76,7 +76,7 @@ public class TestServiceConfiguration extends TestCase2 {
      * A configuration file used by some of the unit tests in this package.
      */
 //    private final String configFile = "file:src/resources/config/bigdata.config";
-    private final String configFile = "file:src/test/com/bigdata/jini/start/config/testfed.config";
+    private final String configFile = "file:bigdata-jini/src/test/com/bigdata/jini/start/config/testfed.config";
 
     /**
      * 
@@ -94,6 +94,10 @@ public class TestServiceConfiguration extends TestCase2 {
                 ServiceConfiguration.class.getName(), "classpath",
                 String[].class)));
         
+        File serviceDirFromConfig = 
+            (File)config.getEntry(ServiceConfiguration.class.getName(), "serviceDir",
+                                  File.class, new File("serviceDir-NOT-SET"));
+
         final BigdataServiceConfiguration serviceConfig = new TransactionServerConfiguration(
                 config);
 
@@ -105,7 +109,7 @@ public class TestServiceConfiguration extends TestCase2 {
                 new String[] { "com.bigdata.service.jini.TransactionServer.Options.SNAPSHOT_INTERVAL=60000" },
                 serviceConfig.options);
 
-        assertEquals(new File("test-fed"), serviceConfig.serviceDir);
+        assertEquals(serviceDirFromConfig, serviceConfig.serviceDir);
 
         assertEquals(1, serviceConfig.serviceCount);
 

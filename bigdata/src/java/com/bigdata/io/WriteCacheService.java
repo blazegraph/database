@@ -252,7 +252,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
     }
 
-	/**
+    /**
      * The task responsible for writing dirty buffers onto the backing channel.
      * 
      * There should be only one of these
@@ -267,9 +267,9 @@ abstract public class WriteCacheService implements IWriteCache {
 
                 try {
 
-    	            while (dirtyList.isEmpty()) {
-                    	Thread.sleep(50);
-                    	continue;
+                    while (dirtyList.isEmpty()) {
+                        Thread.sleep(50);
+                        continue;
                     }
                     
                     lock.readLock().lockInterruptibly(); // allows shutdown1
@@ -277,7 +277,7 @@ abstract public class WriteCacheService implements IWriteCache {
                     try {
 
                         if (dirtyList.isEmpty()) {
-                        	continue;
+                            continue;
                         }
                         
                         final WriteCache cache = dirtyList.take();
@@ -287,13 +287,13 @@ abstract public class WriteCacheService implements IWriteCache {
                         cleanList.add(cache);
                         
                         if (dirtyList.isEmpty()) {
-                        	try {
-                        		dllock.lock();
+                            try {
+                                dllock.lock();
                                 dirtyListEmpty.signalAll();
-                        		
-                        	} finally {
-                        		dllock.unlock();
-                        	}
+                                
+                            } finally {
+                                dllock.unlock();
+                            }
                          }
                             
                     } finally {
@@ -303,9 +303,9 @@ abstract public class WriteCacheService implements IWriteCache {
                     }
                     
                 } catch (Throwable t) {
-                	if (!m_closing) {
-                		log.error(t, t); // will be interrupted in close, so not necessarily a problem
-                	}
+                    if (!m_closing) {
+                        log.error(t, t); // will be interrupted in close, so not necessarily a problem
+                    }
 
                 }
 
@@ -367,8 +367,8 @@ abstract public class WriteCacheService implements IWriteCache {
         if (open.compareAndSet(true/* expect */, false/* update */)) {
 
             try {
-            	m_closing = true;
-            	
+                m_closing = true;
+                
                 // Interrupt the write task.
                 writeFuture.cancel(true/* mayInterruptIfRunning */);
 
@@ -590,28 +590,28 @@ abstract public class WriteCacheService implements IWriteCache {
      */
     public boolean flush(final boolean force, final long timeout,
             final TimeUnit units) throws TimeoutException, InterruptedException {
-    	synchronized (this) {
+        synchronized (this) {
         final Lock writeLock = lock.writeLock();
         boolean isLocked = false;
         writeLock.lockInterruptibly();
         isLocked = true;
         try {
-        	deferredLatch.inc();
-        	
+            deferredLatch.inc();
+            
             final WriteCache tmp = current.get();
             if (!tmp.isEmpty()) {
-            	while (cleanList.peek() == null) {
-            		writeLock.unlock();
-            		// wait for something to be added
-            		writeLock.lockInterruptibly();
-            	}
-	            final WriteCache nxt = cleanList.take();
-	            nxt.resetWith(recordMap);
-	            current.set(nxt); // 
-	            if (tmp == null) {
-	            	throw new RuntimeException();
-	            }
-	            dirtyList.add(tmp);
+                while (cleanList.peek() == null) {
+                    writeLock.unlock();
+                    // wait for something to be added
+                    writeLock.lockInterruptibly();
+                }
+                final WriteCache nxt = cleanList.take();
+                nxt.resetWith(recordMap);
+                current.set(nxt); // 
+                if (tmp == null) {
+                    throw new RuntimeException();
+                }
+                dirtyList.add(tmp);
             }
             
             // wait for dirtyList empty with signal from WriteTask
@@ -619,11 +619,11 @@ abstract public class WriteCacheService implements IWriteCache {
             try {
                 writeLock.unlock();
                 isLocked = false;
-	            dllock.lockInterruptibly();
-	            if (!dirtyList.isEmpty())
-	            	dirtyListEmpty.await(timeout, units);
+                dllock.lockInterruptibly();
+                if (!dirtyList.isEmpty())
+                    dirtyListEmpty.await(timeout, units);
             } finally {
-            	dllock.unlock();
+                dllock.unlock();
             }
             
             // now check for deferredDirty, not allowing anything else to write to it!
@@ -631,29 +631,29 @@ abstract public class WriteCacheService implements IWriteCache {
             writeLock.lockInterruptibly();
             isLocked = true;
             if (log.isInfoEnabled())
-            	log.info("deferredDirtyList.isEmpty: " + deferredDirtyList.isEmpty());
+                log.info("deferredDirtyList.isEmpty: " + deferredDirtyList.isEmpty());
             deferredDirtyList.drainTo(dirtyList);
             
             if (true) {
-            	((FileChannel) opener.reopenChannel()).force(force);
+                ((FileChannel) opener.reopenChannel()).force(force);
             }
             
-                    	
+                        
             return true;
-    	} catch (IOException e) {
-			throw new RuntimeException(e); // force reopen
-		} finally {
-        	deferredLatch.dec();
-        	if (isLocked)
-        		writeLock.unlock();
-    		}
-    	}
+        } catch (IOException e) {
+            throw new RuntimeException(e); // force reopen
+        } finally {
+            deferredLatch.dec();
+            if (isLocked)
+                writeLock.unlock();
+            }
+        }
     }
 
-	public boolean write(long offset, ByteBuffer data) throws IllegalStateException, InterruptedException {
-		return writeChk(offset, data, 0);
-	}
-	
+    public boolean write(long offset, ByteBuffer data) throws IllegalStateException, InterruptedException {
+        return writeChk(offset, data, 0);
+    }
+    
    /**
      * Write the record onto the cache. If the record is too large for the cache
      * buffers, then it is written synchronously onto the backing channel.
@@ -676,9 +676,9 @@ abstract public class WriteCacheService implements IWriteCache {
     public boolean writeChk(final long offset, final ByteBuffer data, final int chk)
             throws InterruptedException, IllegalStateException {
 
-    	if (log.isInfoEnabled()) {
-    		log.info("offset: " + offset + ", length: " + data.limit());
-    	}
+        if (log.isInfoEnabled()) {
+            log.info("offset: " + offset + ", length: " + data.limit());
+        }
         if (offset < 0)
             throw new IllegalArgumentException();
 
@@ -835,15 +835,15 @@ abstract public class WriteCacheService implements IWriteCache {
 
                     // Move the current buffer to the dirty list.
                     if (deferredLatch.get() == 0)
-                    	dirtyList.add(cache);
+                        dirtyList.add(cache);
                     else 
-                    	deferredDirtyList.add(cache);
+                        deferredDirtyList.add(cache);
 
                     // Take the first clean buffer (may block) - but must NOT block with WriteLock
 //                    if (cleanList.isEmpty()) {
-//                    	writeLock.unlock();
+//                      writeLock.unlock();
 //                        while (cleanList.isEmpty()) {
-//                        	Thread.sleep(50);
+//                          Thread.sleep(50);
 //                        }
 //                        
 //                        writeLock.lockInterruptibly();
@@ -890,18 +890,18 @@ abstract public class WriteCacheService implements IWriteCache {
     }
     
     private WriteCache takeFromCleanWithLock(final Lock writeLock) throws InterruptedException {
-	    if (cleanList.isEmpty()) {
-	    	writeLock.unlock();
-	        while (cleanList.isEmpty()) {
-	        	Thread.sleep(50);
-	        }
-	        
-	        writeLock.lockInterruptibly();
-	        
-	        return takeFromCleanWithLock(writeLock);
-	   }
-	    
-	   return cleanList.take();
+        if (cleanList.isEmpty()) {
+            writeLock.unlock();
+            while (cleanList.isEmpty()) {
+                Thread.sleep(50);
+            }
+            
+            writeLock.lockInterruptibly();
+            
+            return takeFromCleanWithLock(writeLock);
+       }
+        
+       return cleanList.take();
     }
 
     /**
@@ -930,5 +930,4 @@ abstract public class WriteCacheService implements IWriteCache {
         return cache.read(off);
 
     }
-
 }

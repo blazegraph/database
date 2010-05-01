@@ -28,12 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
-
 import org.apache.log4j.Logger;
 
 /**
@@ -368,6 +368,53 @@ public class ArrayBindingSet implements IBindingSet {
     public ArrayBindingSet clone() {
 
         return new ArrayBindingSet(this);
+        
+    }
+
+    /**
+     * Return a shallow copy of the binding set, eliminating unecessary 
+     * variables.
+     */
+    public ArrayBindingSet copy(final IVariable[] variablesToKeep) {
+
+        // bitflag for the old binding set
+        final boolean[] keep = new boolean[nbound];
+        
+        // for each var in the old binding set, see if we need to keep it
+        for (int i = 0; i < nbound; i++) {
+            
+            final IVariable v = vars[i];
+
+            keep[i] = false;
+            for (IVariable k : variablesToKeep) {
+                if (v == k) {
+                    keep[i] = true;
+                    break;
+                }
+            }
+            
+        }
+        
+        // allocate the new vars
+        final IVariable[] newVars = new IVariable[vars.length];
+        
+        // allocate the new vals
+        final IConstant[] newVals = new IConstant[vals.length];
+        
+        // fill in the new binding set based on the keep bitflag
+        int newbound = 0;
+        for (int i = 0; i < nbound; i++) {
+            if (keep[i]) {
+                newVars[newbound] = vars[i];
+                newVals[newbound] = vals[i];
+                newbound++;
+            }
+        }
+        
+        ArrayBindingSet bs = new ArrayBindingSet(newVars, newVals);
+        bs.nbound = newbound;
+        
+        return bs;
         
     }
 

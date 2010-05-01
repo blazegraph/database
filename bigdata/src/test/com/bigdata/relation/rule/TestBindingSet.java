@@ -57,8 +57,90 @@ public class TestBindingSet extends TestCase2 {
         super(name);
     }
 
-    /** Place holder for unit tests. */
-    public void test_something() {
+    public void test_copy_abs() {
+        
+        IVariable[] vars = new IVariable[] {
+                Var.var("a"),
+                Var.var("b"),
+                Var.var("c"),
+                Var.var("d"),
+                Var.var("e")
+        };
+        
+        IConstant[] vals = new IConstant[] {
+                new Constant<Integer>(1),
+                new Constant<Integer>(2),
+                new Constant<Integer>(3),
+                new Constant<Integer>(4),
+                new Constant<Integer>(5)
+        };
+        
+        ArrayBindingSet bs = new ArrayBindingSet(vars, vals);
+        
+        assertTrue(bs.size() == 5);
+        for (IVariable v : vars) {
+            assertTrue(bs.isBound(v));
+        }
+        
+        IVariable[] varsToKeep = new IVariable[] {
+                Var.var("a"),
+                Var.var("c"),
+                Var.var("e")
+        };
+        
+        ArrayBindingSet bs2 = bs.copy(varsToKeep);
+        assertTrue(bs2.size() == 3);
+        for (IVariable v : varsToKeep) {
+            assertTrue(bs2.isBound(v));
+            assertTrue(bs2.get(v).equals(bs.get(v)));
+        }
+        assertFalse(bs2.isBound(Var.var("b")));
+        assertFalse(bs2.isBound(Var.var("d")));
+        
+    }
+    
+    public void test_copy_hbs() {
+        
+        IVariable[] vars = new IVariable[] {
+                Var.var("a"),
+                Var.var("b"),
+                Var.var("c"),
+                Var.var("d"),
+                Var.var("e")
+        };
+        
+        IConstant[] vals = new IConstant[] {
+                new Constant<Integer>(1),
+                new Constant<Integer>(2),
+                new Constant<Integer>(3),
+                new Constant<Integer>(4),
+                new Constant<Integer>(5)
+        };
+        
+        HashBindingSet bs = new HashBindingSet();
+        for (int i = 0; i < vars.length; i++) {
+            bs.set(vars[i], vals[i]);
+        }
+        
+        assertTrue(bs.size() == 5);
+        for (IVariable v : vars) {
+            assertTrue(bs.isBound(v));
+        }
+        
+        IVariable[] varsToKeep = new IVariable[] {
+                Var.var("a"),
+                Var.var("c"),
+                Var.var("e")
+        };
+        
+        HashBindingSet bs2 = bs.copy(varsToKeep);
+        assertTrue(bs2.size() == 3);
+        for (IVariable v : varsToKeep) {
+            assertTrue(bs2.isBound(v));
+            assertTrue(bs2.get(v).equals(bs.get(v)));
+        }
+        assertFalse(bs2.isBound(Var.var("b")));
+        assertFalse(bs2.isBound(Var.var("d")));
         
     }
     

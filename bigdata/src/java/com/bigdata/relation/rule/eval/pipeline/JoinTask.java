@@ -44,9 +44,12 @@ import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.eval.ChunkTrace;
 import com.bigdata.relation.rule.eval.IJoinNexus;
+import com.bigdata.relation.rule.eval.IRuleState;
 import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.relation.rule.eval.RuleState;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -196,6 +199,12 @@ abstract public class JoinTask implements Callable<Void> {
     final protected IJoinMaster masterProxy;
 
     final protected UUID masterUUID;
+    
+    /**
+     * A list of variables required for each tail, by tailIndex. Used to filter 
+     * downstream variable binding sets.  
+     */
+    final protected IVariable[][] requiredVars;
     
     /**
      * The {@link IJoinNexus} for the local {@link IIndexManager}, which
@@ -421,7 +430,8 @@ abstract public class JoinTask implements Callable<Void> {
     public JoinTask(/*final String indexName,*/ final IRule rule,
             final IJoinNexus joinNexus, final int[] order,
             final int orderIndex, final int partitionId,
-            final IJoinMaster masterProxy, final UUID masterUUID) {
+            final IJoinMaster masterProxy, final UUID masterUUID,
+            final IVariable[][] requiredVars) {
 
         if (rule == null)
             throw new IllegalArgumentException();
@@ -438,6 +448,8 @@ abstract public class JoinTask implements Callable<Void> {
             throw new IllegalArgumentException();
         if (masterUUID == null)
             throw new IllegalArgumentException();
+        if (requiredVars == null)
+            throw new IllegalArgumentException();
 
         this.rule = rule;
         this.partitionId = partitionId;
@@ -452,6 +464,7 @@ abstract public class JoinTask implements Callable<Void> {
         this.stats = new JoinStats(partitionId, orderIndex);
         this.masterProxy = masterProxy;
         this.masterUUID = masterUUID;
+        this.requiredVars = requiredVars;
 
         if (DEBUG)
             log.debug("orderIndex=" + orderIndex + ", partitionId="
@@ -1508,12 +1521,26 @@ abstract public class JoinTask implements Callable<Void> {
 
                     for (IBindingSet bset : bindingSets) {
 
+                        IVariable[] variablesToKeep = requiredVars[tailIndex];
+                        
+                        if (INFO) {
+                            log.info("tailIndex: " + tailIndex);
+                            log.info("bset before: " + bset);
+                        }
+                        
                         /*
                          * Clone the binding set since it is tested for each
                          * element visited.
                          */
-                        bset = bset.clone();
+                        //bset = bset.clone();
+                        bset = bset.copy(variablesToKeep);
 
+                        if (INFO) {
+                            log.info("tailIndex: " + tailIndex);
+                            log.info("bset after: " + bset);
+                            log.info("element: " + e);
+                        }
+                        
                         // propagate bindings from the visited element.
                         if (joinNexus.bind(rule, tailIndex, e, bset)) {
 

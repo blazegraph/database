@@ -178,6 +178,27 @@ public class HashBindingSet implements IBindingSet {
         
     }
     
+    /**
+     * Return a shallow copy of the binding set, eliminating unecessary 
+     * variables.
+     */
+    public HashBindingSet copy(final IVariable[] variablesToKeep) {
+        
+        final HashBindingSet bs = new HashBindingSet();
+        
+        for (IVariable var : variablesToKeep) {
+            
+            IConstant val = map.get(var);
+            if (val != null) {
+                bs.map.put(var, val);
+            }
+            
+        }
+        
+        return bs;
+        
+    }
+    
     public boolean equals(IBindingSet o) {
         
         if (o == this)
