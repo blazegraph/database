@@ -484,23 +484,23 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
         }
 
-        /**
-         * Return a byte representing the combination of the specified value
-         * type and data type.
-         * 
-         * @param vt
-         *            The value type (URI, Literal, BNode, or SID).
-         * @param dt
-         *            The data type.
-         * 
-         * @todo How do we handle SIDs? (They are a special case of BNode.)
-         */
-        static public byte fuse(final Value vte,
-                final InternalDatatypeEnum dte) {
-
-            return (byte) ((((int) vte.v << 6) | dte.v) & 0xff);
-
-        }
+//        /**
+//         * Return a byte representing the combination of the specified value
+//         * type and data type.
+//         * 
+//         * @param vte
+//         *            The value type (URI, Literal, BNode, or SID).
+//         * @param dt
+//         *            The data type.
+//         * 
+//         * @todo How do we handle SIDs? (They are a special case of BNode.)
+//         */
+//        static public byte fuse(final Value vte,
+//                final InternalDatatypeEnum dte) {
+//
+//            return (byte) ((((int) vte.v << 6) | dte.v) & 0xff);
+//
+//        }
 
     }
 
