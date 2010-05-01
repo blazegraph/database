@@ -255,25 +255,25 @@ public class SPO implements ISPO, Comparable<SPO> {
         
     }
 
-    /**
-     * Constructor used when you know the {s,p,o} and have done a lookup in the
-     * index to determine whether or not the statement exists, its
-     * {@link StatementEnum} type, and its statement identifier (if assigned).
-     * 
-     * @param s
-     * @param p
-     * @param o
-     * @param val
-     */
-    public SPO(final long s, final long p, final long o, final byte[] val) {
-
-        this.s = s;
-        this.p = p;
-        this.o = o;
-        
-        decodeValue(this, val);
-        
-    }
+//    /**
+//     * Constructor used when you know the {s,p,o} and have done a lookup in the
+//     * index to determine whether or not the statement exists, its
+//     * {@link StatementEnum} type, and its statement identifier (if assigned).
+//     * 
+//     * @param s
+//     * @param p
+//     * @param o
+//     * @param val
+//     */
+//    public SPO(final long s, final long p, final long o, final byte[] val) {
+//
+//        this.s = s;
+//        this.p = p;
+//        this.o = o;
+//        
+//        decodeValue(this, val);
+//        
+//    }
 
     /**
      * Variant to create an {@link SPO} from constants (used by the unit tests).

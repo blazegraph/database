@@ -61,7 +61,16 @@ import com.bigdata.relation.accesspath.BlockingBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME Finish this stress test and enable in {@link TestAll}
+ *          FIXME Finish this stress test and enable in {@link TestAll}.
+ *          <p>
+ *          Note: {@link KeyBuilder#decodeBigInteger(int, byte[])} has since
+ *          been written. However, the encoding of a {@link BigInteger} as an
+ *          unsigned byte[] requires a 2 byte signum/runLength prefix. Thus,
+ *          while {@link KeyBuilder#append(BigInteger)} and the decode method
+ *          might be used to complete this test case, the separator keys will
+ *          need to be properly formed initially in order to have the leading
+ *          signum/runlength. The <code>null</code> for the last rightSeparator
+ *          will also need to be handled specially.
  */
 public class TestMasterTaskWithSplits extends AbstractKeyRangeMasterTestCase {
 
@@ -123,7 +132,7 @@ public class TestMasterTaskWithSplits extends AbstractKeyRangeMasterTestCase {
      */
     private final static BigInteger MAX_KEY = BigInteger
             .valueOf(Long.MAX_VALUE).multiply(BigInteger.valueOf(2));
-    
+
     /**
      * Convert an unsigned byte[] into a {@link BigInteger}. A <code>null</code>
      * is understood as <code>2^64</code>. An empty byte[] is understood as a
@@ -131,8 +140,10 @@ public class TestMasterTaskWithSplits extends AbstractKeyRangeMasterTestCase {
      * 
      * @param key
      *            The bytes.
-     *            
+     * 
      * @return The big integer value.
+     * 
+     * @todo [See notes at the top of this file.]
      */
     private BigInteger decodeKey(final byte[] key) {
 
@@ -155,7 +166,8 @@ public class TestMasterTaskWithSplits extends AbstractKeyRangeMasterTestCase {
      * FIXME This test passes because the assertions are correct, but it only
      * lays out some known points and does not go further to verify that a
      * desired translation between signed longs, unsigned byte[] keys, and
-     * {@link BigInteger} values is being carried out.
+     * {@link BigInteger} values is being carried out. [See notes at the top
+     * of this file.]
      */
     public void test_decodeKey() {
 
@@ -179,7 +191,9 @@ public class TestMasterTaskWithSplits extends AbstractKeyRangeMasterTestCase {
     }
 
     /**
-     * FIXME Verify that the separator keys are properly ordered.
+     * FIXME Verify that the separator keys are properly ordered. [See notes at
+     * the top of this file, but also note that we need to handle the
+     * <code>null</code> rightSeparator specially.]
      */
     public void test_getSeparatorKey() {
 

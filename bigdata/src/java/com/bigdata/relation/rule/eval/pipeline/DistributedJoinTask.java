@@ -24,6 +24,7 @@ import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IRuleState;
@@ -138,13 +139,14 @@ public class DistributedJoinTask extends JoinTask {
             final UUID masterUUID,//
             final IAsynchronousIterator<IBindingSet[]> src,//
             final IKeyOrder[] keyOrders,//
-            final DataService dataService//
+            final DataService dataService,//
+            final IVariable[][] requiredVars//
             ) {
 
         super(
                 /*DataService.getIndexPartitionName(scaleOutIndexName,
                         partitionId),*/ rule, joinNexus, order, orderIndex,
-                partitionId, master, masterUUID);
+                partitionId, master, masterUUID, requiredVars);
 
         if (fed == null)
             throw new IllegalArgumentException();
@@ -1113,7 +1115,7 @@ public class DistributedJoinTask extends JoinTask {
                         nextScaleOutIndexName, rule, joinNexus
                                 .getJoinNexusFactory(), order, nextOrderIndex,
                         locator.getPartitionId(), masterProxy, masterUUID,
-                        sourceItrProxy, keyOrders);
+                        sourceItrProxy, keyOrders, requiredVars);
 
                     // submit the factory task, obtain its future.
                     factoryFuture = dataService.submit(factoryTask);

@@ -71,7 +71,6 @@
 	     	>
 			<!-- note: must also specify -bootclasspath and -extdirs when cross-compiling -->
 			<!-- target="${javac.target}" source="${javac.source}" -->
-			<src path="${bigdata.dir}/lgpl-utils/src/java" />
 			<src path="${bigdata.dir}/bigdata/src/java" />
 			<src path="${bigdata.dir}/bigdata-jini/src/java" />
 			<src path="${bigdata.dir}/bigdata-rdf/src/java" />
@@ -1242,6 +1241,7 @@ ${postInstallMessage}</echo>
       <property name="dist.dir" location="${bigdata.dir}/dist/bigdata" />
 
       <property name="dist.bin" location="${dist.dir}/bin" />
+      <property name="dist.bin.config" location="${dist.bin}/config" />
       <property name="dist.lib" location="${dist.dir}/lib" />
       <property name="dist.lib.dl" location="${dist.dir}/lib-dl" />
       <property name="dist.lib.ext" location="${dist.dir}/lib-ext" />
@@ -1298,8 +1298,10 @@ ${postInstallMessage}</echo>
             tofile="${dist.lib}/cweb-commons.jar"/>
       <copy file="${bigdata.lib}/cweb-extser-0.1-b2-dev.jar"
             tofile="${dist.lib}/cweb-extser.jar"/>
-      <copy file="${bigdata.lib}/unimi/dsiutils-1.0.10.jar"
+      <copy file="${bigdata.lib}/dsi-utils-1.0-b5-dev-200410.jar"
             tofile="${dist.lib}/dsiutils.jar"/>
+      <copy file="${bigdata.lib}/lgpl-utils-1.0-b5-dev-200410.jar"
+            tofile="${dist.lib}/lgplutils.jar"/>
       <copy file="${bigdata.lib}/unimi/fastutil-5.1.5.jar"
             tofile="${dist.lib}/fastutil.jar"/>
       <copy file="${bigdata.lib}/icu/icu4j-3_6.jar"
@@ -1382,6 +1384,14 @@ ${postInstallMessage}</echo>
             todir="${dist.bin}"/>
       <chmod file="${dist.bin}/pstart" perm="ugo+x"/>
 
+      <copy file="${src.resources}/bin/config/browser.config"
+            todir="${dist.bin.config}"/>
+      <copy file="${src.resources}/bin/config/reggie.config"
+            todir="${dist.bin.config}"/>
+      <copy file="${src.resources}/bin/config/serviceStarter.config"
+            todir="${dist.bin.config}"/>
+      <copy file="${src.resources}/bin/config/zookeeper.config"
+            todir="${dist.bin.config}"/>
 
       <!-- Stage security policy (config) files -->
       <copy file="${src.resources.config}/policy.all"
@@ -1426,15 +1436,11 @@ ${postInstallMessage}</echo>
       <copy file="${src.resources.config}/bigdataCluster16.config"
             todir="${dist.var.config.jini}"/>
 
-      <copy file="${src.resources.config}/jini/zookeeper.config"
-            todir="${dist.var.config.jini}"/>
       <copy file="${src.resources.config}/jini/reggie.config"
             todir="${dist.var.config.jini}"/>
       <copy file="${src.resources.config}/jini/browser.config"
             todir="${dist.var.config.jini}"/>
-      <copy file="${src.resources.config}/jini/serviceStarterAll.config"
-            todir="${dist.var.config.jini}"/>
-      <copy file="${src.resources.config}/jini/serviceStarterOne.config"
+      <copy file="${src.resources.config}/jini/startAll.config"
             todir="${dist.var.config.jini}"/>
     </target>
 
@@ -1480,7 +1486,7 @@ ${postInstallMessage}</echo>
       <mkdir dir="${bigdata-test.lib}"/>
       <property name="bigdata-test.jar" location="${bigdata-test.lib}/bigdata-test.jar" />
 
-      <property name="javac.test.classpath" value="${classes.dir}:${junit.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/classserver.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/dsiutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/log4j.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/zookeeper.jar"/>
+      <property name="javac.test.classpath" value="${classes.dir}:${junit.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/classserver.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/dsiutils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/log4j.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/zookeeper.jar"/>
 
       <echo>javac
 </echo>
@@ -1516,7 +1522,6 @@ ${postInstallMessage}</echo>
 		classpath="${javac.test.classpath}"
 		verbose="${javac.verbose}">
 
-        <src path="${bigdata.dir}/lgpl-utils/src/test"/>
         <src path="${bigdata.dir}/bigdata/src/test"/>
         <src path="${bigdata.dir}/bigdata-jini/src/test"/>
         <src path="${bigdata.dir}/bigdata-rdf/src/test"/>
@@ -1720,11 +1725,14 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/cweb-extser.jar"/>
         <pathelement location="${dist.lib}/ctc_utils.jar"/>
         <pathelement location="${dist.lib}/dsiutils.jar"/>
+        <pathelement location="${dist.lib}/lgplutils.jar"/>
         <pathelement location="${dist.lib}/fastutil.jar"/>
         <pathelement location="${dist.lib}/icu4j.jar"/>
         <pathelement location="${dist.lib}/iris.jar"/>
         <pathelement location="${dist.lib}/jsk-lib.jar"/>
         <pathelement location="${dist.lib}/jsk-platform.jar"/>
+        <pathelement location="${dist.lib}/start.jar"/>
+        <pathelement location="${dist.lib}/reggie.jar"/>
         <pathelement location="${dist.lib}/log4j.jar"/>
         <pathelement location="${dist.lib}/lucene-analyzer.jar"/>
         <pathelement location="${dist.lib}/lucene-core.jar"/>
@@ -1734,7 +1742,7 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/zookeeper.jar"/>
       </path>
 
-      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/dsiutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
+      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/dsiutils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
 
       <echo>    classpath:    ${run.class.path}
 </echo>
@@ -1817,6 +1825,7 @@ ${postInstallMessage}</echo>
         <sysproperty key="cweb-commons.jar" value="${dist.lib}/cweb-commons.jar" />
         <sysproperty key="cweb-extser.jar" value="${dist.lib}/cweb-extser.jar" />
         <sysproperty key="dsiutils.jar" value="${dist.lib}/dsiutils.jar" />
+        <sysproperty key="lgplutils.jar" value="${dist.lib}/lgplutils.jar" />
         <sysproperty key="fastutil.jar" value="${dist.lib}/fastutil.jar" />
         <sysproperty key="icu4j.jar" value="${dist.lib}/icu4j.jar" />
         <sysproperty key="jsk-lib.jar" value="${dist.lib}/jsk-lib.jar" />
@@ -1831,6 +1840,7 @@ ${postInstallMessage}</echo>
         <sysproperty key="bigdata.fedname" value="${bigdata.fedname}"/>
 
         <classpath refid="run.class.path.id"/>
+        <sysproperty key="java.class.path" value="${run.class.path}" />
 
         <!-- Individual test suite to run when -DtestName is set -->
         <!-- to the fully-qualified name of the test suite       -->
@@ -1911,6 +1921,7 @@ ${postInstallMessage}</echo>
 	        <pathelement location="${dist.lib}/cweb-extser.jar"/>
 	        <pathelement location="${dist.lib}/ctc_utils.jar"/>
 	        <pathelement location="${dist.lib}/dsiutils.jar"/>
+	        <pathelement location="${dist.lib}/lgplutils.jar"/>
 	        <pathelement location="${dist.lib}/fastutil.jar"/>
 	        <pathelement location="${dist.lib}/icu4j.jar"/>
 	        <pathelement location="${dist.lib}/iris.jar"/>
@@ -1924,7 +1935,7 @@ ${postInstallMessage}</echo>
 	        <pathelement location="${dist.lib}/slf4j-log4j.jar"/>
 	        <pathelement location="${dist.lib}/zookeeper.jar"/>
 	      </path>
-	      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/dsiutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
+	      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/dsiutils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
 		<!-- Generate the LUBM dataset. 
 		<mkdir dir="${data}"/>
 		<java classname="edu.lehigh.swat.bench.uba.Generator" dir="${data}" fork="yes">

@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.keys;
 
 import java.io.UnsupportedEncodingException;
+import java.math.BigInteger;
 import java.text.Collator;
 import java.util.Locale;
 import java.util.Properties;
@@ -563,9 +564,9 @@ public class KeyBuilder implements IKeyBuilder {
                 /*
                  * Note: The successor of an empty string is not defined since
                  * it maps to an empty byte[] (an empty value space). However an
-                 * empty string is semantically equivilent to all pad characters
+                 * empty string is semantically equivalent to all pad characters
                  * so we use the successor of a string containing a single pad
-                 * character, which is equivilent to a string containing a
+                 * character, which is equivalent to a string containing a
                  * single byte whose value is pad+1.
                  */
                 
@@ -606,7 +607,7 @@ public class KeyBuilder implements IKeyBuilder {
              * Note: Changed this to append the pad character (a space) as if it
              * was already an unsigned value (0x20) rather than its signed value
              * (0x160). This causes "bro" to sort before "brown", which is
-             * designed. (bbt, 10/1/08)
+             * desired. (bbt, 10/1/08)
              */
             appendUnsigned(pad);
             
@@ -621,7 +622,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
-    final public IKeyBuilder append(byte[] a) {
+    final public IKeyBuilder append(final byte[] a) {
         
         return append(0, a.length, a);
         
@@ -683,7 +684,7 @@ public class KeyBuilder implements IKeyBuilder {
 
     }
 
-    static public float decodeFloat(byte[] key,int off) {
+    static public float decodeFloat(final byte[] key, final int off) {
         
         int v = decodeInt(key, off);
         
@@ -698,7 +699,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
-    final public IKeyBuilder append(UUID uuid) {
+    final public IKeyBuilder append(final UUID uuid) {
 
         if (len + 16 > buf.length) ensureCapacity(len+16);
 
@@ -742,7 +743,7 @@ public class KeyBuilder implements IKeyBuilder {
         return this;
         
     }
-    
+
     /**
      * Return the value that will impose the lexiographic ordering as an
      * unsigned long integer.
@@ -750,8 +751,8 @@ public class KeyBuilder implements IKeyBuilder {
      * @param v
      *            The signed long integer.
      * 
-     * @return The value that will impose the lexiograph ordering as an unsigned
-     *         long integer.
+     * @return The value that will impose the lexiographic ordering as an
+     *         unsigned long integer.
      */
     static final /*public*/ long encode(long v) {
 
@@ -926,6 +927,23 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
+    public IKeyBuilder append(final BigInteger i) {
+
+        // Note: BigInteger.ZERO is represented as byte[]{0}.
+        final byte[] b = i.toByteArray();
+        
+        final int runLength = i.signum() == -1 ? -b.length : b.length;
+        
+        ensureFree(b.length + 2);
+        
+        append((short) runLength);
+        
+        append(b);
+
+        return this;
+        
+    }
+
     /*
      * static helper methods.
      */
@@ -1032,6 +1050,10 @@ public class KeyBuilder implements IKeyBuilder {
         } else if (val instanceof Long) {
 
             append(((Long) val).longValue());
+
+        } else if (val instanceof BigInteger) {
+
+            append((BigInteger) val);
 
         } else if (val instanceof Float) {
 
@@ -1278,6 +1300,29 @@ public class KeyBuilder implements IKeyBuilder {
         }
 
         return (short) v;
+        
+    }
+
+    /**
+     * Convert an unsigned byte[] into a {@link BigInteger}.
+     * 
+     * @param key
+     *            The bytes.
+     *            
+     * @return The big integer value.
+     */
+    static public BigInteger decodeBigInteger(final int offset, final byte[] key) {
+
+        final int tmp = KeyBuilder.decodeShort(key, offset);
+
+        final int runLength = tmp < 0 ? -tmp : tmp;
+        
+        final byte[] b = new byte[runLength];
+        
+        System.arraycopy(key/* src */, offset + 2/* srcpos */, b/* dst */,
+                0/* destPos */, runLength);
+        
+        return new BigInteger(b);
         
     }
 

@@ -68,6 +68,9 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
 
         final ProxyTestSuite suite = new ProxyTestSuite(delegate, "SAIL with Quads (nested subquery joins)");
 
+        // test pruning of variables not required for downstream processing.
+        suite.addTestSuite(TestPruneBindingSets.class);
+
         // misc named graph API stuff.
         suite.addTestSuite(TestQuadsAPI.class);
 
@@ -134,6 +137,8 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
         properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
 */
         properties.setProperty(Options.QUADS_MODE, "true");
+
+        properties.setProperty(Options.TRUTH_MAINTENANCE, "false");
 
         properties.setProperty(AbstractResource.Options.NESTED_SUBQUERY, "true");
 
