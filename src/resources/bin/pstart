@@ -252,7 +252,7 @@ class GenericBigdataService(BigdataServiceBase):
            the class "com.bigdata.<service>.ServiceImpl"
          * The codebase Jar file is named "${appHome}/lib-dl/<service>-dl.jar"
          * The service config file is named
-           "${appHome}/lib/com/bigdata/<service>/config/<service>.config"
+           "${appHome}/bin/config/<service>.config"
     """
     def __init__(self, serviceName, params):
         BigdataServiceBase.__init__(self, serviceName, params)
@@ -260,25 +260,24 @@ class GenericBigdataService(BigdataServiceBase):
         # Use the generic service template and fill in the fields
         self.properties['entityType'] = self.serviceName
         self.properties['entityClasspathJar'] = os.path.join(self.appHome, \
-            "lib", bigdata + ".jar")
+            "lib", "bigdata.jar")
         self.properties['entityMain'] = "com.bigdata." + self.serviceName + \
             ".ServiceImpl"
         self.properties['entityCodebaseJar'] = self.serviceName + "-dl.jar"
         self.properties['entityConfig'] = os.path.join(self.appHome, \
-            "var", "config", "jini", self.serviceName, + ".config")
+            "bin", "config", self.serviceName, + ".config")
 
         self.properties['entityPolicy'] = os.path.join(self.appHome, \
             "var", "config", "policy", "service.policy")
         self.properties['config'] = os.path.join(self.appHome,
-             "var", "config", "jini", "serviceStarterOne.config")
-
+             "bin", "config", "serviceStarterOne.config")
 
 
 class BigdataService(BigdataServiceBase):
     def __init__(self, serviceName, params):
         BigdataServiceBase.__init__(self, serviceName, params)
         self.properties['config'] = os.path.join(self.appHome, 
-            "var", "config", "jini", "serviceStarterAll.config")
+            "bin", "config", "serviceStarter.config")
 
         # Construct the ServiceStarter Service Descriptor list
         if params.startCodebaseHttpd and serviceName != "httpd":
@@ -333,84 +332,6 @@ class BigdataMetaservice(BigdataService):
             "com.sun.jini.start.serviceDescriptors = " + \
             "new ServiceDescriptor[] {" + \
             "Descriptor, ".join(services) + "Descriptor}" ]
-
-
-class ZookeeperServer(BigdataServiceBase):
-    def __init__(self, serviceName, params):
-        BigdataServiceBase.__init__(self, serviceName, params)
-        self.properties['java.security.policy'] = os.path.join(self.appHome, \
-            "var", "config", "policy", "service.policy")
-        self.properties['java.rmi.server.RMIClassLoaderSpi'] = \
-            "com.bigdata.httpaccess.CustomClassProvider"
-        self.properties['com.bigdata.httpaccess.persistenceDirectory'] = \
-            os.path.join(".", "httpaccessState")
-
-    def start(self, args):
-        # Calculate the service classpath
-        classpath = [
-            os.path.join(self.appHome, "lib", "zookeeper.jar"),
-            os.path.join(self.appHome, "lib", "bigdata.jar"),
-            os.path.join(self.appHome, "lib", "jsk-lib.jar"),
-            os.path.join(self.appHome, "lib", "jsk-platform.jar"),
-            os.path.join(self.appHome, "lib", "jsk-resources.jar"),
-            os.path.join(self.appHome, "lib", "log4j.jar") ]
-        os.environ['CLASSPATH'] = ":".join(classpath)
-
-        # Set the library path
-        javahome = os.environ['JAVA_HOME']
-        arch = os.uname()[4]
-        if arch == "x86_64":
-            jvmArch = "amd64"
-        elif arch == "i586" or arch == "i686":
-            jvmArch = "i386"
-        else:
-            print "Unknown CPU architecture"
-            sys.exit(1)
-        os.environ['LD_LIBRARY_PATH'] = self.properties['java.library.path'] + \
-            ":" + os.path.join(javahome, "jre", "lib", jvmArch, "server") + \
-            ":" + os.path.join(javahome, "jre", "lib", jvmArch) + \
-            ":" + os.path.join(javahome, "lib", jvmArch)
-        del self.properties['java.library.path']
-
-        # Build the list of command line arguments
-        argList = []
-        argList.append(os.path.join(self.appHome,
-            "bin", "http_access_server"))
-
-        argList.extend([ "-s", os.path.join(self.appHome,
-             "lib", "com", "bigdata", self.serviceName,
-             "config", self.serviceName + ".config") ])
-
-        # Migrate old property names to new
-        self.migrateProperties()
-
-        # Convert the properties to command line arguments
-        propNames = self.properties.keys()
-        propNames.sort()
-        for p in propNames:
-            argList.append("-D" + p + "=" + self.properties[p])
-        argList.extend(args)
-
-        # Display the command about to be run
-        for a in argList:
-            print a
-
-        if os.environ.has_key('GDB'):
-            # Write the command line args to a file to pass to GDB
-            fp = file("gdbinit.autogen", "w")
-            fp.write("set args " + " ".join(argList[1:]))
-            fp.close()
-
-            # Modify the command to execute
-            argList = [ 'gdb', '-x', 'gdbinit.autogen', argList[0] ]
-
-        os.execvp(argList[0], argList)
-
-    def setGroupProperties(self):
-        # The HTTP server expects a comma-seperated list of group names
-        self.properties['groupsToJoin'] = ",".join(params.groups)
-        # XXX: the HTTP server doesn't use the locator list
-        #self.properties['locsToJoin'] = ",".join(params.lookupLocators)
 
 
 class BigdataServiceOldLog(BigdataService):

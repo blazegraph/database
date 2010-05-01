@@ -198,7 +198,12 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
         protected V newProcessHelper(String className,
                 ProcessBuilder processBuilder, IServiceListener listener)
                 throws IOException {
-            
+
+            if(configFile == null) {
+                throw new NullPointerException("no entry named '"+Options.CONFIG_FILE
+                    +"' in test configuration [under namespace '"+Options.NAMESPACE+"' ]" );
+            }
+           
             if(!configFile.exists()) {
                 
                 throw new FileNotFoundException(configFile.toString());
@@ -241,7 +246,10 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
 //            if (log.isInfoEnabled())
 //                log.info("Will run: " + cmd);
             
-            cmds.add("java");
+            String javaHome = System.getProperty("java.home");
+            String javaPath = (javaHome != null ? 
+                javaHome + File.separator + "bin" + File.separator + "java" : "java");
+            cmds.add(javaPath);
 
         }
 
@@ -254,6 +262,10 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
             cmds.add(ServiceStarter.class.getName());
             
             // the config file.
+            if(configFile == null) {
+                throw new NullPointerException("no entry named '"+Options.CONFIG_FILE
+                    +"' in test configuration [under namespace '"+Options.NAMESPACE+"' ]" );
+            }
             cmds.add(configFile.toString());
             
         }

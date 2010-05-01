@@ -92,21 +92,21 @@ public class AbstractFedZooTestCase extends TestCase2 {
 
     JiniFederation fed;
 
-    String fedname = null;
+    String zrootname = null;
     
     public void setUp() throws Exception {
 
-        fedname = getName() + "_" + UUID.randomUUID();
+        zrootname = getName() + "_" + UUID.randomUUID();
 
-        if (new File(fedname).exists()) {
+        if (new File(zrootname).exists()) {
             // clean out old files.
-            recursiveDelete(new File(fedname));
+            recursiveDelete(new File(zrootname));
         }
         
         // a unique zroot in the /test namespace.
-        final String zroot = "/"+fedname;//"/test/" + fedname;
+        final String zroot = "/"+zrootname;//"/test/" + zrootname;
 
-        System.err.println(getName() + ": setting up fedname=" + fedname);
+        System.err.println(getName() + ": setting up zrootname=" + zrootname);
 
         final String[] args = new String[] { configFile,
                 // Note: overrides the zroot to be unique.
@@ -118,7 +118,7 @@ public class AbstractFedZooTestCase extends TestCase2 {
                 };
         
         // apply the federation name to the configuration file.
-        System.setProperty("bigdata.fedname", fedname);
+        System.setProperty("bigdata.zrootname", zrootname);
 
         config = ConfigurationProvider.getInstance(args);
 
@@ -140,25 +140,13 @@ public class AbstractFedZooTestCase extends TestCase2 {
         // make sure that we have the zroot that we overrode above.
         assertEquals(zroot, fed.getZooConfig().zroot);
 
-        try {
-
-            // make sure /test exists so that we can create its child.
-            zookeeper.create("/test", new byte[] {}/* data */, acl,
-                    CreateMode.PERSISTENT);
-
-        } catch (NodeExistsException ex) {
-
-            // ignore.
-
-        }
-
         fed.createKeyZNodes(zookeeper);
 
     }
 
     public void tearDown() throws Exception {
 
-        System.err.println(getName() + ": tearing down fedname=" + fedname);
+        System.err.println(getName() + ": tearing down zrootname=" + zrootname);
 
         // destroy any processes started by this test suite.
         for (ProcessHelper t : listener.running) {
@@ -181,7 +169,7 @@ public class AbstractFedZooTestCase extends TestCase2 {
             
         }
 
-        if (fedname != null && new File(fedname).exists()) {
+        if (zrootname != null && new File(zrootname).exists()) {
 
             /*
              * Wait a bit and then try and delete the federation directory
@@ -194,7 +182,7 @@ public class AbstractFedZooTestCase extends TestCase2 {
                 throw new RuntimeException(e);
             }
 
-            recursiveDelete(new File(fedname));
+            recursiveDelete(new File(zrootname));
 
         }
         

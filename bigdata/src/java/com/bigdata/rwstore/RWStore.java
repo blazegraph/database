@@ -226,7 +226,7 @@ public class RWStore implements IStore {
 			/**
 			 * TODO: Configure number of WriteCache buffers for WriteCacheService
 			 */
-			m_writeCache = new RWWriteCacheService(6, m_fd, "rw");
+			m_writeCache = new RWWriteCacheService(6, m_fd, m_raf, "rw");
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
