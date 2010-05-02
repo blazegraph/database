@@ -81,17 +81,37 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
 
     static {
     
+    	String s;
         try {
 
 //            hostname = InetAddress.getLocalHost().getHostName();
             
-            fullyQualifiedHostName = InetAddress.getLocalHost().getCanonicalHostName();
+            s = InetAddress.getLocalHost().getCanonicalHostName();
             
         } catch (UnknownHostException e) {
-            
-            throw new AssertionError(e);
+        
+        	try {
+        	
+        		s = InetAddress.getLocalHost().getHostName();
+        		
+        	} catch(UnknownHostException e2) {
+
+				final String msg = "Could not resolve hostname";
+				try {
+					log.error(msg);
+        		} catch(Throwable t) {
+        			System.err.println(msg);
+        		}
+        		
+        		s = "localhost";
+
+        		//throw new AssertionError(e);
+        		
+        	}
             
         }
+        
+        fullyQualifiedHostName = s;
 
         hostPathPrefix = ICounterSet.pathSeparator + fullyQualifiedHostName
                 + ICounterSet.pathSeparator;
