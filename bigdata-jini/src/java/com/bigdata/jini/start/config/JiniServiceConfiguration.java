@@ -168,6 +168,13 @@ abstract public class JiniServiceConfiguration extends
 
         jiniOptions = getJiniOptions(className, config);
 
+        if(this.groups == null) {
+            log.warn("groups = ALL_GROUPS");
+        } else if( ("").equals(this.groups) ) {
+            log.warn("groups = NO_GROUPS");
+        } else {
+            log.warn("groups = " + Arrays.toString(this.groups));
+        }
     }
 
     /**
@@ -567,11 +574,12 @@ abstract public class JiniServiceConfiguration extends
                 
                 out.write("\ngroups=new String[]{\n");
                 
-                for (String e : groups) {
+                for (int i=0; i < groups.length-1; i++) {
 
-                    out.write(ConfigMath.q(e) + "\n");
+                    out.write(ConfigMath.q(groups[i]) + ",");
 
                 }
+                out.write(ConfigMath.q(groups[groups.length-1]) + "\n");
                 
                 out.write("};\n");
                 
@@ -584,11 +592,17 @@ abstract public class JiniServiceConfiguration extends
             out.write("\nlocators=new " + LookupLocator.class.getName()
                     + "[]{\n");
 
-            for (LookupLocator e : locators) {
+            if (locators != null) {
+                for (int i=0; i < locators.length-1; i++) {
 
-                out.write("new " + LookupLocator.class.getName() + "(\""
-                        + e.getHost() + "\"," + e.getPort() + "),\n");
+                    out.write("new " + LookupLocator.class.getName() + "(\""
+                        + (locators[i]).getHost() + "\"," + (locators[i]).getPort() + "),\n");
 
+                }
+                if (locators.length > 0) {
+                    out.write("new " + LookupLocator.class.getName() + "(\""
+                        + (locators[locators.length-1]).getHost() + "\"," + (locators[locators.length-1]).getPort() + ")\n");
+                }
             }
 
             out.write("};\n");
