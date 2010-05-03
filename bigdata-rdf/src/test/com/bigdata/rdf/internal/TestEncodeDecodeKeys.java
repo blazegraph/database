@@ -27,31 +27,24 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
-import java.io.Serializable;
+import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Random;
 import java.util.UUID;
 
 import junit.framework.TestCase2;
 
-import org.openrdf.model.BNode;
-import org.openrdf.model.Literal;
-import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.lexicon.ITermIdCodes;
-import com.bigdata.rdf.lexicon.TermIdEncoder;
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueFactoryImpl;
-import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.spo.TestSPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.rdf.store.AbstractTripleStore.Options;
-import com.ibm.icu.math.BigDecimal;
 
 /**
  * Unit tests for encoding and decoding compound keys (such as are used by the
@@ -72,10 +65,532 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     }
 
     /**
-     * Unit test verifies the ability to decode a key with an inline variable
-     * length coding of a datatype literal (xsd:integer, aka BigInteger).
+     * Unit test for {@link InternalValueTypeEnum} verifies that the
+     * correspondence between the enumerated types and the internal values is
+     * correct (self-consistent).
      */
-    public void test001() {
+    public void test_VTE_selfConsistent() {
+       
+        for(InternalValueTypeEnum e : InternalValueTypeEnum.values()) {
+
+            assertTrue("expected: " + e + " (v=" + e.v + "), actual="
+                    + InternalValueTypeEnum.valueOf(e.v),
+                    e == InternalValueTypeEnum.valueOf(e.v));
+
+        }
+        
+    }
+    
+    /**
+     * Unit test for {@link InternalValueTypeEnum} verifies that all legal byte
+     * values decode to an internal value type enum (basically, this checks that
+     * we mask the two lower bits).
+     */
+    public void test_VTE_decodeNoErrors() {
+
+        for (int i = Byte.MIN_VALUE; i <= Byte.MAX_VALUE; i++) {
+            
+            assertNotNull(InternalValueTypeEnum.valueOf((byte) i));
+            
+        }
+        
+    }
+
+    /**
+     * Unit test for {@link InternalDataTypeEnum} verifies that the
+     * correspondence between the enumerated types and the internal values is
+     * correct.
+     */
+    public void test_DTE_selfConsistent() {
+
+        for(InternalDataTypeEnum e : InternalDataTypeEnum.values()) {
+
+            assertTrue("expected: " + e + " (v=" + e.v + "), actual="
+                    + InternalDataTypeEnum.valueOf(e.v),
+                    e == InternalDataTypeEnum.valueOf(e.v));
+
+            assertEquals(e.v, e.v());
+
+        }
+
+    }
+
+//    /**
+//     * Unit tests for {@link AbstractInternalValue} focused on encoding and
+//     * decoding the flags byte representing the combination of the
+//     * {@link InternalValueTypeEnum} and the {@link InternalDataTypeEnum}. This
+//     * is done using a private concrete implementation of
+//     * {@link AbstractInternalValue} since we need to be able to represent ANY
+//     * kind of RDF Value in order to test all possible
+//     * {@link InternalValueTypeEnum} and {@link InternalDataTypeEnum}.
+//     * 
+//     * @see AbstractInternalValue
+//     * 
+//     * @todo Drop this as the cases are covered by {@link #test_TermId()}?
+//     */
+//    public void test_AbstractInternalValue() {
+//
+//        class ValueImpl<V extends BigdataValue/* URI,BNode,Literal,SID */>
+//                extends AbstractInternalValue<V, Void> {
+//
+//            private static final long serialVersionUID = 1L;
+//
+//            public ValueImpl(final InternalValueTypeEnum vte,
+//                    final InternalDataTypeEnum dte) {
+//
+//                super(vte, dte);
+//
+//            }
+//
+//            public String toString() {
+//                final String datatype = getInternalDataTypeEnum().getDatatype();
+//                return "TermId(" + getInternalValueTypeEnum().getCharCode()
+//                        + ")" + (datatype == null ? "" : datatype);
+//            }
+//
+//            final public V asValue(BigdataValueFactory f)
+//                    throws UnsupportedOperationException {
+//                throw new UnsupportedOperationException();
+//            }
+//
+//            final public Void getInlineValue() {
+//                throw new UnsupportedOperationException();
+//            }
+//
+//            final public long getTermId() {
+//                throw new UnsupportedOperationException();
+//            }
+//
+//            final public boolean isTermId() {
+//                return getInternalDataTypeEnum() == InternalDataTypeEnum.TermId;
+//            }
+//
+//            final public boolean isInline() {
+//                return getInternalDataTypeEnum() != InternalDataTypeEnum.TermId;
+//            }
+//
+//            final public boolean isNull() {
+//                throw new UnsupportedOperationException();
+//            }
+//
+//        } // test class.
+//
+////        final Random r = new Random();
+//        
+//        for(InternalValueTypeEnum vte : InternalValueTypeEnum.values()) {
+////        InternalValueTypeEnum vte = InternalValueTypeEnum.BNODE;
+////        {
+//
+//            for(InternalDataTypeEnum dte : InternalDataTypeEnum.values()) {
+//
+////                // 64 bit random term identifier.
+////                final long termId = r.nextLong();
+//
+//                final ValueImpl<?> v = new ValueImpl<BigdataValue>(vte, dte);
+//
+////                assertTrue(v.isTermId());
+//
+////                assertFalse(v.isInline());
+//                
+////                if (termId == 0L) {
+////                    assertTrue(v.toString(), v.isNull());
+////                } else {
+////                    assertFalse(v.toString(), v.isNull());
+////                }
+//                
+////                assertEquals(termId, v.getTermId());
+//
+//                try {
+//                    v.getInlineValue();
+//                    fail("Expecting "+UnsupportedOperationException.class);
+//                } catch(UnsupportedOperationException ex) {
+//                    // ignored.
+//                }
+//                
+//                assertEquals("flags="+v.flags(), vte, v.getInternalValueTypeEnum());
+//
+//                assertEquals(dte, v.getInternalDataTypeEnum());
+//
+//                switch(vte) {
+//                case URI:
+//                    assertTrue(v.isURI());
+//                    assertFalse(v.isBNode());
+//                    assertFalse(v.isLiteral());
+//                    assertFalse(v.isStatement());
+//                    break;
+//                case BNODE:
+//                    assertFalse(v.isURI());
+//                    assertTrue(v.isBNode());
+//                    assertFalse(v.isLiteral());
+//                    assertFalse(v.isStatement());
+//                    break;
+//                case LITERAL:
+//                    assertFalse(v.isURI());
+//                    assertFalse(v.isBNode());
+//                    assertTrue(v.isLiteral());
+//                    assertFalse(v.isStatement());
+//                    break;
+//                case STATEMENT:
+//                    assertFalse(v.isURI());
+//                    assertFalse(v.isBNode());
+//                    assertFalse(v.isLiteral());
+//                    assertTrue(v.isStatement());
+//                    break;
+//                default:
+//                    fail("vte=" + vte);
+//                }
+//
+//            }
+//            
+//        }
+//        
+//    }
+
+    /**
+     * Unit tests for {@link TermId}
+     * 
+     * @todo test asValue(BigdataFactory)
+     */
+    public void test_TermId() {
+
+        final Random r = new Random();
+        
+        for(InternalValueTypeEnum vte : InternalValueTypeEnum.values()) {
+//        InternalValueTypeEnum vte = InternalValueTypeEnum.BNODE;
+//        {
+
+            for(InternalDataTypeEnum dte : InternalDataTypeEnum.values()) {
+
+                // 64 bit random term identifier.
+                final long termId = r.nextLong();
+
+                final TermId<?> v = new TermId<BigdataValue>(vte, dte, termId);
+
+                assertTrue(v.isTermId());
+
+                assertFalse(v.isInline());
+                
+                if (termId == 0L) {
+                    assertTrue(v.toString(), v.isNull());
+                } else {
+                    assertFalse(v.toString(), v.isNull());
+                }
+                
+                assertEquals(termId, v.getTermId());
+
+                try {
+                    v.getInlineValue();
+                    fail("Expecting "+UnsupportedOperationException.class);
+                } catch(UnsupportedOperationException ex) {
+                    // ignored.
+                }
+                
+                assertEquals("flags="+v.flags(), vte, v.getInternalValueTypeEnum());
+
+                assertEquals(dte, v.getInternalDataTypeEnum());
+
+                switch(vte) {
+                case URI:
+                    assertTrue(v.isURI());
+                    assertFalse(v.isBNode());
+                    assertFalse(v.isLiteral());
+                    assertFalse(v.isStatement());
+                    break;
+                case BNODE:
+                    assertFalse(v.isURI());
+                    assertTrue(v.isBNode());
+                    assertFalse(v.isLiteral());
+                    assertFalse(v.isStatement());
+                    break;
+                case LITERAL:
+                    assertFalse(v.isURI());
+                    assertFalse(v.isBNode());
+                    assertTrue(v.isLiteral());
+                    assertFalse(v.isStatement());
+                    break;
+                case STATEMENT:
+                    assertFalse(v.isURI());
+                    assertFalse(v.isBNode());
+                    assertFalse(v.isLiteral());
+                    assertTrue(v.isStatement());
+                    break;
+                default:
+                    fail("vte=" + vte);
+                }
+
+            }
+            
+        }
+        
+    }
+
+    /**
+     * Encode an RDF value into a key for one of the statement indices.
+     * 
+     * @param keyBuilder
+     *            The key builder.
+     * @param v
+     *            The RDF value.
+     * 
+     * @return The key builder.
+     * 
+     * @todo This should be extensible for registered datatypes, enumerations,
+     *       etc.
+     * 
+     * @todo move to SPOKeyOrder.
+     */
+    private void encodeValue(final IKeyBuilder keyBuilder,
+            final InternalValue<?, ?> v) {
+
+        keyBuilder.append(v.flags());
+
+        /*
+         * Append the natural value type representation.
+         * 
+         * Note: We have to handle the unsigned byte, short, int and long values
+         * specially to get the correct total key order.
+         * 
+         * FIXME Add support to encode and decode unsigned short, int and long
+         * to IKeyBuilder and KeyBuilder to support the unsigned xsd data types.
+         */
+        final InternalDataTypeEnum dte = v.getInternalDataTypeEnum();
+        
+        if (dte == InternalDataTypeEnum.TermId) {
+
+            keyBuilder.append(v.getTermId());
+            
+            return;
+            
+        }
+        
+        final AbstractDatatypeLiteralInternalValue<?, ?> t = (AbstractDatatypeLiteralInternalValue<?, ?>) v;
+        
+        switch (dte) {
+//        case TermId:
+//            keyBuilder.append(v.getTermId());
+//            break;
+        case XSDBoolean:
+            keyBuilder.append(t.booleanValue());
+            break;
+        case XSDByte:
+            keyBuilder.append(t.byteValue());
+            break;
+        case XSDShort:
+            keyBuilder.append(t.shortValue());
+            break;
+        case XSDInt:
+            keyBuilder.append(t.intValue());
+            break;
+        case XSDFloat:
+            keyBuilder.append(t.floatValue());
+            break;
+        case XSDLong:
+            keyBuilder.append(t.longValue());
+            break;
+        case XSDDouble:
+            keyBuilder.append(t.doubleValue());
+            break;
+        case XSDDecimal:
+            keyBuilder.append(t.decimalValue());
+            break;
+        case UUID:
+            keyBuilder.append((UUID)t.getInlineValue());
+            break;
+//        case XSDUnsignedByte:
+//            keyBuilder.appendUnsigned(t.byteValue());
+//            break;
+//        case XSDUnsignedShort:
+//            keyBuilder.appendUnsigned(t.shortValue());
+//            break;
+//        case XSDUnsignedInt:
+//            keyBuilder.appendUnsigned(t.intValue());
+//            break;
+//        case XSDUnsignedLong:
+//            keyBuilder.appendUnsigned(t.longValue());
+//            break;
+        default:
+            throw new AssertionError(v.toString());
+        }
+
+    }
+
+    /**
+     * Decode a key from one of the statement indices. The components of the key
+     * are returned in the order in which they appear in the key. The caller
+     * must reorder those components using their knowledge of which index is
+     * being decoded in order to reconstruct the corresponding RDF statement.
+     * The returned array will always have 4 components. However, the last key
+     * component will be <code>null</code> if there are only three components in
+     * the <i>key</i>.
+     * 
+     * @param key
+     *            The key.
+     * 
+     * @return An ordered array of the {@link InternalValue}s for that key.
+     * 
+     * @todo This could reuse the caller's array.
+     */
+    public InternalValue<?, ?>[] decodeStatement(final byte[] key) {
+        
+        final InternalValue<?,?>[] a = new InternalValue[4];
+
+        // The byte offset into the key.
+        int offset = 0;
+        
+        for (int i = 0; i < 4; i++) {
+
+            final byte flags = KeyBuilder.decodeByte(key[offset]);
+            offset++;
+
+            // The value type (URI, Literal, BNode, SID)
+            final InternalValueTypeEnum vte = AbstractInternalValue.getInternalValueTypeEnum(flags);
+            
+            // The data type
+            final InternalDataTypeEnum dte = AbstractInternalValue.getInternalDataTypeEnum(flags);
+
+            if (dte == InternalDataTypeEnum.TermId) {
+
+                // decode the term identifier.
+                final long termId = KeyBuilder.decodeLong(key, offset);
+                offset += Bytes.SIZEOF_LONG;
+                
+                // @todo type specific factory is required!
+                a[i] = InternalValueTypeFactory.INSTANCE.newTermId(vte, dte,
+                        termId);
+
+            } else {
+                throw new UnsupportedOperationException("vte=" + vte + ", dte="
+                        + dte);
+            }
+
+            if (i == 2 && offset == key.length) {
+                // We have three components and the key is exhausted.
+                break;
+            }
+
+        }
+        
+        return a; 
+        
+    }
+
+    /**
+     * Factory for {@link InternalValue} objects.
+     * 
+     * @todo Only one instance? Should this be linked to the
+     *       {@link BigdataInlineValueConfig}?
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     */
+    public static class InternalValueTypeFactory {
+
+        public static InternalValueTypeFactory INSTANCE = new InternalValueTypeFactory();
+        
+        private InternalValueTypeFactory() {
+            
+        }
+        
+        public InternalValue<?, ?> newTermId(final InternalValueTypeEnum vte,
+                final InternalDataTypeEnum dte, final long termId) {
+
+            if (vte == null)
+                throw new IllegalArgumentException();
+            
+            if (dte == null)
+                throw new IllegalArgumentException();
+
+            /*
+             * FIXME If the DTE is independent of whether or not we are inlining
+             * the value the we need to take one bit for (termId | inline). On
+             * the other hand, if we only preserve the DTE when we are inlining
+             * the value, then we are throwing away the datatype information for
+             * term identifiers.
+             */
+            assert dte == InternalDataTypeEnum.TermId;
+
+            return new TermId(vte, dte, termId);
+            
+        }
+        
+    }
+
+    /**
+     * Encode a key for an RDF Statement index.
+     * 
+     * @param keyBuilder
+     * @param s
+     * @param p
+     * @param o
+     * @param c
+     *            The context position (used iff the key order has 4 components
+     *            in the key (quads)).
+     * @return
+     * 
+     * @todo move to SPOKeyOrder
+     */
+    private byte[] encodeStatement(final IKeyBuilder keyBuilder,
+            final InternalValue<?, ?> s, final InternalValue<?, ?> p,
+            final InternalValue<?, ?> o, final InternalValue<?, ?> c) {
+
+        keyBuilder.reset();
+
+        encodeValue(keyBuilder, s);
+
+        encodeValue(keyBuilder, p);
+
+        encodeValue(keyBuilder, o);
+
+        if (c != null) {
+
+            encodeValue(keyBuilder, c);
+
+        }
+
+        return keyBuilder.getKey();
+
+    }
+
+    /**
+     * Unit test for encoding and decoding a statement formed from
+     * {@link TermId}s.
+     * 
+     * FIXME Finish the encode/decode statement key logic.
+     */
+    public void test_SPO_encodeDecode_001() {
+
+        final InternalValue<?, ?>[] e = {//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 1L),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 2L),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 3L),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 4L) //
+        };
+
+        final byte[] key = encodeStatement(new KeyBuilder(), e[0], e[1], e[2],
+                e[3]);
+
+        final InternalValue<?, ?>[] a = decodeStatement(key);
+
+        for (int i = 0; i < e.length; i++) {
+
+            assertEquals("index=" + Integer.toString(i), e[i], a[i]);
+
+        }
+        
+    }
+
+    
+    /**
+     * Unit test verifies the ability to decode a key with an inline variable
+     * length coding of a datatype literal using <code>xsd:integer</code>, aka
+     * {@link BigInteger}.
+     */
+    public void test_SPO_encodeDecode_BigInteger() {
 
         final Long s = 1L;
         final Long p = 2L;
@@ -111,598 +626,183 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     }
 
     /**
-     * Map declares the code associated with each data type which can be
-     * inlined. Inline values MUST be decodable and MUST have a natural order.
-     * Whether or not the datatype capable of being inlined is actually inlined
-     * is a configuration option for the lexicon. If a data type is not inlined,
-     * then its code will be {@link #TermId}, which indicates that the "inline"
-     * value is a term identifier which must be resolved against the ID2TERM
-     * index to materialize the value.
+     * Abstract base class for inline RDF values (literals, blank nodes, and
+     * statement identifiers can be inlined).
      * <p>
-     * The {@link InternalValueTypeCodes} as 4 distinctions (URI, Literal,
-     * BlankNode, and SID) and is coded in the high 2 bits of a byte while the
-     * {@link InternalDatatypeEnum} has 64 possible distinctions, which are
-     * coded in the lower 6 bits of the same byte. Only a subset of those 64
-     * possible distinctions for inline data types have been declared. The
-     * remaining code values are reserved for future use.
-     * <p>
-     * Note: Unicode values CAN NOT be inlined because (a) Unicode sort keys are
-     * not decodable; and (b) the collation rules for Unicode depend on the
-     * lexicon configuration, which specifies parameters such as Locale,
-     * Strength, etc.
-     * <p>
-     * Blanks nodes (their IDs are UUIDs) and datatypes with larger values
-     * (UUIDs) or varying length values (xsd:integer, xsd:decimanl) can be
-     * inlined. Whether it makes sense to do so is a question which trades off
-     * redundancy in the statement indices for faster materialization of the
-     * data type values and a smaller lexicon. UUIDs for purposes other than
-     * blank nodes can also be inlined, however they will have a different
-     * prefix to indicate that they are Literals rather than blank nodes.
-     * <p>
-     * Note: Datatypes which are multidimensional CAN be inlined. However, they
-     * can not be placed into a total order which has meaningful semantics by a
-     * single index. For example, geo:point describes a 2-dimensional location
-     * and lacks any meaningful locality when inlined into the index. The only
-     * reason to inline such data types is to avoid indirection through the
-     * lexicon to materialize their values. Efficiently resolving points in a
-     * region requires the use of a spatial index.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     * @version $Id$
-     * 
-     * @todo extensibility?
-     * 
-     * @todo geo:point?
-     * 
-     * @todo It is possible to inline ASCII values (URIs and Literals) if the
-     *       lexicon is so configured. Those would be a varying length type.
-     * 
-     * @todo Above some configured size, long literals must be allocated in the
-     *       lexicon, the inline value will be a termId, the key in the TERM2ID
-     *       index will be an MD5 signature (to avoid problems with very long
-     *       keys) and the blob reference will be stored in the ID2TERM tuple
-     *       value. The blob itself is a raw record in the journal or index
-     *       segment.
-     * 
-     * @todo support xsd:decimal coding in KeyBuilder by discarding the
-     *       precision and only retaining the scale information. We need to
-     *       record both the signum and the scale, and the scale needs to be
-     *       adjusted to normalize for either zero or one digits before the
-     *       decimal. This is nearly the same coding as {@link BigInteger}
-     *       except that scale is not quite the same as runLength (it is
-     *       runLength base 10, not base 256) so there might be fence posts
-     *       there too.
-     * 
-     * @see http://www.w3.org/TR/xmlschema-2/
-     * 
-     * @todo replace [byte] with [int] to avoid problems with bit math on a
-     *       signed byte?
-     * 
-     * @todo support the "unsigned" versions of xsd:byte, xsd:short, xsd:int,
-     *       and xsd:long? We have enough bits to do this.
-     * 
-     * @todo Add support for extensible inline enumerations. Use one code value
-     *       to indicate that this is an inline enumeration. Then another 2-4
-     *       bytes to indicate which enumeration (registered somewhere) and then
-     *       the code for the enumerated value. E.g., state codes, product
-     *       codes, etc.
-     */
-    static public enum InternalDatatypeEnum {
-        /**
-         * The "inline" value is a term identifier which must be resolved
-         * against the ID2TERM index in the lexicon in order to materialize the
-         * corresponding RDF Value.
-         */
-        TermId((byte) 0x00, Bytes.SIZEOF_LONG, Long.class, null/* N/A */), //
-        /**
-         * The "inline" value is a boolean (xsd:boolean). Only the distinct
-         * points in the xsd:boolean value space are represented. xsd:boolean
-         * has multiple lexical forms which map onto "true" and "false". Those
-         * distinctions are not preserved.
-         */
-        XSDBoolean((byte) 0x01, Bytes.SIZEOF_BYTE, Boolean.class,
-                BigdataValueFactoryImpl.xsd + "boolean"), //
-        /** The "inline" value is a signed byte (xsd:byte). */
-        XSDByte((byte) 0x02, Bytes.SIZEOF_BYTE, Byte.class,
-                BigdataValueFactoryImpl.xsd + "byte"), //
-        /** The "inline" value is a signed short (xsd:short). */
-        XSDShort((byte) 0x03, Bytes.SIZEOF_SHORT, Short.class,
-                BigdataValueFactoryImpl.xsd + "short"), //
-        /** The "inline" value is a signed 4 byte integer (xsd:int). */
-        XSDInt((byte) 0x04, Bytes.SIZEOF_INT, Integer.class,
-                BigdataValueFactoryImpl.xsd + "int"), //
-        /**
-         * The "inline" value is a single precision floating point number
-         * (xsd:float).
-         */
-        XSDFloat((byte) 0x05, Bytes.SIZEOF_FLOAT, Float.class,
-                BigdataValueFactoryImpl.xsd + "float"), //
-        /** The "inline" value is a signed 8 byte integer (xsd:long). */
-        XSDLong((byte) 0x06, Bytes.SIZEOF_LONG, Long.class,
-                BigdataValueFactoryImpl.xsd + "long"), //
-        /**
-         * The "inline" value is a double precision floating point number
-         * (xsd:double).
-         */
-        XSDDouble((byte) 0x07, Bytes.SIZEOF_DOUBLE, Double.class,
-                BigdataValueFactoryImpl.xsd + "double"), //
-        /**
-         * The "inline" value is an xsd:integer, which is equivalent to
-         * {@link BigInteger}.
-         */
-        XSDInteger((byte) 0x08, 0/* variable length */, BigInteger.class,
-                BigdataValueFactoryImpl.xsd + "integer"), //
-        /**
-         * The "inline" value is an xsd:decimal. This is mostly equivalent to
-         * {@link BigDecimal}, but unlike that Java class, xsd:decimal DOES NOT
-         * preserve the precision of the value. (This fact is convenient for
-         * indices since {@link BigDecimal} has, among other things, many
-         * distinct representations of ZERO with different precision, etc. If we
-         * had to represent the precision, we could not use xsd:decimal in an
-         * index!)
-         */
-        XSDDecimal((byte) 0x09, 0/* variable length */, BigDecimal.class,
-                BigdataValueFactoryImpl.xsd + "decimal"), //
-        /**
-         * The "inline" value is a {@link UUID}.
-         * 
-         * @todo URI for UUID data types?
-         */
-        UUID((byte) 0x0a, Bytes.SIZEOF_UUID, UUID.class, null/* N/A */), //
-//      /**
-//      * @todo reserved for xsd:gregorianCalendar, but I do not know //
-//      *       yet whether its representation is fixed or varying in length.
-//      */
-//     XSDGregorianCalendar((byte) 0x10, -1,XMLGregorianCalendar.class), //
-        ;
-        
-        private InternalDatatypeEnum(final byte b, final int len,
-                final Class<?> cls, final String datatype) {
-            this.v = b;
-            this.len = len;
-            this.cls = cls;
-            this.datatype = datatype;
-        }
-        
-        static final public InternalDatatypeEnum valueOf(final byte b) {
-            /*
-             * Note: This switch MUST correspond to the declarations above (you
-             * can not made the cases of the switch from [v] since it is not
-             * considered a to be constant by the compiler).
-             */
-            switch((MASK_BITS & b)) {
-            case 0x00: return TermId;
-            case 0x01: return XSDBoolean;
-            case 0x02: return XSDByte;
-            case 0x03: return XSDShort;
-            case 0x04: return XSDInt;
-            case 0x05: return XSDFloat;
-            case 0x06: return XSDLong;
-            case 0x07: return XSDDouble;
-            case 0x08: return XSDInteger;
-            case 0x09: return XSDDecimal;
-            case 0x0a: return UUID;
-//            case 0x0b: return XSDGregorianCalendar;
-            default:
-                throw new IllegalArgumentException(Byte.toString(b));
-            }
-        }
-        
-        /**
-         * The code for the data type.
-         */
-        private final byte v;
-
-        /**
-         * The length of the inline value -or- ZERO (0) if the value has a
-         * variable length (xsd:integer, xsd:decimal).
-         */
-        private final int len;
-
-        /**
-         * The class of the Java object used to represent instances of the coded
-         * data type.
-         */
-        private final Class<?> cls;
-        
-        /**
-         * The URI for the data type.
-         */
-        private final String datatype;
-
-        /**
-         * An <code>int</code> value whose lower 6 bits indicate the internal
-         * data type (including {@link #TermId}).
-         */
-        final public int value() {
-            return v;
-        }
-        
-        /**
-         * The length of the data type value when represented as a component in
-         * an unsigned byte[] key -or- ZERO iff the key component has a variable
-         * length for that data type.
-         */
-        final public int len() {
-            return len;
-        }
-
-        /**
-         * The class of the Java object used to represent instances of the coded
-         * data type.
-         */
-        final public Class<?> getCls() {
-            return cls;
-        }
-
-        /**
-         * The string value of the corresponding datatype URI.
-         */
-        final public String getDatatype() {
-            return datatype;
-        }
-        
-        /**
-         * The bit mask that is bit-wise ANDed with the flags byte in order to
-         * reveal the code for the data type (the low SIX (6) bits of the mask
-         * are set).
-         */
-        static final byte MASK_BITS = (byte) (0xbf & 0xff);
-
-        /**
-         * Return <code>true</code> iff the low bits of the byte value indicate
-         * that the inline value is a term identifier and hence must be resolved
-         * against the ID2TERM index to materialize the data type value.
-         * 
-         * @param b
-         *            The byte coding the RDF Value type and its data type.
-         * 
-         * @return <code>true</code> iff the inline value is a term identifier
-         *         (otherwise it will be some inlined data type value).
-         */
-        static final public boolean isTermId(final byte b) {
-            return (MASK_BITS & b) == TermId.v;
-        }
-        
-    }
-
-    /**
-     * Class with static methods for interpreting and setting the bit flags used
-     * to identify the type of an RDF Value (URI, Literal, Blank Node, SID,
-     * etc).
-     * 
-     * @todo This replaces {@link ITermIdCodes}.
-     * 
-     * @todo update {@link TermIdEncoder}. This encodes term identifiers for
-     *       scale-out but moving some bits around. It will be simpler now that
-     *       the term identifier is all bits in the long integer with an
-     *       additional byte prefix to differentiate URI vs Literal vs BNode vs
-     *       SID and to indicate the inline value type (termId vs everything
-     *       else).
-     * 
-     * @todo Rework as an enum like {@link InternalDatatypeEnum}?
-     * 
-     * @todo add method to combine the value type codes and the data type codes
-     *       into a single byte and write unit tests for that method (reworking
-     *       the unit tests in {@link TestSPO}).
-     */
-    public static class InternalValueTypeCodes {
-
-        /**
-         * The bit mask that is bit-wise ANDed with a term identifier in order
-         * to reveal the term code. The low high bits of the lower byte in the
-         * mask are set. The high bytes are ignored (they are there just to make
-         * it easier to deal with unsigned byte values in Java).
-         * 
-         * @see #TERMID_CODE_URI
-         * @see #TERMID_CODE_BNODE
-         * @see #TERMID_CODE_LITERAL
-         * @see #TERMID_CODE_STATEMENT
-         */
-        static final public int TERMID_CODE_MASK = 0xC0;
-
-//        /**
-//         * The #of bits in the {@link #TERMID_CODE_MASK} (
-//         * {@value #TERMID_CODE_MASK_BITS}).
-//         */
-//        static final public long TERMID_CODE_MASK_BITS = 2L;
-
-        /**
-         * The bit value used to indicate that a term identifier stands for a
-         * {@link URI}.
-         */
-        static final public int TERMID_CODE_URI = 0x00 << 6;
-
-        /**
-         * The bit value used to indicate that a term identifier stands for a
-         * {@link BNode}.
-         */
-        static final public int TERMID_CODE_BNODE = 0x01 << 6;
-
-        /**
-         * The bit value used to indicate that a term identifier stands for a
-         * {@link Literal}.
-         */
-        static final public int TERMID_CODE_LITERAL = 0x02 << 6;
-
-        /**
-         * The bit value used to indicate that a term identifier stands for a
-         * statement (when support for statement identifiers is enabled).
-         */
-        static final public int TERMID_CODE_STATEMENT = 0x03 << 6;
-
-        /**
-         * Return true iff the flags identify an RDF {@link Literal}.
-         * <p>
-         * Note: Some entailments require the ability to filter based on whether
-         * or not a term is a literal. For example, literals may not be entailed
-         * into the subject position. This method makes it possible to determine
-         * whether or not a term is a literal without materializing the term,
-         * thereby allowing the entailments to be computed purely within the
-         * term identifier space.
-         */
-        static public boolean isLiteral(final long flags) {
-
-            return (flags & TERMID_CODE_MASK) == TERMID_CODE_LITERAL;
-
-        }
-
-        /**
-         * Return true iff the flags identify an RDF {@link BNode}.
-         */
-        static public boolean isBNode(final long flags) {
-
-            return (flags & TERMID_CODE_MASK) == TERMID_CODE_BNODE;
-
-        }
-
-        /**
-         * Return true iff the flags identify an RDF {@link URI}.
-         */
-        static public boolean isURI(final byte flags) {
-
-            /*
-             * Note: The additional != NULL test is necessary for a URI term
-             * identifier so that it will not report 'true' for 0L since the two
-             * bits used to mark a URI are both zero and the bits to indicate a
-             * TermId are also zero.
-             */
-
-            return (flags & TERMID_CODE_MASK) == TERMID_CODE_URI
-                    && flags != IRawTripleStore.NULL;
-
-        }
-
-        /**
-         * Return true iff the flags identify a statement (this feature is
-         * enabled with {@link Options#STATEMENT_IDENTIFIERS}).
-         */
-        static public boolean isStatement(final byte flags) {
-
-            return (flags & TERMID_CODE_MASK) == TERMID_CODE_STATEMENT;
-
-        }
-
-//        /**
-//         * Return a byte representing the combination of the specified value
-//         * type and data type.
-//         * 
-//         * @param vte
-//         *            The value type (URI, Literal, BNode, or SID).
-//         * @param dt
-//         *            The data type.
-//         * 
-//         * @todo How do we handle SIDs? (They are a special case of BNode.)
-//         */
-//        static public byte fuse(final Value vte,
-//                final InternalDatatypeEnum dte) {
-//
-//            return (byte) ((((int) vte.v << 6) | dte.v) & 0xff);
-//
-//        }
-
-    }
-
-    /**
-     * Interface for the internal representation of an RDF Value (the
-     * representation which is encoded within the statement indices).
-     */
-    public interface InternalValue<V extends BigdataValue, T> extends
-            Serializable {
-
-        /** <code>true</code> iff the RDF value is represented inline. */
-        boolean isInline();
-
-        /**
-         * <code>true</code> iff the RDF value is represented by a term
-         * identifier.
-         */
-        boolean isTermId();
-
-        /**
-         * <code>true</code> iff the RDF value is a term identifier whose value
-         * is <code>0L</code>.
-         */
-        boolean isNull();
-
-        /**
-         * Return the term identifier.
-         * 
-         * @return The term identifier.
-         * @throws UnsupportedOperationException
-         *             unless the RDF value is represented by a term identifier.
-         */
-        long getTermId() throws UnsupportedOperationException;
-
-        /**
-         * Return the {@link InternalDatatypeEnum} for the {@link InternalValue}
-         * . This will be {@link InternalDatatypeEnum#TermId} iff the internal
-         * "value" is a term identifier. Otherwise it will be the type safe enum
-         * corresponding to the specific data type which can be decoded from
-         * this {@link InternalValue} using {@link #getInline()}.
-         */
-        InternalDatatypeEnum getInternalDatatype();
-
-        /**
-         * Return the Java {@link Object} corresponding to the inline value.
-         * 
-         * @return The {@link Object}.
-         * @throws UnsupportedOperationException
-         *             unless the RDF value is inline.
-         */
-        T getInline() throws UnsupportedOperationException;
-
-        /**
-         * Inflate an inline RDF value to a {@link BigdataValue}. This method
-         * DOES NOT guarantee a singleton pattern for the inflated value and the
-         * value factory. However, implementations are encouraged to cache the
-         * inflated {@link BigdataValue} on a transient field.
-         * 
-         * @param f
-         *            The value factory.
-         * @return The corresponding {@link BigdataValue}.
-         * @throws UnsupportedOperationException
-         *             unless the RDF value is inline.
-         */
-        V asValue(BigdataValueFactory f) throws UnsupportedOperationException;
-        
-        /**
-         * Return <code>true</code> iff this is an RDF Literal. Note that some
-         * kinds of RDF Literals MAY be represented inline.
-         */
-        boolean isLiteral();
-
-        /** Return <code>true</code> iff this is an RDF BlankNode. */
-        boolean isBNode();
-
-        /**
-         * Return <code>true</code> iff this is an RDF {@link URI}.
-         */
-        boolean isURI();
-
-        /**
-         * Return <code>true</code> iff this is a statement identifier (this
-         * feature is enabled with {@link Options#STATEMENT_IDENTIFIERS}).
-         */
-        boolean isStatement();
-
-    }
-
-    /**
-     * Abstract base class for the inline representation of an RDF Value (the
-     * representation which is encoded in to the keys of the statement indices).
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     * @version $Id$
-     * @param <V>
-     *            The generic type for the RDF {@link Value} implementation.
-     * @param <T>
-     *            The generic type for the inline value.
-     */
-    public abstract class AbstractInternalValue<V extends BigdataValue, T>
-            implements InternalValue<V, T> {
-
-        /**
-         * Bit flags indicating the kind of RDF Value and the interpretation of
-         * the inline value (either as a term identifier or as some data type
-         * value).
-         * 
-         * @see InternalValueTypeCodes
-         * @see InternalDatatypeEnum
-         */
-        private final byte flags;
-
-        private AbstractInternalValue(final byte flags) {
-            this.flags = flags;
-        }
-        
-        final public boolean isBNode() {
-            return InternalValueTypeCodes.isBNode(flags);
-        }
-
-        final public boolean isLiteral() {
-            return InternalValueTypeCodes.isLiteral(flags);
-        }
-
-        final public boolean isStatement() {
-            return InternalValueTypeCodes.isStatement(flags);
-        }
-
-        final public boolean isURI() {
-            return InternalValueTypeCodes.isURI(flags);
-        }
-        
-        final public InternalDatatypeEnum getInternalDatatype() {
-            return InternalDatatypeEnum.valueOf(flags);
-        }
-
-    }
-
-    /**
-     * Implementation for any kind of RDF Value when the values is not being
-     * inlined. Instances of this class can represent URIs, Blank Nodes (if they
-     * are not being inlined), Literals (including datatype literals if they are
-     * not being inlined) or SIDs (statement identifiers).
-     */
-    public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
-            extends AbstractInternalValue<V, Void> {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = 4309045651680610931L;
-        
-        /** The term identifier. */
-        private final long termId;
-
-        public TermId(final byte flags, final long termId) {
-            super(flags);
-            this.termId = termId;
-        }
-
-        final public V asValue(BigdataValueFactory f)
-                throws UnsupportedOperationException {
-            throw new UnsupportedOperationException();
-        }
-
-        final public Void getInline() {
-            throw new UnsupportedOperationException();
-        }
-
-        final public long getTermId() {
-            return termId;
-        }
-
-        final public boolean isInline() {
-            return false;
-        }
-
-        final public boolean isNull() {
-            return termId != IRawTripleStore.NULL;
-        }
-
-        final public boolean isTermId() {
-            return true;
-        }
-
-    }
-
-    /**
-     * Abstract base class for RDF datatype literals.
      * {@inheritDoc}
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
+     * @version $Id: TestEncodeDecodeKeys.java 2753 2010-05-01 16:36:59Z
+     *          thompsonbry $
      */
-    abstract public class AbstractDatatypeInternalValue<V extends BigdataLiteral, T>
+    static abstract public class AbstractInlineInternalValue<V extends BigdataValue, T>
             extends AbstractInternalValue<V, T> {
 
-        public AbstractDatatypeInternalValue(final InternalDatatypeEnum datatype) {
-            super((byte) (InternalValueTypeCodes.TERMID_CODE_LITERAL | datatype
-                    .value()));
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -2847844163772097836L;
+
+        protected AbstractInlineInternalValue(final InternalValueTypeEnum vte,
+                final InternalDataTypeEnum dte) {
+
+            super(vte, dte);
+
+        }
+        
+        /**
+         * Returns the String-value of a Value object. This returns either a
+         * Literal's label, a URI's URI or a BNode's ID.
+         * 
+         * @see Value#stringValue()
+         */
+        abstract public String stringValue();
+        
+    }
+
+    /**
+     * Class for inline RDF blank nodes. Blank nodes MUST be based on UUIDs in
+     * order to be lined.
+     * <p>
+     * {@inheritDoc}
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id: TestEncodeDecodeKeys.java 2753 2010-05-01 16:36:59Z
+     *          thompsonbry $
+     * 
+     * @see AbstractTripleStore.Options
+     */
+    static public class AbstractBNodeInternalValue<V extends BigdataBNode> extends
+            AbstractInlineInternalValue<V, UUID> {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -4560216387427028030L;
+        
+        private final UUID id;
+        
+        public AbstractBNodeInternalValue(final UUID id) {
+
+            super(InternalValueTypeEnum.BNODE, InternalDataTypeEnum.UUID);
+
+            if (id == null)
+                throw new IllegalArgumentException();
+
+            this.id = id;
+
+        }
+
+        @Override
+        public String stringValue() {
+            return id.toString();
+        }
+
+        final public UUID getInlineValue() {
+            return id;
+        }
+
+        final public long getTermId() {
+            throw new UnsupportedOperationException();
+        }
+
+        final public boolean isInline() {
+            return true;
+        }
+
+        final public boolean isNull() {
+            return false;
+        }
+
+        final public boolean isTermId() {
+            return false;
+        }
+
+        public V asValue(BigdataValueFactory f)
+                throws UnsupportedOperationException {
+            // TODO asValue()
+            throw new UnsupportedOperationException();
+        }
+
+        public boolean equals(Object o) {
+            if (this == o)
+                return true;
+            if (o instanceof AbstractBNodeInternalValue) {
+                return this.id.equals(((AbstractBNodeInternalValue) o).id);
+            }
+            return false;
+        }
+
+        public int hashCode() {
+            return id.hashCode();
+        }
+        
+    }
+    
+    /**
+     * Abstract base class for inline RDF literals.
+     * <p>
+     * {@inheritDoc}
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id: TestEncodeDecodeKeys.java 2753 2010-05-01 16:36:59Z
+     *          thompsonbry $
+     */
+    static abstract public class AbstractLiteralInternalValue<V extends BigdataLiteral, T>
+            extends AbstractInlineInternalValue<V, T> {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -2684528247542410336L;
+
+        protected AbstractLiteralInternalValue(final InternalDataTypeEnum dte) {
+
+            super(InternalValueTypeEnum.LITERAL, dte);
+
+        }
+
+    }
+
+    /**
+     * Abstract base class for RDF datatype literals adds primitive data type
+     * value access methods.
+     * <p>
+     * {@inheritDoc}
+     * 
+     * @todo What are the SPARQL semantics for casting among these datatypes?
+     *       They should probably be reflected here since that is the real use
+     *       case. I believe that those casts also require failing a solution if
+     *       the cast is not legal, in which case these methods might not be all
+     *       that useful.
+     *       <p>
+     *       Also see BigdataLiteralImpl and XMLDatatypeUtil. It handles the
+     *       conversions by reparsing, but there is no reason to do that here
+     *       since we have the canonical point in the value space.
+     * 
+     * @see http://www.w3.org/TR/rdf-sparql-query/#FunctionMapping, The casting
+     *      rules for SPARQL
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id: TestEncodeDecodeKeys.java 2753 2010-05-01 16:36:59Z
+     *          thompsonbry $
+     */
+    static abstract public class AbstractDatatypeLiteralInternalValue<V extends BigdataLiteral, T>
+            extends AbstractLiteralInternalValue<V, T> {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 5962615541158537189L;
+
+        protected AbstractDatatypeLiteralInternalValue(final InternalDataTypeEnum dte) {
+
+            super(dte);
+
         }
 
         final public boolean isInline() {
@@ -721,52 +821,66 @@ public class TestEncodeDecodeKeys extends TestCase2 {
             throw new UnsupportedOperationException();
         }
 
-        /*
-         * Primitive data type value access methods.
-         * 
-         * @todo What are the SPARQL semantics for casting among these
-         * datatypes? They should probably be reflected here since that is the
-         * real use case. I believe that those casts also require failing a
-         * solution if the cast is not legal, in which case these methods might
-         * not be all that useful.
-         * 
-         * Also see BigdataLiteralImpl and XMLDatatypeUtil. It handles the
-         * conversions by reparsing, but there is no reason to do that here
-         * since we have the canonical point in the value space.
-         * 
-         * @see http://www.w3.org/TR/rdf-sparql-query/#FunctionMapping, The
-         * casting rules for SPARQL
-         */
+        /** Return the <code>boolean</code> value of <i>this</i> value. */
+        abstract public boolean booleanValue();
 
-//        /** Cast to xsd:boolean. */
-//        abstract public boolean booleanValue();
-//
-//        /** Cast to xsd:byte (aka signed byte). */
-//        abstract public byte byteValue();
-//
-//        /** Cast to xsd:short. */
-//        abstract public short shortValue();
-//
-//        /** Cast to xsd:int. */
-//        abstract public int intValue();
-//
-//        /** Cast to xsd:float. */
-//        abstract public float floatValue();
-//
-//        /** Cast to xsd:long. */
-//        abstract public long longValue();
-//
-//        /** Cast to xsd:double. */
-//        abstract public double doubleValue();
-//
-//        /** Cast to xsd:string. */
-//        abstract public String stringValue();
-        
+        /**
+         * Return the <code>byte</code> value of <i>this</i> value.
+         * <p>
+         * Note: Java lacks unsigned data types. For safety, operations on
+         * unsigned XSD data types should be conducted after a widening
+         * conversion. For example, operations on <code>xsd:unsignedByte</code>
+         * should be performed using {@link #shortValue()}.
+         */
+        abstract public byte byteValue();
+
+        /**
+         * Return the <code>short</code> value of <i>this</i> value.
+         * <p>
+         * Note: Java lacks unsigned data types. For safety, operations on
+         * unsigned XSD data types should be conducted after a widening
+         * conversion. For example, operations on <code>xsd:unsignedShort</code>
+         * should be performed using {@link #intValue()}.
+         */
+        abstract public short shortValue();
+
+        /**
+         * Return the <code>int</code> value of <i>this</i> value.
+         * <p>
+         * Note: Java lacks unsigned data types. For safety, operations on
+         * unsigned XSD data types should be conducted after a widening
+         * conversion. For example, operations on <code>xsd:unsignedInt</code>
+         * should be performed using {@link #longValue()}.
+         */
+        abstract public int intValue();
+
+        /**
+         * Return the <code>long</code> value of <i>this</i> value.
+         * <p>
+         * Note: Java lacks unsigned data types. For safety, operations on
+         * unsigned XSD data types should be conducted after a widening
+         * conversion. For example, operations on <code>xsd:unsignedLong</code>
+         * should be performed using {@link #integerValue()}.
+         */
+        abstract public long longValue();
+
+        /** Return the <code>float</code> value of <i>this</i> value. */
+        abstract public float floatValue();
+
+        /** Return the <code>double</code> value of <i>this</i> value. */
+        abstract public double doubleValue();
+
+        /** Return the {@link BigInteger} value of <i>this</i> value. */
+        abstract public BigInteger integerValue();
+
+        /** Return the {@link BigDecimal} value of <i>this</i> value. */
+        abstract public BigDecimal decimalValue();
+
     }
 
     /** Implementation for inline <code>xsd:long</code>. */
-    public class LongInternalValue<V extends BigdataLiteral> extends
-            AbstractDatatypeInternalValue<V, Long> {
+    static public class LongInternalValue<V extends BigdataLiteral> extends
+            AbstractDatatypeLiteralInternalValue<V, Long> {
 
         /**
          * 
@@ -776,11 +890,14 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         private final long value;
 
         public LongInternalValue(final long value) {
-            super(InternalDatatypeEnum.XSDLong);
+            
+            super(InternalDataTypeEnum.XSDLong);
+            
             this.value = value;
+            
         }
 
-        final public Long getInline() {
+        final public Long getInlineValue() {
             return value;
         }
 
@@ -797,65 +914,90 @@ public class TestEncodeDecodeKeys extends TestCase2 {
             return (V) f.createLiteral(value);
         }
 
-//        @Override @todo override iff part of the abstract parent class.
+        @Override
         final public long longValue() {
             return value;
         }
 
-//        @Override
-//        public boolean booleanValue() {
-//            return value == 0 ? Boolean.FALSE : true; // @todo SPARQL semantics?
-//        }
-//
-//        @Override
-//        public byte byteValue() {
-//            return (byte) value;
-//        }
-//
-//        @Override
-//        public double doubleValue() {
-//            return (double) value;
-//        }
-//
-//        @Override
-//        public float floatValue() {
-//            return (float) value;
-//        }
-//
-//        @Override
-//        public int intValue() {
-//            return (int) value;
-//        }
-//
-//        @Override
-//        public short shortValue() {
-//            return (short) value;
-//        }
-//        
-//        @Override
-//        public String stringValue() {
-//            return Long.toString(value);
-//        }
+        @Override
+        public boolean booleanValue() {
+            return value == 0 ? Boolean.FALSE : true; // @todo SPARQL semantics?
+        }
+
+        @Override
+        public byte byteValue() {
+            return (byte) value;
+        }
+
+        @Override
+        public double doubleValue() {
+            return (double) value;
+        }
+
+        @Override
+        public float floatValue() {
+            return (float) value;
+        }
+
+        @Override
+        public int intValue() {
+            return (int) value;
+        }
+
+        @Override
+        public short shortValue() {
+            return (short) value;
+        }
+        
+        @Override
+        public String stringValue() {
+            return Long.toString(value);
+        }
+
+        @Override
+        public BigDecimal decimalValue() {
+            return BigDecimal.valueOf(value);
+        }
+
+        @Override
+        public BigInteger integerValue() {
+            return BigInteger.valueOf(value);
+        }
+
+        public boolean equals(final Object o) {
+            if(this==o) return true;
+            if(o instanceof LongInternalValue) {
+                return this.value == ((LongInternalValue) o).value;
+            }
+            return false;
+        }
+        
+        /**
+         * Return the hash code of the long value.
+         */
+        public int hashCode() {
+            return (int) (value ^ (value >>> 32));
+        }
 
     }
 
     /** Implementation for inline <code>xsd:float</code>. */
-    public class FloatInternalValue<V extends BigdataLiteral> extends
-            AbstractDatatypeInternalValue<V, Float> {
+    static public class FloatInternalValue<V extends BigdataLiteral> extends
+            AbstractDatatypeLiteralInternalValue<V, Float> {
 
         /**
          * 
          */
         private static final long serialVersionUID = 2274203835967555711L;
-        
+
         private final float value;
 
         public FloatInternalValue(final float value) {
-            super(InternalDatatypeEnum.XSDFloat);
+            super(InternalDataTypeEnum.XSDFloat);
             this.value = value;
         }
 
-        final public Float getInline() {
+        final public Float getInlineValue() {
             return value;
         }
 
@@ -864,45 +1006,74 @@ public class TestEncodeDecodeKeys extends TestCase2 {
             return (V) f.createLiteral(value);
         }
 
-//        @Override @todo override iff part of the abstract parent class.
+        @Override
         final public float floatValue() {
             return value;
         }
 
-//        @Override
-//        public boolean booleanValue() {
-//            return value == 0 ? Boolean.FALSE : true; // @todo SPARQL semantics?
-//        }
-//
-//        @Override
-//        public byte byteValue() {
-//            return (byte) value;
-//        }
-//
-//        @Override
-//        public double doubleValue() {
-//            return (double) value;
-//        }
-//
-//        @Override
-//        public float floatValue() {
-//            return (float) value;
-//        }
-//
-//        @Override
-//        public int intValue() {
-//            return (int) value;
-//        }
-//
-//        @Override
-//        public short shortValue() {
-//            return (short) value;
-//        }
-//        
-//        @Override
-//        public String stringValue() {
-//            return Long.toString(value);
-//        }
+        @Override
+        public boolean booleanValue() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public byte byteValue() {
+            return (byte) value;
+        }
+
+        @Override
+        public double doubleValue() {
+            return (double) value;
+        }
+
+        @Override
+        public int intValue() {
+            return (int) value;
+        }
+
+        @Override
+        public long longValue() {
+            return (long) value;
+        }
+
+        @Override
+        public short shortValue() {
+            return (short) value;
+        }
+
+        @Override
+        public BigDecimal decimalValue() {
+            return BigDecimal.valueOf(value);
+        }
+
+        @Override
+        public BigInteger integerValue() {
+            return BigInteger.valueOf((long) value);
+        }
+
+        @Override
+        public String stringValue() {
+            return Float.toString(value);
+        }
+        
+        public boolean equals(final Object o) {
+            if(this==o) return true;
+            if(o instanceof FloatInternalValue) {
+                return this.value == ((FloatInternalValue) o).value;
+            }
+            return false;
+        }
+        
+        /**
+         * Return the hash code of the float value.
+         * 
+         * @see Float#hashCode()
+         */
+        public int hashCode() {
+
+            return Float.floatToIntBits(value);
+            
+        }
 
     }
 
@@ -911,24 +1082,36 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      * indices rather than being assigned term identifiers by the lexicon.
      */
     public interface BigdataInlineValueConfig {
-        
+
         /**
-         * <code>true</code> iff the fixed size numerics and xsd:boolean shoul
-         * be inlined.
+         * <code>true</code> iff the fixed size numerics (<code>xsd:int</code>,
+         * <code>xsd:short</code>, <code>xsd:float</code>, etc) and
+         * <code>xsd:boolean</code> should be inlined.
          */
         public boolean isNumericInline();
 
         /**
-         * <code>true</code> iff xsd:integer and xsd:decimal should be inlined.
+         * <code>true</code> iff xsd:integer should be inlined.
          */
-        public boolean isBigNumericInline();
+        public boolean isXSDIntegerInline();
 
         /**
-         * <code>true</code> iff blank node identifiers should be inlined.
-         * However, the ID associated with a blank node will be the ID from the
-         * RDF interchange syntax if
-         * {@link AbstractTripleStore.Options#STORE_BLANK_NODES} AND you have
-         * configured the RDF parser to preserve blank nodes.
+         * <code>true</code> iff <code>xsd:decimal</code> should be inlined.
+         * 
+         * @todo This option is not yet supported.
+         */
+        public boolean isXSDDecimalInline();
+
+        /**
+         * <code>true</code> iff blank node identifiers should be inlined. This
+         * is only possible when the blank node identifiers are internally
+         * generated {@link UUID}s since otherwise they can be arbitrary Unicode
+         * strings which, like text-based Literals, can not be inlined.
+         * <p>
+         * This option is NOT compatible with
+         * {@link AbstractTripleStore.Options#STORE_BLANK_NODES}.
+         * 
+         * @todo Separate option to inlined SIDs?
          */
         public boolean isBlankNodeInline();
 
