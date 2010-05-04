@@ -1238,6 +1238,28 @@ public class KeyBuilder implements IKeyBuilder {
     }
 
     /**
+     * Decode a {@link UUID} as encoded by {@link #append(UUID)}.
+     * 
+     * @param buf
+     *            The buffer containing the encoded key.
+     * @param off
+     *            The offset at which to decode the key.
+     *            
+     * @return The decoded {@link UUID}.
+     */
+    static public UUID decodeUUID(final byte[] buf, int off) {
+
+        final long msb = decodeLong(buf, off);
+
+        off += 8;
+
+        final long lsb = decodeLong(buf, off);
+
+        return new UUID(msb, lsb);
+
+    }
+
+    /**
      * Decodes a signed int value as encoded by {@link #append(int)}.
      * 
      * @param buf
@@ -1315,6 +1337,12 @@ public class KeyBuilder implements IKeyBuilder {
 
         final int tmp = KeyBuilder.decodeShort(key, offset);
 
+        /*
+         * Note: The signum is thrown away when we decode the runLength field.
+         * Signum is actually in the key twice: once in the runLength to put the
+         * BigInteger values into total order and once in the representation of
+         * the BigInteger as a byte[].
+         */
         final int runLength = tmp < 0 ? -tmp : tmp;
         
         final byte[] b = new byte[runLength];
