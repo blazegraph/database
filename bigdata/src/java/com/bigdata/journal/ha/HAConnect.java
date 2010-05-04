@@ -177,13 +177,7 @@ public class HAConnect extends Thread {
 
         m_msgs.put(msg.id, msg);
 		
-		System.out.println("--------------------");
-		System.out.println("HAConnect: sending " + msg);
-		
 		msg.send(m_out);
-		
-		System.out.println("HAConnect: SENT");
-		System.out.println("--------------------");
 		
 		if (wait) {
 			try {

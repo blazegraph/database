@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -159,7 +159,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 				long commitRecordIndexAddr, long metaStartAddr, long metaBitsAddr, long closeTime) {
 
 			IRootBlockView rbv = new RootBlockView(rootBlock0, offsetBits, nextOffset, firstCommitTime, lastCommitTime,
-					commitCounter, commitRecordAddr, commitRecordIndexAddr, m_fileMetadata.rootBlock.getUUID(),
+					commitCounter, commitRecordAddr, commitRecordIndexAddr, m_fileMetadata.rootBlock.getUUID(), -1 /* FIXME: quorumToken */,
 					metaStartAddr, metaBitsAddr, StoreTypeEnum.RW, m_fileMetadata.rootBlock.getCreateTime(), closeTime,
 					s_ckutil);
 
