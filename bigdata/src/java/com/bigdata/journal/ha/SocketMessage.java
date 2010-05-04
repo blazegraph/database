@@ -126,12 +126,14 @@ public abstract class SocketMessage<T> implements Externalizable {
 	public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
 		id = in.readLong();
 		
-		System.out.println("Reading msg ID: " + id);
+		if (log.isTraceEnabled())
+			log.trace("Reading msg ID: " + id);
 	}
 
 //	@Override
 	public void writeExternal(ObjectOutput out) throws IOException {
-		System.out.println("Writing msg ID: " + id);
+		if (log.isTraceEnabled())
+			log.trace("Writing msg ID: " + id);
 		
 		out.writeLong(id);
 	}
@@ -166,7 +168,8 @@ public abstract class SocketMessage<T> implements Externalizable {
 				apply((T) src.handler);
 			} finally {
 				try {
-					System.out.println("Calling ackNotify: " + this);
+					if (log.isTraceEnabled())
+	                    log.trace("Calling ackNotify: " + this);
 					src.ackNotify();
 				} catch (InterruptedException e) {
 					e.printStackTrace(); // FIXME: not sure what to do here in general
@@ -305,7 +308,8 @@ public abstract class SocketMessage<T> implements Externalizable {
 		
 		public void send(ObjectSocketChannelStream ostr) {
 			try {
-				System.out.println("HATruncateMessage send");
+				if (log.isTraceEnabled())
+					log.trace("HATruncateMessage send");
 				ostr.getOutputStream().writeObject(this);				
 			} catch (IOException e) {
 				throw new RuntimeException(e);
@@ -349,8 +353,8 @@ public abstract class SocketMessage<T> implements Externalizable {
 				}				
 			}
 			try {
-				System.out.println("Truncating file " + extent);
-				log.info("Truncating file");
+				if (log.isInfoEnabled())
+					log.info("Truncating file");
 				client.truncate(extent);
 				
 				acknowledge(ack);

@@ -258,9 +258,15 @@ public class TestSocketMessage extends TestCase3 {
 
             HAServer server = new HAServer(InetAddress.getLocalHost(), port, handler);
 
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} // make sure the server is started
+
 			return server;
 			
-			// Thread.sleep(2000); // make sure the server is started
 //		} catch (Exception e1) {
 //			// TODO Auto-generated catch block
 //			e1.printStackTrace();
@@ -274,11 +280,14 @@ public class TestSocketMessage extends TestCase3 {
 		SocketMessage.HAWriteMessage msg1 = new SocketMessage.HAWriteMessage(cache1);
 		SocketMessage.HATruncateMessage msg2 = new SocketMessage.HATruncateMessage(210000);
 		SocketMessage.HAWriteMessage msg3 = new SocketMessage.HAWriteMessage(cache3);
-		final ByteBuffer data1 = getRandomData(r.nextInt(100) + 1);
-		System.out.println("data1 capacity: " + data1.capacity());
-		final ByteBuffer data3 = getRandomData(r.nextInt(cache1.capacity()-100) + 1);
-		final ByteBuffer data4 = getRandomData(r.nextInt((cache1.capacity()-100)/2) + 1);
-		final ByteBuffer data5 = getRandomData(r.nextInt((cache1.capacity()-100)/2) + 1);
+		// final ByteBuffer data2 = getRandomData(r.nextInt(100) + 1);
+		final ByteBuffer data1 = ByteBuffer.wrap(new byte[] {1,2,3,4,5,6,7,8,9,10});
+		final ByteBuffer data2 = ByteBuffer.wrap(new byte[] {50,51,52,53,54,55});
+		final ByteBuffer data3 = ByteBuffer.wrap(new byte[] {11,12,13,14,15});
+		// final ByteBuffer data3 = getRandomData(r.nextInt(cache1.capacity()-100) + 1);
+		// final ByteBuffer data4 = getRandomData(r.nextInt((cache1.capacity()-100)/2) + 1);
+		final ByteBuffer data4 = ByteBuffer.wrap(new byte[] {16,17,18,19,20});
+		final ByteBuffer data5 = ByteBuffer.wrap(new byte[] {31,32,33,34,35,36,37});
 
 		HAGlue glue = null;
 		IWriteCallback whandler = new IWriteCallback() {
@@ -302,18 +311,19 @@ public class TestSocketMessage extends TestCase3 {
         long addr1 = 0;
         cache1.write(addr1, data1, 0);
         long addr2 = addr1 + data1.capacity();
-        assertTrue(cache1.write(addr2, data4, 0));
+        assertTrue(cache1.write(addr2, data2, 0));
+        data1.flip();
         // verify record @ addr can be read.
-        assertNotNull(cache1.read(addr2));
+        assertNotNull(cache1.read(addr1));
         // verify data read back @ addr.
-        // assertEquals(data4, cache1.read(addr1));
+        assertEquals(data1, cache1.read(addr1));
 
-        long addr3 = addr2 + data4.capacity();
+        long addr3 = addr2 + data2.capacity();
         cache3.write(addr3, data5, 0);
 
         // messages are processed in sequence, so just wait for last one
-        messenger.send(msg3);
         messenger.send(msg1);
+        messenger.send(msg3);
         messenger.send(msg2, true);
 
         // Thread.sleep(2000); // give chance for messages to be processed
@@ -321,13 +331,15 @@ public class TestSocketMessage extends TestCase3 {
 
         // assertEquals(data4, cache1.read(0)); // did the data get the the
         // downstream cache?
-        ByteBuffer tst1 = cache1.read(addr2);
-        ByteBuffer tst2 = cache2.read(addr2);
+        ByteBuffer tst1 = cache1.read(addr1);
+        ByteBuffer tst2 = cache2.read(addr1);
         System.out.println("tst capacity: " + tst1.capacity() + "/"
                 + tst2.capacity());
         // At present is a problem with WriteCache (test fails)
         // assertEquals(data4, tst1); // did the data get the the downstream
         // cache?
+        assertEquals(tst1, data1);
+        assertEquals(tst1, tst2);
         
         /*
          * FIXME This unit test will "pass" even though the operation did not

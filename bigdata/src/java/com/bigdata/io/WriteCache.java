@@ -760,6 +760,10 @@ abstract public class WriteCache implements IWriteCache {
 
             counters.nhit.incrementAndGet();
 
+			if (log.isTraceEnabled()) {
+				show(dst, "read bytes");
+			}
+
             return dst;
 
 		} finally {
@@ -769,6 +773,31 @@ abstract public class WriteCache implements IWriteCache {
 		}
 
 	}
+    
+    private void show(final ByteBuffer buf, final String prefix) {
+		StringBuffer str = new StringBuffer();
+		int tpos = buf.position();
+		if (tpos == 0) {
+			tpos = buf.limit();
+		}
+		str.append(prefix + ", length: " + tpos + " : ");
+		for (int tb = 0; tb < tpos && tb < 20; tb++) {
+			str.append(Integer.toString(buf.get(tb)) + ",");
+		}
+		log.trace(str.toString());
+    }
+
+    private void show(final byte[] buf, int len, final String prefix) {
+		StringBuffer str = new StringBuffer();
+		str.append(prefix + ": ");
+		int tpos = len;
+		str.append(prefix + ", length: " + tpos + " : ");
+		for (int tb = 0; tb < tpos && tb < 20; tb++) {
+			str.append(Integer.toString(buf[tb]) + ",");
+		}
+		log.trace(str.toString());
+    }
+
 
 	/**
      * Flush the writes to the backing channel but DOES NOT sync the channel and
@@ -1643,8 +1672,20 @@ abstract public class WriteCache implements IWriteCache {
 		log.info("Acquiring Buffer");
 		final ByteBuffer tmp = acquire();
 		try {
-			outstr.writeInt(tmp.position());
-			out.write(tmp);
+			int pos = tmp.position();
+			if (log.isTraceEnabled()) {
+				log.trace("sendTo, pos: " + pos);
+			}
+			outstr.writeInt(pos);
+			
+			ByteBuffer view = tmp.duplicate();
+			view.limit(pos);
+			view.position(0);
+			if (log.isTraceEnabled()) {
+				show(view, "sendTo bytes");
+			}
+			
+			out.write(view);
 		} finally {
 			release();
 		}
@@ -1676,7 +1717,11 @@ abstract public class WriteCache implements IWriteCache {
 
         ObjectInputStream instr = in.getInputStream();
         int sze = instr.readInt();
-
+        
+        if (log.isTraceEnabled()) {
+			log.trace("readByteArray: " + sze);
+        }
+        
         final byte[] buf = in.readByteArray(sze);
 
         this.writeRaw(0, buf, sze);
@@ -1703,10 +1748,26 @@ abstract public class WriteCache implements IWriteCache {
 		
 	}
 
-	private void writeRaw(int i, byte[] buf2, int sze) {
-		// TODO Auto-generated method stub
-	    throw new UnsupportedOperationException();
-		
+    /**
+     * Writes bytes direct to underlying Buffer
+     * 
+     * @param i
+     * @param buf2
+     * @param sze
+     * @throws InterruptedException 
+     * @throws IllegalStateException 
+     */
+	private void writeRaw(int i, byte[] buf, int sze) throws IllegalStateException, InterruptedException {
+		ByteBuffer tmp = acquire();
+		try {
+			if (log.isTraceEnabled()) {
+				show(buf, sze, "writeRaw");
+			}
+			
+			tmp.put(buf, i, sze);
+		} finally {
+			release();
+		}		
 	}
 
 	/**

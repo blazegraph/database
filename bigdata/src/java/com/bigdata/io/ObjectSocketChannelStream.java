@@ -37,6 +37,8 @@ import java.nio.channels.Channel;
 import java.nio.channels.Channels;
 import java.nio.channels.SocketChannel;
 
+import org.apache.log4j.Logger;
+
 /**
  * Utility class that provides dual Channel/ObjectStream access.
  * 
@@ -44,6 +46,8 @@ import java.nio.channels.SocketChannel;
  *
  */
 public class ObjectSocketChannelStream {
+	protected static final Logger log = Logger.getLogger(ObjectSocketChannelStream.class);
+
 	ObjectOutputStream outStr = null;
 	ObjectInputStream inStr = null;
 	final ByteChannel channel;
@@ -109,6 +113,8 @@ public class ObjectSocketChannelStream {
 		}
 	}
 	public byte[] readByteArray(final int sze) throws IOException {
+		if (log.isTraceEnabled())
+			log.trace("readByteArray: " + sze);
 		checkBuffer(sze);
 		
 		int totrd = 0;
@@ -118,15 +124,16 @@ public class ObjectSocketChannelStream {
 			tsze -= rdlen;
 			totrd += rdlen;
 		}
-		System.out.println("Read buffer of " + sze + " bytes, actual: " + totrd);
+		if (log.isTraceEnabled())
+			log.trace("Read buffer of " + sze + " bytes, actual: " + totrd);
 		
 		return buf;
 	}
 
 	
 	public void write(ByteBuffer tmp) throws IOException {
-		int sze = tmp.position();
-		tmp.position(0);
+		int sze = tmp.limit();
+		// tmp.position(0);
 		byte[] loc = null;
 		if (tmp.hasArray()) {
 			loc = tmp.array();
@@ -135,7 +142,9 @@ public class ObjectSocketChannelStream {
 			tmp.get(buf, 0, sze);
 			loc = buf;
 		}
-		System.out.println("Writing buffer of " + sze + " bytes");
+		if (log.isTraceEnabled()) {
+			log.trace("Writing buffer of " + sze + " bytes");
+		}
 		getOutputStream().write(loc, 0, sze);
 	}
 	

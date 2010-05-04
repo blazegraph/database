@@ -156,7 +156,8 @@ public class HAServer extends Thread {
 					if (key == serverKey) {
 						if (key.isAcceptable()) {
 							SocketChannel client = server.accept();
-							System.out.println("Accepted connection");
+							if(log.isTraceEnabled())
+			                    log.trace("Accepted connection");
 							client.configureBlocking(false);
 							SelectionKey clientKey = client.register(selector, SelectionKey.OP_READ);
 							clientKey.attach(Integer.valueOf(0));
