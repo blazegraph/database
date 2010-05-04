@@ -175,6 +175,24 @@ public interface InternalValue<V extends BigdataValue, T> extends Serializable {
      * @return The corresponding {@link BigdataValue}.
      * @throws UnsupportedOperationException
      *             unless the RDF value is inline.
+     * 
+     *             FIXME Reconcile with BigdataValueImpl and BigdataValue. The
+     *             role of the valueFactory reference on BigdataValueImpl was to
+     *             detect when an instance was created by another value factory.
+     *             The choice of whether or not to inline the value is
+     *             determined by the lexicon configuration, and that choice is
+     *             probably captured by a BigdataValueFactory configuration
+     *             object. Therefore we do need to convert to a different
+     *             instance when the {@link InternalValue} will be used in a
+     *             different lexicon configuration context.
+     *             <P>
+     *             It would be nice to support shared lexicons for a collection
+     *             of triple / quad stores. The lexicon would be in the
+     *             container namespace for that federation of KBs. The
+     *             individual triple/quad stores would be in the per-KB instance
+     *             namespace. The collection could have a mixture of triple
+     *             and/or quad stores since the lexicon does not interact with
+     *             whether we are using triples or quads (except for SIDs).
      */
     V asValue(BigdataValueFactory f) throws UnsupportedOperationException;
 

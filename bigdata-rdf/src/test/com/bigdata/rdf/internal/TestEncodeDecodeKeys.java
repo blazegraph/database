@@ -52,7 +52,32 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * having variable component lengths while others are term identifiers.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TestEncodeDecodeKeys.java 2756 2010-05-03 22:26:18Z thompsonbry
+ *          $
+ * 
+ * @todo Code SIDs using a term identifier, UUID, or secure hash function? The
+ *       latter two choices are inline options. The former is not.
+ * 
+ * @todo Unit tests for correct rejection of {@link BigInteger} with large
+ *       magnitudes (very long byte[]s). The purpose of this is to avoid
+ *       problems in the indices related to keys growing too long for a
+ *       reasonable B+Tree leaf. (The maximum length for the encoding is 32kb
+ *       per key. At m=256 that is only 8MB, which is not all that bad so maybe
+ *       we do not have to do anything here.)
+ * 
+ *       FIXME Finish these unit tests for all data types [xsd:decimal], and
+ *       unsigned byte, short, int and long. For the unsigned values, I need to
+ *       figure out whether you pass in a data type with more bits (e.g., long
+ *       for an unsigned int) or if you manage the bits as if they were
+ *       unsigned. Consider adding unsigned support and xsd:decimal support
+ *       afterwards since they are both a PITA.
+ * 
+ *       FIXME Unit tests for inline of blank nodes (this is based on a UUID, so
+ *       there is not much to that).
+ * 
+ *       FIXME Refactor to pull the inline bit and dataTypeId bit out of the
+ *       dataTypeCode and then test extensible projection of types derived by
+ *       restriction onto the intrinsic data types.
  */
 public class TestEncodeDecodeKeys extends TestCase2 {
 
@@ -350,12 +375,17 @@ public class TestEncodeDecodeKeys extends TestCase2 {
          * Note: We have to handle the unsigned byte, short, int and long values
          * specially to get the correct total key order.
          * 
-         * FIXME Add support to encode and decode unsigned short, int and long
-         * to IKeyBuilder and KeyBuilder to support the unsigned xsd data types.
+         * FIXME Add support to encode and decode unsigned short, int, and long
+         * and also UUID to IKeyBuilder and KeyBuilder to support the unsigned
+         * xsd data types and UUIDs.
          */
         final InternalDataTypeEnum dte = v.getInternalDataTypeEnum();
         
         if (dte == InternalDataTypeEnum.TermId) {
+
+            /*
+             * Handle a term identifier.
+             */
 
             keyBuilder.append(v.getTermId());
             
@@ -370,7 +400,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 //            keyBuilder.append(v.getTermId());
 //            break;
         case XSDBoolean:
-            keyBuilder.append(t.booleanValue());
+            keyBuilder.append((byte) (t.booleanValue() ? 1 : 0));
             break;
         case XSDByte:
             keyBuilder.append(t.byteValue());
@@ -389,6 +419,9 @@ public class TestEncodeDecodeKeys extends TestCase2 {
             break;
         case XSDDouble:
             keyBuilder.append(t.doubleValue());
+            break;
+        case XSDInteger:
+            keyBuilder.append(t.integerValue());
             break;
         case XSDDecimal:
             keyBuilder.append(t.decimalValue());
@@ -430,7 +463,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      * 
      * @todo This could reuse the caller's array.
      */
-    public InternalValue<?, ?>[] decodeStatement(final byte[] key) {
+    public InternalValue<?, ?>[] decodeStatementKey(final byte[] key) {
         
         final InternalValue<?,?>[] a = new InternalValue[4];
 
@@ -443,25 +476,117 @@ public class TestEncodeDecodeKeys extends TestCase2 {
             offset++;
 
             // The value type (URI, Literal, BNode, SID)
-            final InternalValueTypeEnum vte = AbstractInternalValue.getInternalValueTypeEnum(flags);
-            
+            final InternalValueTypeEnum vte = AbstractInternalValue
+                    .getInternalValueTypeEnum(flags);
+
             // The data type
-            final InternalDataTypeEnum dte = AbstractInternalValue.getInternalDataTypeEnum(flags);
+            final InternalDataTypeEnum dte = AbstractInternalValue
+                    .getInternalDataTypeEnum(flags);
 
             if (dte == InternalDataTypeEnum.TermId) {
+
+                /*
+                 * Handle a term identifier (versus an inline value).
+                 */
 
                 // decode the term identifier.
                 final long termId = KeyBuilder.decodeLong(key, offset);
                 offset += Bytes.SIZEOF_LONG;
-                
+
                 // @todo type specific factory is required!
                 a[i] = InternalValueTypeFactory.INSTANCE.newTermId(vte, dte,
                         termId);
 
-            } else {
+                continue;
+                
+            }
+
+            /*
+             * Handle an inline value.
+             * 
+             * @todo construct the InternalValue objects using factory?
+             */
+            final InternalValue v;
+            switch (dte) {
+            case XSDBoolean: {
+                final byte x = KeyBuilder.decodeByte(key[offset++]);
+                if (x == 0) {
+                    v = XSDBooleanInternalValue.FALSE;
+                } else {
+                    v = XSDBooleanInternalValue.TRUE;
+                }
+                break;
+            }
+            case XSDByte: {
+                final byte x = KeyBuilder.decodeByte(key[offset++]);
+                v = new XSDByteInternalValue<BigdataLiteral>(x);
+                break;
+            }
+            case XSDShort: {
+                final short x = KeyBuilder.decodeShort(key, offset);
+                offset += Bytes.SIZEOF_SHORT;
+                v = new XSDShortInternalValue<BigdataLiteral>(x);
+                break;
+            }
+            case XSDInt: {
+                final int x = KeyBuilder.decodeInt(key, offset);
+                offset += Bytes.SIZEOF_INT;
+                v = new XSDIntInternalValue<BigdataLiteral>(x);
+                break;
+            }
+            case XSDLong: {
+                final long x = KeyBuilder.decodeLong(key, offset);
+                offset += Bytes.SIZEOF_LONG;
+                v = new XSDLongInternalValue<BigdataLiteral>(x);
+                break;
+            }
+            case XSDFloat: {
+                final float x = KeyBuilder.decodeFloat(key, offset);
+                offset += Bytes.SIZEOF_FLOAT;
+                v = new XSDFloatInternalValue<BigdataLiteral>(x);
+                break;
+            }
+            case XSDDouble: {
+                final double x = KeyBuilder.decodeDouble(key, offset);
+                offset += Bytes.SIZEOF_DOUBLE;
+                v = new XSDDoubleInternalValue<BigdataLiteral>(x);
+                break;
+            }
+            case XSDInteger: {
+                final byte[] b = KeyBuilder.decodeBigInteger2(offset, key);
+                offset += 2 + b.length;
+                final BigInteger x = new BigInteger(b);
+                v = new XSDIntegerInternalValue<BigdataLiteral>(x);
+                break;
+            }
+//            case XSDDecimal:
+//                keyBuilder.append(t.decimalValue());
+//                break;
+            case UUID: {
+                final UUID x = KeyBuilder.decodeUUID(key, offset);
+                offset += Bytes.SIZEOF_UUID;
+                v = new UUIDInternalValue<BigdataLiteral>(x);
+                break;
+            }
+//            case XSDUnsignedByte:
+//                keyBuilder.appendUnsigned(t.byteValue());
+//                break;
+//            case XSDUnsignedShort:
+//                keyBuilder.appendUnsigned(t.shortValue());
+//                break;
+//            case XSDUnsignedInt:
+//                keyBuilder.appendUnsigned(t.intValue());
+//                break;
+//            case XSDUnsignedLong:
+//                keyBuilder.appendUnsigned(t.longValue());
+//                break;
+            default:
+                // FIXME handle all of the inline value types.
                 throw new UnsupportedOperationException("vte=" + vte + ", dte="
                         + dte);
             }
+            
+            a[i] = v;
 
             if (i == 2 && offset == key.length) {
                 // We have three components and the key is exhausted.
@@ -553,12 +678,56 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     }
 
     /**
+     * Encodes an array of {@link InternalValue}s and then decodes them and
+     * verifies that the decoded values are equal-to the original values.
+     * 
+     * @param e
+     *            The array of the expected values.
+     */
+    protected void doEncodeDecodeTest(final InternalValue<?, ?>[] e) {
+
+        /*
+         * Encode.
+         */
+        final byte[] key;
+        {
+            final IKeyBuilder keyBuilder = new KeyBuilder();
+
+            for (int i = 0; i < e.length; i++) {
+
+                encodeValue(keyBuilder, e[i]);
+
+            }
+
+            key = keyBuilder.getKey();
+        }
+
+        /*
+         * Decode
+         */
+        {
+            final InternalValue<?, ?>[] a = decodeStatementKey(key);
+
+            for (int i = 0; i < e.length; i++) {
+
+                if (!e[i].equals(a[i])) {
+                 
+                    fail("index=" + Integer.toString(i) + " : expected=" + e[i]
+                            + ", actual=" + a[i]);
+                    
+                }
+
+            }
+
+        }
+
+    }
+
+    /**
      * Unit test for encoding and decoding a statement formed from
      * {@link TermId}s.
-     * 
-     * FIXME Finish the encode/decode statement key logic.
      */
-    public void test_SPO_encodeDecode_001() {
+    public void test_SPO_encodeDecode_allTermIds() {
 
         final InternalValue<?, ?>[] e = {//
                 new TermId<BigdataURI>(InternalValueTypeEnum.URI,
@@ -571,59 +740,425 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                         InternalDataTypeEnum.TermId, 4L) //
         };
 
-        final byte[] key = encodeStatement(new KeyBuilder(), e[0], e[1], e[2],
-                e[3]);
-
-        final InternalValue<?, ?>[] a = decodeStatement(key);
-
-        for (int i = 0; i < e.length; i++) {
-
-            assertEquals("index=" + Integer.toString(i), e[i], a[i]);
-
-        }
+        doEncodeDecodeTest(e);
         
     }
 
-    
     /**
-     * Unit test verifies the ability to decode a key with an inline variable
-     * length coding of a datatype literal using <code>xsd:integer</code>, aka
-     * {@link BigInteger}.
+     * Unit test where the RDF Object position is an xsd:boolean.
      */
-    public void test_SPO_encodeDecode_BigInteger() {
+    public void test_SPO_encodeDecode_XSDBoolean() {
 
-        final Long s = 1L;
-        final Long p = 2L;
-        final BigInteger o = BigInteger.valueOf(3L);
-        final Long c = 3L;
+        final InternalValue<?, ?>[] e = {//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 1L),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 2L),//
+                new XSDBooleanInternalValue<BigdataLiteral>(true),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 4L) //
+        };
 
-        final byte[] key = new KeyBuilder().append(s).append(p).append(o)
-                .append(c).getKey();
+        doEncodeDecodeTest(e);
 
-        int off = 0;
-        
-        final Long e_s = KeyBuilder.decodeLong(key, off);
-        off += Bytes.SIZEOF_LONG;
-        
-        final Long e_p = KeyBuilder.decodeLong(key, off);
-        off += Bytes.SIZEOF_LONG;
-        
-        final BigInteger e_o;
-        {
-            final byte[] b = KeyBuilder.decodeBigInteger2(off, key);
-            off += 2 + b.length;
-            e_o = new BigInteger(b);
+        e[2] = new XSDBooleanInternalValue<BigdataLiteral>(false);
+
+        doEncodeDecodeTest(e);
+
+    }
+
+    /**
+     * Unit test where the RDF Object position is an xsd:byte.
+     */
+    public void test_SPO_encodeDecode_XSDByte() {
+
+        final InternalValue<?, ?>[] e = {//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 1L),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 2L),//
+                new XSDByteInternalValue<BigdataLiteral>((byte)1),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 4L) //
+        };
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDByteInternalValue<BigdataLiteral>((byte) -1);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDByteInternalValue<BigdataLiteral>((byte) 0);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDByteInternalValue<BigdataLiteral>(Byte.MAX_VALUE);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDByteInternalValue<BigdataLiteral>(Byte.MIN_VALUE);
+
+        doEncodeDecodeTest(e);
+
+    }
+
+    /**
+     * Unit test where the RDF Object position is an xsd:short.
+     */
+    public void test_SPO_encodeDecode_XSDShort() {
+
+        final InternalValue<?, ?>[] e = {//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 1L),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 2L),//
+                new XSDShortInternalValue<BigdataLiteral>((short)1),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 4L) //
+        };
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDShortInternalValue<BigdataLiteral>((short) -1);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDShortInternalValue<BigdataLiteral>((short) 0);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDShortInternalValue<BigdataLiteral>(Short.MAX_VALUE);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDShortInternalValue<BigdataLiteral>(Short.MIN_VALUE);
+
+        doEncodeDecodeTest(e);
+
+    }
+
+    /**
+     * Unit test where the RDF Object position is an xsd:int.
+     */
+    public void test_SPO_encodeDecode_XSDInt() {
+
+        final InternalValue<?, ?>[] e = {//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 1L),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 2L),//
+                new XSDIntInternalValue<BigdataLiteral>(1),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 4L) //
+        };
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDIntInternalValue<BigdataLiteral>(-1);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDIntInternalValue<BigdataLiteral>(0);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDIntInternalValue<BigdataLiteral>(Integer.MAX_VALUE);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDIntInternalValue<BigdataLiteral>(Integer.MIN_VALUE);
+
+        doEncodeDecodeTest(e);
+
+    }
+
+    /**
+     * Unit test where the RDF Object position is an xsd:long.
+     */
+    public void test_SPO_encodeDecode_XSDLong() {
+
+        final InternalValue<?, ?>[] e = {//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 1L),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 2L),//
+                new XSDLongInternalValue<BigdataLiteral>(1L),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 4L) //
+        };
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDLongInternalValue<BigdataLiteral>(-1L);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDLongInternalValue<BigdataLiteral>(0L);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDLongInternalValue<BigdataLiteral>(Long.MAX_VALUE);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDLongInternalValue<BigdataLiteral>(Long.MIN_VALUE);
+
+        doEncodeDecodeTest(e);
+
+    }
+
+    /**
+     * Unit test where the RDF Object position is an xsd:float.
+     */
+    public void test_SPO_encodeDecode_XSDFloat() {
+
+        final InternalValue<?, ?>[] e = {//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 1L),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 2L),//
+                new XSDFloatInternalValue<BigdataLiteral>(1f),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 4L) //
+        };
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDFloatInternalValue<BigdataLiteral>(-1f);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDFloatInternalValue<BigdataLiteral>(+0f);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDFloatInternalValue<BigdataLiteral>(-0f);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDFloatInternalValue<BigdataLiteral>(Float.MAX_VALUE);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDFloatInternalValue<BigdataLiteral>(Float.MIN_VALUE);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDFloatInternalValue<BigdataLiteral>(Float.MIN_NORMAL);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDFloatInternalValue<BigdataLiteral>(Float.POSITIVE_INFINITY);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDFloatInternalValue<BigdataLiteral>(Float.NEGATIVE_INFINITY);
+
+        doEncodeDecodeTest(e);
+
+    }
+
+    /**
+     * Unit test where the RDF Object position is an xsd:double.
+     */
+    public void test_SPO_encodeDecode_XSDDouble() {
+
+        final InternalValue<?, ?>[] e = {//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 1L),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 2L),//
+                new XSDDoubleInternalValue<BigdataLiteral>(1d),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 4L) //
+        };
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDDoubleInternalValue<BigdataLiteral>(-1d);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDDoubleInternalValue<BigdataLiteral>(-0d);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDDoubleInternalValue<BigdataLiteral>(+0d);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDDoubleInternalValue<BigdataLiteral>(Double.MAX_VALUE);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDDoubleInternalValue<BigdataLiteral>(Double.MIN_VALUE);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDDoubleInternalValue<BigdataLiteral>(Double.MIN_NORMAL);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDDoubleInternalValue<BigdataLiteral>(Double.POSITIVE_INFINITY);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDDoubleInternalValue<BigdataLiteral>(Double.NEGATIVE_INFINITY);
+
+        doEncodeDecodeTest(e);
+
+    }
+
+    /**
+     * Unit test where the RDF Object position is an xsd:float whose value is
+     * {@link Float#NaN}.
+     * 
+     * @todo This unit test fails for NaN. I am not convinced that this is a
+     *       problem since I do not know what it would mean (in terms of the
+     *       natural order of the key) to allow a value which is not a number
+     *       into a key. At a miminum we need to clarify the behavior for NaN
+     *       for the lexicon and the {@link IKeyBuilder}.
+     *       <p>
+     *       According to the XML Schema Datatypes Recommendation: NaN equals
+     *       itself but is ·incomparable· with (neither greater than nor less
+     *       than) any other value in the ·value space·.
+     */
+    public void test_SPO_encodeDecode_XSDFloat_NaN() {
+
+        final InternalValue<?, ?>[] e = {//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 1L),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 2L),//
+                new XSDFloatInternalValue<BigdataLiteral>(Float.NaN),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 4L) //
+        };
+    
+        e[2] = new XSDFloatInternalValue<BigdataLiteral>(Float.NaN);
+
+        doEncodeDecodeTest(e);
+
+    }
+
+    /**
+     * Unit test where the RDF Object position is an xsd:double whose value is
+     * {@link Double#NaN}.
+     * 
+     * @todo This unit test fails for NaN. I am not convinced that this is a
+     *       problem since I do not know what it would mean (in terms of the
+     *       natural order of the key) to allow a value which is not a number
+     *       into a key. At a miminum we need to clarify the behavior for NaN
+     *       for the lexicon and the {@link IKeyBuilder}.
+     *       <p>
+     *       According to the XML Schema Datatypes Recommendation: NaN equals
+     *       itself but is ·incomparable· with (neither greater than nor less
+     *       than) any other value in the ·value space·.
+     */
+    public void test_SPO_encodeDecode_XSDDouble_NaN() {
+
+        final InternalValue<?, ?>[] e = {//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 1L),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 2L),//
+                new XSDDoubleInternalValue<BigdataLiteral>(Double.NaN),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 4L) //
+        };
+    
+        e[2] = new XSDDoubleInternalValue<BigdataLiteral>(Double.NaN);
+
+        doEncodeDecodeTest(e);
+
+    }
+
+    /**
+     * Unit test where the RDF Object position is a {@link UUID}.
+     */
+    public void test_SPO_encodeDecode_UUID() {
+
+        final InternalValue<?, ?>[] e = {//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 1L),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 2L),//
+                new UUIDInternalValue<BigdataLiteral>(UUID.randomUUID()),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 4L) //
+        };
+
+        doEncodeDecodeTest(e);
+
+        for (int i = 0; i < 1000; i++) {
+
+            e[2] = new UUIDInternalValue<BigdataLiteral>(UUID.randomUUID());
+
+            doEncodeDecodeTest(e);
+
         }
 
-        final Long e_c = KeyBuilder.decodeLong(key, off);
-        off += Bytes.SIZEOF_LONG;
+    }
 
-        assertEquals("s", s, e_s);
-        assertEquals("p", p, e_p);
-        assertEquals("o", o, e_o);
-        assertEquals("c", c, e_c);
+    /**
+     * Unit test where the RDF Object position is an xsd:integer.
+     */
+    public void test_SPO_encodeDecode_XSDInteger() {
+
+        final InternalValue<?, ?>[] e = {//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 1L),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 2L),//
+                new XSDIntegerInternalValue<BigdataLiteral>(BigInteger
+                        .valueOf(3L)),//
+                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
+                        InternalDataTypeEnum.TermId, 4L) //
+        };
+
+        doEncodeDecodeTest(e);
         
     }
+
+//    /**
+//     * Unit test verifies the ability to decode a key with an inline variable
+//     * length coding of a datatype literal using <code>xsd:integer</code>, aka
+//     * {@link BigInteger}.
+//     */
+//    public void test_SPO_encodeDecode_BigInteger() {
+//
+//        final Long s = 1L;
+//        final Long p = 2L;
+//        final BigInteger o = BigInteger.valueOf(3L);
+//        final Long c = 3L;
+//
+//        final byte[] key = new KeyBuilder().append(s).append(p).append(o)
+//                .append(c).getKey();
+//
+//        int off = 0;
+//        
+//        final Long e_s = KeyBuilder.decodeLong(key, off);
+//        off += Bytes.SIZEOF_LONG;
+//        
+//        final Long e_p = KeyBuilder.decodeLong(key, off);
+//        off += Bytes.SIZEOF_LONG;
+//        
+//        final BigInteger e_o;
+//        {
+//            final byte[] b = KeyBuilder.decodeBigInteger2(off, key);
+//            off += 2 + b.length;
+//            e_o = new BigInteger(b);
+//        }
+//
+//        final Long e_c = KeyBuilder.decodeLong(key, off);
+//        off += Bytes.SIZEOF_LONG;
+//
+//        assertEquals("s", s, e_s);
+//        assertEquals("p", p, e_p);
+//        assertEquals("o", o, e_o);
+//        assertEquals("c", c, e_c);
+//        
+//    }
 
     /**
      * Abstract base class for inline RDF values (literals, blank nodes, and
@@ -658,6 +1193,12 @@ public class TestEncodeDecodeKeys extends TestCase2 {
          * @see Value#stringValue()
          */
         abstract public String stringValue();
+        
+        public String toString() {
+            
+            return super.toString() + "[" + stringValue() + "]";
+            
+        }
         
     }
 
@@ -878,8 +1419,390 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
     }
 
+    /** Implementation for inline <code>xsd:boolean</code>. */
+    static public class XSDBooleanInternalValue<V extends BigdataLiteral> extends
+            AbstractDatatypeLiteralInternalValue<V, Boolean> {
+
+        static public transient final XSDBooleanInternalValue<BigdataLiteral> TRUE = new XSDBooleanInternalValue<BigdataLiteral>(
+                true);
+
+        static public transient final XSDBooleanInternalValue<BigdataLiteral> FALSE = new XSDBooleanInternalValue<BigdataLiteral>(
+                false);
+        
+        private final boolean value;
+
+        public XSDBooleanInternalValue(final boolean value) {
+            
+            super(InternalDataTypeEnum.XSDBoolean);
+            
+            this.value = value;
+            
+        }
+
+        final public Boolean getInlineValue() {
+
+            return value ? Boolean.TRUE : Boolean.FALSE;
+
+        }
+
+        @SuppressWarnings("unchecked")
+        public V asValue(final BigdataValueFactory f) {
+            return (V) f.createLiteral(value);
+        }
+
+        @Override
+        final public long longValue() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean booleanValue() {
+            return value;
+        }
+
+        @Override
+        public byte byteValue() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public double doubleValue() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public float floatValue() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int intValue() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public short shortValue() {
+            throw new UnsupportedOperationException();
+        }
+        
+        @Override
+        public String stringValue() {
+            return Boolean.toString(value);
+        }
+
+        @Override
+        public BigDecimal decimalValue() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public BigInteger integerValue() {
+            throw new UnsupportedOperationException();
+        }
+
+        public boolean equals(final Object o) {
+            if(this==o) return true;
+            if(o instanceof XSDBooleanInternalValue) {
+                return this.value == ((XSDBooleanInternalValue) o).value;
+            }
+            return false;
+        }
+        
+        /**
+         * Return the hash code of the byte value.
+         * 
+         * @see Boolean#hashCode()
+         */
+        public int hashCode() {
+            return value ? Boolean.TRUE.hashCode() : Boolean.FALSE.hashCode();
+        }
+
+    }
+
+    /** Implementation for inline <code>xsd:byte</code>. */
+    static public class XSDByteInternalValue<V extends BigdataLiteral> extends
+            AbstractDatatypeLiteralInternalValue<V, Byte> {
+
+        private final byte value;
+
+        public XSDByteInternalValue(final byte value) {
+            
+            super(InternalDataTypeEnum.XSDByte);
+            
+            this.value = value;
+            
+        }
+
+        final public Byte getInlineValue() {
+            
+            return value;
+            
+        }
+
+        @SuppressWarnings("unchecked")
+        public V asValue(final BigdataValueFactory f) {
+            return (V) f.createLiteral(value);
+        }
+
+        @Override
+        final public long longValue() {
+            return (long) value;
+        }
+
+        @Override
+        public boolean booleanValue() {
+            return value == 0 ? false : true;
+        }
+
+        @Override
+        public byte byteValue() {
+            return value;
+        }
+
+        @Override
+        public double doubleValue() {
+            return (double) value;
+        }
+
+        @Override
+        public float floatValue() {
+            return (float) value;
+        }
+
+        @Override
+        public int intValue() {
+            return (int)value;
+        }
+
+        @Override
+        public short shortValue() {
+            return (short) value;
+        }
+        
+        @Override
+        public String stringValue() {
+            return Byte.toString(value);
+        }
+
+        @Override
+        public BigDecimal decimalValue() {
+            return BigDecimal.valueOf(value);
+        }
+
+        @Override
+        public BigInteger integerValue() {
+            return BigInteger.valueOf(value);
+        }
+
+        public boolean equals(final Object o) {
+            if(this==o) return true;
+            if(o instanceof XSDByteInternalValue) {
+                return this.value == ((XSDByteInternalValue) o).value;
+            }
+            return false;
+        }
+        
+        /**
+         * Return the hash code of the byte value.
+         * 
+         * @see Byte#hashCode()
+         */
+        public int hashCode() {
+            return (int) value;
+        }
+
+    }
+
+    /** Implementation for inline <code>xsd:short</code>. */
+    static public class XSDShortInternalValue<V extends BigdataLiteral> extends
+            AbstractDatatypeLiteralInternalValue<V, Short> {
+
+        private final short value;
+
+        public XSDShortInternalValue(final short value) {
+            
+            super(InternalDataTypeEnum.XSDShort);
+            
+            this.value = value;
+            
+        }
+
+        final public Short getInlineValue() {
+            
+            return value;
+            
+        }
+
+        @SuppressWarnings("unchecked")
+        public V asValue(final BigdataValueFactory f) {
+            return (V) f.createLiteral(value);
+        }
+
+        @Override
+        final public long longValue() {
+            return (long) value;
+        }
+
+        @Override
+        public boolean booleanValue() {
+            return value == 0 ? false : true;
+        }
+
+        @Override
+        public byte byteValue() {
+            return (byte) value;
+        }
+
+        @Override
+        public double doubleValue() {
+            return (double) value;
+        }
+
+        @Override
+        public float floatValue() {
+            return (float) value;
+        }
+
+        @Override
+        public int intValue() {
+            return (int)value;
+        }
+
+        @Override
+        public short shortValue() {
+            return value;
+        }
+        
+        @Override
+        public String stringValue() {
+            return Short.toString(value);
+        }
+
+        @Override
+        public BigDecimal decimalValue() {
+            return BigDecimal.valueOf(value);
+        }
+
+        @Override
+        public BigInteger integerValue() {
+            return BigInteger.valueOf(value);
+        }
+
+        public boolean equals(final Object o) {
+            if(this==o) return true;
+            if(o instanceof XSDShortInternalValue) {
+                return this.value == ((XSDShortInternalValue) o).value;
+            }
+            return false;
+        }
+        
+        /**
+         * Return the hash code of the short value.
+         * 
+         * @see Short#hashCode()
+         */
+        public int hashCode() {
+            return (int) value;
+        }
+
+    }
+
+    /** Implementation for inline <code>xsd:int</code>. */
+    static public class XSDIntInternalValue<V extends BigdataLiteral> extends
+            AbstractDatatypeLiteralInternalValue<V, Integer> {
+
+        private final int value;
+
+        public XSDIntInternalValue(final int value) {
+            
+            super(InternalDataTypeEnum.XSDInt);
+            
+            this.value = value;
+            
+        }
+
+        final public Integer getInlineValue() {
+            
+            return value;
+            
+        }
+
+        @SuppressWarnings("unchecked")
+        public V asValue(final BigdataValueFactory f) {
+            return (V) f.createLiteral(value);
+        }
+
+        @Override
+        final public long longValue() {
+            return (long) value;
+        }
+
+        @Override
+        public boolean booleanValue() {
+            return value == 0 ? false : true;
+        }
+
+        @Override
+        public byte byteValue() {
+            return (byte) value;
+        }
+
+        @Override
+        public double doubleValue() {
+            return (double) value;
+        }
+
+        @Override
+        public float floatValue() {
+            return (float) value;
+        }
+
+        @Override
+        public int intValue() {
+            return value;
+        }
+
+        @Override
+        public short shortValue() {
+            return (short) value;
+        }
+        
+        @Override
+        public String stringValue() {
+            return Integer.toString(value);
+        }
+
+        @Override
+        public BigDecimal decimalValue() {
+            return BigDecimal.valueOf(value);
+        }
+
+        @Override
+        public BigInteger integerValue() {
+            return BigInteger.valueOf(value);
+        }
+
+        public boolean equals(final Object o) {
+            if(this==o) return true;
+            if(o instanceof XSDIntInternalValue) {
+                return this.value == ((XSDIntInternalValue) o).value;
+            }
+            return false;
+        }
+        
+        /**
+         * Return the hash code of the int value.
+         * 
+         * @see Integer#hashCode()
+         */
+        public int hashCode() {
+            return value;
+        }
+
+    }
+
     /** Implementation for inline <code>xsd:long</code>. */
-    static public class LongInternalValue<V extends BigdataLiteral> extends
+    static public class XSDLongInternalValue<V extends BigdataLiteral> extends
             AbstractDatatypeLiteralInternalValue<V, Long> {
 
         /**
@@ -889,7 +1812,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         
         private final long value;
 
-        public LongInternalValue(final long value) {
+        public XSDLongInternalValue(final long value) {
             
             super(InternalDataTypeEnum.XSDLong);
             
@@ -901,14 +1824,6 @@ public class TestEncodeDecodeKeys extends TestCase2 {
             return value;
         }
 
-        /*
-         * FIXME Reconcile with BigdataValueImpl and BigdataValue. The role of
-         * the valueFactory reference on BigdataValueImpl was to detect when an
-         * instance was created by another value factory. The choice of whether
-         * or not to inline the value is determined by the lexicon
-         * configuration, and that choice is probably captured by a
-         * BigdataValueFactory configuration object.
-         */
         @SuppressWarnings("unchecked")
         public V asValue(final BigdataValueFactory f) {
             return (V) f.createLiteral(value);
@@ -921,7 +1836,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
         @Override
         public boolean booleanValue() {
-            return value == 0 ? Boolean.FALSE : true; // @todo SPARQL semantics?
+            return value == 0 ? false : true;
         }
 
         @Override
@@ -966,8 +1881,8 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
         public boolean equals(final Object o) {
             if(this==o) return true;
-            if(o instanceof LongInternalValue) {
-                return this.value == ((LongInternalValue) o).value;
+            if(o instanceof XSDLongInternalValue) {
+                return this.value == ((XSDLongInternalValue) o).value;
             }
             return false;
         }
@@ -982,7 +1897,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     }
 
     /** Implementation for inline <code>xsd:float</code>. */
-    static public class FloatInternalValue<V extends BigdataLiteral> extends
+    static public class XSDFloatInternalValue<V extends BigdataLiteral> extends
             AbstractDatatypeLiteralInternalValue<V, Float> {
 
         /**
@@ -992,9 +1907,12 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
         private final float value;
 
-        public FloatInternalValue(final float value) {
+        public XSDFloatInternalValue(final float value) {
+            
             super(InternalDataTypeEnum.XSDFloat);
+            
             this.value = value;
+            
         }
 
         final public Float getInlineValue() {
@@ -1058,8 +1976,8 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         
         public boolean equals(final Object o) {
             if(this==o) return true;
-            if(o instanceof FloatInternalValue) {
-                return this.value == ((FloatInternalValue) o).value;
+            if(o instanceof XSDFloatInternalValue) {
+                return this.value == ((XSDFloatInternalValue) o).value;
             }
             return false;
         }
@@ -1077,61 +1995,295 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
     }
 
-    /**
-     * Configuration determines which RDF Values are inlined into the statement
-     * indices rather than being assigned term identifiers by the lexicon.
-     */
-    public interface BigdataInlineValueConfig {
+    /** Implementation for inline <code>xsd:double</code>. */
+    static public class XSDDoubleInternalValue<V extends BigdataLiteral> extends
+            AbstractDatatypeLiteralInternalValue<V, Double> {
 
-        /**
-         * <code>true</code> iff the fixed size numerics (<code>xsd:int</code>,
-         * <code>xsd:short</code>, <code>xsd:float</code>, etc) and
-         * <code>xsd:boolean</code> should be inlined.
-         */
-        public boolean isNumericInline();
+        private final double value;
 
-        /**
-         * <code>true</code> iff xsd:integer should be inlined.
-         */
-        public boolean isXSDIntegerInline();
+        public XSDDoubleInternalValue(final double value) {
+            
+            super(InternalDataTypeEnum.XSDDouble);
+            
+            this.value = value;
+            
+        }
 
-        /**
-         * <code>true</code> iff <code>xsd:decimal</code> should be inlined.
-         * 
-         * @todo This option is not yet supported.
-         */
-        public boolean isXSDDecimalInline();
+        final public Double getInlineValue() {
+            return value;
+        }
 
-        /**
-         * <code>true</code> iff blank node identifiers should be inlined. This
-         * is only possible when the blank node identifiers are internally
-         * generated {@link UUID}s since otherwise they can be arbitrary Unicode
-         * strings which, like text-based Literals, can not be inlined.
-         * <p>
-         * This option is NOT compatible with
-         * {@link AbstractTripleStore.Options#STORE_BLANK_NODES}.
-         * 
-         * @todo Separate option to inlined SIDs?
-         */
-        public boolean isBlankNodeInline();
+        @SuppressWarnings("unchecked")
+        public V asValue(final BigdataValueFactory f) {
+            return (V) f.createLiteral(value);
+        }
 
-        /**
-         * <code>true</code> if UUID values (other than blank nodes) should be
-         * inlined.
-         */
-        public boolean isUUIDInline();
+        @Override
+        final public float floatValue() {
+            return (float) value;
+        }
 
-        /**
-         * @todo Option to enable storing of long literals (over a configured
-         *       threshold) as blob references. The TERM2ID index would have a
-         *       hash function (MD5, SHA-1, SHA-2, etc) of the value and assign
-         *       a termId. The ID2TERM index would map the termId to a blob
-         *       reference. The blob data would be stored in the journal and
-         *       migrate into index segments during overflow processing for
-         *       scale-out.
-         */
-        public boolean isLongLiteralAsBlob();
+        @Override
+        public boolean booleanValue() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public byte byteValue() {
+            return (byte) value;
+        }
+
+        @Override
+        public double doubleValue() {
+            return value;
+        }
+
+        @Override
+        public int intValue() {
+            return (int) value;
+        }
+
+        @Override
+        public long longValue() {
+            return (long) value;
+        }
+
+        @Override
+        public short shortValue() {
+            return (short) value;
+        }
+
+        @Override
+        public BigDecimal decimalValue() {
+            return BigDecimal.valueOf(value);
+        }
+
+        @Override
+        public BigInteger integerValue() {
+            return BigInteger.valueOf((long) value);
+        }
+
+        @Override
+        public String stringValue() {
+            return Double.toString(value);
+        }
         
+        public boolean equals(final Object o) {
+            if(this==o) return true;
+            if(o instanceof XSDDoubleInternalValue) {
+                return this.value == ((XSDDoubleInternalValue) o).value;
+            }
+            return false;
+        }
+        
+        /**
+         * Return the hash code of the double value.
+         * 
+         * @see Double#hashCode()
+         */
+        public int hashCode() {
+
+            final long t = Double.doubleToLongBits(value);
+
+            return (int) (t ^ (t >>> 32));
+
+        }
+
+    }
+
+    /** Implementation for inline <code>xsd:integer</code>. */
+    static public class XSDIntegerInternalValue<V extends BigdataLiteral> extends
+            AbstractDatatypeLiteralInternalValue<V, BigInteger> {
+        
+        private final BigInteger value;
+
+        public XSDIntegerInternalValue(final BigInteger value) {
+            
+            super(InternalDataTypeEnum.XSDInteger);
+
+            if (value == null)
+                throw new IllegalArgumentException();
+            
+            this.value = value;
+            
+        }
+
+        final public BigInteger getInlineValue() {
+
+            return value;
+            
+        }
+
+        @SuppressWarnings("unchecked")
+        public V asValue(final BigdataValueFactory f) {
+            // @todo factory should cache the XSD URIs.
+            return (V) f.createLiteral(value.toString(),//
+                    f.createURI(InternalDataTypeEnum.XSDInteger.getDatatype()));
+        }
+
+        @Override
+        final public long longValue() {
+            return value.longValue();
+        }
+
+        @Override
+        public boolean booleanValue() {
+            return value.equals(BigInteger.ZERO) ? false : true;
+        }
+
+        @Override
+        public byte byteValue() {
+            return value.byteValue();
+        }
+
+        @Override
+        public double doubleValue() {
+            return value.doubleValue();
+        }
+
+        @Override
+        public float floatValue() {
+            return value.floatValue();
+        }
+
+        @Override
+        public int intValue() {
+            return value.intValue();
+        }
+
+        @Override
+        public short shortValue() {
+            return value.shortValue();
+        }
+        
+        @Override
+        public String stringValue() {
+            return value.toString();
+        }
+
+        @Override
+        public BigDecimal decimalValue() {
+            return new BigDecimal(value);
+        }
+
+        @Override
+        public BigInteger integerValue() {
+            return value;
+        }
+
+        public boolean equals(final Object o) {
+            if (this == o)
+                return true;
+            if (o instanceof XSDIntegerInternalValue) {
+                return this.value.equals(((XSDIntegerInternalValue) o).value);
+            }
+            return false;
+        }
+
+        /**
+         * Return the hash code of the {@link BigInteger}.
+         */
+        public int hashCode() {
+            return value.hashCode();
+        }
+
+    }
+
+    /**
+     * Implementation for inline {@link UUID}s (there is no corresponding XML
+     * Schema Datatype).
+     */
+    static public class UUIDInternalValue<V extends BigdataLiteral> extends
+            AbstractDatatypeLiteralInternalValue<V, UUID> {
+        
+        private final UUID value;
+
+        public UUIDInternalValue(final UUID value) {
+            
+            super(InternalDataTypeEnum.UUID);
+
+            if (value == null)
+                throw new IllegalArgumentException();
+            
+            this.value = value;
+            
+        }
+
+        final public UUID getInlineValue() {
+            return value;
+        }
+
+        @SuppressWarnings("unchecked")
+        public V asValue(final BigdataValueFactory f) {
+            return (V) f.createLiteral(value.toString(), //
+                    f.createURI(InternalDataTypeEnum.UUID.getDatatype()));
+        }
+
+        @Override
+        final public long longValue() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean booleanValue() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public byte byteValue() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public double doubleValue() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public float floatValue() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int intValue() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public short shortValue() {
+            throw new UnsupportedOperationException();
+        }
+        
+        @Override
+        public String stringValue() {
+            return value.toString();
+        }
+
+        @Override
+        public BigDecimal decimalValue() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public BigInteger integerValue() {
+            throw new UnsupportedOperationException();
+        }
+
+        public boolean equals(final Object o) {
+            if(this==o) return true;
+            if(o instanceof UUIDInternalValue) {
+                return this.value.equals(((UUIDInternalValue) o).value);
+            }
+            return false;
+        }
+        
+        /**
+         * Return the hash code of the {@link UUID}.
+         */
+        public int hashCode() {
+            return value.hashCode();
+        }
+
     }
 
 }

@@ -159,7 +159,7 @@ public class KeyBuilder implements IKeyBuilder {
      *            The buffer reference is used directly rather than making a
      *            copy of the data.
      */
-    /*public*/ KeyBuilder(int len, byte[] buf) {
+    /*public*/ KeyBuilder(final int len, final byte[] buf) {
 
         this( null /* no unicode support*/, len, buf );
         
@@ -216,7 +216,7 @@ public class KeyBuilder implements IKeyBuilder {
      * Sets the position to any non-negative length less than the current
      * capacity of the buffer.
      */
-    final public void position(int pos) {
+    final public void position(final int pos) {
         
         if (len < 0 || len > buf.length) {
 
@@ -229,7 +229,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
-    final public IKeyBuilder append(int off, int len, byte[] a) {
+    final public KeyBuilder append(final int off, final int len, final byte[] a) {
         
         ensureFree(len);
         
@@ -326,7 +326,7 @@ public class KeyBuilder implements IKeyBuilder {
 //        
 //    }
     
-    final public IKeyBuilder reset() {
+    final public KeyBuilder reset() {
         
         len = 0;
         
@@ -358,9 +358,9 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    final public IKeyBuilder append(String s) {
+    final public KeyBuilder append(final String s) {
         
-        if(sortKeyGenerator==null) {
+        if (sortKeyGenerator == null) {
          
             // Force ASCII semantics on the Unicode text.
             
@@ -389,7 +389,7 @@ public class KeyBuilder implements IKeyBuilder {
      * Non-optional operations.
      */
     
-    public IKeyBuilder appendASCII(String s) {
+    public KeyBuilder appendASCII(final String s) {
         
         int len = s.length();
         
@@ -524,7 +524,7 @@ public class KeyBuilder implements IKeyBuilder {
 
     }
     
-    public IKeyBuilder appendText(String text, final boolean unicode,
+    public KeyBuilder appendText(String text, final boolean unicode,
             final boolean successor) {
 
         // current length of the encoded key.
@@ -622,13 +622,13 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
-    final public IKeyBuilder append(final byte[] a) {
+    final public KeyBuilder append(final byte[] a) {
         
         return append(0, a.length, a);
         
     }
     
-    final public IKeyBuilder append(double d) {
+    final public KeyBuilder append(double d) {
         
         // performance tweak.
         if (len + 8 > buf.length) ensureCapacity(len+8);
@@ -664,7 +664,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    final public IKeyBuilder append(float f) {
+    final public KeyBuilder append(float f) {
 
         // performance tweak.
         if (len + 4 > buf.length) ensureCapacity(len+4);
@@ -699,7 +699,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
-    final public IKeyBuilder append(final UUID uuid) {
+    final public KeyBuilder append(final UUID uuid) {
 
         if (len + 16 > buf.length) ensureCapacity(len+16);
 
@@ -711,7 +711,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
-    final public IKeyBuilder append(long v) {
+    final public KeyBuilder append(long v) {
 
         // performance tweak adds .3% on rdfs bulk load.
         if (len + 8 > buf.length) ensureCapacity(len+8);
@@ -753,6 +753,8 @@ public class KeyBuilder implements IKeyBuilder {
      * 
      * @return The value that will impose the lexiographic ordering as an
      *         unsigned long integer.
+     * 
+     * @todo This is unused and untested.
      */
     static final /*public*/ long encode(long v) {
 
@@ -770,7 +772,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    final public IKeyBuilder append(int v) {
+    final public KeyBuilder append(int v) {
 
         // performance tweak.
         if (len + 4 > buf.length) ensureCapacity(len+4);
@@ -798,7 +800,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    final public IKeyBuilder append(short v) {
+    final public KeyBuilder append(short v) {
 
         // performance tweak.
         if (len + 2 > buf.length) ensureCapacity(len+2);
@@ -845,7 +847,7 @@ public class KeyBuilder implements IKeyBuilder {
 //        
 //    }
 
-    final public IKeyBuilder appendUnsigned(final byte v) {
+    final public KeyBuilder appendUnsigned(final byte v) {
 
         // performance tweak
         if (len + 1 > buf.length) ensureCapacity(len+1);
@@ -857,7 +859,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    final public IKeyBuilder append(final byte v) {
+    final public KeyBuilder append(final byte v) {
 
         // performance tweak
         if (len + 1 > buf.length) ensureCapacity(len+1);
@@ -913,7 +915,7 @@ public class KeyBuilder implements IKeyBuilder {
 //        
 //    }
     
-    final public IKeyBuilder appendNul() {
+    final public KeyBuilder appendNul() {
 
 //        return append(0);
         
@@ -927,7 +929,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    public IKeyBuilder append(final BigInteger i) {
+    public KeyBuilder append(final BigInteger i) {
 
         // Note: BigInteger.ZERO is represented as byte[]{0}.
         final byte[] b = i.toByteArray();
@@ -1016,7 +1018,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
-    public IKeyBuilder append(final Object val) {
+    public KeyBuilder append(final Object val) {
         
         if (val == null) {
 
@@ -1238,6 +1240,28 @@ public class KeyBuilder implements IKeyBuilder {
     }
 
     /**
+     * Decode a {@link UUID} as encoded by {@link #append(UUID)}.
+     * 
+     * @param buf
+     *            The buffer containing the encoded key.
+     * @param off
+     *            The offset at which to decode the key.
+     *            
+     * @return The decoded {@link UUID}.
+     */
+    static public UUID decodeUUID(final byte[] buf, int off) {
+
+        final long msb = decodeLong(buf, off);
+
+        off += 8;
+
+        final long lsb = decodeLong(buf, off);
+
+        return new UUID(msb, lsb);
+
+    }
+
+    /**
      * Decodes a signed int value as encoded by {@link #append(int)}.
      * 
      * @param buf
@@ -1336,6 +1360,12 @@ public class KeyBuilder implements IKeyBuilder {
 
         final int tmp = KeyBuilder.decodeShort(key, offset);
 
+        /*
+         * Note: The signum is thrown away when we decode the runLength field.
+         * Signum is actually in the key twice: once in the runLength to put the
+         * BigInteger values into total order and once in the representation of
+         * the BigInteger as a byte[].
+         */
         final int runLength = tmp < 0 ? -tmp : tmp;
         
         final byte[] b = new byte[runLength];
@@ -1426,7 +1456,7 @@ public class KeyBuilder implements IKeyBuilder {
         /**
          * Optional string property whose value is one of the type safe
          * {@link DecompositionEnum}s. The default decomposition mode will be
-         * overriden on the collator one is explicitly specified using this
+         * overridden on the collator one is explicitly specified using this
          * property.
          * 
          * @see DecompositionEnum
