@@ -30,8 +30,9 @@ package com.bigdata.rdf.internal;
 import com.bigdata.rdf.lexicon.ITermIdCodes;
 
 /**
- * Class with static methods for interpreting and setting the bit flags used to
- * identify the type of an RDF Value (URI, Literal, Blank Node, SID, etc).
+ * Value Type Enumeration (VTE) is a class with methods for interpreting and
+ * setting the bit flags used to identify the type of an RDF Value (URI,
+ * Literal, Blank Node, SID, etc).
  * 
  * @todo This replaces {@link ITermIdCodes}.
  * 
@@ -41,19 +42,24 @@ import com.bigdata.rdf.lexicon.ITermIdCodes;
  *       prefix to differentiate URI vs Literal vs BNode vs SID and to indicate
  *       the inline value type (termId vs everything else).
  */
-public enum InternalValueTypeEnum {
+public enum VTE {
 
     /** A URI. */
     URI((byte) 0x00),
+    
     /** A blank node. */
     BNODE((byte) 0x01),
+    
     /** A literal. */
     LITERAL((byte) 0x02),
+
     /** A statement identifier. */
     STATEMENT((byte) 0x03);
 
-    private InternalValueTypeEnum(final byte flags) {
+    private VTE(final byte flags) {
+
         this.v = flags;
+        
     }
 
     /**
@@ -63,14 +69,14 @@ public enum InternalValueTypeEnum {
     final byte v;
 
     /**
-     * Return the {@link InternalValueTypeEnum} identified by the LOW TWO (2)
+     * Return the {@link VTE} identified by the LOW TWO (2)
      * bits in the caller's value.
      * 
      * @param b
      *            The bit flags.
-     * @return The corresponding {@link InternalValueTypeEnum}.
+     * @return The corresponding {@link VTE}.
      */
-    static public InternalValueTypeEnum valueOf(final byte b) {
+    static public VTE valueOf(final byte b) {
         /*
          * Note: Java does not permit the construct URI.v in the cases of the
          * switch (it is not interpreted as a constant). Therefore the switch

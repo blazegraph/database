@@ -14,7 +14,7 @@ public class XSDShortInternalValue<V extends BigdataLiteral> extends
 
     public XSDShortInternalValue(final short value) {
         
-        super(InternalDataTypeEnum.XSDShort);
+        super(DTE.XSDShort);
         
         this.value = value;
         

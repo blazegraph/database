@@ -1,0 +1,607 @@
+These are my notes on the lexicon refactor.
+
+       #5. Order preserving coding in the statement indices together
+           with less data stored in the lexicon and exploiting that
+           information in FILTERs (range queries, value tests, etc).
+           This should be a lexicon option in case people want to have
+           exact lexical values preserved.  The data type would be
+           preserved so an xsd:int and an xsd:long would not compare
+           as EQ unless they were coerced to the same data type during
+           query (such coercion would require running against the
+           value range for each source data type convertable to the
+           target data type).
+
+	   There are complex issues involving xsd:decimal (BigDecimal)
+	   and xsd:integer (BigInteger).  These have very large
+	   ranges.  Making them into inline values would require a
+	   variable length component for the "termId", which in turn
+	   makes it more complex to form and decode the statement
+	   index keys.
+
+	   Long literals should be supported as transparently
+	   compressed blobs to get the data out of the index.  This
+	   raises the question of just where to store those
+	   blobs. This is the same issue for BFS or key-blob stores.
+	   Basically, we need to dump them into the local file system
+	   in a directory structure parallel to the journals and
+	   segments.  If we move a shard, we also need to move the
+	   blobs.  Note that there are relatively low limits on the
+	   #of files/subdirectories in a directory for many operating
+	   systems.
+
+	   - Verify key component decode with variable length keys.
+
+	   - Add smart separator key selection for the ID2TERM index?
+
+	   - We can not inline plain text or language code literals
+             unless the ASCII option was specified.  Ditto for URIs.
+             This is because we can not decode Unicode sort keys.
+
+	   - Use raw records and an IOverflowHandler to move large
+             literals out of the ID2TERM index.  Likewise, we should
+             probably not register large literals in the TERM2ID
+             index.  However, they could still be indexed, e.g., free
+             text indexing or XML literal indexing. [One problem with
+             not entering them into the TERM2ID index is that we can
+             get duplicate entries.  Perhaps we should enter the MD5
+             signature of the long literal, which is 128 bytes, as the
+             key.  Those keys should all be in their own prefix space
+             for long literals.]
+
+	   - Take notes on the changes to the physical schema in order
+             to support a port of data.  However, the easiest way to
+             do a port is to not break the existing schema and allow
+             people to export/import into a different triple store
+             relation in the same database.  Even easier is export /
+             import into a new database instance.
+
+	   - Figure out how to generate an unsigned byte[] coding of
+             BigInteger and BigDecimal.  Is this possible?  Who can
+             even answer this question?
+
+valueTypeBits byte[] (0x00 run-length) dataTypeId (scale)
+
+valueTypeBits: {URI, BlankNode, Literal, Numeric, SID}.  Also inline
+	        literal vs short blob vs large blob, so we need
+	        perhaps 4 bits.  What about dates?
+
+byte[] is the unsigned byte[] encoding of the numeric value (how is
+       the signum bit to be handled?)  All numeric data types which
+       can be converted by casting need to be mapped onto the same
+       part of the value space (Numeric).  We would then do a key
+       range scan of the statement index in the desired region of the
+       value space and filter by the dataTypeId if the query did not
+       use a cast.
+
+Things for which we generate termIds are inlined as:
+
+valueTypeBits termId
+
+and appear in a different part of the value space.
+
+    ----------
+
+Design two: Since we can not decode the byte[] above, this design uses
+the dataTypeId up front and uses the natural coding for each Numeric
+or Date value space.  This is decodable.  However, one consequence is
+that queries which use a cast on a Numeric literal must use a union
+across all datatypes for which the cast could produce a legal answer.
+
+valueTypeBits dataTypeId bytes
+
+valueTypeBits Double byte[8]
+valueTypeBits Long byte[8]
+valueTypeBits BigInteger run-length byte[]
+valueTypeBits BigDecimal (precision-scale) run-length byte[]
+valueTypeBits dataTypeId byte[] (0x00 run-length) (scale)
+
+? What about XMLGregorianCalander?
+
+? What about coding geo:point?  What is its natural sort order? Does
+  not have one.
+
+=========================
+
+There are several wrinkles to proper handling of datatype literals,
+some of which only apply when we choose to inline those literals into
+the statement indices.  In general, this would result in statement
+indices with variable length keys and the SPO class would have to be
+modified to correctly decode datatype literals when they were inlined
+within the key.  
+
+The biggest single initial win will be not having to indirect through
+the lexicon to resolve xsd:int, xsd:float, xsd:double, etc.  This will
+have a huge impact for aggregations.  A secondary win, and something
+which can be phased in over time, is the ability to do range queries
+against datatype values.  For example, 50 < AGE < 60.  Today, the
+filter is applied after the solutions have been identified.  Once we
+inline numeric datatypes into the statement indices (and modulo issues
+surrounding casts and filters) these queries could also be evaluated
+against the desired key-range of the statement indices.  This
+optimization can be approached incrementally because the existing
+approach (filtering the solutions) will continue to work correctly.
+
+Issues arise with:
+
+- datatypes which have long representations (xsd:integer,
+  xsd:decimal). It appears that we can handle both xsd:integer and
+  xsd:decimal inline.  Therefore it would be reasonable to either
+  represent all literals having numeric values in a single value space
+  -or- represent all values for each each numeric datatype within its
+  own region by using a prefix to separate the keys accordinging to
+  the numeric data type.  The advantage of the former is we can filter
+  by data type in a single scan across all numeric values.  The
+  advantage of the latter is that we can represent the values more
+  tersely since we do not need to convert everything to xsd:decimal
+  before encoding it as an unsigned byte[] key component.  The second
+  approach requires us to query the union of the numeric datatype key
+  spaces when a cast is used in the query but will be much faster if
+  no cast is used.  [We are still looking into the xsd:decimal mapping
+  onto keys, but this appears to be simpler than mapping BigDecimal
+  since xsd:decimal DOES NOT maintain any information about the
+  precision of the value.  Representing the precision would require us
+  to carry the original scale in the value associated with the tuple
+  in the statement index while the key coded the value space.]
+
+- geospatial datatypes.  these need to be mapped onto a spatial index.
+  the statement would just use the termId of the literal representing
+  the point, rectangle, or generalized shape of the extent.  Since we
+  are assigning a termId in the lexicon, we can add geospatial indices
+  later without changing anything in the existing indices.
+
+- datatypes which correspond to durations.  I am open to suggestions
+  here.  This might be handled in a manner similar to spatial data
+  types or by using temporal reasoners.  Either way, we would store
+  the termId in the statement index.  We would have to recognize when
+  a query was addressing a one-dimensional data type for which we
+  lacked a key range index scan and handle it as we handle all queries
+  today (by resolving the lexical values from the id2term index and
+  then filtering for GT, LT, or EQ).
+
+- Infinately repeating intervals, e.g., the 5th day of each month.  We
+  can't really code such things into a spatial index since it would
+  require an infinite number of bands on the index.  I am thinking
+  that temporal reasoners are the only real solution here.
+
+- dateTime. There is no XML schema datatype which corresponds to an
+  unambiguous timeOnTimeline value.  Something similar can be derived
+  from xsd:dateTime.  In order to also preserve the timezone we would
+  have to encode that in the value associated with the statement
+  tuple.  [Alternatively, we could encode all spatial and/or temporal
+  information in spatial indices, in which case the original Literal
+  is stored in the id2term index, however the dateTime still needs to
+  be unambiguous.]
+
+- Long and very long literals.  these should be taken out of the
+  id2term index and put into raw record blobs which are then flowed
+  into the index segments for scale-out (long literals, e.g., up to a
+  few mb) or an addressible file system abstraction (very long
+  literals).  regardless of how we handle the literal, the statement
+  index would use a termId value for the literal.  Since some literals
+  can not reasonably be represented inline in the statement indices,
+  none of the literals can be represented inline and we can not
+  perform key-range scans on the statement indices for plain or
+  language code literals.
+
+- xml literals. per long and very long literals.  one would expect to
+  do additional indexing on the XML blobs at some point, but that is
+  beyond where we are today.
+
+- extensible data types.  I think that there are easy and hard cases
+  in this category.  Some interesting examples might be custom
+  indexing for genomics data.
+
+This will require that Literal#equals(Object) be implemented such that
+representations of the same point in the value space are equals
+without regard to their lexical form.  Comparison operators must
+likewise respect the total ordering of the value spaces within each of
+the data type literals (or across all of them if we choose to
+interleave the value spaces for all numeric types, which I am inclined
+NOT to do).  Literal#stringValue() might be a lazy method to avoid
+overhead if we wrap an inline literal from a statement index as a
+Literal.
+
+One thing that we should do is mark which datatypes are inline and
+assign unique codes for those data types (reserving either one or two
+bytes for that information and using it to create partitions in the
+key space for the inlined values).  This will provide a declarative
+mechanism for the query processor so that it can understand when a
+filter can be mapped onto a key-range scan of a statement index.  This
+could be part of the state serialized into the global row store. An
+open question is whether and how to indicate relationships among the
+inline datatypes.
+
+Bryan
+
+    ----------
+
+At this time, literals can only appear in the Object position of an
+RDF statement.  This limits the scope of the proposed change to the
+ISPO#o() method, the SPO#o public field, and the ISPO#get(int slot)
+method.  However, these changes will still cause a lot of distruption
+as we break the assumption that the statement index keys consist
+solely of term identifiers.
+
+Open questions:
+
+- How to represent a statement key component which is not a term
+  identifier?  Maybe we want to inline only those values which can fit
+  into a long and use the high bits to differentiate, interleave all
+  the numeric values except for BigInteger and BigDecimal since their
+  representations are too long.  We can immediately benefit from
+  inlining [but this requires an additional byte per object] IF we
+  restrict our goals to fast resolution of numeric literals rather
+  than range-based query of statement indices.  If we also disable
+  BigInteger and BigDecimal when values are being inlined key-range
+  queries on OSP(C).
+
+  We need to create an interface / object for the internal
+  representation of the RDF Value, e.g., RDFValueInternal or VI.  This
+  has been a long termId up to now.  With this generalization, it can
+  still be a termId (URIs, literals), the termId could be more than 64
+  bits (if more partitions could be created), it can directly encode a
+  boolean, char, short, int, long, BigInteger, etc.  It could even
+  encode short literals directly.  We need an isTermId() method.  When
+  false, the RDF Value is expressed inline.  When it is inline (not a
+  termId), asValue() will skin the object as a BigdataValue.
+
+  - Move the flag bits into a high byte (in addition to the long
+    termId).  This will cluster URIs and Literals in their own parts
+    of the lexicon.  It will also increase the maximum #of URIs, plain
+    or language code literals, XML literals, SIDs, etc. allowed in the
+    lexicon significantly.
+
+  - Add an inline bit?  When inlining is enabled, some values will
+    always be inlined (boolean, char, short, int, float, long, double,
+    etc).  However, an inline bit would let us differentiate this at
+    runtime based solely on the VI state.  This could be useful for
+    inlining short plain text or language code literals.
+    
+      - Except for the inability to decode a Unicode sort key, we
+        could then support a mode which inlined everything [we could
+        do this anyway if we wanted to tolerate the redundancy of the
+        data in the statement tuple value or if we restricted
+        ourselves to ASCII].
+
+  - Backward compatible mode where flags are in the low bits of the
+    termId and we extract them to the flags byte in decode?  Or just
+    break with the past?
+
+  - Inline blank nodes? (16 bytes).
+
+  - Inlining all values for a datatype makes it possible to translate
+    LT/GT style filters into OSP(C) key-range queries when casts are
+    not used.
+
+  - Inlining all numeric datatypes makes it possible to OSP(C) queries
+    when casts are used. Otherwise, we can not translate a LT / GT
+    style FILTERs into a key-range query.
+
+  - Handle better coding of URIs (scheme, reversed dns components,
+    path component compression)?
+
+  - Join processing must handle IConstant<X> differently for term
+    identifiers and inline literal values.
+
+SPOKeyOrder#encodeKey() : These methods should determine the #of key components based on isQuads()/getKeyArity()
+SPOKeyOrder#decodeKey()
+
+LexiconKeyBuilder - Review this class and then drop it.  It was an
+		    alternative proposal for native datatype handling.
+
+ISPO#o()
+ISPO#get(int index)
+
+SPO#o()
+SPO(s,p,o)
+SPO(s,p,o,c)
+SPO(s,p,o,type)
+SPO(s,p,o,c,type)
+SPO(s,p,o) w/ IConstant<Long> arguments.
+SPO(IPredicate<ISPO>) handling of o.
+SPO(BigdataStatement) handling of o.
+SPO#hashCode() The o hash component is based on the decoded point in the value space?
+SPO#compareTo(ISPO) Must order the o within the value space and also put the value spaces into some order.
+SPO#equals(ISPO) Uses o == foo.o(), but must test 
+
+ITermIdCodes - Must specify inline and long literal flag bits.  Might
+	       also specify how the datatype code is represented.
+	       Update the javadoc since no longer the low bits of the
+	       term identifier.  The TERM2ID index write procedure
+	       should continue to return 64-bit long integers since
+	       the caller can decorate them with the appropriate flags
+	       (is this also true for long literals which get written
+	       onto raw records?)
+
+ITermIndexCodes - This partitions the TERM2ID index using a one byte
+		  prefix.  This probably does not need to be changed.
+
+KVOTermIdComparator - No change.  This is only used for operations on
+		      the lexicon so it will only see term identifiers
+		      rather than inline values.
+
+LexiconRelation - RDF values which can be inlined should be handled
+		  differently. Also, we need to pass around
+		  collections of TermId or InternalValue objects, not
+		  Longs.
+
+TermIdEncoder - drop setFields() since the RDF Value type flags are
+	        now in a header byte.
+		
+		? Modify to use the sign bit from the partition local
+		counter and/or the partition identifier?  Right now we
+		do not roll those counters around to negative values,
+		but doing so would allow us to have 4x as many term
+		identifiers in the lexicon (2^32 vs 2^30).
+
+TermAdvancer - How do we form the successor for the TermAdvancer?  Is
+	       this a fixed length bit string successor or do we
+	       decode the Statement and then get the successor() of
+	       the appropriate RDF Value (the s,p,o, or c).
+
+
+IRawTripleStore
+#addTerm(Value):long
+#getTerm(long id):Value - this is fine as far as it goes, but it is a special case now.
+#getTermId(Value):long - should probably return an InternalValue.  Look at callers.
+#getAccessPath(...) - Redirect callers to SPORelation#getAccessPath()? Or just refactor to use InternalValue rather than long?
+#toString(long,...) - these use be changed to use InternalValues.
+
+AbstractTripleStore#
+isURI(), isLiteral(), isBNode(), isSID() - these static methods could
+		      be colocated on InternalValue with isTermId() etc.
+
+... Finish this survey of places where the code would have to change.
+    Especially, locate all code which encodes or decodes the keys for
+    the statement indices.
+
+BigdataStatement
+SPOTupleSerializer#statement2Key(s,p,o)
+
+Various SPO comparators.
+
+SPOPredicate
+
+...
+
+BaseAxioms
+
+========================================
+
+
+The current xsd:integer coding uses 2 bytes (less the signum bit) for
+the run length of the encoded BigInteger value.  This is pragmatic
+since that would be a key component which is 32k long, and that is
+getting to the point where you do not want to be putting those things
+into the keys of the index.  I will add some code to catch very large
+xsd:integer and xsd:decimal values and refuse to generate keys for
+them.
+
+I think that we should handle very long literals specially.  Probably
+we should put them into raw journal records and store them under their
+MD5 hash code (that is 128 bits and collisions are exceedingly rare)
+in the TERM2ID index.  This change would not effect the termIds as
+such, but rather than keys for the TERM2ID index (we would add a
+prefix code for very long literals there) and the values for the
+ID2TERM index (we would have a bit flag indicating that the value was
+a blog reference which needed to be dereferenced by reading on an
+appropriate record).  This change could handle literals of up to
+several MB in size.  Of course, this also presents a challenge for
+Literal#equals(Literal) for your clients.
+
+I have already mapped out support for this kind of blob reference for
+both standalone and scale-out, so there is nothing extra to do there.
+Just a little bit of work in how we write on and read from the TERM2ID
+and ID2TERM indices respectively.  I am pretty sure that this change
+would not break either the code or the data.
+
+
+============================================================
+
+I have been thinking about how to handle extensibility. I've
+considered several approaches.  Here is the one that I like the best.
+It is focused on providing extensibility for datatypes whose natural
+ordering corresponds to one of a set of built-in datatypes and allows
+for other datatypes to be projected onto the value space of those
+built-in types.
+
+We currently have 14 built-in (or intrinsic) data types, each of those
+types has a natural order which we can encode and decode from the
+B+Tree key:
+
+       xsd:boolean, xsd:byte, xsd:short, xsd:int, xsd:long,
+       xsd:unsignedByte, xsd:unsignedShort, xsd:unsignedInt,
+       xsd:unsignedLong, xsd:float, xsd:double, xsd:integer
+       xsd:decimal, and bd:UUID.
+
+This proposal relies on there being a very limited number of
+interesting codings for things since we have only 4 bits for to code
+the natural order of the value space, which is just 16 distinctions.
+Given that we have 14 intrinsic data types, that leaves room for just
+two more.  For example, we could use one bit for short character data
+types and reserve one for extensibility in the framework itself.
+
+My proposal is that we frame the inline values and term identifiers as
+follows:
+
+flags: (totals one byte).
+[valueType]: 2 bits
+[inline] : 1 bit
+[dataTypeId] : 1 bit
+[dataTypeCode] : 4 bits
+
+valueType : These 2 bits distinguish between URIs, Literals, Blank
+	    Nodes, and statement identifiers (SIDs).  These bits are
+	    up front and therefore partition the key space first by
+	    the RDF Value type.
+
+inline : This bit indicates whether the value is inline or represented
+	 by a term identifier in the key.  This bit is set based on
+	 how a given triple store or quad store instance is
+	 configured.  However, because the bit is present in the
+	 flags, we know how to decode the key without reference to the
+	 store configuration metadata.
+
+dataTypeId : This bit is set based on whether or not the datatype URI
+	     in the source Literal is one of those that we handle as
+	     an "extended" data type rather than one of those that we
+	     handle as an intrinsic data type.  The bit is not used if
+	     the value is not being inlined.  This bit partitions the
+	     key space into the intrinsic data types and the extended
+	     data types.
+
+	     When true, this bit signals that the term identifier for
+	     the datatype URI will follow in the next 8 bytes.  When
+	     false, the datatype URI is directly recoverable from the
+	     [dataTypeCode].
+	     
+	     Note: there can be more than one URI for the same XSD
+	     datatype (there is more than one accepted namspace - see
+	     [1]).  I propose that we collapse these by default onto a
+	     canonical datatype URI.
+	     
+dataTypeCode : These 4 bits indicate the natural value space for the
+	       inline value.
+
+	       Note: These bits partition the key space.  However,
+	       because the [dataTypeId] bit comes first, we will not
+	       interleave inline values for intrinsic and extended
+	       data types having the same dataTypeCode.
+
+	       Note: This design differs from the prior suggestion by
+	       keeping the dataTypeCode for all literals, even when we
+	       are not inlining that literals.
+
+	       Note: The dataTypeCode 0xf is reserved for extending
+	       the set of intrinsic data types.  When the code is 0xf
+	       the next byte must be considered as well to determine
+	       the actual intrinsic data type code.
+
+	---------- byte boundary ----------
+
+If [dataTypeId] was true, then the next 8 bytes are the term
+identifier for the data type URI and the key space will be partitioned
+based on the extended data type URI.  Otherwise this field is not
+present.  When present, this is the term identifier for the actual
+datatype URI used in the RDF Literal.
+
+       ---------- byte boundary ----------
+
+The unsigned byte[] representation of the value in the value space for
+one of the intrinsic types.  The length of this byte[] may be directly
+determined from the [dataTypeCode] for most data types.  However, for
+xsd:integer and xsd:decimal, the length is part of the representation.
+
+       ---------- byte boundary ----------
+
+Extensibility example: 
+
+For example, if you have define a <code>bd:millis</code> data type
+representing milliseconds since the epoch, then the value space of
+that data type can be projected onto a long integer, so we would
+specify the dataTypeId as the term identifier for bd:milliseconds and
+the dataTypeCode for xsd:long.
+
+FYI, the short character code problem is a bit tricky.  I am open to
+ideas here.  The basic issue is that Unicode does not have a natural
+order unless you generate a Unicode sort key from the Unicode string
+(applying an appropriate collation to do so).  So, the easy ASCII
+trick of an N character string with a leading byte to give the run
+length does not work for Unicode, or at least it does not provide a
+natural sort order.  However, we could probably inline Unicode strings
+using a sequence of 2 byte characters in a manner which does not
+preserve the natural order of the value space.  This might be great
+for things like state codes.  It's use would have to be restricted to
+"extended" data types since we can't code some plain text literals one
+way and some the other, but we can choose a specialized coding for an
+extended datatype. [In fact, there are more Unicode code points than
+can be fit into 2-bytes, so this is just an updated version of the
+ASCII hack.]
+
+One reconcilation for extensibility which covers (a) data types which
+project onto intrinsic data types; and (b) enumerated data types is to
+handle them both by registering the extension type against a special
+index and allowing that registration to specify the set of legal
+values.  We could map the enumeration onto a byte (256), short (64k)
+or int (LOTS) as appropriate.  64k values seems like a reasonable
+upper bound for enumerations.  There would also have to be a method as
+part of the extensible type registration which knows how to
+materialize an RDF Value from the inline representation of either an
+enumerated data type.  For a extensible data type which is being
+projected onto an intrinsic data type we would need both (a) a method
+to project the RDF Value onto the appropriate intrinsic data type; and
+(b) a method to materialize an RDF Value from the inline
+representation.  Note that both projected and enumerated extensible
+data types could map many RDF Values onto the same internal value but
+each internal value must map onto a single RDF Value (materialization
+must be deterministic).
+
+This would potentially let people exploit XSD validation for
+enumerations while coding them tightly into the statement indices.  If
+we put the registrations into their own index, then we could use a
+more compact representation (the term identifier of the datatype URI
+is 8 bytes, but we could do with 2 or 4 bytes).  Alternatively, we
+could use the LongPacker to pack an unsigned long integer into as few
+bytes as possible.  This would break the natural ordering across the
+dataTypeIds, but I can not see how that would matter since the term
+identifiers are essentially arbitrary anyway so their order has little
+value.
+
+[1] http://www.w3.org/TR/xmlschema-2/#namespaces
+
+============================================================
+
+Note: appendUnsigned(byte v) already exists.  However, the rest of
+these methods are new and ALL of them need unit tests.  Also, consider
+passing in a data type with more bits to avoid problems with handling
+unsigned values in a signed data type.
+
+    final public KeyBuilder appendUnsigned(final long v) {
+
+        // performance tweak
+        if (len + 8 > buf.length) ensureCapacity(len+8);
+        // ensureFree(1);
+
+        // big-endian.
+        buf[len++] = (byte)(v >>> 56);
+        buf[len++] = (byte)(v >>> 48);
+        buf[len++] = (byte)(v >>> 40);
+        buf[len++] = (byte)(v >>> 32);
+        buf[len++] = (byte)(v >>> 24);
+        buf[len++] = (byte)(v >>> 16);
+        buf[len++] = (byte)(v >>>  8);
+        buf[len++] = (byte)(v >>>  0);
+
+        return this;
+        
+    }
+
+    final public KeyBuilder appendUnsigned(final int v) {
+
+        // performance tweak
+        if (len + 4 > buf.length) ensureCapacity(len+4);
+        // ensureFree(1);
+
+        // big-endian
+        buf[len++] = (byte)(v >>> 24);
+        buf[len++] = (byte)(v >>> 16);
+        buf[len++] = (byte)(v >>>  8);
+        buf[len++] = (byte)(v >>>  0);
+
+        return this;
+        
+    }
+
+    final public KeyBuilder appendUnsigned(final short v) {
+
+        // performance tweak
+        if (len + 2 > buf.length) ensureCapacity(len+2);
+        // ensureFree(1);
+
+        // big-endian
+        buf[len++] = (byte)(v >>>  8);
+        buf[len++] = (byte)(v >>>  0);
+        
+        return this;
+        
+    }

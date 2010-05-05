@@ -18,7 +18,7 @@ public class UUIDInternalValue<V extends BigdataLiteral> extends
 
     public UUIDInternalValue(final UUID value) {
         
-        super(InternalDataTypeEnum.UUID);
+        super(DTE.UUID);
 
         if (value == null)
             throw new IllegalArgumentException();
@@ -34,7 +34,7 @@ public class UUIDInternalValue<V extends BigdataLiteral> extends
     @SuppressWarnings("unchecked")
     public V asValue(final BigdataValueFactory f) {
         return (V) f.createLiteral(value.toString(), //
-                f.createURI(InternalDataTypeEnum.UUID.getDatatype()));
+                f.createURI(DTE.UUID.getDatatype()));
     }
 
     @Override

@@ -19,7 +19,7 @@ public class XSDFloatInternalValue<V extends BigdataLiteral> extends
 
     public XSDFloatInternalValue(final float value) {
         
-        super(InternalDataTypeEnum.XSDFloat);
+        super(DTE.XSDFloat);
         
         this.value = value;
         

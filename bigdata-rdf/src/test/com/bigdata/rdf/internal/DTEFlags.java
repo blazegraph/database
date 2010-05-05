@@ -33,7 +33,7 @@ package com.bigdata.rdf.internal;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @see InternalDataTypeEnum
+ * @see DTE
  */
 public interface DTEFlags {
 

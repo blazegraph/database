@@ -39,6 +39,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
  * Unit tests for encoding and decoding compound keys (such as are used by the
@@ -51,6 +52,14 @@ import com.bigdata.rdf.model.BigdataValue;
  * 
  * @todo Code SIDs using a term identifier, UUID, or secure hash function? The
  *       latter two choices are inline options. The former is not.
+ * 
+ * @todo support xsd:decimal coding in KeyBuilder by discarding the precision
+ *       and only retaining the scale information. We need to record both the
+ *       signum and the scale, and the scale needs to be adjusted to normalize
+ *       for either zero or one digits before the decimal. This is nearly the
+ *       same coding as {@link BigInteger} except that scale is not quite the
+ *       same as runLength (it is runLength base 10, not base 256) so there
+ *       might be fence posts there too.
  * 
  *       FIXME Finish these unit tests for all data types [xsd:decimal], and
  *       unsigned byte, short, int and long. For the unsigned values, I need to
@@ -77,24 +86,24 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     }
 
     /**
-     * Unit test for {@link InternalValueTypeEnum} verifies that the
+     * Unit test for {@link VTE} verifies that the
      * correspondence between the enumerated types and the internal values is
      * correct (self-consistent).
      */
     public void test_VTE_selfConsistent() {
        
-        for(InternalValueTypeEnum e : InternalValueTypeEnum.values()) {
+        for(VTE e : VTE.values()) {
 
             assertTrue("expected: " + e + " (v=" + e.v + "), actual="
-                    + InternalValueTypeEnum.valueOf(e.v),
-                    e == InternalValueTypeEnum.valueOf(e.v));
+                    + VTE.valueOf(e.v),
+                    e == VTE.valueOf(e.v));
 
         }
         
     }
     
     /**
-     * Unit test for {@link InternalValueTypeEnum} verifies that all legal byte
+     * Unit test for {@link VTE} verifies that all legal byte
      * values decode to an internal value type enum (basically, this checks that
      * we mask the two lower bits).
      */
@@ -102,24 +111,24 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
         for (int i = Byte.MIN_VALUE; i <= Byte.MAX_VALUE; i++) {
             
-            assertNotNull(InternalValueTypeEnum.valueOf((byte) i));
+            assertNotNull(VTE.valueOf((byte) i));
             
         }
         
     }
 
     /**
-     * Unit test for {@link InternalDataTypeEnum} verifies that the
+     * Unit test for {@link DTE} verifies that the
      * correspondence between the enumerated types and the internal values is
      * correct.
      */
     public void test_DTE_selfConsistent() {
 
-        for(InternalDataTypeEnum e : InternalDataTypeEnum.values()) {
+        for(DTE e : DTE.values()) {
 
             assertTrue("expected: " + e + " (v=" + e.v + "), actual="
-                    + InternalDataTypeEnum.valueOf(e.v),
-                    e == InternalDataTypeEnum.valueOf(e.v));
+                    + DTE.valueOf(e.v),
+                    e == DTE.valueOf(e.v));
 
             assertEquals(e.v, e.v());
 
@@ -136,16 +145,16 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
         final Random r = new Random();
         
-        for(InternalValueTypeEnum vte : InternalValueTypeEnum.values()) {
+        for(VTE vte : VTE.values()) {
 //        InternalValueTypeEnum vte = InternalValueTypeEnum.BNODE;
 //        {
 
-            for(InternalDataTypeEnum dte : InternalDataTypeEnum.values()) {
+//            for(DTE dte : DTE.values()) {
 
                 // 64 bit random term identifier.
                 final long termId = r.nextLong();
 
-                final TermId<?> v = new TermId<BigdataValue>(vte, dte, termId);
+                final TermId<?> v = new TermId<BigdataValue>(vte, termId);
 
                 assertTrue(v.isTermId());
 
@@ -168,7 +177,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                 
                 assertEquals("flags="+v.flags(), vte, v.getInternalValueTypeEnum());
 
-                assertEquals(dte, v.getInternalDataTypeEnum());
+//                assertEquals(dte, v.getInternalDataTypeEnum());
 
                 switch(vte) {
                 case URI:
@@ -199,10 +208,126 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                     fail("vte=" + vte);
                 }
 
-            }
+//            }
             
         }
         
+    }
+
+    public void test_InlineValue() {
+
+        final Random r = new Random();
+
+        for (VTE vte : VTE.values()) {
+
+            if (vte.equals(VTE.URI)) {
+                // We do not inline URIs.
+                continue;
+            }
+
+            for (DTE dte : DTE.values()) {
+
+//                // 64 bit random term identifier.
+//                final long termId = r.nextLong();
+
+                final InternalValue<?, ?> v = new AbstractInternalValue(vte,
+                        true/* inline */, false/* extension */, dte) {
+
+                    @Override
+                    public boolean equals(Object o) {
+                        if (this == o)
+                            return true;
+                        return false;
+                    }
+
+                    @Override
+                    public int hashCode() {
+                        return 0;
+                    }
+
+                    public BigdataValue asValue(BigdataValueFactory f)
+                            throws UnsupportedOperationException {
+                        // TODO Auto-generated method stub
+                        return null;
+                    }
+
+                    public Object getInlineValue()
+                            throws UnsupportedOperationException {
+                        // TODO Auto-generated method stub
+                        return null;
+                    }
+
+                    public long getTermId() {
+                        throw new UnsupportedOperationException();
+                    }
+
+                    public boolean isInline() {
+                        return true;
+                    }
+
+                    public boolean isNull() {
+                        return false;
+                    }
+
+                    public boolean isTermId() {
+                        return false;
+                    }
+
+                };
+
+                assertFalse(v.isTermId());
+
+                assertTrue(v.isInline());
+
+//                if (termId == 0L) {
+//                    assertTrue(v.toString(), v.isNull());
+//                } else {
+//                    assertFalse(v.toString(), v.isNull());
+//                }
+//
+//                assertEquals(termId, v.getTermId());
+
+                // should not throw an exception.
+                v.getInlineValue();
+
+                assertEquals("flags=" + v.flags(), vte, v
+                        .getInternalValueTypeEnum());
+
+                assertEquals(dte, v.getInternalDataTypeEnum());
+
+                switch (vte) {
+                case URI:
+                    assertTrue(v.isURI());
+                    assertFalse(v.isBNode());
+                    assertFalse(v.isLiteral());
+                    assertFalse(v.isStatement());
+                    break;
+                case BNODE:
+                    assertFalse(v.isURI());
+                    assertTrue(v.isBNode());
+                    assertFalse(v.isLiteral());
+                    assertFalse(v.isStatement());
+                    break;
+                case LITERAL:
+                    assertFalse(v.isURI());
+                    assertFalse(v.isBNode());
+                    assertTrue(v.isLiteral());
+                    assertFalse(v.isStatement());
+                    break;
+                case STATEMENT:
+                    assertFalse(v.isURI());
+                    assertFalse(v.isBNode());
+                    assertFalse(v.isLiteral());
+                    assertTrue(v.isStatement());
+                    break;
+                default:
+                    fail("vte=" + vte);
+                }
+
+            }
+
+        }
+
     }
 
     /**
@@ -218,34 +343,29 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     private void encodeValue(final IKeyBuilder keyBuilder,
             final InternalValue<?, ?> v) {
 
+        // First emit the flags byte.
         keyBuilder.append(v.flags());
 
+        if (!v.isInline()) {
+            /*
+             * Since the RDF Value is not inline, it will be represented as a
+             * term identifier.
+             */
+            keyBuilder.append(v.getTermId());
+            return;
+        }
+        
         /*
          * Append the natural value type representation.
          * 
          * Note: We have to handle the unsigned byte, short, int and long values
          * specially to get the correct total key order.
          */
-        final InternalDataTypeEnum dte = v.getInternalDataTypeEnum();
-        
-        if (dte == InternalDataTypeEnum.TermId) {
-
-            /*
-             * Handle a term identifier.
-             */
-
-            keyBuilder.append(v.getTermId());
-            
-            return;
-            
-        }
+        final DTE dte = v.getInternalDataTypeEnum();
         
         final AbstractDatatypeLiteralInternalValue<?, ?> t = (AbstractDatatypeLiteralInternalValue<?, ?>) v;
         
         switch (dte) {
-//        case TermId:
-//            keyBuilder.append(v.getTermId());
-//            break;
         case XSDBoolean:
             keyBuilder.append((byte) (t.booleanValue() ? 1 : 0));
             break;
@@ -258,11 +378,11 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         case XSDInt:
             keyBuilder.append(t.intValue());
             break;
-        case XSDFloat:
-            keyBuilder.append(t.floatValue());
-            break;
         case XSDLong:
             keyBuilder.append(t.longValue());
+            break;
+        case XSDFloat:
+            keyBuilder.append(t.floatValue());
             break;
         case XSDDouble:
             keyBuilder.append(t.doubleValue());
@@ -307,6 +427,12 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      *            The key.
      * 
      * @return An ordered array of the {@link InternalValue}s for that key.
+     * 
+     *         FIXME handle all of the inline value types.
+     * 
+     *         FIXME Construct the InternalValue objects using factory since we
+     *         will have to scope how the RDF Value is represented to the
+     *         lexicon relation with which it is associated.
      */
     public InternalValue<?, ?>[] decodeStatementKey(final byte[] key) {
         
@@ -320,16 +446,8 @@ public class TestEncodeDecodeKeys extends TestCase2 {
             final byte flags = KeyBuilder.decodeByte(key[offset]);
             offset++;
 
-            // The value type (URI, Literal, BNode, SID)
-            final InternalValueTypeEnum vte = AbstractInternalValue
-                    .getInternalValueTypeEnum(flags);
-
-            // The data type
-            final InternalDataTypeEnum dte = AbstractInternalValue
-                    .getInternalDataTypeEnum(flags);
-
-            if (dte == InternalDataTypeEnum.TermId) {
-
+            if(!AbstractInternalValue.isInline(flags)) {
+                
                 /*
                  * Handle a term identifier (versus an inline value).
                  */
@@ -338,22 +456,24 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                 final long termId = KeyBuilder.decodeLong(key, offset);
                 offset += Bytes.SIZEOF_LONG;
 
-                // @todo type specific factory is required!
-                a[i] = InternalValueTypeFactory.INSTANCE.newTermId(vte, dte,
-                        termId);
+                a[i] = new TermId(flags, termId);
 
                 continue;
                 
             }
-
+            
             /*
              * Handle an inline value.
-             * 
-             * FIXME Construct the InternalValue objects using factory since we
-             * will have to scope how the RDF Value is represented to the
-             * lexicon relation with which it is associated.
              */
-            final InternalValue v;
+            // The value type (URI, Literal, BNode, SID)
+            final VTE vte = AbstractInternalValue
+                    .getInternalValueTypeEnum(flags);
+
+            // The data type
+            final DTE dte = AbstractInternalValue
+                    .getInternalDataTypeEnum(flags);
+            
+            final InternalValue<?,?> v;
             switch (dte) {
             case XSDBoolean: {
                 final byte x = KeyBuilder.decodeByte(key[offset++]);
@@ -428,7 +548,6 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 //                keyBuilder.appendUnsigned(t.longValue());
 //                break;
             default:
-                // FIXME handle all of the inline value types.
                 throw new UnsupportedOperationException("vte=" + vte + ", dte="
                         + dte);
             }
@@ -446,49 +565,49 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         
     }
 
-    /**
-     * A factory for {@link InternalValue} objects.
-     * <p>
-     * Note: The behavior of the factory is informed by a
-     * {@link LexiconConfiguration}. The factory will produce different
-     * representations
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     * @version $Id: TestEncodeDecodeKeys.java 2760 2010-05-04 16:48:47Z
-     *          thompsonbry $
-     */
-    public static class InternalValueTypeFactory {
-
-        public static InternalValueTypeFactory INSTANCE = new InternalValueTypeFactory();
-        
-        private InternalValueTypeFactory() {
-            
-        }
-        
-        public InternalValue<?, ?> newTermId(final InternalValueTypeEnum vte,
-                final InternalDataTypeEnum dte, final long termId) {
-
-            if (vte == null)
-                throw new IllegalArgumentException();
-            
-            if (dte == null)
-                throw new IllegalArgumentException();
-
-            /*
-             * FIXME If the DTE is independent of whether or not we are inlining
-             * the value the we need to take one bit for (termId | inline). On
-             * the other hand, if we only preserve the DTE when we are inlining
-             * the value, then we are throwing away the datatype information for
-             * term identifiers.
-             */
-            assert dte == InternalDataTypeEnum.TermId;
-
-            return new TermId(vte, dte, termId);
-            
-        }
-        
-    }
+//    /**
+//     * A factory for {@link InternalValue} objects.
+//     * <p>
+//     * Note: The behavior of the factory is informed by a
+//     * {@link LexiconConfiguration}. The factory will produce different
+//     * representations
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+//     *         Thompson</a>
+//     * @version $Id: TestEncodeDecodeKeys.java 2760 2010-05-04 16:48:47Z
+//     *          thompsonbry $
+//     */
+//    public static class InternalValueTypeFactory {
+//
+//        public static InternalValueTypeFactory INSTANCE = new InternalValueTypeFactory();
+//        
+//        private InternalValueTypeFactory() {
+//            
+//        }
+//        
+//        public InternalValue<?, ?> newTermId(final VTE vte,
+//                final DTE dte, final long termId) {
+//
+//            if (vte == null)
+//                throw new IllegalArgumentException();
+//            
+//            if (dte == null)
+//                throw new IllegalArgumentException();
+//
+//            /*
+//             * FIXME If the DTE is independent of whether or not we are inlining
+//             * the value the we need to take one bit for (termId | inline). On
+//             * the other hand, if we only preserve the DTE when we are inlining
+//             * the value, then we are throwing away the datatype information for
+//             * term identifiers.
+//             */
+//            assert dte == DTE.TermId;
+//
+//            return new TermId(vte, dte, termId);
+//            
+//        }
+//        
+//    }
 
     /**
      * Encode a key for an RDF Statement index.
@@ -577,14 +696,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_allTermIds() {
 
         final InternalValue<?, ?>[] e = {//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 1L),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 2L),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 3L),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 4L) //
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
+                new TermId<BigdataURI>(VTE.URI, 3L),//
+                new TermId<BigdataURI>(VTE.URI, 4L) //
         };
 
         doEncodeDecodeTest(e);
@@ -597,13 +712,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_XSDBoolean() {
 
         final InternalValue<?, ?>[] e = {//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 1L),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 2L),//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDBooleanInternalValue<BigdataLiteral>(true),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 4L) //
+                new TermId<BigdataURI>(VTE.URI, 4L) //
         };
 
         doEncodeDecodeTest(e);
@@ -620,13 +732,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_XSDByte() {
 
         final InternalValue<?, ?>[] e = {//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 1L),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 2L),//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDByteInternalValue<BigdataLiteral>((byte)1),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 4L) //
+                new TermId<BigdataURI>(VTE.URI, 4L) //
         };
 
         doEncodeDecodeTest(e);
@@ -655,13 +764,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_XSDShort() {
 
         final InternalValue<?, ?>[] e = {//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 1L),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 2L),//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDShortInternalValue<BigdataLiteral>((short)1),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 4L) //
+                new TermId<BigdataURI>(VTE.URI, 4L) //
         };
 
         doEncodeDecodeTest(e);
@@ -690,13 +796,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_XSDInt() {
 
         final InternalValue<?, ?>[] e = {//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 1L),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 2L),//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDIntInternalValue<BigdataLiteral>(1),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 4L) //
+                new TermId<BigdataURI>(VTE.URI, 4L) //
         };
 
         doEncodeDecodeTest(e);
@@ -725,13 +828,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_XSDLong() {
 
         final InternalValue<?, ?>[] e = {//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 1L),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 2L),//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDLongInternalValue<BigdataLiteral>(1L),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 4L) //
+                new TermId<BigdataURI>(VTE.URI, 4L) //
         };
 
         doEncodeDecodeTest(e);
@@ -760,13 +860,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_XSDFloat() {
 
         final InternalValue<?, ?>[] e = {//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 1L),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 2L),//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDFloatInternalValue<BigdataLiteral>(1f),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 4L) //
+                new TermId<BigdataURI>(VTE.URI, 4L) //
         };
 
         doEncodeDecodeTest(e);
@@ -811,13 +908,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_XSDDouble() {
 
         final InternalValue<?, ?>[] e = {//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 1L),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 2L),//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDDoubleInternalValue<BigdataLiteral>(1d),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 4L) //
+                new TermId<BigdataURI>(VTE.URI, 4L) //
         };
 
         doEncodeDecodeTest(e);
@@ -873,13 +967,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_XSDFloat_NaN() {
 
         final InternalValue<?, ?>[] e = {//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 1L),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 2L),//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDFloatInternalValue<BigdataLiteral>(Float.NaN),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 4L) //
+                new TermId<BigdataURI>(VTE.URI, 4L) //
         };
     
         e[2] = new XSDFloatInternalValue<BigdataLiteral>(Float.NaN);
@@ -905,13 +996,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_XSDDouble_NaN() {
 
         final InternalValue<?, ?>[] e = {//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 1L),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 2L),//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDDoubleInternalValue<BigdataLiteral>(Double.NaN),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 4L) //
+                new TermId<BigdataURI>(VTE.URI, 4L) //
         };
     
         e[2] = new XSDDoubleInternalValue<BigdataLiteral>(Double.NaN);
@@ -926,13 +1014,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_UUID() {
 
         final InternalValue<?, ?>[] e = {//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 1L),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 2L),//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
                 new UUIDInternalValue<BigdataLiteral>(UUID.randomUUID()),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 4L) //
+                new TermId<BigdataURI>(VTE.URI, 4L) //
         };
 
         doEncodeDecodeTest(e);
@@ -953,14 +1038,11 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     public void test_SPO_encodeDecode_XSDInteger() {
 
         final InternalValue<?, ?>[] e = {//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 1L),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 2L),//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDIntegerInternalValue<BigdataLiteral>(BigInteger
                         .valueOf(3L)),//
-                new TermId<BigdataURI>(InternalValueTypeEnum.URI,
-                        InternalDataTypeEnum.TermId, 4L) //
+                new TermId<BigdataURI>(VTE.URI, 4L) //
         };
 
         doEncodeDecodeTest(e);

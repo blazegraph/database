@@ -31,7 +31,7 @@ public class AbstractBNodeInternalValue<V extends BigdataBNode> extends
     
     public AbstractBNodeInternalValue(final UUID id) {
 
-        super(InternalValueTypeEnum.BNODE, InternalDataTypeEnum.UUID);
+        super(VTE.BNODE, DTE.UUID);
 
         if (id == null)
             throw new IllegalArgumentException();
@@ -53,18 +53,6 @@ public class AbstractBNodeInternalValue<V extends BigdataBNode> extends
         throw new UnsupportedOperationException();
     }
 
-    final public boolean isInline() {
-        return true;
-    }
-
-    final public boolean isNull() {
-        return false;
-    }
-
-    final public boolean isTermId() {
-        return false;
-    }
-
     public V asValue(BigdataValueFactory f)
             throws UnsupportedOperationException {
         // TODO asValue()
@@ -74,8 +62,8 @@ public class AbstractBNodeInternalValue<V extends BigdataBNode> extends
     public boolean equals(Object o) {
         if (this == o)
             return true;
-        if (o instanceof AbstractBNodeInternalValue) {
-            return this.id.equals(((AbstractBNodeInternalValue) o).id);
+        if (o instanceof AbstractBNodeInternalValue<?>) {
+            return this.id.equals(((AbstractBNodeInternalValue<?>) o).id);
         }
         return false;
     }

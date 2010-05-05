@@ -37,22 +37,10 @@ abstract public class AbstractDatatypeLiteralInternalValue<V extends BigdataLite
      */
     private static final long serialVersionUID = 5962615541158537189L;
 
-    protected AbstractDatatypeLiteralInternalValue(final InternalDataTypeEnum dte) {
+    protected AbstractDatatypeLiteralInternalValue(final DTE dte) {
 
         super(dte);
 
-    }
-
-    final public boolean isInline() {
-        return true;
-    }
-
-    final public boolean isTermId() {
-        return false;
-    }
-
-    final public boolean isNull() {
-        return false;
     }
 
     final public long getTermId() {

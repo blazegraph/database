@@ -14,7 +14,7 @@ public class XSDDoubleInternalValue<V extends BigdataLiteral> extends
 
     public XSDDoubleInternalValue(final double value) {
         
-        super(InternalDataTypeEnum.XSDDouble);
+        super(DTE.XSDDouble);
         
         this.value = value;
         
