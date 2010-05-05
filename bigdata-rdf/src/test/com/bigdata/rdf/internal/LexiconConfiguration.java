@@ -9,7 +9,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * Configuration determines which RDF Values are inlined into the statement
  * indices rather than being assigned term identifiers by the lexicon.
  */
-public interface BigdataInlineValueConfig {
+public interface LexiconConfiguration {
 
     /**
      * <code>true</code> iff <code>xsd:boolean</code> should be inlined.
@@ -24,6 +24,11 @@ public interface BigdataInlineValueConfig {
 
     /**
      * <code>true</code> iff xsd:integer should be inlined.
+     * <p>
+     * Note: The maximum length for the encoding is ~32kb per key. With a B+Tree
+     * branching factor of 256 that is ~ 8MB per leaf before compression. While
+     * that is definitely large, it is not so outrageous that we need to forbid
+     * it.
      */
     public boolean isXSDIntegerInline();
 

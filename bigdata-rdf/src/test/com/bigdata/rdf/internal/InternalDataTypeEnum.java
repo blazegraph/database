@@ -32,7 +32,6 @@ import java.math.BigInteger;
 import java.util.UUID;
 
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.internal.TestEncodeDecodeKeys.AbstractDatatypeLiteralInternalValue;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
 /**

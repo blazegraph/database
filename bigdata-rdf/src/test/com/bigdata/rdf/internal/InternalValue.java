@@ -31,6 +31,8 @@ import java.io.Serializable;
 
 import org.openrdf.model.URI;
 
+import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
@@ -38,6 +40,12 @@ import com.bigdata.rdf.store.AbstractTripleStore.Options;
 /**
  * Interface for the internal representation of an RDF Value (the representation
  * which is encoded within the statement indices).
+ * 
+ * @todo Consider whether we need the ability to compute the successor of a
+ *       value in the value space here. There are implementations of successor()
+ *       for most data types in {@link SuccessorUtil}, including fixed length
+ *       unsigned byte[]s, and also {@link BytesUtil#successor(byte[])}, which
+ *       handles variable length unsigned byte[]s.
  */
 public interface InternalValue<V extends BigdataValue, T> extends Serializable {
 
@@ -137,6 +145,13 @@ public interface InternalValue<V extends BigdataValue, T> extends Serializable {
      */
     T getInlineValue() throws UnsupportedOperationException;
 
+//    /**
+//     * 
+//     * @return
+//     * @throws NoSuccessorException
+//     */
+//    T successor() throws NoSuccessorException;
+    
     /**
      * <code>true</code> for any of the numeric data types (xsd:byte,
      * xsd:unsignedByte, xsd:short, xsd:unsignedShort, xsd:int, xsd:unsignedInt,
