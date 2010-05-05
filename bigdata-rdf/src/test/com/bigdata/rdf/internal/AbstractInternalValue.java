@@ -185,6 +185,13 @@ import com.bigdata.rdf.model.BigdataValue;
  *       language code must be ASCII and might be restricted to two characters.
  *       This might use up our {@link DTE#Reserved1} bit.
  * 
+ * @todo One consequences of this refactor is that you must use equals() rather
+ *       than == to compare internal values, including term identifiers. This
+ *       boils down to verifying that the two internal values are the same type
+ *       (same VTE, DTE, etc) and have the same value (termId, long, etc). That
+ *       can all be done rather quickly, but it is more overhead than testing a
+ *       == b.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestEncodeDecodeKeys.java 2753 2010-05-01 16:36:59Z thompsonbry
  *          $
