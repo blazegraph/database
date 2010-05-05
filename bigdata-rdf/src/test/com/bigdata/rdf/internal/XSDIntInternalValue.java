@@ -14,7 +14,7 @@ public class XSDIntInternalValue<V extends BigdataLiteral> extends
 
     public XSDIntInternalValue(final int value) {
         
-        super(InternalDataTypeEnum.XSDInt);
+        super(DTE.XSDInt);
         
         this.value = value;
         

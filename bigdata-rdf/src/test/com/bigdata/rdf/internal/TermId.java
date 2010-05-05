@@ -2,7 +2,6 @@ package com.bigdata.rdf.internal;
 
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueImpl;
 import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
@@ -10,28 +9,6 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * inlined. Instances of this class can represent URIs, Blank Nodes (if they are
  * not being inlined), Literals (including datatype literals if they are not
  * being inlined) or SIDs (statement identifiers).
- * <p>
- * Note: The <em>always</em> captures the datatype information in the flag bits.
- * This is a change from the historical representation of a term identifier
- * which only captured the value type information in the flag bits.
- * 
- * @todo Reconcile the lack of the value with the type information available
- *       about that value. What does this imply about
- *       {@link #asValue(BigdataValueFactory)} for {@link TermId}? Do we need a
- *       method to combine the {@link TermId} object with its value (from the
- *       ID2TERM index), obtaining a {@link BigdataValueImpl}?
- *       <p>
- *       {@link #getInlineValue()} declares a <code>Void</code> return type (and
- *       will always throw an {@link UnsupportedOperationException}) since the
- *       actual value information is not represented by this class (it could be
- *       if we change how we manage the {@link InternalDataTypeEnum}, breaking
- *       it into an (inline|termId) bit and 5 bits for the actual data type
- *       enum).
- *       <p>
- *       When an RDF Value is materialized from its term identifier, the result
- *       will be a {@link BigdataValue} which DOES NOT extend
- *       {@link AbstractInternalValue} since it will include information which
- *       is not captured inlined.
  */
 public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
         extends AbstractInternalValue<V, Void> {
@@ -44,14 +21,69 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
     /** The term identifier. */
     private final long termId;
 
-    public TermId(final InternalValueTypeEnum vte,
-            final InternalDataTypeEnum dte, final long termId) {
+//    /** The datatype term identifier. */
+//    private final long dataTypeId;
 
-        super(vte, dte);
-        
+    /**
+     * Constructor for a term identifier when you are decoding and already have
+     * the flags.
+     * 
+     * @param flags
+     *            The flags
+     * @param termId
+     */
+    public TermId(final byte flags, final long termId) {
+
+        super(flags);
+
         this.termId = termId;
         
+//        this.dataTypeId = 0L;
+        
     }
+
+    /**
+     * Constructor for a term identifier.
+     * @param vte
+     * @param termId
+     */
+    public TermId(final VTE vte, final long termId) {
+
+        /*
+         * Note: XSDBoolean happens to be assigned the code value of 0, which is
+         * the value we we want when the data type enumeration will be ignored.
+         */
+        super(vte, false/* inline */, false/* extension */, DTE.XSDBoolean);
+
+        this.termId = termId;
+        
+//        this.dataTypeId = 0L;
+        
+    }
+
+//    /**
+//     * Constructor for a term identifier for a datatype literal. Do NOT use this
+//     * constructor when the lexicon is configured such that the datatype literal
+//     * should be inlined.
+//     * 
+//     * @param vte
+//     * @param dte
+//     * @param termId
+//     * @param dataTypeId
+//     */
+//    public TermId(final VTE vte, final DTE dte, final long termId,
+//            final long dataTypeId) {
+//
+//        super(vte, false/* inline */, true/* extension */, dte);
+//
+//        if (dataTypeId == IRawTripleStore.NULL)
+//            throw new IllegalArgumentException();
+//        
+//        this.termId = termId;
+//        
+//        this.dataTypeId = dataTypeId;
+//
+//    }
 
     /**
      * Human readable representation includes the term identifier, whether
@@ -82,17 +114,36 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
     final public long getTermId() {
         return termId;
     }
+    
+//    /**
+//     * Return the term identifier for the datatype associated with the term.
+//     */
+//    final public long getDataTypeID() {
+//        return dataTypeId;
+//    }
 
+    /**
+     * Always returns <code>false</code> since the RDF value is not inline.
+     */
+    @Override
     final public boolean isInline() {
         return false;
     }
 
-    final public boolean isNull() {
-        return termId == IRawTripleStore.NULL;
-    }
-
+    /**
+     * Always returns <code>true</code> since this is a term identifier.
+     */
+    @Override
     final public boolean isTermId() {
         return true;
+    }
+
+    /**
+     * Return <code>true</code> iff the term identifier is
+     * {@link IRawTripleStore#NULL}.
+     */
+    final public boolean isNull() {
+        return termId == IRawTripleStore.NULL;
     }
 
     /**
@@ -103,8 +154,8 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
     public boolean equals(final Object o) {
         if (this == o)
             return true;
-        if (o instanceof TermId) {
-            return termId == ((TermId) o).termId;
+        if (o instanceof TermId<?>) {
+            return termId == ((TermId<?>) o).termId;
         }
         return false;
     }

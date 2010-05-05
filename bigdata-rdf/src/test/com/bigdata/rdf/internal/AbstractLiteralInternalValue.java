@@ -20,9 +20,9 @@ abstract public class AbstractLiteralInternalValue<V extends BigdataLiteral, T>
      */
     private static final long serialVersionUID = -2684528247542410336L;
 
-    protected AbstractLiteralInternalValue(final InternalDataTypeEnum dte) {
+    protected AbstractLiteralInternalValue(final DTE dte) {
 
-        super(InternalValueTypeEnum.LITERAL, dte);
+        super(VTE.LITERAL, dte);
 
     }
 

@@ -14,7 +14,7 @@ public class XSDIntegerInternalValue<V extends BigdataLiteral> extends
 
     public XSDIntegerInternalValue(final BigInteger value) {
         
-        super(InternalDataTypeEnum.XSDInteger);
+        super(DTE.XSDInteger);
 
         if (value == null)
             throw new IllegalArgumentException();
@@ -33,7 +33,7 @@ public class XSDIntegerInternalValue<V extends BigdataLiteral> extends
     public V asValue(final BigdataValueFactory f) {
         // @todo factory should cache the XSD URIs.
         return (V) f.createLiteral(value.toString(),//
-                f.createURI(InternalDataTypeEnum.XSDInteger.getDatatype()));
+                f.createURI(DTE.XSDInteger.getDatatype()));
     }
 
     @Override

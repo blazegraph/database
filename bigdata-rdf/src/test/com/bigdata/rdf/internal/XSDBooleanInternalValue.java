@@ -20,7 +20,7 @@ public class XSDBooleanInternalValue<V extends BigdataLiteral> extends
 
     public XSDBooleanInternalValue(final boolean value) {
         
-        super(InternalDataTypeEnum.XSDBoolean);
+        super(DTE.XSDBoolean);
         
         this.value = value;
         

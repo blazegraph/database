@@ -23,10 +23,10 @@ abstract public class AbstractInlineInternalValue<V extends BigdataValue, T>
      */
     private static final long serialVersionUID = -2847844163772097836L;
 
-    protected AbstractInlineInternalValue(final InternalValueTypeEnum vte,
-            final InternalDataTypeEnum dte) {
+    protected AbstractInlineInternalValue(final VTE vte,
+            final DTE dte) {
 
-        super(vte, dte);
+        super(vte, true/* inline */, false/* extension */, dte);
 
     }
     
@@ -37,7 +37,28 @@ abstract public class AbstractInlineInternalValue<V extends BigdataValue, T>
      * @see Value#stringValue()
      */
     abstract public String stringValue();
-    
+
+    /**
+     * Always returns <code>true</code> since the value is inline.
+     */
+    final public boolean isInline() {
+        return true;
+    }
+
+    /**
+     * Always returns <code>false</code> since the value is inline.
+     */
+    final public boolean isTermId() {
+        return false;
+    }
+
+    /**
+     * Always returns <code>false</code> since the value is inline.
+     */
+    final public boolean isNull() {
+        return false;
+    }
+
     public String toString() {
         
         return super.toString() + "[" + stringValue() + "]";

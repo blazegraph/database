@@ -50,10 +50,10 @@ import com.bigdata.rdf.store.AbstractTripleStore.Options;
 public interface InternalValue<V extends BigdataValue, T> extends Serializable {
 
     /**
-     * The value of the flags representing the {@link InternalValueTypeEnum} and
-     * the {@link InternalDataTypeEnum}. The upper TWO (2) bits code the
-     * {@link InternalValueTypeEnum} while the lower SIX (6) bits code the
-     * {@link InternalDataTypeEnum}.
+     * The value of the flags representing the {@link VTE} and
+     * the {@link DTE}. The upper TWO (2) bits code the
+     * {@link VTE} while the lower SIX (6) bits code the
+     * {@link DTE}.
      */
     byte flags();
 
@@ -62,9 +62,9 @@ public interface InternalValue<V extends BigdataValue, T> extends Serializable {
      */
 
     /**
-     * Return the {@link InternalValueTypeEnum} for the {@link InternalValue}
+     * Return the {@link VTE} for the {@link InternalValue}
      */
-    InternalValueTypeEnum getInternalValueTypeEnum();
+    VTE getInternalValueTypeEnum();
 
     /**
      * Return <code>true</code> iff this is an RDF Literal. Note that some kinds
@@ -91,13 +91,13 @@ public interface InternalValue<V extends BigdataValue, T> extends Serializable {
      */
 
     /**
-     * Return the {@link InternalDataTypeEnum} for the {@link InternalValue} .
-     * This will be {@link InternalDataTypeEnum#TermId} iff the internal "value"
+     * Return the {@link DTE} for the {@link InternalValue} .
+     * This will be {@link DTE#TermId} iff the internal "value"
      * is a term identifier. Otherwise it will be the type safe enum
      * corresponding to the specific data type which can be decoded from this
      * {@link InternalValue} using {@link #getInlineValue()}.
      */
-    InternalDataTypeEnum getInternalDataTypeEnum();
+    DTE getInternalDataTypeEnum();
 
     /**
      * <code>true</code> iff the RDF value is represented by a term identifier.

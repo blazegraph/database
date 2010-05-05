@@ -19,7 +19,7 @@ public class XSDLongInternalValue<V extends BigdataLiteral> extends
 
     public XSDLongInternalValue(final long value) {
         
-        super(InternalDataTypeEnum.XSDLong);
+        super(DTE.XSDLong);
         
         this.value = value;
         

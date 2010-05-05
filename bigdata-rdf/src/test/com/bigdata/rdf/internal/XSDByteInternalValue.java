@@ -14,7 +14,7 @@ public class XSDByteInternalValue<V extends BigdataLiteral> extends
 
     public XSDByteInternalValue(final byte value) {
         
-        super(InternalDataTypeEnum.XSDByte);
+        super(DTE.XSDByte);
         
         this.value = value;
         
