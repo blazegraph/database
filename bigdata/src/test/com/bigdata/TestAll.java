@@ -84,9 +84,6 @@ public class TestAll extends TestCase {
         
         final TestSuite suite = new TestSuite("bigdata");
 
-        // modified dsiutil classes.
-        suite.addTest( it.unimi.dsi.TestAll.suite() );
-
         // core bigdata packages.
         suite.addTest( com.bigdata.cache.TestAll.suite() );
         suite.addTest( com.bigdata.io.TestAll.suite() );

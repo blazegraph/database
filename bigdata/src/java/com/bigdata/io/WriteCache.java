@@ -1049,8 +1049,7 @@ abstract public class WriteCache implements IWriteCache {
 
                 try {
                     
-                    // FIXME: problem with waiting at present
-                    connect.send(msg, true/*wait*/);
+                    connect.send(msg, true);
                     
                 } catch (Throwable e) {
 
@@ -1707,7 +1706,7 @@ abstract public class WriteCache implements IWriteCache {
 	 * @throws IllegalStateException 
 	 */
     public void receiveAndForward(ObjectSocketChannelStream in,
-            ObjectSocketChannelStream out) throws IllegalStateException,
+            HAConnect out) throws IllegalStateException,
             InterruptedException, IOException {
         
         if (log.isInfoEnabled())

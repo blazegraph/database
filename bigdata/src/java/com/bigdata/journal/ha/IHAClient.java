@@ -38,7 +38,7 @@ import com.bigdata.journal.ha.SocketMessage.HAWriteMessage.HAWriteConfirm;
  */
 public interface IHAClient {
 
-	ObjectSocketChannelStream getNextSocket();
+	HAConnect getNextConnect();
 
 	WriteCache getWriteCache();
 

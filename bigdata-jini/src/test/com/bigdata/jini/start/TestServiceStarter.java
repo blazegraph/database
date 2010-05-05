@@ -54,6 +54,7 @@ import com.bigdata.service.IService;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.service.jini.TransactionServer;
 import com.bigdata.zookeeper.ZNodeDeletedWatcher;
+import com.bigdata.zookeeper.ZooHelper;
 
 /**
  * Test suite for starting a bigdata service based on a
@@ -121,12 +122,29 @@ public class TestServiceStarter extends AbstractFedZooTestCase {
                 + BigdataZooDefs.LOGICAL_SERVICE_PREFIX, SerializerUtil.serialize(UUID
                 .randomUUID()), acl, CreateMode.PERSISTENT_SEQUENTIAL);
 
+        /*
+         * Create the znode that is the parent for the physical service
+         * instances (direct child of the logicalSevice znode).
+         */
+        final String parentZNode = logicalServiceZPath + "/" + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER;
+        final ManagedServiceStarter serviceStarter = 
+            (ManagedServiceStarter) serviceConfig.newServiceStarter
+                                        (fed, listener, logicalServiceZPath, null/* attributes */);
+        zookeeper.create(parentZNode, 
+                         SerializerUtil.serialize(serviceStarter.serviceUUID),
+                         acl, CreateMode.PERSISTENT);
+
+        /*
+         * Create the znode for the election of the primary physical service for
+         * this logical service (direct child of the logicalSevice znode).
+         */
+        zookeeper.create(logicalServiceZPath + "/"
+                + BigdataZooDefs.MASTER_ELECTION, new byte[0], acl,
+                CreateMode.PERSISTENT);
+
         // will be zero unless we started a zookeeper server above.
         final int processCountBefore = listener.running.size();
         
-        final ManagedServiceStarter serviceStarter = (ManagedServiceStarter) serviceConfig
-                .newServiceStarter(fed, listener, logicalServiceZPath, null/* attributes */);
-
         // start the service.
         final ProcessHelper processHelper = serviceStarter.call();
 
@@ -145,7 +163,7 @@ public class TestServiceStarter extends AbstractFedZooTestCase {
             System.err.println("physicalServices=" + children);
             
             // will fail if the znode was not registered.
-            assertEquals(1, children.size());
+            assertEquals(2, children.size());
 
             /*
              * There should be only one child, which is the physical service
@@ -191,6 +209,8 @@ public class TestServiceStarter extends AbstractFedZooTestCase {
                 + listener.running.size() + ", processes="
                 + listener.running.toString(), processCountBefore,
                 listener.running.size());
+
+        ZooHelper.destroyZNodes(zookeeper, parentZNode, 1);
 
         /*
          * Wait until the znode for the physical service has been removed.

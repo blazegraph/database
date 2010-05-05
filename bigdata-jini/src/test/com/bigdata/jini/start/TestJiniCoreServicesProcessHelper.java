@@ -28,11 +28,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.jini.start;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import junit.framework.TestCase2;
+import net.jini.admin.Administrable;
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationProvider;
+import net.jini.core.lookup.ServiceItem;
+import net.jini.core.lookup.ServiceRegistrar;
+import net.jini.core.lookup.ServiceTemplate;
+import net.jini.discovery.LookupDiscoveryManager;
+import net.jini.lookup.ServiceDiscoveryManager;
 
 import com.bigdata.jini.start.config.JiniCoreServicesConfiguration;
 import com.bigdata.jini.start.config.JiniCoreServicesConfiguration.Options;
@@ -67,7 +74,7 @@ public class TestJiniCoreServicesProcessHelper extends TestCase2 {
     /**
      * The configuration file used the unit tests.
      */
-    protected final String configFile = "file:src/test/com/bigdata/jini/start/testjini.config";
+    protected final String configFile = "file:bigdata-jini/src/test/com/bigdata/jini/start/testjini.config";
 
     /**
      * The configuration read from that file with any overrides applied.
@@ -179,8 +186,47 @@ public class TestJiniCoreServicesProcessHelper extends TestCase2 {
                 .isJiniRunning(clientConfig.groups, clientConfig.locators, 500,
                         TimeUnit.MILLISECONDS));
 
-        JiniCoreServicesProcessHelper.startCoreServices(config, listener);
-        
+        boolean serviceStarted = 
+            JiniCoreServicesProcessHelper.startCoreServices(config, listener);
+        String testName = (this.getClass()).getSimpleName();
+        if(serviceStarted) {
+            // Find and shutdown lookup service started above
+            ServiceDiscoveryManager sdm = 
+                new ServiceDiscoveryManager
+                    (new LookupDiscoveryManager(clientConfig.groups,
+                                                clientConfig.locators, null),
+                     null);
+            Class[] types = new Class[] { ServiceRegistrar.class };
+            ServiceTemplate tmpl = new ServiceTemplate(null, types, null);
+            ServiceItem regItem = sdm.lookup(tmpl, null, 5L*1000L);
+            if(regItem == null) {
+                System.err.println
+                    ("WARNING ["+testName+"]: lookup service started but "
+                     +"could not discover it for shutdown");
+            } else {
+                ServiceRegistrar reg = (ServiceRegistrar)(regItem.service);
+                List<String> groupsList = Arrays.asList(reg.getGroups());
+                System.err.println
+                    ("INFO ["+testName+"]: lookup service started "
+                     +"[groups="+groupsList+"] - shutting it down");
+                Object admin  = ((Administrable)reg).getAdmin();
+                ((com.sun.jini.admin.DestroyAdmin)admin).destroy();
+                System.err.println
+                    ("INFO ["+testName+"]: lookup service started and "
+                     +"destroyed - [groups="+groupsList+"]");
+            }
+        }
+
+        // Shutdown the httpd class server
+        String httpdStopCmd = 
+            (String)config.getEntry("jini", "httpdStopCmd", String.class,
+                                    null /*force exception if not in config*/);
+        System.err.println
+            ("INFO ["+testName+"]: shutdown class server ["+httpdStopCmd+"]");
+        Runtime.getRuntime().exec(httpdStopCmd);
+
+        assertTrue(serviceStarted);
+
 //
 //        final JiniCoreServicesStarter<JiniCoreServicesProcessHelper> serviceStarter = serviceConfig
 //                .newServiceStarter(listener);

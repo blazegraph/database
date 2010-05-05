@@ -882,7 +882,7 @@ public class TestWriteCache extends TestCase3 {
         	int pos = r.nextInt(3072);
         	int size = r.nextInt(1023)+1;
         	allocs.add(new AllocView(curAddr, pos, size, srcBuf));
-        	curAddr += size;
+        	curAddr += (size + 4); // include space for chk
         }
         
         final ChecksumUtility checker = new ChecksumUtility();
@@ -1245,5 +1245,99 @@ public class TestWriteCache extends TestCase3 {
 //        assertEquals(expected, actual2);
 //
 //    }
+
+    /**
+     * Helper method verifies that the contents of <i>actual</i> from
+     * position() to limit() are consistent with the expected byte[]. A
+     * read-only view of <i>actual</i> is used to avoid side effects on the
+     * position, mark or limit properties of the buffer.
+     * 
+     * @param expected
+     *            Non-null byte[].
+     * @param actual
+     *            Buffer.
+     */
+    public static void assertEquals(ByteBuffer expectedBuffer, ByteBuffer actual) {
+
+        if (expectedBuffer == null)
+            throw new IllegalArgumentException();
+
+        if (actual == null)
+            fail("actual is null");
+
+        if (expectedBuffer.hasArray() && expectedBuffer.arrayOffset() == 0) {
+
+            // evaluate byte[] against actual.
+            assertEquals(expectedBuffer.array(), actual);
+
+            return;
+
+        }
+        
+        /*
+         * Copy the expected data into a byte[] using a read-only view on the
+         * buffer so that we do not mess with its position, mark, or limit.
+         */
+        final byte[] expected;
+        {
+
+            expectedBuffer = expectedBuffer.asReadOnlyBuffer();
+
+            final int len = expectedBuffer.remaining();
+
+            expected = new byte[len];
+
+            expectedBuffer.get(expected);
+
+        }
+
+        // evaluate byte[] against actual.
+        assertEquals(expected, actual);
+
+    }
+
+    /**
+     * Helper method verifies that the contents of <i>actual</i> from
+     * position() to limit() are consistent with the expected byte[]. A
+     * read-only view of <i>actual</i> is used to avoid side effects on the
+     * position, mark or limit properties of the buffer.
+     * 
+     * @param expected
+     *            Non-null byte[].
+     * @param actual
+     *            Buffer.
+     */
+    public static void assertEquals(final byte[] expected, ByteBuffer actual) {
+
+        if (expected == null)
+            throw new IllegalArgumentException();
+
+        if (actual == null)
+            fail("actual is null");
+
+        if (actual.hasArray() && actual.arrayOffset() == 0) {
+
+            assertEquals(expected, actual.array());
+
+            return;
+
+        }
+
+        /*
+         * Create a read-only view on the buffer so that we do not mess with its
+         * position, mark, or limit.
+         */
+        actual = actual.asReadOnlyBuffer();
+
+        final int len = actual.remaining();
+
+        final byte[] actual2 = new byte[len];
+
+        actual.get(actual2);
+
+        // compare byte[]s.
+        assertEquals(expected, actual2);
+
+    }
 
 }

@@ -162,12 +162,17 @@ public class TestDoubleOpen extends ProxyTestCase<Journal> {
                             //@Override
                             public Void call() throws Exception {
 
+                                boolean didDoubleOpen = false;
                                 try {
 
                                     new Journal(p);
 
-                                    fail("Double-open of journal is not allowed");
-
+                                    /*
+                                     * Note: An assertion will be throw after
+                                     * the try / catch clause.
+                                     */
+                                    didDoubleOpen = true;
+                                    
                                 } catch (Throwable t) {
 
                                     Throwable cause;
@@ -210,6 +215,9 @@ public class TestDoubleOpen extends ProxyTestCase<Journal> {
                                     }
 
                                 }
+
+                                if (didDoubleOpen)
+                                    fail("Double-open of journal is not allowed");
 
                                 return null;
 

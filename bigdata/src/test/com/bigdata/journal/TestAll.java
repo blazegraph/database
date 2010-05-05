@@ -89,7 +89,7 @@ public class TestAll extends TestCase {
          * down the nightly build demands.
          */
         
-        if(Boolean.parseBoolean(System.getProperty("minimizeUnitTests","false"))) {
+//        if(Boolean.parseBoolean(System.getProperty("minimizeUnitTests","false"))) {
 
             suite.addTest( TestTransientJournal.suite() );
 
@@ -106,7 +106,7 @@ public class TestAll extends TestCase {
             
 //            suite.addTest( TestMappedJournal.suite() );
 
-        }
+//        }
 
         suite.addTest( TestDiskJournal.suite() );
 

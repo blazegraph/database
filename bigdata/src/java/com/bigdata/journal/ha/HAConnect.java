@@ -26,9 +26,11 @@ package com.bigdata.journal.ha;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ByteChannel;
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -67,6 +69,12 @@ public class HAConnect extends Thread {
             throws IOException {
 
         this.inetSocketAddress = inetSocketAddress;
+        
+        try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			// just a delay to allow server to start in debug;
+		} // FIXME: remove
     }
 
 	/**
@@ -106,6 +114,7 @@ public class HAConnect extends Thread {
 
             // Kick off connection establishment
             // socketChannel.connect(new InetSocketAddress("localhost", port));
+            log.info("Connecting to " + inetSocketAddress);
             socketChannel.connect(inetSocketAddress);
             socketChannel.finishConnect();
             // Thread.sleep(2000);
@@ -133,15 +142,17 @@ public class HAConnect extends Thread {
                     log.trace("Message acknowledged");
             }
 
+        } catch (ClosedByInterruptException cie) {
+        	// standard close
         } catch (Throwable e) {
             
-            log.error(e,e);
+            log.error("Problem with connection on: " + inetSocketAddress ,e);
             
             throw new RuntimeException(e);
             
         } finally {
 
-            log.info("Shutting down.");
+            log.info("Shutdown");
             if (socketChannel != null) {
                 try {
                     socketChannel.close();
@@ -172,6 +183,9 @@ public class HAConnect extends Thread {
     public void send(SocketMessage<?> msg, boolean wait) throws IOException,
             InterruptedException {
 
+    	if (log.isTraceEnabled())
+    		log.trace("sending message: " + msg + ", wait: " + wait);
+    	
         if (m_out == null)
             throw new IllegalStateException("Not running?");
 
@@ -187,4 +201,8 @@ public class HAConnect extends Thread {
 			}
 		}
 	}
+    
+    public ObjectOutputStream getOutputStream() {
+    	return m_out.getOutputStream();
+    }
 }

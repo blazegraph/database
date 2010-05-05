@@ -44,6 +44,7 @@ import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.process.JiniCoreServicesProcessHelper;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.util.JiniServicesHelper;
+import com.bigdata.service.jini.util.LookupStarter;
 import com.sun.jini.start.NonActivatableServiceDescriptor;
 import com.sun.jini.start.ServiceStarter;
 
@@ -71,8 +72,9 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
     /**
      * Configuration options.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
+     * FIXME We need to specify the discovery groups and then modify this to
+     * start the lookup service (the only thing that we need) using the correct
+     * groups override. See {@link LookupStarter}.
      */
     public interface Options extends ServiceConfiguration.Options {
         
@@ -196,7 +198,12 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
         protected V newProcessHelper(String className,
                 ProcessBuilder processBuilder, IServiceListener listener)
                 throws IOException {
-            
+
+            if(configFile == null) {
+                throw new NullPointerException("no entry named '"+Options.CONFIG_FILE
+                    +"' in test configuration [under namespace '"+Options.NAMESPACE+"' ]" );
+            }
+           
             if(!configFile.exists()) {
                 
                 throw new FileNotFoundException(configFile.toString());
@@ -239,7 +246,10 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
 //            if (log.isInfoEnabled())
 //                log.info("Will run: " + cmd);
             
-            cmds.add("java");
+            String javaHome = System.getProperty("java.home");
+            String javaPath = (javaHome != null ? 
+                javaHome + File.separator + "bin" + File.separator + "java" : "java");
+            cmds.add(javaPath);
 
         }
 
@@ -252,6 +262,10 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
             cmds.add(ServiceStarter.class.getName());
             
             // the config file.
+            if(configFile == null) {
+                throw new NullPointerException("no entry named '"+Options.CONFIG_FILE
+                    +"' in test configuration [under namespace '"+Options.NAMESPACE+"' ]" );
+            }
             cmds.add(configFile.toString());
             
         }
