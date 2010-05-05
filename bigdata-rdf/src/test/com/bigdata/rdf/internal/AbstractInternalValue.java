@@ -120,7 +120,7 @@ import com.bigdata.rdf.model.BigdataValue;
  * 
  * <h3>Extensibility</h3>
  * 
- * There are two core use cases for extensibility:
+ * There are three core use cases for extensibility:
  * <dl>
  * <dt>projections</dt>
  * <dd>A projection takes an application specific data type and maps it onto one
@@ -148,6 +148,13 @@ import com.bigdata.rdf.model.BigdataValue;
  * character codes. For example, an enumeration could be defined for the two
  * character abbreviations for the 50 US States. That enumeration could be
  * mapped onto a single byte.</dd>
+ * <dt>custom indices</dt>
+ * <dd>The best example here is spatial data, which requires literals which
+ * represent points, rectangles, circles, arcs, clouds, etc to be inserted into
+ * special spatial indices. Queries must be aware of spatial data and must be
+ * rewritten to run against the appropriate spatial indices.<br/>
+ * Another use case would be carrying specialized indices for bioinformatics or
+ * genomics data.</dd>
  * </dl>
  * Note: Both projected and enumerated extensible data types MAY map many RDF
  * Values onto the same internal value but each internal value MUST map onto a
