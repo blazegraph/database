@@ -1,0 +1,184 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html><head><title>HttpClient - HttpClient Performance Optimization Guide</title><style type="text/css" media="all">
+          @import url("./style/maven-base.css");
+          
+          @import url("./style/maven-theme.css");@import url("./style/project.css");</style><link rel="stylesheet" href="./style/print.css" type="text/css" media="print"></link><meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1"></meta><meta name="author" content="Oleg Kalnichevski"></meta><meta name="email" content="oleg -at- ural.ru"></meta></head><body class="composite"><div id="banner"><a href="http://jakarta.apache.org/" id="organizationLogo"><img alt="Apache Software Foundation" src="http://jakarta.apache.org/images/jakarta-logo.gif"></img></a><a href="http://jakarta.apache.org/httpcomponents/httpclient-3.x/" id="projectLogo"><img alt="HttpClient" src="./images/httpclient_logo.png"></img></a><div class="clear"><hr></hr></div></div><div id="breadcrumbs"><div class="xleft">Last published: 18 August 2007
+                <span class="separator">|</span> Doc for  3.1
+                </div><div class="xright"></div><div class="clear"><hr></hr></div></div><div id="leftColumn"><div id="navcolumn"><div id="menuOverview"><h5>Overview</h5><ul><li class="none"><a href="features.html">Features</a></li><li class="none"><a href="news.html">News</a></li><li class="none"><a href="status.html">Status</a></li><li class="none"><a href="downloads.html">Download</a></li><li class="none"><a href="http://wiki.apache.org/jakarta-httpclient/" class="externalLink" title="External Link">Wiki</a></li><li class="expanded"><a href="userguide.html">User Guide</a><ul><li class="none"><a href="authentication.html">Authentication Guide</a></li><li class="none"><a href="charencodings.html">Character Encodings</a></li><li class="none"><a href="cookies.html">Cookies</a></li><li class="none"><a href="exception-handling.html">Exception Handling</a></li><li class="none"><a href="logging.html">Logging Guide</a></li><li class="none"><a href="methods.html">Methods</a></li><li class="none"><strong><a href="performance.html">Optimization Guide</a></strong></li><li class="none"><a href="preference-api.html">Preference Architecture</a></li><li class="none"><a href="redirects.html">Redirects Handling</a></li><li class="none"><a href="http://svn.apache.org/viewvc/jakarta/httpcomponents/oac.hc3x/trunk/src/examples/" class="externalLink" title="External Link">Sample Code</a></li><li class="none"><a href="sslguide.html">SSL Guide</a></li><li class="none"><a href="threading.html">Threading</a></li><li class="none"><a href="troubleshooting.html">Trouble Shooting</a></li><li class="none"><a href="tutorial.html">Tutorial</a></li></ul></li><li class="none"><a href="developerguide.html">Developer Guide</a></li></ul></div><div id="menuProject_Documentation"><h5>Project Documentation</h5><ul><li class="none"><a href="index.html">About</a></li><li class="collapsed"><a href="project-info.html">Project Info</a></li><li class="collapsed"><a href="maven-reports.html">Project Reports</a></li><li class="none"><a href="development-process.html">Development Process</a></li></ul></div><div id="legend"><h5>Legend</h5><ul><li class="externalLink">External Link</li><li class="newWindow">Opens in a new window</li></ul></div><a href="http://maven.apache.org/" title="Built by Maven" id="poweredBy"><img alt="Built by Maven" src="./images/logos/mavenlogo_builtby_w.png"></img></a></div></div><div id="bodyColumn"><div class="contentBox"><div class="section"><a name="Introduction"></a><h2>Introduction</h2>
+      <p>
+       By default HttpClient is configured to provide maximum reliability and standards 
+       compliance rather than raw performance. There are several configuration options and
+       optimization techniques which can significantly improve the performance of HttpClient.
+       This document outlines various techniques to achieve maximum HttpClient performance.
+     </p>
+      <div class="subsection"><a name="Contents"></a><h3>Contents</h3>
+        <ul>
+          <li>
+            <a href="#Reuse_of_HttpClient_instance">Reuse the HttpClient instance</a>
+          </li>
+          <li>
+            <a href="#Connection_persistence">Connection persistence</a>
+          </li>
+          <li>
+            <a href="#Concurrent_execution_of_HTTP_methods">Concurrent execution of HTTP methods</a>
+          </li>
+          <li>
+            <a href="#Request_Response_entity_streaming">Request/Response entity streaming</a>
+          </li>
+          <li>
+            <a href="#Expect-continue_handshake">Expect-continue handshake</a>
+          </li>
+          <li>
+            <a href="#Stale_connection_check">Stale connection check</a>
+          </li>
+          <li>
+            <a href="#Cookie_processing">Cookie processing</a>
+          </li>
+        </ul>
+      </div>
+    </div><div class="section"><a name="Reuse_the_HttpClient_instance"></a><h2>Reuse the HttpClient instance</h2>
+      <p>
+       Generally it is recommended to have a single instance of HttpClient per communication
+       component or even per application. However, if the application makes use of HttpClient 
+       only very infrequently, and keeping an idle instance of HttpClient in memory is not warranted,
+       it is highly recommended to explicitly <a href="apidocs/org/apache/commons/httpclient/MultiThreadedHttpConnectionManager.html#shutdown()">
+       shut down</a> the multithreaded connection manager prior to disposing
+       the HttpClient instance. This will ensure proper closure of all HTTP connections in the
+       connection pool. 
+     </p>
+    </div><div class="section"><a name="Connection_persistence"></a><h2>Connection persistence</h2>
+      <p>
+       HttpClient always does its best to reuse connections. Connection persistence is enabled 
+       by default and requires no configuration. Under some situations this can lead to leaked
+       connections and therefore lost resources. The easiest way to disable connection persistence
+       is to provide or extend a connection manager that force-closes connections
+       upon release in the <a href="apidocs/org/apache/commons/httpclient/HttpConnectionManager.html#releaseConnection(org.apache.commons.httpclient.HttpConnection)">
+       releaseConnection</a> method.
+     </p>
+    </div><div class="section"><a name="Concurrent_execution_of_HTTP_methods"></a><h2>Concurrent execution of HTTP methods</h2>
+      <p>
+      If the application logic allows for execution of multiple HTTP requests concurrently 
+      (e.g. multiple requests against various sites, or multiple requests representing 
+      different user identities), the use of a dedicated thread per HTTP session can result in a 
+      significant performance gain. HttpClient is fully thread-safe when used with a thread-safe
+      connection manager such as <a href="apidocs/org/apache/commons/httpclient/MultiThreadedHttpConnectionManager.html">
+      MultiThreadedHttpConnectionManager</a>. Please note that each respective thread of execution 
+      must have a local instance of HttpMethod and can have a local instance of HttpState or/and
+      HostConfiguration to represent a specific host configuration and conversational state. At the
+      same time the HttpClient instance and connection manager should be shared among all threads 
+      for maximum efficiency.
+     </p>
+      <p>
+      For details on using multiple threads with HttpClient please refer to the <a href="threading.html">
+      HttpClient Threading Guide</a>.  
+     </p>
+    </div><div class="section"><a name="Request_Response_entity_streaming"></a><h2>Request/Response entity streaming</h2>
+      <p>
+      HttpClient is capable of efficient request/response body streaming. Large entities may be submitted 
+      or received without being buffered in memory. This is especially critical if multiple HTTP 
+      methods may be executed concurrently. While there are convenience methods to deal with entities such as
+      strings or byte arrays, their use is discouraged. Unless used carefully they can easily lead to
+      out of memory conditions, since they imply buffering of the complete entity in memory.
+     </p>
+      <p>
+        <strong>Response streaming:</strong> It is recommended to consume the HTTP response body as a stream of
+       bytes/characters using HttpMethod#getResponseBodyAsStream method. The use of HttpMethod#getResponseBody and 
+       HttpMethod#getResponseBodyAsString are strongly discouraged.
+      
+    <div class="source"><pre>
+  HttpClient httpclient = new HttpClient();
+  GetMethod httpget = new GetMethod("http://www.myhost.com/");
+  try {
+    httpclient.executeMethod(httpget);
+    Reader reader = new InputStreamReader(
+            httpget.getResponseBodyAsStream(), httpget.getResponseCharSet()); 
+    // consume the response entity
+  } finally {
+    httpget.releaseConnection();
+  }</pre></div>
+  
+      </p>
+      <p>
+        <strong>Request streaming:</strong> The main difficulty encountered when streaming request bodies is that
+        some entity enclosing methods need to be retried due to an authentication failure or an I/O failure. 
+        Obviously non-buffered entities cannot be reread and resubmitted. The recommended approach is to create a custom 
+        <a href="apidocs/org/apache/commons/httpclient/methods/RequestEntity.html">RequestEntity</a> capable of 
+        reconstructing the underlying input stream.
+      
+    <div class="source"><pre>
+public class FileRequestEntity implements RequestEntity {
+
+    private File file = null;
+    
+    public FileRequestEntity(File file) {
+        super();
+        this.file = file;
+    }
+
+    public boolean isRepeatable() {
+        return true;
+    }
+
+    public String getContentType() {
+        return "text/plain; charset=UTF-8";
+    }
+    
+    public void writeRequest(OutputStream out) throws IOException {
+        InputStream in = new FileInputStream(this.file);
+        try {
+            int l;
+            byte[] buffer = new byte[1024];
+            while ((l = in.read(buffer)) != -1) {
+                out.write(buffer, 0, l);
+            }
+        } finally {
+            in.close();
+        }
+    }
+
+    public long getContentLength() {
+        return file.length();
+    }
+}
+
+File myfile = new File("myfile.txt");
+PostMethod httppost = new PostMethod("/stuff");
+httppost.setRequestEntity(new FileRequestEntity(myfile));</pre></div>
+  
+      </p>
+    </div><div class="section"><a name="Expect-continue_handshake"></a><h2>Expect-continue handshake</h2>
+      <p>
+      The purpose of the HTTP 100 (Continue) status is to allow a client sending a request entity to 
+      determine if the target server is willing to accept the request (based on the 
+      request headers) before the client sends the request entity. It is highly inefficient for the client
+      to send the request entity if the server will reject the request without looking at the body. 
+      Authentication failures are the most common reason for the request to be rejected based on the request
+      headers alone. Therefore, use of the 'Expect-continue' handshake is especially recommended with 
+      those target servers that require HTTP authentication. For proxied requests caution
+      must be taken as older HTTP/1.0 proxies may be unable to correctly handle the 'Expect-continue' 
+      handshake.
+     </p>
+     <p>
+     See the <a href="preference-api.html">http.protocol.expect-continue</a> parameter documentation 
+     for more information.
+     </p>
+    </div><div class="section"><a name="Stale_connection_check"></a><h2>Stale connection check</h2>
+      <p>
+      HTTP specification permits both the client and the server to terminate a persistent (keep-alive) 
+      connection at any time without notice to the counterpart, thus rendering the connection invalid
+      or stale. By default HttpClient performs a check, just prior to executing a request, to determine if the 
+      active connection is stale. The cost of this operation is about 15-30 ms, depending on the JRE used.
+      Disabling stale connection check may result in slight performance improvement, especially for small
+      payload responses, at the risk of getting an I/O error when executing a request over a connection 
+      that has been closed at the server side.
+     </p>
+     <p>
+     See the <a href="preference-api.html">http.connection.stalecheck</a> parameter documentation for more 
+     information.
+     </p>
+    </div><div class="section"><a name="Cookie_processing"></a><h2>Cookie processing</h2>
+      <p>
+      If an application, such as web spider, does not need to maintain conversational state with the target
+      server, a small performance gain can made by disabling cookie processing. For details 
+      on cookie processing please to the <a href="cookies.html">HttpClient Cookies Guide</a>.
+     </p>
+    </div></div></div><div class="clear"><hr></hr></div><div id="footer"><div class="xright">© 2001-2007, Apache Software Foundation</div><div class="clear"><hr></hr></div></div></body></html>

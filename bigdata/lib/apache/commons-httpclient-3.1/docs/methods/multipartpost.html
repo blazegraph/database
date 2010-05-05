@@ -1,0 +1,76 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html><head><title>HttpClient - Multipart Post Method</title><style type="text/css" media="all">
+          @import url("../style/maven-base.css");
+          
+          @import url("../style/maven-theme.css");@import url("../style/project.css");</style><link rel="stylesheet" href="../style/print.css" type="text/css" media="print"></link><meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1"></meta><meta name="author" content="Adrian Sutton"></meta><meta name="email" content="adrian@ephox.com"></meta></head><body class="composite"><div id="banner"><a href="http://jakarta.apache.org/" id="organizationLogo"><img alt="Apache Software Foundation" src="http://jakarta.apache.org/images/jakarta-logo.gif"></img></a><a href="http://jakarta.apache.org/httpcomponents/httpclient-3.x/" id="projectLogo"><img alt="HttpClient" src="../images/httpclient_logo.png"></img></a><div class="clear"><hr></hr></div></div><div id="breadcrumbs"><div class="xleft">Last published: 18 August 2007
+                <span class="separator">|</span> Doc for  3.1
+                </div><div class="xright"></div><div class="clear"><hr></hr></div></div><div id="leftColumn"><div id="navcolumn"><div id="menuOverview"><h5>Overview</h5><ul><li class="none"><a href="../features.html">Features</a></li><li class="none"><a href="../news.html">News</a></li><li class="none"><a href="../status.html">Status</a></li><li class="none"><a href="../downloads.html">Download</a></li><li class="none"><a href="http://wiki.apache.org/jakarta-httpclient/" class="externalLink" title="External Link">Wiki</a></li><li class="expanded"><a href="../userguide.html">User Guide</a><ul><li class="none"><a href="../authentication.html">Authentication Guide</a></li><li class="none"><a href="../charencodings.html">Character Encodings</a></li><li class="none"><a href="../cookies.html">Cookies</a></li><li class="none"><a href="../exception-handling.html">Exception Handling</a></li><li class="none"><a href="../logging.html">Logging Guide</a></li><li class="none"><a href="../methods.html">Methods</a></li><li class="none"><a href="../performance.html">Optimization Guide</a></li><li class="none"><a href="../preference-api.html">Preference Architecture</a></li><li class="none"><a href="../redirects.html">Redirects Handling</a></li><li class="none"><a href="http://svn.apache.org/viewvc/jakarta/httpcomponents/oac.hc3x/trunk/src/examples/" class="externalLink" title="External Link">Sample Code</a></li><li class="none"><a href="../sslguide.html">SSL Guide</a></li><li class="none"><a href="../threading.html">Threading</a></li><li class="none"><a href="../troubleshooting.html">Trouble Shooting</a></li><li class="none"><a href="../tutorial.html">Tutorial</a></li></ul></li><li class="none"><a href="../developerguide.html">Developer Guide</a></li></ul></div><div id="menuProject_Documentation"><h5>Project Documentation</h5><ul><li class="none"><a href="../index.html">About</a></li><li class="collapsed"><a href="../project-info.html">Project Info</a></li><li class="collapsed"><a href="../maven-reports.html">Project Reports</a></li><li class="none"><a href="../development-process.html">Development Process</a></li></ul></div><div id="legend"><h5>Legend</h5><ul><li class="externalLink">External Link</li><li class="newWindow">Opens in a new window</li></ul></div><a href="http://maven.apache.org/" title="Built by Maven" id="poweredBy"><img alt="Built by Maven" src="../images/logos/mavenlogo_builtby_w.png"></img></a></div></div><div id="bodyColumn"><div class="contentBox"><div class="section"><a name="Introduction"></a><h2>Introduction</h2>
+      <p>The multipart post method is a different request body format for a
+      <a href="post.html">POST</a> method.  The media-type multipart/form-data
+      follows the rules of all multipart MIME data streams as outlined in RFC
+      1521.  It is intended for use in returning the data that comes about from
+      filling out a form, particularly when the form requires binary data to
+      be uploaded such as the contents of a file.</p>
+    </div><div class="section"><a name="Typical_Usage"></a><h2>Typical Usage</h2>
+      <p>Like for the standard POST method, there are two main steps to using
+      the multipart post method, setting the request data and retrieving the
+      response data.</p>
+
+      <p>The request data is specified by adding parameters to the method,
+      these are defined by the
+      <code>org.apache.commons.httpclient.methods.multipart.Part</code> class
+      and it's various subclasses.  A description of each of these is below.</p>
+
+      <table class="bodyTable">
+        <tr class="b">
+          <th>Part</th>
+          <th>Description</th>
+        </tr>
+        <tr class="a">
+          <td>StringPart</td>
+          <td>The string part is a simple part that takes a name for the part
+          and the value of the part as a string.  This is typically used for
+          standard form elements such as a text area within a multipart
+          form.</td>
+        </tr>
+        <tr class="b">
+          <td>FilePart</td>
+          <td>The file part is actually a very generic type of part that can
+          contain any type of data and specify a name, content type and charset
+          for the data.  In it's simplest form, it takes just a name and a File
+          object and uploads the contents of the file, however it can also be
+          passed a <code>PartSource</code> object to upload.  See the part
+          source section below for more information.</td>
+        </tr>
+      </table>
+
+      <div class="subsection"><a name="Part_Sources"></a><h3>Part Sources</h3>
+        <p>The <code>PartSource</code> interface provides a generic container
+        for providing data to the FilePart class.  There are two concrete
+        implementations of PartSource provided with HttpClient (described
+        below) but you can also provide your own implementation easily.  The
+        input for the multipart post could come from anywhere, perhaps it's
+        being received from another server or process, and all that the
+        PartSource class needs to be able to do is provide the length of the
+        data that will be provided, an input stream to retrieve the data from
+        and a file name (or some name identifying the data).</p>
+
+        <p>The two concrete implementations of PartSource are FilePartSource
+        and ByteArrayPartSource.  FilePartSource simply takes a File to upload
+        whereas ByteArrayPartSource allows for the case where the data has been
+        cached in memory and takes a file name and a byte array to upload.</p>
+      </div>
+    </div><div class="section"><a name="Common_Problems"></a><h2>Common Problems</h2>
+      <p>The most common problem people run into with multipart uploads is that
+      the length of the data must be known before hand.  If the length of the
+      data can not be determined in advance, it needs to be cached either in
+      memory or to a file and then uploaded using either ByteArrayPartSource or
+      FilePartSource.  The HTTP specification does not allow for POST data to
+      be of an unknown length.</p>
+    </div><div class="section"><a name="RFC_Section"></a><h2>RFC Section</h2>
+      <p>The multipart form data uses the POST method from the HTTP standard
+      which is defined in section 8.3 of <a href="http://www.ietf.org/rfc//rfc1945.txt" class="externalLink" title="External Link">RFC1945</a> and similarly
+      redefined for HTTP 1.1 in section 9.5 of <a href="http://www.ietf.org/rfc/rfc2616.txt" class="externalLink" title="External Link">RFC2616</a>.</p>
+
+      <p>The multipart/form-data MIME type used to format the body of the
+      request is defined in <a href="http://www.ietf.org/rfc/rfc1867.txt" class="externalLink" title="External Link">RFC1867</a>.</p>
+    </div></div></div><div class="clear"><hr></hr></div><div id="footer"><div class="xright">© 2001-2007, Apache Software Foundation</div><div class="clear"><hr></hr></div></div></body></html>

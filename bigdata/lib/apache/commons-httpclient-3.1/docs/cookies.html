@@ -1,0 +1,132 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html><head><title>HttpClient - HttpClient Cookie Guide</title><style type="text/css" media="all">
+          @import url("./style/maven-base.css");
+          
+          @import url("./style/maven-theme.css");@import url("./style/project.css");</style><link rel="stylesheet" href="./style/print.css" type="text/css" media="print"></link><meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1"></meta><meta name="author" content="Adrian Sutton"></meta><meta name="email" content="adrian@intencha.com"></meta><meta name="author" content="Oleg Kalnichevski"></meta><meta name="email" content="oleg@ural.ru"></meta></head><body class="composite"><div id="banner"><a href="http://jakarta.apache.org/" id="organizationLogo"><img alt="Apache Software Foundation" src="http://jakarta.apache.org/images/jakarta-logo.gif"></img></a><a href="http://jakarta.apache.org/httpcomponents/httpclient-3.x/" id="projectLogo"><img alt="HttpClient" src="./images/httpclient_logo.png"></img></a><div class="clear"><hr></hr></div></div><div id="breadcrumbs"><div class="xleft">Last published: 18 August 2007
+                <span class="separator">|</span> Doc for  3.1
+                </div><div class="xright"></div><div class="clear"><hr></hr></div></div><div id="leftColumn"><div id="navcolumn"><div id="menuOverview"><h5>Overview</h5><ul><li class="none"><a href="features.html">Features</a></li><li class="none"><a href="news.html">News</a></li><li class="none"><a href="status.html">Status</a></li><li class="none"><a href="downloads.html">Download</a></li><li class="none"><a href="http://wiki.apache.org/jakarta-httpclient/" class="externalLink" title="External Link">Wiki</a></li><li class="expanded"><a href="userguide.html">User Guide</a><ul><li class="none"><a href="authentication.html">Authentication Guide</a></li><li class="none"><a href="charencodings.html">Character Encodings</a></li><li class="none"><strong><a href="cookies.html">Cookies</a></strong></li><li class="none"><a href="exception-handling.html">Exception Handling</a></li><li class="none"><a href="logging.html">Logging Guide</a></li><li class="none"><a href="methods.html">Methods</a></li><li class="none"><a href="performance.html">Optimization Guide</a></li><li class="none"><a href="preference-api.html">Preference Architecture</a></li><li class="none"><a href="redirects.html">Redirects Handling</a></li><li class="none"><a href="http://svn.apache.org/viewvc/jakarta/httpcomponents/oac.hc3x/trunk/src/examples/" class="externalLink" title="External Link">Sample Code</a></li><li class="none"><a href="sslguide.html">SSL Guide</a></li><li class="none"><a href="threading.html">Threading</a></li><li class="none"><a href="troubleshooting.html">Trouble Shooting</a></li><li class="none"><a href="tutorial.html">Tutorial</a></li></ul></li><li class="none"><a href="developerguide.html">Developer Guide</a></li></ul></div><div id="menuProject_Documentation"><h5>Project Documentation</h5><ul><li class="none"><a href="index.html">About</a></li><li class="collapsed"><a href="project-info.html">Project Info</a></li><li class="collapsed"><a href="maven-reports.html">Project Reports</a></li><li class="none"><a href="development-process.html">Development Process</a></li></ul></div><div id="legend"><h5>Legend</h5><ul><li class="externalLink">External Link</li><li class="newWindow">Opens in a new window</li></ul></div><a href="http://maven.apache.org/" title="Built by Maven" id="poweredBy"><img alt="Built by Maven" src="./images/logos/mavenlogo_builtby_w.png"></img></a></div></div><div id="bodyColumn"><div class="contentBox"><div class="section"><a name="Introduction"></a><h2>Introduction</h2>
+      <p>HttpClient supports automatic management of cookies, including
+      allowing the server to set cookies and automatically return them to the
+      server when required.  It is also possible to manually set cookies to be
+      sent to the server.</p>
+
+      <p>Unfortunately, there are several at times conflicting  standards for 
+      handling Cookies: the Netscape Cookie draft, RFC2109, RFC2965 and a large
+      number of vendor specific implementations that are compliant with neither 
+      specification. To deal with this, HttpClient provides policy driven cookie 
+      management. This guide will explain how to use the different cookie 
+      specifications and identify some of the common problems people have when 
+      using Cookies and HttpClient.</p>
+    </div><div class="section"><a name="Available_Specifications"></a><h2>Available Specifications</h2>
+      <p>The following cookie specifications are supported by HttpClient.</p>
+
+      <div class="subsection"><a name="Netscape_Draft"></a><h3>Netscape Draft</h3>
+        <p>The Netscape draft is the original cookie specification which formed
+        the basis for RFC2109.  Despite this it has some significant
+        differences with RFC2109 and thus may be required for compatibility
+        with some servers.</p>
+
+        <p>The Netscape cookie draft is available at <a href="http://wp.netscape.com/newsref/std/cookie_spec.html" class="externalLink" title="External Link">http://wp.netscape.com/newsref/std/cookie_spec.html</a>
+        </p>
+      </div>
+
+      <div class="subsection"><a name="RFC2109"></a><h3>RFC2109</h3>
+        <p>RFC2109 is the first official cookie specification released by the W3C.
+        Theoretically, all servers that handle version 1 cookies should use this
+        specification and as such this specification is used by default within
+        HttpClient.</p>
+
+        <p>Unfortunately, many servers either incorrectly implement this
+        standard or are still using the Netscape draft so occasionally this
+        specification is too strict.  If this is the case, you should switch to
+        the compatibility specification as described below.</p>
+
+        <p>RFC2109 is available at
+        <a href="http://www.w3.org/Protocols/rfc2109/rfc2109.txt" class="externalLink" title="External Link">http://www.w3.org/Protocols/rfc2109/rfc2109.txt</a>
+        </p>
+
+        <p>RFC2109 is the default cookie policy used by HttpClient.</p>
+      </div>
+
+      <div class="subsection"><a name="Browser_Compatibility"></a><h3>Browser Compatibility</h3>
+        <p>The compatibility specification is designed to be compatible with as
+        many different servers as possible even if they are not completely
+        standards compliant. If you are encountering problems with parsing
+        cookies, you should probably try using this specification.</p>
+        <p>There are many web sites with badly written CGI scripts that only work 
+        when all cookies are put into one request header. It is advisable to 
+        set <a href="preference-api.html">http.protocol.single-cookie-header</a>
+        parameter to <code>true</code> for maximum compatibility.
+        </p>
+      </div>
+
+      <div class="subsection"><a name="Ignore_Cookies"></a><h3>Ignore Cookies</h3>
+        <p>This cookie specification ignores all cookies.  It should be used to
+        keep HttpClient from accepting and sending cookies.</p>
+      </div>
+
+    </div><div class="section"><a name="Unsupported_Specifications"></a><h2>Unsupported Specifications</h2>
+      <p>The following cookie specifications are not presently supported by HttpClient.</p>
+
+      <div class="subsection"><a name="RFC2965"></a><h3>RFC2965</h3>
+        <p>RFC2965 defines cookie version 2 and attempts to address the shortcomings 
+        of the RFC2109 regarding cookie version 1. RFC2965 is intended to eventually 
+        supersede RFC2109.</p>
+
+        <p>Currently HttpClient does not implement this specification. Support for
+           version 2 cookies will be added in the future</p>
+
+        <p>RFC2965 is available at
+        <a href="http://www.w3.org/Protocols/rfc2965/rfc2965.txt" class="externalLink" title="External Link">http://www.w3.org/Protocols/rfc2965/rfc2965.txt</a>
+        </p>
+      </div>
+      
+    </div><div class="section"><a name="Specifying_the_Specification"></a><h2>Specifying the Specification</h2>
+      <p>There are two ways to specify which cookie specification should be
+      used, either for each <code>HttpMethod</code> instance using the 
+      <code>HttpMethodParams</code>, or by setting the default value on
+      <code>CookiePolicy</code>.</p>
+
+      <div class="subsection"><a name="Per_HttpMethod"></a><h3>Per HttpMethod</h3>
+        <p>In most cases, the best way to specify the cookie spec to use is the
+        <code>setCookiePolicy(String policy)</code> method on
+        <code>HttpMethodParams</code>.  The value of <code>policy</code>
+        must be one of the values registered with <code>CookiePolicy.registerCookieSpec()</code>.</p>
+
+        
+    <div class="source"><pre>
+        HttpMethod method = new GetMethod();
+        method.getParams().setCookiePolicy(CookiePolicy.RFC_2109);
+        </pre></div>
+  
+      </div>
+
+      
+    </div><div class="section"><a name="Manual_handling_of_cookies"></a><h2>Manual handling of cookies</h2>
+      <p>The cookie management API of HttpClient can co-exist with the manual 
+      cookie handling. One can manually set request <code>Cookie</code> 
+      headers or process response <code>Set-Cookie</code> headers in addition 
+      or instead of the automatic cookie management</p>
+
+        
+    <div class="source"><pre>
+        HttpMethod method = new GetMethod();
+        method.getParams().setCookiePolicy(CookiePolicy.IGNORE_COOKIES);
+        method.setRequestHeader("Cookie", "special-cookie=value");
+        </pre></div>
+  
+
+    </div><div class="section"><a name="Common_Problems"></a><h2>Common Problems</h2>
+      <p>The most common problems encountered with parsing cookies is due to
+      non-compliant servers.  In these cases, switching to the compatibility
+      cookie specification usually solves the problem.</p>
+    </div><div class="section"><a name="Encoding_Issues"></a><h2>Encoding Issues</h2>
+      <p>Since cookies are transfered as HTTP Headers they are confined to
+      the <tt>US-ASCII</tt> character set. Other characters will be lost or
+      mangeled. Cookies are typically set and read by the same server, so
+      a custom scheme for escaping non-ASCII characters can be used, for
+      instance the well-established URL encoding scheme. If cookies are
+      used to transfer data between server and client both parties must
+      agree on the escaping scheme used in a custom way. The HttpClient
+      cookie implementation provides no special means to handle non-ASCII
+      characters nor does it issue warnings.</p>
+    </div></div></div><div class="clear"><hr></hr></div><div id="footer"><div class="xright">© 2001-2007, Apache Software Foundation</div><div class="clear"><hr></hr></div></div></body></html>

@@ -1,0 +1,1508 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html><head><title>HttpClient - JDepend Source Code Analysis</title><style type="text/css" media="all">
+          @import url("./style/maven-base.css");
+          
+          @import url("./style/maven-theme.css");@import url("./style/project.css");</style><link rel="stylesheet" href="./style/print.css" type="text/css" media="print"></link><meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1"></meta><style type="text/css">.jdepend td ul, .jdepend td ul li { margin:0; padding:0; list-style-type: none; }</style></head><body class="jdepend"><div id="banner"><a href="http://jakarta.apache.org/" id="organizationLogo"><img alt="Apache Software Foundation" src="http://jakarta.apache.org/images/jakarta-logo.gif"></img></a><a href="http://jakarta.apache.org/httpcomponents/httpclient-3.x/" id="projectLogo"><img alt="HttpClient" src="./images/httpclient_logo.png"></img></a><div class="clear"><hr></hr></div></div><div id="breadcrumbs"><div class="xleft">Last published: 18 August 2007
+                <span class="separator">|</span> Doc for  3.1
+                </div><div class="xright"></div><div class="clear"><hr></hr></div></div><div id="leftColumn"><div id="navcolumn"><div id="menuOverview"><h5>Overview</h5><ul><li class="none"><a href="features.html">Features</a></li><li class="none"><a href="news.html">News</a></li><li class="none"><a href="status.html">Status</a></li><li class="none"><a href="downloads.html">Download</a></li><li class="none"><a href="http://wiki.apache.org/jakarta-httpclient/" class="externalLink" title="External Link">Wiki</a></li><li class="expanded"><a href="userguide.html">User Guide</a><ul><li class="none"><a href="authentication.html">Authentication Guide</a></li><li class="none"><a href="charencodings.html">Character Encodings</a></li><li class="none"><a href="cookies.html">Cookies</a></li><li class="none"><a href="exception-handling.html">Exception Handling</a></li><li class="none"><a href="logging.html">Logging Guide</a></li><li class="none"><a href="methods.html">Methods</a></li><li class="none"><a href="performance.html">Optimization Guide</a></li><li class="none"><a href="preference-api.html">Preference Architecture</a></li><li class="none"><a href="redirects.html">Redirects Handling</a></li><li class="none"><a href="http://svn.apache.org/viewvc/jakarta/httpcomponents/oac.hc3x/trunk/src/examples/" class="externalLink" title="External Link">Sample Code</a></li><li class="none"><a href="sslguide.html">SSL Guide</a></li><li class="none"><a href="threading.html">Threading</a></li><li class="none"><a href="troubleshooting.html">Trouble Shooting</a></li><li class="none"><a href="tutorial.html">Tutorial</a></li></ul></li><li class="none"><a href="developerguide.html">Developer Guide</a></li></ul></div><div id="menuProject_Documentation"><h5>Project Documentation</h5><ul><li class="none"><a href="index.html">About</a></li><li class="collapsed"><a href="project-info.html">Project Info</a></li><li class="expanded"><a href="maven-reports.html">Project Reports</a><ul><li class="none"><a href="changelog-report.html">Change Log</a></li><li class="none"><a href="developer-activity-report.html">Developer Activity</a></li><li class="none"><a href="file-activity-report.html">File Activity</a></li><li class="none"><a href="apidocs/index.html" class="newWindow" title="New Window" target="_blank">JavaDocs</a></li><li class="none"><a href="javadoc.html">JavaDoc Report</a></li><li class="none"><a href="javadoc-warnings-report.html">JavaDoc Warnings Report</a></li><li class="none"><strong><a href="jdepend-report.html">Metrics</a></strong></li><li class="none"><a href="junit-report.html">Unit Tests</a></li><li class="none"><a href="xref/index.html" class="newWindow" title="New Window" target="_blank">Source Xref</a></li><li class="none"><a href="xref-test/index.html" class="newWindow" title="New Window" target="_blank">Test Xref</a></li><li class="none"><a href="license.html">Project License</a></li><li class="none"><a href="task-list.html">Task List</a></li></ul></li><li class="none"><a href="development-process.html">Development Process</a></li></ul></div><div id="legend"><h5>Legend</h5><ul><li class="externalLink">External Link</li><li class="newWindow">Opens in a new window</li></ul></div><a href="http://maven.apache.org/" title="Built by Maven" id="poweredBy"><img alt="Built by Maven" src="./images/logos/mavenlogo_builtby_w.png"></img></a></div></div><div id="bodyColumn"><div class="contentBox"><div class="section"><a name="Metric_Results"></a><h2>Metric Results</h2>
+      <p>[
+        <a href="#Summary">summary</a>] [
+        <a href="#Packages">packages</a>] [
+        <a href="#Cycles">cycles</a>] [
+        <a href="#Explanations">explanations</a>]
+      </p>
+      <p>The following document contains the results of a
+        <a href="http://www.clarkware.com/software/JDepend.html" class="externalLink" title="External Link">JDepend</a>metric analysis. The various metrics are defined at the bottom of this document.
+      </p>
+    </div><div class="section"><a name="Summary"></a><h2>Summary</h2>
+      <p>[
+        <a href="#Summary">summary</a>] [
+        <a href="#Packages">packages</a>] [
+        <a href="#Cycles">cycles</a>] [
+        <a href="#Explanations">explanations</a>]
+      </p>
+      <table class="bodyTable">
+        <thead>
+          <tr class="b">
+            <th title="Package">Package</th>
+            <th style="text-align:right">
+              <acronym title="Total Classes">TC</acronym>
+            </th>
+            <th style="text-align:right">
+              <acronym title="Abstract Classes">AC</acronym>
+            </th>
+            <th style="text-align:right">
+              <acronym title="Concrete Classes">CC</acronym>
+            </th>
+            <th style="text-align:right">
+              <acronym title="Afferent Couplings">AC</acronym>
+            </th>
+            <th style="text-align:right">
+              <acronym title="Efferent Couplings">EC</acronym>
+            </th>
+            <th style="text-align:right">
+              <acronym title="Abstractness">A</acronym>
+            </th>
+            <th style="text-align:right">
+              <acronym title="Instability">I</acronym>
+            </th>
+            <th style="text-align:right">
+              <acronym title="Distance">D</acronym>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="a">
+            <td>
+              <a href="#org_apache_commons_httpclient">org.apache.commons.httpclient</a>
+            </td>
+            <td style="text-align:right">68</td>
+            <td style="text-align:right">7</td>
+            <td style="text-align:right">61</td>
+            <td style="text-align:right">6</td>
+            <td style="text-align:right">15</td>
+            <td style="text-align:right"> 0.1</td>
+            <td style="text-align:right"> 71%</td>
+            <td style="text-align:right"> 18%</td>
+          </tr>
+          <tr class="b">
+            <td>
+              <a href="#org_apache_commons_httpclient_auth">org.apache.commons.httpclient.auth</a>
+            </td>
+            <td style="text-align:right">20</td>
+            <td style="text-align:right">5</td>
+            <td style="text-align:right">15</td>
+            <td style="text-align:right">1</td>
+            <td style="text-align:right">10</td>
+            <td style="text-align:right"> 0.25</td>
+            <td style="text-align:right"> 91%</td>
+            <td style="text-align:right"> 16%</td>
+          </tr>
+          <tr class="a">
+            <td>
+              <a href="#org_apache_commons_httpclient_cookie">org.apache.commons.httpclient.cookie</a>
+            </td>
+            <td style="text-align:right">23</td>
+            <td style="text-align:right">4</td>
+            <td style="text-align:right">19</td>
+            <td style="text-align:right">1</td>
+            <td style="text-align:right">6</td>
+            <td style="text-align:right"> 0.17</td>
+            <td style="text-align:right"> 86%</td>
+            <td style="text-align:right"> 3%</td>
+          </tr>
+          <tr class="b">
+            <td>
+              <a href="#org_apache_commons_httpclient_methods">org.apache.commons.httpclient.methods</a>
+            </td>
+            <td style="text-align:right">15</td>
+            <td style="text-align:right">3</td>
+            <td style="text-align:right">12</td>
+            <td style="text-align:right">1</td>
+            <td style="text-align:right">8</td>
+            <td style="text-align:right"> 0.2</td>
+            <td style="text-align:right"> 89%</td>
+            <td style="text-align:right"> 9%</td>
+          </tr>
+          <tr class="a">
+            <td>
+              <a href="#org_apache_commons_httpclient_methods_multipart">org.apache.commons.httpclient.methods.multipart</a>
+            </td>
+            <td style="text-align:right">8</td>
+            <td style="text-align:right">3</td>
+            <td style="text-align:right">5</td>
+            <td style="text-align:right">1</td>
+            <td style="text-align:right">7</td>
+            <td style="text-align:right"> 0.38</td>
+            <td style="text-align:right"> 88%</td>
+            <td style="text-align:right"> 25%</td>
+          </tr>
+          <tr class="b">
+            <td>
+              <a href="#org_apache_commons_httpclient_params">org.apache.commons.httpclient.params</a>
+            </td>
+            <td style="text-align:right">9</td>
+            <td style="text-align:right">2</td>
+            <td style="text-align:right">7</td>
+            <td style="text-align:right">5</td>
+            <td style="text-align:right">5</td>
+            <td style="text-align:right"> 0.22</td>
+            <td style="text-align:right"> 50%</td>
+            <td style="text-align:right"> 28%</td>
+          </tr>
+          <tr class="a">
+            <td>
+              <a href="#org_apache_commons_httpclient_protocol">org.apache.commons.httpclient.protocol</a>
+            </td>
+            <td style="text-align:right">9</td>
+            <td style="text-align:right">3</td>
+            <td style="text-align:right">6</td>
+            <td style="text-align:right">1</td>
+            <td style="text-align:right">10</td>
+            <td style="text-align:right"> 0.33</td>
+            <td style="text-align:right"> 91%</td>
+            <td style="text-align:right"> 24%</td>
+          </tr>
+          <tr class="b">
+            <td>
+              <a href="#org_apache_commons_httpclient_util">org.apache.commons.httpclient.util</a>
+            </td>
+            <td style="text-align:right">15</td>
+            <td style="text-align:right">0</td>
+            <td style="text-align:right">15</td>
+            <td style="text-align:right">6</td>
+            <td style="text-align:right">11</td>
+            <td style="text-align:right"> 0</td>
+            <td style="text-align:right"> 65%</td>
+            <td style="text-align:right"> 35%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div><div class="section"><a name="Packages"></a><h2>Packages</h2>
+      <p>[
+        <a href="#Summary">summary</a>] [
+        <a href="#Packages">packages</a>] [
+        <a href="#Cycles">cycles</a>] [
+        <a href="#Explanations">explanations</a>]
+      </p>
+      <div class="subsection"><a name="org_apache_commons_httpclient"></a><h3>org.apache.commons.httpclient</h3>
+        <table class="bodyTable">
+          <thead>
+            <tr class="a">
+              <th>Afferent Couplings</th>
+              <th>Efferent Couplings</th>
+              <th>Abstractness</th>
+              <th>Instability</th>
+              <th>Distance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="b">
+              <td>6</td>
+              <td>15</td>
+              <td> 10%</td>
+              <td> 71%</td>
+              <td> 18%</td>
+            </tr>
+          </tbody>
+        </table>
+        <table class="bodyTable">
+          <thead>
+            <tr class="a">
+              <th>Abstract Classes</th>
+              <th>Concrete Classes</th>
+              <th>Used by Packages</th>
+              <th>Uses Packages</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="b">
+              <td>
+                <ul>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/Credentials.html">Credentials</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HttpConnectionManager.html">HttpConnectionManager</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HttpMethod.html">HttpMethod</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HttpMethodBase.html">HttpMethodBase</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HttpMethodRetryHandler.html">HttpMethodRetryHandler</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/MethodRetryHandler.html">MethodRetryHandler</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/ResponseConsumedWatcher.html">ResponseConsumedWatcher</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/AutoCloseInputStream.html">AutoCloseInputStream</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/ChunkedInputStream.html">ChunkedInputStream</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/ChunkedOutputStream.html">ChunkedOutputStream</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/CircularRedirectException.html">CircularRedirectException</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/ConnectMethod.html">ConnectMethod</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/ConnectTimeoutException.html">ConnectTimeoutException</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/ConnectionPoolTimeoutException.html">ConnectionPoolTimeoutException</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/ContentLengthInputStream.html">ContentLengthInputStream</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/Cookie.html">Cookie</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/DefaultHttpMethodRetryHandler.html">DefaultHttpMethodRetryHandler</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/DefaultMethodRetryHandler.html">DefaultMethodRetryHandler</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/Header.html">Header</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HeaderElement.html">HeaderElement</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HeaderGroup.html">HeaderGroup</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HostConfiguration.html">HostConfiguration</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HttpClient.html">HttpClient</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HttpClientError.html">HttpClientError</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HttpConnection.html">HttpConnection</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HttpConstants.html">HttpConstants</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HttpContentTooLargeException.html">HttpContentTooLargeException</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HttpException.html">HttpException</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HttpHost.html">HttpHost</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HttpMethodBase.html">HttpMethodBase$1</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HttpMethodDirector.html">HttpMethodDirector</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HttpParser.html">HttpParser</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HttpRecoverableException.html">HttpRecoverableException</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HttpState.html">HttpState</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HttpStatus.html">HttpStatus</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HttpURL.html">HttpURL</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HttpVersion.html">HttpVersion</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/HttpsURL.html">HttpsURL</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/InvalidRedirectLocationException.html">InvalidRedirectLocationException</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/MultiThreadedHttpConnectionManager.html">MultiThreadedHttpConnectionManager</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/MultiThreadedHttpConnectionManager.html">MultiThreadedHttpConnectionManager$1</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/MultiThreadedHttpConnectionManager.html">MultiThreadedHttpConnectionManager$ConnectionPool</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/MultiThreadedHttpConnectionManager.html">MultiThreadedHttpConnectionManager$ConnectionSource</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/MultiThreadedHttpConnectionManager.html">MultiThreadedHttpConnectionManager$HostConnectionPool</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/MultiThreadedHttpConnectionManager.html">MultiThreadedHttpConnectionManager$HttpConnectionAdapter</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/MultiThreadedHttpConnectionManager.html">MultiThreadedHttpConnectionManager$HttpConnectionWithReference</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/MultiThreadedHttpConnectionManager.html">MultiThreadedHttpConnectionManager$ReferenceQueueThread</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/MultiThreadedHttpConnectionManager.html">MultiThreadedHttpConnectionManager$WaitingThread</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/NTCredentials.html">NTCredentials</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/NameValuePair.html">NameValuePair</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/NoHttpResponseException.html">NoHttpResponseException</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/ProtocolException.html">ProtocolException</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/ProxyClient.html">ProxyClient</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/ProxyClient.html">ProxyClient$1</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/ProxyClient.html">ProxyClient$ConnectResponse</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/ProxyClient.html">ProxyClient$DummyConnectionManager</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/ProxyHost.html">ProxyHost</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/RedirectException.html">RedirectException</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/SimpleHttpConnectionManager.html">SimpleHttpConnectionManager</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/StatusLine.html">StatusLine</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/URI.html">URI</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/URI.html">URI$DefaultCharsetChanged</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/URI.html">URI$LocaleToCharsetMap</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/URIException.html">URIException</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/UsernamePasswordCredentials.html">UsernamePasswordCredentials</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/Wire.html">Wire</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/WireLogInputStream.html">WireLogInputStream</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/WireLogOutputStream.html">WireLogOutputStream</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_auth">org.apache.commons.httpclient.auth</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_cookie">org.apache.commons.httpclient.cookie</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_methods">org.apache.commons.httpclient.methods</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_params">org.apache.commons.httpclient.params</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_protocol">org.apache.commons.httpclient.protocol</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_util">org.apache.commons.httpclient.util</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="#java_io">java.io</a>
+                  </li>
+                  <li>
+                    <a href="#java_lang">java.lang</a>
+                  </li>
+                  <li>
+                    <a href="#java_lang_ref">java.lang.ref</a>
+                  </li>
+                  <li>
+                    <a href="#java_lang_reflect">java.lang.reflect</a>
+                  </li>
+                  <li>
+                    <a href="#java_net">java.net</a>
+                  </li>
+                  <li>
+                    <a href="#java_security">java.security</a>
+                  </li>
+                  <li>
+                    <a href="#java_util">java.util</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_codec">org.apache.commons.codec</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_codec_net">org.apache.commons.codec.net</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_auth">org.apache.commons.httpclient.auth</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_cookie">org.apache.commons.httpclient.cookie</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_params">org.apache.commons.httpclient.params</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_protocol">org.apache.commons.httpclient.protocol</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_util">org.apache.commons.httpclient.util</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_logging">org.apache.commons.logging</a>
+                  </li>
+                </ul>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="subsection"><a name="org_apache_commons_httpclient_auth"></a><h3>org.apache.commons.httpclient.auth</h3>
+        <table class="bodyTable">
+          <thead>
+            <tr class="a">
+              <th>Afferent Couplings</th>
+              <th>Efferent Couplings</th>
+              <th>Abstractness</th>
+              <th>Instability</th>
+              <th>Distance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="b">
+              <td>1</td>
+              <td>10</td>
+              <td> 25%</td>
+              <td> 91%</td>
+              <td> 16%</td>
+            </tr>
+          </tbody>
+        </table>
+        <table class="bodyTable">
+          <thead>
+            <tr class="a">
+              <th>Abstract Classes</th>
+              <th>Concrete Classes</th>
+              <th>Used by Packages</th>
+              <th>Uses Packages</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="b">
+              <td>
+                <ul>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/auth/AuthPolicy.html">AuthPolicy</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/auth/AuthScheme.html">AuthScheme</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/auth/AuthSchemeBase.html">AuthSchemeBase</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/auth/CredentialsProvider.html">CredentialsProvider</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/auth/RFC2617Scheme.html">RFC2617Scheme</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/auth/AuthChallengeException.html">AuthChallengeException</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/auth/AuthChallengeParser.html">AuthChallengeParser</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/auth/AuthChallengeProcessor.html">AuthChallengeProcessor</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/auth/AuthScope.html">AuthScope</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/auth/AuthState.html">AuthState</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/auth/AuthenticationException.html">AuthenticationException</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/auth/BasicScheme.html">BasicScheme</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/auth/CredentialsNotAvailableException.html">CredentialsNotAvailableException</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/auth/DigestScheme.html">DigestScheme</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/auth/HttpAuthRealm.html">HttpAuthRealm</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/auth/HttpAuthenticator.html">HttpAuthenticator</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/auth/InvalidCredentialsException.html">InvalidCredentialsException</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/auth/MalformedChallengeException.html">MalformedChallengeException</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/auth/NTLM.html">NTLM</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/auth/NTLMScheme.html">NTLMScheme</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="#org_apache_commons_httpclient">org.apache.commons.httpclient</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="#java_lang">java.lang</a>
+                  </li>
+                  <li>
+                    <a href="#java_security">java.security</a>
+                  </li>
+                  <li>
+                    <a href="#java_util">java.util</a>
+                  </li>
+                  <li>
+                    <a href="#javax_crypto">javax.crypto</a>
+                  </li>
+                  <li>
+                    <a href="#javax_crypto_spec">javax.crypto.spec</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_codec_binary">org.apache.commons.codec.binary</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient">org.apache.commons.httpclient</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_params">org.apache.commons.httpclient.params</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_util">org.apache.commons.httpclient.util</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_logging">org.apache.commons.logging</a>
+                  </li>
+                </ul>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="subsection"><a name="org_apache_commons_httpclient_cookie"></a><h3>org.apache.commons.httpclient.cookie</h3>
+        <table class="bodyTable">
+          <thead>
+            <tr class="a">
+              <th>Afferent Couplings</th>
+              <th>Efferent Couplings</th>
+              <th>Abstractness</th>
+              <th>Instability</th>
+              <th>Distance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="b">
+              <td>1</td>
+              <td>6</td>
+              <td> 17%</td>
+              <td> 86%</td>
+              <td> 3%</td>
+            </tr>
+          </tbody>
+        </table>
+        <table class="bodyTable">
+          <thead>
+            <tr class="a">
+              <th>Abstract Classes</th>
+              <th>Concrete Classes</th>
+              <th>Used by Packages</th>
+              <th>Uses Packages</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="b">
+              <td>
+                <ul>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/CookieAttributeHandler.html">CookieAttributeHandler</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/CookiePolicy.html">CookiePolicy</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/CookieSpec.html">CookieSpec</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/CookieVersionSupport.html">CookieVersionSupport</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/Cookie2.html">Cookie2</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/CookieOrigin.html">CookieOrigin</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/CookiePathComparator.html">CookiePathComparator</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/CookieSpecBase.html">CookieSpecBase</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/IgnoreCookiesSpec.html">IgnoreCookiesSpec</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/MalformedCookieException.html">MalformedCookieException</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/NetscapeDraftSpec.html">NetscapeDraftSpec</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/RFC2109Spec.html">RFC2109Spec</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/RFC2965Spec.html">RFC2965Spec</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/RFC2965Spec.html">RFC2965Spec$1</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/RFC2965Spec.html">RFC2965Spec$Cookie2DomainAttributeHandler</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/RFC2965Spec.html">RFC2965Spec$Cookie2MaxageAttributeHandler</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/RFC2965Spec.html">RFC2965Spec$Cookie2PathAttributeHandler</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/RFC2965Spec.html">RFC2965Spec$Cookie2PortAttributeHandler</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/RFC2965Spec.html">RFC2965Spec$Cookie2VersionAttributeHandler</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/RFC2965Spec.html">RFC2965Spec$CookieCommentAttributeHandler</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/RFC2965Spec.html">RFC2965Spec$CookieCommentUrlAttributeHandler</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/RFC2965Spec.html">RFC2965Spec$CookieDiscardAttributeHandler</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/cookie/RFC2965Spec.html">RFC2965Spec$CookieSecureAttributeHandler</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="#org_apache_commons_httpclient">org.apache.commons.httpclient</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="#java_lang">java.lang</a>
+                  </li>
+                  <li>
+                    <a href="#java_text">java.text</a>
+                  </li>
+                  <li>
+                    <a href="#java_util">java.util</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient">org.apache.commons.httpclient</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_util">org.apache.commons.httpclient.util</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_logging">org.apache.commons.logging</a>
+                  </li>
+                </ul>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="subsection"><a name="org_apache_commons_httpclient_methods"></a><h3>org.apache.commons.httpclient.methods</h3>
+        <table class="bodyTable">
+          <thead>
+            <tr class="a">
+              <th>Afferent Couplings</th>
+              <th>Efferent Couplings</th>
+              <th>Abstractness</th>
+              <th>Instability</th>
+              <th>Distance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="b">
+              <td>1</td>
+              <td>8</td>
+              <td> 20%</td>
+              <td> 89%</td>
+              <td> 9%</td>
+            </tr>
+          </tbody>
+        </table>
+        <table class="bodyTable">
+          <thead>
+            <tr class="a">
+              <th>Abstract Classes</th>
+              <th>Concrete Classes</th>
+              <th>Used by Packages</th>
+              <th>Uses Packages</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="b">
+              <td>
+                <ul>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/EntityEnclosingMethod.html">EntityEnclosingMethod</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/ExpectContinueMethod.html">ExpectContinueMethod</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/RequestEntity.html">RequestEntity</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/ByteArrayRequestEntity.html">ByteArrayRequestEntity</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/DeleteMethod.html">DeleteMethod</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/FileRequestEntity.html">FileRequestEntity</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/GetMethod.html">GetMethod</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/HeadMethod.html">HeadMethod</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/InputStreamRequestEntity.html">InputStreamRequestEntity</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/MultipartPostMethod.html">MultipartPostMethod</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/OptionsMethod.html">OptionsMethod</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/PostMethod.html">PostMethod</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/PutMethod.html">PutMethod</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/StringRequestEntity.html">StringRequestEntity</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/TraceMethod.html">TraceMethod</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_methods_multipart">org.apache.commons.httpclient.methods.multipart</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="#java_io">java.io</a>
+                  </li>
+                  <li>
+                    <a href="#java_lang">java.lang</a>
+                  </li>
+                  <li>
+                    <a href="#java_util">java.util</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient">org.apache.commons.httpclient</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_methods_multipart">org.apache.commons.httpclient.methods.multipart</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_params">org.apache.commons.httpclient.params</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_util">org.apache.commons.httpclient.util</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_logging">org.apache.commons.logging</a>
+                  </li>
+                </ul>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="subsection"><a name="org_apache_commons_httpclient_methods_multipart"></a><h3>org.apache.commons.httpclient.methods.multipart</h3>
+        <table class="bodyTable">
+          <thead>
+            <tr class="a">
+              <th>Afferent Couplings</th>
+              <th>Efferent Couplings</th>
+              <th>Abstractness</th>
+              <th>Instability</th>
+              <th>Distance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="b">
+              <td>1</td>
+              <td>7</td>
+              <td> 38%</td>
+              <td> 88%</td>
+              <td> 25%</td>
+            </tr>
+          </tbody>
+        </table>
+        <table class="bodyTable">
+          <thead>
+            <tr class="a">
+              <th>Abstract Classes</th>
+              <th>Concrete Classes</th>
+              <th>Used by Packages</th>
+              <th>Uses Packages</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="b">
+              <td>
+                <ul>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/multipart/Part.html">Part</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/multipart/PartBase.html">PartBase</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/multipart/PartSource.html">PartSource</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/multipart/ByteArrayPartSource.html">ByteArrayPartSource</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/multipart/FilePart.html">FilePart</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/multipart/FilePartSource.html">FilePartSource</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/multipart/MultipartRequestEntity.html">MultipartRequestEntity</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/methods/multipart/StringPart.html">StringPart</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_methods">org.apache.commons.httpclient.methods</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="#java_io">java.io</a>
+                  </li>
+                  <li>
+                    <a href="#java_lang">java.lang</a>
+                  </li>
+                  <li>
+                    <a href="#java_util">java.util</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_methods">org.apache.commons.httpclient.methods</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_params">org.apache.commons.httpclient.params</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_util">org.apache.commons.httpclient.util</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_logging">org.apache.commons.logging</a>
+                  </li>
+                </ul>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="subsection"><a name="org_apache_commons_httpclient_params"></a><h3>org.apache.commons.httpclient.params</h3>
+        <table class="bodyTable">
+          <thead>
+            <tr class="a">
+              <th>Afferent Couplings</th>
+              <th>Efferent Couplings</th>
+              <th>Abstractness</th>
+              <th>Instability</th>
+              <th>Distance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="b">
+              <td>5</td>
+              <td>5</td>
+              <td> 22%</td>
+              <td> 50%</td>
+              <td> 28%</td>
+            </tr>
+          </tbody>
+        </table>
+        <table class="bodyTable">
+          <thead>
+            <tr class="a">
+              <th>Abstract Classes</th>
+              <th>Concrete Classes</th>
+              <th>Used by Packages</th>
+              <th>Uses Packages</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="b">
+              <td>
+                <ul>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/params/HttpParams.html">HttpParams</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/params/HttpParamsFactory.html">HttpParamsFactory</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/params/DefaultHttpParams.html">DefaultHttpParams</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/params/DefaultHttpParamsFactory.html">DefaultHttpParamsFactory</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/params/HostParams.html">HostParams</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/params/HttpClientParams.html">HttpClientParams</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/params/HttpConnectionManagerParams.html">HttpConnectionManagerParams</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/params/HttpConnectionParams.html">HttpConnectionParams</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/params/HttpMethodParams.html">HttpMethodParams</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="#org_apache_commons_httpclient">org.apache.commons.httpclient</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_auth">org.apache.commons.httpclient.auth</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_methods">org.apache.commons.httpclient.methods</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_methods_multipart">org.apache.commons.httpclient.methods.multipart</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_protocol">org.apache.commons.httpclient.protocol</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="#java_io">java.io</a>
+                  </li>
+                  <li>
+                    <a href="#java_lang">java.lang</a>
+                  </li>
+                  <li>
+                    <a href="#java_util">java.util</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient">org.apache.commons.httpclient</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_logging">org.apache.commons.logging</a>
+                  </li>
+                </ul>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="subsection"><a name="org_apache_commons_httpclient_protocol"></a><h3>org.apache.commons.httpclient.protocol</h3>
+        <table class="bodyTable">
+          <thead>
+            <tr class="a">
+              <th>Afferent Couplings</th>
+              <th>Efferent Couplings</th>
+              <th>Abstractness</th>
+              <th>Instability</th>
+              <th>Distance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="b">
+              <td>1</td>
+              <td>10</td>
+              <td> 33%</td>
+              <td> 91%</td>
+              <td> 24%</td>
+            </tr>
+          </tbody>
+        </table>
+        <table class="bodyTable">
+          <thead>
+            <tr class="a">
+              <th>Abstract Classes</th>
+              <th>Concrete Classes</th>
+              <th>Used by Packages</th>
+              <th>Uses Packages</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="b">
+              <td>
+                <ul>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/protocol/ControllerThreadSocketFactory.html">ControllerThreadSocketFactory$SocketTask</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/protocol/ProtocolSocketFactory.html">ProtocolSocketFactory</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/protocol/SecureProtocolSocketFactory.html">SecureProtocolSocketFactory</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/protocol/ControllerThreadSocketFactory.html">ControllerThreadSocketFactory</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/protocol/ControllerThreadSocketFactory.html">ControllerThreadSocketFactory$1</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/protocol/DefaultProtocolSocketFactory.html">DefaultProtocolSocketFactory</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/protocol/Protocol.html">Protocol</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/protocol/ReflectionSocketFactory.html">ReflectionSocketFactory</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/protocol/SSLProtocolSocketFactory.html">SSLProtocolSocketFactory</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="#org_apache_commons_httpclient">org.apache.commons.httpclient</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="#java_io">java.io</a>
+                  </li>
+                  <li>
+                    <a href="#java_lang">java.lang</a>
+                  </li>
+                  <li>
+                    <a href="#java_lang_reflect">java.lang.reflect</a>
+                  </li>
+                  <li>
+                    <a href="#java_net">java.net</a>
+                  </li>
+                  <li>
+                    <a href="#java_util">java.util</a>
+                  </li>
+                  <li>
+                    <a href="#javax_net">javax.net</a>
+                  </li>
+                  <li>
+                    <a href="#javax_net_ssl">javax.net.ssl</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient">org.apache.commons.httpclient</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_params">org.apache.commons.httpclient.params</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_util">org.apache.commons.httpclient.util</a>
+                  </li>
+                </ul>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="subsection"><a name="org_apache_commons_httpclient_util"></a><h3>org.apache.commons.httpclient.util</h3>
+        <table class="bodyTable">
+          <thead>
+            <tr class="a">
+              <th>Afferent Couplings</th>
+              <th>Efferent Couplings</th>
+              <th>Abstractness</th>
+              <th>Instability</th>
+              <th>Distance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="b">
+              <td>6</td>
+              <td>11</td>
+              <td> 0%</td>
+              <td> 65%</td>
+              <td> 35%</td>
+            </tr>
+          </tbody>
+        </table>
+        <table class="bodyTable">
+          <thead>
+            <tr class="a">
+              <th>Abstract Classes</th>
+              <th>Concrete Classes</th>
+              <th>Used by Packages</th>
+              <th>Uses Packages</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="b">
+              <td>
+                <em>None</em>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/util/DateParseException.html">DateParseException</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/util/DateParser.html">DateParser</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/util/DateUtil.html">DateUtil</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/util/EncodingUtil.html">EncodingUtil</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/util/ExceptionUtil.html">ExceptionUtil</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/util/HttpURLConnection.html">HttpURLConnection</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/util/IdleConnectionHandler.html">IdleConnectionHandler</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/util/IdleConnectionTimeoutThread.html">IdleConnectionTimeoutThread</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/util/LangUtils.html">LangUtils</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/util/ParameterFormatter.html">ParameterFormatter</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/util/ParameterParser.html">ParameterParser</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/util/TimeoutController.html">TimeoutController</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/util/TimeoutController.html">TimeoutController$TimeoutException</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/util/URIUtil.html">URIUtil</a>
+                  </li>
+                  <li>
+                    <a href="xref/org/apache/commons/httpclient/util/URIUtil.html">URIUtil$Coder</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="#org_apache_commons_httpclient">org.apache.commons.httpclient</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_auth">org.apache.commons.httpclient.auth</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_cookie">org.apache.commons.httpclient.cookie</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_methods">org.apache.commons.httpclient.methods</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_methods_multipart">org.apache.commons.httpclient.methods.multipart</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient_protocol">org.apache.commons.httpclient.protocol</a>
+                  </li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>
+                    <a href="#java_io">java.io</a>
+                  </li>
+                  <li>
+                    <a href="#java_lang">java.lang</a>
+                  </li>
+                  <li>
+                    <a href="#java_lang_reflect">java.lang.reflect</a>
+                  </li>
+                  <li>
+                    <a href="#java_net">java.net</a>
+                  </li>
+                  <li>
+                    <a href="#java_security">java.security</a>
+                  </li>
+                  <li>
+                    <a href="#java_text">java.text</a>
+                  </li>
+                  <li>
+                    <a href="#java_util">java.util</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_codec">org.apache.commons.codec</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_codec_net">org.apache.commons.codec.net</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_httpclient">org.apache.commons.httpclient</a>
+                  </li>
+                  <li>
+                    <a href="#org_apache_commons_logging">org.apache.commons.logging</a>
+                  </li>
+                </ul>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div><div class="section"><a name="Cycles"></a><h2>Cycles</h2>
+      <p>[
+        <a href="#Summary">summary</a>] [
+        <a href="#Packages">packages</a>] [
+        <a href="#Cycles">cycles</a>] [
+        <a href="#Explanations">explanations</a>]
+      </p>
+      <table class="bodyTable">
+        <thead>
+          <tr class="a">
+            <th>Package</th>
+            <th>Cyclic Dependencies</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="b">
+            <td>org.apache.commons.httpclient</td>
+            <td>
+              <ul>
+                <li>org.apache.commons.httpclient.util</li>
+                <li>org.apache.commons.httpclient</li>
+              </ul>
+            </td>
+          </tr>
+          <tr class="a">
+            <td>org.apache.commons.httpclient.auth</td>
+            <td>
+              <ul>
+                <li>org.apache.commons.httpclient.util</li>
+                <li>org.apache.commons.httpclient</li>
+                <li>org.apache.commons.httpclient.util</li>
+              </ul>
+            </td>
+          </tr>
+          <tr class="b">
+            <td>org.apache.commons.httpclient.cookie</td>
+            <td>
+              <ul>
+                <li>org.apache.commons.httpclient</li>
+                <li>org.apache.commons.httpclient.util</li>
+                <li>org.apache.commons.httpclient</li>
+              </ul>
+            </td>
+          </tr>
+          <tr class="a">
+            <td>org.apache.commons.httpclient.methods</td>
+            <td>
+              <ul>
+                <li>org.apache.commons.httpclient</li>
+                <li>org.apache.commons.httpclient.util</li>
+                <li>org.apache.commons.httpclient</li>
+              </ul>
+            </td>
+          </tr>
+          <tr class="b">
+            <td>org.apache.commons.httpclient.methods.multipart</td>
+            <td>
+              <ul>
+                <li>org.apache.commons.httpclient.util</li>
+                <li>org.apache.commons.httpclient</li>
+                <li>org.apache.commons.httpclient.util</li>
+              </ul>
+            </td>
+          </tr>
+          <tr class="a">
+            <td>org.apache.commons.httpclient.params</td>
+            <td>
+              <ul>
+                <li>org.apache.commons.httpclient</li>
+                <li>org.apache.commons.httpclient.util</li>
+                <li>org.apache.commons.httpclient</li>
+              </ul>
+            </td>
+          </tr>
+          <tr class="b">
+            <td>org.apache.commons.httpclient.protocol</td>
+            <td>
+              <ul>
+                <li>org.apache.commons.httpclient.util</li>
+                <li>org.apache.commons.httpclient</li>
+                <li>org.apache.commons.httpclient.util</li>
+              </ul>
+            </td>
+          </tr>
+          <tr class="a">
+            <td>org.apache.commons.httpclient.util</td>
+            <td>
+              <ul>
+                <li>org.apache.commons.httpclient</li>
+                <li>org.apache.commons.httpclient.util</li>
+              </ul>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div><div class="section"><a name="Explanations"></a><h2>Explanations</h2>
+      <p>[
+        <a href="#Summary">summary</a>] [
+        <a href="#Packages">packages</a>] [
+        <a href="#Cycles">cycles</a>] [
+        <a href="#Explanations">explanations</a>]
+      </p>
+      <p>The following explanations are for quick reference and are lifted directly from the original
+        <a href="http://www.clarkware.com/software/JDepend.html" class="externalLink" title="External Link">JDepend documentation</a>.
+      </p>
+      <table class="bodyTable">
+        <thead>
+          <tr class="b">
+            <th>Term</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="a">
+            <td>Number of Classes</td>
+            <td>The number of concrete and abstract classes (and interfaces) in the package is an indicator of the extensibility of the package.</td>
+          </tr>
+          <tr class="b">
+            <td>Afferent Couplings</td>
+            <td>The number of other packages that depend upon classes within the package is an indicator of the package's responsibility.</td>
+          </tr>
+          <tr class="a">
+            <td>Efferent Couplings</td>
+            <td>The number of other packages that the classes in the package depend upon is an indicator of the package's independence.</td>
+          </tr>
+          <tr class="b">
+            <td>Abstractness</td>
+            <td>The ratio of the number of abstract classes (and interfaces) in the analyzed package to the total number of classes in the analyzed package. The range for this metric is 0 to 1, with A=0 indicating a completely concrete package and A=1 indicating a completely abstract package.</td>
+          </tr>
+          <tr class="a">
+            <td>Instability</td>
+            <td>The ratio of efferent coupling (Ce) to total coupling (Ce / (Ce + Ca)). This metric is an indicator of the package's resilience to change. The range for this metric is 0 to 1, with I=0 indicating a completely stable package and I=1 indicating a completely instable package.</td>
+          </tr>
+          <tr class="b">
+            <td>Distance</td>
+            <td>The perpendicular distance of a package from the idealized line A + I = 1. This metric is an indicator of the package's balance between abstractness and stability. A package squarely on the main sequence is optimally balanced with respect to its abstractness and stability. Ideal packages are either completely abstract and stable (x=0, y=1) or completely concrete and instable (x=1, y=0). The range for this metric is 0 to 1, with D=0 indicating a package that is coincident with the main sequence and D=1 indicating a package that is as far from the main sequence as possible.</td>
+          </tr>
+          <tr class="a">
+            <td>Cycles</td>
+            <td>Packages participating in a package dependency cycle are in a deadly embrace with respect to reusability and their release cycle. Package dependency cycles can be easily identified by reviewing the textual reports of dependency cycles. Once these dependency cycles have been identified with JDepend, they can be broken by employing various object-oriented techniques.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div></div></div><div class="clear"><hr></hr></div><div id="footer"><div class="xright">© 2001-2007, Apache Software Foundation</div><div class="clear"><hr></hr></div></div></body></html>
