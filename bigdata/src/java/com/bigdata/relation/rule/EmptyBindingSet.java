@@ -63,6 +63,12 @@ final public class EmptyBindingSet implements IBindingSet, Serializable {
         
     }
     
+    public EmptyBindingSet copy(IVariable[] variablesToDrop) {
+        
+        return this;
+        
+    }
+    
     public void clear(IVariable var) {
         throw new UnsupportedOperationException();
     }

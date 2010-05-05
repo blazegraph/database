@@ -12,8 +12,11 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.eval.IJoinNexus;
+import com.bigdata.relation.rule.eval.IRuleState;
 import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.relation.rule.eval.RuleState;
 import com.bigdata.service.LocalDataServiceFederation;
 
 /**
@@ -45,6 +48,7 @@ public class LocalJoinTask extends JoinTask {
      * @param masterUUID
      * @param source
      * @param solutionBuffer
+     * @param ruleState
      */
     public LocalJoinTask(
             /*final String indexName, */final IRule rule,
@@ -53,10 +57,11 @@ public class LocalJoinTask extends JoinTask {
             final IJoinMaster masterProxy,
             final UUID masterUUID,
             final IAsynchronousIterator<IBindingSet[]> source,
-            final IBuffer<ISolution[]> solutionBuffer) {
+            final IBuffer<ISolution[]> solutionBuffer,
+            final IVariable[][] requiredVars) {
 
         super(/*indexName,*/ rule, joinNexus, order, orderIndex,
-                -1/* partitionId */, masterProxy, masterUUID);
+                -1/* partitionId */, masterProxy, masterUUID, requiredVars);
 
         if (source == null)
             throw new IllegalArgumentException();

@@ -216,14 +216,11 @@ public class TestAbort extends ProxyTestCase<Journal> {
 
                 /*
                  * Verify read back
-                 * 
-                 * Note: This assumes the buffer is backed by an array; change
-                 * the test if this assumption is violated to copy the data out
-                 * of the buffer before comparing.
                  */
                 final ByteBuffer b = store.read(addr);
                 
                 assertEquals(a, b/*.array()*/);
+                assertEquals(a, b);
                 
             }
 

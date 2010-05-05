@@ -30,11 +30,15 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Random;
 
+import junit.framework.AssertionFailedError;
+
 import com.bigdata.journal.ha.MockSingletonQuorumManager;
+import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rwstore.RWWriteCacheService;
 import com.bigdata.util.ChecksumUtility;
 
@@ -65,7 +69,7 @@ public class TestWriteCacheService extends TestCase3 {
         
     }
     
-    public void test_simpleRWService() {
+    public void test_simpleRWService() throws IOException {
         
         File file = null;
         ReopenFileChannel opener = null;
@@ -77,7 +81,11 @@ public class TestWriteCacheService extends TestCase3 {
 			
 			final long fileExtent = opener.reopenChannel().size();
 			
-            writeCache = new RWWriteCacheService(5, fileExtent, opener,
+//		    public RWWriteCacheService(final int nbuffers, final long fileExtent,
+//		            final IReopenChannel<? extends Channel> opener,
+//		            final QuorumManager quorumManager)
+
+			writeCache = new RWWriteCacheService(5, fileExtent, opener,
                     new MockSingletonQuorumManager());
 
             writeCache.close();
@@ -98,7 +106,7 @@ public class TestWriteCacheService extends TestCase3 {
         
     }
     
-    public void test_simpleDataRWService() {
+    public void test_simpleDataRWService() throws IOException {
         
         File file = null;
         ReopenFileChannel opener = null;
@@ -172,7 +180,7 @@ public class TestWriteCacheService extends TestCase3 {
         	int pos = r.nextInt(3072);
         	int size = r.nextInt(1023)+1;
         	allocs.add(new AllocView(curAddr, pos, size, srcBuf));
-        	curAddr += size;
+        	curAddr += (size + 4); // include space for chk;
         }
         
         final ChecksumUtility checker = new ChecksumUtility();
@@ -231,7 +239,12 @@ public class TestWriteCacheService extends TestCase3 {
             writeCache.flush(true);
             for (int i = 0; i < 1000; i++) {
             	AllocView v = allocs.get(i);
-             	assertEquals(v.buf, opener.read(v.addr, v.buf.capacity()));     // expected, actual   	
+                try {
+                    assertEquals(v.buf, opener.read(v.addr, v.buf.capacity()));     // expected, actual
+                } catch(AssertionFailedError e) {
+                    System.err.println("ERROR: i=" + i + ", v=" + v.buf);
+                    throw e;
+                }
             }
             /*
              * Now reset and write full 10000 records, checking for write success and if fail then flush/reset and
@@ -524,6 +537,7 @@ public class TestWriteCacheService extends TestCase3 {
         }
 
     };
+    
     /*
      * Now generate randomviews, first an ordered view of 10000 random lengths
      */

@@ -121,7 +121,8 @@ abstract public class AbstractHAJournalTestCase
          */
         for (int i = k - 1; i >= 0; i--) {
 
-            stores[i] = newJournal(i, properties);
+            // stores[i] = newJournal(i, properties);
+            newJournal(i, properties); // journal initialization sets store index
 
         }
 
@@ -135,7 +136,7 @@ abstract public class AbstractHAJournalTestCase
         return new Journal(properties) {
         
             protected QuorumManager newQuorumManager() {
-
+            	stores[index] = this;
                 return AbstractHAJournalTestCase.this.newQuorumManager(index,
                         stores);
 

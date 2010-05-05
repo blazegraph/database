@@ -235,7 +235,7 @@ public class TestSocketMessage extends TestCase3 {
 				}
 
 //				@Override
-				public ObjectSocketChannelStream getNextSocket() {
+				public HAConnect getNextConnect() {
 					return null;
 				}
 
@@ -280,11 +280,11 @@ public class TestSocketMessage extends TestCase3 {
 		SocketMessage.HAWriteMessage msg1 = new SocketMessage.HAWriteMessage(cache1);
 		SocketMessage.HATruncateMessage msg2 = new SocketMessage.HATruncateMessage(210000);
 		SocketMessage.HAWriteMessage msg3 = new SocketMessage.HAWriteMessage(cache3);
-		// final ByteBuffer data2 = getRandomData(r.nextInt(100) + 1);
+		final ByteBuffer data2 = getRandomData(r.nextInt(100) + 1);
 		final ByteBuffer data1 = ByteBuffer.wrap(new byte[] {1,2,3,4,5,6,7,8,9,10});
-		final ByteBuffer data2 = ByteBuffer.wrap(new byte[] {50,51,52,53,54,55});
-		final ByteBuffer data3 = ByteBuffer.wrap(new byte[] {11,12,13,14,15});
-		// final ByteBuffer data3 = getRandomData(r.nextInt(cache1.capacity()-100) + 1);
+		// final ByteBuffer data2 = ByteBuffer.wrap(new byte[] {50,51,52,53,54,55});
+		// final ByteBuffer data3 = ByteBuffer.wrap(new byte[] {11,12,13,14,15});
+		final ByteBuffer data3 = getRandomData(r.nextInt(cache1.capacity()-100) + 1);
 		// final ByteBuffer data4 = getRandomData(r.nextInt((cache1.capacity()-100)/2) + 1);
 		final ByteBuffer data4 = ByteBuffer.wrap(new byte[] {16,17,18,19,20});
 		final ByteBuffer data5 = ByteBuffer.wrap(new byte[] {31,32,33,34,35,36,37});
@@ -322,9 +322,9 @@ public class TestSocketMessage extends TestCase3 {
         cache3.write(addr3, data5, 0);
 
         // messages are processed in sequence, so just wait for last one
-        messenger.send(msg1);
-        messenger.send(msg3);
+        messenger.send(msg1, true);
         messenger.send(msg2, true);
+        messenger.send(msg3, true);
 
         // Thread.sleep(2000); // give chance for messages to be processed
         assertNotNull(cache1.read(addr2));
@@ -335,11 +335,10 @@ public class TestSocketMessage extends TestCase3 {
         ByteBuffer tst2 = cache2.read(addr1);
         System.out.println("tst capacity: " + tst1.capacity() + "/"
                 + tst2.capacity());
-        // At present is a problem with WriteCache (test fails)
-        // assertEquals(data4, tst1); // did the data get the the downstream
-        // cache?
+
         assertEquals(tst1, data1);
         assertEquals(tst1, tst2);
+        assertEquals(cache1.read(addr2), cache2.read(addr2));
         
         /*
          * FIXME This unit test will "pass" even though the operation did not

@@ -232,13 +232,13 @@ public class RWStore implements IStore {
 			/**
 			 * TODO: Configure number of WriteCache buffers for WriteCacheService
 			 */
-            m_writeCache = new RWWriteCacheService(6, m_raf.length(),
+           m_writeCache = new RWWriteCacheService(6, m_raf.length(),
                     new ReopenFileChannel(m_fd, m_raf, "rw"), m_quorumManager);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {
             throw new RuntimeException(e);
-		}
+		} 
 	}
 
 	protected String m_filename;
@@ -973,7 +973,7 @@ public class RWStore implements IStore {
 
 		long addr = physicalAddress((int) m_metaBitsAddr);
 		try {
-			m_writeCache.write(addr, ByteBuffer.wrap(buf));
+			m_writeCache.write(addr, ByteBuffer.wrap(buf), 0);
 		} catch (IllegalStateException e) {
 			throw new RuntimeException(e);
 		} catch (InterruptedException e) {
@@ -1072,7 +1072,7 @@ public class RWStore implements IStore {
 								+ naddr);
 
 					try {
-						m_writeCache.write(allocator.getDiskAddr(), ByteBuffer.wrap(allocator.write()));
+						m_writeCache.write(allocator.getDiskAddr(), ByteBuffer.wrap(allocator.write()), 0);
 					} catch (IllegalStateException e) {
 						throw new RuntimeException(e);
 					} catch (InterruptedException e) {

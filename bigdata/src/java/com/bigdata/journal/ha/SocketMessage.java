@@ -222,7 +222,7 @@ public abstract class SocketMessage<T> implements Externalizable {
             ostr.getOutputStream().writeObject(this);
 
             wc.sendTo(ostr);
-
+            ostr.getOutputStream().flush();
         }
 		
 		@Override
@@ -245,15 +245,18 @@ public abstract class SocketMessage<T> implements Externalizable {
 			ObjectSocketChannelStream in = client.getInputSocket(); // retrieve input stream
 			
 			wc = client.getWriteCache();
-			ObjectSocketChannelStream out = client.getNextSocket();
+			HAConnect out = client.getNextConnect();
 			
 			if (out != null) {
 				try {
 					// send this message object
-					out.getOutputStream().writeObject(this);
+					out.send(this, false); // don't wait yet!!
 				} catch (IOException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
+					throw new RuntimeException(e);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+					throw new RuntimeException(e);
 				}				
 			}
 			try {
@@ -261,8 +264,10 @@ public abstract class SocketMessage<T> implements Externalizable {
 				wc.receiveAndForward(in, out);
 				
 				acknowledge(ack);
+				log.info("Sent acknowledge");
 			} catch (Exception ioe) {
 				ioe.printStackTrace();
+				throw new RuntimeException(ioe);
 			}			
 			log.info("HAWritemessage apply: done");
 		}
@@ -341,15 +346,16 @@ public abstract class SocketMessage<T> implements Externalizable {
 		public void apply(IHAClient client) {			
 			HATruncateConfirm ack = new HATruncateConfirm(id);
 
-			ObjectSocketChannelStream out = client.getNextSocket();
+			HAConnect out = client.getNextConnect();
 			
 			if (out != null) {
 				try {
 					// send this message object
-					out.getOutputStream().writeObject(this);
+					out.send(this, true); // we can wait for this here
 				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+					throw new RuntimeException(e);
+				} catch (InterruptedException e) {
+					throw new RuntimeException(e);
 				}				
 			}
 			try {

@@ -225,6 +225,12 @@ abstract public class WriteCacheService implements IWriteCache {
             c = new HAConnect(new InetSocketAddress(addr, port));
             haConnect.set(c);
             c.start();
+            
+            try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				// just a delay to make sure al is ready for testing
+			}
         } else {
             if (!c.isAlive()) {
                 /*
@@ -490,7 +496,7 @@ abstract public class WriteCacheService implements IWriteCache {
          * down so we can execute local operations for resynchronization
          * purposes?
          */
-        if(quorumManager.isHighlyAvailable()) {
+        if (quorumManager.isHighlyAvailable()) {
 
             final int k = quorumManager.replicationFactor();
 
@@ -502,23 +508,21 @@ abstract public class WriteCacheService implements IWriteCache {
                 // quorum.
                 final int index = quorum.getIndex();
 
-                if (index + 1 < k) {
+                // if (index + 1 < k) { // this would rule out the final node!
+ 
+                final HAGlue haGlueService = quorum.getHAGlue(index);
 
-                    final HAGlue haGlueNextService = quorum
-                            .getHAGlue(index + 1);
+                // Our local service listening for upstream messages - needed for all non-master nodes
+                final HAServer s = new HAServer(//
+                		haGlueService.getWritePipelineAddr(),//
+                		haGlueService.getWritePipelinePort(),//
+                        newHAClient()//
+                        );
+                
+                haServer.set(s);
 
-                    // Our local service listening for upstream messages.
-                    final HAServer s = new HAServer(//
-                            haGlueNextService.getWritePipelineAddr(),//
-                            haGlueNextService.getWritePipelinePort(),//
-                            newHAClient()//
-                            );
-                    
-                    haServer.set(s);
+                s.start();
 
-                    s.start();
-
-                }
 
             }
 
@@ -590,30 +594,39 @@ abstract public class WriteCacheService implements IWriteCache {
 
         return new IHAClient() {
             
+			ObjectSocketChannelStream input = null;
+			
+//			@Override
+			public ObjectSocketChannelStream getInputSocket() {
+				return input;
+			}
+
             public void truncate(long extent) {
                 // TODO Auto-generated method stub
                 
             }
             
             public void setInputSocket(ObjectSocketChannelStream in) {
-                // TODO Auto-generated method stub
-                
+                input = in;
             }
             
             public WriteCache getWriteCache() {
-                // TODO Auto-generated method stub
-                return null;
+                return current.get();
             }
             
-            public ObjectSocketChannelStream getNextSocket() {
-                // TODO Auto-generated method stub
-                return null;
+            public HAConnect getNextConnect() {
+            	if (remoteWriteService != null) {
+                    // establish connection or return existing connection.
+                    try {
+						return establishHAConnect(quorumManager);
+					} catch (IOException e) {
+						throw new RuntimeException(e);
+					}
+            	} else {
+            		return null;
+            	}
             }
             
-            public ObjectSocketChannelStream getInputSocket() {
-                // TODO Auto-generated method stub
-                return null;
-            }
         };
         
     }
@@ -2084,5 +2097,4 @@ abstract public class WriteCacheService implements IWriteCache {
         return counters.get().getCounters();
 
     }
-
 }
