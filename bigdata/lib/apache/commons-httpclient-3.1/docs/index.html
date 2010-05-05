@@ -1,0 +1,60 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html><head><title>HttpClient - HttpClient Home</title><style type="text/css" media="all">
+          @import url("./style/maven-base.css");
+          
+          @import url("./style/maven-theme.css");@import url("./style/project.css");</style><link rel="stylesheet" href="./style/print.css" type="text/css" media="print"></link><meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1"></meta><meta name="author" content="HttpComponents Team"></meta><meta name="email" content="httpcomponents-dev@jakarta.apache.org"></meta><meta name="author" content="Rodney Waldhoff"></meta><meta name="email" content="rwaldhoff@apache.org"></meta><meta name="author" content="Jeff Dever"></meta><meta name="email" content="jsdever@apache.org"></meta></head><body class="composite"><div id="banner"><a href="http://jakarta.apache.org/" id="organizationLogo"><img alt="Apache Software Foundation" src="http://jakarta.apache.org/images/jakarta-logo.gif"></img></a><a href="http://jakarta.apache.org/httpcomponents/httpclient-3.x/" id="projectLogo"><img alt="HttpClient" src="./images/httpclient_logo.png"></img></a><div class="clear"><hr></hr></div></div><div id="breadcrumbs"><div class="xleft">Last published: 18 August 2007
+                <span class="separator">|</span> Doc for  3.1
+                </div><div class="xright"></div><div class="clear"><hr></hr></div></div><div id="leftColumn"><div id="navcolumn"><div id="menuOverview"><h5>Overview</h5><ul><li class="none"><a href="features.html">Features</a></li><li class="none"><a href="news.html">News</a></li><li class="none"><a href="status.html">Status</a></li><li class="none"><a href="downloads.html">Download</a></li><li class="none"><a href="http://wiki.apache.org/jakarta-httpclient/" class="externalLink" title="External Link">Wiki</a></li><li class="expanded"><a href="userguide.html">User Guide</a><ul><li class="none"><a href="authentication.html">Authentication Guide</a></li><li class="none"><a href="charencodings.html">Character Encodings</a></li><li class="none"><a href="cookies.html">Cookies</a></li><li class="none"><a href="exception-handling.html">Exception Handling</a></li><li class="none"><a href="logging.html">Logging Guide</a></li><li class="none"><a href="methods.html">Methods</a></li><li class="none"><a href="performance.html">Optimization Guide</a></li><li class="none"><a href="preference-api.html">Preference Architecture</a></li><li class="none"><a href="redirects.html">Redirects Handling</a></li><li class="none"><a href="http://svn.apache.org/viewvc/jakarta/httpcomponents/oac.hc3x/trunk/src/examples/" class="externalLink" title="External Link">Sample Code</a></li><li class="none"><a href="sslguide.html">SSL Guide</a></li><li class="none"><a href="threading.html">Threading</a></li><li class="none"><a href="troubleshooting.html">Trouble Shooting</a></li><li class="none"><a href="tutorial.html">Tutorial</a></li></ul></li><li class="none"><a href="developerguide.html">Developer Guide</a></li></ul></div><div id="menuProject_Documentation"><h5>Project Documentation</h5><ul><li class="none"><strong><a href="index.html">About</a></strong></li><li class="collapsed"><a href="project-info.html">Project Info</a></li><li class="collapsed"><a href="maven-reports.html">Project Reports</a></li><li class="none"><a href="development-process.html">Development Process</a></li></ul></div><div id="legend"><h5>Legend</h5><ul><li class="externalLink">External Link</li><li class="newWindow">Opens in a new window</li></ul></div><a href="http://maven.apache.org/" title="Built by Maven" id="poweredBy"><img alt="Built by Maven" src="./images/logos/mavenlogo_builtby_w.png"></img></a></div></div><div id="bodyColumn"><div class="contentBox"><div class="section"><a name="Introduction"></a><h2>Introduction</h2>
+
+      <p>
+        The Hyper-Text Transfer Protocol (HTTP) is perhaps the most
+        significant protocol used on the Internet today.
+        Web services, network-enabled appliances and the growth
+        of network computing continue to expand the role of the HTTP
+        protocol beyond user-driven web browsers, while increasing the
+        number of applications that require HTTP support.
+      </p>
+      <p>
+        Although the <tt>java.net</tt>
+        package provides basic functionality for accessing resources via HTTP,
+        it doesn't provide the full flexibility or functionality needed
+        by many applications.  The Jakarta Commons <em>HttpClient</em> 
+        component seeks to fill this void
+        by providing an efficient, up-to-date, and feature-rich package
+        implementing the client side of the most recent HTTP standards
+        and recommendations.  See the <a href="features.html">Features</a> page
+        for more details on standards compliance and capabilities.
+      </p>
+      <p>
+        Designed for extension while providing robust support for the
+        base HTTP protocol, the <em>HttpClient</em> component may be of interest
+        to anyone building HTTP-aware client applications such as web
+        browsers, web service clients, or systems that leverage or extend
+        the HTTP protocol for distributed communication.
+      </p>
+      <p>
+        There are many projects that use <em>HttpClient</em> to provide the core HTTP functionality.
+        Some of these are open source with project pages you can find on the web
+        while others are closed source that you would never see or hear about.
+        The Apache Source License provides maximum flexibility for source and binary
+        reuse.  Please see the <a href="http://wiki.apache.org/jakarta-httpclient/HttpClientPowered" class="externalLink" title="External Link">
+        Applications</a> page for projects using <em>HttpClient</em>.
+      </p>
+    </div><div class="section"><a name="History"></a><h2>History</h2>
+      <p>
+        <em>HttpClient</em> was started in 2001 as a subproject of the
+        Jakarta Commons, based on code developed by the
+        <a href="http://jakarta.apache.org/slide/">Jakarta Slide</a> project.
+        It was promoted out of the Commons in 2004, graduating to a separate
+        Jakarta project. In 2005, the
+        <a href="http://jakarta.apache.org/httpcomponents/">HttpComponents</a>
+        project at Jakarta was created, with the task of developing a successor
+        to <em>HttpClient 3.x</em> and to maintain the existing codebase until
+        the new one is ready to take over.
+        The <a href="http://commons.apache.org/" class="externalLink" title="External Link">Commons</a> project,
+        cradle of <em>HttpClient</em>,
+        left <a href="http://jakarta.apache.org/">Jakarta</a>
+        in 2007 to become an independent Top Level Project.
+        For the time being, <em>HttpClient</em> still has it's home with
+        <em>HttpComponents</em> at Jakarta.
+      </p>
+    </div></div></div><div class="clear"><hr></hr></div><div id="footer"><div class="xright">© 2001-2007, Apache Software Foundation</div><div class="clear"><hr></hr></div></div></body></html>

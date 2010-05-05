@@ -1,0 +1,365 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html><head><title>HttpClient - HttpClient SSL Guide</title><style type="text/css" media="all">
+          @import url("./style/maven-base.css");
+          
+          @import url("./style/maven-theme.css");@import url("./style/project.css");</style><link rel="stylesheet" href="./style/print.css" type="text/css" media="print"></link><meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1"></meta><meta name="author" content="Oleg Kalnichevski"></meta><meta name="email" content="oleg@ural.ru"></meta><meta name="author" content="Adrian Sutton"></meta><meta name="email" content="adrian@intencha.com"></meta></head><body class="composite"><div id="banner"><a href="http://jakarta.apache.org/" id="organizationLogo"><img alt="Apache Software Foundation" src="http://jakarta.apache.org/images/jakarta-logo.gif"></img></a><a href="http://jakarta.apache.org/httpcomponents/httpclient-3.x/" id="projectLogo"><img alt="HttpClient" src="./images/httpclient_logo.png"></img></a><div class="clear"><hr></hr></div></div><div id="breadcrumbs"><div class="xleft">Last published: 18 August 2007
+                <span class="separator">|</span> Doc for  3.1
+                </div><div class="xright"></div><div class="clear"><hr></hr></div></div><div id="leftColumn"><div id="navcolumn"><div id="menuOverview"><h5>Overview</h5><ul><li class="none"><a href="features.html">Features</a></li><li class="none"><a href="news.html">News</a></li><li class="none"><a href="status.html">Status</a></li><li class="none"><a href="downloads.html">Download</a></li><li class="none"><a href="http://wiki.apache.org/jakarta-httpclient/" class="externalLink" title="External Link">Wiki</a></li><li class="expanded"><a href="userguide.html">User Guide</a><ul><li class="none"><a href="authentication.html">Authentication Guide</a></li><li class="none"><a href="charencodings.html">Character Encodings</a></li><li class="none"><a href="cookies.html">Cookies</a></li><li class="none"><a href="exception-handling.html">Exception Handling</a></li><li class="none"><a href="logging.html">Logging Guide</a></li><li class="none"><a href="methods.html">Methods</a></li><li class="none"><a href="performance.html">Optimization Guide</a></li><li class="none"><a href="preference-api.html">Preference Architecture</a></li><li class="none"><a href="redirects.html">Redirects Handling</a></li><li class="none"><a href="http://svn.apache.org/viewvc/jakarta/httpcomponents/oac.hc3x/trunk/src/examples/" class="externalLink" title="External Link">Sample Code</a></li><li class="none"><strong><a href="sslguide.html">SSL Guide</a></strong></li><li class="none"><a href="threading.html">Threading</a></li><li class="none"><a href="troubleshooting.html">Trouble Shooting</a></li><li class="none"><a href="tutorial.html">Tutorial</a></li></ul></li><li class="none"><a href="developerguide.html">Developer Guide</a></li></ul></div><div id="menuProject_Documentation"><h5>Project Documentation</h5><ul><li class="none"><a href="index.html">About</a></li><li class="collapsed"><a href="project-info.html">Project Info</a></li><li class="collapsed"><a href="maven-reports.html">Project Reports</a></li><li class="none"><a href="development-process.html">Development Process</a></li></ul></div><div id="legend"><h5>Legend</h5><ul><li class="externalLink">External Link</li><li class="newWindow">Opens in a new window</li></ul></div><a href="http://maven.apache.org/" title="Built by Maven" id="poweredBy"><img alt="Built by Maven" src="./images/logos/mavenlogo_builtby_w.png"></img></a></div></div><div id="bodyColumn"><div class="contentBox"><div class="section"><a name="Introduction"></a><h2>Introduction</h2>
+     
+     <p>
+       HttpClient provides full support for HTTP over Secure Sockets Layer (SSL) or IETF Transport Layer
+       Security (TLS) protocols by leveraging the <a href="http://java.sun.com/products/jsse/index.html" class="externalLink" title="External Link">
+       Java Secure Socket Extension (JSSE)</a>. JSSE has been integrated into the Java 2 platform as of 
+       version 1.4 and works with HttpClient out of the box. On older Java 2 versions JSSE 
+       needs to be manually installed and configured. Installation instructions can be found
+       <a href="http://java.sun.com/products/jsse/doc/guide/API_users_guide.html#Installation" class="externalLink" title="External Link">here</a>
+     </p>
+
+    </div><div class="section"><a name="Standard_SSL_in_HttpClient"></a><h2>Standard SSL in HttpClient</h2>
+      <p>
+        Once you have JSSE correctly installed, secure HTTP communication over SSL should be as simple 
+        as plain HTTP communication. 
+      </p>
+      
+    <div class="source"><pre>
+  HttpClient httpclient = new HttpClient();
+  GetMethod httpget = new GetMethod("https://www.verisign.com/"); 
+  try { 
+    httpclient.executeMethod(httpget);
+    System.out.println(httpget.getStatusLine());
+  } finally {
+    httpget.releaseConnection();
+  }</pre></div>
+  
+      
+      <p>
+        HTTPS communication via an authenticating proxy server is also no different from plain HTTP 
+        communication. All the low-level details of establishing a tunneled SSL connection are handled
+        by HttpClient:
+      </p>
+
+      
+    <div class="source"><pre>
+  HttpClient httpclient = new HttpClient();
+  httpclient.getHostConfiguration().setProxy("myproxyhost", 8080);
+  httpclient.getState().setProxyCredentials("my-proxy-realm", " myproxyhost",
+  new UsernamePasswordCredentials("my-proxy-username", "my-proxy-password"));
+  GetMethod httpget = new GetMethod("https://www.verisign.com/");
+  try { 
+    httpclient.executeMethod(httpget);
+    System.out.println(httpget.getStatusLine());
+  } finally {
+    httpget.releaseConnection();
+  }</pre></div>
+  
+
+    </div><div class="section"><a name="Customizing_SSL_in_HttpClient"></a><h2>Customizing SSL in HttpClient</h2>
+      
+      <p>
+      The default behaviour of HttpClient is suitable for most uses, however
+      there are some aspects which you may want to configure.  The most common
+      requirements for customizing SSL are:</p>
+
+    <ul>
+      <li>Ability to accept self-signed or untrusted SSL certificates.  This
+      is highlighted by an <code>SSLException</code> with the message
+      <i>Unrecognized SSL handshake</i> (or similar) being thrown when a
+      connection attempt is made.</li>
+
+      <li>You want to use a third party SSL library instead of Sun's default
+      implementation.</li>
+    </ul>
+    
+    <p>
+     Implementation of a custom protocol involves the following steps:
+    </p>
+
+    <ol>
+
+      <li>
+       <p>
+       Provide a custom socket factory that implements 
+       <a href="apidocs/org/apache/commons/httpclient/protocol/SecureProtocolSocketFactory.html">
+       org.apache.commons.httpclient.protocol.SecureProtocolSocketFactory</a> interface. The socket 
+       factory is responsible for opening a socket to the target server 
+       using either the standard or a third party SSL library and
+       performing any required initialization such as performing the
+       connection handshake.  Generally the initialization is performed
+       automatically when the socket is created.
+       </p>
+      </li>
+
+      <li>
+       <p>
+       Instantiate an object of type <a href="apidocs/org/apache/commons/httpclient/protocol/Protocol.html">
+       org.apache.commons.httpclient.protocol.Protocol</a>.  The new instance
+       would be created with a valid URI protocol scheme (https in this
+       case), the custom socket factory (discussed above) and a default port
+       number (typically 443 for https).  For example:
+       </p>
+
+      
+    <div class="source"><pre>
+Protocol myhttps = new Protocol("https", new MySSLSocketFactory(), 443);
+      </pre></div>
+  
+
+      <p>
+      The new instance of protocol can then be set as the protocol handler
+      for a HostConfiguration.  For example to configure the default host and
+      protocol handler for a HttpClient instance use:
+      </p>
+
+      
+    <div class="source"><pre>
+HttpClient httpclient = new HttpClient();
+httpclient.getHostConfiguration().setHost("www.whatever.com", 443, myhttps);
+GetMethod httpget = new GetMethod("/");
+try {
+  httpclient.executeMethod(httpget);
+  System.out.println(httpget.getStatusLine());
+} finally {
+  httpget.releaseConnection();
+}</pre></div>
+  
+
+      </li>
+
+      <li>
+       <p>
+        Finally, you can register your custom protocol as the default handler
+        for a specific protocol designator (eg: https) by calling the
+        Protocol.registerProtocol method.  You can specify your own protocol
+        designator (such as 'myhttps') if you need to use your custom
+        protocol as well as the default SSL protocol implementation.
+       </p>
+
+      
+    <div class="source"><pre>
+Protocol.registerProtocol("myhttps", 
+new Protocol("https", new MySSLSocketFactory(), 9443));
+      </pre></div>
+  
+
+       <p>
+        Once registered the protocol be used as a 'virtual' scheme inside target URIs.
+       </p>
+
+      
+    <div class="source"><pre>
+HttpClient httpclient = new HttpClient();
+GetMethod httpget = new GetMethod("myhttps://www.whatever.com/");
+try {
+  httpclient.executeMethod(httpget);
+  System.out.println(httpget.getStatusLine());
+} finally {
+  httpget.releaseConnection();
+}</pre></div>
+  
+
+
+      <p>
+       If you want this protocol to represent the default SSL protocol implementation, simply register
+       it under 'https' designator, which will make the protocol object take place of the existing one
+      </p>
+
+      
+    <div class="source"><pre>
+Protocol.registerProtocol("https", 
+new Protocol("https", new MySSLSocketFactory(), 443));
+HttpClient httpclient = new HttpClient();
+GetMethod httpget = new GetMethod("https://www.whatever.com/");
+try {
+  httpclient.executeMethod(httpget);
+  System.out.println(httpget.getStatusLine());
+} finally {
+  httpget.releaseConnection();
+}</pre></div>
+  
+
+      </li>
+
+    </ol>
+
+  </div><div class="section"><a name="Examples_of_SSL_customization_in_HttpClient"></a><h2>Examples of SSL customization in HttpClient</h2>
+    
+    <p>
+     There are several custom socket factories available in our contribution
+     package. They can be a good start for those who seek to tailor the
+     behavior of the HTTPS protocol to the specific needs of their
+     application:
+    </p>
+
+    <ul>
+
+        <li>
+         <a href="http://svn.apache.org/viewvc/jakarta/httpcomponents/oac.hc3x/trunk/src/contrib/org/apache/commons/httpclient/contrib/ssl/EasySSLProtocolSocketFactory.java?view=markup" class="externalLink" title="External Link">  
+          EasySSLProtocolSocketFactory</a> can be used to create SSL connections that allow the target 
+          server to authenticate with a self-signed certificate.
+        </li>
+
+        <li>
+         <a href="http://svn.apache.org/viewvc/jakarta/httpcomponents/oac.hc3x/trunk/src/contrib/org/apache/commons/httpclient/contrib/ssl/StrictSSLProtocolSocketFactory.java?view=markup" class="externalLink" title="External Link">  
+          StrictSSLProtocolSocketFactory</a> can be used to create SSL connections that can optionally perform host name verification in order to help preventing man-in-the-middle type of attacks. 
+        </li>
+        <li>
+         <a href="http://svn.apache.org/viewvc/jakarta/httpcomponents/oac.hc3x/trunk/src/contrib/org/apache/commons/httpclient/contrib/ssl/AuthSSLProtocolSocketFactory.java?view=markup" class="externalLink" title="External Link">  
+          AuthSSLProtocolSocketFactory</a> can be used to optionally enforce mutual client/server authentication. This is the most flexible
+          implementation of a protocol socket factory.  It allows for customization of most, if not all, aspects of the SSL authentication.
+        </li>
+
+      </ul>
+    
+    </div><div class="section"><a name="Known_limitations_and_problems"></a><h2>Known limitations and problems</h2>
+
+      <ol>
+
+        <li>
+         <p>
+          <strong>Persistent SSL connections do not work on Sun's JVMs below 1.4</strong>
+         </p>
+     
+         <p>
+         Due to what appears to be a bug in Sun's older (below 1.4) implementation of 
+         Java Virtual Machines or JSSE there's no reliable way of telling if an SSL connection 
+         is 'stale' or not. For example, the HTTP 1.1 specification permits HTTP servers in 
+         'keep-alive' mode to drop the connection to the client after a given period inactivity 
+         without having to notify the client, effectively rendering such connection unusable or 
+         'stale'. For the HTTP agent written in Java there's no reliable way to test 
+         if a connection is 'stale' other than attempting to perform a read on it.
+         However, a read 
+         operation on an idle SSL connection on Sun JVM older than 1.4 returns 'end of stream' 
+         instead of an expected read timeout. That effectively makes the connection appear 'stale' 
+         to HttpClient, which leaves it with no other way but to drop the connection and to 
+         open a new one, thus defeating HTTP 1.1 keep-alive mechanism and resulting in significant 
+         performance degradation (SSL authentication is a highly time consuming operation). The problem appears to have been fixed in Sun's 
+         Java 1.4 SSL implementation.  Sockets which are not using HTTPS are
+         unaffected on any JVM.
+         </p>
+
+         <p>
+         <strong>Workaround:</strong> Disable stale connection check if upgrade to Java 1.4 or above is 
+          not an option. Please note that HttpClient will no longer be able to detect invalid connections
+          and some requests may fail due to transport errors. For details on how transport errors can be 
+          recovered from please refer to the <a href="exception-handling.html#Transport%20exceptions">
+          Exception Handling Guide</a>. If persistent SSL connections support and transport reliability 
+          is an issue for your application we strongly advise you to upgrade to Java 1.4.
+         </p>
+        </li>
+        <li>
+         <p>
+          <strong>Authetication schemes that rely on persistent connection state do not work on Sun's JVMs 
+          below 1.4 if SSL is used</strong>
+         </p>
+         <p>
+          This problem is directly related to the problem described above. Certain authentication schemes or 
+          certain implementations of standard authentication schemes are connection based, that is, the user 
+          authentication is performed once when the connection is being established, rather than every time
+          a request is being processed. Microsoft NTLM scheme and Digest scheme as implemented in Microsoft 
+          Proxy and IIS servers are known to fall into this category. If connections cannot be kept alive
+          the user authorization is lost along with the persistent connection state
+         </p>
+         <p>
+         <strong>Workaround:</strong> Disable stale connection check or upgrade to Java 1.4 or above.
+         </p>
+        </li>
+
+        <li>
+        <p>
+         <strong>JSSE prior to Java 1.4 incorrectly reports socket timeout.</strong>
+        </p>
+        <p>
+         Prior to Java 1.4, in Sun's JSSE implementation, a read operation that has timed out incorrect
+         reports end of stream condition instead of throwing java.io.InterruptedIOException as expected.
+         HttpClient responds to this exception by assuming that the connection was dropped and throws a 
+         NoHttpResponseException. It should instead report "java.io.InterruptedIOException: Read timed 
+         out". If you encounter NoHttpResponseException when working with an older version of JDK and 
+         JSSE, it can be caused by the timeout waiting for data and not by a problem with the connection.
+        </p>
+        <p>
+         <strong>Work-around:</strong> One possible solution is to increase the timeout value as the server is
+         taking too long to start sending the response. Alternatively you may choose to upgrade to Java 1.4 or 
+         above which does not exhibit this problem.
+        </p>
+        <p>
+         The problem has been discovered and reported by Daniel C. Amadei.
+        </p>
+        </li>
+
+        <li>
+        <p>
+         <strong>HttpClient does not work with IBM JSSE shipped with IBM Websphere Application Platform</strong>
+        </p>
+        <p>
+         Several releases of the IBM JSSE exhibit a bug that cause HttpClient to fail while detecting the size
+         of the socket send buffer (java.net.Socket.getSendBufferSize method throws java.net.SocketException:
+         "Socket closed" exception).
+        </p>
+        <p>
+         <strong>Solution:</strong> Make sure that you have all the latest Websphere fix packs applied and IBMJSSE
+         is at least version 1.0.3. HttpClient users have reported that IBM Websphere Application Server versions 
+         4.0.6, 5.0.2.2, 5.1.0 and above do not exhibit this problem.
+        </p>
+        </li>
+      </ol>
+ 
+    </div><div class="section"><a name="Troubleshooting"></a><h2>Troubleshooting</h2>
+
+       <p>
+        JSSE is prone to configuration problems, especially on older JVMs,
+        which it is not an integral part of.  As such, if you do encounter
+        problems with SSL and HttpClient it is important to check that JSSE is
+        correctly installed.
+       </p>
+
+       <p>
+        The application below can be used as an ultimate test that can reliably
+        tell if SSL configured properly, as it relies on a plain socket in
+        order to communicate with the target server. If an exception is thrown
+        when executing this code, SSL is not correctly installed and configured.
+        Please refer to Sun's official resources for support or additional
+        details on JSSE configuration.
+       </p>
+
+        
+    <div class="source"><pre>
+  import java.io.BufferedReader;
+  import java.io.InputStreamReader;
+  import java.io.OutputStreamWriter;
+  import java.io.Writer;
+  import java.net.Socket;
+
+  import javax.net.ssl.SSLSocketFactory;
+
+  public class Test {
+        
+     public static final String TARGET_HTTPS_SERVER = "www.verisign.com"; 
+     public static final int    TARGET_HTTPS_PORT   = 443; 
+        
+     public static void main(String[] args) throws Exception {
+        
+       Socket socket = SSLSocketFactory.getDefault().
+         createSocket(TARGET_HTTPS_SERVER, TARGET_HTTPS_PORT);
+       try {
+         Writer out = new OutputStreamWriter(
+            socket.getOutputStream(), "ISO-8859-1");
+         out.write("GET / HTTP/1.1\r\n");  
+         out.write("Host: " + TARGET_HTTPS_SERVER + ":" + 
+             TARGET_HTTPS_PORT + "\r\n");  
+         out.write("Agent: SSL-TEST\r\n");  
+         out.write("\r\n");  
+         out.flush();  
+         BufferedReader in = new BufferedReader(
+            new InputStreamReader(socket.getInputStream(), "ISO-8859-1"));
+         String line = null;
+         while ((line = in.readLine()) != null) {
+            System.out.println(line);
+         }
+       } finally {
+         socket.close(); 
+       }
+     }
+  }
+        </pre></div>
+  
+
+    </div></div></div><div class="clear"><hr></hr></div><div id="footer"><div class="xright">© 2001-2007, Apache Software Foundation</div><div class="clear"><hr></hr></div></div></body></html>

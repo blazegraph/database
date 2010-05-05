@@ -1,0 +1,38 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html><head><title>HttpClient - Trace Method</title><style type="text/css" media="all">
+          @import url("../style/maven-base.css");
+          
+          @import url("../style/maven-theme.css");@import url("../style/project.css");</style><link rel="stylesheet" href="../style/print.css" type="text/css" media="print"></link><meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1"></meta><meta name="author" content="Adrian Sutton"></meta><meta name="email" content="adrian@ephox.com"></meta></head><body class="composite"><div id="banner"><a href="http://jakarta.apache.org/" id="organizationLogo"><img alt="Apache Software Foundation" src="http://jakarta.apache.org/images/jakarta-logo.gif"></img></a><a href="http://jakarta.apache.org/httpcomponents/httpclient-3.x/" id="projectLogo"><img alt="HttpClient" src="../images/httpclient_logo.png"></img></a><div class="clear"><hr></hr></div></div><div id="breadcrumbs"><div class="xleft">Last published: 18 August 2007
+                <span class="separator">|</span> Doc for  3.1
+                </div><div class="xright"></div><div class="clear"><hr></hr></div></div><div id="leftColumn"><div id="navcolumn"><div id="menuOverview"><h5>Overview</h5><ul><li class="none"><a href="../features.html">Features</a></li><li class="none"><a href="../news.html">News</a></li><li class="none"><a href="../status.html">Status</a></li><li class="none"><a href="../downloads.html">Download</a></li><li class="none"><a href="http://wiki.apache.org/jakarta-httpclient/" class="externalLink" title="External Link">Wiki</a></li><li class="expanded"><a href="../userguide.html">User Guide</a><ul><li class="none"><a href="../authentication.html">Authentication Guide</a></li><li class="none"><a href="../charencodings.html">Character Encodings</a></li><li class="none"><a href="../cookies.html">Cookies</a></li><li class="none"><a href="../exception-handling.html">Exception Handling</a></li><li class="none"><a href="../logging.html">Logging Guide</a></li><li class="none"><a href="../methods.html">Methods</a></li><li class="none"><a href="../performance.html">Optimization Guide</a></li><li class="none"><a href="../preference-api.html">Preference Architecture</a></li><li class="none"><a href="../redirects.html">Redirects Handling</a></li><li class="none"><a href="http://svn.apache.org/viewvc/jakarta/httpcomponents/oac.hc3x/trunk/src/examples/" class="externalLink" title="External Link">Sample Code</a></li><li class="none"><a href="../sslguide.html">SSL Guide</a></li><li class="none"><a href="../threading.html">Threading</a></li><li class="none"><a href="../troubleshooting.html">Trouble Shooting</a></li><li class="none"><a href="../tutorial.html">Tutorial</a></li></ul></li><li class="none"><a href="../developerguide.html">Developer Guide</a></li></ul></div><div id="menuProject_Documentation"><h5>Project Documentation</h5><ul><li class="none"><a href="../index.html">About</a></li><li class="collapsed"><a href="../project-info.html">Project Info</a></li><li class="collapsed"><a href="../maven-reports.html">Project Reports</a></li><li class="none"><a href="../development-process.html">Development Process</a></li></ul></div><div id="legend"><h5>Legend</h5><ul><li class="externalLink">External Link</li><li class="newWindow">Opens in a new window</li></ul></div><a href="http://maven.apache.org/" title="Built by Maven" id="poweredBy"><img alt="Built by Maven" src="../images/logos/mavenlogo_builtby_w.png"></img></a></div></div><div id="bodyColumn"><div class="contentBox"><div class="section"><a name="Introduction"></a><h2>Introduction</h2>
+      <p>The TRACE method is primarily used for debugging and testing purposes,
+      and simply requests that the server echo back the request it received.
+      This can be useful for identifying any changes to the request that is
+      made by proxies.</p>
+
+      <p>The TRACE method is used to invoke a remote, application-layer
+      loop-back of the request message.  The final recipient of the request
+      <i>should</i> reflect the message received back to the client as the
+      entity-body of a 200 (OK) response.  The final recipient is either the
+      origin server or the first proxy or gateway to receive a max-Forwards
+      value of zero (0) in the request (see section 14.31 of <a href="http://www.ietf.org/rfc/rfc2616.txt" class="externalLink" title="External Link">RFC2616</a>).</p>
+    </div><div class="section"><a name="Typical_Usage"></a><h2>Typical Usage</h2>
+      <p>The trace method simply requires providing a URL and reading the
+      response received.  Additional headers can be added with the
+      <code>addRequestHeader</code> method as with any other HttpMethod.</p>
+
+      
+    <div class="source"><pre>
+        TraceMethod trace = new TraceMethod("http://jakarata.apache.org");
+        // Execute the method and handle any errors.
+        ...
+        // Read the response body.
+        String request = trace.getResponseBodyAsString();
+        trace.releaseConnection();
+      
+      </pre></div>
+  
+    </div><div class="section"><a name="Common_Problems"></a><h2>Common Problems</h2>
+      <p>None.</p>
+    </div><div class="section"><a name="RFC_Section"></a><h2>RFC Section</h2>
+      <p>The trace method is defined in section 9.6 of <a href="http://www.ietf.org/rfc/rfc2616.txt" class="externalLink" title="External Link">RFC2616</a>.</p>
+    </div></div></div><div class="clear"><hr></hr></div><div id="footer"><div class="xright">© 2001-2007, Apache Software Foundation</div><div class="clear"><hr></hr></div></div></body></html>
