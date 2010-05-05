@@ -29,13 +29,16 @@ These are my notes on the lexicon refactor.
 	   #of files/subdirectories in a directory for many operating
 	   systems.
 
-	   - Verify key component decode with variable length keys.
+	   - done. Verify key component decode with variable length
+             keys.
 
 	   - Add smart separator key selection for the ID2TERM index?
 
-	   - We can not inline plain text or language code literals
-             unless the ASCII option was specified.  Ditto for URIs.
-             This is because we can not decode Unicode sort keys.
+	   - Note: We can not inline plain text or language code
+             literals unless the ASCII option was specified.  Ditto
+             for URIs.  This is because we can not decode Unicode sort
+             keys.  An extensibility mechanism has been defined to
+             handle this using "enumerations".
 
 	   - Use raw records and an IOverflowHandler to move large
              literals out of the ID2TERM index.  Likewise, we should
@@ -55,50 +58,8 @@ These are my notes on the lexicon refactor.
              relation in the same database.  Even easier is export /
              import into a new database instance.
 
-	   - Figure out how to generate an unsigned byte[] coding of
-             BigInteger and BigDecimal.  Is this possible?  Who can
-             even answer this question?
-
-valueTypeBits byte[] (0x00 run-length) dataTypeId (scale)
-
-valueTypeBits: {URI, BlankNode, Literal, Numeric, SID}.  Also inline
-	        literal vs short blob vs large blob, so we need
-	        perhaps 4 bits.  What about dates?
-
-byte[] is the unsigned byte[] encoding of the numeric value (how is
-       the signum bit to be handled?)  All numeric data types which
-       can be converted by casting need to be mapped onto the same
-       part of the value space (Numeric).  We would then do a key
-       range scan of the statement index in the desired region of the
-       value space and filter by the dataTypeId if the query did not
-       use a cast.
-
-Things for which we generate termIds are inlined as:
-
-valueTypeBits termId
-
-and appear in a different part of the value space.
-
-    ----------
-
-Design two: Since we can not decode the byte[] above, this design uses
-the dataTypeId up front and uses the natural coding for each Numeric
-or Date value space.  This is decodable.  However, one consequence is
-that queries which use a cast on a Numeric literal must use a union
-across all datatypes for which the cast could produce a legal answer.
-
-valueTypeBits dataTypeId bytes
-
-valueTypeBits Double byte[8]
-valueTypeBits Long byte[8]
-valueTypeBits BigInteger run-length byte[]
-valueTypeBits BigDecimal (precision-scale) run-length byte[]
-valueTypeBits dataTypeId byte[] (0x00 run-length) (scale)
-
-? What about XMLGregorianCalander?
-
-? What about coding geo:point?  What is its natural sort order? Does
-  not have one.
+	   - Generate an unsigned byte[] coding of BigInteger (done)
+             and BigDecimal (todo).
 
 =========================
 
@@ -189,7 +150,8 @@ Issues arise with:
 
 - extensible data types.  I think that there are easy and hard cases
   in this category.  Some interesting examples might be custom
-  indexing for genomics data.
+  indexing for genomics data.  For some kinds of extensibility we
+  would probably register additional indices (geospatial).
 
 This will require that Literal#equals(Object) be implemented such that
 representations of the same point in the value space are equals
@@ -394,160 +356,6 @@ both standalone and scale-out, so there is nothing extra to do there.
 Just a little bit of work in how we write on and read from the TERM2ID
 and ID2TERM indices respectively.  I am pretty sure that this change
 would not break either the code or the data.
-
-
-============================================================
-
-I have been thinking about how to handle extensibility. I've
-considered several approaches.  Here is the one that I like the best.
-It is focused on providing extensibility for datatypes whose natural
-ordering corresponds to one of a set of built-in datatypes and allows
-for other datatypes to be projected onto the value space of those
-built-in types.
-
-We currently have 14 built-in (or intrinsic) data types, each of those
-types has a natural order which we can encode and decode from the
-B+Tree key:
-
-       xsd:boolean, xsd:byte, xsd:short, xsd:int, xsd:long,
-       xsd:unsignedByte, xsd:unsignedShort, xsd:unsignedInt,
-       xsd:unsignedLong, xsd:float, xsd:double, xsd:integer
-       xsd:decimal, and bd:UUID.
-
-This proposal relies on there being a very limited number of
-interesting codings for things since we have only 4 bits for to code
-the natural order of the value space, which is just 16 distinctions.
-Given that we have 14 intrinsic data types, that leaves room for just
-two more.  For example, we could use one bit for short character data
-types and reserve one for extensibility in the framework itself.
-
-My proposal is that we frame the inline values and term identifiers as
-follows:
-
-flags: (totals one byte).
-[valueType]: 2 bits
-[inline] : 1 bit
-[dataTypeId] : 1 bit
-[dataTypeCode] : 4 bits
-
-valueType : These 2 bits distinguish between URIs, Literals, Blank
-	    Nodes, and statement identifiers (SIDs).  These bits are
-	    up front and therefore partition the key space first by
-	    the RDF Value type.
-
-inline : This bit indicates whether the value is inline or represented
-	 by a term identifier in the key.  This bit is set based on
-	 how a given triple store or quad store instance is
-	 configured.  However, because the bit is present in the
-	 flags, we know how to decode the key without reference to the
-	 store configuration metadata.
-
-dataTypeId : This bit is set based on whether or not the datatype URI
-	     in the source Literal is one of those that we handle as
-	     an "extended" data type rather than one of those that we
-	     handle as an intrinsic data type.  The bit is not used if
-	     the value is not being inlined.  This bit partitions the
-	     key space into the intrinsic data types and the extended
-	     data types.
-
-	     When true, this bit signals that the term identifier for
-	     the datatype URI will follow in the next 8 bytes.  When
-	     false, the datatype URI is directly recoverable from the
-	     [dataTypeCode].
-	     
-	     Note: there can be more than one URI for the same XSD
-	     datatype (there is more than one accepted namspace - see
-	     [1]).  I propose that we collapse these by default onto a
-	     canonical datatype URI.
-	     
-dataTypeCode : These 4 bits indicate the natural value space for the
-	       inline value.
-
-	       Note: These bits partition the key space.  However,
-	       because the [dataTypeId] bit comes first, we will not
-	       interleave inline values for intrinsic and extended
-	       data types having the same dataTypeCode.
-
-	       Note: This design differs from the prior suggestion by
-	       keeping the dataTypeCode for all literals, even when we
-	       are not inlining that literals.
-
-	       Note: The dataTypeCode 0xf is reserved for extending
-	       the set of intrinsic data types.  When the code is 0xf
-	       the next byte must be considered as well to determine
-	       the actual intrinsic data type code.
-
-	---------- byte boundary ----------
-
-If [dataTypeId] was true, then the next 8 bytes are the term
-identifier for the data type URI and the key space will be partitioned
-based on the extended data type URI.  Otherwise this field is not
-present.  When present, this is the term identifier for the actual
-datatype URI used in the RDF Literal.
-
-       ---------- byte boundary ----------
-
-The unsigned byte[] representation of the value in the value space for
-one of the intrinsic types.  The length of this byte[] may be directly
-determined from the [dataTypeCode] for most data types.  However, for
-xsd:integer and xsd:decimal, the length is part of the representation.
-
-       ---------- byte boundary ----------
-
-Extensibility example: 
-
-For example, if you have define a <code>bd:millis</code> data type
-representing milliseconds since the epoch, then the value space of
-that data type can be projected onto a long integer, so we would
-specify the dataTypeId as the term identifier for bd:milliseconds and
-the dataTypeCode for xsd:long.
-
-FYI, the short character code problem is a bit tricky.  I am open to
-ideas here.  The basic issue is that Unicode does not have a natural
-order unless you generate a Unicode sort key from the Unicode string
-(applying an appropriate collation to do so).  So, the easy ASCII
-trick of an N character string with a leading byte to give the run
-length does not work for Unicode, or at least it does not provide a
-natural sort order.  However, we could probably inline Unicode strings
-using a sequence of 2 byte characters in a manner which does not
-preserve the natural order of the value space.  This might be great
-for things like state codes.  It's use would have to be restricted to
-"extended" data types since we can't code some plain text literals one
-way and some the other, but we can choose a specialized coding for an
-extended datatype. [In fact, there are more Unicode code points than
-can be fit into 2-bytes, so this is just an updated version of the
-ASCII hack.]
-
-One reconcilation for extensibility which covers (a) data types which
-project onto intrinsic data types; and (b) enumerated data types is to
-handle them both by registering the extension type against a special
-index and allowing that registration to specify the set of legal
-values.  We could map the enumeration onto a byte (256), short (64k)
-or int (LOTS) as appropriate.  64k values seems like a reasonable
-upper bound for enumerations.  There would also have to be a method as
-part of the extensible type registration which knows how to
-materialize an RDF Value from the inline representation of either an
-enumerated data type.  For a extensible data type which is being
-projected onto an intrinsic data type we would need both (a) a method
-to project the RDF Value onto the appropriate intrinsic data type; and
-(b) a method to materialize an RDF Value from the inline
-representation.  Note that both projected and enumerated extensible
-data types could map many RDF Values onto the same internal value but
-each internal value must map onto a single RDF Value (materialization
-must be deterministic).
-
-This would potentially let people exploit XSD validation for
-enumerations while coding them tightly into the statement indices.  If
-we put the registrations into their own index, then we could use a
-more compact representation (the term identifier of the datatype URI
-is 8 bytes, but we could do with 2 or 4 bytes).  Alternatively, we
-could use the LongPacker to pack an unsigned long integer into as few
-bytes as possible.  This would break the natural ordering across the
-dataTypeIds, but I can not see how that would matter since the term
-identifiers are essentially arbitrary anyway so their order has little
-value.
-
-[1] http://www.w3.org/TR/xmlschema-2/#namespaces
 
 ============================================================
 
