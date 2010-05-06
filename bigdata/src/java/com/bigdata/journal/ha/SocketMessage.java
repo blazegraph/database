@@ -83,6 +83,8 @@ public abstract class SocketMessage<T> implements Externalizable {
 		id = ids.incrementAndGet();
 	}
 	
+	AckMessage<?,? extends SocketMessage<?>> ack;
+	
 	private final ReentrantLock lock = new ReentrantLock();
 	/**
 	 * Signaled when the message has been acknowledged.
@@ -108,6 +110,9 @@ public abstract class SocketMessage<T> implements Externalizable {
 			}
             if (log.isTraceEnabled())
                 log.trace("Got the ack on message: " + id);
+            
+            if (ack.err != null)
+            	throw new RuntimeException("Downstream Exception", ack.err);
 		} finally {
 			lock.unlock();
 		}
@@ -125,6 +130,8 @@ public abstract class SocketMessage<T> implements Externalizable {
 		}
 	}
 	
+	abstract public AckMessage<?,? extends SocketMessage<?>> establishAck();
+	
 	Object handler = null;
 
 	private HAServer server;
@@ -134,7 +141,15 @@ public abstract class SocketMessage<T> implements Externalizable {
 
 	public abstract void apply(T client) throws Exception;
 	
-//	@Override
+	
+	/**
+	 * Called by HAConnect before signalling original message
+	 */
+	public void setAck(AckMessage<?,? extends SocketMessage<?>> ack) {
+		this.ack = ack;
+	}
+
+	//	@Override
 	public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
 		id = in.readLong();
 		
@@ -150,6 +165,10 @@ public abstract class SocketMessage<T> implements Externalizable {
 		out.writeLong(id);
 	}
 	
+	public String toString() {
+		return getClass().getSimpleName() + ":" + id;
+	}
+	
 	interface AckHandler { }
 	
 	/**
@@ -159,6 +178,8 @@ public abstract class SocketMessage<T> implements Externalizable {
 	 * the message completion. 
 	 */
 	static abstract class AckMessage<T,M extends SocketMessage<?>> extends SocketMessage<T> {
+		
+		private Throwable err;
 		
         private M src;
 
@@ -189,6 +210,14 @@ public abstract class SocketMessage<T> implements Externalizable {
 		    
 		}
 		
+		public void setError(Throwable err) {
+			this.err = err;
+		}
+		
+		public Throwable getError() {
+			return err;
+		}
+		
 		public void setMessageSource(final SocketMessage<?> socketMessage) {
 			this.src = (M) socketMessage;
 		}
@@ -209,6 +238,7 @@ public abstract class SocketMessage<T> implements Externalizable {
 			super.readExternal(in);
 			
 			twinId = in.readLong();
+			err = (Throwable) in.readObject();
 		}
 
 //		@Override
@@ -216,7 +246,18 @@ public abstract class SocketMessage<T> implements Externalizable {
 			super.writeExternal(out);
 			
 			out.writeLong(twinId);
+			out.writeObject(err);
 		}
+		
+		public AckMessage<?,? extends SocketMessage<?>>  establishAck() {
+			return null;
+		}
+		
+		public String toString() {
+
+			return super.toString() + ":" + twinId;
+		}
+		
 	}
 
 		/**
@@ -274,8 +315,6 @@ public abstract class SocketMessage<T> implements Externalizable {
 		@Override
 		public void apply(final IHAClient client) throws Exception {
 			
-			final HAWriteConfirm ack = new HAWriteConfirm(id);
-			
 			final ObjectSocketChannelStream in = client.getInputSocket(); // retrieve input stream
 			
 			final HAConnect out = client.getNextConnect();
@@ -297,10 +336,6 @@ public abstract class SocketMessage<T> implements Externalizable {
             }
 
             client.setNextOffset(wc.getLastOffset());
-
-            acknowledge(ack);
-            log.info("Sent acknowledge");
-            log.info("HAWritemessage apply: done");
         }
 		
 		public interface IWriteCallback {
@@ -324,6 +359,13 @@ public abstract class SocketMessage<T> implements Externalizable {
 					client.ack(this);
 				}
 			}			
+		}
+
+		public AckMessage<?,? extends SocketMessage<?>>  establishAck() {
+			if (ack == null)
+				ack = new HAWriteConfirm(id);
+			
+			return ack;
 		}
 	}
 
@@ -368,8 +410,6 @@ public abstract class SocketMessage<T> implements Externalizable {
 		 */
 		public void apply(IHAClient client) throws Exception {	
 		    
-		    final HATruncateConfirm ack = new HATruncateConfirm(id);
-
 			final HAConnect out = client.getNextConnect();
 			
 			if (out != null) {
@@ -382,9 +422,14 @@ public abstract class SocketMessage<T> implements Externalizable {
             if (log.isInfoEnabled())
                 log.info("Truncating file");
             client.truncate(extent);
-
-            acknowledge(ack);
 						
+		}
+
+		public com.bigdata.journal.ha.SocketMessage.AckMessage<?, ? extends SocketMessage<?>> establishAck() {
+			if (ack == null)
+				ack = new HATruncateConfirm(id);
+			
+			return ack;
 		}
 	}
 	

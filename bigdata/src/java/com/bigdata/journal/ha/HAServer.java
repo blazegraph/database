@@ -75,7 +75,7 @@ public class HAServer extends Thread {
 		this.addr = addr;
 		this.port = port;
 		this.client = client;
-		
+		this.setDaemon(true);
 		log.info("Created for " + addr + ":" + port);
 	}
 
@@ -142,7 +142,12 @@ public class HAServer extends Thread {
                 if (log.isTraceEnabled())
                     log.trace("Applying " + msg.getClass().getName());
        
-                msg.apply(this.client);
+				try {
+					msg.apply(this.client);
+				} catch (Throwable t) {
+					msg.establishAck().setError(t);
+				}
+				acknowledge(msg.establishAck());
 
                 if (log.isTraceEnabled())
                     log.trace("Message applied");
@@ -191,7 +196,12 @@ public class HAServer extends Thread {
 						ObjectInputStream instr = str.getInputStream();
 						while (true) {
 							SocketMessage msg = (SocketMessage) instr.readObject();
-							msg.apply(client);
+							try {
+								msg.apply(client);
+							} catch (Throwable t) {
+								msg.establishAck().setError(t);
+							}
+							acknowledge(msg.establishAck());
 						}
 
 					}
@@ -213,7 +223,7 @@ public class HAServer extends Thread {
 	public void acknowledge(final AckMessage<?, ?> ack) throws IOException {
 
 		if (log.isTraceEnabled())
-			log.trace("Sending Acknowledge " + ack);
+			log.trace("Sending Acknowledge " + ack + " from " + addr + ":" + port);
 
 		final ObjectOutputStream ostr = str.getOutputStream();
 		ostr.writeObject(ack);
