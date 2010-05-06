@@ -257,4 +257,9 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
      */
     public boolean useChecksums();
 
+    /**
+     * Needed to support HAWrite protocol, setting the offset of most recent write
+     */
+	public void setNextOffset(long lastOffset);
+
 }

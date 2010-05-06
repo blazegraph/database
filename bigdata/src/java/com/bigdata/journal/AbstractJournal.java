@@ -3634,6 +3634,17 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         public void terminate() {
             // NOP - the quorum is static and does no asynchronous processing.
         }
+
+		public IBufferStrategy getLocalBufferStrategy() {
+			return _bufferStrategy;
+		}
+
+		public void setLocalBufferStrategy(IBufferStrategy strategy) {
+			// void since it should always be the outer instance
+			if (strategy != _bufferStrategy) {
+				throw new IllegalStateException("Unknown buffer strategy");
+			}
+		}
         
     }
 

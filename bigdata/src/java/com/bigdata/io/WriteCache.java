@@ -1608,6 +1608,8 @@ abstract public class WriteCache implements IWriteCache {
 
 	boolean m_written = false;
 
+	private long lastOffset;
+
     /**
      * Called to clear the WriteCacheService map of references to this
      * WriteCache.
@@ -1737,9 +1739,14 @@ abstract public class WriteCache implements IWriteCache {
             if (false) {
                 // out.getChannel().write(tmp);
             } else {
-                outstr.writeInt(sze);
-                outstr.write(buf, 0, sze);
+            	try {
+	                outstr.writeInt(sze);
+	                outstr.write(buf, 0, sze);
+            	} catch (Exception e) {
+            		throw new RuntimeException(e);
+            	}
             }
+            outstr.flush();
         }
 
         // now should flush the WriteCache, but leave control to caller
@@ -1802,6 +1809,10 @@ abstract public class WriteCache implements IWriteCache {
 				long fileOffset = in.readLong();
 				int bufferOffset = in.readInt();
 				int recordLength = in.readInt();
+				
+				long endRec = fileOffset + recordLength;
+				if (endRec > lastOffset)
+					lastOffset = endRec; // update lastOffset for each entry
 				
 				log.info("receiveRecordMap - entry fileOffset: " + fileOffset + ", bufferOffset: " + bufferOffset + ", recordLength: " + recordLength);
 
@@ -1941,6 +1952,15 @@ abstract public class WriteCache implements IWriteCache {
 //
 //	    }
 
+	}
+
+	/**
+	 * Used by the HAWriteMessage to retrieve the nextOffset as implied by the recordMap
+	 * 
+	 * @return the last offset value
+	 */
+	public long getLastOffset() {
+		return lastOffset;
 	}
 	
 }
