@@ -103,7 +103,11 @@ public class HAConnect extends Thread {
 	}
 
     /**
-     * The main thread processes the AckMessages
+     * The main thread processes the {@link AckMessage}s from the downstream
+     * {@link HAServer}. Those messages are placed into an internal
+     * {@link #m_msgs} map by {@link #send(SocketMessage, boolean)}.
+     * {@link #run()} uses that map to correlate the {@link AckMessage} with the
+     * original messages based on their message ids (twined).
      */
     public void run() {
 
@@ -132,12 +136,12 @@ public class HAConnect extends Thread {
                 if (log.isTraceEnabled())
                     log.trace("Acknowledging " + msg.getClass().getName());
 
-                final SocketMessage<?> twin = m_msgs.get(msg.twinId);
+                final SocketMessage<?> twin = m_msgs.get(msg.getTwinId());
                 if (twin == null) {
                     throw new RuntimeException("Twin not found for message: "
-                            + msg.twinId);
+                            + msg.getTwinId());
                 }
-                m_msgs.remove(msg.twinId);
+                m_msgs.remove(msg.getTwinId());
                 msg.setMessageSource(twin);
                 try {
                     msg.processAck();

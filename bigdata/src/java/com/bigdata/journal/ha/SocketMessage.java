@@ -160,10 +160,36 @@ public abstract class SocketMessage<T> implements Externalizable {
 	 */
 	static abstract class AckMessage<T,M extends SocketMessage<?>> extends SocketMessage<T> {
 		
-		M src;
-		public long twinId;
+        private M src;
+
+        /**
+         * The id of the original message being acknowledged by this message.
+         * This is private but not final since the message uses the
+         * {@link Externalizable} interface.
+         */
+		private long twinId;
+
+		/**
+         * The id of the original message being acknowledged by this message.
+		 */
+		public long getTwinId() {
+		    return twinId;
+		}
 		
-		public void setMessageSource(SocketMessage<?> socketMessage) {
+		/**
+		 * Deserialization ctor.
+		 */
+		protected AckMessage() {
+          
+		}
+
+		protected AckMessage(final long twinId) {
+		    
+		    this.twinId = twinId;
+		    
+		}
+		
+		public void setMessageSource(final SocketMessage<?> socketMessage) {
 			this.src = (M) socketMessage;
 		}
 		public M getMessageSource() {
@@ -288,7 +314,7 @@ public abstract class SocketMessage<T> implements Externalizable {
 			public HAWriteConfirm() {} // for deserialization
 
 			public HAWriteConfirm(long twinid) {
-				this.twinId = twinid;
+				super(twinid);
 				setId();
 			}
 
@@ -373,7 +399,7 @@ public abstract class SocketMessage<T> implements Externalizable {
 		public HATruncateConfirm() {} // for deserialization
 
 		public HATruncateConfirm(long twinid) {
-			this.twinId = twinid;
+			super(twinid);
 			setId();
 		}
 

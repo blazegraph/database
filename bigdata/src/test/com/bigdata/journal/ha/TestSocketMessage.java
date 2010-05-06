@@ -298,14 +298,14 @@ public class TestSocketMessage extends TestCase3 {
 		IWriteCallback whandler = new IWriteCallback() {
 
 			public void ack(HAWriteConfirm writeConfirm) {
-				System.out.println("Got write acknowledgement : " + writeConfirm.twinId);
+				System.out.println("Got write acknowledgement : " + writeConfirm.getTwinId());
 			}
 		};
 		
 		ITruncateCallback thandler = new ITruncateCallback() {
 
 			public void ack(HATruncateConfirm truncateConfirm) {
-				System.out.println("Got truncate acknowledgement : " + truncateConfirm.twinId);
+				System.out.println("Got truncate acknowledgement : " + truncateConfirm.getTwinId());
 			}
 		};
 
