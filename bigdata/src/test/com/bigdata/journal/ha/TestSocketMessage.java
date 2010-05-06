@@ -254,6 +254,11 @@ public class TestSocketMessage extends TestCase3 {
 					System.out.println("Received truncate request");
 				}
 
+				@Override
+				public void setNextOffset(long lastOffset) {
+					// not needed
+				}
+
 			};
 
             HAServer server = new HAServer(InetAddress.getLocalHost(), port, handler);

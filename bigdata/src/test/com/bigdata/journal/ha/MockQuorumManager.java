@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal.ha;
 
+import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.Journal;
 
 public class MockQuorumManager implements QuorumManager {
@@ -40,6 +41,8 @@ public class MockQuorumManager implements QuorumManager {
     final Journal[] stores;
 
     final Quorum quorum;
+
+	private IBufferStrategy bufferStrategy;
     
     public int replicationFactor() {
 
@@ -99,5 +102,14 @@ public class MockQuorumManager implements QuorumManager {
         // NOP.
         
     }
+
+	public IBufferStrategy getLocalBufferStrategy() {
+		return bufferStrategy;
+	}
+
+	@Override
+	public void setLocalBufferStrategy(IBufferStrategy strategy) {
+		bufferStrategy = strategy;
+	}
     
 }

@@ -61,7 +61,11 @@ public class TestHAWritePipeline extends ProxyTestCase<Journal> {
             System.err.println("a");            
             
             store.commit();
-            
+            try {
+				Thread.sleep(1000);  // wait for acks
+			} catch (InterruptedException e) {
+				// ignore
+			}
             System.err.println("b");
             
         } finally {
