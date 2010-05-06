@@ -1793,6 +1793,8 @@ ${postInstallMessage}</echo>
 
         <sysproperty key="log4j.path" value="${bigdata.test.log4j.abs.path}"/>
 
+        <sysproperty key="app.home" value="${app.home}"/>
+
         <sysproperty key="classserver.jar" value="${dist.lib}/classserver.jar" />
         <sysproperty key="colt.jar" value="${dist.lib}/colt.jar" />
         <sysproperty key="ctc_utils.jar" value="${dist.lib}/ctc_utils.jar" />
