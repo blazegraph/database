@@ -254,7 +254,7 @@ public class TestSocketMessage extends TestCase3 {
 					System.out.println("Received truncate request");
 				}
 
-				@Override
+//				@Override
 				public void setNextOffset(long lastOffset) {
 					// not needed
 				}

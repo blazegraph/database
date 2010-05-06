@@ -704,6 +704,7 @@ abstract public class WriteCacheService implements IWriteCache {
                     }
 
                     // Start downstream IOs (network IO) iff highly availably.
+                    boolean didDownstreamWrite = false;
                     if (remoteWriteService != null) {
                         // establish connection or return existing connection.
                         final HAConnect cxn = establishHAConnect(quorumManager);
@@ -712,6 +713,7 @@ abstract public class WriteCacheService implements IWriteCache {
                         if (r == null)
                             throw new AssertionError();
                         remoteWriteFuture = remoteWriteService.submit(r);
+                        didDownstreamWrite = true;
                     }
 
                     /*
@@ -726,7 +728,7 @@ abstract public class WriteCacheService implements IWriteCache {
                     cache.flush(false/* force */);
 
                     // Wait for the downstream IOs to finish.
-                    {
+                    if(didDownstreamWrite){
                         final Future<?> tmp = remoteWriteFuture;
                         if (tmp != null) {
                             tmp.get();

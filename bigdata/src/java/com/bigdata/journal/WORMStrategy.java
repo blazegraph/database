@@ -1163,8 +1163,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     public ByteBuffer read(final long addr) {
 
         try {
-            // Try reading from the disk.
-            return readFromDisk(addr);
+            // Try reading from the local store.
+            return readFromLocalStore(addr);
         } catch (ChecksumError e) {
             /*
              * Note: This assumes that the ChecksumError is not wrapped by
@@ -1203,15 +1203,17 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     }
 
     /**
-     * Read from the disk. This is automatically invoked by {@link #read(long)}.
-     * It is public so it may also be used to handle a {@link ChecksumError} by
-     * reading on another node in a highly available {@link Quorum}.
+     * Read from the local store, testing the {@link WriteCacheService} first
+     * and then reading through to the local disk on a cache miss. This is
+     * automatically invoked by {@link #read(long)}. It is public so it may also
+     * be used to handle a {@link ChecksumError} by reading on another node in a
+     * highly available {@link Quorum}.
      * <p>
      * Note: {@link ClosedChannelException} and
      * {@link AsynchronousCloseException} can get thrown out of this method
      * (wrapped as {@link RuntimeException}s) if a reader task is interrupted.
      */
-    public ByteBuffer readFromDisk(final long addr) {
+    public ByteBuffer readFromLocalStore(final long addr) {
         
         final long begin = System.nanoTime();
         

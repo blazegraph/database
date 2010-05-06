@@ -114,7 +114,7 @@ public class HAConnect extends Thread {
 
             // Kick off connection establishment
             // socketChannel.connect(new InetSocketAddress("localhost", port));
-            log.info("Connecting to " + inetSocketAddress);
+            if(log.isInfoEnabled()) log.info("Connecting to " + inetSocketAddress);
             socketChannel.connect(inetSocketAddress);
             socketChannel.finishConnect();
             // Thread.sleep(2000);
@@ -125,6 +125,7 @@ public class HAConnect extends Thread {
             final ObjectInputStream instr = m_out.getInputStream();
             while (true) {
 
+                // wait for an ack message.
                 final AckMessage<?, ?> msg = (AckMessage<?, ?>) instr
                         .readObject();
 
@@ -132,12 +133,18 @@ public class HAConnect extends Thread {
                     log.trace("Acknowledging " + msg.getClass().getName());
 
                 final SocketMessage<?> twin = m_msgs.get(msg.twinId);
+                if (twin == null) {
+                    throw new RuntimeException("Twin not found for message: "
+                            + msg.twinId);
+                }
+                m_msgs.remove(msg.twinId);
                 msg.setMessageSource(twin);
-                msg.processAck();
-                if (twin != null) {
-                    m_msgs.remove(msg.twinId);
-                } else {
-                	log.warn("Twin not found for message: " + msg.twinId);
+                try {
+                    msg.processAck();
+                } finally {
+                    if (log.isTraceEnabled())
+                        log.trace("Calling ackNotify: " + this);
+                    twin.ackNotify();
                 }
 
                 if (log.isTraceEnabled())
@@ -175,15 +182,26 @@ public class HAConnect extends Thread {
      * @throws InterruptedException
      * @throws IOException
      */
-    public void send(SocketMessage<?> msg) throws IOException,
+    public void send(final SocketMessage<?> msg) throws IOException,
             InterruptedException {
 
         send(msg, false/* wait */);
 
 	}
 
-    public void send(SocketMessage<?> msg, boolean wait) throws IOException,
-            InterruptedException {
+    /**
+     * Store the message in the msgs map and send it downstream. The msg.id is
+     * used later to retrieve the message to twin with the Ack
+     * 
+     * @param wait
+     *            When <code>true</code>, this method will block until the
+     *            message has been acknowledged.
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void send(final SocketMessage<?> msg, final boolean wait)
+            throws IOException, InterruptedException {
 
     	if (log.isTraceEnabled())
     		log.trace("sending message: " + msg + ", wait: " + wait);
@@ -195,12 +213,8 @@ public class HAConnect extends Thread {
 		
 		msg.send(m_out);
 		
-		if (wait) {
-			try {
-				msg.await();
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
+        if (wait) {
+            msg.await();
 		}
 	}
     
