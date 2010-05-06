@@ -26,6 +26,8 @@ package com.bigdata.journal.ha;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.io.RandomAccessFile;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -278,6 +280,55 @@ public class TestSocketMessage extends TestCase3 {
 //		}
 	}
 
+	public static class ExceptionMessage extends SocketMessage<Object> {
+		String msg;
+		public ExceptionMessage() {}
+		public ExceptionMessage(String msg) {
+			this.msg = msg;
+			setId();
+		}
+		
+		public void apply(Object client) throws Exception {
+			throw new RuntimeException(msg);
+		}
+
+		public AckMessage<Object, SocketMessage<Object>> establishAck() {
+			return new AckMessage<Object, SocketMessage<Object>>() {
+
+				public void apply(Object client) throws Exception {
+					// void Ack
+				}
+				
+			};
+		}
+		
+		public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+			super.readExternal(in);
+			
+			msg = (String) in.readObject();
+		}
+
+		public void writeExternal(ObjectOutput out) throws IOException {
+			super.writeExternal(out);
+			
+			out.writeObject(msg);
+		}
+	}
+	
+	public void testExceptionMessage() {
+		final String txt = "He's not the messiah, he's a very naughty boy!";
+		final ExceptionMessage msg = new ExceptionMessage(txt);
+		
+		try {
+			Thread.sleep(1000); // Wait for the pipes to get setup
+			
+			messenger.send(msg, true);
+			fail("Should have thrown an exception");
+		} catch (Exception e) {
+			e.printStackTrace();
+			assertTrue("Expected RuntimeException", e instanceof RuntimeException);
+		}
+	}
 	public void testSimpleMessage() throws ChecksumError, InterruptedException, IOException {
 		
 //		setup();
