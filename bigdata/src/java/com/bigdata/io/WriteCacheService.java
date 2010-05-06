@@ -60,6 +60,7 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.WriteCache.WriteCacheCounters;
 import com.bigdata.journal.AbstractBufferStrategy;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.WORMStrategy;
@@ -516,7 +517,7 @@ abstract public class WriteCacheService implements IWriteCache {
                 final HAServer s = new HAServer(//
                 		haGlueService.getWritePipelineAddr(),//
                 		haGlueService.getWritePipelinePort(),//
-                        newHAClient()//
+                        newHAClient(quorumManager.getLocalBufferStrategy())//
                         );
                 
                 haServer.set(s);
@@ -590,7 +591,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * 
      * @return
      */
-    protected IHAClient newHAClient() {
+    protected IHAClient newHAClient(final IBufferStrategy bufferStrategy) {
 
         return new IHAClient() {
             
@@ -626,6 +627,12 @@ abstract public class WriteCacheService implements IWriteCache {
             		return null;
             	}
             }
+
+			// @Override
+			public void setNextOffset(long lastOffset) {
+				if (bufferStrategy != null)
+					bufferStrategy.setNextOffset(lastOffset);
+			}
             
         };
         

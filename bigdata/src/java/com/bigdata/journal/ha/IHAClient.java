@@ -40,6 +40,10 @@ public interface IHAClient {
 
 	HAConnect getNextConnect();
 
+	/**
+	 * Provides clean current WriteCache for transfer from upstream
+	 * @return
+	 */
 	WriteCache getWriteCache();
 
 	/**
@@ -55,4 +59,11 @@ public interface IHAClient {
 	 * @param extent
 	 */
 	void truncate(long extent);
+
+	/**
+	 * Required for WORMStrategy to ensure nextOffset is kept in-sync with writes
+	 * 
+	 * @param lastOffset from writeCache
+	 */
+	void setNextOffset(long lastOffset);
 }

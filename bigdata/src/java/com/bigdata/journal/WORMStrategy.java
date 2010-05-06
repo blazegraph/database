@@ -844,6 +844,10 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         // initialize striped performance counters for this store.
         this.storeCounters.set(new StoreCounters(10/* batchSize */));
         
+        if (quorumManager != null) {
+        	quorumManager.setLocalBufferStrategy(this);
+        }
+        
         /*
          * Enable the write cache?
          * 
@@ -2188,9 +2192,19 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * This implementation can not release storage allocations and invocations
      * of this method are ignored.
      */
-	@Override
 	public void delete(long addr) {
 		// NOP
+	}
+
+	/**
+	 * Supports HAWrite protocol to keep bufferStrategy in sync with underlying WriteCacheService
+	 */
+	public void setNextOffset(long lastOffset) {
+		if (lastOffset > nextOffset.get()) {
+			nextOffset.set(lastOffset);
+		} else {
+			log.warn("unexpected nextOffset value: " + lastOffset + " < " + nextOffset.get());
+		}
 	}
     
 }

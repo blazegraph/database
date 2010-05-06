@@ -137,5 +137,10 @@ public class TransientBufferStrategy extends BasicBufferStrategy {
         return rootBlocks[rootBlock0 ? 0 : 1].asReadOnlyBuffer();
         
     }
-    
-}
+
+	/**
+	 * Protocol support for HAWrite
+	 */
+	public void setNextOffset(long lastOffset) {
+		// void
+	}}

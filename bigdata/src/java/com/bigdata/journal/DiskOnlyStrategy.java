@@ -2531,9 +2531,12 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
     }
 
-	@Override
 	public void delete(long addr) {
 		// void behaviour
+	}
+
+	public void setNextOffset(long lastOffset) {
+		// void for standard Disk strategy
 	}
     
 }

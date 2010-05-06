@@ -94,11 +94,18 @@ public abstract class SocketMessage<T> implements Externalizable {
 	
 	ReentrantLock completeLock = new ReentrantLock();
 	Condition waitCondition = completeLock.newCondition();
+	boolean acknowledged = false;
 	
 	public void await() throws InterruptedException {
 		completeLock.lockInterruptibly();
 		try {
-			waitCondition.await();
+			if (!acknowledged) {
+				if (log.isTraceEnabled())
+					log.trace("Waiting for ack on message: " + id);
+				waitCondition.await();
+				if (log.isTraceEnabled())
+					log.trace("Got the ack on message: " + id);
+			}
 		} finally {
 			completeLock.unlock();
 		}
@@ -107,6 +114,9 @@ public abstract class SocketMessage<T> implements Externalizable {
 	protected void ackNotify() throws InterruptedException {
 		completeLock.lockInterruptibly();
 		try {
+			acknowledged = true;
+			if (log.isTraceEnabled())
+				log.trace("Acknowledging message: " + id);
 			waitCondition.signalAll();
 		} finally {
 			completeLock.unlock();
@@ -197,6 +207,9 @@ public abstract class SocketMessage<T> implements Externalizable {
 	 * 
 	 * The message will pass data on to the next service in the chain if present, and write data
 	 * to the WriteCache of the local service.
+	 * 
+	 * The message also needs to communicate the file extent to which the WriteCache is applicable
+	 * and also the nextOffset - which can be inferred from the recordMap.
 	 */
 	public static class HAWriteMessage extends SocketMessage<IHAClient> {
 		WriteCache wc;
@@ -214,15 +227,17 @@ public abstract class SocketMessage<T> implements Externalizable {
 		@Override
         public void send(ObjectSocketChannelStream ostr) throws IOException, InterruptedException {
 
-		    if (wc == null) {
-                throw new IllegalStateException(
-                        "send cannot be called with no WriteCache");
-            }
+//		    if (wc == null) {
+//                throw new IllegalStateException(
+//                        "send cannot be called with no WriteCache");
+//            }
 
             ostr.getOutputStream().writeObject(this);
 
-            wc.sendTo(ostr);
-            ostr.getOutputStream().flush();
+            if (wc != null) {
+	            wc.sendTo(ostr);
+	            ostr.getOutputStream().flush();
+            }
         }
 		
 		@Override
@@ -244,7 +259,6 @@ public abstract class SocketMessage<T> implements Externalizable {
 			
 			ObjectSocketChannelStream in = client.getInputSocket(); // retrieve input stream
 			
-			wc = client.getWriteCache();
 			HAConnect out = client.getNextConnect();
 			
 			if (out != null) {
@@ -259,9 +273,19 @@ public abstract class SocketMessage<T> implements Externalizable {
 					throw new RuntimeException(e);
 				}				
 			}
+
+			wc = client.getWriteCache();
 			try {
 				log.info("Calling receiveAndForward");
 				wc.receiveAndForward(in, out);
+				
+				if (out != null) {
+					log.info("Waiting on downstream ack");
+					await(); // wait for ack
+					log.info("Got downstream ack");
+				}
+				
+				client.setNextOffset(wc.getLastOffset());
 				
 				acknowledge(ack);
 				log.info("Sent acknowledge");

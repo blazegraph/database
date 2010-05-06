@@ -136,6 +136,8 @@ public class HAConnect extends Thread {
                 msg.processAck();
                 if (twin != null) {
                     m_msgs.remove(msg.twinId);
+                } else {
+                	log.warn("Twin not found for message: " + msg.twinId);
                 }
 
                 if (log.isTraceEnabled())

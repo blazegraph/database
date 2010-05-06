@@ -424,4 +424,10 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
         
     }
 
+	/**
+	 * Protocol support for HAWrite
+	 */
+	public void setNextOffset(long lastOffset) {
+		// void for default DiskBackedBufferStrategy
+	}
 }
