@@ -293,13 +293,22 @@ public class TestSocketMessage extends TestCase3 {
 		}
 
 		public AckMessage<Object, SocketMessage<Object>> establishAck() {
-			return new AckMessage<Object, SocketMessage<Object>>() {
+			if(ack == null)
+				ack = new AckExceptionMessage(this.getId());
+			
+			return (com.bigdata.journal.ha.SocketMessage.AckMessage<Object, SocketMessage<Object>>) ack;
+		}
+		public static class AckExceptionMessage extends AckMessage<Object, SocketMessage<Object>> {
 
-				public void apply(Object client) throws Exception {
-					// void Ack
-				}
-				
-			};
+			public AckExceptionMessage() {}
+			public AckExceptionMessage(long id) {
+				super(id);
+			}
+			
+			public void apply(Object client) throws Exception {
+				// void			
+			}
+			
 		}
 		
 		public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
@@ -325,8 +334,7 @@ public class TestSocketMessage extends TestCase3 {
 			messenger.send(msg, true);
 			fail("Should have thrown an exception");
 		} catch (Exception e) {
-			e.printStackTrace();
-			assertTrue("Expected RuntimeException", e instanceof RuntimeException);
+			assertTrue("Expected RuntimeException", txt.equals(e.getCause().getMessage()));
 		}
 	}
 	public void testSimpleMessage() throws ChecksumError, InterruptedException, IOException {
