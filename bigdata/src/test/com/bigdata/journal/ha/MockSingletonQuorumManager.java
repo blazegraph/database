@@ -32,6 +32,7 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 
 public class MockSingletonQuorumManager implements QuorumManager {
@@ -119,5 +120,15 @@ public class MockSingletonQuorumManager implements QuorumManager {
         }
         
     };
+
+    // Cannot be required since a singleton will have no downstream nodes
+	public IBufferStrategy getLocalBufferStrategy() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public void setLocalBufferStrategy(IBufferStrategy strategy) {
+		// Void since only relevant for downstream		
+	}
     
 }

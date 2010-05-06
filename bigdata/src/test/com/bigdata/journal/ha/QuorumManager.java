@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal.ha;
 
+import com.bigdata.journal.AbstractBufferStrategy;
+import com.bigdata.journal.IBufferStrategy;
+import com.bigdata.journal.WORMStrategy;
+
 /**
  * A manager for a set of physical services designated as prospective members of
  * the same logical service. The physical services must met in a {@link Quorum}
@@ -95,4 +99,11 @@ public interface QuorumManager {
      * {@link QuorumManager}.
      */
     void terminate();
+
+    /**
+     * Returns the BufferStrategy associated with this HA node
+     */
+	IBufferStrategy getLocalBufferStrategy();
+
+	void setLocalBufferStrategy(IBufferStrategy strategy);
 }
