@@ -83,6 +83,10 @@ public abstract class SocketMessage<T> implements Externalizable {
 		id = ids.incrementAndGet();
 	}
 	
+	protected long getId() {
+		return id;
+	}
+	
 	AckMessage<?,? extends SocketMessage<?>> ack;
 	
 	private final ReentrantLock lock = new ReentrantLock();
@@ -239,6 +243,10 @@ public abstract class SocketMessage<T> implements Externalizable {
 			
 			twinId = in.readLong();
 			err = (Throwable) in.readObject();
+			if (err != null) {
+		           if (log.isTraceEnabled())
+		                log.trace("readExternal, err", err);				
+				}
 		}
 
 //		@Override
@@ -246,6 +254,11 @@ public abstract class SocketMessage<T> implements Externalizable {
 			super.writeExternal(out);
 			
 			out.writeLong(twinId);
+			
+			if (err != null) {
+	           if (log.isTraceEnabled())
+	                log.trace("writeExternal, err", err);				
+			}
 			out.writeObject(err);
 		}
 		

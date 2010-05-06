@@ -145,7 +145,11 @@ public class HAServer extends Thread {
 				try {
 					msg.apply(this.client);
 				} catch (Throwable t) {
-					msg.establishAck().setError(t);
+
+	                if (log.isTraceEnabled())
+	                    log.trace("Propagating error", t);
+
+	                msg.establishAck().setError(t);
 				}
 				acknowledge(msg.establishAck());
 
