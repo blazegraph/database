@@ -1048,7 +1048,9 @@ abstract public class WriteCache implements IWriteCache {
                         self);
 
                 try {
-                    
+                    if (log.isTraceEnabled())
+                    	log.trace("sending and waiting for " + msg);
+                   
                     connect.send(msg, true);
                     
                 } catch (Throwable e) {

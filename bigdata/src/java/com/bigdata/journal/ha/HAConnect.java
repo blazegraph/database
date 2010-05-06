@@ -70,6 +70,8 @@ public class HAConnect extends Thread {
 
         this.inetSocketAddress = inetSocketAddress;
         
+		this.setDaemon(true);
+        
         try {
 			Thread.sleep(1000);
 		} catch (InterruptedException e) {
@@ -143,11 +145,13 @@ public class HAConnect extends Thread {
                 }
                 m_msgs.remove(msg.getTwinId());
                 msg.setMessageSource(twin);
+                twin.setAck(msg);
+                
                 try {
                     msg.processAck();
                 } finally {
                     if (log.isTraceEnabled())
-                        log.trace("Calling ackNotify: " + this);
+                        log.trace("Calling ackNotify: " + msg);
                     twin.ackNotify();
                 }
 
@@ -208,7 +212,7 @@ public class HAConnect extends Thread {
             throws IOException, InterruptedException {
 
     	if (log.isTraceEnabled())
-    		log.trace("sending message: " + msg + ", wait: " + wait);
+    		log.trace("sending message: " + msg + ", wait: " + wait +  " to " + inetSocketAddress);
     	
         if (m_out == null)
             throw new IllegalStateException("Not running?");
