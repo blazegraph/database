@@ -26,15 +26,8 @@ package com.bigdata.journal.ha;
 
 import java.io.Externalizable;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.ObjectInput;
-import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
-import java.io.ObjectOutputStream;
-import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -43,8 +36,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.io.ObjectSocketChannelStream;
 import com.bigdata.io.WriteCache;
-import com.bigdata.io.WriteCache.RecordMetadata;
-import com.bigdata.journal.ha.SocketMessage.HAWriteMessage.HAWriteConfirm;
 
 /**
  * SocketMessage is a control message that is input from a Socket stream.
@@ -92,34 +83,45 @@ public abstract class SocketMessage<T> implements Externalizable {
 		id = ids.incrementAndGet();
 	}
 	
-	ReentrantLock completeLock = new ReentrantLock();
-	Condition waitCondition = completeLock.newCondition();
-	boolean acknowledged = false;
+	private final ReentrantLock lock = new ReentrantLock();
+	/**
+	 * Signaled when the message has been acknowledged.
+	 */
+	private final Condition acknowledgedCondition = lock.newCondition();
+	/**
+	 * The {@link #acknowledged} field is guarded by the {@link #lock}.
+	 */
+	private boolean acknowledged = false;
 	
+    /**
+     * Await acknowledgment of the message.
+     * 
+     * @throws InterruptedException
+     */
 	public void await() throws InterruptedException {
-		completeLock.lockInterruptibly();
+		lock.lockInterruptibly();
 		try {
-			if (!acknowledged) {
+		    while(!acknowledged) {
 				if (log.isTraceEnabled())
 					log.trace("Waiting for ack on message: " + id);
-				waitCondition.await();
-				if (log.isTraceEnabled())
-					log.trace("Got the ack on message: " + id);
+				acknowledgedCondition.await();
 			}
+            if (log.isTraceEnabled())
+                log.trace("Got the ack on message: " + id);
 		} finally {
-			completeLock.unlock();
+			lock.unlock();
 		}
 	}
 	
 	protected void ackNotify() throws InterruptedException {
-		completeLock.lockInterruptibly();
+		lock.lockInterruptibly();
 		try {
 			acknowledged = true;
 			if (log.isTraceEnabled())
 				log.trace("Acknowledging message: " + id);
-			waitCondition.signalAll();
+			acknowledgedCondition.signalAll();
 		} finally {
-			completeLock.unlock();
+			lock.unlock();
 		}
 	}
 	
@@ -130,7 +132,7 @@ public abstract class SocketMessage<T> implements Externalizable {
 		this.handler = handler;
 	}
 
-	public abstract void apply(T client);
+	public abstract void apply(T client) throws Exception;
 	
 //	@Override
 	public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
@@ -173,18 +175,8 @@ public abstract class SocketMessage<T> implements Externalizable {
 		 * @param client
 		 */
 		@SuppressWarnings("unchecked")
-		public void processAck() {
-			try {
-				apply((T) src.handler);
-			} finally {
-				try {
-					if (log.isTraceEnabled())
-	                    log.trace("Calling ackNotify: " + this);
-					src.ackNotify();
-				} catch (InterruptedException e) {
-					e.printStackTrace(); // FIXME: not sure what to do here in general
-				}
-			}
+		public void processAck() throws Exception {
+		    apply((T) src.handler);
 		}
 				
 		public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
@@ -253,48 +245,37 @@ public abstract class SocketMessage<T> implements Externalizable {
 		/**
 		 * For the WriteMessage
 		 */
-		public void apply(IHAClient client) {
+		@Override
+		public void apply(final IHAClient client) throws Exception {
 			
-			HAWriteConfirm ack = new HAWriteConfirm(id);
+			final HAWriteConfirm ack = new HAWriteConfirm(id);
 			
-			ObjectSocketChannelStream in = client.getInputSocket(); // retrieve input stream
+			final ObjectSocketChannelStream in = client.getInputSocket(); // retrieve input stream
 			
-			HAConnect out = client.getNextConnect();
+			final HAConnect out = client.getNextConnect();
 			
-			if (out != null) {
-				try {
-					// send this message object
-					out.send(this, false); // don't wait yet!!
-				} catch (IOException e) {
-					e.printStackTrace();
-					throw new RuntimeException(e);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-					throw new RuntimeException(e);
-				}				
-			}
+            if (out != null) {
+                // send this message object
+                out.send(this, false); // don't wait yet!!
+            }
 
 			wc = client.getWriteCache();
-			try {
-				log.info("Calling receiveAndForward");
-				wc.receiveAndForward(in, out);
-				
-				if (out != null) {
-					log.info("Waiting on downstream ack");
-					await(); // wait for ack
-					log.info("Got downstream ack");
-				}
-				
-				client.setNextOffset(wc.getLastOffset());
-				
-				acknowledge(ack);
-				log.info("Sent acknowledge");
-			} catch (Exception ioe) {
-				ioe.printStackTrace();
-				throw new RuntimeException(ioe);
-			}			
-			log.info("HAWritemessage apply: done");
-		}
+
+            log.info("Calling receiveAndForward");
+            wc.receiveAndForward(in, out);
+
+            if (out != null) {
+                log.info("Waiting on downstream ack");
+                await(); // wait for ack
+                log.info("Got downstream ack");
+            }
+
+            client.setNextOffset(wc.getLastOffset());
+
+            acknowledge(ack);
+            log.info("Sent acknowledge");
+            log.info("HAWritemessage apply: done");
+        }
 		
 		public interface IWriteCallback {
 
@@ -312,7 +293,7 @@ public abstract class SocketMessage<T> implements Externalizable {
 			}
 
 			@Override
-			public void apply(IWriteCallback client) {
+			public void apply(IWriteCallback client) throws Exception {
 				if (client != null) {
 					client.ack(this);
 				}
@@ -335,18 +316,10 @@ public abstract class SocketMessage<T> implements Externalizable {
 			setId();
 		}
 		
-		public void send(ObjectSocketChannelStream ostr) {
-			try {
-				if (log.isTraceEnabled())
-					log.trace("HATruncateMessage send");
-				ostr.getOutputStream().writeObject(this);				
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			} catch (IllegalStateException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			
+        public void send(ObjectSocketChannelStream ostr) throws IOException {
+            if (log.isTraceEnabled())
+                log.trace("HATruncateMessage send");
+            ostr.getOutputStream().writeObject(this);
 		}
 		
 		@Override
@@ -367,30 +340,25 @@ public abstract class SocketMessage<T> implements Externalizable {
 		/**
 		 * For the WriteMessage
 		 */
-		public void apply(IHAClient client) {			
-			HATruncateConfirm ack = new HATruncateConfirm(id);
+		public void apply(IHAClient client) throws Exception {	
+		    
+		    final HATruncateConfirm ack = new HATruncateConfirm(id);
 
-			HAConnect out = client.getNextConnect();
+			final HAConnect out = client.getNextConnect();
 			
 			if (out != null) {
-				try {
-					// send this message object
-					out.send(this, true); // we can wait for this here
-				} catch (IOException e) {
-					throw new RuntimeException(e);
-				} catch (InterruptedException e) {
-					throw new RuntimeException(e);
-				}				
-			}
-			try {
-				if (log.isInfoEnabled())
-					log.info("Truncating file");
-				client.truncate(extent);
-				
-				acknowledge(ack);
-			} catch (Exception ioe) {
-				ioe.printStackTrace();
-			}			
+
+			    // send this message object
+				out.send(this, true); // we can wait for this here
+			
+            }
+
+            if (log.isInfoEnabled())
+                log.info("Truncating file");
+            client.truncate(extent);
+
+            acknowledge(ack);
+						
 		}
 	}
 	
@@ -410,7 +378,7 @@ public abstract class SocketMessage<T> implements Externalizable {
 		}
 
 		@Override
-		public void apply(ITruncateCallback client) {
+		public void apply(ITruncateCallback client) throws Exception {
 			if (client != null) {
 				client.ack(this);
 			}

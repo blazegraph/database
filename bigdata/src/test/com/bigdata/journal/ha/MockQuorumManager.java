@@ -107,7 +107,7 @@ public class MockQuorumManager implements QuorumManager {
 		return bufferStrategy;
 	}
 
-	@Override
+//	@Override
 	public void setLocalBufferStrategy(IBufferStrategy strategy) {
 		bufferStrategy = strategy;
 	}

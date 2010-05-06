@@ -24,7 +24,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal.ha;
 
-import java.io.EOFException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -85,7 +84,8 @@ public class HAServer extends Thread {
 			selector = Selector.open();
 			server = ServerSocketChannel.open();
 			server.socket().bind(new InetSocketAddress(addr, port));
-			log.info("Listening on" + addr + ":" + port);
+			if(log.isInfoEnabled())
+			    log.info("Listening on" + addr + ":" + port);
 			// server.socket().bind(new InetSocketAddress(port));
 			server.configureBlocking(true);
 			// serverKey = server.register(selector, SelectionKey.OP_ACCEPT);
@@ -114,39 +114,42 @@ public class HAServer extends Thread {
 		}
 	}
 
-	/**
-	 * Wait for a client connection. This only supports one client connection.
-	 * 
-	 * @throws IOException
-	 * @throws InterruptedException
-	 * @throws Exception
-	 */
-	private void runBlock() throws IOException, InterruptedException, Exception {
-			while (true) {
-				final SocketChannel client = server.accept();
-				log.info("Accepted connection");
-				client.configureBlocking(true);
+    /**
+     * Wait for a client connection. This only supports one client connection.
+     * 
+     * @throws IOException
+     * @throws InterruptedException
+     * @throws Exception
+     */
+    private void runBlock() throws IOException, InterruptedException, Exception {
+        while (true) {
+            
+            final SocketChannel client = server.accept();
+            log.info("Accepted connection");
+            client.configureBlocking(true);
 
-				str = new ObjectSocketChannelStream(client);
-				this.client.setInputSocket(str);
-				// Now process messages
-				final ObjectInputStream instr = str.getInputStream();
-				while (true) {
-					if (log.isTraceEnabled())
-						log.trace("Reading next message from " + str);
+            str = new ObjectSocketChannelStream(client);
+            this.client.setInputSocket(str);
+            // Now process messages
+            final ObjectInputStream instr = str.getInputStream();
+            while (true) {
+                if (log.isTraceEnabled())
+                    log.trace("Reading next message from " + str);
 
-					final SocketMessage msg = (SocketMessage) instr.readObject();
-					msg.setHAServer(this);
+                final SocketMessage msg = (SocketMessage) instr.readObject();
+                msg.setHAServer(this);
 
-					if (log.isTraceEnabled())
-						log.trace("Applying " + msg.getClass().getName());
-					msg.apply(this.client);
+                if (log.isTraceEnabled())
+                    log.trace("Applying " + msg.getClass().getName());
+       
+                msg.apply(this.client);
 
-					if (log.isTraceEnabled())
-						log.trace("Message applied");
-				}
-			}
-	}
+                if (log.isTraceEnabled())
+                    log.trace("Message applied");
+                
+            }
+        }
+    }
 
 	/**
 	 * Note: This is an alternative implementation of {@link #runBlock()} which
@@ -200,7 +203,10 @@ public class HAServer extends Thread {
 			} catch (ClassNotFoundException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
-			}
+			} catch (Exception e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
 		}
 	}
 
