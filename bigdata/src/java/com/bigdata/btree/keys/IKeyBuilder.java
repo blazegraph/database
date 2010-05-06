@@ -354,11 +354,12 @@ public interface IKeyBuilder extends ISortKeyBuilder {
     public IKeyBuilder append(float f);
 
     /**
-     * Appends the UUID to the key using the MSB and then the LSB.
+     * Appends the UUID to the key using the MSB and then the LSB (this
+     * preserves the natural order imposed by {@link UUID#compareTo(UUID)}).
      * 
      * @param uuid
      *            The UUID.
-     *            
+     * 
      * @return <i>this</i>
      */
     public IKeyBuilder append(UUID uuid);

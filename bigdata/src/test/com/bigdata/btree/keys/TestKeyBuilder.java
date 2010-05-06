@@ -36,10 +36,12 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.UUID;
 
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 
 /**
  * Test suite for high level operations that build variable length _unsigned_
@@ -628,6 +630,60 @@ public class TestKeyBuilder extends TestCase2 {
 
     }
 
+    /**
+     * Test verifies encode/decode of {@link UUID}s and also verifies that the
+     * natural order of the encoded {@link UUID}s respects the order imposed
+     * by {@link UUID#compareTo(UUID)}.
+     */
+    public void test_keyBuilder_UUID() {
+
+        final IKeyBuilder keyBuilder = new KeyBuilder();
+        
+        final int limit = 1000;
+        
+        final UUID[] a = new UUID[limit];
+
+        final byte[][] b = new byte[limit][];
+
+        for (int i = 0; i < limit; i++) {
+
+            final UUID expected = UUID.randomUUID();
+
+            final byte[] key = keyBuilder.reset().append(expected).getKey();
+
+            final UUID actual = KeyBuilder.decodeUUID(key, 0/* offset */);
+
+            a[i] = expected;
+            
+            b[i] = key;
+
+            // verify decode.
+            assertEquals(expected, actual);
+
+        }
+        
+        // Put the UUIDs into their natural order.
+        Arrays.sort(a);
+
+        // Put the keys into their natural order.
+        Arrays.sort(b, UnsignedByteArrayComparator.INSTANCE);
+
+        // Verify that the natural orders are the same.
+        for (int i = 0; i < limit; i++) {
+
+            final UUID expected = a[i];
+
+            final byte[] key = b[i];
+
+            final UUID actual = KeyBuilder.decodeUUID(key, 0/* offset */);
+
+            // verify decode.
+            assertEquals(expected, actual);
+
+        }
+        
+    }
+    
     /**
      * Test ordering imposed by encoding a single ASCII key.
      * 
@@ -1471,6 +1527,12 @@ public class TestKeyBuilder extends TestCase2 {
         
     }
 
+    /**
+     * FIXME The 2 byte run length limits the maximum key length for a
+     * BigInteger to ~32k. Write unit tests which verify that we detect and
+     * throw an IllegalArgumentException rather than just truncating the run
+     * length!
+     */
     private byte[] encodeBigInteger(final BigInteger i) {
 
         return new KeyBuilder().append(i).getKey();
@@ -1489,7 +1551,7 @@ public class TestKeyBuilder extends TestCase2 {
 //        return key;
         
     }
-
+    
     protected void doEncodeDecodeTest(final BigInteger expected) {
 
         byte[] encoded = null;
@@ -1779,4 +1841,256 @@ public class TestKeyBuilder extends TestCase2 {
 
     }
 
+//    /*
+//     * BigDecimal (w/o precision).
+//     */
+//
+//    /*
+//     * Note: signum is in the key twice. Once as the first thing in the key to
+//     * put the values into the correct total order and once in the byte[]
+//     * representation of the unscaled BigInteger value. The first occurrence of
+//     * the signum is thrown away when we decode the key.
+//     */
+//    private BigDecimal decodeBigDecimal(final byte[] key) {
+//
+//        final int offset = 0;
+//        final int signum = KeyBuilder.decodeByte(key[offset]);
+//        final int scale = -KeyBuilder.decodeInt(key, offset + 1);
+//        final int runLength = KeyBuilder.decodeShort(key, offset + 1 + 4);
+//        final byte[] b = new byte[runLength];
+//        System.arraycopy(key/* src */, offset + (1 + 4 + 2)/* srcpos */,
+//                b/* dst */, 0/* destPos */, runLength);
+//        final BigInteger i = new BigInteger(b);// unscaled value.
+//        final BigDecimal d = new BigDecimal(i, scale);
+//        return d;
+//        
+//      }
+//
+//    /*
+//     * Note: This relies on front-coding to compress common leading bytes
+//     * (signum, scale, and runLength).
+//     * 
+//     * @todo limit runLength to 32kbits.
+//     * @todo do we really need signum first or just scale?
+//     */
+//      private byte[] encodeBigDecimal(final BigDecimal i) {
+//
+//          // @todo When elevating into the KeyBuilder, normalize here.  We are
+//          // normalizing in the unit tests in order to be able to compare the
+//          // normalized values for EQ since BigDecimal compares value and
+//          // scale in BigDecimal#equals().
+//          final KeyBuilder keyBuilder = new KeyBuilder();
+//
+//          // Extract the scale of the BigDecimal. This has 32bits of significance.
+//          // We flip the sign since it represents digits after the decimal, so
+//          // negative scale() means smaller values.
+//          final int scale = -i.scale();
+//          // Extract the unscaled BigInteger component.
+//          final byte[] b = i.unscaledValue().toByteArray();
+//          // key := [signum(1)][scale(4)][runLength(2)][b.length]
+//          keyBuilder.ensureFree(1 + 4 + 2 + b.length);
+//          keyBuilder.append((byte)i.signum()); // signum (front-coding will compress)
+//          keyBuilder.append(scale); // int32 scale.
+//          keyBuilder.append((short) b.length); // run-length.
+//          keyBuilder.append(b); // unscaled BigInteger bytes.
+//
+//          final byte[] key = keyBuilder.getKey();
+//
+//          return key;
+//
+//      }
+//
+//    /**
+//     * Normalize the {@link BigDecimal} by setting the scale such that there are
+//     * no digits before the decimal point.
+//     * 
+//     * FIXME This fails for "0" and "0.0". The trailing .0 is considered a
+//     * significant digit and is not being stripped. We need to also strip
+//     * trailing zeros which are significant.
+//     * 
+//     * <pre>
+//     * i=0   (scale=0,prec=1) : 0,   scale=0, precision=1, unscaled=0, unscaled_byte[]=[0]
+//     * i=0.0 (scale=1,prec=1) : 0.0, scale=1, precision=1, unscaled=0, unscaled_byte[]=[0]
+//     * </pre>
+//     */
+//      private BigDecimal normalizeBigDecimal(final BigDecimal i) {
+//          
+//          return i.stripTrailingZeros();
+//          
+//      }
+//
+//      /**
+//       * Dumps out interesting bits of the {@link BigDecimal} state.
+//       * 
+//       * @return The dump.
+//       */
+//      private String dumpBigDecimal(final BigDecimal i) {
+//
+//        final BigInteger unscaled = i.unscaledValue();
+//
+//        final String msg = i.toString() + ", scale=" + i.scale()
+//                + //
+//                ", precision=" + i.precision()
+//                + //
+//                ", unscaled=" + unscaled
+//                + //
+//                ", unscaled_byte[]="
+//                + BytesUtil.toString(unscaled.toByteArray())//
+//        ;
+//
+//          return msg;
+//
+//      }
+//      
+//    /**
+//     * Note: must have normalized representation of the BigDecimal to do
+//     * equals(). BigDecimal#equals(foo) compares both value and scale, while we
+//     * can only test on value here.
+//     */
+//    protected void doEncodeDecodeTest(BigDecimal expected) {
+//
+//          expected = normalizeBigDecimal(expected);
+//          
+//          byte[] encoded = null;
+//          BigDecimal actual = null;
+//          Throwable cause = null;
+//          try {
+//
+//              encoded = encodeBigDecimal(expected);
+//
+//              actual = decodeBigDecimal(encoded);
+//
+//          } catch (Throwable t) {
+//
+//              cause = t;
+//
+//          }
+//
+//          if (cause != null || !expected.equals(actual)) {
+//
+//              final String msg = "BigDecimal" + //
+//                      "\nexpected=" + expected + //
+//                      "\nsigned  =" + Arrays.toString(expected.unscaledValue().toByteArray())+//
+//                      "\nunsigned=" + BytesUtil.toString(expected.unscaledValue().toByteArray())+//
+//                      "\nencoded =" + BytesUtil.toString(encoded) + //
+//                      "\nactual  =" + actual+//
+//                      (actual != null ? "\nactualS ="
+//                              + Arrays.toString(actual.unscaledValue().toByteArray())
+//                              + //
+//                              "\nactualU ="
+//                              + BytesUtil.toString(actual.unscaledValue().toByteArray()) //
+//                      : "")
+//                      ;
+//
+//              if (cause == null) {
+//
+//                  fail(msg);
+//                  
+//              } else {
+//                  
+//                  fail(msg, cause);
+//                  
+//              }
+//              
+//          }
+//
+//      }
+//
+//    private enum CompareEnum {
+//
+//        LT(-1), EQ(0), GT(1);
+//        
+//        private CompareEnum(final int ret) {
+//            this.ret = ret;
+//        }
+//
+//        private int ret;
+//        
+//        static public CompareEnum valueOf(final int ret) {
+//            if(ret<0) return LT;
+//            if(ret>0) return GT;
+//            return EQ;
+//        }
+//        
+//    }
+//
+//    protected void doCompareTest(BigDecimal i1, BigDecimal i2, final CompareEnum cmp) {
+//
+//      i1 = normalizeBigDecimal(i1);
+//      i2 = normalizeBigDecimal(i2);
+//
+//      final byte[] k1 = encodeBigDecimal(i1);
+//
+//      final byte[] k2 = encodeBigDecimal(i2);
+//
+//      final int ret = BytesUtil.compareBytes(k1, k2);
+//
+//      final CompareEnum cmp2 = CompareEnum.valueOf(ret);
+//
+//        if (cmp2 != cmp) {
+//
+//              fail("BigDecimal" + //
+//                      "\ni1=" + dumpBigDecimal(i1) + //
+//                      "\ni2=" + dumpBigDecimal(i2) + //
+//                      "\nk1=" + BytesUtil.toString(k1) + //
+//                      "\nk2=" + BytesUtil.toString(k2) + //
+//                      "\nret=" + cmp2 +", but expected="+cmp//
+//              );
+//
+//          }
+//
+//      }
+//
+//    /**
+//     * Test encode/decode for various values of zero.
+//     */
+//    public void test_BigDecimal0() {
+//
+//        final BigDecimal[] a = new BigDecimal[] {
+//                new BigDecimal("0"),    // scale=0, precision=1
+//                new BigDecimal("0."),   // scale=0, precision=1
+//                new BigDecimal("0.0"),  // scale=1, precision=1
+//                new BigDecimal("0.00"), // scale=2, precision=1
+//                new BigDecimal("00.0"), // scale=1, precision=1
+//                new BigDecimal("00.00"),// scale=2, precision=1
+//                new BigDecimal(".0"),   // scale=1, precision=1
+//                // NB: The precision is the #of decimal digits in the unscaled value.
+//                // NB: scaled := unscaled * (10 ^ -scale) 
+//                new BigDecimal(".010"), // scale=3, precision=2
+//                new BigDecimal(".01"),  // scale=2, precision=1
+//                new BigDecimal(".1"),   // scale=1, precision=1
+//                new BigDecimal("1."),   // scale=0, precision=1
+//                new BigDecimal("10."),  // scale=0, precision=2
+//                new BigDecimal("10.0"), // scale=1, precision=3
+//                new BigDecimal("010.0"), // scale=1, precision=3
+//                new BigDecimal("0010.00"), // scale=2, precision=4
+//                // @todo Test with cases where scale is negative (large powers of 10).
+//                };
+//
+//        for (BigDecimal i : a) {
+//            i = i.stripTrailingZeros();
+//            System.err.println("i="
+//                    + i
+//                    + "\t(scale="
+//                    + i.scale()
+//                    + ",prec="
+//                    + i.precision()
+//                    + ") : "
+//                    + dumpBigDecimal(i)
+////                    i.scaleByPowerOfTen(i.scale()- i.precision()))
+//                            );
+//        }
+//
+//        for (BigDecimal i : a) {
+//            doEncodeDecodeTest(i);
+//        }
+//
+//        for (int i = 0; i < a.length; i++) {
+//            for (int j = 0; j < a.length; j++) {
+//                doCompareTest(a[i], a[j], CompareEnum.EQ);
+//            }
+//        }
+//
+//    }
+      
 }
