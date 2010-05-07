@@ -2750,7 +2750,15 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      * @param commitTime
      * 
      * @throws IOException
-     * @throws InterruptedException 
+     * @throws InterruptedException
+     * 
+     *             FIXME There is no sense of an atomic commit when building a
+     *             new index segment. We should write ZEROs into the checkpoint
+     *             record initially and then seek back to the head of the file
+     *             once we are done and write out the correct checkpoint record.
+     *             <p>
+     *             Note: There are similar issues involved when we replicate
+     *             index segment or journal files to verify that they are good.
      */
     protected IndexSegmentCheckpoint writeIndexSegment(
             final FileChannel outChannel, final long commitTime)

@@ -81,8 +81,8 @@ abstract public class AbstractResourceManagerTask<T> extends AbstractTask<T> {
      * @param timestamp
      * @param resource
      */
-    public AbstractResourceManagerTask(ResourceManager resourceManager,
-            long timestamp, String resource) {
+    public AbstractResourceManagerTask(final ResourceManager resourceManager,
+            final long timestamp, final String resource) {
 
         super(resourceManager.getConcurrencyManager(), timestamp, resource);
 

@@ -62,19 +62,19 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("resources");
         
-        /*
-         * unit tests for identifying separator keys for a split based on the
-         * traversal of the key-range.
-         */
-        suite.addTestSuite(TestDefaultSplitHandler.class);
+//        /*
+//         * unit tests for identifying separator keys for a split based on the
+//         * traversal of the key-range.
+//         */
+//        suite.addTestSuite(TestDefaultSplitHandler.class);
 
-        /*
-         * unit tests for identifying separator keys for a split based on search
-         * across the nodes of the sources in the view using the combined #of
-         * spanned tuples for each source (@todo this feature has not been
-         * implemented.)
-         */ 
-        suite.addTestSuite(TestViewSplitter.class);
+//        /*
+//         * unit tests for identifying separator keys for a split based on search
+//         * across the nodes of the sources in the view using the combined #of
+//         * spanned tuples for each source (@todo this feature has not been
+//         * implemented.)
+//         */ 
+//        suite.addTestSuite(TestViewSplitter.class);
 
         /*
          * unit tests for splitting an index segment based on its size on the
@@ -107,19 +107,24 @@ public class TestAll extends TestCase {
          * where we have access to the IMetadataService as well so that we can
          * validate the results of an index split, etc.
          */
+
         // bootstrap tests of the resource manager
         suite.addTestSuite(TestResourceManagerBootstrap.class);
+        
         // test overflow handling.
         suite.addTestSuite(TestOverflow.class);
+        
         // test incremental builds.
         suite.addTestSuite(TestBuildTask.class);
         suite.addTestSuite(TestBuildTask2.class);
+        
         // test compacting merge.
         suite.addTestSuite(TestMergeTask.class);
-        // test index partition split.
-        suite.addTestSuite(TestSplitTask.class);
-        // Note: moves are tested in the com.bigdata.services package.
-        // Note: split+join are testing the com.bigdata.services.package.
+
+        /*
+         * Note: split, join, and move are tested in the com.bigdata.services
+         * package.
+         */
 
         // test release of old resources.
         suite.addTestSuite(TestAddDeleteResource.class);

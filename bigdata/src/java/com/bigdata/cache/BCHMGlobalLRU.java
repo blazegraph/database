@@ -74,13 +74,13 @@ import com.bigdata.rawstore.IRawStore;
  * will be rare and the whole cache will be non-blocking, wait free, and not
  * spinning on CAS locks 99% of the time; and</li>
  * <li>
- * (d) explicit management of the threads used to access the cache. e.g., by
+ * (e) explicit management of the threads used to access the cache. e.g., by
  * queuing accepted requests and servicing them out of a thread pool, which has
  * the benefit of managing the workload imposed by the clients.</li>
  * </ul>
  * <p>
  * This should have the best possible performance and the simplest
- * implementation. (b) The TLB could be a DLN[] or other simple data structures.
+ * implementation. (b) The TLB could be a DLN[] or other simple data structure.
  * The access policy (c) is composed from linking DLN instances together while
  * holding the lock.
  * <ul>
@@ -124,6 +124,15 @@ import com.bigdata.rawstore.IRawStore;
  *       lock, which really leads us right back here.
  *       <p>
  *       Adapt to support LIRS as well as LRU.
+ * 
+ * @todo A main issue with this approach is managing the pool of threads used to
+ *       access the TLBs in a manner which does not leak TLBs. If we do a hand
+ *       off of the request from the caller's thread to an inner thread pool
+ *       then that hand off can become a bottleneck. We could use a striped
+ *       lock, but that is the same issue all over again. Maybe fork/join has
+ *       sufficient concurrency for handing off requests? Another approach is to
+ *       make the inner CHM<hash(ThreadId),TLB> and to impose locking for the
+ *       TLB.  That will stripe access to the TLB instances.
  * 
  * @todo Support tx isolation.
  * 

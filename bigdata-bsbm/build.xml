@@ -60,11 +60,11 @@
 			<!-- copy benchmark data and queries. -->
 			<fileset dir="${bsbm.dir}/src/resources/bsbm-data"/>
 			<!-- copy the journal configuration file. -->
-			<fileset file="${bsbm.dir}/journal.properties"/>
+			<fileset file="${bsbm.dir}/*.properties"/>
 		</copy>
 	</target>
 
-	<!-- @todo modify to support split output files for large runs. -->
+	<!-- @todo modify to support gzip and split output files for large runs. -->
 	<target name="run-generator" depends="compile">
 		<mkdir dir="${bsbm.baseDir}"/>
 		<java classname="benchmark.generator.Generator"
@@ -88,26 +88,16 @@
 		</java>
 	</target>
 		
-	<!-- @todo Support standalone and scale-out.  Specify properties file, not
-		 journal???  If .config, then use the JiniFederation, not the Journal. 
-		 If .properties, then the filename of the journal should be set in that
-		 file. -->
-	
-	<!-- @todo specify the kb namespace (default is "kb"). -->
-	<!-- Note: Can also load xxx.nt.zip and xxx.nt.gz files. -->
 	<!-- Note: split data files and use RDFDataLoadMaster for scale-out. -->
-	<!-- Arg for debug
-	java -Xmx1g -server -Dcom.bigdata.journal.AbstractJournal.file=/bigdata-perf-analysis/bsbm/bsbm_2785/bigdata-bsbm.jnl benchmark.bigdata.BigdataLoader "/Eclipse/BD Workspace/bigdata/bigdata-bsbm/journal.properties" /bigdata-perf-analysis/bsbm/bsbm_2785/dataset.nt
-	-->
  	<target name="run-load" depends="compile">
- 		<!-- delete file if it exists (@todo dangerous!). -->
-		<delete file="${bsbm.journalFile}" />
+ 		<!-- delete file if it exists (@todo dangerous, but also done by BigdataLoader!).
+		<delete file="${bsbm.journalFile}" /> -->
 		<java classname="benchmark.bigdata.BigdataLoader"
 	          fork="true"
 	          failonerror="true"
 			  dir="${build.dir}/bin"
 			  >
-			<arg line="journal.properties ${bsbm.outputFile}.${bsbm.outputType}"/>
+			<arg line="${bsbm.namespace} ${bsbm.journalPropertyFile} ${bsbm.outputFile}.${bsbm.outputType}${bsbm.compressType}"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<jvmarg value="-Dlog4j.configuration=log4j.properties"/>
@@ -138,14 +128,14 @@
 
 	-->
 		
- 	<target name="run-load-qualification" depends="compile">
+ 	<target name="run-load-qualification" depends="compile" description="Load the qualification data set.">
 		<delete file="${bsbm.qualJournal}" />
 		<java classname="benchmark.bigdata.BigdataLoader"
 	          fork="true"
 	          failonerror="true"
 	          dir="${build.dir}/bin"
 	          >
-			<arg line="journal.properties ${bsbm.qualDataDir}/dataset_1m.ttl"/>
+			<arg line="qual ${bsbm.journalPropertyFile} ${bsbm.qualDataDir}/dataset_1m.ttl"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<!-- specify/override the journal file name. -->
@@ -157,24 +147,24 @@
 		</java>
 	</target>
 	
-	<target name="run-qualification-1" depends="compile">
+	<target name="run-qualification-1" depends="compile" description="Run the qualification queries.">
 		<java classname="benchmark.bigdata.BigdataQueryDriver"
 	          fork="true"
 	          failonerror="true"
 	          dir="${build.dir}/bin"
 			  >
-			<arg line="-idir ${bsbm.qualDataDir}/td_data -q http://dummyendpoint journal.properties"/>
+			<arg line="-idir ${bsbm.qualDataDir}/td_data -q http://dummyendpoint qual ${bsbm.journalPropertyFile}"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<jvmarg value="-Dlog4j.configuration=log4j.properties"/>
-			<jvmarg value="-Dcom.bigdata.journal.AbstractJournal.file=${bsbm.journalFile}"/>
+			<jvmarg value="-Dcom.bigdata.journal.AbstractJournal.file=${bsbm.qualJournal}"/>
 			<classpath>
 				<path refid="runtime.classpath" />
             </classpath>
 		</java>
 	</target>
 	
-	<target name="run-qualification-2" depends="compile">
+	<target name="run-qualification-2" depends="compile" description="Compare qualification query run against ground truth.">
 		<java classname="benchmark.qualification.Qualification"
 	          fork="true"
 	          failonerror="true"
@@ -184,6 +174,39 @@
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<jvmarg value="-Dlog4j.configuration=log4j.properties"/>
+			<classpath>
+				<path refid="runtime.classpath" />
+            </classpath>
+		</java>
+	</target>
+	
+	<target name="rampup" depends="compile" description="Runs the benchmark queries against the loaded data until system performance reaches a steady state as defined by the benchmark.">
+		<java classname="benchmark.bigdata.BigdataQueryDriver"
+	          fork="true"
+	          failonerror="true"
+			  dir="${build.dir}/bin" 
+			>
+
+			<arg value="-rampup"/>
+			
+			<!-- -idir dir is the test data directory (default td_data). -->
+			<arg value="-idir"/><arg value="${bsbm.dataDir}"/>
+			
+			<!-- The randomizer seed. -->
+			<arg value="-seed"/><arg value="random"/><!--<arg value="${bsbm.seed}"/>-->
+			
+			<!-- -o file is the name of the xml output file. -->
+			<arg value="-o"/>
+			<arg value="${bsbm.resultsDir}/benchmark_result_pc${bsbm.pc}_runs${bsbm.runs}_mt${bsbm.mt}.xml"/>
+
+			<!-- The namespace of the KB instance. -->
+			<arg value="${bsbm.namespace}"/>
+
+			<!-- The property file for the database instance. -->
+			<arg value="${bsbm.journalPropertyFile}"/>
+            
+        	<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${bsbm.journalFile}"/>
+			
 			<classpath>
 				<path refid="runtime.classpath" />
             </classpath>
@@ -218,8 +241,11 @@
 			<arg value="-o"/>
 			<arg value="${bsbm.resultsDir}/benchmark_result_pc${bsbm.pc}_runs${bsbm.runs}_mt${bsbm.mt}.xml"/>
 			
+			<!-- The namespace of the KB instance. -->
+			<arg value="${bsbm.namespace}"/>
+
 			<!-- The property file for the database instance. -->
-			<arg value="journal.properties"/>
+			<arg value="${bsbm.journalPropertyFile}"/>
             
         	<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${bsbm.journalFile}"/>
 			

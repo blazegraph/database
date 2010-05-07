@@ -6,8 +6,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.ILocalBTreeView;
-import com.bigdata.btree.ISplitHandler;
-import com.bigdata.btree.ITupleCursor;
+import com.bigdata.btree.ISimpleSplitHandler;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.AbstractTask;
@@ -22,30 +21,35 @@ import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
 import com.bigdata.service.Split;
-import com.bigdata.sparse.SparseRowStore;
 
 /**
- * Task splits an index partition and should be invoked when there is strong
- * evidence that an index partition has grown large enough to be split into 2 or
- * more index partitions, each of which should be 50-75% full.
+ * Task splits an index partition which is a compact view (no more than one
+ * journal and one index segment) and should be invoked when the size of the
+ * index segment on the disk exceeds the nominal size of an index partition. The
+ * index partition is the result of a compacting merge, which could have been
+ * created by {@link IncrementalBuildTask} or {@link CompactingMergeTask}. The
+ * index partition is passed into this task because it is not yet part of the
+ * view. Based on the nominal size of the index partition and the size of the
+ * segment, N=segSize/nominalSize splits will be generated, requiring N-1
+ * separator keys.
  * <p>
- * The task reads from the lastCommitTime of the old journal after an overflow.
- * It uses a key range scan to sample the index partition, building an ordered
- * set of {key,offset} tuples. Based on the actual #of index entries and the
- * target #of index entries per index partition, it chooses the #of output index
- * partitions, N, and selects N-1 {key,offset} tuples to split the index
- * partition. If the index defines a constraint on the split rule, then that
- * constraint will be applied to refine the actual split points, e.g., so as to
- * avoid splitting a logical row of a {@link SparseRowStore}.
+ * The task uses the linear list API to identify N-1 separator key which would
+ * split the index segment and assumes that the data is evenly distributed
+ * across the keys within the index segment. The buffered writes are ignored
+ * when determining the separator keys (most data will be on the index segment
+ * if the journal extent roughly the same as the nominal index segment extent
+ * and multiple index partitions are registered on the journal). Application
+ * constraints on the choice of the separator keys will be honored and can
+ * result in fewer splits being generated.
  * <p>
  * Once the N-1 split points have been selected, N index segments are built -
  * one from each of the N key ranges which those N-1 split points define. Once
  * the index segment for each split has been built, an
  * {@link AtomicUpdateSplitIndexPartitionTask} will atomically re-define the
- * source index partition as N new index partition. During the atomic update the
- * original index partition becomes un-defined and new index partitions are
- * defined in its place which span the same total key range and have the same
- * data.
+ * source index partition as N new index partition and copy the buffered writes
+ * into the appropriate index partition. During the atomic update the original
+ * index partition becomes un-defined and new index partitions are defined in
+ * its place which span the same total key range and have the same data.
  * 
  * @see AtomicUpdateSplitIndexPartitionTask, which MUST be invoked in order to
  *      update the index partition definitions on the live journal and the
@@ -54,37 +58,6 @@ import com.bigdata.sparse.SparseRowStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: SplitIndexPartitionTask.java 2265 2009-10-26 12:51:06Z
  *          thompsonbry $
- * 
- *          FIXME Refactor: Task splits an index partition which is a compact
- *          view (no more than one journal and one index segment) and should be
- *          invoked when the size of the index segment on the disk exceeds the
- *          nominal size of an index partition. The index partition is the
- *          result of a compacting merge, which could have been created by
- *          {@link IncrementalBuildTask} or {@link CompactingMergeTask}. The
- *          index partition is passed into this task because it is not yet part
- *          of the view. Based on the nominal size of the index partition and
- *          the size of the segment, N=segSize/nominalSize splits will be
- *          generated, requiring N-1 separator keys.
- *          <p>
- *          The task uses the linear list API to identify N-1 separator key
- *          which would split the index segment and assumes that the data is
- *          evenly distributed across the keys within the index segment. The
- *          buffered writes are ignored when determining the separator keys
- *          (most data will be on the index segment if the journal extent
- *          roughly the same as the nominal index segment extent and multiple
- *          index partitions are registered on the journal). Application
- *          constraints on the choice of the separator keys will be honored and
- *          can result in fewer splits being generated.
- *          <p>
- *          Once the N-1 split points have been selected, N index segments are
- *          built - one from each of the N key ranges which those N-1 split
- *          points define. Once the index segment for each split has been built,
- *          an {@link AtomicUpdateSplitIndexPartitionTask} will atomically
- *          re-define the source index partition as N new index partition and
- *          copy the buffered writes into the appropriate index partition.
- *          During the atomic update the original index partition becomes
- *          un-defined and new index partitions are defined in its place which
- *          span the same total key range and have the same data.
  */
 public class SplitIndexPartitionTask extends
         AbstractPrepareTask<AbstractResult> {
@@ -94,17 +67,12 @@ public class SplitIndexPartitionTask extends
     protected final UUID[] moveTargets;
 
     /**
-     * The split handler to be applied. Note that this MAY have been overridden
-     * in order to promote a split so you MUST use this instance and NOT the one
-     * in the {@link IndexMetadata} object.
-     * 
-     * @todo Refactor as just a constraint on the separatorKey choice. hand the
-     *       application the recommended separatorKey and the
-     *       {@link IndexSegment} and let it do whatever it needs to do.
-     *       Typically, just use an {@link ITupleCursor} to locate the closest
-     *       valid separatorKey for the application semantics.
+     * The adjusted nominal bytes on disk for a full shard after a compacting
+     * merge. Note that this MAY have been overridden in order to promote a
+     * split so you MUST use this instance and NOT
+     * {@link OverflowManager#nominalShardSize}.
      */
-    private final ISplitHandler splitHandler;
+    private final long adjustedNominalShardSize;
     
     /**
      * @param vmd
@@ -173,17 +141,9 @@ public class SplitIndexPartitionTask extends
         }
         
         this.moveTargets = moveTargets;
+
+        this.adjustedNominalShardSize = vmd.getAdjustedNominalShardSize();
         
-        this.splitHandler = vmd.getAdjustedSplitHandler();
-
-        if (splitHandler == null) {
-            
-            // This was checked as a pre-condition and should not be null.
-            
-            throw new AssertionError();
-            
-        }
-
     }
 
     @Override
@@ -237,40 +197,26 @@ public class SplitIndexPartitionTask extends
                  * splits.
                  */
                 
-                Split[] splits;
+                Split[] splits = null;
+                final ISimpleSplitHandler splitHandler = vmd.indexMetadata
+                        .getSplitHandler();
                 try {
 
-                    final boolean compactView = src.getSourceCount() == 2
-                            && (src.getSources()[1] instanceof IndexSegment);
-
-                    if (compactView && false) {
+                    // FIXME This operation should verify that the shard is compact as a precondition.
+                    if (vmd.compactView) {
 
                         /*
-                         * FIXME Choose splits using the linear-list API based
-                         * on the index segment data only. Eventually this will
-                         * become the only way to do a split.
-                         * 
-                         * FIXME Write ISimpleSplitHandler for SparseRowStore
-                         * and unit tests for that impl.
+                         * Choose splits using the linear-list API based on the
+                         * index segment data only.
                          */
 
                         splits = SplitUtility.getSplits(resourceManager,
                                 vmd.pmd, (IndexSegment) src.getSources()[1],
-                                resourceManager.nominalShardSize, null/*
-                                                                       * FIXME
-                                                                       * splitHandler
-                                                                       * from
-                                                                       * the
-                                                                       * IndexMetadata
-                                                                       * .
-                                                                       */);
+                                adjustedNominalShardSize,
+                                splitHandler);
 
-                    } else {
-
-                        splits = splitHandler.getSplits(resourceManager, src);
-                        
                     }
-
+                    
                 } catch (Throwable t) {
 
                     if (AsynchronousOverflowTask.isNormalShutdown(
@@ -307,6 +253,48 @@ public class SplitIndexPartitionTask extends
 
                 if (splits == null) {
 
+                    final double overextension = ((double) vmd.sumSegBytes)
+                            / resourceManager.nominalShardSize;
+
+                    if (overextension > resourceManager.shardOverextensionLimit
+                            && !resourceManager.isDisabledWrites(vmd.name)) {
+
+                        /*
+                         * The shard is overextended (it is at least two times
+                         * its nominal maximum size) and is refusing a split.
+                         * Continuing to do incremental builds here will mask
+                         * the problem and cause the cost of a merge on the
+                         * shard to increase over time and will drag down
+                         * performance for this DS. In order to prevent this we
+                         * MUST disallow further writes on the shard. The shard
+                         * can be re-enabled for writes by an administrative
+                         * action once the problem has been fixed.
+                         * 
+                         * Note: The default split behavior should always find a
+                         * separator key to split the shard. The mostly likely
+                         * cause for a problem is an application defined split
+                         * handler. Rather than allowing a poorly written split
+                         * handler to foul up the works, we disallow further
+                         * writes onto this shard until the application has
+                         * fixed their split handler.
+                         */
+
+                        log.error("Shard will not split - writes are disabled"
+                                + ": name="
+                                + vmd.name
+                                + ", size="
+                                + vmd.sumSegBytes
+                                + ", overextended="
+                                + (int) overextension
+                                + "x"
+                                + ", splitHandler="
+                                + (splitHandler == null ? "N/A" : splitHandler
+                                        .getClass().getName()));
+
+                        // Disable writes on the index partition.
+                        resourceManager.disableWrites(vmd.name);
+
+                    }
                     /*
                      * No splits were chosen so the index will not be split at
                      * this time.
@@ -370,9 +358,13 @@ public class SplitIndexPartitionTask extends
             /*
              * Do the atomic update
              */
-            doSplitAtomicUpdate(resourceManager, vmd, splitResult,
+            doSplitAtomicUpdate(
+                    resourceManager,
+                    vmd,
+                    splitResult,
                     OverflowActionEnum.Split,
-                    resourceManager.indexPartitionSplitCounter, e);
+                    resourceManager.overflowCounters.indexPartitionSplitCounter,
+                    e);
 
             if (moveTargets != null) {
                 
