@@ -153,11 +153,11 @@
 	          failonerror="true"
 	          dir="${build.dir}/bin"
 			  >
-			<arg line="-idir ${bsbm.qualDataDir}/td_data -q http://dummyendpoint kb ${bsbm.journalPropertyFile}"/>
+			<arg line="-idir ${bsbm.qualDataDir}/td_data -q http://dummyendpoint qual ${bsbm.journalPropertyFile}"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<jvmarg value="-Dlog4j.configuration=log4j.properties"/>
-			<jvmarg value="-Dcom.bigdata.journal.AbstractJournal.file=${bsbm.journalFile}"/>
+			<jvmarg value="-Dcom.bigdata.journal.AbstractJournal.file=${bsbm.qualJournal}"/>
 			<classpath>
 				<path refid="runtime.classpath" />
             </classpath>
