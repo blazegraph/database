@@ -60,11 +60,11 @@
 			<!-- copy benchmark data and queries. -->
 			<fileset dir="${bsbm.dir}/src/resources/bsbm-data"/>
 			<!-- copy the journal configuration file. -->
-			<fileset file="${bsbm.dir}/journal.properties"/>
+			<fileset file="${bsbm.dir}/*.properties"/>
 		</copy>
 	</target>
 
-	<!-- @todo modify to support split output files for large runs. -->
+	<!-- @todo modify to support gzip and split output files for large runs. -->
 	<target name="run-generator" depends="compile">
 		<mkdir dir="${bsbm.baseDir}"/>
 		<java classname="benchmark.generator.Generator"
@@ -88,24 +88,16 @@
 		</java>
 	</target>
 		
-	<!-- @todo Support standalone and scale-out.  Specify properties file, not
-		 journal???  If .config, then use the JiniFederation, not the Journal. 
-		 If .properties, then the filename of the journal should be set in that
-		 file. -->
-	
-	<!-- @todo specify the kb namespace (default is "kb"). -->
 	<!-- Note: split data files and use RDFDataLoadMaster for scale-out. -->
  	<target name="run-load" depends="compile">
- 		<!-- delete file if it exists (@todo dangerous!). -->
-		<delete file="${bsbm.journalFile}" />
+ 		<!-- delete file if it exists (@todo dangerous, but also done by BigdataLoader!).
+		<delete file="${bsbm.journalFile}" /> -->
 		<java classname="benchmark.bigdata.BigdataLoader"
 	          fork="true"
 	          failonerror="true"
 			  dir="${build.dir}/bin"
 			  >
-        	<!-- Note: Can also load xxx.nt.zip and xxx.nt.gz files.  Just add
-        	     the file extension here. -->
-			<arg line="${bsbm.namespace} journal.properties ${bsbm.outputFile}.${bsbm.outputType}"/>
+			<arg line="${bsbm.namespace} ${bsbm.journalPropertyFile} ${bsbm.outputFile}.${bsbm.outputType}${bsbm.compressType}"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<jvmarg value="-Dlog4j.configuration=log4j.properties"/>
@@ -136,14 +128,14 @@
 
 	-->
 		
- 	<target name="run-load-qualification" depends="compile">
+ 	<target name="run-load-qualification" depends="compile" description="Load the qualification data set.">
 		<delete file="${bsbm.qualJournal}" />
 		<java classname="benchmark.bigdata.BigdataLoader"
 	          fork="true"
 	          failonerror="true"
 	          dir="${build.dir}/bin"
 	          >
-			<arg line="qual journal.properties ${bsbm.qualDataDir}/dataset_1m.ttl"/>
+			<arg line="qual ${bsbm.journalPropertyFile} ${bsbm.qualDataDir}/dataset_1m.ttl"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<!-- specify/override the journal file name. -->
@@ -155,13 +147,13 @@
 		</java>
 	</target>
 	
-	<target name="run-qualification-1" depends="compile">
+	<target name="run-qualification-1" depends="compile" description="Run the qualification queries.">
 		<java classname="benchmark.bigdata.BigdataQueryDriver"
 	          fork="true"
 	          failonerror="true"
 	          dir="${build.dir}/bin"
 			  >
-			<arg line="-idir ${bsbm.qualDataDir}/td_data -q http://dummyendpoint qual journal.properties"/>
+			<arg line="-idir ${bsbm.qualDataDir}/td_data -q http://dummyendpoint kb ${bsbm.journalPropertyFile}"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<jvmarg value="-Dlog4j.configuration=log4j.properties"/>
@@ -172,7 +164,7 @@
 		</java>
 	</target>
 	
-	<target name="run-qualification-2" depends="compile">
+	<target name="run-qualification-2" depends="compile" description="Compare qualification query run against ground truth.">
 		<java classname="benchmark.qualification.Qualification"
 	          fork="true"
 	          failonerror="true"
@@ -211,7 +203,7 @@
 			<arg value="${bsbm.namespace}"/>
 
 			<!-- The property file for the database instance. -->
-			<arg value="journal.properties"/>
+			<arg value="${bsbm.journalPropertyFile}"/>
             
         	<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${bsbm.journalFile}"/>
 			
@@ -253,7 +245,7 @@
 			<arg value="${bsbm.namespace}"/>
 
 			<!-- The property file for the database instance. -->
-			<arg value="journal.properties"/>
+			<arg value="${bsbm.journalPropertyFile}"/>
             
         	<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${bsbm.journalFile}"/>
 			
