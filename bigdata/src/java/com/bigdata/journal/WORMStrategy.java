@@ -2205,7 +2205,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 		if (lastOffset > nextOffset.get()) {
 			nextOffset.set(lastOffset);
 		} else {
-			log.warn("unexpected nextOffset value: " + lastOffset + " < " + nextOffset.get());
+			log.warn("unexpected nextOffset value: " + lastOffset + " <= " + nextOffset.get());
 		}
 	}
     

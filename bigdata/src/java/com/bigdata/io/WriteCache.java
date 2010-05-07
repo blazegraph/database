@@ -1049,12 +1049,16 @@ abstract public class WriteCache implements IWriteCache {
 
                 try {
                     if (log.isTraceEnabled())
-                    	log.trace("sending and waiting for " + msg);
+                    	log.trace("sending and waiting for " + msg + ", Thread: " + Thread.currentThread());
                    
                     connect.send(msg, true);
                     
+                    if (log.isTraceEnabled())
+                    	log.trace("returning from " + msg + ", Thread: " + Thread.currentThread());
+                   
                 } catch (Throwable e) {
-
+                	e.printStackTrace();
+                	
                     throw new RuntimeException(e);
                     
                 }
@@ -1804,9 +1808,10 @@ abstract public class WriteCache implements IWriteCache {
 
 	private void receiveRecordMap(ObjectInputStream in) {
 		try {
-			log.info("receiveRecordMap: start");
 			int mapsize = in.readInt();
-			log.info("receiveRecordMap, size: " + mapsize);
+			if (log.isTraceEnabled())
+				log.trace("receiveRecordMap, size: " + mapsize);
+			System.out.println("receiveRecordMap, size: " + mapsize);
 			while (mapsize-- > 0) {
 				long fileOffset = in.readLong();
 				int bufferOffset = in.readInt();
@@ -1816,7 +1821,8 @@ abstract public class WriteCache implements IWriteCache {
 				if (endRec > lastOffset)
 					lastOffset = endRec; // update lastOffset for each entry
 				
-				log.info("receiveRecordMap - entry fileOffset: " + fileOffset + ", bufferOffset: " + bufferOffset + ", recordLength: " + recordLength);
+				if (log.isTraceEnabled())
+					log.trace("receiveRecordMap - entry fileOffset: " + fileOffset + ", bufferOffset: " + bufferOffset + ", recordLength: " + recordLength);
 
 				recordMap.put(fileOffset, new RecordMetadata(fileOffset, bufferOffset, recordLength));
 				if (recordMap.size() == 1) {
