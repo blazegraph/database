@@ -32,20 +32,14 @@ import java.util.Properties;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IndexMetadata.Options;
-import com.bigdata.config.Configuration;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.axioms.RdfsAxioms;
-import com.bigdata.rdf.lexicon.LexiconKeyOrder;
-import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
-import com.bigdata.rdf.spo.SPOKeyOrder;
-import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.LocalTripleStore;
@@ -354,88 +348,85 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
                     IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY,
                     "4000");
 
-            if(false){ // custom OSP index override
-                final String namespace = getNamespace();
-                final String overrideValue = "200000";
-                final String overrideProperty = com.bigdata.config.Configuration
-                        .getOverrideProperty(
-                                namespace + "." + SPORelation.NAME_SPO_RELATION
-                                        + "." + SPOKeyOrder.OSP,
-                                IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY);
-                properties.setProperty(overrideProperty, overrideValue);
-                System.err.println(overrideProperty + "=" + overrideValue);
-            }
-            if(false){ // custom POS index override
-                final String namespace = getNamespace();
-                final String overrideValue = "200000";
-                final String overrideProperty = com.bigdata.config.Configuration
-                        .getOverrideProperty(
-                                namespace + "." + SPORelation.NAME_SPO_RELATION
-                                        + "." + SPOKeyOrder.POS,
-                                IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY);
-                properties.setProperty(overrideProperty, overrideValue);
-                System.err.println(overrideProperty + "=" + overrideValue);
-            }
+//            if(false){ // custom OSP index override
+//                final String namespace = getNamespace();
+//                final String overrideValue = "200000";
+//                final String overrideProperty = com.bigdata.config.Configuration
+//                        .getOverrideProperty(
+//                                namespace + "." + SPORelation.NAME_SPO_RELATION
+//                                        + "." + SPOKeyOrder.OSP,
+//                                IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY);
+//                properties.setProperty(overrideProperty, overrideValue);
+//                System.err.println(overrideProperty + "=" + overrideValue);
+//            }
+//            if(false){ // custom POS index override
+//                final String namespace = getNamespace();
+//                final String overrideValue = "200000";
+//                final String overrideProperty = com.bigdata.config.Configuration
+//                        .getOverrideProperty(
+//                                namespace + "." + SPORelation.NAME_SPO_RELATION
+//                                        + "." + SPOKeyOrder.POS,
+//                                IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY);
+//                properties.setProperty(overrideProperty, overrideValue);
+//                System.err.println(overrideProperty + "=" + overrideValue);
+//            }
               
 //
 //            properties.setProperty(
 //                    IndexMetadata.Options.BTREE_BRANCHING_FACTOR,
 //                    "64");
 
-            {
-                /*
-                 * Tweak the split points for the various indices to achieve
-                 * 100M segments (based on U50 data set).
-                 * 
-                 * FIXME These changes should be applied to the triple store, but
-                 * in a manner that permits explicit override.
-                 */
-                final String namespace = getNamespace();
-
-                // turn on direct buffering for index segment nodes.
-                properties.setProperty(Configuration.getOverrideProperty(
-                        namespace,
-                        IndexMetadata.Options.INDEX_SEGMENT_BUFFER_NODES),
-                        "true");
-
-                // statement indices (10x the default)
-                properties.setProperty(Configuration.getOverrideProperty(namespace
-                    + "." + SPORelation.NAME_SPO_RELATION,
-                    IndexMetadata.Options.SPLIT_HANDLER_MIN_ENTRY_COUNT), ""
-                    + (500 * Bytes.kilobyte32 * 10));
-            
-                properties.setProperty(Configuration.getOverrideProperty(namespace
-                    + "."+  SPORelation.NAME_SPO_RELATION,
-                    IndexMetadata.Options.SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT), ""
-                    + (1 * Bytes.megabyte32 * 10));
-
-                // term2id index (5x the default).
-                properties.setProperty(Configuration.getOverrideProperty(namespace
-                        +"."+ LexiconRelation.NAME_LEXICON_RELATION
-                        +"."+ LexiconKeyOrder.TERM2ID,
-                        IndexMetadata.Options.SPLIT_HANDLER_MIN_ENTRY_COUNT), ""
-                        + (500 * Bytes.kilobyte32 * 5));
-                
-                properties.setProperty(Configuration.getOverrideProperty(namespace
-                    +"."+ LexiconRelation.NAME_LEXICON_RELATION
-                    +"."+ LexiconKeyOrder.TERM2ID,
-                    IndexMetadata.Options.SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT), ""
-                    + (1 * Bytes.megabyte32 * 5));
-
-                // id2term index (2x the default)
-                properties.setProperty(Configuration.getOverrideProperty(namespace
-                        +"."+ LexiconRelation.NAME_LEXICON_RELATION
-                        +"."+ LexiconKeyOrder.ID2TERM,
-                        IndexMetadata.Options.SPLIT_HANDLER_MIN_ENTRY_COUNT), ""
-                        + (500 * Bytes.kilobyte32 * 2));
-                
-                properties.setProperty(Configuration.getOverrideProperty(namespace
-                    +"."+ LexiconRelation.NAME_LEXICON_RELATION
-                    +"."+ LexiconKeyOrder.ID2TERM,
-                    IndexMetadata.Options.SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT), ""
-                    + (1 * Bytes.megabyte32 * 2));
-                
-            }
+//            {
+//                /*
+//                 * Tweak the split points for the various indices to achieve
+//                 * 100M segments (based on U50 data set).
+//                 */
+//                final String namespace = getNamespace();
+//
+//                // turn on direct buffering for index segment nodes.
+//                properties.setProperty(Configuration.getOverrideProperty(
+//                        namespace,
+//                        IndexMetadata.Options.INDEX_SEGMENT_BUFFER_NODES),
+//                        "true");
+//
+//                // statement indices (10x the default)
+//                properties.setProperty(Configuration.getOverrideProperty(namespace
+//                    + "." + SPORelation.NAME_SPO_RELATION,
+//                    IndexMetadata.Options.SPLIT_HANDLER_MIN_ENTRY_COUNT), ""
+//                    + (500 * Bytes.kilobyte32 * 10));
+//            
+//                properties.setProperty(Configuration.getOverrideProperty(namespace
+//                    + "."+  SPORelation.NAME_SPO_RELATION,
+//                    IndexMetadata.Options.SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT), ""
+//                    + (1 * Bytes.megabyte32 * 10));
+//
+//                // term2id index (5x the default).
+//                properties.setProperty(Configuration.getOverrideProperty(namespace
+//                        +"."+ LexiconRelation.NAME_LEXICON_RELATION
+//                        +"."+ LexiconKeyOrder.TERM2ID,
+//                        IndexMetadata.Options.SPLIT_HANDLER_MIN_ENTRY_COUNT), ""
+//                        + (500 * Bytes.kilobyte32 * 5));
+//                
+//                properties.setProperty(Configuration.getOverrideProperty(namespace
+//                    +"."+ LexiconRelation.NAME_LEXICON_RELATION
+//                    +"."+ LexiconKeyOrder.TERM2ID,
+//                    IndexMetadata.Options.SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT), ""
+//                    + (1 * Bytes.megabyte32 * 5));
+//
+//                // id2term index (2x the default)
+//                properties.setProperty(Configuration.getOverrideProperty(namespace
+//                        +"."+ LexiconRelation.NAME_LEXICON_RELATION
+//                        +"."+ LexiconKeyOrder.ID2TERM,
+//                        IndexMetadata.Options.SPLIT_HANDLER_MIN_ENTRY_COUNT), ""
+//                        + (500 * Bytes.kilobyte32 * 2));
+//                
+//                properties.setProperty(Configuration.getOverrideProperty(namespace
+//                    +"."+ LexiconRelation.NAME_LEXICON_RELATION
+//                    +"."+ LexiconKeyOrder.ID2TERM,
+//                    IndexMetadata.Options.SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT), ""
+//                    + (1 * Bytes.megabyte32 * 2));
+//                
+//            }
             
         }
 

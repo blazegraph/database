@@ -174,15 +174,22 @@ public class SparseRowStore implements IRowStoreConstants {
         return ndx;
         
     }
-    
+
     /**
      * Create a client-side abstraction that treats an {@link IIndex} as a
      * {@link SparseRowStore}.
+     * <p>
+     * Note: When creating the backing index you MUST specify the split handler
+     * to ensure that dynamic sharding does not break logical rows, e.g.:
+     * 
+     * <pre>
+     * md.setSplitHandler(LogicalRowSplitHandler.INSTANCE);
+     * </pre>
      * 
      * @param ndx
      *            The index.
      */
-    public SparseRowStore(IIndex ndx) {
+    public SparseRowStore(final IIndex ndx) {
 
         if (ndx == null)
             throw new IllegalArgumentException();

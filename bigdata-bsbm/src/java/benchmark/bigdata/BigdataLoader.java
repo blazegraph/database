@@ -74,13 +74,24 @@ public class BigdataLoader {
                 }
             }
             
-            final File journalFile = new File(properties.getProperty(BigdataSail.Options.FILE));
-            if (journalFile.exists()) {
-                if(!journalFile.delete()) {
-                    throw new RuntimeException("could not delete old journal file");
+            final File journalFile;
+            {
+                final String tmp = properties
+                        .getProperty(BigdataSail.Options.FILE);
+                if (tmp == null) {
+                    throw new RuntimeException(
+                            "Required property not specified: "
+                                    + BigdataSail.Options.FILE);
                 }
+                journalFile = new File(tmp);
+                if (journalFile.exists()) {
+                    if (!journalFile.delete()) {
+                        throw new RuntimeException(
+                                "could not delete old journal file");
+                    }
+                }
+                System.out.println("Journal: " + journalFile);
             }
-            System.out.println("Journal: "+journalFile);
 
             // Create the journal (we know it does not exist per above).
             jnl = new Journal(properties);

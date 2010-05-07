@@ -387,7 +387,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
                     final long priorCommitTime = view.getMutableBTree().createViewCheckpoint();
                     
                     /*
-                     * Done. The new view will be seek by any task executing
+                     * Done. The new view will be seen by any task executing
                      * after this one within the commit group and by any task
                      * starting after the group commit iff the commit is
                      * successful.

@@ -40,6 +40,7 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.KV;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.io.SerializerUtil;
@@ -48,7 +49,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
-import com.bigdata.resources.DefaultSplitHandler;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.ResourceManager.Options;
 import com.bigdata.service.ndx.ClientIndexView;
@@ -60,13 +61,13 @@ import com.bigdata.service.ndx.RawDataServiceTupleIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
+public class TestMove extends AbstractEmbeddedFederationTestCase {
 
-    public TestIndexPartitionMove() {
+    public TestMove() {
         super();
     }
 
-    public TestIndexPartitionMove(String name) {
+    public TestMove(String name) {
         super(name);
     }
 
@@ -76,11 +77,14 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
      */
     public Properties getProperties() {
         
-        final Properties properties = new Properties( super.getProperties() );
+        final Properties properties = new Properties(super.getProperties());
         
         // overrides Transient in the base class.
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
                 .toString());
+
+        // this test relies on 2 or more data services.
+        properties.setProperty(EmbeddedClient.Options.NDATA_SERVICES, "2");
 
         // Note: disable copy of small index segments to the new journal during overflow.
         properties.setProperty(Options.COPY_INDEX_THRESHOLD,"0");
@@ -91,20 +95,14 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
         // enable moves (one per target).
         properties.setProperty(ResourceManager.Options.MAXIMUM_MOVES_PER_TARGET,"1");
 
+        // allow move of shards which would otherwise be split.
+        properties.setProperty(ResourceManager.Options.MAXIMUM_MOVE_PERCENT_OF_SPLIT,"2.0");
+
         // disable the CPU threshold for moves.
         properties.setProperty(ResourceManager.Options.MOVE_PERCENT_CPU_TIME_THRESHOLD,".0");
         
         // disable scatter split
         properties.setProperty(ResourceManager.Options.SCATTER_SPLIT_ENABLED,"false");
-
-        /*
-         * Note: Together these properties disable incremental index builds
-         * (this test was written before incremental builds were implemented so
-         * this keeps the logic of the test intact).
-         */
-        properties.setProperty(Options.MAXIMUM_JOURNALS_PER_VIEW, "2");
-        properties.setProperty(Options.MAXIMUM_SEGMENTS_PER_VIEW, "1");
-        properties.setProperty(Options.MAXIMUM_OPTIONAL_MERGES_PER_OVERFLOW, ""+Integer.MAX_VALUE);
 
         /*
          * Note: Disables the initial round robin policy for the load balancer
@@ -116,6 +114,9 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
         properties.setProperty(Options.ACCELERATE_OVERFLOW_THRESHOLD, "0");
         properties.setProperty(Options.ACCELERATE_SPLIT_THRESHOLD, "0");
 
+        // Note: Set a low maximum shard size.
+        properties.setProperty(Options.NOMINAL_SHARD_SIZE, ""+Bytes.megabyte);
+
 //        properties.setProperty(Options.INITIAL_EXTENT, ""+1*Bytes.megabyte);
         
 //        properties.setProperty(Options.MAXIMUM_EXTENT, ""+1*Bytes.megabyte);
@@ -123,10 +124,10 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
         return properties;
         
     }
-    
+
     /**
      * Test forces a move of an index partition and validates the scale-out
-     * after the move against ground truth.
+     * index after the move against ground truth.
      * 
      * @throws IOException
      * @throws ExecutionException
@@ -139,31 +140,16 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
          */
         final String name = "testIndex";
         final UUID indexUUID = UUID.randomUUID();
-        final int entryCountPerSplit = 400;
-        final double overCapacityMultiplier = 1.5;
-        final int minimumEntryCountPerSplit = 100;
         {
 
             final IndexMetadata indexMetadata = new IndexMetadata(name,indexUUID);
 
-            // The threshold below which we will try to join index partitions.
-            ((DefaultSplitHandler) indexMetadata.getSplitHandler())
-                    .setMinimumEntryCount(minimumEntryCountPerSplit);
-
-            // The target #of index entries per partition.
-            ((DefaultSplitHandler) indexMetadata.getSplitHandler())
-                    .setEntryCountPerSplit(entryCountPerSplit);
-
-            // Overcapacity multipler before an index partition will be split.
-            ((DefaultSplitHandler) indexMetadata.getSplitHandler())
-                    .setOverCapacityMultiplier(overCapacityMultiplier);
-            
             // must support delete markers
             indexMetadata.setDeleteMarkers(true);
 
             // register the scale-out index, creating a single index partition.
-            fed.registerIndex(indexMetadata,dataService0.getServiceUUID());
-            
+            fed.registerIndex(indexMetadata, dataService0.getServiceUUID());
+
         }
 
         /*
@@ -172,9 +158,10 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
         final PartitionLocator pmd0;
         {
             
-            ClientIndexView ndx = (ClientIndexView)fed.getIndex(name,ITx.UNISOLATED);
-            
-            IMetadataIndex mdi = ndx.getMetadataIndex();
+            final ClientIndexView ndx = (ClientIndexView) fed.getIndex(name,
+                    ITx.UNISOLATED);
+
+            final IMetadataIndex mdi = ndx.getMetadataIndex();
             
             assertEquals("#index partitions", 1, mdi.rangeCount());
 
@@ -195,20 +182,15 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
         final BTree groundTruth;
         {
         
-            IndexMetadata indexMetadata = new IndexMetadata(indexUUID);
-            
-            groundTruth = BTree.create(new TemporaryRawStore(),indexMetadata);
-        
+            final IndexMetadata indexMetadata = new IndexMetadata(indexUUID);
+
+            groundTruth = BTree.create(new TemporaryRawStore(), indexMetadata);
+
         }
 
         /*
          * Populate the index with data until the initial the journal for the
          * data service on which the initial partition resides overflows.
-         * 
-         * Note: Since the keys are random there can be duplicates which means
-         * that the resulting rangeCount can be less than the #of tuples written
-         * on the index. We handle by looping until a scan of the metadata index
-         * shows that an index partition split has occurred.
          * 
          * Note: The index split will occur asynchronously once (a) the index
          * partition has a sufficient #of entries; and (b) a group commit
@@ -217,10 +199,12 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
          * Once the overflow process completes the client be notified that the
          * index partition which it has been addressing no longer exists on the
          * data service. At that point the client SHOULD re-try the operation.
-         * Once the client returns from tha retry we will notice that the
+         * Once the client returns from the retry we will notice that the
          * partition count has increased and exit this loop.
          */
-        final long overflowCounter0 = dataService0.getAsynchronousOverflowCounter();
+        final int batchSize = 5000;
+        long overflowCounter = dataService0.getAsynchronousOverflowCounter();
+        int npartitions = -1;
         {
 
             if(log.isInfoEnabled())
@@ -228,88 +212,83 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
 
             int nrounds = 0;
             long nwritten = 0L;
-            boolean done = false;
-            while (!done) {
+            while (npartitions < 2) {
 
-                final int nentries = minimumEntryCountPerSplit;
-                final KV[] data = getRandomKeyValues(nentries);
-                final byte[][] keys = new byte[nentries][];
-                final byte[][] vals = new byte[nentries][];
+                final byte[][] keys = new byte[batchSize][];
+                final byte[][] vals = new byte[batchSize][];
 
-                for (int i = 0; i < nentries; i++) {
+                for (int i = 0; i < batchSize; i++) {
 
-                    keys[i] = data[i].key;
+                    keys[i] = KeyBuilder.asSortKey(nwritten + i);
 
-                    vals[i] = data[i].val;
-
+                    vals[i] = SerializerUtil.serialize(nwritten + i);
+                    
                 }
 
                 // insert the data into the ground truth index.
                 groundTruth
-                        .submit(0/* fromIndex */, nentries/* toIndex */, keys,
+                        .submit(0/* fromIndex */, batchSize/* toIndex */, keys,
                                 vals, BatchInsertConstructor.RETURN_NO_VALUES,
                                 null/* handler */);
 
-                /*
-                 * Set flag to force overflow on group commit if the ground
-                 * truth index has reached the split threshold.
-                 */
-                if (groundTruth.getEntryCount() >= overCapacityMultiplier
-                        * entryCountPerSplit) {
-
-                    dataService0
-                            .forceOverflow(false/* immediate */, false/*compactingMerge*/);
-
-                    done = true;
-
-                }
+                // Set flag to force overflow on group commit.
+                dataService0
+                        .forceOverflow(false/* immediate */, false/* compactingMerge */);
 
                 // insert the data into the scale-out index.
                 fed.getIndex(name, ITx.UNISOLATED)
-                        .submit(0/* fromIndex */, nentries/* toIndex */, keys,
+                        .submit(0/* fromIndex */, batchSize/* toIndex */, keys,
                                 vals, BatchInsertConstructor.RETURN_NO_VALUES,
                                 null/* handler */);
 
+                overflowCounter = awaitAsynchronousOverflow(dataService0,
+                        overflowCounter);
+                
                 assertEquals("rangeCount", groundTruth.getEntryCount(), fed
                         .getIndex(name, ITx.UNISOLATED).rangeCount());
 
                 nrounds++;
 
-                nwritten += nentries;
+                nwritten += batchSize;
 
-                System.err.println("Populating the index: nrounds="
-                        + nrounds
-                        + ", nwritten="
-                        + nwritten
-                        + ", nentries="
-                        + groundTruth.getEntryCount()
-                        + " ("
-                        + fed.getIndex(name, ITx.UNISOLATED).rangeCount(null,
-                                null) + ")");
+                npartitions = getPartitionCount(name);
+
+//                if (log.isInfoEnabled())
+//                    log.info
+                System.err.println
+                    ("Populating the index: overflowCounter="
+                        + overflowCounter + ", nrounds=" + nrounds
+                        + ", nwritten=" + nwritten + ", nentries="
+                        + groundTruth.getEntryCount() + " ("
+                        + fed.getIndex(name, ITx.UNISOLATED).rangeCount()
+                        + "), npartitions=" + npartitions);
+
+                /*
+                 * Compare the index against ground truth after overflow.
+                 */
+                if(log.isInfoEnabled())
+                    log.info("Verifying scale-out index against ground truth");
+
+                assertSameEntryIterator(groundTruth, fed.getIndex(name,
+                        ITx.UNISOLATED));
 
             }
-            
+
         }
-        
-        // wait until overflow processing is done.
-        final long overflowCounter1 = awaitOverflow(dataService0,overflowCounter0);
-        
-        assertEquals("partitionCount", 2, getPartitionCount(name));
-        
-        /*
-         * Compare the index against ground truth after overflow.
-         */
-        
-        System.err.println("Verifying scale-out index against ground truth");
 
-        assertSameEntryIterator(groundTruth, fed.getIndex(name, ITx.UNISOLATED));
+        npartitions = getPartitionCount(name);
 
+        // Verify at least 2 partitions.
+        assertTrue("partitionCount=" + npartitions, npartitions >= 2);
+        
         /*
          * Fake out the load balancer so that it will report the source data
          * service (dataService0) is "highly utilized" and the target data
          * service (dataService1) is "under utilized".
          */
         {
+
+            System.err.println("Setting up LBS for move.");
 
             // explicitly set the log level for the load balancer.
             LoadBalancerService.log.setLevel(Level.INFO);
@@ -334,22 +313,31 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
 
         /*
          * Continue to populate index until we can provoke another overflow.
-         * Since there are now 2 index partitions and 2 data services and since
-         * we have configured the various thresholds appropriately this overflow
-         * should select one of the index partitions to move over to the other
-         * data service.
+         * 
+         * Since we have configured the various thresholds appropriately this
+         * overflow should select one of the index partitions to move over to
+         * the other data service.
          */
         {
 
             if (log.isInfoEnabled())
                 log.info("Writing on indices to provoke overflow");
             
-            int nrounds = 0;
-            long nwritten = 0L;
-            boolean done = false;
-            while (!done) {
+//            int nrounds = 0;
+//            long nwritten = 0L;
+//            boolean done = false;
+//            while (!done) 
+            {
 
-                final int nentries = minimumEntryCountPerSplit;
+                /*
+                 * Just a little random data.
+                 * 
+                 * Note: We have to write enough data so that the new updates
+                 * are not just copied onto the new journal in order for the
+                 * index partition(s) on which we write to be eligible for a
+                 * move. 
+                 */
+                final int nentries = 5000;
                 final KV[] data = getRandomKeyValues(nentries);
                 final byte[][] keys = new byte[nentries][];
                 final byte[][] vals = new byte[nentries][];
@@ -369,18 +357,10 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
                                 null/* handler */);
 
                 /*
-                 * Set flag to force overflow on group commit if the ground
-                 * truth index has reached the split threshold.
+                 * Set flag to force overflow on group commit.
                  */
-                if (groundTruth.getEntryCount() >= overCapacityMultiplier
-                        * entryCountPerSplit) {
-
-                    dataService0
-                            .forceOverflow(false/* immediate */, false/*compactingMerge*/);
-
-                    done = true;
-
-                }
+                dataService0
+                        .forceOverflow(false/* immediate */, false/* compactingMerge */);
 
                 // insert the data into the scale-out index.
                 fed.getIndex(name, ITx.UNISOLATED)
@@ -388,46 +368,32 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
                                 vals, BatchInsertConstructor.RETURN_NO_VALUES,
                                 null/* handler */);
 
+                // wait until overflow processing is done.
+                overflowCounter = awaitAsynchronousOverflow(dataService0,
+                        overflowCounter);
+
                 /*
-                 * Problem is comparing entryCount on ground truth to rangeCount
-                 * on scale-out index. Since duplicate keys can be generated the
-                 * scale-out count can be larger than the ground truth count.
-                 * Write a utility method based on an iterator that returns the
-                 * real count for the scale-out index if I care.
+                 * Compare the index against ground truth after overflow.
                  */
-//                assertEquals("rangeCount", groundTruth.getEntryCount(), fed
-//                        .getIndex(name, ITx.UNISOLATED).rangeCount(null, null));
 
-                nrounds++;
+                if (log.isInfoEnabled())
+                    log.info("Verifying scale-out index against ground truth");
 
-                nwritten += nentries;
-
-                System.err.println("Populating the index: nrounds="
-                        + nrounds
-                        + ", nwritten="
-                        + nwritten
-                        + ", nentries="
-                        + groundTruth.getEntryCount()
-                        + " ("
-                        + fed.getIndex(name, ITx.UNISOLATED).rangeCount() + ")");
+                assertSameEntryIterator(groundTruth, fed.getIndex(name,
+                        ITx.UNISOLATED));
 
             }
         
         }
-        
-        // wait until overflow processing is done.
-        final long overflowCounter2 = awaitOverflow(dataService0,overflowCounter1);
-        
-        assertEquals("partitionCount", 2,getPartitionCount(name));
 
         /*
          * Figure out which index partition was moved and verify that there is
-         * now one index partition on each data service.
+         * now (at least) one index partition on each data service.
          */
         {
-            
-            int ndataService0 = 0;
-            int ndataService1 = 0;
+
+            int ndataService0 = 0;// #of index partitions on data service 0.
+            int ndataService1 = 0;// #of index partitions on data service 1.
             
             final ITupleIterator itr = new RawDataServiceTupleIterator(
                     fed.getMetadataService(),//
@@ -464,27 +430,21 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
 
                     fail("Not expecting partition move to this service: "
                             + locator);
-                    
+
                 }
-                
+
                 n++;
 
             }
-            
-            assertEquals("#dataService0",1,ndataService0);
 
-            assertEquals("#dataService1",1,ndataService1);
-            
+            System.err.println("npartitions=" + getPartitionCount(name));
+            System.err.println("npartitions(ds0)=" + ndataService0);
+            System.err.println("npartitions(ds1)=" + ndataService1);
+            assertEquals("#dataService0=" + ndataService0, 1, ndataService0);
+            assertEquals("#dataService1=" + ndataService0, 1, ndataService1);
+
         }
-        
-        /*
-         * Compare the index against ground truth after overflow.
-         */
-        
-        System.err.println("Verifying scale-out index against ground truth");
 
-        assertSameEntryIterator(groundTruth, fed.getIndex(name,ITx.UNISOLATED));
-        
     }
-    
+
 }
