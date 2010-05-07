@@ -3,7 +3,7 @@
  *
  * Licensed under the Aduna BSD-style license.
  */
-package org.openrdf.query.parser.sparql;
+package com.bigdata.rdf.sail.sparql;
 
 import info.aduna.net.ParsedURI;
 
