@@ -296,6 +296,43 @@ abstract public class IndexManager extends StoreManager {
     }
 
     /**
+     * This map is used to note index partitions which could not be split and
+     * have become overextended as a result (they are at least 2x the nominal
+     * size of a shard and are refusing to split). These indices are registered
+     * in this map in order to disallow additional writes onto the index, which
+     * pushes the problem back onto the application.
+     */
+    private final ConcurrentHashMap<String, Void> disabledShards = new ConcurrentHashMap<String, Void>(); 
+    
+    /**
+     * Declare that the named index will no longer accept writes (transient
+     * effect only).
+     */
+    public void disableWrites(final String name) {
+        disabledShards.putIfAbsent(name, null);
+    }
+
+    /**
+     * Declare that the named index will accept writes (default).
+     */
+    public void enableWrites(final String name) {
+        disabledShards.remove(name);
+    }
+
+    /**
+     * Return <code>true</code> if writes have been disabled for the named
+     * index.
+     * 
+     * @param name
+     *            The index name.
+     *            
+     * @return <code>true</code> if writes are disabled for that index.
+     */
+    public boolean isDisabledWrites(final String name) {
+        return disabledShards.contains(name);
+    }
+
+    /**
      * Cache of added/retrieved {@link IIndex}s by name and timestamp.
      * <p>
      * Map from the name and timestamp of an index to a weak reference for the
@@ -1524,7 +1561,38 @@ abstract public class IndexManager extends StoreManager {
                     if (reason != null) {
 
                         // Notify client of stale locator.
-                        throw new StaleLocatorException(name, reason);
+                            throw new StaleLocatorException(name, reason);
+
+                        }
+
+                    if (isDisabledWrites(name)) {
+
+                        /*
+                         * Writes on the index have been disabled. This
+                         * occurs when the index refuses to split and is at
+                         * least two times larger than the nominal shard
+                         * size. In this case writes are disabled to push
+                         * the problem back onto the application (typically
+                         * the problem is a bad split handler supplied by
+                         * the application).
+                         * 
+                         * To fix this condition, you must fix the split
+                         * handler, explicitly enable writes, and then
+                         * update the IndexMetadata for the each shard of
+                         * the index and in the MDS as well.
+                         * 
+                         * Note: This check is only performed for the full
+                         * view of the shard. It MUST NOT be performed by
+                         * getIndexOnJournal(...) since that code path is
+                         * used to update the definition of the shard view
+                         * and we need to continue to propagate the shard
+                         * view definition from overflow to overflow even
+                         * after further writes on the shard have been
+                         * disabled.
+                         */
+
+                        throw new RuntimeException(
+                                "Index writes disabled: " + name);
 
                     }
 

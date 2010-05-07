@@ -59,13 +59,17 @@ import com.bigdata.service.EmbeddedClient.Options;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- @todo The EDS/LDS should use their own options in their own namespace to
- *       specify the data directory for the federation. Ditto for the
- *       "transient" or "createTempFile" properties. Everything is namespaced
- *       now and the overridden semantics of
- *       com.bigdata.journal.Options.CREATE_TEMP_FILE and StoreManager#DATA_DIR
- *       are just getting us into trouble. Look at all uses of these options in
- *       the unit tests and decouple them from the journal's options.
+ * @todo Put the services into directories named by the service class, e.g.,
+ *       MetadataService, just like scale-out.
+ * 
+ * @todo The EDS/LDS should use their own options in their own namespace to
+ *       specify the data directory for the federation (they could just use a
+ *       jini configuration). Ditto for the "transient" or "createTempFile"
+ *       properties. Everything is namespaced now and the overridden semantics
+ *       of com.bigdata.journal.Options.CREATE_TEMP_FILE and
+ *       StoreManager#DATA_DIR are just getting us into trouble. Look at all
+ *       uses of these options in the unit tests and decouple them from the
+ *       journal's options.
  */
 public class EmbeddedFederation<T> extends AbstractScaleOutFederation<T> {
 

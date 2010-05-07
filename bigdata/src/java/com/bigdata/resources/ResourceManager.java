@@ -41,11 +41,9 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.IConcurrencyManager;
-import com.bigdata.journal.Journal;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.DataService;
-import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.util.ReverseLongComparator;
@@ -70,21 +68,6 @@ import com.bigdata.util.ReverseLongComparator;
  * <dt>{@link ResourceEvents}</dt>
  * <dd>Event reporting API</dd>
  * </dl>
- * 
- * @todo Transparent promotion of unpartitioned indices to indicate that support
- *       delete markers and can therefore undergo {@link #overflow()}? This is
- *       done by defining one partition that encompases the entire legal key
- *       range and setting the resource metadata for the view. However, I am not
- *       sure that the situation is likely to arise except if trying to import
- *       data from a {@link Journal} into an {@link IBigdataFederation}.
- *       <p>
- *       Transparent promotion of indices to support delete markers on
- *       {@link #overflow()}? We don't need to maintain delete markers until
- *       the first overflow event....
- *       <P>
- *       Do NOT break the ability to use concurrency control on unpartitioned
- *       indices -- note that overflow handling will only work on that support
- *       deletion markers.
  * 
  * @todo Document backup procedures for the journal (the journal is a
  *       log-structured store; it can be deployed on RAID for media robustness;
@@ -232,123 +215,39 @@ abstract public class ResourceManager extends OverflowManager implements
                             }
                         });
 
-                tmp.addCounter(
-                        IOverflowManagerCounters.SynchronousOverflowMillis,
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(synchronousOverflowMillis.get());
-                            }
-                        });
+                tmp.attach(overflowCounters.getCounters());
 
+                /*
+                 * Note: In order to report this counter we need access to the
+                 * OverflowManager itself.
+                 */
                 tmp.addCounter(
                         IOverflowManagerCounters.AsynchronousOverflowMillis,
                         new Instrument<Long>() {
                             public void sample() {
-                                long t = asynchronousOverflowMillis.get();
+                                long t = overflowCounters.asynchronousOverflowMillis
+                                        .get();
                                 if (isOverflowEnabled() && !isOverflowAllowed()) {
                                     /*
                                      * Include time from the active (ongoing)
                                      * asynchronous overflow operation.
-                                     */ 
-                                    t += (System.currentTimeMillis()
-                                            - asynchronousOverflowStartMillis
-                                                    .get());
+                                     */
+                                    t += (System.currentTimeMillis() - overflowCounters.asynchronousOverflowStartMillis
+                                            .get());
                                 }
                                 setValue(t);
                             }
                         });
 
-                tmp.addCounter(
-                        IOverflowManagerCounters.AsynchronousOverflowCount,
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(getAsynchronousOverflowCount());
-                            }
-                        });
-
-                tmp
-                        .addCounter(
-                                IOverflowManagerCounters.AsynchronousOverflowFailedCount,
-                                new Instrument<Long>() {
-                                    public void sample() {
-                                        setValue(asyncOverflowFailedCounter
-                                                .get());
-                                    }
-                                });
-
-                tmp
-                        .addCounter(
-                                IOverflowManagerCounters.AsynchronousOverflowTaskFailedCount,
-                                new Instrument<Long>() {
-                                    public void sample() {
-                                        setValue(asyncOverflowTaskFailedCounter
-                                                .get());
-                                    }
-                                });
-
-                tmp
-                        .addCounter(
-                                IOverflowManagerCounters.AsynchronousOverflowTaskCancelledCount,
-                                new Instrument<Long>() {
-                                    public void sample() {
-                                        setValue(asyncOverflowTaskCancelledCounter
-                                                .get());
-                                    }
-                                });
-
+                /*
+                 * These are some counters tracked by the IndexManager but
+                 * reported under the same path as the OverflowManager's
+                 * per-index partition task counters.
+                 */
                 {
                 
                     final CounterSet tmp2 = tmp
                             .makePath(IResourceManagerCounters.IndexPartitionTasks);
-
-                    tmp2.addCounter(IIndexPartitionTaskCounters.BuildCount,
-                            new Instrument<Long>() {
-                                public void sample() {
-                                    setValue(indexPartitionBuildCounter.get());
-                                }
-                            });
-
-                    tmp2.addCounter(IIndexPartitionTaskCounters.MergeCount,
-                            new Instrument<Long>() {
-                                public void sample() {
-                                    setValue(indexPartitionMergeCounter.get());
-                                }
-                            });
-
-                    tmp2.addCounter(IIndexPartitionTaskCounters.SplitCount,
-                            new Instrument<Long>() {
-                                public void sample() {
-                                    setValue(indexPartitionSplitCounter.get());
-                                }
-                            });
-
-                    tmp2.addCounter(IIndexPartitionTaskCounters.TailSplitCount,
-                            new Instrument<Long>() {
-                                public void sample() {
-                                    setValue(indexPartitionTailSplitCounter.get());
-                                }
-                            });
-
-                    tmp2.addCounter(IIndexPartitionTaskCounters.JoinCount,
-                            new Instrument<Long>() {
-                                public void sample() {
-                                    setValue(indexPartitionJoinCounter.get());
-                                }
-                            });
-
-                    tmp2.addCounter(IIndexPartitionTaskCounters.MoveCount,
-                            new Instrument<Long>() {
-                                public void sample() {
-                                    setValue(indexPartitionMoveCounter.get());
-                                }
-                            });
-
-                    tmp2.addCounter(IIndexPartitionTaskCounters.ReceiveCount,
-                            new Instrument<Long>() {
-                                public void sample() {
-                                    setValue(indexPartitionReceiveCounter.get());
-                                }
-                            });
 
                     tmp2.addCounter(IIndexPartitionTaskCounters.ConcurrentBuildCount,
                             new Instrument<Integer>() {
@@ -818,7 +717,7 @@ abstract public class ResourceManager extends OverflowManager implements
      * 
      * @see DataService#start()
      */
-    public ResourceManager(Properties properties) {
+    public ResourceManager(final Properties properties) {
 
         super(properties);
         
@@ -857,5 +756,34 @@ abstract public class ResourceManager extends OverflowManager implements
         }
 
     }
+
+//    /**
+//     * Impose flow control on data destined for the named index partition. When
+//     * invoked, clients will no longer be authorized to buffer data on this data
+//     * service to be written on the named index partition.  
+//     * 
+//     * @param name
+//     *            The index partition.
+//     * 
+//     * @todo Implement flow control (this method is a place holder).
+//     */
+//    protected void suspendWrites(String name) {
+//        
+//        // NOP
+//
+//    }
+//    
+//    /**
+//     * Allow clients to buffer writes for the named index partition.
+//     * 
+//     * @param name
+//     * 
+//     * @todo Implement flow control (this method is a place holder).
+//     */
+//    protected void resumeWrites(String name) {
+//       
+//        // NOP
+//        
+//    }
 
 }
