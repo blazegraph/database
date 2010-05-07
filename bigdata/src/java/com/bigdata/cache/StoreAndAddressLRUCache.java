@@ -253,7 +253,13 @@ public class StoreAndAddressLRUCache<V> implements IHardReferenceGlobalLRU<Long,
         return counters.bytesInMemory.get();
         
     }
-    
+
+    public long getMaximumBytesInMemory() {
+
+        return maximumBytesInMemory;
+        
+    }
+
     public int getCacheSetSize() {
         
         return cacheSet.size();
