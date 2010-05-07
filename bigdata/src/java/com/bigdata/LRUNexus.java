@@ -40,6 +40,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.cache.BCHMGlobalLRU;
+import com.bigdata.cache.BCHMGlobalLRU2;
 import com.bigdata.cache.HardReferenceGlobalLRU;
 import com.bigdata.cache.HardReferenceGlobalLRURecycler;
 import com.bigdata.cache.HardReferenceGlobalLRURecyclerExplicitDeleteRequired;
@@ -675,6 +676,15 @@ public class LRUNexus {
                                 s.maximumBytesInMemory, s.minCacheSetSize,
                                 s.limitingCacheCapacity, s.loadFactor,
                                 s.accessPolicy);
+
+                    } else if (s.cls == BCHMGlobalLRU2.class) {
+
+                        tmp = new BCHMGlobalLRU2<Long,Object>(
+                                s.maximumBytesInMemory, s.minCleared,
+                                s.minCacheSetSize, s.initialCacheCapacity,
+                                s.loadFactor
+//                                , s.accessPolicy
+                                );
 
                     } else {
 

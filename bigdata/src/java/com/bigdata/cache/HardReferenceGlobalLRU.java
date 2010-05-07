@@ -214,6 +214,12 @@ public class HardReferenceGlobalLRU<K, V> implements
         
     }
     
+    public long getMaximumBytesInMemory() {
+
+        return maximumBytesInMemory;
+        
+    }
+
     public int getCacheSetSize() {
         
         return cacheSet.size();
