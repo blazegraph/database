@@ -27,9 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.cache;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -145,15 +148,6 @@ import com.bigdata.rawstore.IRawStore;
  *       maybe the tx gets a {@link UUID}? We can then delete that cache if the
  *       tx aborts().
  * 
- *       FIXME Write unit tests.
- *       <p>
- *       Concurrency problems with counters. Either CAS or CAT to address. The
- *       {@link GlobalLRUCounters} and the {@link LRUCacheCounters} both will
- *       have hot spots.
- *       <p>
- *       The TLB acquire()/release() model may provide equally good concurrency
- *       without requiring the caller to manage their threads.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -172,11 +166,20 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
      */
 
     /**
+     * The concurrency level of the cache -or- ZERO (0) if <em>per-thread</em>
+     * buffers will be used. When non-zero, this is the #of striped locks and
+     * lock will protect a {@link TLB} instance.
+     * 
+     * @see #add(DLN)
+     */
+    private final int concurrencyLevel;
+
+    /**
      * The capacity of the thread-local buffers.
      * 
      * @todo config : threadLocalBufferCapacity
      */
-    private final int threadLocalBufferCapacity = 128;
+    private final int threadLocalBufferCapacity = 64;
 
     /**
      * When our inner queue has this many entries we will invoke tryLock() and
@@ -284,6 +287,11 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
     abstract private static class TLB<T> {
 
         /**
+         * The identifier for this instance.
+         */
+        public final int id;
+        
+        /**
          * The capacity of the thread-local buffers.
          */
         private final int capacity;
@@ -313,7 +321,8 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         private int size;
 
         /**
-         * 
+         * @param id
+         *            The instance identifier.
          * @param capacity
          *            The capacity of the internal array.
          * @param tryLockSize
@@ -323,8 +332,9 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
          * @param lock
          *            The lock.
          */
-        protected TLB(final int capacity, final int tryLockSize, final Lock lock) {
+        protected TLB(final int id, final int capacity, final int tryLockSize, final Lock lock) {
 
+            this.id = id;
             this.capacity = capacity;
             this.tryLockSize = tryLockSize;
             this.lock = lock;
@@ -437,16 +447,10 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         
     }
 
-    /**
-     * The thread-local buffers.
-     */
-    private final ConcurrentHashMap<Thread/* Thread */, TLB<DLN<K, V>>> threadLocalBuffers;
-//    private final ConcurrentHashMap<Thread, BatchQueue<T>> threadLocalQueues;
-
-    protected TLB<DLN<K, V>> newTLB(final int capacity,
+    protected TLB<DLN<K, V>> newTLB(final int id, final int capacity,
             final int tryLockSize, final Lock lock) {
 
-        return new TLB<DLN<K, V>>(threadLocalBufferCapacity,
+        return new TLB<DLN<K, V>>(id, threadLocalBufferCapacity,
                 threadLocalBufferTryLockSize, lock) {
 
             /**
@@ -487,19 +491,18 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
         if (tmp == null) {
 
-            if (threadLocalBuffers.put(t, tmp = newTLB(
-                    threadLocalBufferCapacity,
-                    threadLocalBufferTryLockSize, lock
-                    )) != null) {
-                
+            if (threadLocalBuffers.put(t, tmp = newTLB(0/* idIsIgnored */,
+                    threadLocalBufferCapacity, threadLocalBufferTryLockSize,
+                    lock)) != null) {
+
                 /*
-                 * Note: Since the key is the thread it is not possible for there to
-                 * be a concurrent put of an entry under the same key so we do not
-                 * have to use putIfAbsent().
+                 * Note: Since the key is the thread it is not possible for
+                 * there to be a concurrent put of an entry under the same key
+                 * so we do not have to use putIfAbsent().
                  */
 
                 throw new AssertionError();
-                
+
             }
 
         }
@@ -508,6 +511,118 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
     }
 
+    /**
+     * Acquire a {@link TLB} from an internal array of {@link TLB} instances
+     * using a striped lock pattern.
+     * <p>
+     * Note: Contention can definitely arise with {@link #acquire()} on the
+     * backing {@link Semaphore}. For the synthetic test, implementing using
+     * per-thread {@link TLB}s scores <code>2694</code> ops/ms whereas
+     * implementing using striped locks the performance score is only
+     * <code>2033</code> (on a 2 core laptop with 3 threads). One thread on the
+     * laptop has a throughput of <code>1405</code>, so <code>2800</code> is the
+     * maximum possible throughput for 2 threads and is very nearly achieved by
+     * the implementation based on thread-local {@link TLB}s. The actual
+     * performance of the striped locks approach depends on the degree of
+     * collision in the {@link Thread#getId()} values and the #of {@link TLB}
+     * instances in the array.
+     * <p>
+     * While striped locks clearly have less throughput when compared to thread-
+     * local {@link TLB}s, the striped lock performance is still nearly twice
+     * the best performance of any other {@link IGlobalLRU} implementation and,
+     * with striped locks, we do not have to worry about references on
+     * {@link TLB}s "escaping" when we rarely see requests for some threads.
+     * 
+     * @return The {@link TLB}.
+     * 
+     * @throws InterruptedException
+     */
+    private TLB<DLN<K,V>> acquire() throws InterruptedException {
+        
+        // Note: Thread.getId() is a positive integer.
+        final int i = (int) (Thread.currentThread().getId() % concurrencyLevel);
+
+        permits[i].acquire();
+
+        return buffers[i];
+        
+    }
+
+    /**
+     * Release a {@link TLB} obtained using {@link #acquire()}.
+     * 
+     * @param b
+     *            The {@link TLB}.
+     */
+    private void release(final TLB<DLN<K, V>> b) {
+
+        permits[b.id].release();
+
+    }
+
+    /**
+     * Buffer an access policy update on a {@link TLB}. If the
+     * {@link DLN#delete} flag is set, then it is removed from the access
+     * policy. Otherwise, if the {@link DLN#prior} and {@link DLN#next}
+     * references of the entry are <code>null</code> then it is inserted into
+     * the access policy. Otherwise it is relinked within the access policy
+     * according to the semantics of the {@link AccessPolicy} (LRU, LIRS, etc).
+     * 
+     * @param entry
+     *            An entry in the access policy.
+     */
+    private void add(final DLN<K, V> entry) {
+
+        if (concurrencyLevel == 0) {
+
+            /*
+             * Per-thread buffers.
+             */
+            getTLB().add(entry);
+            
+        } else {
+            
+            /*
+             * Striped locks.
+             */
+            
+            TLB<DLN<K, V>> t = null;
+            try {
+
+                t = acquire();
+
+                t.add(entry);
+
+            } catch (InterruptedException ex) {
+
+                throw new RuntimeException(ex);
+
+            } finally {
+
+                if (t != null)
+                    release(t);
+
+            }
+            
+        }
+
+    }
+    
+    /**
+     * Visits all {@link TLB}s.
+     * <p>
+     * Note: You MUST hold a global lock in order to operate on the {@link TLB}s
+     * without using {@link #acquire()} and {@link #release(TLB)}.
+     * 
+     * @todo do explicit acquire/release for each one? In that case, use direct
+     *       access to the {@link #permits} and {@link #buffers}.
+     */
+    private Iterator<TLB<DLN<K,V>>> bufferIterator() {
+        
+        return Collections.unmodifiableList(Arrays.asList(buffers)).iterator();
+        
+    }
+    
     /**
      * The counters for the shared LRU.
      */
@@ -545,6 +660,31 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
      */
     private final float loadFactor;
 
+    /*
+     * Used iff striped locks are used.
+     */
+    /**
+     * The striped locks and <code>null</code> if per-thread {@link TLB}s are
+     * being used.
+     */
+    private final Semaphore[] permits;
+
+    /**
+     * The {@link TLB}s protected by the striped locks and <code>null</code> if
+     * per-thread {@link TLB}s are being used.
+     */
+    private final TLB<DLN<K,V>>[] buffers;
+
+    /*
+     * Used iff true thread-local buffers are used.
+     */
+
+    /**
+     * The per-thread {@link TLB}s and <code>null</code> if striped locks are
+     * being used.
+     */
+    private final ConcurrentHashMap<Thread/* Thread */, TLB<DLN<K, V>>> threadLocalBuffers;
+
     /**
      * 
      * @param maximumBytesInMemory
@@ -565,10 +705,16 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
      *            The initial capacity of each new cache instance.
      * @param loadFactor
      *            The load factor for the cache instances.
+     * @param concurrencyLevel
+     *            The concurrency level of the cache -or- ZERO (0) if
+     *            <em>per-thread</em> buffers will be used. When non-zero, this
+     *            is the #of striped locks and lock will protect a {@link TLB}
+     *            instance.
      */
     public BCHMGlobalLRU2(final long maximumBytesInMemory,
             final long minCleared, final int minimumCacheSetCapacity,
-            final int initialCacheCapacity, final float loadFactor) {
+            final int initialCacheCapacity, final float loadFactor,
+            final int concurrencyLevel) {
 
         if (maximumBytesInMemory <= 0)
             throw new IllegalArgumentException();
@@ -579,6 +725,9 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         if (minCleared > maximumBytesInMemory)
             throw new IllegalArgumentException();
 
+        if (concurrencyLevel < 0)
+            throw new IllegalArgumentException();
+
         this.maximumBytesInMemory = maximumBytesInMemory;
 
         this.minCleared = minCleared;
@@ -587,18 +736,36 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
         this.loadFactor = loadFactor;
 
+        this.concurrencyLevel = concurrencyLevel;
+        
         this.globalLRUCounters = new GlobalLRUCounters<K, V>(this);
 
         this.accessPolicy = new LRUAccessPolicy<K, V>(lock, globalLRUCounters);
         
-        // cacheSet = new ConcurrentWeakValueCache<UUID, LRUCacheImpl<K, V>>(
-        // minimumCacheSetCapacity);
-
         cacheSet = new ConcurrentHashMap<UUID, LRUCacheImpl<K, V>>(
                 minimumCacheSetCapacity);
-
-        threadLocalBuffers = new ConcurrentHashMap<Thread, TLB<DLN<K, V>>>();
-
+        
+        if (concurrencyLevel == 0) {
+            /*
+             * Per-thread buffers.
+             */
+            permits = null;
+            buffers = null;
+            threadLocalBuffers = new ConcurrentHashMap<Thread, TLB<DLN<K, V>>>();
+        } else {
+            /*
+             * Striped locks.
+             */
+            permits = new Semaphore[concurrencyLevel];
+            buffers = new TLB[concurrencyLevel];
+            threadLocalBuffers = null;
+            for (int i = 0; i < concurrencyLevel; i++) {
+                permits[i] = new Semaphore(1, false/* fair */);
+                buffers[i] = newTLB(i/* id */, threadLocalBufferCapacity,
+                        threadLocalBufferTryLockSize, lock);
+            }
+        }
+        
     }
 
     public ILRUCache<K, V> getCache(final UUID uuid, final IAddressManager am) {
@@ -634,6 +801,19 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
     }
 
+    /**
+     * The concurrency level of the cache -or- ZERO (0) if <em>per-thread</em>
+     * buffers will be used. When non-zero, this is the #of striped locks and
+     * lock will protect a {@link TLB} instance.
+     * 
+     * @todo report as a one-shot counter.
+     */
+    public int getConcurrencyLevel() {
+    
+        return concurrencyLevel;
+        
+    }
+    
     public int getRecordCount() {
 
         return accessPolicy.size();
@@ -786,8 +966,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
             // Discard any buffered references.
             {
 
-                final Iterator<TLB<DLN<K, V>>> itr = threadLocalBuffers
-                        .values().iterator();
+                final Iterator<TLB<DLN<K, V>>> itr = bufferIterator();
 
                 while (itr.hasNext()) {
 
@@ -1591,8 +1770,8 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                  */
                 {
                     
-                    final Iterator<TLB<DLN<K, V>>> itr = globalLRU.threadLocalBuffers
-                            .values().iterator();
+                    final Iterator<TLB<DLN<K, V>>> itr = globalLRU
+                            .bufferIterator();
 
                     while (itr.hasNext()) {
 
@@ -1670,7 +1849,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                  */
 
                 // buffer the touch on an existing entry.
-                globalLRU.getTLB().add(entry);
+                globalLRU.add(entry);
 
                 // Return the old value.
                 return entry.v;
@@ -1696,7 +1875,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
             map.put(k, entry);
 
             // buffer access policy update.
-            globalLRU.getTLB().add(entry);
+            globalLRU.add(entry);
 
             final int count = map.size();
 
@@ -1740,7 +1919,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
             }
 
             // buffer access policy update.
-            globalLRU.getTLB().add(entry);
+            globalLRU.add(entry);
 
             cacheCounters.nsuccess++;
 
@@ -1761,7 +1940,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
             // mark as deleted and add to TLB.
             entry.delete = true;
-            globalLRU.getTLB().add(entry);
+            globalLRU.add(entry);
 
             // return the old value.
             return entry.v;
