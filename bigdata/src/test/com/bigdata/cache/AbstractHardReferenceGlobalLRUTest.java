@@ -372,8 +372,8 @@ public class AbstractHardReferenceGlobalLRUTest extends TestCase2 {
          * XorShift pseudo-random generator. Certainly, I am seeing too much
          * when those parameters are non-zero.
          */
-        final Op gen = new Op(.8f, .2f, .005f, .0001f, .00005f, .00001f);
-//        final Op gen = new Op(.8f, .2f, .005f, 0f, 0f, 0f);
+//        final Op gen = new Op(.8f, .2f, .005f, .0001f, .00005f, .00001f);
+        final Op gen = new Op(.8f, .2f, .005f, 0f, 0f, 0f);
         
         // max distinct records per store.
         final int nrecords = 10000;
@@ -381,7 +381,7 @@ public class AbstractHardReferenceGlobalLRUTest extends TestCase2 {
         // #of stores.
         final int nstores = 5;
         
-        // #of concurrent threads : @todo test w/ more than the default concurrency level.
+        // #of concurrent threads
         final int nthreads = Runtime.getRuntime().availableProcessors() + 1;
 
         // #of operations to execute
@@ -390,7 +390,7 @@ public class AbstractHardReferenceGlobalLRUTest extends TestCase2 {
 
         // test run time.
 //        final long timeout = Long.MAX_VALUE;// when profiling
-        final long timeout = 20;// standard stress
+        final long timeout = 20L;// standard stress
         
 //        // #of operations which have been executed so far.
 //        final AtomicLong opCount = new AtomicLong();
@@ -543,10 +543,18 @@ public class AbstractHardReferenceGlobalLRUTest extends TestCase2 {
             
         }
 
-        System.err.println("elapsed=" + TimeUnit.NANOSECONDS.toMillis(elapsed)
-                + "ms, #ops=" + opCount + ", ops/ms="
-                + (opCount / TimeUnit.NANOSECONDS.toMillis(elapsed))
-                + ", lruClass=" + lru.getClass());
+        System.err
+                .println("elapsed="
+                        + TimeUnit.NANOSECONDS.toMillis(elapsed)
+                        + "ms, #ops="
+                        + opCount
+                        + ", ops/ms="
+                        + (opCount / TimeUnit.NANOSECONDS.toMillis(elapsed))
+                        + ", lruClass="
+                        + lru.getClass().getName()
+                        + (lru instanceof BCHMGlobalLRU2 ? ("concurrencyLevel=" + ((BCHMGlobalLRU2) lru)
+                                .getConcurrencyLevel())
+                                : ""));
 
         if (isTimeout && log.isInfoEnabled())
             log.info("Test timed out");

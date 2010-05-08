@@ -41,19 +41,19 @@ import com.bigdata.rawstore.Bytes;
  *          that, as does a cluster run, but there should be something specific
  *          to the cache behavior.
  */
-public class TestBCHMGlobalLRU2 extends
+public class TestBCHMGlobalLRU2WithThreadLocalBuffers extends
         AbstractHardReferenceGlobalLRUTest {
 
     /**
      * 
      */
-    public TestBCHMGlobalLRU2() {
+    public TestBCHMGlobalLRU2WithThreadLocalBuffers() {
     }
 
     /**
      * @param name
      */
-    public TestBCHMGlobalLRU2(String name) {
+    public TestBCHMGlobalLRU2WithThreadLocalBuffers(String name) {
         super(name);
     }
 
@@ -72,9 +72,9 @@ public class TestBCHMGlobalLRU2 extends
 
         final float loadFactor = .75f;
 
-        lru = new BCHMGlobalLRU2<Long, Object>(
-                maximumBytesInMemory, minCleared, minimumCacheSetCapacity,
-                initialCacheCapacity, loadFactor);
+        lru = new BCHMGlobalLRU2<Long, Object>(maximumBytesInMemory,
+                minCleared, minimumCacheSetCapacity, initialCacheCapacity,
+                loadFactor, 0/* thread-local-buffers */);
 
     }
 

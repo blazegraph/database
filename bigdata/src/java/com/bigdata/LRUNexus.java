@@ -249,6 +249,16 @@ public class LRUNexus {
         String DEFAULT_LOAD_FACTOR = ".75";
 
         /**
+         * The concurrency level for the backing hash map(s). This property is
+         * not understood by all implementations. A value of ZERO (0) is
+         * interpreted in a special manner by {@link BCHMGlobalLRU2}.
+         */
+        String CONCURRENCY_LEVEL = LRUNexus.class.getName()
+                + ".concurrencyLevel";
+
+        String DEFAULT_CONCURRENCY_LEVEL = "16";
+        
+        /**
          * The initial capacity for the cache instances.
          */
         String INITIAL_CAPACITY = LRUNexus.class.getName() + ".initialCapacity";
@@ -380,6 +390,14 @@ public class LRUNexus {
         final float loadFactor;
 
         /**
+         * The concurrency level for the backing hash map(s). This property is
+         * not understood by all implementations.
+         * 
+         * @see Options#LOAD_FACTOR
+         */
+        final int concurrencyLevel;
+
+        /**
          * The initial capacity for the backing {@link ILRUCache} hash map for
          * each {@link IRawStore}.
          * 
@@ -468,6 +486,9 @@ public class LRUNexus {
             
             loadFactor = Float.valueOf(System.getProperty(
                     Options.LOAD_FACTOR, Options.DEFAULT_LOAD_FACTOR));
+
+            concurrencyLevel = Integer.valueOf(System.getProperty(
+                    Options.CONCURRENCY_LEVEL, Options.DEFAULT_CONCURRENCY_LEVEL));
 
             initialCacheCapacity = Integer.valueOf(System
                     .getProperty(Options.INITIAL_CAPACITY,
@@ -682,7 +703,8 @@ public class LRUNexus {
                         tmp = new BCHMGlobalLRU2<Long,Object>(
                                 s.maximumBytesInMemory, s.minCleared,
                                 s.minCacheSetSize, s.initialCacheCapacity,
-                                s.loadFactor
+                                s.loadFactor,
+                                s.concurrencyLevel
 //                                , s.accessPolicy
                                 );
 

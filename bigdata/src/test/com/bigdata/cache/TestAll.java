@@ -82,8 +82,13 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestHardReferenceGlobalLRURecyclerExplicitDeleteRequired.class);
 
-        // high concurrency cache with support for memory cap.
-        suite.addTestSuite(TestBCHMGlobalLRU2.class);
+        /*
+         * These are test suites for the same high concurrency cache with
+         * support for memory cap. The cache can be configured with thread-lock
+         * buffers or striped locks, so we test it both ways.
+         */
+        suite.addTestSuite(TestBCHMGlobalLRU2WithThreadLocalBuffers.class);
+        suite.addTestSuite(TestBCHMGlobalLRU2WithStripedLocks.class);
 
 //        // Generic test of cache policy.
 //        retval.addTestSuite( TestCachePolicy.class );
