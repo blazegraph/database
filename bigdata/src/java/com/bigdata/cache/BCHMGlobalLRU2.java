@@ -147,7 +147,9 @@ import com.bigdata.rawstore.IRawStore;
  * 
  *       FIXME Write unit tests.
  *       <p>
- *       Concurrency problems with counters. Either CAS or CAT to address.
+ *       Concurrency problems with counters. Either CAS or CAT to address. The
+ *       {@link GlobalLRUCounters} and the {@link LRUCacheCounters} both will
+ *       have hot spots.
  *       <p>
  *       The TLB acquire()/release() model may provide equally good concurrency
  *       without requiring the caller to manage their threads.
@@ -298,9 +300,10 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         private final Lock lock;
 
         /**
-         * The local buffer (not protected by a lock).
+         * The local buffer, which is lazily initialized so we can have it
+         * strongly typed.
          */
-        private final Object[] a;
+        private T[] a;
         
         /**
          * The current #of elements in {@link #a}.
@@ -325,7 +328,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
             this.capacity = capacity;
             this.tryLockSize = tryLockSize;
             this.lock = lock;
-            this.a = new Object[capacity];
+//            this.a = new Object[capacity];
             this.size = 0;
 
         }
@@ -338,10 +341,9 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
          * Note: The references in the array are cleared to facilitate GC of the
          * references.
          */
-        @SuppressWarnings("unchecked")
         protected void evict() {
 
-            doEvict(size, (T[]) a);
+            doEvict(size, a);
 
             clearBuffer();
             
@@ -382,8 +384,17 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
          * @param ref
          *            The reference.
          */
+        @SuppressWarnings("unchecked")
         public void add(final T ref) {
 
+            if (a == null) {
+
+                // Allocate strongly typed array.
+                a = (T[]) java.lang.reflect.Array.newInstance(ref.getClass(),
+                        capacity);
+
+            }
+            
             if (tryLockSize != 0 && size == tryLockSize) {
 
                 if (lock.tryLock()) {
@@ -754,7 +765,6 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
                 while (itr.hasNext()) {
 
-                    // final LRUCacheImpl<K, V> cache = itr.next().get();
                     final LRUCacheImpl<K, V> cache = itr.next();
 
                     if (cache == null) {
@@ -789,6 +799,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
             }
 
+            // reset the global counters.
             globalLRUCounters.clear();
 
         } finally {
@@ -799,6 +810,40 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
     }
 
+//    /**
+//     * Flush all buffered touches to the backing access policy.
+//     * <p>
+//     * Note: This method is NOT required during normal operations. It's sole
+//     * purpose is to bring counters associated with the access policy (rather
+//     * than the {@link ConcurrentHashMap}) up to date by evicting the buffered
+//     * references currently in the {@link TLB thread-local buffers} onto the
+//     * shared access policy.
+//     * 
+//     * @todo Unless we acquire()/release() the {@link TLB}s their internal state
+//     *       changes may not be visible to another thread.
+//     */
+//    public void flushBuffers() {
+//        
+//        lock.lock();
+//        try {
+//
+//            final Iterator<TLB<DLN<K, V>>> itr = threadLocalBuffers.values()
+//                    .iterator();
+//
+//            while (itr.hasNext()) {
+//
+//                final TLB<DLN<K, V>> t = itr.next();
+//
+//                t.evict();
+//
+//            }
+//
+//        } finally {
+//            lock.unlock();
+//        }
+//        
+//    }
+    
     public CounterSet getCounterSet() {
 
         final CounterSet root = globalLRUCounters.getCounterSet();
@@ -1123,7 +1168,8 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
             if (!lock.isHeldByCurrentThread())
                 throw new IllegalMonitorStateException();
 
-            assert size == 0;
+            assert size == 0 : "size=" + size + ", first=" + first + ", last="
+                    + last;
             assert first == null;
             assert last == null;
 
@@ -1552,7 +1598,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
                         final TLB<DLN<K, V>> t = itr.next();
 
-                        t.clearBuffer();
+                        t.evict();
 
                     }
                     
@@ -1712,8 +1758,6 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
             if (entry == null)
                 return null;
-
-            globalLRU.lock.lock();
 
             // mark as deleted and add to TLB.
             entry.delete = true;

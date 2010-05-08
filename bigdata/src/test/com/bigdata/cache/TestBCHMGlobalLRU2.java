@@ -29,28 +29,31 @@ package com.bigdata.cache;
 
 import java.util.concurrent.ExecutionException;
 
-import com.bigdata.LRUNexus.AccessPolicyEnum;
 import com.bigdata.rawstore.Bytes;
 
 /**
- * Some unit tests for the {@link BCHMGlobalLRU}.
+ * Some unit tests for the {@link BCHMGlobalLRU2}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ *          FIXME We need a high concurrency stress test. BSBM works Ok for
+ *          that, as does a cluster run, but there should be something specific
+ *          to the cache behavior.
  */
-public class TestBCHMGlobalLRU extends
+public class TestBCHMGlobalLRU2 extends
         AbstractHardReferenceGlobalLRUTest {
 
     /**
      * 
      */
-    public TestBCHMGlobalLRU() {
+    public TestBCHMGlobalLRU2() {
     }
 
     /**
      * @param name
      */
-    public TestBCHMGlobalLRU(String name) {
+    public TestBCHMGlobalLRU2(String name) {
         super(name);
     }
 
@@ -60,17 +63,18 @@ public class TestBCHMGlobalLRU extends
 
         final long maximumBytesInMemory = 10 * Bytes.kilobyte;
 
+        // clear at least 25% of the memory.
+        final long minCleared = maximumBytesInMemory / 4;
+
         final int minimumCacheSetCapacity = 0;
 
-        final int limitingCacheCapacity = 100000;
+        final int initialCacheCapacity = 16;
 
         final float loadFactor = .75f;
 
-        lru = new BCHMGlobalLRU<Object>(maximumBytesInMemory,
-                minimumCacheSetCapacity, limitingCacheCapacity, loadFactor,
-//                AccessPolicyEnum.LRU
-                AccessPolicyEnum.LIRS
-                );
+        lru = new BCHMGlobalLRU2<Long, Object>(
+                maximumBytesInMemory, minCleared, minimumCacheSetCapacity,
+                initialCacheCapacity, loadFactor);
 
     }
 

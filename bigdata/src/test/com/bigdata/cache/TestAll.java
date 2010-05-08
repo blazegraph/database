@@ -72,6 +72,8 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestStoreAndAddressLRUCache.class);
 
+        // high concurrency cache based on the infinispan project w/o support
+        // for memory cap.
         suite.addTestSuite(TestBCHMGlobalLRU.class);
 
         suite.addTestSuite(TestHardReferenceGlobalLRU.class);
@@ -79,7 +81,10 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestHardReferenceGlobalLRURecycler.class);
 
         suite.addTestSuite(TestHardReferenceGlobalLRURecyclerExplicitDeleteRequired.class);
-        
+
+        // high concurrency cache with support for memory cap.
+        suite.addTestSuite(TestBCHMGlobalLRU2.class);
+
 //        // Generic test of cache policy.
 //        retval.addTestSuite( TestCachePolicy.class );
 

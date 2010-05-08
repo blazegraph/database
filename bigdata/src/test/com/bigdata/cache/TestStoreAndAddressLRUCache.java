@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.cache;
 
+import java.util.concurrent.ExecutionException;
+
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -69,6 +71,19 @@ public class TestStoreAndAddressLRUCache extends
 
         lru = new StoreAndAddressLRUCache<Object>(maximumBytesInMemory,
                 minimumCacheSetCapacity, initialCacheCapacity, loadFactor);
+
+    }
+
+    /**
+     * This is a hook for running just this test under the profiler.
+     * 
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    public void test_concurrentOperations() throws InterruptedException,
+            ExecutionException {
+
+        super.test_concurrentOperations();
 
     }
 
