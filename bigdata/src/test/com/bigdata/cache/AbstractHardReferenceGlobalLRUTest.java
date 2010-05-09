@@ -350,15 +350,15 @@ public class AbstractHardReferenceGlobalLRUTest extends TestCase2 {
                     + discardAllCaches + "}";
         }
     }
-    
+
     /**
-     * Stress test for cache consistency with concurrent operations.
+     * Stress test for cache with concurrent operations. This hammers on the
+     * cache and reports data on throughput and may be used to analyze the
+     * {@link IGlobalLRU} implementation for concurrency issues but it does not
+     * provide correctness testing.
      * 
-     * @throws InterruptedException 
-     * @throws ExecutionException 
-     * 
-     * @todo should hammer at the implementation and report on throughput. might
-     *       not be able to measure correctness.
+     * @throws InterruptedException
+     * @throws ExecutionException
      * 
      * @todo verify final iterate over all caches and clear of each leaves
      *       bytesInMemory, bytesOnDisk, and recordCount at zero.
@@ -371,9 +371,13 @@ public class AbstractHardReferenceGlobalLRUTest extends TestCase2 {
          * @todo any clearing of caches is might be too much based on the
          * XorShift pseudo-random generator. Certainly, I am seeing too much
          * when those parameters are non-zero.
+         * 
+         * Note: deleteCache and discardAllCaches DO NOT guarantee consistency
+         * if there are concurrent operations against the cache.
          */
+        final Op gen = new Op(.8f, .2f, .005f, .0001f, .00005f, .00001f);
 //        final Op gen = new Op(.8f, .2f, .005f, .0001f, .00005f, .00001f);
-        final Op gen = new Op(.8f, .2f, .005f, 0f, 0f, 0f);
+//        final Op gen = new Op(.8f, .2f, .005f, 0f, 0f, 0f);
         
         // max distinct records per store.
         final int nrecords = 10000;
@@ -464,6 +468,15 @@ public class AbstractHardReferenceGlobalLRUTest extends TestCase2 {
                             break;
                         }
                         case Op.DISCARD_ALL_CACHES: {
+                            /*
+                             * Note: The API DOES NOT guarantee coherence if
+                             * this method is invoked with concurrent operations
+                             * against the cache. Therefore it is not a good
+                             * idea to have a non-zero probability for this
+                             * operation. Some implementations provide enough
+                             * locking to make the operation coherent, but many
+                             * do not.
+                             */
                             c.discardAllCaches++;
 //                            System.err.println("Discarding all caches");
                             lru.discardAllCaches();

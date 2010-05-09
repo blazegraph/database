@@ -36,10 +36,6 @@ import com.bigdata.rawstore.Bytes;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- *          FIXME We need a high concurrency stress test. BSBM works Ok for
- *          that, as does a cluster run, but there should be something specific
- *          to the cache behavior.
  */
 public class TestBCHMGlobalLRU2WithStripedLocks extends
         AbstractHardReferenceGlobalLRUTest {
@@ -72,9 +68,13 @@ public class TestBCHMGlobalLRU2WithStripedLocks extends
 
         final float loadFactor = .75f;
 
+        final int concurrencyLevel = 16;
+
+        final int threadLocalBufferCapacity = 128;
+
         lru = new BCHMGlobalLRU2<Long, Object>(maximumBytesInMemory,
                 minCleared, minimumCacheSetCapacity, initialCacheCapacity,
-                loadFactor, 16/* concurrencyLevel */);
+                loadFactor, concurrencyLevel, threadLocalBufferCapacity);
 
     }
 
