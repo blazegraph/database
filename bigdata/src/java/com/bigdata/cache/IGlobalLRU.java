@@ -206,29 +206,13 @@ public interface IGlobalLRU<K,V> {
      */
     public ILRUCache<K, V> getCache(final UUID storeUUID, IAddressManager am);
 
-//    /**
-//     * Remove the cache for the {@link IRawStore} from the set of caches
-//     * maintained by this class and clear any entries in that cache. This method
-//     * SHOULD be used when the persistent resources for the store are deleted.
-//     * It SHOULD NOT be used if a store is simply closed in a context when the
-//     * store COULD be re-opened. In such cases, the cache for that store will be
-//     * automatically released after it has become only weakly reachable.
-//     * 
-//     * @param store
-//     *            The store.
-//     * 
-//     * @see IRawStore#destroy()
-//     * @see IRawStore#deleteResources()
-//     */
-//    public void deleteCache(final IRawStore store);
-
     /**
      * Remove the cache for the {@link IRawStore} from the set of caches
      * maintained by this class and clear any entries in that cache. This method
      * SHOULD be used when the persistent resources for the store are deleted.
      * It SHOULD NOT be used if a store is simply closed in a context when the
-     * store COULD be re-opened. In such cases, the cache for that store will be
-     * automatically released after it has become only weakly reachable.
+     * store COULD be re-opened. The method DOES NOT guarantee consistency if
+     * there are concurrent requests against that cache instance.
      * 
      * @param storeUUID
      *            The store's {@link UUID}.
@@ -241,7 +225,9 @@ public interface IGlobalLRU<K,V> {
     /**
      * Clear all per-{@link IRawStore} cache instances. This may be used if all
      * bigdata instances in the JVM are closed, but SHOULD NOT be invoked if you
-     * are just closing some {@link IRawStore}.
+     * are just closing some {@link IRawStore}. The method DOES NOT guarantee
+     * consistency if there are concurrent requests against the
+     * {@link IGlobalLRU}.
      */
     public void discardAllCaches();
 
@@ -255,6 +241,11 @@ public interface IGlobalLRU<K,V> {
      * @version $Id$
      */
     public interface IGlobalLRUCounters extends ICounterSet {
+
+        /**
+         * The concurrency level of the cache.
+         */
+        final String CONCURRENCY_LEVEL = "Concurrency Level";
 
         /**
          * The #of bytes on disk for the records that are buffered by the cache.

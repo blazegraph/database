@@ -229,15 +229,19 @@ public class LRUNexus {
          * causes problems with the tenured generation since the Entry instances
          * are always new, but they could last quite a while before eviction
          * from the LRU position if there is a large heap.
-         * 
-         * FIXME Scale-out should use the
+         * <p>
+         * Scale-out should use the
          * {@link HardReferenceGlobalLRURecyclerExplicitDeleteRequired} to avoid
          * giving away the cached index segment records when an index segment
          * store is closed by a timeout.
-         * 
-         * FIXME For scale-up, the {@link HardReferenceGlobalLRURecycler} is
-         * fine. We are not re-opening stores all the time so the weak value
-         * reference semantics of that class do not cause a problem.
+         * <p>
+         * For scale-up, the {@link HardReferenceGlobalLRURecycler} is fine. We
+         * are not re-opening stores all the time so the weak value reference
+         * semantics of that class do not cause a problem.
+         * <p>
+         * The recently written {@link BCHMGlobalLRU2} implementation should be
+         * ideal for both scale-out and scale-up once it has been tested more
+         * throughly. Even better would be a LIRS access policy for that class.
          */
         String DEFAULT_CLASS = HardReferenceGlobalLRURecycler.class.getName();
 
@@ -279,12 +283,20 @@ public class LRUNexus {
         String DEFAULT_LIMITING_CAPACITY = "" + (2 * Bytes.megabyte);
 
         /**
-         * The access policy (LIRS, LRU, etc).
+         * The capacity of the thread-local buffer used to amortize the cost of
+         * updating the access policy. This option is only understood by select
+         * {@link IGlobalLRU} implementations.
+         */
+        String THREAD_LOCAL_BUFFER_CAPACITY = LRUNexus.class.getName()
+                + ".threadLocalBufferCapacity";
+
+        String DEFAULT_THREAD_LOCAL_BUFFER_CAPACITY = "128";
+
+        /**
+         * The access policy (LIRS, LRU, etc). At the moment, this option is
+         * only understood by the {@link BCHMGlobalLRU}.
          * 
          * @see #DEFAULT_ACCESS_POLICY_ENUM
-         * 
-         * @deprecated At the moment, this option is only understood by the
-         * {@link BCHMGlobalLRU}.
          */
         String ACCESS_POLICY = LRUNexus.class.getName() + ".accessPolicy";
         
@@ -336,15 +348,35 @@ public class LRUNexus {
     public static final IGlobalLRU<Long, Object> INSTANCE;
 
     /**
-     * @deprecated This is a trial feature specifically to allow configuration
-     * time selection of the access policy for {@link BCHMGlobalLRU}
+     * The access policy. Not all {@link IGlobalLRU} implementations support
+     * multiple access policies. Check the specific implementation to see which
+     * policies it supports.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
      * @version $Id$
      */
     public static enum AccessPolicyEnum {
 
-        LRU, LIRS;
+        /**
+         * Least-recently used access policy.
+         */
+        LRU,
+
+        /**
+         * An access policy designed to avoid displacement of frequently used
+         * cache entries by scans of infrequently used items.
+         * 
+         * @see <a
+         *      href="http://portal.acm.org/citation.cfm?doid=511334.511340">LIRS:
+         *      an efficient low inter-reference recency set replacement policy
+         *      to improve buffer cache performance</a> and <a
+         *      href="http://www.ece.eng.wayne.edu/~sjiang/Projects/LIRS/sig02.ppt"
+         *      >LIRS : An Efficient Replacement Policy to Improve Buffer Cache
+         *      Performance.</a>
+         */
+        LIRS;
+        
         private AccessPolicyEnum() {
         }
         
@@ -453,9 +485,22 @@ public class LRUNexus {
          * @see Options#MIN_CACHE_SET_SIZE
          */
         final int minCacheSetSize;
-        
+
+        /**
+         * The capacity of the thread-local buffer used to amortize the cost of
+         * updating the access policy. This option is only recognized by some
+         * {@link IGlobalLRU} implementations.
+         * 
+         * @see BCHMGlobalLRU2
+         * 
+         * @see Options#THREAD_LOCAL_BUFFER_CAPACITY
+         */
+        final int threadLocalBufferCapacity;
+
         /**
          * The access policy algorithm (LRU, LIRS, etc).
+         * 
+         * @see Options#ACCESS_POLICY
          */
         final AccessPolicyEnum accessPolicy;
         
@@ -497,6 +542,10 @@ public class LRUNexus {
             limitingCacheCapacity = Integer.valueOf(System
                     .getProperty(Options.LIMITING_CAPACITY,
                             Options.DEFAULT_LIMITING_CAPACITY));
+
+            threadLocalBufferCapacity = Integer.valueOf(System.getProperty(
+                    Options.THREAD_LOCAL_BUFFER_CAPACITY,
+                    Options.DEFAULT_THREAD_LOCAL_BUFFER_CAPACITY));
 
             accessPolicy = AccessPolicyEnum.valueOf(System.getProperty(
                     Options.ACCESS_POLICY, Options.DEFAULT_ACCESS_POLICY));
@@ -704,7 +753,8 @@ public class LRUNexus {
                                 s.maximumBytesInMemory, s.minCleared,
                                 s.minCacheSetSize, s.initialCacheCapacity,
                                 s.loadFactor,
-                                s.concurrencyLevel
+                                s.concurrencyLevel,
+                                s.threadLocalBufferCapacity
 //                                , s.accessPolicy
                                 );
 

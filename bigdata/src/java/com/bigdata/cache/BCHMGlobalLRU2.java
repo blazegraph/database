@@ -109,6 +109,40 @@ import com.bigdata.rawstore.IRawStore;
  * If the cache is over its defined maximums, then evictions are batched while
  * holding the lock. Evictions are only processed when batching touches through
  * the lock.
+ * <h2>Concurrency Level</h2>
+ * This class supports either true thread-local buffers (concurrencyLevel := 0)
+ * or striped locks protecting a pool of buffers as a configuration option (any
+ * positive value for concurrencyLevel).
+ * <p>
+ * True thread-local buffers have significantly higher throughput since no locks
+ * are required to buffer touches. However, unless the application drives all
+ * threads, "touches" may linger on some thread-local buffers causing (a) the
+ * access policy to not update for those objects in a timely manner (this is
+ * acceptable since the objects are by definition rarely used if touches on a
+ * rarely used buffer would cause a significant update in the access order); and
+ * (b) the referenced objects may have their life cycle falsely extended since
+ * hard references will remain on the thread-local buffer. In a pathological
+ * case where the application never reuses a thread, this can cause a memory
+ * leak. However, if the application reasonably managers its touches from a
+ * thread pool this can have 50% better throughput over the striped lock version
+ * of this class.
+ * <p>
+ * When the concurrencyLevel is positive, a pool of buffers will be allocated
+ * and protected by striped locks. Since there are many such buffers, there is
+ * less contention for each one. Since each buffer is guarded by a lock (when
+ * the conurrencyLevel is GT zero), each TLB is still thread-safe without
+ * further synchronization. When this option is used, the choice of the buffer
+ * is made based on the hash code of the {@link Thread#getId() thread id}. While
+ * this option has significantly better throughput than any other
+ * {@link IGlobalLRU} implementation, its throughput is still quite a bit less
+ * than when using true thread local buffers (concurrencyLevel := 0).
+ * <h2>Notes</h2>
+ * <p>
+ * Note: {@link #deleteCache(UUID)} and {@link #discardAllCaches()} DO NOT
+ * guarantee consistency if there are concurrent operations against the cache.
+ * They have been written somewhat defensively as have {@link TLB#clear()} and
+ * {@link TLB#doEvict(int, Object[])} in order to handle concurrent invocations
+ * safely.
  * <p>
  * Note: This implementation was derived from
  * {@link HardReferenceGlobalLRURecyclerExplicitDeleteRequired}. However, this
@@ -116,33 +150,6 @@ import com.bigdata.rawstore.IRawStore;
  * a better guarantee of thread-safety.
  * 
  * @todo Support LIRS as well as LRU.
- * 
- * @todo A main issue with this approach is managing the pool of threads used to
- *       access the TLBs in a manner which does not leak TLBs. If we do a hand
- *       off of the request from the caller's thread to an inner thread pool
- *       then that hand off can become a bottleneck. We could use a striped
- *       lock, but that is the same issue all over again. Maybe fork/join has
- *       sufficient concurrency for handing off requests? Another approach is to
- *       make the inner CHM<hash(ThreadId),TLB> and to impose locking for the
- *       TLB. That will stripe access to the TLB instances. Or if we bound the
- *       #of threads in join processing, then we may not have a problem.
- *       <p>
- *       This could be handled by a striped lock granting access to a specific
- *       {@link TLB} instance out of a pool of {@link TLB}s (which would be a
- *       {@link ConcurrentHashMap}, naturally). The caller would acquire the
- *       {@link TLB} and release the {@link TLB} inside of get(), putIfAbsent(),
- *       and remove(). Since there are many such TLBs, there is less contention
- *       for each one. Since they are guarded by a lock, each TLB is still
- *       thread-safe without further synchronization.
- *       <p>
- *       There still needs to be a global read/write lock in order to execute
- *       operations against all the {@link TLB}s without deadlock (such as
- *       {@link #discardAllCaches()}). Without that global lock, any TLB which
- *       was already held could attempt to batch updates through to the shared
- *       access policy which could then seek to obtain the outer lock. If normal
- *       operations take the read() lock and global update operations take the
- *       write lock when we will avoid deadlocks based on such lock ordering
- *       problems.
  * 
  * @todo Support tx isolation. This will involve a per-tx cache I believe, so
  *       maybe the tx gets a {@link UUID}? We can then delete that cache if the
@@ -176,18 +183,14 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
     /**
      * The capacity of the thread-local buffers.
-     * 
-     * @todo config : threadLocalBufferCapacity
      */
-    private final int threadLocalBufferCapacity = 64;
+    private final int threadLocalBufferCapacity;
 
     /**
      * When our inner queue has this many entries we will invoke tryLock() and
      * batch the updates if we can barge in on the lock.
-     * 
-     * @todo config : threadLocalBufferTryLockSize
      */
-    private final int threadLocalBufferTryLockSize = threadLocalBufferCapacity >> 1;
+    private final int threadLocalBufferTryLockSize;
 
     /**
      * A double-linked node having a (key,value) pair with a (prior,next)
@@ -275,7 +278,9 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
     } // class DLN
 
     /**
-     * A thread-local buffer.
+     * A thread-local buffer (the buffer may be deployed in a true thread local
+     * manner or behind a striped lock, but we still call it a thread local
+     * buffer for historical reasons).
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
@@ -355,28 +360,32 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
             doEvict(size, a);
 
-            clearBuffer();
+//            clear();
+            size = 0;
             
         }
 
         /**
-         * Clears the references in the buffer, setting the size back to ZERO
-         * (0).
+         * Clears all references in the buffer and sets the size to ZERO (0).
          */
-        protected void clearBuffer() {
+        protected void clear() {
 
-            while (size > 0) {
+            for (int i = 0; i < capacity; i++) {
 
-                a[size--] = null;
-                
+                a[i] = null;
+
             }
+
+            size = 0;
 
         }
 
         /**
          * Dispatch the first <i>n</i> references from the array. The lock
          * specified to the constructor will be held by the caller across this
-         * call (you do not need to acquire it yourself).
+         * call (you do not need to acquire it yourself). The implementation
+         * MUST clear each non-<code>null</code> reference in <i>a</i> to
+         * <code>null</code> (this saves the caller effort and facilitates GC).
          * 
          * @param n
          *            The #of references in the buffer.
@@ -457,11 +466,28 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
              * Batch the touches through to the {@link AccessPolicy}.
              */
             @Override
-            protected void doEvict(int n, DLN<K, V>[] a) {
+            protected void doEvict(final int n, final DLN<K, V>[] a) {
 
                 for (int i = 0; i < n; i++) {
 
-                    BCHMGlobalLRU2.this.accessPolicy.relink(a[i]);
+                    final DLN<K, V> ref = a[i];
+
+                    if (ref == null) {
+                        
+                        /*
+                         * Note: A null reference can arise due to a concurrent
+                         * discardAllCaches() invocation since the clear() of
+                         * the TLB is not safely published.
+                         */
+                        
+                        continue;
+                        
+                    }
+
+                    BCHMGlobalLRU2.this.accessPolicy.relink(ref);
+                    
+                    // clear the reference.
+                    a[i] = null;
 
                 }
 
@@ -607,20 +633,27 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         }
 
     }
-    
+
     /**
      * Visits all {@link TLB}s.
      * <p>
-     * Note: You MUST hold a global lock in order to operate on the {@link TLB}s
-     * without using {@link #acquire()} and {@link #release(TLB)}.
-     * 
-     * @todo do explicit acquire/release for each one? In that case, use direct
-     *       access to the {@link #permits} and {@link #buffers}.
+     * Note: You MUST hold the shared {@link #lock} in order to operate on the
+     * {@link TLB}s.
      */
     private Iterator<TLB<DLN<K,V>>> bufferIterator() {
         
-        return Collections.unmodifiableList(Arrays.asList(buffers)).iterator();
-        
+        if (concurrencyLevel == 0) {
+
+            return Collections.unmodifiableCollection(
+                    threadLocalBuffers.values()).iterator();
+            
+        } else {
+            
+            return Collections.unmodifiableList(Arrays.asList(buffers))
+                    .iterator();
+            
+        }
+
     }
     
     /**
@@ -710,11 +743,20 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
      *            <em>per-thread</em> buffers will be used. When non-zero, this
      *            is the #of striped locks and lock will protect a {@link TLB}
      *            instance.
+     * @param threadLocalBufferCapacity
+     *            The capacity of the thread-local buffer used to amortize the
+     *            cost of updating the access policy. When a buffer instance is
+     *            1/2 full an attempt will be made using {@link Lock#tryLock()}
+     *            to update the access policy. If the lock could not obtained
+     *            using {@link Lock#tryLock()} then then {@link Lock#lock()}
+     *            will be used once the buffer is full. The buffer is cleared
+     *            each time the {@link DLN} references in the buffer are batched
+     *            through the {@link Lock}.
      */
     public BCHMGlobalLRU2(final long maximumBytesInMemory,
             final long minCleared, final int minimumCacheSetCapacity,
             final int initialCacheCapacity, final float loadFactor,
-            final int concurrencyLevel) {
+            final int concurrencyLevel, final int threadLocalBufferCapacity) {
 
         if (maximumBytesInMemory <= 0)
             throw new IllegalArgumentException();
@@ -742,6 +784,11 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
         this.accessPolicy = new LRUAccessPolicy<K, V>(lock, globalLRUCounters);
         
+        this.threadLocalBufferCapacity = threadLocalBufferCapacity;
+        
+        // Note: Set to 1/2 of the buffer capacity.
+        this.threadLocalBufferTryLockSize = threadLocalBufferCapacity >> 1;
+
         cacheSet = new ConcurrentHashMap<UUID, LRUCacheImpl<K, V>>(
                 minimumCacheSetCapacity);
         
@@ -805,8 +852,6 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
      * The concurrency level of the cache -or- ZERO (0) if <em>per-thread</em>
      * buffers will be used. When non-zero, this is the #of striped locks and
      * lock will protect a {@link TLB} instance.
-     * 
-     * @todo report as a one-shot counter.
      */
     public int getConcurrencyLevel() {
     
@@ -904,12 +949,20 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This implementation removes the {@link LRUCacheImpl} and then clears the
+     * entries for that cache instance. Any touches already buffered for the
+     * cache are batched through the lock by {@link LRUCacheImpl#clear()} before
+     * the cache is cleared to prevent lost updates.
+     */
     public void deleteCache(final UUID uuid) {
 
         if (uuid == null)
             throw new IllegalArgumentException();
 
-        // remove cache from the cacheSet.
+        // Remove cache from the cacheSet. 
         final LRUCacheImpl<K, V> cache = cacheSet.remove(uuid);
 
         if (cache != null) {
@@ -929,15 +982,44 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
     }
 
-    /*
-     * @todo We might need to use a read/write lock to clear the TLB instances
-     * atomically.
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This grabs the shared lock but that DOES NOT prevent concurrent
+     * operations from continuing to buffer touches. However, the API DOES NOT
+     * guarantee consistency if this method is invoked with concurrent
+     * operations. The method is only designed for shutdown of a database and
+     * should not be invoked until all operations against the database have been
+     * terminate.
      */
     public void discardAllCaches() {
 
         lock.lock();
         try {
 
+            /*
+             * Discard any buffered references.
+             * 
+             * @todo This is not really safe. The change in the TLB state will
+             * not be noticed until an attempt is made to batch the updates
+             * through the lock since that is the only time the TLB acquires the
+             * lock.
+             */
+            {
+
+                final Iterator<TLB<DLN<K, V>>> itr = bufferIterator();
+
+                while (itr.hasNext()) {
+
+                    final TLB<DLN<K, V>> t = itr.next();
+
+                    t.clear();
+
+                }
+
+            }
+
+            // Clear the cache for each IRawStore.
             {
 
                 final Iterator<LRUCacheImpl<K, V>> itr = cacheSet.values()
@@ -954,29 +1036,18 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
                     }
 
-                    cache.clear();
+                    // clear the cache's backing CHM.
+                    cache.map.clear();
 
                 }
-
-                // Verify the access policy state was reset.
-                accessPolicy.assertEmpty();
+                
+                // Discard the cache for all IRawStores.
+                cacheSet.clear();
 
             }
 
-            // Discard any buffered references.
-            {
-
-                final Iterator<TLB<DLN<K, V>>> itr = bufferIterator();
-
-                while (itr.hasNext()) {
-
-                    final TLB<DLN<K, V>> t = itr.next();
-
-                    t.clearBuffer();
-
-                }
-
-            }
+            // Clear the access policy.
+            accessPolicy.clear();
 
             // reset the global counters.
             globalLRUCounters.clear();
@@ -988,40 +1059,6 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         }
 
     }
-
-//    /**
-//     * Flush all buffered touches to the backing access policy.
-//     * <p>
-//     * Note: This method is NOT required during normal operations. It's sole
-//     * purpose is to bring counters associated with the access policy (rather
-//     * than the {@link ConcurrentHashMap}) up to date by evicting the buffered
-//     * references currently in the {@link TLB thread-local buffers} onto the
-//     * shared access policy.
-//     * 
-//     * @todo Unless we acquire()/release() the {@link TLB}s their internal state
-//     *       changes may not be visible to another thread.
-//     */
-//    public void flushBuffers() {
-//        
-//        lock.lock();
-//        try {
-//
-//            final Iterator<TLB<DLN<K, V>>> itr = threadLocalBuffers.values()
-//                    .iterator();
-//
-//            while (itr.hasNext()) {
-//
-//                final TLB<DLN<K, V>> t = itr.next();
-//
-//                t.evict();
-//
-//            }
-//
-//        } finally {
-//            lock.unlock();
-//        }
-//        
-//    }
     
     public CounterSet getCounterSet() {
 
@@ -1085,11 +1122,11 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
          */
         private final AtomicLong evictionByteCount = new AtomicLong();
 
-        private final IHardReferenceGlobalLRU<K,V> cache;
+        private final BCHMGlobalLRU2<K,V> globalLRU;
         
         public GlobalLRUCounters(final BCHMGlobalLRU2<K,V> cache) {
             
-            this.cache = cache;
+            this.globalLRU = cache;
             
         }
         
@@ -1108,6 +1145,9 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         public CounterSet getCounterSet() {
 
             final CounterSet counters = new CounterSet();
+
+            counters.addCounter(IGlobalLRU.IGlobalLRUCounters.CONCURRENCY_LEVEL,
+                    new OneShotInstrument<Integer>(globalLRU.concurrencyLevel));
 
             counters.addCounter(IGlobalLRU.IGlobalLRUCounters.BYTES_ON_DISK,
                     new Instrument<Long>() {
@@ -1130,7 +1170,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                     new Instrument<Double>() {
                         @Override
                         protected void sample() {
-                            setValue(((int) (10000 * cache.getBytesInMemory() / (double) cache
+                            setValue(((int) (10000 * globalLRU.getBytesInMemory() / (double) globalLRU
                                     .getMaximumBytesInMemory())) / 10000d);
                         }
                     });
@@ -1138,7 +1178,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
             counters
                     .addCounter(
                             IGlobalLRU.IGlobalLRUCounters.MAXIMUM_ALLOWED_BYTES_IN_MEMORY,
-                            new OneShotInstrument<Long>(cache
+                            new OneShotInstrument<Long>(globalLRU
                                     .getMaximumBytesInMemory()));
 
             counters.addCounter(
@@ -1146,7 +1186,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                     new Instrument<Integer>() {
                         @Override
                         protected void sample() {
-                            setValue(cache.getRecordCount());
+                            setValue(globalLRU.getRecordCount());
                         }
                     });
 
@@ -1176,7 +1216,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                             new Instrument<Integer>() {
                                 @Override
                                 protected void sample() {
-                                    final long tmp = cache.getRecordCount();
+                                    final long tmp = globalLRU.getRecordCount();
                                     if (tmp == 0) {
                                         setValue(0);
                                         return;
@@ -1190,7 +1230,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                     new Instrument<Integer>() {
                         @Override
                         protected void sample() {
-                            final long tmp = cache.getRecordCount();
+                            final long tmp = globalLRU.getRecordCount();
                             if (tmp == 0) {
                                 setValue(0);
                                 return;
@@ -1203,7 +1243,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                     new Instrument<Integer>() {
                         @Override
                         protected void sample() {
-                            setValue(cache.getCacheSetSize());
+                            setValue(globalLRU.getCacheSetSize());
                         }
                     });
 
@@ -1238,12 +1278,9 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
     interface AccessPolicy<K, V> {
 
         /**
-         * Check the internal state and verify that the access policy is empty.
-         * 
-         * @throws AssertionError
-         *             if the access policy is not empty.
+         * Reset the access policy (unlink everything).
          */
-        void assertEmpty();
+        void clear();
         
         /**
          * The approximate #of objects in the access policy.
@@ -1262,21 +1299,6 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
          */
         void relink(DLN<K,V> e);
         
-//        /**
-//         * Add an entry to the access policy.
-//         */
-//        void addEntry(final DLN<K, V> e);
-
-//        /**
-//         * Update the order of the entry in the access policy.
-//         */
-//        void touchEntry(final DLN<K, V> e);
-        
-//        /**
-//         * Remove the specified entry from the access policy.
-//         */
-//        void removeEntry(final DLN<K, V> e);
-
         /**
          * Evict an entry from the access policy.
          */
@@ -1285,7 +1307,8 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
     }
 
     /**
-     * LRU implementation.
+     * LRU implementation. The caller MUST be holding the shared lock when
+     * updating the access policy.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
@@ -1328,32 +1351,6 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
         private final GlobalLRUCounters<K, V> counters;
 
-        /**
-         * Return the #of objects in the LRU. This is non-blocking and relies on
-         * a volatile read for visibility.
-         */
-        public int size() {
-            
-            return size;
-            
-        }
-        
-        public void assertEmpty() {
-
-            /*
-             * The caller needs to be holding the lock for changes to first and
-             * last to be visible.
-             */
-            if (!lock.isHeldByCurrentThread())
-                throw new IllegalMonitorStateException();
-
-            assert size == 0 : "size=" + size + ", first=" + first + ", last="
-                    + last;
-            assert first == null;
-            assert last == null;
-
-        }
-        
         protected LRUAccessPolicy(final ReentrantLock lock,
                 final GlobalLRUCounters<K, V> counters) {
 
@@ -1363,6 +1360,58 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
         }
 
+        /**
+         * Return the #of objects in the LRU. This is non-blocking and relies on
+         * a volatile read for visibility.
+         */
+        public int size() {
+            
+            return size;
+            
+        }
+
+        /**
+         * Unlinks everything, updating the "bytesInMemory" and "bytesOnDisk"
+         * counters as it goes.
+         * 
+         * @throws IllegalMonitorStateException
+         *             unless the caller is holding the shared lock.
+         */
+        public void clear() {
+
+            if (!lock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
+
+            while (last != null) {
+                
+                last.delete = true;
+                
+                removeEntry(last);
+
+            }
+
+            /*
+             * Note: These asserts can be tripped if discardAllCaches() is
+             * invoked while there are concurrent operations against the store.
+             */
+            
+//            assert size == 0 && first == null && last == null : "size=" + size
+//                    + ", first=" + first + ",last=" + last;
+//
+//            assert counters.bytesInMemory.get() == 0 : "bytesInMemory="
+//                    + counters.bytesInMemory.get();
+//            
+//            assert counters.bytesOnDisk.get() == 0 : "bytesOnDisk="
+//                    + counters.bytesOnDisk.get();
+
+        }
+        
+        /**
+         * {@inheritDoc}
+         * 
+         * @throws IllegalMonitorStateException
+         *             unless the caller is holding the shared lock.
+         */
         public void relink(final DLN<K,V> e) {
 
             if (e.delete) {
@@ -1757,6 +1806,13 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
          * Discards each entry in this cache and resets the statistics for this
          * cache, but does not remove the {@link LRUCacheImpl} from the
          * {@link BCHMGlobalLRU2#cacheSet}.
+         * <p>
+         * Note: If there are updates already buffered for the specified cache,
+         * then the will be linked into the access policy when they get batched
+         * through the lock. {@link #putIfAbsent(Object, Object)} can see these
+         * {@link DLN}s as they are evicted from the cache and the {@link DLN}s
+         * will hold a hard reference to the {@link LRUCacheImpl} until they
+         * have been evicted.  This should not be a problem.
          */
         public void clear() {
 
@@ -1764,44 +1820,19 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
             try {
 
-                /*
-                 * While holding the [lock], batch through each of the TLBs so
-                 * we do not lose any updates.
-                 */
-                {
-                    
-                    final Iterator<TLB<DLN<K, V>>> itr = globalLRU
-                            .bufferIterator();
+                // Discard all entries in the selected cache.
+                final Iterator<DLN<K, V>> itr = map.values().iterator();
 
-                    while (itr.hasNext()) {
+                while (itr.hasNext()) {
 
-                        final TLB<DLN<K, V>> t = itr.next();
+                    final DLN<K, V> e = itr.next();
 
-                        t.evict();
+                    // remove entry from the map.
+                    itr.remove();
 
-                    }
-                    
-                }
-                
-                /*
-                 * Now discard all entries in the selected cache.
-                 */
-                {
-
-                    final Iterator<DLN<K, V>> itr = map.values().iterator();
-
-                    while (itr.hasNext()) {
-
-                        final DLN<K, V> e = itr.next();
-
-                        // remove entry from the map.
-                        itr.remove();
-
-                        // unlink entry from the LRU.
-                        e.delete = true;
-                        globalLRU.accessPolicy.relink(e);
-
-                    }
+                    // unlink entry from the LRU.
+                    e.delete = true;
+                    globalLRU.accessPolicy.relink(e);
 
                 }
 
