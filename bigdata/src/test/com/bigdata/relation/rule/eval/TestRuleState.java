@@ -61,14 +61,14 @@ public class TestRuleState extends TestCase2 {
 
     public void test_requiredVars() {
         
-        // select ?a where { ?a x ?b . ?b x ?c . ?c x ?d . }
+        // select ?a where { ?a x ?b . ?b x ?c . ?c x ?d . ?d x ?e . }
         
         final IConstant x = new Constant<Integer>(1);
         
         final IPredicate[] tails = new IPredicate[] {
                 new SPOPredicate("", Var.var("d"), x, Var.var("e")),
-                new SPOPredicate("", Var.var("b"), x, Var.var("c")),
                 new SPOPredicate("", Var.var("a"), x, Var.var("b")),
+                new SPOPredicate("", Var.var("b"), x, Var.var("c")),
                 new SPOPredicate("", Var.var("c"), x, Var.var("d")),
         };
         
@@ -80,7 +80,7 @@ public class TestRuleState extends TestCase2 {
             new Rule("", null, tails, QueryOptions.NONE, null, null, null, requiredVars);
         
         final int[] order = new int[] {
-                2,1,3,0
+                1,2,3,0
         };
         
         final RuleState2 ruleState = new RuleState2(rule, order);
