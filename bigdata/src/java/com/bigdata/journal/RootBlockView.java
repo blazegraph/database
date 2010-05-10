@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
+import java.sql.Date;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
@@ -884,9 +885,9 @@ public class RootBlockView implements IRootBlockView {
         sb.append(", challisField="+getChallisField());
         sb.append(", version="+getVersion());
         sb.append(", nextOffset="+getNextOffset());
-        sb.append(", localTime="+getLocalTime());
-        sb.append(", firstCommitTime="+getFirstCommitTime());
-        sb.append(", lastCommitTime="+getLastCommitTime());
+        sb.append(", localTime="+getLocalTime()+"["+new Date(getLocalTime())+"]");
+        sb.append(", firstCommitTime="+getFirstCommitTime()+"["+new Date(getFirstCommitTime())+"]");
+        sb.append(", lastCommitTime="+getLastCommitTime()+"["+new Date(getLastCommitTime())+"]");
         sb.append(", commitCounter="+getCommitCounter());
         sb.append(", commitRecordAddr="+am.toString(getCommitRecordAddr()));
         sb.append(", commitRecordIndexAddr="+am.toString(getCommitRecordIndexAddr()));
@@ -900,8 +901,8 @@ public class RootBlockView implements IRootBlockView {
         sb.append(", uuid="+getUUID());
         sb.append(", offsetBits="+getOffsetBits());
         sb.append(", checksum="+(checker==null?"N/A":""+calcChecksum(checker)));
-        sb.append(", createTime="+getCreateTime());
-        sb.append(", closeTime="+getCloseTime());
+        sb.append(", createTime="+getCreateTime()+"["+new Date(getCreateTime())+"]");
+        sb.append(", closeTime="+getCloseTime()+(getCloseTime()!=0L?"["+new Date(getCloseTime())+"]":""));
         
         sb.append("}");
         
