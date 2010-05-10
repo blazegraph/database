@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.ObjectOutputStream;
 
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -352,6 +353,24 @@ public class TestDriver {
 						if(queryResult!=null)
 							objectOutput.writeObject(queryResult);
 						queryMix.setCurrent(0, -1.0);
+/*
+                        { // hacked by mikep to get more info on problem queries
+                            final int queryNumber = next.getNr();
+                            final int runNumber = (nrRun + 1);
+                            if (queryNumber == 4 && (runNumber == 5 || runNumber == 13)) {
+                                String queryString = next.getQueryString();
+                                Iterator<String> results = queryResult.getResults();
+                                StringBuilder sb = new StringBuilder();
+                                sb.append("\nQuery 4, run ").append(runNumber);
+                                sb.append("\nquery:\n").append(queryString);
+                                sb.append("\nresults:");
+                                while (results.hasNext()) {
+                                    sb.append("\n").append(results.next());                                
+                                }
+                                System.out.println(sb.toString());
+                            }
+                        }
+*/                        
 					}
 					System.out.print(".");
 				}
