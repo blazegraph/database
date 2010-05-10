@@ -892,11 +892,8 @@ public class RootBlockView implements IRootBlockView {
         sb.append(", commitRecordAddr="+am.toString(getCommitRecordAddr()));
         sb.append(", commitRecordIndexAddr="+am.toString(getCommitRecordIndexAddr()));
         sb.append(", quorumToken="+getQuorumToken());
-        if (getVersion() >= VERSION1) {
-            // These fields are not defined before VERSION1.
-            sb.append(", metaBitsAddr=" + getMetaBitsAddr());
-            sb.append(", metaStartAddr=" + getMetaStartAddr());
-        }
+        sb.append(", metaBitsAddr=" + getMetaBitsAddr());
+        sb.append(", metaStartAddr=" + getMetaStartAddr());
         sb.append(", storeType="+getStoreType().getType());
         sb.append(", uuid="+getUUID());
         sb.append(", offsetBits="+getOffsetBits());
