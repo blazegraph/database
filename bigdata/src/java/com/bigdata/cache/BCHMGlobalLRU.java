@@ -40,6 +40,7 @@ import org.infinispan.util.concurrent.BufferedConcurrentHashMap.EvictionListener
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.LRUNexus.AccessPolicyEnum;
+import com.bigdata.LRUNexus.CacheSettings;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
@@ -182,6 +183,14 @@ public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
     /** The counters. */
     private final LRUCounters counters = new LRUCounters();
 
+    public BCHMGlobalLRU(final CacheSettings s) {
+
+        this(s.maximumBytesInMemory, s.minCacheSetSize,
+                s.limitingCacheCapacity, s.loadFactor, s.concurrencyLevel,
+                s.accessPolicy);
+
+    }
+    
     /**
      * 
      * @param maximumBytesInMemory
@@ -203,6 +212,7 @@ public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
             final int minimumCacheSetCapacity,//
             final int limitingCacheCapacity,//
             final float loadFactor,//
+            final int concurrencyLevel,
             final AccessPolicyEnum accessPolicy//
             ) {
 
@@ -214,9 +224,6 @@ public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
         cacheSet = new ConcurrentWeakValueCache<UUID, InnerCacheImpl>(
                 minimumCacheSetCapacity);
 
-        final int concurrencyLevel = 16; // @todo config
-        
-        // @todo impose a global memory capacity limit.
         final Eviction evictionMode;
         switch (accessPolicy) {
         case LRU:
@@ -239,6 +246,7 @@ public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
                 counters.bytesInMemory.addAndGet(key.bytesInMemory);
                 counters.bytesOnDisk.addAndGet(key.bytesOnDisk);
                 counters.evictionCount.incrementAndGet();
+                counters.evictionByteCount.addAndGet(key.bytesInMemory);
 
             }
 
@@ -264,9 +272,13 @@ public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
 
     public long getEvictionByteCount() {
 
-        // FIXME getEvictionByteCount
-        return 0L;
-//        return counters.evictionByteCount.get();
+        return counters.evictionByteCount.get();
+        
+    }
+    
+    public long getBytesOnDisk() {
+
+        return counters.bytesOnDisk.get();
         
     }
     
@@ -404,6 +416,11 @@ public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
          */
         private final AtomicLong evictionCount = new AtomicLong();
         
+        /**
+         * The #of bytes that have been evicted.
+         */
+        private final AtomicLong evictionByteCount = new AtomicLong();
+        
         public void clear() {
             
             bytesOnDisk.set(0L);
@@ -411,7 +428,9 @@ public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
             bytesInMemory.set(0L);
             
             evictionCount.set(0L);
-                
+            
+            evictionByteCount.set(0L);
+            
         }
         
         public CounterSet getCounterSet() {
@@ -459,11 +478,20 @@ public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
                     });
 
             counters.addCounter(
-                    IGlobalLRU.IGlobalLRUCounters.BUFFERED_RECORD_COUNT,
+                    IGlobalLRU.IGlobalLRUCounters.BUFFERED_RECORD_EVICTION_COUNT,
                     new Instrument<Long>() {
                         @Override
                         protected void sample() {
                             setValue(evictionCount.get());
+                        }
+                    });
+
+            counters.addCounter(
+                    IGlobalLRU.IGlobalLRUCounters.BUFFERED_RECORD_EVICTION_BYTE_COUNT,
+                    new Instrument<Long>() {
+                        @Override
+                        protected void sample() {
+                            setValue(evictionByteCount.get());
                         }
                     });
 

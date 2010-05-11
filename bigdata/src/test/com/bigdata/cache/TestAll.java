@@ -26,8 +26,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.cache;
 
+import java.io.File;
+
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+
+import com.bigdata.test.ExperimentDriver;
 
 /**
  * Aggregates unit tests into dependency order.
@@ -72,15 +76,20 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestStoreAndAddressLRUCache.class);
 
-        // high concurrency cache based on the infinispan project w/o support
-        // for memory cap.
-        suite.addTestSuite(TestBCHMGlobalLRU.class);
-
         suite.addTestSuite(TestHardReferenceGlobalLRU.class);
 
         suite.addTestSuite(TestHardReferenceGlobalLRURecycler.class);
 
         suite.addTestSuite(TestHardReferenceGlobalLRURecyclerExplicitDeleteRequired.class);
+
+        /*
+         * A high concurrency cache based on the infinispan project w/o support
+         * for memory cap. This implementation has the disadvantage that we can
+         * not directly manage the amount of memory which will be used by the
+         * cache.  It has pretty much been replaced by the BCHMGlobalLRU2, 
+         * which gets tested below.
+         */
+        suite.addTestSuite(TestBCHMGlobalLRU.class);
 
         /*
          * These are test suites for the same high concurrency cache with
@@ -90,10 +99,41 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestBCHMGlobalLRU2WithThreadLocalBuffers.class);
         suite.addTestSuite(TestBCHMGlobalLRU2WithStripedLocks.class);
 
-//        // Generic test of cache policy.
-//        retval.addTestSuite( TestCachePolicy.class );
+        /*
+         * Run the stress tests.
+         */
+        suite.addTestSuite(StressTests.class);
 
         return suite;
+    }
+
+    /**
+     * Glue class used to execute the stress tests.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class StressTests extends TestCase {
+
+        public StressTests() {
+
+        }
+
+        public StressTests(String name) {
+            super(name);
+        }
+
+        /**
+         * FIXME Modify the stress test configuration file to run each condition
+         * of interest. It is only setup for a few conditions right now.
+         */
+        public void test() throws Exception {
+            ExperimentDriver
+                    .doMain(
+                            new File(
+                                    "bigdata/src/test/com/bigdata/cache/StressTestGlobalLRU.xml"),
+                            1/* nruns */, true/* randomize */);
+        }
     }
 
 }
