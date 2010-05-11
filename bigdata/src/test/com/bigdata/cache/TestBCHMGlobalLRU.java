@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.cache;
 
-import java.util.concurrent.ExecutionException;
-
 import com.bigdata.LRUNexus.AccessPolicyEnum;
 import com.bigdata.rawstore.Bytes;
 
@@ -37,6 +35,8 @@ import com.bigdata.rawstore.Bytes;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo clone the test setup for LIRS.
  */
 public class TestBCHMGlobalLRU extends
         AbstractHardReferenceGlobalLRUTest {
@@ -65,26 +65,16 @@ public class TestBCHMGlobalLRU extends
         final int limitingCacheCapacity = 100000;
 
         final float loadFactor = .75f;
+        
+        final int concurrencyLevel = 16;
 
         lru = new BCHMGlobalLRU<Object>(maximumBytesInMemory,
                 minimumCacheSetCapacity, limitingCacheCapacity, loadFactor,
+                concurrencyLevel,
 //                AccessPolicyEnum.LRU
                 AccessPolicyEnum.LIRS
                 );
 
     }
 
-    /**
-     * This is a hook for running just this test under the profiler.
-     * 
-     * @throws ExecutionException
-     * @throws InterruptedException
-     */
-    public void test_concurrentOperations() throws InterruptedException,
-            ExecutionException {
-
-        super.test_concurrentOperations();
-
-    }
-    
 }

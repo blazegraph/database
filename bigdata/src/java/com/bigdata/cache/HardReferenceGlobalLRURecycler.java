@@ -37,6 +37,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.bigdata.BigdataStatics;
+import com.bigdata.LRUNexus.CacheSettings;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
@@ -128,6 +129,19 @@ public class HardReferenceGlobalLRURecycler<K, V> implements
      * and <code>null</code> iff the cache is empty.
      */
     private volatile Entry<K, V> last = null;
+
+    /**
+     * The designated constructor used by {@link CacheSettings}.
+     * 
+     * @param s
+     *            The {@link CacheSettings}.
+     */
+    public HardReferenceGlobalLRURecycler(final CacheSettings s) {
+
+        this(s.maximumBytesInMemory, s.minCleared, s.minCacheSetSize,
+                s.initialCacheCapacity, s.loadFactor);
+
+    }
 
     /**
      * 
@@ -226,6 +240,12 @@ public class HardReferenceGlobalLRURecycler<K, V> implements
     public long getEvictionByteCount() {
 
         return counters.evictionByteCount.get();
+        
+    }
+    
+    public long getBytesOnDisk() {
+
+        return counters.bytesOnDisk.get();
         
     }
     

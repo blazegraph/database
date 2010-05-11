@@ -33,11 +33,13 @@ import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.bigdata.BigdataStatics;
+import com.bigdata.LRUNexus.CacheSettings;
+import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
@@ -149,7 +151,7 @@ import com.bigdata.rawstore.IRawStore;
  * implementation DOES NOT permit recycling of the {@link DLN}s in order to have
  * a better guarantee of thread-safety.
  * 
- * @todo Support LIRS as well as LRU.
+ * FIXME Support LIRS as well as LRU.
  * 
  * @todo Support tx isolation. This will involve a per-tx cache I believe, so
  *       maybe the tx gets a {@link UUID}? We can then delete that cache if the
@@ -173,13 +175,17 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
      */
 
     /**
-     * The concurrency level of the cache -or- ZERO (0) if <em>per-thread</em>
-     * buffers will be used. When non-zero, this is the #of striped locks and
-     * lock will protect a {@link TLB} instance.
+     * The concurrency level of the cache.
+     */
+    private final int concurrencyLevel;
+
+    /**
+     * When <code>true</code> true thread-local buffers will be used. Otherwise,
+     * striped locks will be used and each lock will protect its own buffer.
      * 
      * @see #add(DLN)
      */
-    private final int concurrencyLevel;
+    private final boolean threadLocalBuffers;
 
     /**
      * The capacity of the thread-local buffers.
@@ -315,6 +321,9 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         /**
          * The local buffer, which is lazily initialized so we can have it
          * strongly typed.
+         * 
+         * @todo a[] and size as volatile since they get accessed by clear() w/o
+         *       synchronization?
          */
         private T[] a;
         
@@ -370,10 +379,16 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
          */
         protected void clear() {
 
-            for (int i = 0; i < capacity; i++) {
+            if (a != null) {
 
-                a[i] = null;
+                // Note: the array is initialized lazily so it can be null.
+                
+                for (int i = 0; i < capacity; i++) {
 
+                    a[i] = null;
+
+                }
+                
             }
 
             size = 0;
@@ -413,7 +428,13 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                         capacity);
 
             }
-            
+
+            /*
+             * Add to array first, then check see if the array is at 1/2
+             * (tryLock()) or full capacity (lock()).
+             */
+            a[size++] = ref;
+
             if (tryLockSize != 0 && size == tryLockSize) {
 
                 if (lock.tryLock()) {
@@ -434,7 +455,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
             }
 
-            if (size + 1 == capacity) {
+            if (size == capacity) {
 
                 lock.lock();
 
@@ -449,8 +470,6 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                 }
 
             }
-
-            a[size++] = ref;
 
         }
         
@@ -513,11 +532,11 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
         final Thread t = Thread.currentThread();
 
-        TLB<DLN<K, V>> tmp = threadLocalBuffers.get(t);// id);
+        TLB<DLN<K, V>> tmp = threadLocalBufferMap.get(t);// id);
 
         if (tmp == null) {
 
-            if (threadLocalBuffers.put(t, tmp = newTLB(0/* idIsIgnored */,
+            if (threadLocalBufferMap.put(t, tmp = newTLB(0/* idIsIgnored */,
                     threadLocalBufferCapacity, threadLocalBufferTryLockSize,
                     lock)) != null) {
 
@@ -593,13 +612,18 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
      * references of the entry are <code>null</code> then it is inserted into
      * the access policy. Otherwise it is relinked within the access policy
      * according to the semantics of the {@link AccessPolicy} (LRU, LIRS, etc).
+     * <p>
+     * This method localizes most of the logic for handling true thread local
+     * buffers versus striped locks protecting a fixed array of buffers.
      * 
      * @param entry
      *            An entry in the access policy.
+     * 
+     * @see #isTrueThreadLocalBuffer()
      */
     private void add(final DLN<K, V> entry) {
 
-        if (concurrencyLevel == 0) {
+        if (threadLocalBuffers) {
 
             /*
              * Per-thread buffers.
@@ -640,18 +664,18 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
      * Note: You MUST hold the shared {@link #lock} in order to operate on the
      * {@link TLB}s.
      */
-    private Iterator<TLB<DLN<K,V>>> bufferIterator() {
-        
-        if (concurrencyLevel == 0) {
+    private Iterator<TLB<DLN<K, V>>> bufferIterator() {
+
+        if (threadLocalBuffers) {
 
             return Collections.unmodifiableCollection(
-                    threadLocalBuffers.values()).iterator();
-            
+                    threadLocalBufferMap.values()).iterator();
+
         } else {
-            
+
             return Collections.unmodifiableList(Arrays.asList(buffers))
                     .iterator();
-            
+
         }
 
     }
@@ -716,7 +740,22 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
      * The per-thread {@link TLB}s and <code>null</code> if striped locks are
      * being used.
      */
-    private final ConcurrentHashMap<Thread/* Thread */, TLB<DLN<K, V>>> threadLocalBuffers;
+    private final ConcurrentHashMap<Thread/* Thread */, TLB<DLN<K, V>>> threadLocalBufferMap;
+
+    /**
+     * The designated constructor used by {@link CacheSettings}.
+     * 
+     * @param s
+     *            The {@link CacheSettings}.
+     */
+    public BCHMGlobalLRU2(final CacheSettings s) {
+
+        this(s.maximumBytesInMemory, s.minCleared, s.minCacheSetSize,
+                s.initialCacheCapacity, s.loadFactor, s.concurrencyLevel,
+                s.threadLocalBuffers,
+                s.threadLocalBufferCapacity);
+    
+    }
 
     /**
      * 
@@ -739,10 +778,11 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
      * @param loadFactor
      *            The load factor for the cache instances.
      * @param concurrencyLevel
-     *            The concurrency level of the cache -or- ZERO (0) if
-     *            <em>per-thread</em> buffers will be used. When non-zero, this
-     *            is the #of striped locks and lock will protect a {@link TLB}
-     *            instance.
+     *            The concurrency level of the cache.
+     * @param threadLocalBuffers
+     *            When <code>true</code> true thread-local buffers will be used.
+     *            Otherwise, striped locks will be used and each lock will
+     *            protect its own buffer.
      * @param threadLocalBufferCapacity
      *            The capacity of the thread-local buffer used to amortize the
      *            cost of updating the access policy. When a buffer instance is
@@ -756,7 +796,8 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
     public BCHMGlobalLRU2(final long maximumBytesInMemory,
             final long minCleared, final int minimumCacheSetCapacity,
             final int initialCacheCapacity, final float loadFactor,
-            final int concurrencyLevel, final int threadLocalBufferCapacity) {
+            final int concurrencyLevel, final boolean threadLocalBuffers,
+            final int threadLocalBufferCapacity) {
 
         if (maximumBytesInMemory <= 0)
             throw new IllegalArgumentException();
@@ -767,7 +808,10 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         if (minCleared > maximumBytesInMemory)
             throw new IllegalArgumentException();
 
-        if (concurrencyLevel < 0)
+        if (concurrencyLevel < 1)
+            throw new IllegalArgumentException();
+
+        if (threadLocalBufferCapacity <= 0)
             throw new IllegalArgumentException();
 
         this.maximumBytesInMemory = maximumBytesInMemory;
@@ -779,6 +823,8 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         this.loadFactor = loadFactor;
 
         this.concurrencyLevel = concurrencyLevel;
+
+        this.threadLocalBuffers = threadLocalBuffers;
         
         this.globalLRUCounters = new GlobalLRUCounters<K, V>(this);
 
@@ -790,22 +836,22 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         this.threadLocalBufferTryLockSize = threadLocalBufferCapacity >> 1;
 
         cacheSet = new ConcurrentHashMap<UUID, LRUCacheImpl<K, V>>(
-                minimumCacheSetCapacity);
-        
-        if (concurrencyLevel == 0) {
+                minimumCacheSetCapacity, loadFactor, concurrencyLevel);
+
+        if (threadLocalBuffers) {
             /*
              * Per-thread buffers.
              */
             permits = null;
             buffers = null;
-            threadLocalBuffers = new ConcurrentHashMap<Thread, TLB<DLN<K, V>>>();
+            threadLocalBufferMap = new ConcurrentHashMap<Thread, TLB<DLN<K, V>>>();
         } else {
             /*
              * Striped locks.
              */
             permits = new Semaphore[concurrencyLevel];
             buffers = new TLB[concurrencyLevel];
-            threadLocalBuffers = null;
+            threadLocalBufferMap = null;
             for (int i = 0; i < concurrencyLevel; i++) {
                 permits[i] = new Semaphore(1, false/* fair */);
                 buffers[i] = newTLB(i/* id */, threadLocalBufferCapacity,
@@ -825,7 +871,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         if (cache == null) {
 
             cache = new LRUCacheImpl<K, V>(uuid, am, this,
-                    initialCacheCapacity, loadFactor);
+                    initialCacheCapacity, loadFactor, concurrencyLevel);
 
             final LRUCacheImpl<K, V> oldVal = cacheSet.putIfAbsent(uuid, cache);
 
@@ -849,13 +895,21 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
     }
 
     /**
-     * The concurrency level of the cache -or- ZERO (0) if <em>per-thread</em>
-     * buffers will be used. When non-zero, this is the #of striped locks and
-     * lock will protect a {@link TLB} instance.
+     * The concurrency level of the cache.
      */
     public int getConcurrencyLevel() {
     
         return concurrencyLevel;
+        
+    }
+    
+    /**
+     * When <code>true</code> true thread-local buffers will be used. Otherwise,
+     * striped locks will be used and each lock will protect its own buffer.
+     */
+    public boolean isTrueThreadLocalBuffer() {
+        
+        return threadLocalBuffers;
         
     }
     
@@ -867,19 +921,25 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
     public long getEvictionCount() {
 
-        return globalLRUCounters.evictionCount.get();
+        return globalLRUCounters.evictionCount;
 
     }
 
     public long getEvictionByteCount() {
 
-        return globalLRUCounters.evictionByteCount.get();
+        return globalLRUCounters.evictionByteCount;
 
     }
 
     public long getBytesInMemory() {
 
-        return globalLRUCounters.bytesInMemory.get();
+        return globalLRUCounters.bytesInMemory;
+
+    }
+
+    public long getBytesOnDisk() {
+
+        return globalLRUCounters.bytesInMemory;
 
     }
 
@@ -917,7 +977,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
      */
     protected void purgeEntriesIfOverCapacity() {
 
-        if (globalLRUCounters.bytesInMemory.get() < maximumBytesInMemory) {
+        if (globalLRUCounters.bytesInMemory < maximumBytesInMemory) {
 
             return;
 
@@ -935,7 +995,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
             assert threshold >= 0;
 
-            while (globalLRUCounters.bytesInMemory.get() >= threshold) {
+            while (globalLRUCounters.bytesInMemory >= threshold) {
 
                 accessPolicy.evictEntry();
 
@@ -1000,10 +1060,13 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
             /*
              * Discard any buffered references.
              * 
-             * @todo This is not really safe. The change in the TLB state will
+             * Note: This is not really safe. The change in the TLB state will
              * not be noticed until an attempt is made to batch the updates
              * through the lock since that is the only time the TLB acquires the
-             * lock.
+             * lock. This can result in [TLB.size] not being consistent. For
+             * that reason, TLB.doEvict(size,a[]) is instructed to ignore null
+             * references and TLB.clear() explicitly nulls all entries in the
+             * array and zeros the size.
              */
             {
 
@@ -1101,26 +1164,42 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         /**
          * {@link #bytesOnDisk} is the sum of the compressed storage on the disk
          * for the buffered data records.
+         * <p>
+         * Note: This counter is updated when holding the shared lock and in
+         * {@link #clear()} (no locks explicitly held, but the caller should
+         * ensure that no threads are carrying out concurrent operations).
          */
-        private final AtomicLong bytesOnDisk = new AtomicLong();
+        private volatile long bytesOnDisk = 0L;
 
         /**
          * {@link #bytesInMemory} is the sum of the decompressed byte[] lengths.
          * In fact, the memory footprint is always larger than bytesInMemory.
          * The ratio of bytesOnDisk to bytesInMemory reflects the degree of
          * "active" compression.
+         * <p>
+         * Note: This counter is updated when holding the shared lock and in
+         * {@link #clear()} (no locks explicitly held, but the caller should
+         * ensure that no threads are carrying out concurrent operations).
          */
-        private final AtomicLong bytesInMemory = new AtomicLong();
+        private volatile long bytesInMemory = 0L;
 
         /**
          * The #of cache entries that have been evicted.
+         * <p>
+         * Note: This counter is updated when holding the shared lock and in
+         * {@link #clear()} (no locks explicitly held, but the caller should
+         * ensure that no threads are carrying out concurrent operations).
          */
-        private final AtomicLong evictionCount = new AtomicLong();
+        private volatile long evictionCount = 0L;
 
         /**
          * The #of bytes for cache entries that have been evicted.
+         * <p>
+         * Note: This counter is updated when holding the shared lock and in
+         * {@link #clear()} (no locks explicitly held, but the caller should
+         * ensure that no threads are carrying out concurrent operations).
          */
-        private final AtomicLong evictionByteCount = new AtomicLong();
+        private volatile long evictionByteCount = 0L;
 
         private final BCHMGlobalLRU2<K,V> globalLRU;
         
@@ -1132,13 +1211,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         
         public void clear() {
 
-            bytesOnDisk.set(0L);
-
-            bytesInMemory.set(0L);
-
-            evictionCount.set(0L);
-
-            evictionByteCount.set(0L);
+            bytesOnDisk = bytesInMemory = evictionCount = evictionByteCount = 0L;
 
         }
 
@@ -1146,14 +1219,16 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
             final CounterSet counters = new CounterSet();
 
-            counters.addCounter(IGlobalLRU.IGlobalLRUCounters.CONCURRENCY_LEVEL,
-                    new OneShotInstrument<Integer>(globalLRU.concurrencyLevel));
+            counters.addCounter(
+                    IGlobalLRU.IGlobalLRUCounters.CONCURRENCY_LEVEL,
+                    new OneShotInstrument<Integer>(globalLRU
+                            .getConcurrencyLevel()));
 
             counters.addCounter(IGlobalLRU.IGlobalLRUCounters.BYTES_ON_DISK,
                     new Instrument<Long>() {
                         @Override
                         protected void sample() {
-                            setValue(bytesOnDisk.get());
+                            setValue(globalLRU.getBytesOnDisk());
                         }
                     });
 
@@ -1161,7 +1236,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                     new Instrument<Long>() {
                         @Override
                         protected void sample() {
-                            setValue(bytesInMemory.get());
+                            setValue(globalLRU.getBytesInMemory());
                         }
                     });
 
@@ -1196,7 +1271,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                             new Instrument<Long>() {
                                 @Override
                                 protected void sample() {
-                                    setValue(evictionCount.get());
+                                    setValue(globalLRU.getEvictionCount());
                                 }
                             });
 
@@ -1206,7 +1281,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                             new Instrument<Long>() {
                                 @Override
                                 protected void sample() {
-                                    setValue(evictionByteCount.get());
+                                    setValue(globalLRU.getEvictionByteCount());
                                 }
                             });
 
@@ -1221,7 +1296,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                                         setValue(0);
                                         return;
                                     }
-                                    setValue((int) (bytesInMemory.get() / tmp));
+                                    setValue((int) (globalLRU.getBytesInMemory() / tmp));
                                 }
                             });
 
@@ -1235,7 +1310,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                                 setValue(0);
                                 return;
                             }
-                            setValue((int) (bytesOnDisk.get() / tmp));
+                            setValue((int) (globalLRU.getBytesOnDisk() / tmp));
                         }
                     });
 
@@ -1319,10 +1394,15 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
      *            The value type.
      */
     private static class LRUAccessPolicy<K,V> implements AccessPolicy<K, V> {
-        
+
         /**
          * The current LRU linked list size (the entry count) across all cache
          * instances.
+         * <p>
+         * Note: This is <code>volatile</code> since it can be read by
+         * {@link #size()} without holding the shared {@link #lock}. However,
+         * threads performing updates to this field (and all other fields on
+         * this class) MUST hold the {@link #lock}.
          */
         private volatile int size = 0;
 
@@ -1452,8 +1532,8 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                 last = e;
             }
             size++;
-            counters.bytesInMemory.addAndGet(e.bytesInMemory);
-            counters.bytesOnDisk.addAndGet(e.bytesOnDisk);
+            counters.bytesInMemory += e.bytesInMemory;
+            counters.bytesOnDisk += e.bytesOnDisk;
         }
 
         /**
@@ -1489,8 +1569,8 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
             // e.k = null; // clear the key.
             // e.v = null; // clear the value reference.
             size--;
-            counters.bytesInMemory.addAndGet(-e.bytesInMemory);
-            counters.bytesOnDisk.addAndGet(-e.bytesOnDisk);
+            counters.bytesInMemory -= e.bytesInMemory;
+            counters.bytesOnDisk -= e.bytesOnDisk;
             // e.bytesInMemory = e.bytesOnDisk = 0;
 //            return clearedValue;
         }
@@ -1568,9 +1648,9 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
             // remove entry under that key from hash map for that store.
             evictedFromCache.remove(evictedKey);// entry.k);
 
-            counters.evictionCount.incrementAndGet();
+            counters.evictionCount++;
 
-            counters.evictionByteCount.addAndGet(bytesOnDisk);
+            counters.evictionByteCount += bytesOnDisk;
             
             return entry;
 
@@ -1604,40 +1684,37 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
          *         Thompson</a>
          * @version $Id: BCHMGlobalLRU2.java 2547 2010-03-24 20:44:07Z
          *          thompsonbry $
-         * 
-         *          FIXME Review visibility concerns for these counters.
-         *          <p>
-         *          Do these counters need to be volatile or {@link AtomicLong}s
-         *          in order to be consistent? They are updated inside of a
-         *          {@link Lock}, but that does not help with their visibility,
-         *          does it?
          */
         private class LRUCacheCounters {
 
             /**
              * The largest #of entries in the cache to date.
+             * <p>
+             * Note: Always read but relatively rarely updated so using a CAS
+             * operation rather than a {@link CAT}.
              */
-            private int highTide = 0;
+            private final AtomicInteger highTide = new AtomicInteger();
 
             /** The #of inserts into the cache. */
-            private long ninserts = 0;
+            private final CAT ninserts = new CAT();
 
             /** The #of cache tests (get())). */
-            private long ntests = 0;
+            private final CAT ntests = new CAT();
 
             /**
              * The #of cache hits (get() returns non-<code>null</code>).
              */
-            private long nsuccess = 0;
+            private final CAT nsuccess = new CAT();
 
             /**
              * Reset the counters.
              */
             public void clear() {
 
-                highTide = 0;
-
-                ninserts = ntests = nsuccess = 0;
+                highTide.set(0);
+                ninserts.set(0);
+                ntests.set(0);
+                nsuccess.set(0);
 
             }
 
@@ -1652,7 +1729,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                 c.addCounter("highTide", new Instrument<Integer>() {
                     @Override
                     protected void sample() {
-                        setValue(highTide);
+                        setValue(highTide.get());
                     }
                 });
 
@@ -1668,7 +1745,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                 c.addCounter("ninserts", new Instrument<Long>() {
                     @Override
                     protected void sample() {
-                        setValue(ninserts);
+                        setValue(ninserts.get());
                     }
                 });
 
@@ -1676,7 +1753,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                 c.addCounter("ntests", new Instrument<Long>() {
                     @Override
                     protected void sample() {
-                        setValue(ntests);
+                        setValue(ntests.get());
                     }
                 });
 
@@ -1684,7 +1761,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                 c.addCounter("nsuccess", new Instrument<Long>() {
                     @Override
                     protected void sample() {
-                        setValue(nsuccess);
+                        setValue(nsuccess.get());
                     }
                 });
 
@@ -1692,8 +1769,8 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                 c.addCounter("hitRatio", new Instrument<Double>() {
                     @Override
                     protected void sample() {
-                        final long tmp = ntests;
-                        setValue(tmp == 0 ? 0 : (double) nsuccess / tmp);
+                        final long tmp = ntests.get();
+                        setValue(tmp == 0 ? 0 : (double) nsuccess.get() / tmp);
                     }
                 });
 
@@ -1759,10 +1836,12 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
          *            The capacity of the cache (must be positive).
          * @param loadFactor
          *            The load factor for the internal hash table.
+         * @param concurrencyLevel
+         *            The concurrency level for the internal hash table.
          */
         public LRUCacheImpl(final UUID storeUUID, final IAddressManager am,
                 final BCHMGlobalLRU2<K, V> lru, final int initialCapacity,
-                final float loadFactor) {
+                final float loadFactor, final int concurrencyLevel) {
 
             if (storeUUID == null)
                 throw new IllegalArgumentException();
@@ -1786,7 +1865,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
             this.globalLRU = lru;
 
             this.map = new ConcurrentHashMap<K, DLN<K, V>>(initialCapacity,
-                    loadFactor);
+                    loadFactor, concurrencyLevel);
 
         }
 
@@ -1910,13 +1989,21 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
             final int count = map.size();
 
-            if (count > cacheCounters.highTide) {
-
-                cacheCounters.highTide = count;
+            if (count > cacheCounters.highTide.get() + 50) {
+                /*
+                 * Note: The conditional update will be approximately consistent
+                 * since this operation is not atomic.
+                 * 
+                 * Note: The counter is only updated when the delta is at least
+                 * M in order to minimize write contention for the highTide.
+                 * 
+                 * @todo could loop until new value is GT Max(count,oldValue).
+                 */
+                cacheCounters.highTide.set(count);
 
             }
 
-            cacheCounters.ninserts++;
+            cacheCounters.ninserts.increment(); // CAT counter
 
             // return [null] since there was no entry under the key.
             return null;
@@ -1941,7 +2028,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
             final DLN<K, V> entry = map.get(key);
 
-            cacheCounters.ntests++;
+            cacheCounters.ntests.increment(); // CAT counter
 
             if (entry == null) {
 
@@ -1952,7 +2039,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
             // buffer access policy update.
             globalLRU.add(entry);
 
-            cacheCounters.nsuccess++;
+            cacheCounters.nsuccess.increment(); // CAT counter.
 
             return entry.v;
 

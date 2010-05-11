@@ -34,6 +34,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.BigdataStatics;
+import com.bigdata.LRUNexus.CacheSettings;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
@@ -105,6 +106,21 @@ public class WeakReferenceGlobalLRU implements IGlobalLRU<Long,Object> {
      */
     private final ConcurrentWeakValueCache<UUID, CacheImpl<Object>> cacheSet;
 
+
+    /**
+     * The designated constructor used by {@link CacheSettings}.
+     * 
+     * @param s
+     *            The {@link CacheSettings}.
+     */
+    public WeakReferenceGlobalLRU(final CacheSettings s) {
+
+        this(s.maximumBytesInMemory, s.minCacheSetSize, s.queueCapacity,
+                s.nscan, s.initialCacheCapacity, s.loadFactor,
+                s.concurrencyLevel);
+
+    }
+    
     /**
      * Constructor with caller specified parameters.
      * 

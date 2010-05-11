@@ -37,6 +37,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.bigdata.BigdataStatics;
+import com.bigdata.LRUNexus.CacheSettings;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
@@ -127,6 +128,19 @@ public class HardReferenceGlobalLRU<K, V> implements
     private volatile Entry<K, V> last = null;
 
     /**
+     * The designated constructor used by {@link CacheSettings}.
+     * 
+     * @param s
+     *            The {@link CacheSettings}.
+     */
+    public HardReferenceGlobalLRU(final CacheSettings s) {
+
+        this(s.maximumBytesInMemory, s.minCacheSetSize, s.initialCacheCapacity,
+                s.loadFactor);
+        
+    }
+
+    /**
      * 
      * @param maximumBytesInMemory
      *            The maximum bytes in memory for the cached records across all
@@ -205,6 +219,12 @@ public class HardReferenceGlobalLRU<K, V> implements
     public long getEvictionCount() {
 
         return counters.evictionCount.get();
+        
+    }
+    
+    public long getBytesOnDisk() {
+
+        return counters.bytesOnDisk.get();
         
     }
     
