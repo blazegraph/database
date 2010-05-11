@@ -18,7 +18,6 @@
 	<classpathentry kind="lib" path="bigdata-jini/lib/apache/zookeeper-3.2.1.jar"/>
 	<classpathentry kind="lib" path="bigdata-sails/lib/commons-httpclient.jar"/>
 	<classpathentry kind="lib" path="bigdata-sails/lib/servlet-api.jar"/>
-	<classpathentry kind="lib" path="bigdata/lib/high-scale-lib.jar"/>
 	<classpathentry kind="src" path="lgpl-utils/src/java"/>
 	<classpathentry kind="src" path="lgpl-utils/src/test"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-3_6.jar"/>
@@ -61,5 +60,6 @@
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-store-testsuite-2.3.0.jar"/>
 	<classpathentry kind="lib" path="bigdata/lib/dsi-utils-1.0-b5-dev-200410.jar"/>
 	<classpathentry kind="lib" path="bigdata/lib/lgpl-utils-1.0-b5-dev-200410.jar"/>
+	<classpathentry kind="lib" path="bigdata/lib/high-scale-lib-v1.1.2.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
