@@ -1644,6 +1644,10 @@ ${postInstallMessage}</echo>
 
       <antcall target="stopLookup" />
       <antcall target="stopHttpd" />
+    	
+      <!-- This message is noticed by the hudson build and is used to trigger
+           after various after actions. -->
+      <echo>JUNIT RUN COMPLETE</echo>
     </target>
 
     <target name="startHttpd">
