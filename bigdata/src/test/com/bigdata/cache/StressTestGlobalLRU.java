@@ -440,10 +440,25 @@ public class StressTestGlobalLRU extends TestCase implements IComparisonTest {
                             throw new AssertionError();
                         }
 
-                        // Note: enable iff debugging.
-                        if (false && c.n % 1000000 == 0) {
-                            System.err
-                                    .println(Thread.currentThread() + ":" + c);
+                        if (c.n % 1000000 == 0) {
+
+                            if (Thread.currentThread().isInterrupted()) {
+
+                                /*
+                                 * Notice interrupts in case we are using a
+                                 * cache implementation which does not notice
+                                 * interrupts.
+                                 */
+                                throw new InterruptedException();
+                                
+                            }
+                            
+                            // Note: enable iff debugging.
+                            if (false) {
+                                System.err.println(Thread.currentThread() + ":"
+                                        + c);
+                            }
+                            
                         }
 
                     } // while(...)
@@ -462,7 +477,8 @@ public class StressTestGlobalLRU extends TestCase implements IComparisonTest {
         }
         
         final ExecutorService service = Executors
-                .newCachedThreadPool(DaemonThreadFactory.defaultThreadFactory());
+                .newCachedThreadPool(new DaemonThreadFactory(
+                        StressTestGlobalLRU.class.getName()));
 
         final List<Future<OpCounters>> futures;
         
@@ -476,6 +492,8 @@ public class StressTestGlobalLRU extends TestCase implements IComparisonTest {
         } finally {
 
             service.shutdownNow();
+            
+            service.awaitTermination(1L, TimeUnit.SECONDS);
 
         }
 
