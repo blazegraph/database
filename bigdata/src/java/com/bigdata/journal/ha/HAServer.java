@@ -36,6 +36,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
@@ -78,6 +79,8 @@ public class HAServer extends Thread {
 	private boolean messageDrive;
 
 	private ObjectInputStream m_instr;
+
+	final private ReentrantLock inputStreamReady = new ReentrantLock();
 
 	/**
 	 * @param addr
@@ -154,7 +157,12 @@ public class HAServer extends Thread {
             // Now process messages
             // Retrieving the input stream may be a problem for non message driven protocols since
             // it may not return until data is sent to the stream.
-            m_instr = str.getInputStream();
+            inputStreamReady.lock();
+            try {
+            	m_instr = str.getInputStream();
+            } finally {
+            	inputStreamReady.unlock();
+            }
             log.info("Set input stream to " + m_instr);
             if (messageDrive) {
 	            while (true) {
@@ -187,15 +195,22 @@ public class HAServer extends Thread {
     }
     
     public SocketMessage readMessage() throws IOException, ClassNotFoundException {
+        inputStreamReady.lock();
+        try {
     	if (m_instr == null) {
     		log.warn("read message request on null stream for " + this);
     		throw new IllegalStateException("readMessage request on null stream");
     	}
     	
         final SocketMessage msg = (SocketMessage) m_instr.readObject();
-        msg.setHAServer(this);
+    	if (log.isTraceEnabled())
+    		log.trace("processing message");
+    	msg.setHAServer(this);
         
         return msg;
+        } finally {
+        	inputStreamReady.unlock();
+        }
    }
 
 	/**
