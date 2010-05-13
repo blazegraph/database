@@ -47,6 +47,7 @@ import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.WriteCache;
 import com.bigdata.io.WriteCacheService;
+import com.bigdata.journal.ha.IHAClient;
 import com.bigdata.journal.ha.Quorum;
 import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rawstore.IRawStore;
@@ -171,8 +172,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
     private final long minimumExtension;
 
-    private final QuorumManager quorumManager;
-    
+	private Environment environment;
+
     /**
      * This lock is used to exclude readers when the extent of the backing file
      * is about to be changed. This is a workaround for an old (an unresolved as
@@ -806,7 +807,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * @param fileMetadata
      */
     WORMStrategy(final long maximumExtent, final long minimumExtension,
-            final FileMetadata fileMetadata, final QuorumManager quorumManager) {
+            final FileMetadata fileMetadata, final Environment environment) {
 
         super(fileMetadata.extent, maximumExtent, fileMetadata.offsetBits,
                 fileMetadata.nextOffset, fileMetadata.bufferMode,
@@ -837,15 +838,15 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         this.minimumExtension = minimumExtension;
 
-        this.quorumManager = quorumManager;
+        this.environment = environment;
 
         this.useChecksums = fileMetadata.useChecksums;
         
         // initialize striped performance counters for this store.
         this.storeCounters.set(new StoreCounters(10/* batchSize */));
         
-        if (quorumManager != null) {
-        	quorumManager.setLocalBufferStrategy(this);
+        if (environment != null) {
+        	environment.setLocalBufferStrategy(this);
         }
         
         /*
@@ -868,7 +869,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         
             final boolean useWriteCacheService = fileMetadata.writeCacheEnabled
                     && !fileMetadata.readOnly && fileMetadata.closeTime == 0L
-                    || (quorumManager.replicationFactor() > 1);
+                    || (environment.isHighlyAvailable());
         
         if (useWriteCacheService) {
             /*
@@ -877,7 +878,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             try {
                 this.writeCacheService = new WriteCacheService(
                         fileMetadata.writeCacheBufferCount, useChecksums,
-                        extent, opener, quorumManager) {
+                        extent, opener, environment) {
                     @Override
                     protected WriteCache newWriteCache(final ByteBuffer buf,
                             final boolean useChecksum,
@@ -920,7 +921,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 final IReopenChannel<FileChannel> opener)
                 throws InterruptedException {
 
-            super(baseOffset, buf, useChecksum, quorumManager
+            super(baseOffset, buf, useChecksum, environment
                     .isHighlyAvailable(), opener);
 
         }
@@ -1185,8 +1186,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             } finally {
                 c.release();
             }
-            if (quorumManager.isHighlyAvailable()) {
-                final Quorum q = quorumManager.getQuorum();
+            if (environment.isHighlyAvailable()) {
+                final Quorum q = environment.getQuorumManager().getQuorum();
                 if (q.isQuorumMet()) {
                     try {
                         // Read on another node in the quorum.
@@ -2207,6 +2208,22 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 		} else {
 			log.warn("unexpected nextOffset value: " + lastOffset + " <= " + nextOffset.get());
 		}
+	}
+
+	/**
+	 * Initially the HAClient was conceived as a link into a Socket message stream piping WriteCache
+	 * modifications between Quorum members.
+	 */
+	public IHAClient getHAClient() {
+		return writeCacheService.getHAClient();
+	}
+
+	/**
+	 * The BufferStrategy implmentation to provide a hook into the WriteCacheService supports the combined
+	 * HAGlue/HAClient integration object.
+	 */
+	public WriteCacheService getWriteCacheService() {
+		return writeCacheService;
 	}
     
 }

@@ -43,6 +43,7 @@ import java.util.TreeSet;
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.IReopenChannel;
+import com.bigdata.journal.Environment;
 import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RWStrategy.FileMetadataView;
@@ -199,7 +200,7 @@ public class RWStore implements IStore {
 	ArrayList m_commitList;
 
 	WriteBlock m_writes;
-	QuorumManager m_quorumManager;
+	Environment m_environment;
 	RWWriteCacheService m_writeCache;
 
 	private void baseInit() {
@@ -233,7 +234,7 @@ public class RWStore implements IStore {
 			 * TODO: Configure number of WriteCache buffers for WriteCacheService
 			 */
            m_writeCache = new RWWriteCacheService(6, m_raf.length(),
-                    new ReopenFileChannel(m_fd, m_raf, "rw"), m_quorumManager);
+                    new ReopenFileChannel(m_fd, m_raf, "rw"), m_environment);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {
@@ -255,7 +256,7 @@ public class RWStore implements IStore {
 	// Constructor
 
 	public RWStore(FileMetadataView fileMetadataView, boolean readOnly,
-	        QuorumManager quorumManager) {
+	        Environment environment) {
 
 	    if (false && Config.isLockFileNeeded() && !readOnly) {
 			m_lockFile = LockFile.create(m_filename + ".lock");
@@ -265,7 +266,7 @@ public class RWStore implements IStore {
 			}
 		}
 
-        m_quorumManager = quorumManager;
+        m_environment = environment;
 	    
 		reopen(fileMetadataView);
 	}

@@ -37,6 +37,7 @@ import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.WriteCache;
 import com.bigdata.io.WriteCacheService;
 import com.bigdata.io.WriteCache.FileChannelScatteredWriteCache;
+import com.bigdata.journal.Environment;
 import com.bigdata.journal.ha.QuorumManager;
 
 /**
@@ -50,11 +51,11 @@ public class RWWriteCacheService extends WriteCacheService {
     
     public RWWriteCacheService(final int nbuffers, final long fileExtent,
             final IReopenChannel<? extends Channel> opener,
-            final QuorumManager quorumManager) throws InterruptedException,
+            final Environment environment) throws InterruptedException,
             IOException {
 
         super(nbuffers, true/* useChecksum */, fileExtent, opener,
-                quorumManager);
+                environment);
         
     }
 
@@ -68,7 +69,7 @@ public class RWWriteCacheService extends WriteCacheService {
             throws InterruptedException {
 
         return new FileChannelScatteredWriteCache(buf, true/* useChecksum */,
-                quorumManager.isHighlyAvailable(),
+        		environment.isHighlyAvailable(),
                 (IReopenChannel<FileChannel>) opener);
 
     }

@@ -1789,16 +1789,17 @@ abstract public class WriteCache implements IWriteCache {
 	private void sendRecordMap(ObjectOutputStream out) {
 		Collection<RecordMetadata> data = recordMap.values();
 		try {
-			log.info("sendRecordMap, size: " + data.size());
+			if (log.isTraceEnabled())
+				log.trace("sendRecordMap, size: " + data.size());
 			out.writeInt(data.size());
 			Iterator<RecordMetadata> values = data.iterator();
 			while (values.hasNext()) {
 				RecordMetadata md = values.next();
-				log.info("sendRecordMap, entry: " + md);
+				if (log.isTraceEnabled())
+					log.trace("sendRecordMap, entry: " + md);
 				out.writeLong(md.fileOffset);
 				out.writeInt(md.bufferOffset);
 				out.writeInt(md.recordLength);
-				log.info("sendRecordMap, entry: done");
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -1811,7 +1812,6 @@ abstract public class WriteCache implements IWriteCache {
 			int mapsize = in.readInt();
 			if (log.isTraceEnabled())
 				log.trace("receiveRecordMap, size: " + mapsize);
-			System.out.println("receiveRecordMap, size: " + mapsize);
 			while (mapsize-- > 0) {
 				long fileOffset = in.readLong();
 				int bufferOffset = in.readInt();
