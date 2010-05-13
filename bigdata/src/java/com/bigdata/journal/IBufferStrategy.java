@@ -28,6 +28,8 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 
 import com.bigdata.counters.CounterSet;
+import com.bigdata.io.WriteCacheService;
+import com.bigdata.journal.ha.IHAClient;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IMRMW;
 import com.bigdata.rawstore.IRawStore;
@@ -261,5 +263,17 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
      * Needed to support HAWrite protocol, setting the offset of most recent write
      */
 	public void setNextOffset(long lastOffset);
+
+	/**
+	 * Returns the HAClient interface for this strategy.  The HAClient provides the interface
+	 * to service SocketMessages.  This method is required to support a protocol that enables
+	 * IBufferStrategy clients to implement HAGlue RMI.
+	 */
+	public IHAClient getHAClient();
+
+	/**
+	 * Returns the WriteCacheService (if any) associated with this Buffer Strategy
+	 */
+	public WriteCacheService getWriteCacheService();
 
 }

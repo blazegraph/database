@@ -45,6 +45,20 @@ import com.bigdata.journal.ha.SocketMessage.AckMessage;
 /**
  * The HAServer processes HAMessages and dispatches to a message client.
  * 
+ * There are two modes of use depending on whether the control is message
+ * driven or message requested.
+ * 
+ * If message driven then the run process will receive and apply messages.  The
+ * alternative is for some other external trigger - such as RMI - to call the
+ * readMessage method.
+ * 
+ * The HAServer communicates with the HAConnect on the other side of the socket, 
+ * sending ACK messages.  When the process is message driven, the ACK is sent
+ * from the message processing loop.  If he message is requested, it is the 
+ * responsibility of the requestor to trigger the ACK.  However, this can be
+ * a simple ACK to confirm message receipt rather than an ACK on full processing
+ * since the RMI trigger will take responsibility.
+ * 
  * @author Martyn Cutcher
  * 
  */
@@ -61,6 +75,10 @@ public class HAServer extends Thread {
 
 	private ObjectSocketChannelStream str;
 
+	private boolean messageDrive;
+
+	private ObjectInputStream m_instr;
+
 	/**
 	 * @param addr
 	 *            The internet address on which the server will listen.
@@ -69,12 +87,15 @@ public class HAServer extends Thread {
 	 * @param client
 	 *            The object with access to the local service and the downstream
 	 *            service.
+	 * @param active
+	 *            Determines if the process is message driven
 	 * @throws IOException
 	 */
-	public HAServer(InetAddress addr, int port, IHAClient client) {
+	public HAServer(InetAddress addr, int port, IHAClient client, boolean messageDrive) {
 		this.addr = addr;
 		this.port = port;
 		this.client = client;
+		this.messageDrive = messageDrive;
 		this.setDaemon(true);
 		log.info("Created for " + addr + ":" + port);
 	}
@@ -125,40 +146,57 @@ public class HAServer extends Thread {
         while (true) {
             
             final SocketChannel client = server.accept();
-            log.info("Accepted connection");
+            log.info("Accepted connection " + this);
             client.configureBlocking(true);
 
             str = new ObjectSocketChannelStream(client);
             this.client.setInputSocket(str);
             // Now process messages
-            final ObjectInputStream instr = str.getInputStream();
-            while (true) {
-                if (log.isTraceEnabled())
-                    log.trace("Reading next message from " + str);
-
-                final SocketMessage msg = (SocketMessage) instr.readObject();
-                msg.setHAServer(this);
-
-                if (log.isTraceEnabled())
-                    log.trace("Applying " + msg.getClass().getName());
-       
-				try {
-					msg.apply(this.client);
-				} catch (Throwable t) {
-
+            // Retrieving the input stream may be a problem for non message driven protocols since
+            // it may not return until data is sent to the stream.
+            m_instr = str.getInputStream();
+            log.info("Set input stream to " + m_instr);
+            if (messageDrive) {
+	            while (true) {
 	                if (log.isTraceEnabled())
-	                    log.trace("Propagating error", t);
-
-	                msg.establishAck().setError(t);
-				}
-				acknowledge(msg.establishAck());
-
-                if (log.isTraceEnabled())
-                    log.trace("Message applied");
-                
+	                    log.trace("Reading next message from " + str);
+	
+	                final SocketMessage msg = (SocketMessage) m_instr.readObject();
+	                msg.setHAServer(this);
+	
+	                if (log.isTraceEnabled())
+	                    log.trace("Applying " + msg.getClass().getName());
+	       
+					try {
+						msg.apply(this.client);
+					} catch (Throwable t) {
+	
+		                if (log.isTraceEnabled())
+		                    log.trace("Propagating error", t);
+	
+		                msg.establishAck().setError(t);
+					}
+					acknowledge(msg.establishAck());
+	
+	                if (log.isTraceEnabled())
+	                    log.trace("Message applied");
+	                
+	            }
             }
         }
     }
+    
+    public SocketMessage readMessage() throws IOException, ClassNotFoundException {
+    	if (m_instr == null) {
+    		log.warn("read message request on null stream for " + this);
+    		throw new IllegalStateException("readMessage request on null stream");
+    	}
+    	
+        final SocketMessage msg = (SocketMessage) m_instr.readObject();
+        msg.setHAServer(this);
+        
+        return msg;
+   }
 
 	/**
 	 * Note: This is an alternative implementation of {@link #runBlock()} which

@@ -35,6 +35,8 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.FileChannelUtility;
+import com.bigdata.io.WriteCacheService;
+import com.bigdata.journal.ha.IHAClient;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.Bytes;
@@ -672,4 +674,19 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         return false;
     }
     
+
+    /**
+     * No HAClient dependencies should be propagated to inappropriate buffers
+     */
+	public IHAClient getHAClient() {
+		throw new IllegalStateException("Unexpected request for HAClient from " + getClass().getSimpleName());
+	}
+    
+
+    /**
+     * No HAClient/HAGlue dependencies should be propagated to inappropriate buffers
+     */
+	public WriteCacheService getWriteCacheService() {
+		throw new IllegalStateException("Unexpected request for WriteCacheService from " + getClass().getSimpleName());
+	}
 }

@@ -72,9 +72,18 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.journal.Name2Addr.Entry;
+import com.bigdata.journal.ha.HAClient;
+import com.bigdata.journal.ha.HAConnect;
+import com.bigdata.journal.ha.HADelegate;
+import com.bigdata.journal.ha.HADelegator;
 import com.bigdata.journal.ha.HAGlue;
+import com.bigdata.journal.ha.HAServer;
+import com.bigdata.journal.ha.IHAClient;
 import com.bigdata.journal.ha.Quorum;
 import com.bigdata.journal.ha.QuorumManager;
+import com.bigdata.journal.ha.SocketMessage;
+import com.bigdata.journal.ha.SocketMessage.AckMessage;
+import com.bigdata.journal.ha.SocketMessage.HAWriteMessage;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.rawstore.IRawStore;
@@ -539,6 +548,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * @see Options#MAXIMUM_EXTENT
      */
     private final long maximumExtent;
+
+	private final Environment environment;
     
     /**
      * The maximum extent before a {@link #commit()} will {@link #overflow()}.
@@ -972,10 +983,15 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         quorumManager = newQuorumManager();
         
-        haGlue = newHAGlue();
-        
         // The current quorum token.
         quorumToken = quorumManager.getQuorum().token();
+        
+        /*
+         * Setenvironment
+         */
+        this.environment = new Environment(this);
+        
+        haGlue = newHAGlue();
         
         /*
          * Create the appropriate IBufferStrategy object.
@@ -1144,7 +1160,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     0L/* soft limit for maximumExtent */,
                     minimumExtension,
                     fileMetadata,
-                    quorumManager);
+                    environment);
 
             this._rootBlock = fileMetadata.rootBlock;
 
@@ -1169,7 +1185,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     createTime, quorumToken,
                     checker, alternateRootBlock);
 
-            _bufferStrategy = new RWStrategy(fileMetadata,quorumManager);
+            _bufferStrategy = new RWStrategy(fileMetadata, environment);
 
             this._rootBlock = fileMetadata.rootBlock;
 
@@ -1905,7 +1921,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     }
     
     public boolean isOpen() {
-
+    	
         return _bufferStrategy.isOpen();
 
     }
@@ -3588,7 +3604,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         return haGlue;
         
     }
-    private final HAGlue haGlue;
+    private HAGlue haGlue;
 
     /**
      * Factory for the {@link HAGlue} object for this {@link AbstractJournal}.
@@ -3597,8 +3613,13 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     protected HAGlue newHAGlue() {
 
-        return new BasicHAGlue(null/* loopback addr */, 0/* anyPort */);
+        if (haGlue == null) {
+        	BasicHA delegate = new BasicHA(environment);
+    	
+    		haGlue = new HADelegator(delegate);
+        }
 
+        return haGlue;
     }
 
     /**
@@ -3644,6 +3665,18 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 			if (strategy != _bufferStrategy) {
 				throw new IllegalStateException("Unknown buffer strategy");
 			}
+		}
+
+		public HAConnect getHAConnect() {
+			return null;
+		}
+
+		public HAServer establishHAServer(IHAClient haClient) {
+			throw new IllegalStateException("SingletonForum should not receive this request");
+		}
+
+		public HAServer getHAServer() {
+			throw new IllegalStateException("SingletonForum should not receive this request");
 		}
         
     }
@@ -3787,39 +3820,29 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             }
         }
 
+        /**
+         * For writeCacheBuffer this is a NOP in the SingletonQuorum since the local action
+         * is carried out directly by the WriteCacheService and not via the local HAGlue
+         * implementation.
+         */
+		public void writeCacheBuffer(long fileExtent) throws IOException, InterruptedException {
+			// NOP
+		}
+
     }
 
     /**
      * Implementation hooks into the various low-level operations required
      * to support HA for the journal.
      */
-    protected class BasicHAGlue implements HAGlue {
-
-        private final InetAddress writePipelineAddr;
-        private final int writePipelinePort;
+    protected class BasicHA extends HADelegate {
 
         /** Defaults to the loopback interface and a random open port. */
-        protected BasicHAGlue(final InetAddress writePipelineAddr,
-                final int writePipelinePort) {
-            if (writePipelineAddr == null) {
-                try {
-                    this.writePipelineAddr = InetAddress
-                            .getByAddress(new byte[] { 127, 0, 0, 1 });
-                } catch (UnknownHostException e) {
-                    throw new RuntimeException(e);
-                }
-            } else {
-                this.writePipelineAddr = writePipelineAddr;
-            }
-            if (writePipelinePort == 0) {
-                try {
-                    this.writePipelinePort = getPort(0/* suggestedPort */);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            } else {
-                this.writePipelinePort = writePipelinePort;
-            }
+        protected BasicHA(Environment environment) {
+        	super(environment);
+        	
+        	environment.checkWritePipeline();
+        	
         }
 
         /**
@@ -4046,31 +4069,50 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             
         }
         
-        public InetAddress getWritePipelineAddr() {
-            return writePipelineAddr;
-        }
+        /**
+         * Tells the downstream node to retrieve a writeCache buffer from the upstream socket.
+         * This will be passed on to the WriteCacheService.
+         * 
+         * The application of the HAWriteMessage will propagate on the pipeline, whilst
+         * the RMI calls to writeCacheBuffer will set all downstream quorum members
+         * to wait for the message.
+         */
+		public RunnableFuture<Void> writeCacheBuffer(long fileExtent) throws IOException {
+            return new FutureTask<Void>(new Runnable() {
+                public void run() {
 
-        public int getWritePipelinePort() {
-            return writePipelinePort;
-        }
+                HAServer srvr = getQuorumManager().getHAServer();
+                HAWriteMessage msg = null;
+                try {
+					msg = (HAWriteMessage) srvr.readMessage();
+					
+					msg.apply(_bufferStrategy.getHAClient());
+					
+					msg.acknowledge(msg.establishAck());
+				} catch (Exception e) {
+					log.error("Failure to process writeCacheBuffer request", e);
+					if (msg != null) {
+						AckMessage<?, ? extends SocketMessage<?>> ack = msg.establishAck();
+						ack.setError(e);
+						try {
+							msg.acknowledge(ack);
+						} catch (IOException e1) {
+							log.error("Failed to acknoweldge message", e1);
+						}
+					}
+					
+                    _abort();
+				}
+                
+                    
+                }
+            }, null/* Void */);
+		}
 
     };
 
-    /**
-     * Return an open port on current machine. Try the suggested port first. If
-     * suggestedPort is zero, just select a random port
-     */
-    static protected int getPort(int suggestedPort) throws IOException {
-        ServerSocket openSocket;
-        try {
-            openSocket = new ServerSocket(suggestedPort);
-        } catch (BindException ex) {
-            // the port is busy, so look for a random open port
-            openSocket = new ServerSocket(0);
-        }
-        final int port = openSocket.getLocalPort();
-        openSocket.close();
-        return port;
-    }
+	public boolean isDoubleSync() {
+		return doubleSync;
+	}
 
 }

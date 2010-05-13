@@ -134,7 +134,12 @@ public abstract class SocketMessage<T> implements Externalizable {
 		}
 	}
 	
-	abstract public AckMessage<?,? extends SocketMessage<?>> establishAck();
+	/**
+	 * Returns default AckMessage for any SocketMessage
+	 */
+	public AckMessage<?,? extends SocketMessage<?>> establishAck() {
+		return new AckMessage<Object, SocketMessage<?>>(id);
+	}
 	
 	Object handler = null;
 
@@ -181,7 +186,7 @@ public abstract class SocketMessage<T> implements Externalizable {
 	 * is registered, will signal the twinned message to awake any control thread awaiting
 	 * the message completion. 
 	 */
-	static abstract class AckMessage<T,M extends SocketMessage<?>> extends SocketMessage<T> {
+	public static class AckMessage<T,M extends SocketMessage<?>> extends SocketMessage<T> {
 		
 		private Throwable err;
 		
@@ -269,6 +274,11 @@ public abstract class SocketMessage<T> implements Externalizable {
 		public String toString() {
 
 			return super.toString() + ":" + twinId;
+		}
+
+		public void apply(T client) throws Exception {
+			// Null void apply for standard ACK that should only be used
+			// as a general receipt acknowledge and error propagation
 		}
 		
 	}
@@ -379,6 +389,31 @@ public abstract class SocketMessage<T> implements Externalizable {
 				ack = new HAWriteConfirm(id);
 			
 			return ack;
+		}
+	}
+
+	/**
+	 * The HATruncateMessage send a request to truncate the file on the SocketStream.
+	 * 
+	 * The message will pass data on to the next service in the chain if present.
+	 */
+	static class PingMessage extends SocketMessage<Object> {
+		long extent;
+		
+		public PingMessage() {}
+		
+       public void send(ObjectSocketChannelStream ostr) throws IOException {
+            if (log.isTraceEnabled())
+                log.trace("PingMessage send");
+            ostr.getOutputStream().writeObject(this);
+		}
+		
+		/**
+		 * For the WriteMessage
+		 */
+		public void apply(Object client) throws Exception {	
+            if (log.isTraceEnabled())
+                log.trace("PingMessage received");
 		}
 	}
 

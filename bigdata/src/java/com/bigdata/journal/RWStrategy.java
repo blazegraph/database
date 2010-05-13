@@ -36,6 +36,8 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
+import com.bigdata.io.WriteCacheService;
+import com.bigdata.journal.ha.IHAClient;
 import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.AbstractRawStore;
@@ -56,7 +58,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 
 	FileMetadata m_fileMetadata = null;
 	
-	QuorumManager m_quorumManager = null;
+	Environment m_environment = null;
 
 	RWStore m_store = null;
 	
@@ -74,15 +76,19 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 	 * 
 	 * @param fileMetadata
 	 */
-	RWStrategy(final FileMetadata fileMetadata,final QuorumManager quorumManager) {
+	RWStrategy(final FileMetadata fileMetadata, final Environment environment) {
 
 		m_fileMetadata = fileMetadata;
 		
-		m_quorumManager = quorumManager;
+		m_environment = environment;
+		
+        if (environment != null) {
+        	environment.setLocalBufferStrategy(this);
+        }
 		
 		m_rb = fileMetadata.rootBlock;
 
-		m_store = new RWStore(m_fmv, false, quorumManager); // not read-only for now
+		m_store = new RWStore(m_fmv, false, environment); // not read-only for now
 		
 		m_rb0 = copyRootBlock(true);
 		m_rb1 = copyRootBlock(false);
@@ -475,7 +481,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 
 			m_store.close();
 			m_fileMetadata.raf = new RandomAccessFile(m_fileMetadata.file, m_fileMetadata.fileMode);
-			m_store = new RWStore(m_fmv, false, m_quorumManager); // never read-only for now
+			m_store = new RWStore(m_fmv, false, m_environment); // never read-only for now
 			m_needsReopen = false;
 		} catch (Throwable t) {
 			t.printStackTrace();
@@ -601,4 +607,11 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 		// not needed for RW since last offset is not used for allocation
 	}
 
+	public IHAClient getHAClient() {
+		throw new UnsupportedOperationException("HAClient required for RWStrategy");
+	}
+
+	public WriteCacheService getWriteCacheService() {
+		throw new UnsupportedOperationException("getWriteCacheService required for RWStrategy");
+	}
 }
