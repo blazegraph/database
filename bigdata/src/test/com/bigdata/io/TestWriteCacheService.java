@@ -37,6 +37,7 @@ import java.util.Random;
 
 import junit.framework.AssertionFailedError;
 
+import com.bigdata.journal.Environment;
 import com.bigdata.journal.ha.MockSingletonQuorumManager;
 import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rwstore.RWWriteCacheService;
@@ -74,6 +75,8 @@ public class TestWriteCacheService extends TestCase3 {
         File file = null;
         ReopenFileChannel opener = null;
         RWWriteCacheService writeCache = null;
+        Environment environment = new Environment(null);
+        environment.setQuorumManager(new MockSingletonQuorumManager());
         try {
 			file = File.createTempFile(getName(), ".rw.tmp");
 
@@ -86,7 +89,7 @@ public class TestWriteCacheService extends TestCase3 {
 //		            final QuorumManager quorumManager)
 
 			writeCache = new RWWriteCacheService(5, fileExtent, opener,
-                    new MockSingletonQuorumManager());
+                    environment);
 
             writeCache.close();
 
@@ -111,7 +114,9 @@ public class TestWriteCacheService extends TestCase3 {
         File file = null;
         ReopenFileChannel opener = null;
         RWWriteCacheService writeCache = null;
-        try {
+        Environment environment = new Environment(null);
+        environment.setQuorumManager(new MockSingletonQuorumManager());
+       try {
             file = File.createTempFile(getName(), ".rw.tmp");
 
             opener = new ReopenFileChannel(file, "rw");
@@ -119,7 +124,7 @@ public class TestWriteCacheService extends TestCase3 {
             final long fileExtent = opener.reopenChannel().size();
 
             writeCache = new RWWriteCacheService(5, fileExtent, opener,
-                    new MockSingletonQuorumManager());
+            		environment);
 			
             final ByteBuffer data1 = getRandomData();
             final long addr1 = 2048;
@@ -191,6 +196,8 @@ public class TestWriteCacheService extends TestCase3 {
         File file = null;
         ReopenFileChannel opener = null;
         RWWriteCacheService writeCache = null;
+        Environment environment = new Environment(null);
+        environment.setQuorumManager(new MockSingletonQuorumManager());
         try {
             file = File.createTempFile(getName(), ".rw.tmp");
 
@@ -199,7 +206,7 @@ public class TestWriteCacheService extends TestCase3 {
             final long fileExtent = opener.reopenChannel().size();
 
             writeCache = new RWWriteCacheService(5, fileExtent, opener,
-                    new MockSingletonQuorumManager());
+            		environment);
 
             /*
              * First write 500 records into the cache and confirm they can all be read okay

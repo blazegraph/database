@@ -263,7 +263,7 @@ public class TestSocketMessage extends TestCase3 {
 
 			};
 
-            HAServer server = new HAServer(InetAddress.getLocalHost(), port, handler);
+            HAServer server = new HAServer(InetAddress.getLocalHost(), port, handler, true);
 
 			try {
 				Thread.sleep(1000);

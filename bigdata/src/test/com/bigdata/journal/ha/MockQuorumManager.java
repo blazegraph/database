@@ -43,6 +43,7 @@ public class MockQuorumManager implements QuorumManager {
     final Quorum quorum;
 
 	private IBufferStrategy bufferStrategy;
+	private HAServer haServer;
     
     public int replicationFactor() {
 
@@ -110,6 +111,40 @@ public class MockQuorumManager implements QuorumManager {
 //	@Override
 	public void setLocalBufferStrategy(IBufferStrategy strategy) {
 		bufferStrategy = strategy;
+	}
+
+	public HAConnect getHAConnect() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public HAServer getHAServer() {
+		return haServer;
+	}
+
+	/**
+	 * Ensure HAServer is created and started, ready to process upstream messages.
+	 */
+	public HAServer establishHAServer(IHAClient haClient) {
+		if (haServer == null) {
+	        final int index = quorum.getIndex();
+	
+	        // if (index + 1 < k) { // this would rule out the final node!
+	
+	        final HAGlue haGlueService = quorum.getHAGlue(index);
+	
+	        // Our local service listening for upstream messages - needed for all non-master nodes
+	        haServer = new HAServer(//
+	        		haGlueService.getWritePipelineAddr(),//
+	        		haGlueService.getWritePipelinePort(),//
+	                haClient,//
+	                false // No message drive
+	                );
+	        
+	        haServer.start(); // must process accept messages to establish socket connection
+		}
+		
+		return haServer;
 	}
     
 }
