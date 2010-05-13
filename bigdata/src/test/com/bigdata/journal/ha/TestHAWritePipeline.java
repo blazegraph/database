@@ -53,31 +53,39 @@ public class TestHAWritePipeline extends ProxyTestCase<Journal> {
     }
 
     public void test_writePipeline() {
-
-        final Journal store = getStore(getProperties());
-
-        try {
-
-            System.err.println("a");            
-            
-            try {
-				Thread.sleep(1000);  // allow pipe setup
-			} catch (InterruptedException e) {
-				// ignore
-			}
-            store.commit();
-            try {
-				Thread.sleep(4000);  // wait for acks
-			} catch (InterruptedException e) {
-				// ignore
-			}
-            System.err.println("b");
-            
-        } finally {
-
-            store.destroy();
-            
-        }
+    	try {
+	        final Journal store = getStore(getProperties());
+	
+	        try {
+	
+	            System.err.println("a");            
+	            
+	            try {
+					Thread.sleep(1000);  // allow pipe setup
+				} catch (InterruptedException e) {
+					// ignore
+				}
+	            store.commit();
+	            try {
+					Thread.sleep(4000);  // wait for acks
+				} catch (InterruptedException e) {
+					// ignore
+				}
+	            System.err.println("b");
+	            
+	        } catch (Exception e) {
+	        	e.printStackTrace();
+	        	
+	        	throw new RuntimeException(e);
+	        } finally {
+	
+	            store.destroy();
+	            
+	        }
+    	} catch (Throwable t) {
+    		t.printStackTrace();
+    		throw new RuntimeException(t);
+    	}
         
     }
     

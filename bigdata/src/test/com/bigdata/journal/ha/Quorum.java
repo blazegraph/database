@@ -80,6 +80,7 @@ public interface Quorum {
      */
     int getIndex();
     
+    
     /**
      * Return the remote interface used to perform HA operations on the members
      * of quorum.
@@ -163,5 +164,13 @@ public interface Quorum {
      * this message.
      */
     void abort2Phase() throws IOException, InterruptedException;
+
+    /**
+     * Send a message to each member of the quorum telling it to read a writeCache
+     * buffer from the pipeline.
+     * The fileExtent is the current active extent that is retrievable from the
+     * service evaluation Environment.
+     */
+    void writeCacheBuffer(long fileExtent) throws IOException, InterruptedException;
 
 }

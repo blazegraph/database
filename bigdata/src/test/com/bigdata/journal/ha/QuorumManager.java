@@ -106,4 +106,19 @@ public interface QuorumManager {
 	IBufferStrategy getLocalBufferStrategy();
 
 	void setLocalBufferStrategy(IBufferStrategy strategy);
+
+	/**
+	 * Returns the upstream HAServer from which this node receives data
+	 */
+	HAServer establishHAServer(IHAClient haClient);
+
+	/**
+	 * Returns the upstream HAServer from which this node receives data
+	 */
+	HAServer getHAServer();
+
+	/**
+	 * Returns the downstream HAConnect to which this node sends data
+	 */
+	HAConnect getHAConnect();
 }

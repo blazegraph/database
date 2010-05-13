@@ -118,6 +118,11 @@ public class MockSingletonQuorumManager implements QuorumManager {
         public long token() {
             return token;
         }
+
+		public void writeCacheBuffer(long fileExtent) throws IOException, InterruptedException {
+			// TODO Auto-generated method stub
+			
+		}
         
     };
 
@@ -129,6 +134,21 @@ public class MockSingletonQuorumManager implements QuorumManager {
 
 	public void setLocalBufferStrategy(IBufferStrategy strategy) {
 		// Void since only relevant for downstream		
+	}
+
+	public HAConnect getHAConnect() {
+		// No downstream Quorum member
+		return null;
+	}
+
+	public HAServer establishHAServer(IHAClient haClient) {
+		// No upstream member requiring messaging
+		return null;
+	}
+    
+	public HAServer getHAServer() {
+		// No upstream member requiring messaging
+		return null;
 	}
     
 }

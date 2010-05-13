@@ -511,4 +511,81 @@ public class MockQuorumImpl implements Quorum {
 
     }
 
+	public void writeCacheBuffer(long fileExtent) throws IOException, InterruptedException {
+
+        /*
+         * To minimize latency, we first submit the futures for the other
+         * services and then do f.run() on the master. This will allow the other
+         * services to commit concurrently with the master's IO.
+         */
+
+        assertMaster();
+
+        final List<RunnableFuture<Void>> remoteFutures = new LinkedList<RunnableFuture<Void>>();
+        
+        
+
+        /*
+         * For services (other than the master) in the quorum, submit the
+         * RunnableFutures to an Executor.
+         */
+        for (int i = 1; i < stores.length; i++) {
+
+            /*
+             * Runnable which will execute this message on the remote service.
+             */
+            final RunnableFuture<Void> rf = getHAGlue(i).writeCacheBuffer(fileExtent);
+
+            // add to list of futures we will check.
+            remoteFutures.add(rf);
+
+            /*
+             * Submit the runnable for execution by the master's
+             * ExecutorService. When the runnable runs it will execute the
+             * message on the remote service using RMI.
+             */
+            stores[0/* master */].getExecutorService().submit(rf);
+
+        }
+
+        /*
+         * Check the futures for the other services in the quorum.
+         */
+        final List<Throwable> causes = new LinkedList<Throwable>();
+        for (Future<Void> rf : remoteFutures) {
+            boolean done = false;
+            try {
+                rf.get();
+                done = true;
+            } catch (InterruptedException ex) {
+                log.error(ex, ex);
+                causes.add(ex);
+            } catch (ExecutionException ex) {
+                log.error(ex, ex);
+                causes.add(ex);
+            } finally {
+                if (!done) {
+                    // Cancel the request on the remote service (RMI).
+                    try {
+                        rf.cancel(true/* mayInterruptIfRunning */);
+                    } catch (Throwable t) {
+                        // ignored.
+                    }
+                }
+            }
+        }
+
+        /*
+         * If there were any errors, then throw an exception listing them.
+         */
+        if (causes.isEmpty()) {
+            // Cancel remote futures.
+            cancelRemoteFutures(remoteFutures);
+            // Throw exception back to the master.
+            throw new RuntimeException("remote errors: nfailures="
+                    + causes.size(), new ExecutionExceptions(causes));
+        }
+
+ 	}
+
 }
