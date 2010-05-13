@@ -30,7 +30,6 @@ package com.bigdata.service;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -110,7 +109,7 @@ abstract public class ResourceService {
 	 * @todo could also monitor the accept and request thread pools. The latter
 	 *       is the more interesting from a workload perspective.
 	 */
-	public class Counters {
+	static public class Counters {
 
 		/**
 		 * #of requests.
@@ -339,25 +338,47 @@ abstract public class ResourceService {
 
 	}
 
-	public void awaitRunning(final long timeout, final TimeUnit unit) throws InterruptedException, TimeoutException {
+    public void awaitRunning(final long timeout, final TimeUnit unit)
+            throws InterruptedException, TimeoutException {
 
-		lock.lock();
-		try {
+        // the start time in nanoseconds.
+        final long begin = System.nanoTime();
 
-			if (!open) {
+        // the timeout in nanoseconds.
+        final long nanos = unit.toNanos(timeout);
+        
+        // the time remaining in nanoseconds.
+        long remaining = nanos;
 
-				running.await(timeout, unit);
+        if (lock.tryLock(remaining, TimeUnit.NANOSECONDS)) {
 
-			}
+            try {
 
-			if (open)
-				return;
+                while (!open) {
 
-			throw new TimeoutException();
+                    remaining = nanos - (System.nanoTime() - begin);
 
-		} finally {
-			lock.unlock();
-		}
+                    if (!running.await(remaining, TimeUnit.NANOSECONDS)) {
+
+                        // timeout
+                        break;
+
+                    }
+
+                }
+
+                if (open)
+                    return;
+
+            } finally {
+
+                lock.unlock();
+                
+            }
+
+        }
+
+        throw new TimeoutException();
 
 	}
 
