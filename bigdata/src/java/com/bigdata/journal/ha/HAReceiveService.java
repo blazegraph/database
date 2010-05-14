@@ -241,10 +241,25 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
 								}								
 							}
 						}
+						readFuture.get(); // wait synchronously for read!!
 					} else {
-						// we don't expect to see readable selectors here, the readTask should consume them
-
-						log.warn("Unexpected selection " + key);
+						// we don't expect to see readable selectors here, the readTask should consume them, OTOH
+						//	a read selector may indicate the socket has been closed by the client
+						if (key.isReadable()) {
+							if (log.isTraceEnabled()) log.trace("Maybe socket close " + key);
+							
+							SocketChannel client = (SocketChannel) key.channel();
+							
+							ByteBuffer tmp = ByteBuffer.allocate(512);
+							int rdlen = client.read(tmp);
+							if (rdlen == -1) {
+								if (log.isTraceEnabled()) log.trace("Socket closed");
+					            key.cancel();
+					            client.close();					    
+							} else {
+								log.warn("Read " + rdlen + " bytes from unexpected read");
+							}
+						}
 
 
 					}
