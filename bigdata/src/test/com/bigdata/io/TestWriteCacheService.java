@@ -29,6 +29,7 @@ package com.bigdata.io;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
@@ -37,7 +38,9 @@ import java.util.Random;
 
 import junit.framework.AssertionFailedError;
 
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.Environment;
+import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.ha.MockSingletonQuorumManager;
 import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rwstore.RWWriteCacheService;
@@ -75,8 +78,6 @@ public class TestWriteCacheService extends TestCase3 {
         File file = null;
         ReopenFileChannel opener = null;
         RWWriteCacheService writeCache = null;
-        Environment environment = new Environment(null);
-        environment.setQuorumManager(new MockSingletonQuorumManager());
         try {
 			file = File.createTempFile(getName(), ".rw.tmp");
 
@@ -89,7 +90,7 @@ public class TestWriteCacheService extends TestCase3 {
 //		            final QuorumManager quorumManager)
 
 			writeCache = new RWWriteCacheService(5, fileExtent, opener,
-                    environment);
+                    newDefaultEnvironment());
 
             writeCache.close();
 
@@ -114,8 +115,6 @@ public class TestWriteCacheService extends TestCase3 {
         File file = null;
         ReopenFileChannel opener = null;
         RWWriteCacheService writeCache = null;
-        Environment environment = new Environment(null);
-        environment.setQuorumManager(new MockSingletonQuorumManager());
        try {
             file = File.createTempFile(getName(), ".rw.tmp");
 
@@ -124,7 +123,7 @@ public class TestWriteCacheService extends TestCase3 {
             final long fileExtent = opener.reopenChannel().size();
 
             writeCache = new RWWriteCacheService(5, fileExtent, opener,
-            		environment);
+            		newDefaultEnvironment());
 			
             final ByteBuffer data1 = getRandomData();
             final long addr1 = 2048;
@@ -154,6 +153,39 @@ public class TestWriteCacheService extends TestCase3 {
 		}        
     }
     
+    private Environment newDefaultEnvironment() {
+        final QuorumManager qm = new MockSingletonQuorumManager();
+        return new Environment() {
+
+			public long getActiveFileExtent() {
+				return 0;
+			}
+
+			public AbstractJournal getJournal() {
+				return null;
+			}
+
+			public QuorumManager getQuorumManager() {
+				return qm;
+			}
+
+			public IBufferStrategy getStrategy() {
+				return null;
+			}
+
+			public InetAddress getWritePipelineAddr() {
+				return null;
+			}
+
+			public int getWritePipelinePort() {
+				return 0;
+			}
+
+			public boolean isHighlyAvailable() {
+				return false;
+			}};
+		
+    }
     private void randomizeArray(ArrayList<AllocView> allocs) {
         for (int i = 0; i < 5000; i++) {
         	int swap1 = r.nextInt(10000);
@@ -196,8 +228,6 @@ public class TestWriteCacheService extends TestCase3 {
         File file = null;
         ReopenFileChannel opener = null;
         RWWriteCacheService writeCache = null;
-        Environment environment = new Environment(null);
-        environment.setQuorumManager(new MockSingletonQuorumManager());
         try {
             file = File.createTempFile(getName(), ".rw.tmp");
 
@@ -206,7 +236,7 @@ public class TestWriteCacheService extends TestCase3 {
             final long fileExtent = opener.reopenChannel().size();
 
             writeCache = new RWWriteCacheService(5, fileExtent, opener,
-            		environment);
+            		newDefaultEnvironment());
 
             /*
              * First write 500 records into the cache and confirm they can all be read okay

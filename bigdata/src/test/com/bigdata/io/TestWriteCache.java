@@ -523,7 +523,7 @@ public class TestWriteCache extends TestCase3 {
 
                 // verify the write cache self-reported capacity.
                 assertEquals(DirectBufferPool.INSTANCE.getBufferCapacity()
-                        - (useChecksum ? 4 : 0), writeCache.capacity());
+                        - (useChecksum ? 4 : 0) - 12 /* prefixWrites*/, writeCache.capacity());
 
                 // correct rejection test for null write.
                 try {
