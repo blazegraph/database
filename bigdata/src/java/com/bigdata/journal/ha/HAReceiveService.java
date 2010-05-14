@@ -194,7 +194,7 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
 								public Void call() throws Exception {
 									lock.lockInterruptibly();
 									try {
-										if (message == null) messageReady.await(); 
+										while (message == null) messageReady.await(); 
 									} finally {
 										lock.unlock();
 									}
@@ -218,6 +218,7 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
 													throw new IllegalStateException("Unexpected socket channel");
 
 												int rdlen = client.read(localBuffer);
+												log.trace("Read " + rdlen + " into buffer");
 												rem -= rdlen;
 											} else {
 												throw new IllegalStateException("Unexpected Selection Key: " + key);
@@ -282,7 +283,7 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                 localBuffer.position(0);
                 messageReady.signal();
 
-                if (readFuture == null)
+                while (readFuture == null)
                     futureReady.await();
             } finally {
                 lock.unlock();
