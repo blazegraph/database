@@ -110,6 +110,11 @@ abstract public class WriteCache implements IWriteCache {
 	private final boolean useChecksum;
 	
 	/**
+	 * <code>true</code> iff per-record checksums are being maintained.
+	 */
+	private final boolean prefixWrites;
+	
+	/**
 	 * The buffer used to absorb writes that are destined for some channel.
 	 */
 	final private AtomicReference<ByteBuffer> buf;
@@ -368,6 +373,7 @@ abstract public class WriteCache implements IWriteCache {
 //        this.quorumManager = quorumManager;
         
         this.useChecksum = useChecksum;
+        this.prefixWrites = scatteredWrites;
 
         if (isHighlyAvailable) {
             checker = new ChecksumHelper();
@@ -464,7 +470,7 @@ abstract public class WriteCache implements IWriteCache {
      */
 	final public int capacity() {
 
-        return capacity - (useChecksum ? 4 : 0);
+        return capacity - (useChecksum ? 4 : 0) - (prefixWrites ? 12 : 0);
 
 	}
 
@@ -595,8 +601,9 @@ abstract public class WriteCache implements IWriteCache {
 		    final int remaining = data.remaining();
 		    
 			// The #of bytes to transfer into the write cache.
-            final int nwrite = remaining + (writeChecksum && useChecksum ? 4 : 0);
-
+            final int datalen = remaining + (writeChecksum && useChecksum ? 4 : 0);
+            final int nwrite = datalen + (prefixWrites ? 12 : 0);
+            
 			if (nwrite > capacity) {
 			    // This is more bytes than the total capacity of the buffer.
                 throw new IllegalArgumentException(
@@ -617,10 +624,10 @@ abstract public class WriteCache implements IWriteCache {
 			final int pos;
 			synchronized (tmp) {
 
-				// the position() at which the record is cached in the buffer.
-				pos = tmp.position();
+                // the position() at which the record is cached in the buffer.
+				final int spos = tmp.position();
 
-				if (pos + nwrite > capacity) {
+				if (spos + nwrite > capacity) {
 
 					/*
 					 * There is not enough room left in the write cache for this
@@ -630,6 +637,15 @@ abstract public class WriteCache implements IWriteCache {
 					return false;
 
 				}
+				
+				// add prefix data if required and set data position in buffer
+                if (prefixWrites) {
+                	tmp.putLong(offset);
+                	tmp.putInt(datalen);
+                	pos = spos + 12;
+                } else {
+                	pos = spos;
+                }
 
 				// copy the record into the cache, updating position() as we go.
                 if (checker != null) {
@@ -661,7 +677,7 @@ abstract public class WriteCache implements IWriteCache {
              * cache.
              */
             if (recordMap.put(Long.valueOf(offset), new RecordMetadata(offset,
-                    pos, nwrite)) != null) {
+                    pos, datalen)) != null) {
                 /*
                  * Note: This exception indicates that the abort protocol did
                  * not reset() the current write cache before new writes were
@@ -1509,6 +1525,10 @@ abstract public class WriteCache implements IWriteCache {
      * 
      * The writeonChannel must therefore utilize the {@link RecordMetadata} to
      * write each update separately.
+     * 
+     * To support HA, we prefix each write with the fileposition and buffer length in the cache.
+     * This enables the cache buffer to be sent as a single stream and the RecordMap
+     * rebuilt downstream.
      */
 	public static class FileChannelScatteredWriteCache extends WriteCache {
 
@@ -1544,7 +1564,6 @@ abstract public class WriteCache implements IWriteCache {
 		 * Called by WriteCacheService to process a direct write for large blocks and
 		 * also to flush data from dirty caches.
 		 */
-		@Override
         protected boolean writeOnChannel(final ByteBuffer data,
                 final long firstOffsetIgnored,
                 final Map<Long, RecordMetadata> recordMap, final long nanos)
@@ -1601,15 +1620,34 @@ abstract public class WriteCache implements IWriteCache {
      * To support deletion we will remove any entries for the provided address
      * 
      * @param addr
+     * @throws InterruptedException 
+     * @throws IllegalStateException 
      * 
      * @todo This seems a bit odd to me. How does this propagate over a write
      *       replication chain? Why not leave the old record in the cache? Or is
      *       this just to yank something out of the cache which was created and
      *       then immediately deleted on the RW store before it could be written
-     *       through to the disk? BT 2/26/2010
+     *       through to the disk? BT 2/26/2010...  Yes MC
+     *       
+     * For HA if write prefixes are stored in the buffer we must zero the address
+     * element to indicate data removal from the buffer.
      */
-	public void clearAddrMap(long addr) {
-		recordMap.remove(addr);
+	public void clearAddrMap(long addr) throws IllegalStateException, InterruptedException {
+		RecordMetadata entry = recordMap.remove(addr);
+		
+		if (prefixWrites) {
+			int pos = entry.bufferOffset - 12;
+			ByteBuffer tmp = acquire();
+			try {
+				ByteBuffer view = tmp.duplicate();
+				view.limit(8);
+				view.position(pos);
+				view.putLong(0);
+			} finally {
+				release();
+			}
+			
+		}
 	}
 
 	boolean m_written = false;
