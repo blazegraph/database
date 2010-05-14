@@ -30,6 +30,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -68,7 +70,7 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
    
     private ServerSocketChannel server;
-    private Future<Void> readFuture;
+    private FutureTask<Void> readFuture;
    
     final Lock lock = new ReentrantLock();
     final Condition futureReady  = lock.newCondition();
@@ -187,43 +189,38 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                 // wait for the message to be set (actually, msg + buffer).
                 lock.lockInterruptibly();
                 try {
+                    
+                    // wait for the message.
                     while (message == null)
                         messageReady.await();
+
+                    /*
+                     * @todo pass in serverSocket, message, and buffer and make
+                     * this static.
+                     */
+                    readFuture = new FutureTask<Void>(new ReadTask(selector,
+                            serverKey)); // , message, buffer));
+
+                    futureReady.signal();
+
                 } finally {
+
                     lock.unlock();
+                    
                 }
 
                 /*
                  * The ReadTask now listens for the accept, ensuring that a
                  * future is available as soon as a message is present.
-                 * 
-                 * @todo handle RejectedExecutionException.
-                 * 
-                 * @todo pass in serverSocket, message, and buffer and make
-                 * this static.
                  */
-                this.readFuture = executor.submit(new ReadTask(selector,
-                        serverKey));//, message, buffer));
-
-                /*
-                 * We must signal the future availability separately because the
-                 * RMI message may be received before we have data on the input
-                 * stream.
-                 * 
-                 * @todo if the ReadTask is not submitted then the receiveData()
-                 * method would block forever. E.g., if the executor was
-                 * shutdown.
-                 */
-                {
-                    lock.lockInterruptibly();
-                    try {
-                        futureReady.signal();
-                    } finally {
-                        lock.unlock();
-                    }
+                try {
+                    executor.execute(readFuture);
+                } catch (RejectedExecutionException ex) {
+                    readFuture.cancel(true/* mayInterruptIfRunning */);
+                    log.error(ex);
                 }
 
-                readFuture.get(); // wait synchronously for read!!
+                readFuture.get();
 
             } // while(true)
 
@@ -250,7 +247,7 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
      * 
      * @todo compute checksum and verify.
      * 
-     * @todo transfer data onto the downstream socket.
+     * @todo transfer data onto the downstream socket and unit tests.
      */
     private class ReadTask implements Callable<Void> {
 
@@ -286,6 +283,8 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                 }
             }
 
+            // @todo client should use its own selector.
+            
             // get the client connection.
             final SocketChannel client = server.accept();
             client.configureBlocking(false);
