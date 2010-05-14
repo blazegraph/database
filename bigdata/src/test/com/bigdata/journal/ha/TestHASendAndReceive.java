@@ -103,11 +103,13 @@ public class TestHASendAndReceive extends TestCase3 {
 		ByteBuffer rcv = ByteBuffer.allocate(2000);
 		
 		try {
-			Future<Integer> fut = receiveService.receiveData(msg, rcv);
+			Future<Void> fut = receiveService.receiveData(msg, rcv);
 			
-			int ret = fut.get();
+			assertTrue("Future not set: " + fut, fut != null);
+
+			Void ret = fut.get();
 			
-			assertTrue("Unexpected value returned: " + ret, ret == 50);
+			// assertTrue("Unexpected value returned: " + ret, ret == 50);
 			
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
