@@ -4075,7 +4075,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
          * the RMI calls to writeCacheBuffer will set all downstream quorum members
          * to wait for the message.
          */
-		public RunnableFuture<Void> writeCacheBuffer(long fileExtent) throws IOException {
+		public RunnableFuture<Void> writeCacheBuffer(final long fileExtent) throws IOException {
             return new FutureTask<Void>(new Runnable() {
                 public void run() {
 
@@ -4095,7 +4095,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 						try {
 							msg.acknowledge(ack);
 						} catch (IOException e1) {
-							log.error("Failed to acknoweldge message", e1);
+							log.error("Failed to acknowledge message", e1);
 						}
 					}
 					
@@ -4116,6 +4116,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 	/**
 	 * Local class providing Environment hooks used by all objects supporting HA
 	 *
+	 * FIXME This should use the configured properties for the writePipelineAddr
+	 * and writePipelinePort.  It is important that these are well known values
+	 * when configuring on different hosts.
 	 */
 	class HAEnvironment implements Environment {
 
