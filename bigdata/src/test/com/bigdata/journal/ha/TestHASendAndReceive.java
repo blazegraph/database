@@ -96,27 +96,32 @@ public class TestHASendAndReceive extends TestCase3 {
 	}
 	
 	public void testSimpleExchange() {
-		ByteBuffer tst = getRandomData(50);
-		sendService.send(tst);
+		ByteBuffer tst1 = getRandomData(50);
+		sendService.send(tst1);
 		
-		HAWriteMessage msg = new HAWriteMessage(50, 0);
+		HAWriteMessage msg1 = new HAWriteMessage(50, 0);
+		HAWriteMessage msg2 = new HAWriteMessage(100, 0);
 		ByteBuffer rcv = ByteBuffer.allocate(2000);
+		ByteBuffer rcv2 = ByteBuffer.allocate(2000);
 		
 		try {
-			Future<Void> fut = receiveService.receiveData(msg, rcv);
-			
-			assertTrue("Future not set: " + fut, fut != null);
+			rcv.limit(50);
+			Future<Void> fut = receiveService.receiveData(msg1, rcv);			
+			fut.get();			
+			assertEquals(tst1, rcv);
 
-			Void ret = fut.get();
-			
-			// assertTrue("Unexpected value returned: " + ret, ret == 50);
-			
+			ByteBuffer tst2 = getRandomData(100);
+			sendService.send(tst2);
+
+			rcv2.limit(100);
+			fut = receiveService.receiveData(msg2, rcv2);			
+			fut.get();			
+			assertEquals(tst2, rcv2);
+
 		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			throw new RuntimeException(e);
 		} catch (ExecutionException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			throw new RuntimeException(e);
 		}
 	}
 }
