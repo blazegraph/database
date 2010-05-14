@@ -104,11 +104,15 @@ public class HASendService {
 	}
 
     /**
-     * Ensure that the private executor service is always terminated.
+     * Extended to ensure that the private executor service is always
+     * terminated.
      */
-    protected void finalize() throws Exception {
+    @Override
+    protected void finalize() throws Throwable {
         
         terminate();
+        
+        super.finalize();
         
     }
     
