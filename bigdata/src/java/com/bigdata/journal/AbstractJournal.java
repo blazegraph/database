@@ -989,7 +989,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         /*
          * Setenvironment
          */
-        this.environment = new Environment(this);
+        this.environment = new HAEnvironment();
         
         haGlue = newHAGlue();
         
@@ -3841,8 +3841,6 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         protected BasicHA(Environment environment) {
         	super(environment);
         	
-        	environment.checkWritePipeline();
-        	
         }
 
         /**
@@ -4113,6 +4111,71 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
 	public boolean isDoubleSync() {
 		return doubleSync;
+	}
+	
+	/**
+	 * Local class providing Environment hooks used by all objects supporting HA
+	 *
+	 */
+	class HAEnvironment implements Environment {
+
+		private InetAddress writePipelineAddr;
+		private int writePipelinePort;
+		
+		HAEnvironment() {
+            try {
+                writePipelineAddr = InetAddress
+                        .getByAddress(new byte[] { 127, 0, 0, 1 });
+            } catch (UnknownHostException e) {
+                throw new RuntimeException(e);
+            }
+            try {
+                writePipelinePort = getPort(0/* suggestedPort */);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+		}
+
+		public long getActiveFileExtent() {
+			return _bufferStrategy.getExtent();
+		}
+
+		public AbstractJournal getJournal() {
+			return AbstractJournal.this;
+		}
+
+		public QuorumManager getQuorumManager() {
+			return quorumManager;
+		}
+
+		public IBufferStrategy getStrategy() {
+			return _bufferStrategy;
+		}
+
+		public InetAddress getWritePipelineAddr() {
+			return writePipelineAddr;
+		}
+
+		public int getWritePipelinePort() {
+			return writePipelinePort;
+		}
+
+		public boolean isHighlyAvailable() {
+			return quorumManager != null && quorumManager.isHighlyAvailable();
+		}
+		
+	    protected int getPort(int suggestedPort) throws IOException {
+	        ServerSocket openSocket;
+	        try {
+	            openSocket = new ServerSocket(suggestedPort);
+	        } catch (BindException ex) {
+	            // the port is busy, so look for a random open port
+	            openSocket = new ServerSocket(0);
+	        }
+	        final int port = openSocket.getLocalPort();
+	        openSocket.close();
+	        return port;
+	    }
 	}
 
 }

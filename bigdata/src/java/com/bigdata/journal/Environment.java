@@ -46,97 +46,19 @@ import com.bigdata.journal.ha.QuorumManager;
  * @author Martyn Cutcher
  *
  */
-public class Environment {
+public interface Environment {
 
-	private AbstractJournal journal;
-	private IBufferStrategy strategy;
-	private QuorumManager quorumManager;
-    private InetAddress writePipelineAddr;
-    private int writePipelinePort;
+	public InetAddress getWritePipelineAddr();
 
-	public Environment(AbstractJournal journal) {
-		this.journal = journal;
-		this.quorumManager = journal.getQuorumManager();
-	}
-	
-	public void setWritePipeline(InetAddress addr, int port) {
-		writePipelineAddr = addr;
-		writePipelinePort = port;
-	}
-	
-	public InetAddress getWritePipelineAddr() {
-		return writePipelineAddr;
-	}
+	public int getWritePipelinePort();
 
-	public int getWritePipelinePort() {
-		return writePipelinePort;
-	}
+	public AbstractJournal getJournal();
 
-	public AbstractJournal getJournal() {
-		return journal;
-	}
+	public QuorumManager getQuorumManager();
 
-	public void setQuorumManager(QuorumManager quorumManager) {
-		this.quorumManager = quorumManager;
-	}
+	public boolean isHighlyAvailable();
 
-	public QuorumManager getQuorumManager() {
-		return quorumManager;
-	}
+	public long getActiveFileExtent();
 
-	public void setLocalBufferStrategy(IBufferStrategy strategy) {
-		this.strategy = strategy;
-	}
-
-	public boolean isHighlyAvailable() {
-		return quorumManager != null && quorumManager.isHighlyAvailable();
-	}
-
-	public long getActiveFileExtent() {
-		if (strategy == null) {
-			throw new IllegalStateException("BufferStarteg not set in Environment");
-		}
-		
-		return strategy.getExtent();
-	}
-
-	public IBufferStrategy getStrategy() {
-		return strategy;
-	}
-
-	public void checkWritePipeline() {
-        if (writePipelineAddr == null) {
-            try {
-                writePipelineAddr = InetAddress
-                        .getByAddress(new byte[] { 127, 0, 0, 1 });
-            } catch (UnknownHostException e) {
-                throw new RuntimeException(e);
-            }
-        }
-        if (writePipelinePort == 0) {
-            try {
-                writePipelinePort = getPort(0/* suggestedPort */);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-       }
-	}
-
-    /**
-     * Return an open port on current machine. Try the suggested port first. If
-     * suggestedPort is zero, just select a random port
-     */
-    static protected int getPort(int suggestedPort) throws IOException {
-        ServerSocket openSocket;
-        try {
-            openSocket = new ServerSocket(suggestedPort);
-        } catch (BindException ex) {
-            // the port is busy, so look for a random open port
-            openSocket = new ServerSocket(0);
-        }
-        final int port = openSocket.getLocalPort();
-        openSocket.close();
-        return port;
-    }
-
+	public IBufferStrategy getStrategy();
 }
