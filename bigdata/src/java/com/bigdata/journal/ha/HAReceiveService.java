@@ -25,8 +25,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.ha;
 
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
@@ -40,58 +38,112 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.io.ObjectSocketChannelStream;
-import com.bigdata.io.WriteCache;
-
 /**
- * Receives data from an HASendService.
- * 
- * The non-blocking processing of the data cannot proceed until the message parameters and an output
- * buffer have been set.  So an accept results in a task to be run.  The Future from this task is
- * returned to the method called from the RMI control invocation, thus allowing that method to wait
- * for the completion of the data transfer.
+ * Receives data from an {@link HASendService}.
+ * <p>
+ * The non-blocking processing of the data cannot proceed until the message
+ * parameters and an output buffer have been set. So an accept results in a task
+ * to be run. The Future from this task is returned to the method called from
+ * the RMI control invocation, thus allowing that method to wait for the
+ * completion of the data transfer.
  * 
  * @author Martyn Cutcher
- *
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class HAReceiveService extends Thread {
-	protected static final Logger log = Logger.getLogger(HAReceiveService.class);
-	private InetAddress addr;
-	private int port;
+public class HAReceiveService<M extends HAWriteMessage> extends Thread {
+
+    protected static final Logger log = Logger
+            .getLogger(HAReceiveService.class);
+
+    /** The Internet socket address at which this service will listen. */
+    private final InetSocketAddress addrSelf;
+
+    /**
+     * The Internet socket address of a downstream service to which each data
+     * transfer will be relayed as it is received (optional and may be
+     * <code>null</code>).
+     * 
+     * FIXME Implement the relay semantics.
+     */
+    private final InetSocketAddress addrNext;
+	
 	private Selector selector;
 	private ServerSocketChannel server;
 	private SelectionKey serverKey;
-	private ExecutorService executor = Executors.newSingleThreadExecutor();
-	private Future<Integer> readFuture; // future task ready to process data transfer
+	
+	private final ExecutorService executor = Executors.newSingleThreadExecutor();
+	
+	private Future<Void> readFuture;
+	
 	final Lock lock = new ReentrantLock();
 	final Condition futureReady  = lock.newCondition(); 
 	final Condition messageReady = lock.newCondition(); 
 	private HAWriteMessage message;
 	private ByteBuffer localBuffer;
 
-	public HAReceiveService(InetAddress addr, int port, IHAClient client, boolean messageDrive) {
-		this.addr = addr;
-		this.port = port;
-		this.setDaemon(true);
-		
-		if (log.isInfoEnabled())
-			log.info("Created for " + addr + ":" + port);
-	}
-	
+    /**
+     * 
+     * @param addrSelf
+     *            The Internet socket address at which this service will listen.
+     * @param addrNext
+     *            The Internet socket address of a downstream service to which
+     *            each data transfer will be relayed as it is received
+     *            (optional).
+     */
+    public HAReceiveService(final InetSocketAddress addrSelf,
+            final InetSocketAddress addrNext) {
+
+        if (addrSelf == null)
+            throw new IllegalArgumentException();
+
+        this.addrSelf = addrSelf;
+
+        this.addrNext = addrNext;
+
+        if (log.isInfoEnabled())
+            log.info("Created for " + addrSelf + ", addrNext" + addrNext);
+
+        setDaemon(true);
+        
+    }
+
+    /**
+     * Extended to {@link #terminate()} processing in order to ensure that
+     * the service is eventually shutdown.
+     */
+    @Override
+    protected void finalize() throws Throwable {
+        
+        terminate();
+        
+        super.finalize();
+        
+    }
+    
+    /**
+     * Immediate shutdown.
+     */
+    public void terminate() {
+        
+        this.interrupt();
+        
+        executor.shutdownNow();
+        
+    }
+    
 	public void run() {
 		try {
 			selector = Selector.open();
 			server = ServerSocketChannel.open();
-			server.socket().bind(new InetSocketAddress(addr, port));
+			server.socket().bind(addrSelf);
 			if(log.isInfoEnabled())
-			    log.info("Listening on" + addr + ":" + port);
+			    log.info("Listening on" + addrSelf);
 			server.configureBlocking(false);
 			serverKey = server.register(selector, SelectionKey.OP_ACCEPT);
 			runNoBlock();
@@ -113,6 +165,7 @@ public class HAReceiveService extends Thread {
 			}
 		}
 	}
+
 	/**
 	 * Loops accepting requests and scheduling readTasks
 	 */
@@ -136,9 +189,9 @@ public class HAReceiveService extends Thread {
 							SelectionKey clientKey = client.register(selector, SelectionKey.OP_READ);
 							clientKey.attach(Integer.valueOf(0));
 							
-							this.readFuture = executor.submit(new Callable<Integer>() {
+							this.readFuture = executor.submit(new Callable<Void>() {
 
-								public Integer call() throws Exception {
+								public Void call() throws Exception {
 									lock.lockInterruptibly();
 									try {
 										if (message == null) messageReady.await(); 
@@ -172,7 +225,8 @@ public class HAReceiveService extends Thread {
 										}
 									}
 									
-									return message.getSize(); // returns length of data read
+									// success.
+									return null;
 								}});
 							
 							// We must signal the future availability separately because the RMI
@@ -204,32 +258,38 @@ public class HAReceiveService extends Thread {
             }
 		}
 	}
-	
-	/**
-	 * 
-	 * @param sze
-	 * @param chk
-	 * @param cache
-	 * @return
-	 * @throws InterruptedException 
-	 */
-	public Future<Integer> receiveData(HAWriteMessage hamsg, ByteBuffer buffer) throws InterruptedException {
-		{
-			lock.lockInterruptibly();
-			try {
-				message = hamsg;
-				localBuffer = buffer.duplicate();
-				localBuffer.limit(message.getSize());
-				localBuffer.position(0);
-				messageReady.signal();
-				
-				if (readFuture == null) futureReady.await(); 
-			} finally {
-				lock.unlock();
-			}
-			
-		}
-		
-		return readFuture;
-	}	
+
+    /**
+     * 
+     * @param msg
+     *            The metadata about the data to be transferred.
+     * @param buffer
+     *            The buffer in which this service will receive the data. The
+     *            buffer MUST be large enough for the data to be received. The
+     *            buffer SHOULD be a direct {@link ByteBuffer} in order to
+     *            benefit from NIO efficiencies.
+     * @return
+     * @throws InterruptedException
+     */
+    public Future<Void> receiveData(final HAWriteMessage msg,
+            final ByteBuffer buffer) throws InterruptedException {
+        {
+            lock.lockInterruptibly();
+            try {
+                message = msg;
+                localBuffer = buffer.duplicate();
+                localBuffer.limit(message.getSize());
+                localBuffer.position(0);
+                messageReady.signal();
+
+                if (readFuture == null)
+                    futureReady.await();
+            } finally {
+                lock.unlock();
+            }
+
+        }
+
+        return readFuture;
+    }
 }
