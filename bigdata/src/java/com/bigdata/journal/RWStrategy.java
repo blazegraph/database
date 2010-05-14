@@ -82,10 +82,6 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 		
 		m_environment = environment;
 		
-        if (environment != null) {
-        	environment.setLocalBufferStrategy(this);
-        }
-		
 		m_rb = fileMetadata.rootBlock;
 
 		m_store = new RWStore(m_fmv, false, environment); // not read-only for now

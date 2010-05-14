@@ -845,10 +845,6 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         // initialize striped performance counters for this store.
         this.storeCounters.set(new StoreCounters(10/* batchSize */));
         
-        if (environment != null) {
-        	environment.setLocalBufferStrategy(this);
-        }
-        
         /*
          * Enable the write cache?
          * 
