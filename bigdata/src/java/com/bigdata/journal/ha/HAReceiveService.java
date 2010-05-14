@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -72,7 +73,8 @@ public class HAReceiveService extends Thread {
 	final Lock lock = new ReentrantLock();
 	final Condition futureReady  = lock.newCondition(); 
 	final Condition messageReady = lock.newCondition(); 
-	private WriteMessage message;
+	private HAWriteMessage message;
+	private ByteBuffer localBuffer;
 
 	public HAReceiveService(InetAddress addr, int port, IHAClient client, boolean messageDrive) {
 		this.addr = addr;
@@ -127,7 +129,7 @@ public class HAReceiveService extends Thread {
 
 					if (key == serverKey) {
 						if (key.isAcceptable()) {
-							SocketChannel client = server.accept();
+							final SocketChannel client = server.accept();
 							if (log.isTraceEnabled())
 								log.trace("Accepted connection");
 							client.configureBlocking(false);
@@ -147,9 +149,30 @@ public class HAReceiveService extends Thread {
 									// We should now have parametesr ready in the WriteMessage and 
 									//	can begin transferring data from the stream to the writeCache
 									
-									// TODO: Do the transfer
+									// Do the transfer
+									int rem = message.getSize();
+									while (rem > 0) {
+										selector.select();
+
+										final Set<SelectionKey> keys = selector.selectedKeys();
+										final Iterator<SelectionKey> iter = keys.iterator();
+										while (iter.hasNext())  {
+											final SelectionKey key = (SelectionKey) iter.next();
+											if (key.isReadable()) {
+												iter.remove();
+												
+												if (key.channel() != client)
+													throw new IllegalStateException("Unexpected socket channel");
+
+												int rdlen = client.read(localBuffer);
+												rem -= rdlen;
+											} else {
+												throw new IllegalStateException("Unexpected Selection Key: " + key);
+											}
+										}
+									}
 									
-									return -1; // returns length of data read
+									return message.getSize(); // returns length of data read
 								}});
 							
 							// We must signal the future availability separately because the RMI
@@ -190,11 +213,14 @@ public class HAReceiveService extends Thread {
 	 * @return
 	 * @throws InterruptedException 
 	 */
-	public Future<Integer> receiveData(int sze, int chk, boolean prefixWrites, WriteCache cache) throws InterruptedException {
+	public Future<Integer> receiveData(HAWriteMessage hamsg, ByteBuffer buffer) throws InterruptedException {
 		{
 			lock.lockInterruptibly();
 			try {
-				this.message = new WriteMessage(sze, chk, prefixWrites, cache);
+				message = hamsg;
+				localBuffer = buffer.duplicate();
+				localBuffer.limit(message.getSize());
+				localBuffer.position(0);
 				messageReady.signal();
 				
 				if (readFuture == null) futureReady.await(); 
@@ -205,21 +231,5 @@ public class HAReceiveService extends Thread {
 		}
 		
 		return readFuture;
-	}
-	
-	static class WriteMessage {
-
-		int sze;
-		int chk;
-		boolean prefixWrites;
-		WriteCache writeCache;
-
-		public WriteMessage(int sze, int chk, boolean prefixWrites, WriteCache cache) {
-			this.sze = sze;
-			this.chk = chk;
-			this.prefixWrites = prefixWrites;
-			this.writeCache = writeCache;
-		}
-		
-	}
+	}	
 }
