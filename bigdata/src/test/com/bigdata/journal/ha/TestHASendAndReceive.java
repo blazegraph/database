@@ -38,6 +38,7 @@ import com.bigdata.io.TestCase3;
  * 
  * @author martyn Cutcher
  *
+ * FIXME Write a stress test for this.
  */
 public class TestHASendAndReceive extends TestCase3 {
 
@@ -80,19 +81,28 @@ public class TestHASendAndReceive extends TestCase3 {
 
 	}
 	
-	HASendService sendService;
-	HAReceiveService receiveService;
+	private HASendService sendService;
+	private HAReceiveService<HAWriteMessage> receiveService;
 	
 	protected void setUp() throws Exception {
-		InetSocketAddress addr = new InetSocketAddress(3000);
+
+	    final InetSocketAddress addr = new InetSocketAddress(3000);
 		
-		receiveService = new HAReceiveService(addr, null);
+		receiveService = new HAReceiveService<HAWriteMessage>(addr, null);
 		receiveService.start();
-		
-		// Thread.sleep(2000);
-		
-		sendService = new HASendService(addr);
-		
+
+        sendService = new HASendService(addr);
+
+    }
+
+    protected void tearDown() throws Exception {
+
+        if (receiveService != null)
+            receiveService.terminate();
+
+        if (sendService != null)
+            sendService.terminate();
+	    
 	}
 	
 	public void testSimpleExchange() {

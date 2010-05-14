@@ -79,6 +79,12 @@ public class HAWriteMessage implements Externalizable {
 		return chk;
 	}
 	
+    public String toString() {
+
+        return super.toString() + "{size=" + sze + ",chksum=" + chk + "}";
+        
+    }
+    
 //	public boolean usePrefixWrites() {
 //		return prefixWrites;
 //	}
