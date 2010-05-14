@@ -29,18 +29,46 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
+/**
+ * Base class for RMI messages used to communicate metadata about a raw data
+ * transfer occurring on a socket channel.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ * 
+ * @see HASendService
+ * @see HAReceiveService
+ */
 public class HAWriteMessage implements Externalizable {
 	
-	private int sze;
-	private boolean prefixWrites;
-	private int chk;
+	/**
+     * 
+     */
+    private static final long serialVersionUID = -6807744466616574690L;
 
-	public HAWriteMessage(int sze, int chq, boolean prefixWrites) {
+    /** The #of bytes of data to be transfered. */
+    private int sze;
+
+    /** The Alder32 checksum of the bytes to be transfered. */
+    private int chk;
+
+    /**
+     * 
+     * @param sze
+     *            The #of bytes of data to be transfered.
+     * @param chk
+     *            The Alder32 checksum of the bytes to be transfered.
+     */
+    public HAWriteMessage(final int sze, final int chk) {
+        if (sze <= 0)
+            throw new IllegalArgumentException();
 		this.sze = sze;
 		this.chk = chk;
-		this.prefixWrites = prefixWrites;
 	}
 	
+    /**
+     * Deserialization constructor.
+     */
 	public HAWriteMessage() {}
 
 	public int getSize() {
@@ -51,19 +79,19 @@ public class HAWriteMessage implements Externalizable {
 		return chk;
 	}
 	
-	public boolean usePrefixWrites() {
-		return prefixWrites;
-	}
+//	public boolean usePrefixWrites() {
+//		return prefixWrites;
+//	}
 	
 	public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
 		sze = in.readInt();
 		chk = in.readInt();
-		prefixWrites = in.readBoolean();
+//		prefixWrites = in.readBoolean();
 	}
 
 	public void writeExternal(ObjectOutput out) throws IOException {
 		out.writeInt(sze);
 		out.writeInt(chk);
-		out.writeBoolean(prefixWrites);
+//		out.writeBoolean(prefixWrites);
 	}	
 }
