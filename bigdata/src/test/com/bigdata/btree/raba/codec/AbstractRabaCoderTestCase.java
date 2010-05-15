@@ -76,6 +76,18 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
     }
 
     /**
+     * Return <code>true</code> if the {@link IRabaCoder} only handles fixed
+     * length values (the default always returns <code>false</code>). This is
+     * used to skip tests which have variable length byte[]s when testing the
+     * {@link FixedLengthValueRabaCoder}.
+     */
+    protected boolean isFixedLength() {
+        
+        return false;
+        
+    }
+
+    /**
      * The fixture under test. This will be <code>null</code> unless you
      * explicitly set it in {@link #setUp()}.
      */
@@ -85,6 +97,8 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
      * A simple unit test.
      */
     public void test_mike_personick() throws UnsupportedEncodingException {
+
+        if(isFixedLength()) return;
         
         final byte[][] a = new byte[2][];
         a[0] = "mike".getBytes("US-ASCII");
@@ -138,6 +152,8 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
      */
     public void test_negativeByteValues() throws UnsupportedEncodingException {
 
+        if(isFixedLength()) return;
+
         final byte[][] a = new byte[1][];
 
         a[0] = new byte[] { 64, -64 };
@@ -162,6 +178,8 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
      * @throws UnsupportedEncodingException
      */
     public void test_emptyElement() throws UnsupportedEncodingException {
+
+        if(isFixedLength()) return;
 
         final byte[][] a = new byte[3][];
         a[0] = new byte[0];
@@ -190,6 +208,8 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
      */
     public void test_nsymbolsOne() {
 
+        if(isFixedLength()) return;
+
         final byte[][] a = new byte[1][];
         a[0] = new byte[]{1};
         
@@ -214,6 +234,8 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
      * been implemented in the {@link CanonicalHuffmanRabaCoder}.
      */
     public void test_nsymbolsOne_nulls() {
+
+        if(isFixedLength()) return;
 
         final byte[][] a = new byte[3][];
         a[0] = new byte[]{1};
@@ -243,8 +265,8 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
         }
         
         final byte[][] a = new byte[3][];
-        a[0] = "mike".getBytes("US-ASCII");
-        a[1] = "personick".getBytes("US-ASCII");
+        a[0] = getRandomValue(rabaCoder);
+        a[1] = getRandomValue(rabaCoder);
         a[2] = null;
         
         final IRaba expected = new ReadOnlyValuesRaba(a);
@@ -329,6 +351,8 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
      */
     public void test_error1() throws IOException {
 
+        if(isFixedLength()) return;
+        
         final byte b187 = KeyBuilder.encodeByte(187);
         final byte b146 = KeyBuilder.encodeByte(146);
         final byte b207 = KeyBuilder.encodeByte(207);
@@ -402,6 +426,8 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
      */
     public void test_error2() {
 
+        if(isFixedLength()) return;
+
         final int n = 2;
         final byte[][] a = new byte[n][];
         a[0] = new byte[]{44, 127-186, 127-169, 127-175, 127-191, 31, 36, 12};
@@ -454,6 +480,8 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
      */
     public void test_randomURIs() throws Exception {
 
+        if(isFixedLength()) return;
+        
         // random, distinct, unordered w/o nulls.
         final byte[][] data = new RandomURIGenerator(r).generateValues(100);
 
@@ -482,6 +510,37 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
         
     }
 
+    /**
+     * Return a random byte array. The byte array will also have a random length
+     * in [0:512] unless the {@link IRabaCoder} is a
+     * {@link FixedLengthValueRabaCoder}, in which case a byte[] having the
+     * appropriate length will be returned.
+     * 
+     * @param dataCoder
+     *            The coder.
+     *            
+     * @return The random byte[].
+     */
+    protected byte[] getRandomValue(final IRabaCoder dataCoder) {
+
+        final int len;
+        if (dataCoder instanceof FixedLengthValueRabaCoder) {
+            
+            len = ((FixedLengthValueRabaCoder) dataCoder).getLength();
+
+        } else {
+        
+            len = r.nextInt(512);
+            
+        }
+
+        final byte[] a = new byte[len];
+
+        r.nextBytes(a);
+
+        return a;
+
+    }
     
     /**
      * Generates a random byte[][] and verifies round-trip encoding and
@@ -515,21 +574,15 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
 
             for (int i = 0; i < size; i++) {
 
-                final boolean isNull = r.nextFloat()<.03;
-                
+                final boolean isNull = r.nextFloat() < .03;
+
                 if(isNull) {
                     
                     data[i] = null;
 
                 } else {
 
-                    final int len = r.nextInt(512);
-
-                    final byte[] a = new byte[len];
-
-                    r.nextBytes(a);
-
-                    data[i] = a;
+                    data[i] = getRandomValue(dataCoder);
 
                 }
 
