@@ -220,6 +220,12 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                     log.error(ex);
                 }
 
+                /*
+                 * @todo We might have to wait for the Future to avoid having
+                 * more than one ReadTask at a time, but we should log and
+                 * ignore any exception and restart the loop.
+                 */
+                
                 readFuture.get();
 
             } // while(true)
@@ -357,9 +363,6 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
      *         exception.
      * 
      * @throws InterruptedException
-     * 
-     * @todo This will block until data appears on the server socket. Perhaps we
-     *       need an indirection so that it does not block on that event?
      */
     public Future<Void> receiveData(final HAWriteMessage msg,
             final ByteBuffer buffer) throws InterruptedException {
