@@ -249,7 +249,49 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 		assertEquals(rcv1, rcv2);
 	}
 
-	public void testStressDirectBuffers() throws InterruptedException {
+    /**
+     * FIXME When I ramp up the stress test for three nodes to 1000 passes I get
+     * one of the following exceptions repeatedly:
+     * <p>
+     * (a) trying to reopen the downstream client socket either in the SendTask;
+     * 
+     * <pre>
+     * Caused by: java.net.BindException: Address already in use: connect
+     *     at sun.nio.ch.Net.connect(Native Method)
+     *     at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:507)
+     *     at com.bigdata.journal.ha.HASendService.openChannel(HASendService.java:272)
+     *     at com.bigdata.journal.ha.HASendService$SendTask.call(HASendService.java:319)
+     *     at com.bigdata.journal.ha.HASendService$SendTask.call(HASendService.java:1)
+     *     at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:303)
+     *     at java.util.concurrent.FutureTask.run(FutureTask.java:138)
+     *     at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:886)
+     *     at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:908)
+     *     at java.lang.Thread.run(Thread.java:619)
+     * </pre>
+     * 
+     * (b) trying to open a selector on the client socket in the Receive task.
+     * 
+     * <pre>
+     * Caused by: java.io.IOException: Unable to establish loopback connection
+     *     at sun.nio.ch.PipeImpl$Initializer.run(PipeImpl.java:106)
+     *     at java.security.AccessController.doPrivileged(Native Method)
+     *     at sun.nio.ch.PipeImpl.<init>(PipeImpl.java:122)
+     *     at sun.nio.ch.SelectorProviderImpl.openPipe(SelectorProviderImpl.java:27)
+     *     at java.nio.channels.Pipe.open(Pipe.java:133)
+     *     at sun.nio.ch.WindowsSelectorImpl.<init>(WindowsSelectorImpl.java:105)
+     *     at sun.nio.ch.WindowsSelectorProvider.openSelector(WindowsSelectorProvider.java:26)
+     *     at java.nio.channels.Selector.open(Selector.java:209)
+     *     at com.bigdata.journal.ha.HAReceiveService$ReadTask.call(HAReceiveService.java:508)
+     * </pre>
+     * 
+     * It seems that we need to hold the client socket open across send and
+     * receive tasks and also hold open the selectors. I think that (a) is
+     * caused by the reconnect latency while (b) is caused by GC not having
+     * allowed reclamation yet of the existing selectors.
+     * 
+     * @throws InterruptedException
+     */
+    public void testStressDirectBuffers() throws InterruptedException {
 
 		ByteBuffer tst = null, rcv1 = null, rcv2 = null;
 		int i = -1, sze = -1;
@@ -257,10 +299,10 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 			tst = DirectBufferPool.INSTANCE.acquire();
 			rcv1 = DirectBufferPool.INSTANCE.acquire();
 			rcv2 = DirectBufferPool.INSTANCE.acquire();
-			for (i = 0; i < 100; i++) {
+			for (i = 0; i < 1000; i++) {
 
-				if(log.isInfoEnabled())
-				    log.info("Transferring message #" + i);
+				if(log.isTraceEnabled())
+				    log.trace("Transferring message #" + i);
 
 				sze = 1 + r.nextInt(tst.capacity());
 				getRandomData(tst, sze);
@@ -292,8 +334,8 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
                 assertEquals(tst, rcv1);
                 // make sure buffer has been transmitted
                 assertEquals(rcv1, rcv2);
-                if (log.isInfoEnabled())
-                    log.info("Looks good for #" + i);
+                if (log.isTraceEnabled())
+                    log.trace("Looks good for #" + i);
             }
 		} catch (Throwable t) {
 			throw new RuntimeException("i=" + i + ", sze=" + sze + " : " + t, t);
