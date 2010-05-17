@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License along with thi
 
 package com.bigdata.journal.ha;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -37,6 +38,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
+
+import com.bigdata.util.ChecksumUtility;
 
 /**
  * Receives data from an {@link HASendService}.
@@ -360,6 +363,8 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
 
         private final HASendService downstream;
 
+		private ChecksumUtility chk = new ChecksumUtility();
+
         public ReadTask(final ServerSocketChannel server,
                 final HAWriteMessage message, final ByteBuffer localBuffer,
                 final HASendService downstream) {
@@ -368,7 +373,6 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
             this.message = message;
             this.localBuffer = localBuffer;
             this.downstream = downstream;
-
         }
 
         /**
@@ -442,7 +446,10 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                  * writeCache.
                  */
 
-                // Do the transfer
+                // Do the transfer, prepare downstream (if any) for incremental transfers
+                if (downstream != null) {
+                	downstream.initiateIncSend();
+                }
                 int rem = message.getSize();
                 while (rem > 0) {
 
@@ -455,7 +462,11 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
 
                         final int rdlen = client.read(localBuffer);
                         if (log.isTraceEnabled())
-                            log.trace("Read " + rdlen + " into buffer");
+                            log.trace("Read " + rdlen + " bytes");
+                        
+                        if (rdlen == -1) 
+                        	break;
+                        
                         rem -= rdlen;
 
                         /*
@@ -471,19 +482,30 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                          * more effort.
                          */
                         if (downstream != null) {
-                            ByteBuffer out = localBuffer.asReadOnlyBuffer();
+                        	if (log.isTraceEnabled())
+                                log.trace("Incremental send of " + rdlen + " bytes");
+                        	ByteBuffer out = localBuffer.asReadOnlyBuffer();
                             out.position(localBuffer.position() - rdlen);
                             out.limit(localBuffer.position());
-                            downstream.send(out);
+                            downstream.incSend(out);
                         }
                     }
 
                 } // while( rem > 0 )
                 
+                // wait for downstream send
+                if (downstream != null) {
+                	downstream.closeIncSend();
+                }
+                
                 // prepare for reading.
                 assert localBuffer.position() == message.getSize() : "localBuffer.pos="+localBuffer.position()+", message.size="+message.getSize();
                 localBuffer.flip();
                 
+                // TODO extent utility to compute incrementally to take advantage of wait time for transfers
+                if (chk.checksum(localBuffer) != message.getChk()) {
+                	throw new RuntimeException("Checksum Error");
+                }
                 // success.
                 return null;
 
