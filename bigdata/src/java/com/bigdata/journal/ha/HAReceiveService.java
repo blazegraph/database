@@ -446,46 +446,42 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                 int rem = message.getSize();
                 while (rem > 0) {
 
-                	clientSelector.select();
+                    clientSelector.select();
                     final Set<SelectionKey> keys = clientSelector.selectedKeys();
                     final Iterator<SelectionKey> iter = keys.iterator();
                     while (iter.hasNext()) {
-                        final SelectionKey key = (SelectionKey) iter.next();
-                        if (key.isReadable()) {
-                            assert key == clientKey;
+                        iter.next();
+                        iter.remove();
 
-                            iter.remove();
+                        final int rdlen = client.read(localBuffer);
+                        if (log.isTraceEnabled())
+                            log.trace("Read " + rdlen + " into buffer");
+                        rem -= rdlen;
 
-                            if (key.channel() != client)
-                                throw new IllegalStateException(
-                                        "Unexpected socket channel");
-
-                            final int rdlen = client.read(localBuffer);
-                            if (log.isTraceEnabled())
-                                log.trace("Read " + rdlen + " into buffer");
-                            rem -= rdlen;
-                            
-                            /* Now forward the most recent transfer bytes downstream
-                             * 
-                             * @todo inline open of downstream socket channel since
-                             * we may have to transfer smaller chunks.
-                             */
-                            if (downstream != null) {
-                            	ByteBuffer out = localBuffer.asReadOnlyBuffer();
-                            	out.position(localBuffer.position() - rdlen);
-                            	out.limit(localBuffer.position());
-                            	downstream.send(out);
-                            }
-                        } else {
-                            throw new IllegalStateException(
-                                    "Unexpected Selection Key: " + key);
+                        /*
+                         * Now forward the most recent transfer bytes downstream
+                         * 
+                         * @todo inline open of downstream socket channel since
+                         * we may have to transfer smaller chunks.
+                         * 
+                         * @todo Since the downstream writes are against a
+                         * blocking mode channel, the receiver on this node runs
+                         * in sync with the receiver on the downstream node. In
+                         * fact, those processes could be decoupled with a bit
+                         * more effort.
+                         */
+                        if (downstream != null) {
+                            ByteBuffer out = localBuffer.asReadOnlyBuffer();
+                            out.position(localBuffer.position() - rdlen);
+                            out.limit(localBuffer.position());
+                            downstream.send(out);
                         }
                     }
-                    
+
                 } // while( rem > 0 )
                 
                 // prepare for reading.
-                assert localBuffer.position() == message.getSize();
+                assert localBuffer.position() == message.getSize() : "localBuffer.pos="+localBuffer.position()+", message.size="+message.getSize();
                 localBuffer.flip();
                 
                 // success.
