@@ -72,10 +72,32 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
     private ServerSocketChannel server;
     private FutureTask<Void> readFuture;
     private FutureTask<Void> waitFuture;
-   
-    final Lock lock = new ReentrantLock();
-    final Condition futureReady  = lock.newCondition();
-    final Condition messageReady = lock.newCondition();
+
+    /**
+     * Service run state enumeration.
+
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    private static enum RunState {
+
+        Start(0), Running(1), ShuttingDown(2), Shutdown(3);
+        
+        private RunState(final int level) {
+        
+            this.level = level;
+            
+        }
+
+        private final int level;
+    }
+
+    /*
+     * The lock and the things which it guards.
+     */
+    private final Lock lock = new ReentrantLock();
+    private final Condition futureReady  = lock.newCondition();
+    private final Condition messageReady = lock.newCondition();
+    private RunState runState = RunState.Start;
     private HAWriteMessage message;
     private ByteBuffer localBuffer;
 
@@ -129,16 +151,63 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
    
     /**
      * Immediate shutdown.
+     * @throws InterruptedException 
      */
-    public void terminate() {
+    public void terminate() throws InterruptedException {
        
-        this.interrupt();
-       
+        lock.lockInterruptibly();
+        try {
+            runState = RunState.ShuttingDown;
+            this.interrupt();
+        } finally {
+            lock.unlock();
+        }
+
+        if (downstream != null)
+            downstream.terminate();
+        
         executor.shutdownNow();
-       
+
+        /*
+         * Wait until we observe that the service is no longer running while
+         * holding the lock.
+         * 
+         * Note: When run() exits it MUST signalAll() on both [futureReady] and
+         * [messageReady] so that all threads watching those Conditions notice
+         * that the service is no longer running.
+         */
+        lock.lockInterruptibly();
+        try {
+            while (true) {
+                switch (runState) {
+                case Start:
+                case Running:
+                case ShuttingDown:
+                    futureReady.await();
+                    continue;
+                case Shutdown:
+                    // Exit terminate().
+                    return;
+                default:
+                    throw new AssertionError();
+                }
+            }
+        } finally {
+            lock.unlock();
+        }
+
     }
    
     public void run() {
+        lock.lock();
+        try {
+            // Change the run state and signal anyone who might be watching.
+            runState = RunState.Running;
+            futureReady.signalAll();
+            messageReady.signalAll();
+        } finally {
+            lock.unlock();
+        }
         try {
             /*
              * Open a non-blocking server socket channel and start listening.
@@ -168,6 +237,14 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                     log.error(e, e);
                 }
             }
+            lock.lock();
+            try {
+                runState = RunState.Shutdown;
+                messageReady.signalAll();
+                futureReady.signalAll();
+            } finally {
+                lock.unlock();
+            }
         }
     }
 
@@ -186,7 +263,6 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
 
         try {
 
- 
             while (true) {
 
                 // wait for the message to be set (actually, msg + buffer).
@@ -194,14 +270,24 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                 try {
                     
                     // wait for the message.
-                    while (message == null)
+                    while (message == null) {
+                        switch (runState) {
+                        case Running:
+                            break;
+                        case ShuttingDown:
+                            // Service is terminating.
+                            return;
+                        case Start:
+                        case Shutdown:
+                        default:
+                            throw new AssertionError(runState.toString());
+                        }
                         messageReady.await();
-
-                    /*
-                     * @todo pass in serverSocket, message, and buffer and make
-                     * this static.
-                     */
-                    waitFuture = new FutureTask<Void>(new ReadTask(server, message, downstream)); // , message, buffer));
+                    }
+                    
+                    // setup task.
+                    waitFuture = new FutureTask<Void>(new ReadTask(server,
+                            message, localBuffer, downstream));
                     readFuture = waitFuture;
                     message = null;
                     
@@ -259,24 +345,28 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
-     * 
-     * @todo make this static.
+     * @version $Id: HAReceiveService.java 2826 2010-05-17 11:46:23Z
+     *          martyncutcher $
      * 
      * @todo compute checksum and verify.
-     * 
-     * @todo transfer data onto the downstream socket and unit tests.
      */
-    private class ReadTask implements Callable<Void> {
+    static private class ReadTask implements Callable<Void> {
 
- 		private HAWriteMessage message;
-		private ServerSocketChannel server;
-		private HASendService downstream;
+        private final ServerSocketChannel server;
 
-        public ReadTask(final ServerSocketChannel server, final HAWriteMessage message, final HASendService downstream) {
+        private final HAWriteMessage message;
+
+        private final ByteBuffer localBuffer;
+
+        private final HASendService downstream;
+
+        public ReadTask(final ServerSocketChannel server,
+                final HAWriteMessage message, final ByteBuffer localBuffer,
+                final HASendService downstream) {
 
             this.server = server;
             this.message = message;
+            this.localBuffer = localBuffer;
             this.downstream = downstream;
 
         }
@@ -306,9 +396,11 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                 }
             }
 
-            // @todo client should use its own selector.
-            
-            // get the client connection.
+            /*
+             * Get the client connection and open the channel in a non-blocking
+             * mode so we will read whatever is available and loop until all
+             * data has been read.
+             */
             final SocketChannel client = server.accept();
             client.configureBlocking(false);
             
@@ -348,7 +440,11 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                                 log.trace("Read " + rdlen + " into buffer");
                             rem -= rdlen;
                             
-                            // now forward the most recent transfer bytes downstream
+                            /* Now forward the most recent transfer bytes downstream
+                             * 
+                             * @todo inline open of downstream socket channel since
+                             * we may have to transfer smaller chunks.
+                             */
                             if (downstream != null) {
                             	ByteBuffer out = localBuffer.asReadOnlyBuffer();
                             	out.position(localBuffer.position() - rdlen);
@@ -360,20 +456,29 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                                     "Unexpected Selection Key: " + key);
                         }
                     }
-                }
+                    
+                } // while( rem > 0 )
                 
                 // success.
                 return null;
+
             } finally {
                 clientKey.cancel();
-                client.close();
-                clientSelector.close();
                 serverKey.cancel();
-                serverSelector.close();
-            }
-
-        }
-    }
+                try {
+                    client.close();
+                } finally {
+                    try {
+                        clientSelector.close();
+                    } finally {
+                        serverSelector.close();
+                    }
+                }
+            } // finally {}
+            
+        } // call()
+            
+    } // class ReadTask
 
     /**
      * Receive data into the caller's buffer as described by the caller's
@@ -408,10 +513,21 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                 if (log.isTraceEnabled())
                     log.trace("Will accept data for message: msg=" + msg);
 
-                while (waitFuture == null)
+                while (waitFuture == null) {
+                    switch (runState) {
+                    case Start:
+                    case Running:
+                        break;
+                    case ShuttingDown:
+                    case Shutdown:
+                        throw new RuntimeException("Service closed.");
+                    default:
+                        throw new AssertionError();
+                    }
                     futureReady.await();
+                }
                 waitFuture = null;
-                
+
             } finally {
                 lock.unlock();
             }
