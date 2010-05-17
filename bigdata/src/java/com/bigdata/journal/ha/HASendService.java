@@ -30,6 +30,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -87,6 +88,10 @@ public class HASendService {
      * A single threaded executor on which {@link SendTask}s will be executed.
      */
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
+
+	private SocketChannel incSocketChannel;
+
+	private Future<Void> lastIncSendTask;
 
     /**
      * Starts an {@link HASendService} which will transfer data to a service
@@ -160,6 +165,60 @@ public class HASendService {
 	}
 
     /**
+     * Send the bytes {@link ByteBuffer#remaining()} in the buffer to the
+     * configured {@link InetSocketAddress}. This operation DOES NOT have a side
+     * effect on the position, limit or mark for the buffer.
+     * <p>
+     * Note: In order to use efficient NIO operations this MUST be a direct
+     * {@link ByteBuffer}.
+     * 
+     * @param buffer
+     *            The buffer.
+     * 
+     * @return The {@link Future} which can be used to await the outcome of this
+     *         operation.
+     * 
+     * @throws IllegalArgumentException
+     *             if the buffer is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the buffer is empty (no bytes remaining).
+     * @throws RejectedExecutionException
+     *             if this service has been shutdown.
+     */
+	public Future<Void> incSend(final ByteBuffer buffer) {
+
+        if (buffer == null)
+            throw new IllegalArgumentException();
+
+        if (buffer.remaining() == 0)
+            throw new IllegalArgumentException();
+	 
+        // Note: wrapped as a read-only buffer to prevent side-effects.
+	    lastIncSendTask =  executor.submit(newIncSendTask(buffer.asReadOnlyBuffer()));
+	    
+	    return lastIncSendTask;
+	}
+	
+	public void initiateIncSend() throws IOException {
+		log.info("initiateIncSend");
+		
+		incSocketChannel = SocketChannel.open(addr);
+	}
+
+	public void closeIncSend() throws IOException, ExecutionException, InterruptedException {
+		log.info("closeIncSend: " + lastIncSendTask);
+		
+		try {
+			if (lastIncSendTask != null)
+				lastIncSendTask.get();
+		} finally {
+			lastIncSendTask = null;
+			incSocketChannel.close();
+			incSocketChannel = null;
+		}
+	}
+
+    /**
      * Factory for the {@link SendTask}.
      * 
      * @param buffer
@@ -172,6 +231,20 @@ public class HASendService {
 
         return new SendTask(addr, buffer);
 	    
+    }
+
+    /**
+     * Factory for the {@link SendTask}.
+     * 
+     * @param buffer
+     *            The buffer whose data are to be sent.
+     *            
+     * @return The task which will send the data to the configured
+     *         {@link InetSocketAddress}.
+     */
+    protected Callable<Void> newIncSendTask(final ByteBuffer buffer) {
+
+         return new IncSendTask(incSocketChannel, buffer);
     }
 
     /**
@@ -262,6 +335,64 @@ public class HASendService {
 
             if(log.isTraceEnabled())
                 log.trace("Sent "+remaining+" bytes to "+addr);
+            
+            // check all data written
+            assert data.remaining() == 0 : "remaining=" + data.remaining();
+
+            return null;
+            
+        }
+
+    }
+    
+    /**
+     * This task implements the raw data transfer. Each instance of this task
+     * sends the {@link ByteBuffer#remaining()} bytes in a single
+     * {@link ByteBuffer} to the receiving service on a specified
+     * {@link InetSocketAddress}.
+     */
+    protected static class IncSendTask implements Callable<Void> {
+
+        private final SocketChannel socketChannel;
+        private final ByteBuffer data;
+
+        public IncSendTask(final SocketChannel socketChannel, final ByteBuffer data) {
+
+            if (socketChannel == null)
+                throw new IllegalArgumentException();
+
+            if (data == null)
+                throw new IllegalArgumentException();
+
+            this.socketChannel = socketChannel;
+            
+            this.data = data;
+
+        }
+
+        public Void call() throws Exception {
+
+            // The #of bytes to transfer.
+            final int remaining = data.remaining();
+            
+            try {
+
+                /*
+                 * Write the data -- should block until finished or until this
+                 * thread is interrupted, e.g., by shutting down the thread pool
+                 * on which it is running.
+                 */
+                socketChannel.write(data);
+
+            } finally {
+
+                // do no close the socket, leave to explicit closeIncSend
+                // socketChannel.close();
+
+            }
+
+            if(log.isTraceEnabled())
+                log.trace("Sent "+remaining+" bytes");
             
             // check all data written
             assert data.remaining() == 0 : "remaining=" + data.remaining();
