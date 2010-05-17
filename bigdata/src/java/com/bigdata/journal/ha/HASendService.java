@@ -200,13 +200,15 @@ public class HASendService {
 	}
 	
 	public void initiateIncSend() throws IOException {
-		log.info("initiateIncSend");
-		
+        if (log.isInfoEnabled())
+            log.info("initiateIncSend");
+
 		incSocketChannel = SocketChannel.open(addr);
 	}
 
 	public void closeIncSend() throws IOException, ExecutionException, InterruptedException {
-		log.info("closeIncSend: " + lastIncSendTask);
+	    if (log.isInfoEnabled())
+	        log.info("closeIncSend: " + lastIncSendTask);
 		
 		try {
 			if (lastIncSendTask != null)
