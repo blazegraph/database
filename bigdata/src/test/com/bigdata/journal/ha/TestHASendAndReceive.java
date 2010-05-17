@@ -24,7 +24,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal.ha;
 
+import java.io.IOException;
+import java.net.BindException;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
@@ -43,6 +46,8 @@ import com.bigdata.io.TestCase3;
  * 
  * @todo Add random interrupts of the threads and shutdown of the services to
  *       look for deadlock conditions.
+ * 
+ * @todo Stress test w/ random ports to avoid address already in use?
  */
 public class TestHASendAndReceive extends TestCase3 {
 
@@ -113,7 +118,15 @@ public class TestHASendAndReceive extends TestCase3 {
 	
 	protected void setUp() throws Exception {
 
-	    final InetSocketAddress addr = new InetSocketAddress(3000);
+        /*
+         * Note: ZERO (0) indicates that a random free port will be selected. If
+         * you use a fixed port then there is a danger that the port will not be
+         * able to be reopened immediately after it has been closed, in which
+         * case you will see something like: "bind address already in use".
+         */
+	    final int port = getPort(0);// 3000
+	    
+	    final InetSocketAddress addr = new InetSocketAddress(port);
 		
 		receiveService = new HAReceiveService<HAWriteMessage>(addr, null);
 		receiveService.start();
@@ -131,6 +144,35 @@ public class TestHASendAndReceive extends TestCase3 {
             sendService.terminate();
 	    
 	}
+
+    /**
+     * Return an open port on current machine. Try the suggested port first. If
+     * suggestedPort is zero, just select a random port
+     */
+    private static int getPort(int suggestedPort) throws IOException {
+        
+        ServerSocket openSocket;
+        try {
+            openSocket = new ServerSocket(suggestedPort);
+        } catch (BindException ex) {
+            // the port is busy, so look for a random open port
+            openSocket = new ServerSocket(0);
+        }
+
+        final int port = openSocket.getLocalPort();
+        
+        openSocket.close();
+
+        if (suggestedPort != 0 && port != suggestedPort) {
+
+            log.warn("suggestedPort is busy: suggestedPort=" + suggestedPort
+                    + ", using port=" + port + " instead");
+            
+        }
+
+        return port;
+
+    }
 
     /**
      * Should we expect concurrency of the Socket send and RMI? It seems that we
