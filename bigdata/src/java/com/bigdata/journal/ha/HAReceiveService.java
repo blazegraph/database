@@ -371,31 +371,56 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
 
         }
 
-        public Void call() throws Exception {
+        /**
+         * Blocking wait for a client connection.
+         * 
+         * @throws IOException
+         *             if something goes wrong.
+         */
+        protected void awaitAccept() throws IOException {
 
             // blocking wait for a client connection.
             final Selector serverSelector = Selector.open();
-            final SelectionKey serverKey = server.register(serverSelector,
-                     SelectionKey.OP_ACCEPT);
-            
-            serverSelector.select();
+            try {
 
-            {
-                final Set<SelectionKey> keys = serverSelector.selectedKeys();
-                final Iterator<SelectionKey> iter = keys.iterator();
-                while (iter.hasNext()) {
+                final SelectionKey serverKey = server.register(serverSelector,
+                        SelectionKey.OP_ACCEPT);
 
-                    final SelectionKey key = (SelectionKey) iter.next();
+                try {
 
-                    iter.remove();
+                    serverSelector.select(); // blocks
 
-                    if (key != serverKey)
-                        throw new AssertionError();
+                    final Set<SelectionKey> keys = serverSelector
+                            .selectedKeys();
 
-                    break;
+                    final Iterator<SelectionKey> iter = keys.iterator();
+                    
+                    while (iter.hasNext()) {
+
+                        final SelectionKey key = (SelectionKey) iter.next();
+
+                        iter.remove();
+
+                        if (key != serverKey)
+                            throw new AssertionError();
+
+                        break;
+                    }
+
+                } finally {
+                    serverKey.cancel();
                 }
+
+            } finally {
+                serverSelector.close();
             }
 
+        }
+        
+        public Void call() throws Exception {
+
+            awaitAccept();
+            
             /*
              * Get the client connection and open the channel in a non-blocking
              * mode so we will read whatever is available and loop until all
@@ -464,15 +489,10 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
 
             } finally {
                 clientKey.cancel();
-                serverKey.cancel();
                 try {
                     client.close();
                 } finally {
-                    try {
-                        clientSelector.close();
-                    } finally {
-                        serverSelector.close();
-                    }
+                    clientSelector.close();
                 }
             } // finally {}
             
