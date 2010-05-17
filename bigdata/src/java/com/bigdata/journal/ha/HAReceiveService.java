@@ -16,7 +16,6 @@ You should have received a copy of the GNU General Public License along with thi
 
 package com.bigdata.journal.ha;
 
-import java.io.EOFException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -36,10 +35,11 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.zip.Adler32;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.ChecksumError;
 
 /**
  * Receives data from an {@link HASendService}.
@@ -290,7 +290,7 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                     
                     // setup task.
                     waitFuture = new FutureTask<Void>(new ReadTask(server,
-                            message, localBuffer, downstream));
+                            message, localBuffer, addrNext, downstream));
                     readFuture = waitFuture;
                     message = null;
                     
@@ -350,8 +350,6 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
      *         Thompson</a>
      * @version $Id: HAReceiveService.java 2826 2010-05-17 11:46:23Z
      *          martyncutcher $
-     * 
-     * @todo compute checksum and verify.
      */
     static private class ReadTask implements Callable<Void> {
 
@@ -361,17 +359,58 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
 
         private final ByteBuffer localBuffer;
 
+        /**
+         * Address of the downstream node (may be null).
+         */
+        private final InetSocketAddress addrNext;
+
+        /**
+         * @deprecated by {@link #addrNext} and inlining of the xfer.
+         */
         private final HASendService downstream;
 
-		private ChecksumUtility chk = new ChecksumUtility();
+//		private ChecksumUtility chk = new ChecksumUtility();
+        private final Adler32 chk = new Adler32();
 
+        /**
+         * Private buffer used to incrementally compute the checksum of the data
+         * as it is received. The purpose of this buffer is to take advantage of
+         * more efficient bulk copy operations from the NIO buffer into a local
+         * byte[] on the Java heap against which we then track the evolving
+         * checksum of the data.
+         */
+        private final byte[] a = new byte[512]; 
+
+        /**
+         * 
+         * @param server
+         *            The server socket.
+         * @param message
+         *            The message carrying metadata about the data to be
+         *            received (especially its byte length and its {@link Adler32}
+         *             checksum).
+         * @param localBuffer
+         *            The buffer into which the data will be transferred.
+         * @param addrNext
+         *            The address of the downstream service to which the data
+         *            will be relayed (optional).
+         */
         public ReadTask(final ServerSocketChannel server,
                 final HAWriteMessage message, final ByteBuffer localBuffer,
+                final InetSocketAddress addrNext,
                 final HASendService downstream) {
 
+            if (server == null)
+                throw new IllegalArgumentException();
+            if (message == null)
+                throw new IllegalArgumentException();
+            if (localBuffer == null)
+                throw new IllegalArgumentException();
+            
             this.server = server;
             this.message = message;
             this.localBuffer = localBuffer;
+            this.addrNext = addrNext;
             this.downstream = downstream;
         }
 
@@ -420,6 +459,39 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
             }
 
         }
+
+        /**
+         * Update the running checksum.
+         *  
+         * @param rdlen
+         *            The #of bytes read in the last read from the socket into
+         *            the {@link #localBuffer}.
+         */
+        private void updateChk(final int rdlen) {
+
+            // isolate changes to (pos,limit).
+            final ByteBuffer b = localBuffer.asReadOnlyBuffer();
+
+            // current position (and limit of how much data we need to chksum).
+            final int mark = b.position();
+
+            // rewind to the first byte to be read.
+            b.position(mark - rdlen);
+            
+            for (int pos = mark - rdlen; pos < mark; pos += a.length) {
+
+                // #of bytes to copy into the local byte[]. 
+                final int len = Math.min(mark - pos, a.length);
+
+                // copy into Java heap byte[], advancing b.position().
+                b.get(a, 0/* off */, len);
+
+                // update the running checksum.
+                chk.update(a, 0/* off */, len);
+
+            }
+            
+        }
         
         public Void call() throws Exception {
 
@@ -463,6 +535,9 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                         final int rdlen = client.read(localBuffer);
                         if (log.isTraceEnabled())
                             log.trace("Read " + rdlen + " bytes");
+
+                        if (rdlen > 0)
+                            updateChk(rdlen);
                         
                         if (rdlen == -1) 
                         	break;
@@ -502,10 +577,12 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                 assert localBuffer.position() == message.getSize() : "localBuffer.pos="+localBuffer.position()+", message.size="+message.getSize();
                 localBuffer.flip();
                 
-                // TODO extent utility to compute incrementally to take advantage of wait time for transfers
-                if (chk.checksum(localBuffer) != message.getChk()) {
-                	throw new RuntimeException("Checksum Error");
+                if (message.getChk() != (int) chk.getValue()) {
+                    throw new ChecksumError();
                 }
+//                if (chk.checksum(localBuffer) != message.getChk()) {
+//                	throw new RuntimeException("Checksum Error");
+//                }
                 // success.
                 return null;
 

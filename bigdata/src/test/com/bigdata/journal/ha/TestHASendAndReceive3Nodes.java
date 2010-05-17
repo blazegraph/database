@@ -37,7 +37,9 @@ import java.util.concurrent.TimeoutException;
 
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.TestCase3;
+import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.InnerCause;
 
 /**
  * Test the raw socket protocol implemented by {@link HASendService} and
@@ -233,7 +235,7 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 				futRec2.get(10L, TimeUnit.MILLISECONDS);
 			} catch (TimeoutException ignore) {
 			} catch (ExecutionException e) {
-				assertTrue(e.getCause().getMessage().equals("Checksum Error"));
+			    assertTrue(InnerCause.isInnerCause(e, ChecksumError.class));
 			}
 		}
 		futSnd.get();
@@ -241,7 +243,7 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 			futRec1.get();
 			futRec2.get();
 		} catch (ExecutionException e) {
-			assertTrue(e.getCause().getMessage().equals("Checksum Error"));
+            assertTrue(InnerCause.isInnerCause(e, ChecksumError.class));
 		}
 		assertEquals(tst1, rcv1);
 		assertEquals(rcv1, rcv2);
@@ -257,7 +259,8 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 			rcv2 = DirectBufferPool.INSTANCE.acquire();
 			for (i = 0; i < 100; i++) {
 
-				log.info("Transferring message #" + i);
+				if(log.isInfoEnabled())
+				    log.info("Transferring message #" + i);
 
 				sze = 1 + r.nextInt(tst.capacity());
 				getRandomData(tst, sze);
@@ -283,14 +286,15 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 					}
 				}
 				futSnd.get();
-				futRec1.get();
-				futRec2.get();
-				assertEquals(tst, rcv1); // make sure buffer has been
-											// transmitted
-				assertEquals(rcv1, rcv2); // make sure buffer has been
-											// transmitted
-				log.info("Looks good for #" + i);
-			}
+                futRec1.get();
+                futRec2.get();
+                // make sure buffer has been transmitted
+                assertEquals(tst, rcv1);
+                // make sure buffer has been transmitted
+                assertEquals(rcv1, rcv2);
+                if (log.isInfoEnabled())
+                    log.info("Looks good for #" + i);
+            }
 		} catch (Throwable t) {
 			throw new RuntimeException("i=" + i + ", sze=" + sze + " : " + t, t);
 		} finally {
