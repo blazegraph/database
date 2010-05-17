@@ -136,6 +136,7 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 		receiveService1.start();
 
 		sendService = new HASendService(receiveAddr1);
+        sendService.open();
 
 		if (log.isInfoEnabled()) {
 			log.info("receiveService1: addr=" + receiveAddr1);
@@ -146,15 +147,24 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 
 	protected void tearDown() throws Exception {
 
-		if (receiveService1 != null)
+		if (receiveService1 != null) {
 			receiveService1.terminate();
+			receiveService2 = null;
+		}
 
-		if (receiveService2 != null)
+		if (receiveService2 != null) {
 			receiveService2.terminate();
+			receiveService2 = null;
+		}
 
-		if (sendService != null)
-			sendService.terminate();
-
+		if (sendService != null) {
+//            sendService.closeIncSend();
+            sendService.terminate();
+            sendService = null;
+		}
+		
+		chk = null;
+		
 	}
 
 	/**
@@ -334,8 +344,8 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
                 assertEquals(tst, rcv1);
                 // make sure buffer has been transmitted
                 assertEquals(rcv1, rcv2);
-                if (log.isTraceEnabled())
-                    log.trace("Looks good for #" + i);
+                if (log.isInfoEnabled() && (i<10 || i % 10 == 0))
+                    log.info("Looks good for #" + i);
             }
 		} catch (Throwable t) {
 			throw new RuntimeException("i=" + i + ", sze=" + sze + " : " + t, t);

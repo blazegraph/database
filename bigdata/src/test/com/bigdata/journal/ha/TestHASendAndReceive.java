@@ -138,17 +138,25 @@ public class TestHASendAndReceive extends TestCase3 {
 		receiveService.start();
 
         sendService = new HASendService(addr);
+        sendService.open();
 
     }
 
     protected void tearDown() throws Exception {
 
-        if (receiveService != null)
+        if (receiveService != null) {
             receiveService.terminate();
+            receiveService = null;
+        }
 
-        if (sendService != null)
+        if (sendService != null) {
+//            sendService.closeIncSend();
             sendService.terminate();
-	    
+            sendService = null;
+        }
+	 
+        chk = null;
+        
 	}
 
     /**
@@ -307,8 +315,11 @@ public class TestHASendAndReceive extends TestCase3 {
                 }
                 futSnd.get();
                 futRec.get();
-                assertEquals(tst, rcv); // make sure buffer has been transmitted
-            }
+                // make sure buffer has been transmitted
+                assertEquals(tst, rcv);
+                if (log.isInfoEnabled() && (i<10 || i % 10 == 0))
+                    log.info("Looks good for #" + i);
+           }
         } catch (Throwable t) {
             throw new RuntimeException("i=" + i + ", sze=" + sze + " : " + t, t);
         } finally {
