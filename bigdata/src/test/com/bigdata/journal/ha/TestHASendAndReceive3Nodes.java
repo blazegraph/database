@@ -30,8 +30,14 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.ByteBuffer;
 import java.util.Random;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.TestCase3;
+import com.bigdata.util.ChecksumUtility;
 
 /**
  * Test the raw socket protocol implemented by {@link HASendService} and
@@ -40,6 +46,8 @@ import com.bigdata.io.TestCase3;
  * @author martyn Cutcher
  */
 public class TestHASendAndReceive3Nodes extends TestCase3 {
+
+	private ChecksumUtility chk = new ChecksumUtility();
 
 	/**
 	 * A random number generated - the seed is NOT fixed.
@@ -176,4 +184,94 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 
     }
 
+    public void testSimpleExchange() throws InterruptedException, ExecutionException
+        
+        {
+            final ByteBuffer tst1 = getRandomData(50);
+            final HAWriteMessage msg1 = new HAWriteMessage(50, chk.checksum(tst1));
+            final ByteBuffer rcv1 = ByteBuffer.allocate(2000);
+            final ByteBuffer rcv2 = ByteBuffer.allocate(2000);
+//            rcv.limit(50);
+            final Future<Void> futRec1 = receiveService1.receiveData(msg1, rcv1);
+            final Future<Void> futRec2 = receiveService2.receiveData(msg1, rcv2);
+            final Future<Void> futSnd = sendService.send(tst1);
+            while (!futSnd.isDone() && !futRec2.isDone()) {
+                try {
+                    futSnd.get(10L, TimeUnit.MILLISECONDS);
+                } catch (TimeoutException ignore) {
+                }
+                try {
+                    futRec2.get(10L, TimeUnit.MILLISECONDS);
+                } catch (TimeoutException ignore) {
+                }
+            }
+            futSnd.get();
+            futRec1.get();
+            futRec2.get();
+            assertEquals(tst1, rcv1);
+            assertEquals(rcv1, rcv2);
+        }
+
+    public void testStressDirectBuffers() throws InterruptedException {
+
+        ByteBuffer tst = null, rcv1 = null, rcv2 = null;
+        int i = -1, sze = -1;
+        try {
+            tst = DirectBufferPool.INSTANCE.acquire();
+            rcv1 = DirectBufferPool.INSTANCE.acquire();
+            rcv2 = DirectBufferPool.INSTANCE.acquire();
+            for (i = 0; i < 100; i++) {
+
+                log.info("Transferring message #" + i);
+                
+                sze = 1 + r.nextInt(tst.capacity());
+                getRandomData(tst, sze);
+                final HAWriteMessage msg = new HAWriteMessage(sze, chk.checksum(tst));
+                assertEquals(0,tst.position());
+                assertEquals(sze,tst.limit());
+                // FutureTask return ensures remote ready for Socket data
+                final Future<Void> futRec1 = receiveService1.receiveData(msg, rcv1);
+                final Future<Void> futRec2 = receiveService2.receiveData(msg, rcv2);
+                final Future<Void> futSnd = sendService.send(tst);
+                while (!futSnd.isDone() && !futRec1.isDone() && !futRec2.isDone()) {
+                    try {
+                        futSnd.get(10L, TimeUnit.MILLISECONDS);
+                    } catch (TimeoutException ignored) {
+                    }
+                    try {
+                        futRec1.get(10L, TimeUnit.MILLISECONDS);
+                    } catch (TimeoutException ignored) {
+                    }
+                    try {
+                        futRec2.get(10L, TimeUnit.MILLISECONDS);
+                    } catch (TimeoutException ignored) {
+                    }
+                }
+                futSnd.get();
+                futRec1.get();
+                futRec2.get();
+                assertEquals(tst, rcv1); // make sure buffer has been transmitted
+                assertEquals(rcv1, rcv2); // make sure buffer has been transmitted
+                log.info("Looks good for #" + i);
+            }
+        } catch (Throwable t) {
+            throw new RuntimeException("i=" + i + ", sze=" + sze + " : " + t, t);
+        } finally {
+            try {
+                if (tst != null) {
+                    DirectBufferPool.INSTANCE.release(tst);
+                }
+            } finally {
+            	try {
+	                if (rcv1 != null) {
+	                    DirectBufferPool.INSTANCE.release(rcv1);
+	                }
+            	} finally {
+	                if (rcv2 != null) {
+	                    DirectBufferPool.INSTANCE.release(rcv2);
+	                }
+            	}
+            }
+        }
+    }
 }
