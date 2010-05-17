@@ -510,12 +510,14 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
      *            The buffer in which this service will receive the data. The
      *            buffer MUST be large enough for the data to be received. The
      *            buffer SHOULD be a direct {@link ByteBuffer} in order to
-     *            benefit from NIO efficiencies.
+     *            benefit from NIO efficiencies. This method will own the buffer
+     *            until the returned {@link Future} is done.
      * 
      * @return A future which you can await. The future will become available
-     *         when the data has been transferred into the buffer. If the data
-     *         transfer fails or is interrupted, the future will report the
-     *         exception.
+     *         when the data has been transferred into the buffer, at which
+     *         point the position will be ZERO (0) and the limit will be the #of
+     *         bytes received into the buffer. If the data transfer fails or is
+     *         interrupted, the future will report the exception.
      * 
      * @throws InterruptedException
      */
@@ -525,7 +527,7 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
         lock.lockInterruptibly();
         try {
             message = msg;
-            localBuffer = buffer.duplicate();
+            localBuffer = buffer;//buffer.duplicate();
             localBuffer.limit(message.getSize());
             localBuffer.position(0);
             messageReady.signal();
