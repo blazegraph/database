@@ -39,15 +39,10 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.TestCase3;
 
 /**
- * Test the raw socket protocol implemented by HASendService and
- * HAReceiveService.
+ * Test the raw socket protocol implemented by {@link HASendService} and
+ * {@link HAReceiveService}.
  * 
  * @author martyn Cutcher
- * 
- * @todo Add random interrupts of the threads and shutdown of the services to
- *       look for deadlock conditions.
- * 
- * @todo Stress test w/ random ports to avoid address already in use?
  */
 public class TestHASendAndReceive extends TestCase3 {
 
