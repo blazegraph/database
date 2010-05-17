@@ -311,7 +311,7 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                 }
 
                 /*
-                 * @todo We might have to wait for the Future to avoid having
+                 * Note: We might have to wait for the Future to avoid having
                  * more than one ReadTask at a time, but we should log and
                  * ignore any exception and restart the loop.
                  */
@@ -501,40 +501,41 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
      */
     public Future<Void> receiveData(final HAWriteMessage msg,
             final ByteBuffer buffer) throws InterruptedException {
-        {
-            lock.lockInterruptibly();
-            try {
-                message = msg;
-                localBuffer = buffer.duplicate();
-                localBuffer.limit(message.getSize());
-                localBuffer.position(0);
-                messageReady.signal();
 
-                if (log.isTraceEnabled())
-                    log.trace("Will accept data for message: msg=" + msg);
+        lock.lockInterruptibly();
+        try {
+            message = msg;
+            localBuffer = buffer.duplicate();
+            localBuffer.limit(message.getSize());
+            localBuffer.position(0);
+            messageReady.signal();
 
-                while (waitFuture == null) {
-                    switch (runState) {
-                    case Start:
-                    case Running:
-                        break;
-                    case ShuttingDown:
-                    case Shutdown:
-                        throw new RuntimeException("Service closed.");
-                    default:
-                        throw new AssertionError();
-                    }
-                    futureReady.await();
+            if (log.isTraceEnabled())
+                log.trace("Will accept data for message: msg=" + msg);
+
+            while (waitFuture == null) {
+                switch (runState) {
+                case Start:
+                case Running:
+                    // fall through and await signal.
+                    break;
+                case ShuttingDown:
+                case Shutdown:
+                    throw new RuntimeException("Service closed.");
+                default:
+                    throw new AssertionError();
                 }
-                waitFuture = null;
-
-            } finally {
-                lock.unlock();
+                // await signal.
+                futureReady.await();
             }
+            assert waitFuture != null;
+            return readFuture;
 
+        } finally {
+            waitFuture = null;
+            lock.unlock();
         }
 
-        return readFuture;
     }
 
 }
