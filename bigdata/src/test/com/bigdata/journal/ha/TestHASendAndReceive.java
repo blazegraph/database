@@ -197,16 +197,11 @@ public class TestHASendAndReceive extends TestCase3 {
      */
     public void testSimpleExchange() throws InterruptedException, ExecutionException {
        
-        final ByteBuffer tst1 = getRandomData(50);
-        // sendService.send(tst1);
-
-        final HAWriteMessage msg1 = new HAWriteMessage(50, 0);
-        final HAWriteMessage msg2 = new HAWriteMessage(100, 0);
-        final ByteBuffer rcv = ByteBuffer.allocate(2000);
-        final ByteBuffer rcv2 = ByteBuffer.allocate(2000);
-
         {
-            rcv.limit(50);
+            final ByteBuffer tst1 = getRandomData(50);
+            final HAWriteMessage msg1 = new HAWriteMessage(50, 0);
+            final ByteBuffer rcv = ByteBuffer.allocate(2000);
+//            rcv.limit(50);
             final Future<Void> futRec = receiveService.receiveData(msg1, rcv);
             final Future<Void> futSnd = sendService.send(tst1);
             while (!futSnd.isDone() && !futRec.isDone()) {
@@ -226,7 +221,9 @@ public class TestHASendAndReceive extends TestCase3 {
 
         {
             final ByteBuffer tst2 = getRandomData(100);
-            rcv2.limit(100);
+            final HAWriteMessage msg2 = new HAWriteMessage(100, 0);
+            final ByteBuffer rcv2 = ByteBuffer.allocate(2000);
+//            rcv2.limit(100);
             final Future<Void> futRec = receiveService.receiveData(msg2, rcv2);
             final Future<Void> futSnd = sendService.send(tst2);
             while (!futSnd.isDone() && !futRec.isDone()) {
@@ -261,7 +258,7 @@ public class TestHASendAndReceive extends TestCase3 {
             final int sze = 10000 + r.nextInt(300000);
             final HAWriteMessage msg = new HAWriteMessage(sze, 0/*@todo chksum*/);
             final ByteBuffer tst = getRandomData(sze);
-            final ByteBuffer rcv = ByteBuffer.allocate(sze);
+            final ByteBuffer rcv = ByteBuffer.allocate(sze + r.nextInt(1024));
             // FutureTask return ensures remote ready for Socket data
             final Future<Void> futRec = receiveService.receiveData(msg, rcv);
             final Future<Void> futSnd = sendService.send(tst);
