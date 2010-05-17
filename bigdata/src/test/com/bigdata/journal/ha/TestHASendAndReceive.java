@@ -105,9 +105,16 @@ public class TestHASendAndReceive extends TestCase3 {
 	    
 	}
 	
+    /**
+     * Should we expect concurrency of the Socket send and RMI? It seems that we shold be able to handle it
+     * whatever the logical argument.  The only constraint should be on the processing of each pair of
+     * socket/RMI interactions.  OTOH, if we are intending to process the OP_ACCEPT and OP_READ within the 
+     * ReadTask that can only be processed AFTER the RMI is received, then we should not sen the socket until we
+     * have a returned FutureTask.
+     */
 	public void testSimpleExchange() {
 		ByteBuffer tst1 = getRandomData(50);
-		sendService.send(tst1);
+		// sendService.send(tst1);
 		
 		HAWriteMessage msg1 = new HAWriteMessage(50, 0);
 		HAWriteMessage msg2 = new HAWriteMessage(100, 0);
@@ -117,16 +124,42 @@ public class TestHASendAndReceive extends TestCase3 {
 		try {
 			rcv.limit(50);
 			Future<Void> fut = receiveService.receiveData(msg1, rcv);			
+			sendService.send(tst1);
 			fut.get();			
 			assertEquals(tst1, rcv);
 
 			ByteBuffer tst2 = getRandomData(100);
-			sendService.send(tst2);
+			// sendService.send(tst2);
 
 			rcv2.limit(100);
 			fut = receiveService.receiveData(msg2, rcv2);			
+			sendService.send(tst2);
 			fut.get();			
 			assertEquals(tst2, rcv2);
+
+		} catch (InterruptedException e) {
+			throw new RuntimeException(e);
+		} catch (ExecutionException e) {
+			throw new RuntimeException(e);
+		}
+	}
+	
+	/**
+	 * Sends a large number of random buffers, confirming successful transmission.
+	 */
+	public void testStress() {
+		
+		try {
+			for (int i = 0; i < 100; i++) {
+				int sze = 10000 + r.nextInt(300000);
+				HAWriteMessage msg = new HAWriteMessage(sze, 0);				
+				ByteBuffer tst = getRandomData(sze);
+				ByteBuffer rcv = ByteBuffer.allocate(sze);
+				Future<Void> fut = receiveService.receiveData(msg, rcv); // FutureTask return ensures remote ready for Socket data	
+				sendService.send(tst);
+				fut.get(); // wait for task complete	
+				assertEquals(tst, rcv); // make sure buffer has been transmitted
+			}
 
 		} catch (InterruptedException e) {
 			throw new RuntimeException(e);
