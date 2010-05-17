@@ -186,17 +186,27 @@ public class HASendService {
      */
     static protected SocketChannel openChannel(final InetSocketAddress addr)
             throws IOException {
-        
+
         final SocketChannel socketChannel = SocketChannel.open();
 
-        socketChannel.configureBlocking(true);
+        try {
 
-        if (log.isTraceEnabled())
-            log.trace("Connecting to " + addr);
+            socketChannel.configureBlocking(true);
 
-        socketChannel.connect(addr);
-        
-        socketChannel.finishConnect();
+            if (log.isTraceEnabled())
+                log.trace("Connecting to " + addr);
+
+            socketChannel.connect(addr);
+
+            socketChannel.finishConnect();
+
+        } catch (IOException ex) {
+
+            log.error(ex);
+            
+            throw ex;
+            
+        }
 
         return socketChannel;
         
