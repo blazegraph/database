@@ -61,6 +61,12 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("journal/HA");
 
+        // Test of HASendService and HAReceiveService (2 nodes).
+        suite.addTestSuite(TestHASendAndReceive.class);
+
+        // Test of HASendService and HAReceiveService (3 nodes).
+        suite.addTestSuite(TestHASendAndReceive3Nodes.class);
+
         // HA test suite for the WORM strategy.
         suite.addTest(TestHAWORMStrategy.suite());
 
