@@ -109,10 +109,16 @@ public class TestHASendAndReceive extends TestCase3 {
 
     }
     
-	public TestHASendAndReceive() {
+    public TestHASendAndReceive() {
 
-	}
-	
+    }
+    
+    public TestHASendAndReceive(String name) {
+        
+        super(name);
+
+    }
+    
 	private HASendService sendService;
 	private HAReceiveService<HAWriteMessage> receiveService;
 	
@@ -126,6 +132,9 @@ public class TestHASendAndReceive extends TestCase3 {
          */
 	    final int port = getPort(0);// 3000
 	    
+        if (log.isInfoEnabled())
+            log.info("Using port=" + port);
+
 	    final InetSocketAddress addr = new InetSocketAddress(port);
 		
 		receiveService = new HAReceiveService<HAWriteMessage>(addr, null);
@@ -249,7 +258,7 @@ public class TestHASendAndReceive extends TestCase3 {
             ExecutionException {
 
         for (int i = 0; i < 100; i++) {
-            int sze = 10000 + r.nextInt(300000);
+            final int sze = 10000 + r.nextInt(300000);
             final HAWriteMessage msg = new HAWriteMessage(sze, 0/*@todo chksum*/);
             final ByteBuffer tst = getRandomData(sze);
             final ByteBuffer rcv = ByteBuffer.allocate(sze);
@@ -309,7 +318,7 @@ public class TestHASendAndReceive extends TestCase3 {
                 assertEquals(tst, rcv); // make sure buffer has been transmitted
             }
         } catch (Throwable t) {
-            throw new RuntimeException("i=" + i + ": " + t, t);
+            throw new RuntimeException("i=" + i + ", sze=" + sze + " : " + t, t);
         } finally {
             try {
                 if (tst != null) {
