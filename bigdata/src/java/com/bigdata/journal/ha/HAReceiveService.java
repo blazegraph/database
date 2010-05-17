@@ -484,6 +484,10 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                     
                 } // while( rem > 0 )
                 
+                // prepare for reading.
+                assert localBuffer.position() == message.getSize();
+                localBuffer.flip();
+                
                 // success.
                 return null;
 
