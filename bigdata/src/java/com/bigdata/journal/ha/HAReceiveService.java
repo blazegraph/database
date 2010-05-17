@@ -71,12 +71,15 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
    
     private ServerSocketChannel server;
     private FutureTask<Void> readFuture;
+    private FutureTask<Void> waitFuture;
    
     final Lock lock = new ReentrantLock();
     final Condition futureReady  = lock.newCondition();
     final Condition messageReady = lock.newCondition();
     private HAWriteMessage message;
     private ByteBuffer localBuffer;
+
+	private HASendService downstream;
 
     /**
      * Create a new service instance - you MUST {@link Thread#start()} the
@@ -104,6 +107,9 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                     .info("Created: addrSelf=" + addrSelf + ", addrNext="
                             + addrNext);
 
+        if (addrNext != null) {
+        	this.downstream = new HASendService(addrNext);
+        }
         setDaemon(true);
        
     }
@@ -178,12 +184,9 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
     private void runNoBlock() throws IOException, InterruptedException,
             ExecutionException {
 
-        final Selector selector = Selector.open();
         try {
 
-            final SelectionKey serverKey = server.register(selector,
-                    SelectionKey.OP_ACCEPT);
-
+ 
             while (true) {
 
                 // wait for the message to be set (actually, msg + buffer).
@@ -198,9 +201,10 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                      * @todo pass in serverSocket, message, and buffer and make
                      * this static.
                      */
-                    readFuture = new FutureTask<Void>(new ReadTask(selector,
-                            serverKey)); // , message, buffer));
-
+                    waitFuture = new FutureTask<Void>(new ReadTask(server, message, downstream)); // , message, buffer));
+                    readFuture = waitFuture;
+                    message = null;
+                    
                     futureReady.signal();
 
                 } finally {
@@ -225,15 +229,23 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                  * more than one ReadTask at a time, but we should log and
                  * ignore any exception and restart the loop.
                  */
+                try {
+                	readFuture.get();
+                } catch (Exception e) {
+                	log.warn(e);
+                }
                 
-                readFuture.get();
+                lock.lockInterruptibly();
+                try {
+                	readFuture = null;
+                } finally {
+                	lock.unlock();
+                }
 
             } // while(true)
 
         } finally {
-
-            selector.close();
-
+        	// Now stateless since serverSocket is passed to ReadTask
         }
 
     }
@@ -257,24 +269,29 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
      */
     private class ReadTask implements Callable<Void> {
 
-        final Selector selector;
+ 		private HAWriteMessage message;
+		private ServerSocketChannel server;
+		private HASendService downstream;
 
-        final SelectionKey serverKey;
+        public ReadTask(final ServerSocketChannel server, final HAWriteMessage message, final HASendService downstream) {
 
-        public ReadTask(final Selector selector, final SelectionKey serverKey) {
-
-            this.selector = selector;
-            this.serverKey = serverKey;
+            this.server = server;
+            this.message = message;
+            this.downstream = downstream;
 
         }
 
         public Void call() throws Exception {
 
             // blocking wait for a client connection.
-            selector.select();
+            final Selector serverSelector = Selector.open();
+            final SelectionKey serverKey = server.register(serverSelector,
+                     SelectionKey.OP_ACCEPT);
+            
+            serverSelector.select();
 
             {
-                final Set<SelectionKey> keys = selector.selectedKeys();
+                final Set<SelectionKey> keys = serverSelector.selectedKeys();
                 final Iterator<SelectionKey> iter = keys.iterator();
                 while (iter.hasNext()) {
 
@@ -294,9 +311,11 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
             // get the client connection.
             final SocketChannel client = server.accept();
             client.configureBlocking(false);
+            
+            final Selector clientSelector = Selector.open();
 
             // must register OP_READ selector on the new client
-            final SelectionKey clientKey = client.register(selector,
+            final SelectionKey clientKey = client.register(clientSelector,
                     SelectionKey.OP_READ);
 
             try {
@@ -310,8 +329,8 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                 int rem = message.getSize();
                 while (rem > 0) {
 
-                    selector.select();
-                    final Set<SelectionKey> keys = selector.selectedKeys();
+                	clientSelector.select();
+                    final Set<SelectionKey> keys = clientSelector.selectedKeys();
                     final Iterator<SelectionKey> iter = keys.iterator();
                     while (iter.hasNext()) {
                         final SelectionKey key = (SelectionKey) iter.next();
@@ -328,18 +347,29 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                             if (log.isTraceEnabled())
                                 log.trace("Read " + rdlen + " into buffer");
                             rem -= rdlen;
+                            
+                            // now forward the most recent transfer bytes downstream
+                            if (downstream != null) {
+                            	ByteBuffer out = localBuffer.asReadOnlyBuffer();
+                            	out.position(localBuffer.position() - rdlen);
+                            	out.limit(localBuffer.position());
+                            	downstream.send(out);
+                            }
                         } else {
                             throw new IllegalStateException(
                                     "Unexpected Selection Key: " + key);
                         }
                     }
                 }
-
+                
                 // success.
                 return null;
             } finally {
                 clientKey.cancel();
                 client.close();
+                clientSelector.close();
+                serverKey.cancel();
+                serverSelector.close();
             }
 
         }
@@ -378,8 +408,10 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
                 if (log.isTraceEnabled())
                     log.trace("Will accept data for message: msg=" + msg);
 
-                while (readFuture == null)
+                while (waitFuture == null)
                     futureReady.await();
+                waitFuture = null;
+                
             } finally {
                 lock.unlock();
             }
