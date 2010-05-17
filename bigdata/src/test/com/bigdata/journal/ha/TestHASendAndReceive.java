@@ -198,7 +198,6 @@ public class TestHASendAndReceive extends TestCase3 {
             final ByteBuffer tst1 = getRandomData(50);
             final HAWriteMessage msg1 = new HAWriteMessage(50, chk.checksum(tst1));
             final ByteBuffer rcv = ByteBuffer.allocate(2000);
-//            rcv.limit(50);
             final Future<Void> futRec = receiveService.receiveData(msg1, rcv);
             final Future<Void> futSnd = sendService.send(tst1);
             while (!futSnd.isDone() && !futRec.isDone()) {
@@ -220,9 +219,8 @@ public class TestHASendAndReceive extends TestCase3 {
             final ByteBuffer tst2 = getRandomData(100);
             final HAWriteMessage msg2 = new HAWriteMessage(100, chk.checksum(tst2));
             final ByteBuffer rcv2 = ByteBuffer.allocate(2000);
-//            rcv2.limit(100);
-            final Future<Void> futRec = receiveService.receiveData(msg2, rcv2);
             final Future<Void> futSnd = sendService.send(tst2);
+            final Future<Void> futRec = receiveService.receiveData(msg2, rcv2);
             while (!futSnd.isDone() && !futRec.isDone()) {
                 try {
                     futSnd.get(10L, TimeUnit.MILLISECONDS);
@@ -288,7 +286,7 @@ public class TestHASendAndReceive extends TestCase3 {
         try {
             tst = DirectBufferPool.INSTANCE.acquire();
             rcv = DirectBufferPool.INSTANCE.acquire();
-            for (i = 0; i < 100; i++) {
+            for (i = 0; i < 1000; i++) {
                 sze = 1 + r.nextInt(tst.capacity());
                 getRandomData(tst, sze);
                 final HAWriteMessage msg = new HAWriteMessage(sze, chk.checksum(tst));
