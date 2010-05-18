@@ -1613,7 +1613,31 @@ abstract public class WriteCache implements IWriteCache {
 			return true;
 
 		}
+        
+    	
+    	/**
+    	 * Hook to rebuild RecordMetadata after buffer has been transferred.
+    	 * For the ScatteredWriteCache this means hopping trough the buffer marking offsets
+    	 * and data size into the RecordMetadata map, and ignoring any zero address entries that
+    	 * indicate a "freed" allocation.
+    	 * @throws InterruptedException 
+    	 */
+    	public void resetRecordMapFromBuffer(final ByteBuffer buf, final Map<Long, RecordMetadata> recordMap) {
+    		recordMap.clear();
+			int pos = 0;
+			while (pos <= buf.limit()) {
+				buf.position(pos);
+				long addr = buf.getLong();
+				int sze = buf.getInt();
+				if (addr != 0 /* not deleted */) {
+					recordMap.put(addr, new RecordMetadata(addr, pos+12, sze));
+				}
+				pos += 12 + sze; // hop over buffer info (addr + sze) and then data
+			}
+    	}
 
+
+        
 	}
 
     /**
@@ -2007,6 +2031,28 @@ abstract public class WriteCache implements IWriteCache {
 	 */
 	public long getLastOffset() {
 		return lastOffset;
+	}
+	
+	/**
+	 * Hook to rebuild RecordMetadata after buffer has been transferred.  The the default
+	 * WrteCache this is a single entry using firstOffset and current position.
+	 * @throws InterruptedException 
+	 */
+	public void resetRecordMapFromBuffer() throws InterruptedException {
+		final Lock writeLock = lock.writeLock();
+
+		writeLock.lockInterruptibly();
+
+		try {
+			resetRecordMapFromBuffer(buf.get(), recordMap);
+		} finally {
+			writeLock.unlock();
+		}
+	}
+	
+	protected void resetRecordMapFromBuffer(final ByteBuffer buf, final Map<Long, RecordMetadata> recordMap) {
+		recordMap.clear();
+		recordMap.put(firstOffset.get(), new RecordMetadata(firstOffset.get(), 0, buf.limit()));
 	}
 	
 }
