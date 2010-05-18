@@ -2198,13 +2198,18 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 	/**
 	 * Supports HAWrite protocol to keep bufferStrategy in sync with underlying WriteCacheService
 	 */
-    public void setNextOffset(long lastOffset) {
+    public void setNextOffset(final long lastOffset) {
+        
         if (lastOffset > nextOffset.get()) {
+        
             nextOffset.set(lastOffset);
+            
         } else {
+            
             throw new IllegalArgumentException("nextOffset value: "
                     + lastOffset + " <= " + nextOffset.get());
         }
+        
 	}
 
 	public WriteCacheService getWriteCacheService() {
