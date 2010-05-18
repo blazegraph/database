@@ -673,7 +673,4 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         return false;
     }
 
-	public WriteCacheService getWriteCacheService() {
-		throw new UnsupportedOperationException();
-	}
 }

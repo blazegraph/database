@@ -38,6 +38,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.io.WriteCacheService;
 import com.bigdata.io.messages.IHAClient;
+import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.AbstractRawStore;
@@ -53,7 +54,7 @@ import com.bigdata.util.ChecksumUtility;
  * 
  * @author mgc
  */
-public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
+public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHABufferStrategy {
     protected static final Logger log = Logger.getLogger(RWStrategy.class);
 
 	FileMetadata m_fileMetadata = null;
@@ -596,11 +597,11 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 		return m_store;
 	}
 
-	public void setNextOffset(long lastOffset) {
-		// NOP for RW since last offset is not used for allocation
-	}
-
-	public WriteCacheService getWriteCacheService() {
-		throw new UnsupportedOperationException("getWriteCacheService required for RWStrategy");
-	}
+	// FIXME writeRawBuffer
+    public void writeRawBuffer(HAWriteMessage msg, ByteBuffer b) {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+    
 }

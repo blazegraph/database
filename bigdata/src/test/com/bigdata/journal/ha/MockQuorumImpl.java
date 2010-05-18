@@ -19,6 +19,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.ha.HAReceiveService.IHAReceiveCallback;
@@ -850,7 +851,7 @@ public class MockQuorumImpl implements Quorum {
         final AbstractJournal jnl = ((HADelegate) getHAGlue(getIndex()))
                 .getEnvironment().getJournal();
 
-        jnl.getBufferStrategy().getWriteCacheService();
+        ((IHABufferStrategy) jnl.getBufferStrategy()).writeRawBuffer(msg, data);
 
     }
 
