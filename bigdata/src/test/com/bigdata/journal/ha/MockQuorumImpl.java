@@ -522,32 +522,28 @@ public class MockQuorumImpl implements Quorum {
 
         final int indexSelf = getIndex();
 
-        final FutureTask<Void> ft;
+        final Future<Void> ft;
+
         if (isMaster()) {
 
             ft = new FutureTask<Void>(new Callable<Void>() {
 
                 public Void call() throws Exception {
 
-                    final Future<Void> futRec = isLastInChain() ? null
-                            : getHAGlue(indexSelf + 1).replicate(msg);
+                    final Future<Void> futRec = getHAGlue(indexSelf + 1)
+                            .replicate(msg);
 
-                    final Future<Void> futSnd = isMaster() ? getHASendService()
-                            .send(b) : getHAReceiveService()
-                            .receiveData(msg, b);
+                    final Future<Void> futSnd = getHASendService().send(b);
 
                     // @todo review options here for awaiting these futures.
-                    while (!futSnd.isDone()
-                            && (futRec != null && !futRec.isDone())) {
+                    while (!futSnd.isDone() && !futRec.isDone()) {
                         try {
                             futSnd.get(10L, TimeUnit.MILLISECONDS);
                         } catch (TimeoutException ignore) {
                         }
-                        if (futRec != null) {
-                            try {
-                                futRec.get(10L, TimeUnit.MILLISECONDS);
-                            } catch (TimeoutException ignore) {
-                            }
+                        try {
+                            futRec.get(10L, TimeUnit.MILLISECONDS);
+                        } catch (TimeoutException ignore) {
                         }
                     }
                     futSnd.get();
@@ -558,45 +554,22 @@ public class MockQuorumImpl implements Quorum {
                 }
 
             });
+
+            // execute the FutureTask.
+            stores[indexSelf].getExecutorService()
+                    .submit((FutureTask<Void>) ft);
 
         } else if (isLastInChain()) {
 
-            ft = new FutureTask<Void>(new Callable<Void>() {
-
-                public Void call() throws Exception {
-
-                    final Future<Void> futRec = isLastInChain() ? null
-                            : getHAGlue(indexSelf + 1).replicate(msg);
-
-                    final Future<Void> futSnd = isMaster() ? getHASendService()
-                            .send(b) : getHAReceiveService()
-                            .receiveData(msg, b);
-
-                    // @todo review options here for awaiting these futures.
-                    while (!futSnd.isDone()
-                            && (futRec != null && !futRec.isDone())) {
-                        try {
-                            futSnd.get(10L, TimeUnit.MILLISECONDS);
-                        } catch (TimeoutException ignore) {
-                        }
-                        if (futRec != null) {
-                            try {
-                                futRec.get(10L, TimeUnit.MILLISECONDS);
-                            } catch (TimeoutException ignore) {
-                            }
-                        }
-                    }
-                    futSnd.get();
-                    futRec.get();
-
-                    // done
-                    return null;
-                }
-
-            });
+            // receive service will execute.
+            ft = getHAReceiveService().receiveData(msg, b);
 
         } else {
 
+            /*
+             * A node in the middle of the 
+             */
+            
             ft = new FutureTask<Void>(new Callable<Void>() {
 
                 public Void call() throws Exception {
@@ -632,8 +605,6 @@ public class MockQuorumImpl implements Quorum {
             });
 
         }
-
-        stores[indexSelf].getExecutorService().submit(ft);
 
         return ft;
 
