@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.io;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.util.LinkedList;
@@ -58,16 +56,10 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.WriteCache.WriteCacheCounters;
-import com.bigdata.io.messages.HAConnect;
-import com.bigdata.io.messages.HAServer;
-import com.bigdata.io.messages.IHAClient;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.Environment;
-import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.WORMStrategy;
-import com.bigdata.journal.StressTestConcurrentUnisolatedIndices.WriteTask;
-import com.bigdata.journal.ha.HAGlue;
 import com.bigdata.journal.ha.Quorum;
 import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rawstore.IAddressManager;
@@ -186,73 +178,73 @@ abstract public class WriteCacheService implements IWriteCache {
 	 */
 	private Future<Void> localWriteFuture;
 
-	/**
-	 * The IHAClient is created as required but then retained by newHAClient()
-	 */
-	private IHAClient haClient;
-
-	/**
-	 * The {@link HAServer} is responsible for listening for messages from the
-	 * upstream service in the write failover chain. This value will be
-	 * <code>null</code> for the master since it is the first service in the
-	 * chain.
-	 */
-	final AtomicReference<HAServer> haServer = new AtomicReference<HAServer>();
-
-	/**
-	 * The {@link HAConnect} is the local process used to talk to the downstream
-	 * {@link HAServer} instance.
-	 */
-	final AtomicReference<HAConnect> haConnect = new AtomicReference<HAConnect>();
-
-	/**
-	 * TODO: Should this await a quorum before attempting to connect to the
-	 * downstream?
-	 * 
-	 * TODO: Should this be moved to inside of the {@link WriteTask}? That way
-	 * we can scope the {@link HAConnect} to the {@link WriteTask}, which seems
-	 * correct.
-	 * 
-	 * @param quorumManager
-	 * @return
-	 * @throws IOException
-	 */
-	private HAConnect establishHAConnect(final QuorumManager quorumManager) throws IOException {
-
-		HAConnect c = haConnect.get();
-		if (c == null) {
-			final Quorum quorum = quorumManager.getQuorum();
-			final HAGlue glue = quorum.getHAGlue(quorum.getIndex() + 1);
-			final InetSocketAddress addr = glue.getWritePipelineAddr();
-			c = new HAConnect(addr);
-			haConnect.set(c);
-			c.start();
-
-			try {
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {
-				// just a delay to make sure al is ready for testing
-			}
-		} else {
-			if (!c.isAlive()) {
-				/*
-				 * Note: Throw out an exception. This is called from within
-				 * WriteTask.call(). If the HAConnect is dead then we need to
-				 * reestablish the write pipeline, so we need to abort the
-				 * current WriteTask.call(), do a high-level abort, and then
-				 * setup the WriteTask again.
-				 */
-				throw new RuntimeException("HAConnect is dead.");
-			}
-		}
-		return c;
-	}
-
-	/**
-	 * A single threaded service which writes dirty {@link WriteCache}s onto the
-	 * downstream service in the quorum.
-	 */
-	final private ExecutorService remoteWriteService;
+//	/**
+//	 * The IHAClient is created as required but then retained by newHAClient()
+//	 */
+//	private IHAClient haClient;
+//
+//	/**
+//	 * The {@link HAServer} is responsible for listening for messages from the
+//	 * upstream service in the write failover chain. This value will be
+//	 * <code>null</code> for the master since it is the first service in the
+//	 * chain.
+//	 */
+//	final AtomicReference<HAServer> haServer = new AtomicReference<HAServer>();
+//
+//	/**
+//	 * The {@link HAConnect} is the local process used to talk to the downstream
+//	 * {@link HAServer} instance.
+//	 */
+//	final AtomicReference<HAConnect> haConnect = new AtomicReference<HAConnect>();
+//
+//	/**
+//	 * TODO: Should this await a quorum before attempting to connect to the
+//	 * downstream?
+//	 * 
+//	 * TODO: Should this be moved to inside of the {@link WriteTask}? That way
+//	 * we can scope the {@link HAConnect} to the {@link WriteTask}, which seems
+//	 * correct.
+//	 * 
+//	 * @param quorumManager
+//	 * @return
+//	 * @throws IOException
+//	 */
+//	private HAConnect establishHAConnect(final QuorumManager quorumManager) throws IOException {
+//
+//		HAConnect c = haConnect.get();
+//		if (c == null) {
+//			final Quorum quorum = quorumManager.getQuorum();
+//			final HAGlue glue = quorum.getHAGlue(quorum.getIndex() + 1);
+//			final InetSocketAddress addr = glue.getWritePipelineAddr();
+//			c = new HAConnect(addr);
+//			haConnect.set(c);
+//			c.start();
+//
+//			try {
+//				Thread.sleep(1000);
+//			} catch (InterruptedException e) {
+//				// just a delay to make sure al is ready for testing
+//			}
+//		} else {
+//			if (!c.isAlive()) {
+//				/*
+//				 * Note: Throw out an exception. This is called from within
+//				 * WriteTask.call(). If the HAConnect is dead then we need to
+//				 * reestablish the write pipeline, so we need to abort the
+//				 * current WriteTask.call(), do a high-level abort, and then
+//				 * setup the WriteTask again.
+//				 */
+//				throw new RuntimeException("HAConnect is dead.");
+//			}
+//		}
+//		return c;
+//	}
+//
+//	/**
+//	 * A single threaded service which writes dirty {@link WriteCache}s onto the
+//	 * downstream service in the quorum.
+//	 */
+//	final private ExecutorService remoteWriteService;
 
 	/**
 	 * The {@link Future} of the task running on the {@link #remoteWriteService}
@@ -470,55 +462,55 @@ abstract public class WriteCacheService implements IWriteCache {
 		// start service to write on the backing channel.
 		localWriteService = Executors.newSingleThreadExecutor(new DaemonThreadFactory(getClass().getName()));
 
-		if (quorumManager.isHighlyAvailable()) {
-			final Quorum q = quorumManager.getQuorum();
-			if (q.getIndex() + 1 < q.size()) {
-				// service used to write on the downstream node in the quorum.
-				remoteWriteService = Executors.newSingleThreadExecutor(new DaemonThreadFactory(getClass().getName()));
-			} else {
-				remoteWriteService = null;
-			}
-		} else {
-			remoteWriteService = null;
-		}
+//		if (quorumManager.isHighlyAvailable()) {
+//			final Quorum q = quorumManager.getQuorum();
+//			if (q.getIndex() + 1 < q.size()) {
+//				// service used to write on the downstream node in the quorum.
+//				remoteWriteService = Executors.newSingleThreadExecutor(new DaemonThreadFactory(getClass().getName()));
+//			} else {
+//				remoteWriteService = null;
+//			}
+//		} else {
+//			remoteWriteService = null;
+//		}
 
 		// save the current file extent.
 		this.fileExtent.set(fileExtent);
 
-		/*
-		 * @todo This needs to be redone a quorum change events, but not on
-		 * abort() so not in reset(). That means it probably needs to be
-		 * notified of the quorum change itself.
-		 * 
-		 * Should the write cache service remain available if the pipeline goes
-		 * down so we can execute local operations for resynchronization
-		 * purposes?
-		 */
-		if (quorumManager.isHighlyAvailable()) {
-
-			final int k = quorumManager.replicationFactor();
-
-			final Quorum quorum = quorumManager.getQuorum();
-
-			if (!quorum.isMaster()) {
-
-				// The index of this node in the ordered list of services in the
-				// quorum.
-				final int index = quorum.getIndex();
-
-				// if (index + 1 < k) { // this would rule out the final node!
-
-				final HAGlue haGlueService = quorum.getHAGlue(index);
-
-				// Our local service listening for upstream messages - needed
-				// for all non-master nodes
-//				final HAServer s = quorumManager.establishHAServer(newHAClient(quorumManager.getLocalBufferStrategy()));
+//		/*
+//		 * @todo This needs to be redone a quorum change events, but not on
+//		 * abort() so not in reset(). That means it probably needs to be
+//		 * notified of the quorum change itself.
+//		 * 
+//		 * Should the write cache service remain available if the pipeline goes
+//		 * down so we can execute local operations for resynchronization
+//		 * purposes?
+//		 */
+//		if (quorumManager.isHighlyAvailable()) {
 //
-//				haServer.set(s);
-
-			}
-
-		}
+//			final int k = quorumManager.replicationFactor();
+//
+//			final Quorum quorum = quorumManager.getQuorum();
+//
+//			if (!quorum.isMaster()) {
+//
+//				// The index of this node in the ordered list of services in the
+//				// quorum.
+//				final int index = quorum.getIndex();
+//
+//				// if (index + 1 < k) { // this would rule out the final node!
+//
+//				final HAGlue haGlueService = quorum.getHAGlue(index);
+//
+//				// Our local service listening for upstream messages - needed
+//				// for all non-master nodes
+////				final HAServer s = quorumManager.establishHAServer(newHAClient(quorumManager.getLocalBufferStrategy()));
+////
+////				haServer.set(s);
+//
+//			}
+//
+//		}
 
 		// run the write task
 		localWriteFuture = localWriteService.submit(newWriteTask());
@@ -539,98 +531,98 @@ abstract public class WriteCacheService implements IWriteCache {
 
 	}
 
-	/**
-	 * Return the local object which reads from the upstream service, writes on
-	 * the downstream service, and operations against the local persistence
-	 * store.
-	 * <p>
-	 * The write replication pipeline bundles two messages together:
-	 * <ol>
-	 * <li>Changes in the file extent.</li>
-	 * <li>Dirty {@link WriteCache} buffers.</li>
-	 * </ol>
-	 * When a dirty {@link WriteCache} buffer is received, the {@link IHAClient}
-	 * must first ensure that the current file extent is the extent specified in
-	 * the message. If the extents differ, then it must adjust it using
-	 * {@link IBufferStrategy#truncate(long)}.
-	 * <p>
-	 * Once the file extents are in agreement, the received {@link WriteCache}
-	 * is simply placed onto the dirtyList. It will be taken and eventually
-	 * drained onto the local persistence store.
-	 * 
-	 * FIXME There are three problems with the behavior of this interface as
-	 * outlined above.
-	 * <p>
-	 * First, {@link IBufferStrategy#truncate(long)} would recursively invoke
-	 * {@link #setExtent(long)} on this {@link WriteCacheService}, which is
-	 * probably NOT desired.
-	 * <p>
-	 * Second, the change in the file extent can not be applied until the
-	 * {@link MasterWriteTask} takes the {@link WriteCache} off of the dirtyList
-	 * and begins to process it.
-	 * <p>
-	 * Third, in order to acknowledge the receipt of the message from the
-	 * upstream service, we need a means to be notified when the
-	 * {@link WriteCache} has been successfully written onto both the local
-	 * persistence store and the downstream service (if any). Maybe we could do
-	 * this with a message counter. The counter would be new for each quorum and
-	 * would be incremented for each message set. Each time the
-	 * {@link WriteCache} associated with a message counter (or messageId) was
-	 * fully handled (on the local store and the downstream store), this class
-	 * could then ACK that message to the upstream service. Message correlation
-	 * would have to stitch that all back together.
-	 * 
-	 * @return
-	 */
-	protected IHAClient newHAClient(final IBufferStrategy bufferStrategy) {
-		if (haClient == null) {
-			haClient = new IHAClient() {
-
-				ObjectSocketChannelStream input = null;
-
-				// @Override
-				public ObjectSocketChannelStream getInputSocket() {
-					return input;
-				}
-
-				public void truncate(long extent) {
-					// TODO Auto-generated method stub
-
-				}
-
-				public void setInputSocket(ObjectSocketChannelStream in) {
-					input = in;
-				}
-
-				public WriteCache getWriteCache() {
-					return current.get();
-				}
-
-				public HAConnect getNextConnect() {
-					if (remoteWriteService != null) {
-						// establish connection or return existing connection.
-						try {
-							return establishHAConnect(quorumManager);
-						} catch (IOException e) {
-							throw new RuntimeException(e);
-						}
-					} else {
-						return null;
-					}
-				}
-
-				// @Override
-				public void setNextOffset(long lastOffset) {
-					if (bufferStrategy != null)
-						bufferStrategy.setNextOffset(lastOffset);
-				}
-
-			};
-		}
-
-		return haClient;
-
-	}
+//	/**
+//	 * Return the local object which reads from the upstream service, writes on
+//	 * the downstream service, and operations against the local persistence
+//	 * store.
+//	 * <p>
+//	 * The write replication pipeline bundles two messages together:
+//	 * <ol>
+//	 * <li>Changes in the file extent.</li>
+//	 * <li>Dirty {@link WriteCache} buffers.</li>
+//	 * </ol>
+//	 * When a dirty {@link WriteCache} buffer is received, the {@link IHAClient}
+//	 * must first ensure that the current file extent is the extent specified in
+//	 * the message. If the extents differ, then it must adjust it using
+//	 * {@link IBufferStrategy#truncate(long)}.
+//	 * <p>
+//	 * Once the file extents are in agreement, the received {@link WriteCache}
+//	 * is simply placed onto the dirtyList. It will be taken and eventually
+//	 * drained onto the local persistence store.
+//	 * 
+//	 * FIXME There are three problems with the behavior of this interface as
+//	 * outlined above.
+//	 * <p>
+//	 * First, {@link IBufferStrategy#truncate(long)} would recursively invoke
+//	 * {@link #setExtent(long)} on this {@link WriteCacheService}, which is
+//	 * probably NOT desired.
+//	 * <p>
+//	 * Second, the change in the file extent can not be applied until the
+//	 * {@link MasterWriteTask} takes the {@link WriteCache} off of the dirtyList
+//	 * and begins to process it.
+//	 * <p>
+//	 * Third, in order to acknowledge the receipt of the message from the
+//	 * upstream service, we need a means to be notified when the
+//	 * {@link WriteCache} has been successfully written onto both the local
+//	 * persistence store and the downstream service (if any). Maybe we could do
+//	 * this with a message counter. The counter would be new for each quorum and
+//	 * would be incremented for each message set. Each time the
+//	 * {@link WriteCache} associated with a message counter (or messageId) was
+//	 * fully handled (on the local store and the downstream store), this class
+//	 * could then ACK that message to the upstream service. Message correlation
+//	 * would have to stitch that all back together.
+//	 * 
+//	 * @return
+//	 */
+//	protected IHAClient newHAClient(final IBufferStrategy bufferStrategy) {
+//		if (haClient == null) {
+//			haClient = new IHAClient() {
+//
+//				ObjectSocketChannelStream input = null;
+//
+//				// @Override
+//				public ObjectSocketChannelStream getInputSocket() {
+//					return input;
+//				}
+//
+//				public void truncate(long extent) {
+//					// TODO Auto-generated method stub
+//
+//				}
+//
+//				public void setInputSocket(ObjectSocketChannelStream in) {
+//					input = in;
+//				}
+//
+//				public WriteCache getWriteCache() {
+//					return current.get();
+//				}
+//
+//				public HAConnect getNextConnect() {
+//					if (remoteWriteService != null) {
+//						// establish connection or return existing connection.
+//						try {
+//							return establishHAConnect(quorumManager);
+//						} catch (IOException e) {
+//							throw new RuntimeException(e);
+//						}
+//					} else {
+//						return null;
+//					}
+//				}
+//
+//				// @Override
+//				public void setNextOffset(long lastOffset) {
+//					if (bufferStrategy != null)
+//						bufferStrategy.setNextOffset(lastOffset);
+//				}
+//
+//			};
+//		}
+//
+//		return haClient;
+//
+//	}
 
 	/**
 	 * The task responsible for writing dirty buffers onto the backing channel
@@ -708,7 +700,7 @@ abstract public class WriteCacheService implements IWriteCache {
                     }
 
 					/*
-					 * Do the local IOs.
+					 * Do the local IOs (concurrent w/ remote replication).
 					 * 
 					 * Note: This will not throw out an InterruptedException
 					 * unless this thread is actually interrupted. The local
@@ -884,16 +876,16 @@ abstract public class WriteCacheService implements IWriteCache {
 					log.warn(t, t);
 				}
 			}
-			/*
-			 * If there is an HAConnect running, then interrupt it so it will
-			 * terminate.
-			 */
-			{
-				final HAConnect cxn = haConnect.getAndSet(null/* clear */);
-				if (cxn != null) {
-					cxn.interrupt();
-				}
-			}
+//			/*
+//			 * If there is an HAConnect running, then interrupt it so it will
+//			 * terminate.
+//			 */
+//			{
+//				final HAConnect cxn = haConnect.getAndSet(null/* clear */);
+//				if (cxn != null) {
+//					cxn.interrupt();
+//				}
+//			}
 
 			// drain the dirty list.
 			dirtyListLock.lockInterruptibly();
@@ -997,24 +989,24 @@ abstract public class WriteCacheService implements IWriteCache {
 					log.warn(t, t);
 				}
 			}
-			/*
-			 * If there is an HAConnect running, then interrupt it so it will
-			 * terminate.
-			 */
-			{
-				final HAConnect cxn = haConnect.getAndSet(null/* clear */);
-				if (cxn != null) {
-					cxn.interrupt();
-				}
-			}
+//			/*
+//			 * If there is an HAConnect running, then interrupt it so it will
+//			 * terminate.
+//			 */
+//			{
+//				final HAConnect cxn = haConnect.getAndSet(null/* clear */);
+//				if (cxn != null) {
+//					cxn.interrupt();
+//				}
+//			}
 
 			// Immediate shutdown of the write service.
 			localWriteService.shutdownNow();
 
-			// Immediate shutdown of the remote write service (if running).
-			if (remoteWriteService != null) {
-				remoteWriteService.shutdownNow();
-			}
+//			// Immediate shutdown of the remote write service (if running).
+//			if (remoteWriteService != null) {
+//				remoteWriteService.shutdownNow();
+//			}
 
 			/*
 			 * Ensure that the WriteCache buffers are close()d in a timely
@@ -1053,12 +1045,12 @@ abstract public class WriteCacheService implements IWriteCache {
 			// clear the file extent to an illegal value.
 			fileExtent.set(-1L);
 
-			/*
-			 * Stop the HAServer instance if one is running.
-			 */
-			final HAServer haServer = this.haServer.get();
-			if (haServer != null)
-				haServer.interrupt();
+//			/*
+//			 * Stop the HAServer instance if one is running.
+//			 */
+//			final HAServer haServer = this.haServer.get();
+//			if (haServer != null)
+//				haServer.interrupt();
 
 			// Closed.
 			open = false;
@@ -2081,7 +2073,8 @@ abstract public class WriteCacheService implements IWriteCache {
 
 	}
 
-	public IHAClient getHAClient() {
-		return null; // return newHAClient(quorumManager.getLocalBufferStrategy());
-	}
+//	public IHAClient getHAClient() {
+//		return null; // return newHAClient(quorumManager.getLocalBufferStrategy());
+//	}
+
 }

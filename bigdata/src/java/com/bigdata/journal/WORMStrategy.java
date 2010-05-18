@@ -47,8 +47,6 @@ import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.WriteCache;
 import com.bigdata.io.WriteCacheService;
-import com.bigdata.io.messages.IHAClient;
-import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.journal.ha.Quorum;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.util.ChecksumError;
@@ -2208,20 +2206,21 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 		}
 	}
 
-	/**
-	 * Initially the HAClient was conceived as a link into a Socket message stream piping WriteCache
-	 * modifications between Quorum members.
-	 */
-	public IHAClient getHAClient() {
-		return writeCacheService.getHAClient();
-	}
+//	/**
+//	 * Initially the HAClient was conceived as a link into a Socket message stream piping WriteCache
+//	 * modifications between Quorum members.
+//	 */
+//	public IHAClient getHAClient() {
+//		return writeCacheService.getHAClient();
+//	}
 
-	/**
-	 * The BufferStrategy implmentation to provide a hook into the WriteCacheService supports the combined
-	 * HAGlue/HAClient integration object.
-	 */
+    /**
+     * The {@link WriteCacheService} in use by this {@link IBufferStrategy}.
+     */
 	public WriteCacheService getWriteCacheService() {
-		return writeCacheService;
+
+	    return writeCacheService;
+	    
 	}
     
 }
