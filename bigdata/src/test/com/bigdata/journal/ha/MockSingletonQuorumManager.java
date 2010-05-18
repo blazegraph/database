@@ -29,6 +29,7 @@ package com.bigdata.journal.ha;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -71,6 +72,10 @@ public class MockSingletonQuorumManager implements QuorumManager {
             return true;
         }
 
+        public boolean isLastInChain() {
+            return false;
+        }
+
         public boolean isQuorumMet() {
             return true;
         }
@@ -97,6 +102,10 @@ public class MockSingletonQuorumManager implements QuorumManager {
             return null;
         }
 
+        public ExecutorService getExecutorService() {
+            throw new UnsupportedOperationException();
+        }
+        
         public int prepare2Phase(IRootBlockView rootBlock, long timeout, TimeUnit unit)
                 throws InterruptedException, TimeoutException, IOException {
             // TODO Auto-generated method stub
@@ -146,7 +155,7 @@ public class MockSingletonQuorumManager implements QuorumManager {
          *             always.
          */
         public Future<Void> replicate(HAWriteMessage msg, ByteBuffer b)
-                throws IOException, InterruptedException {
+                throws IOException {
             throw new UnsupportedOperationException();
         }
         
