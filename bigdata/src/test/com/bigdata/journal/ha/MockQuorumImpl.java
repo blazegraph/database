@@ -17,8 +17,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.ha.HAReceiveService.IHAReceiveCallback;
 import com.bigdata.util.concurrent.ExecutionExceptions;
 
 /**
@@ -98,7 +100,16 @@ public class MockQuorumImpl implements Quorum {
                     : getHAGlue(getIndex() + 1).getWritePipelineAddr();
 
             receiveService = new HAReceiveService<HAWriteMessage>(addrSelf,
-                    addrNext, callback);
+                    addrNext, new IHAReceiveCallback<HAWriteMessage>() {
+
+                        public void callback(HAWriteMessage msg, ByteBuffer data)
+                                throws Exception {
+                            
+                            handleReplicatedWrite(msg,data);
+                            
+                        }
+                
+                    });
 
         }
         
@@ -113,7 +124,9 @@ public class MockQuorumImpl implements Quorum {
     }
 
     public void invalidate() {
+     
         _close();
+        
     }
 
     protected void _close() {
@@ -122,9 +135,13 @@ public class MockQuorumImpl implements Quorum {
             return;
         
         if(isMaster()) {
+        
             sendService.terminate();
+        
         } else {
+        
             receiveService.terminate();
+            
         }
         
     }
@@ -604,68 +621,82 @@ public class MockQuorumImpl implements Quorum {
 
         final Future<Void> ft;
 
-        if (isMaster()) {
+        if (!isMaster())
+            throw new UnsupportedOperationException();
 
-            /*
-             * This is the master, so send() the buffer.
-             */
-            
-            ft = new FutureTask<Void>(new Callable<Void>() {
+        /*
+         * This is the master, so send() the buffer.
+         */
 
-                public Void call() throws Exception {
+        ft = new FutureTask<Void>(new Callable<Void>() {
 
-                    // Get Future for send() outcome on local service.
-                    final Future<Void> futSnd = getHASendService().send(b);
+            public Void call() throws Exception {
+
+                // Get Future for send() outcome on local service.
+                final Future<Void> futSnd = getHASendService().send(b);
+
+                try {
+
+                    // Get Future for receive outcome on the remote service.
+                    final Future<Void> futRec = getHAGlue(indexSelf + 1)
+                            .receiveAndReplicate(msg);
 
                     try {
 
-                        // Get Future for receive outcome on the remote service.
-                        final Future<Void> futRec = getHAGlue(indexSelf + 1)
-                                .replicate(msg);
-
-                        try {
-
-                            /*
-                             * Await the Futures, but spend more time waiting on
-                             * the local Future and only check the remote Future
-                             * every second. Timeouts are ignored during this
-                             * loop.
-                             */
-                            while (!futSnd.isDone() && !futRec.isDone()) {
-                                try {
-                                    futSnd.get(1L, TimeUnit.SECONDS);
-                                } catch (TimeoutException ignore) {
-                                }
-                                try {
-                                    futRec.get(10L, TimeUnit.MILLISECONDS);
-                                } catch (TimeoutException ignore) {
-                                }
+                        /*
+                         * Await the Futures, but spend more time waiting on the
+                         * local Future and only check the remote Future every
+                         * second. Timeouts are ignored during this loop.
+                         */
+                        while (!futSnd.isDone() && !futRec.isDone()) {
+                            try {
+                                futSnd.get(1L, TimeUnit.SECONDS);
+                            } catch (TimeoutException ignore) {
                             }
-                            futSnd.get();
-                            futRec.get();
-
-                        } finally {
-                            if (!futRec.isDone()) {
-                                // cancel remote Future unless done.
-                                futRec.cancel(true/* mayInterruptIfRunning */);
+                            try {
+                                futRec.get(10L, TimeUnit.MILLISECONDS);
+                            } catch (TimeoutException ignore) {
                             }
                         }
+                        futSnd.get();
+                        futRec.get();
 
                     } finally {
-                        // cancel the local Future.
-                        futSnd.cancel(true/* mayInterruptIfRunning */);
+                        if (!futRec.isDone()) {
+                            // cancel remote Future unless done.
+                            futRec.cancel(true/* mayInterruptIfRunning */);
+                        }
                     }
 
-                    // done
-                    return null;
+                } finally {
+                    // cancel the local Future.
+                    futSnd.cancel(true/* mayInterruptIfRunning */);
                 }
 
-            });
+                // done
+                return null;
+            }
 
-            // execute the FutureTask.
-            getExecutorService().submit((FutureTask<Void>) ft);
+        });
 
-        } else if (isLastInChain()) {
+        // execute the FutureTask.
+        getExecutorService().submit((FutureTask<Void>) ft);
+
+        return ft;
+
+    }
+
+    public Future<Void> receiveAndReplicate(final HAWriteMessage msg)
+            throws IOException {
+
+        final int indexSelf = getIndex();
+
+        final Future<Void> ft;
+
+        if (isMaster())
+            throw new UnsupportedOperationException();
+
+        if (isLastInChain()) {
 
             /*
              * This is the last node in the write pipeline, so just receive the
@@ -674,7 +705,7 @@ public class MockQuorumImpl implements Quorum {
              * Note: The receive service is executing this Future locally on
              * this host.
              */
-            
+
             try {
                 ft = getHAReceiveService().receiveData(msg, b);
             } catch (InterruptedException e) {
@@ -686,7 +717,7 @@ public class MockQuorumImpl implements Quorum {
             /*
              * A node in the middle of the write pipeline.
              */
-            
+
             ft = new FutureTask<Void>(new Callable<Void>() {
 
                 public Void call() throws Exception {
@@ -699,7 +730,7 @@ public class MockQuorumImpl implements Quorum {
 
                         // Get future for receive outcome on the remote service.
                         final Future<Void> futRec = getHAGlue(indexSelf + 1)
-                                .replicate(msg);
+                                .receiveAndReplicate(msg);
 
                         try {
 
@@ -721,14 +752,14 @@ public class MockQuorumImpl implements Quorum {
                             }
                             futSnd.get();
                             futRec.get();
-                            
+
                         } finally {
                             if (!futRec.isDone()) {
                                 // cancel remote Future unless done.
                                 futRec.cancel(true/* mayInterruptIfRunning */);
                             }
                         }
-                        
+
                     } finally {
                         // cancel the local Future.
                         futSnd.cancel(true/* mayInterruptIfRunning */);
@@ -767,4 +798,25 @@ public class MockQuorumImpl implements Quorum {
         
     }
     
+    /**
+     * Core implementation causes the data to get written onto the local
+     * persistence store.
+     * 
+     * @param msg
+     *            Metadata about a buffer containing data replicated to this
+     *            node.
+     * @param data
+     *            The buffer containing the data.
+     * @throws Exception
+     */
+    private void handleReplicatedWrite(HAWriteMessage msg, ByteBuffer data)
+            throws Exception {
+
+        final AbstractJournal jnl = ((HADelegate) getHAGlue(getIndex()))
+                .getEnvironment().getJournal();
+
+        jnl.getBufferStrategy().getWriteCacheService();
+
+    }
+
 }

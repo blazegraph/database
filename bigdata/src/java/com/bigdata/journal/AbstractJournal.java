@@ -3851,6 +3851,17 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * Not supported for a standalone journal.
+         * 
+         * @throws UnsupportedOperationException
+         *             always.
+         */
+        public Future<Void> receiveAndReplicate(HAWriteMessage msg)
+                throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
     }
 
     /**
@@ -4089,24 +4100,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             
         }
 
-        /**
-         * Tells the downstream node to retrieve a writeCache buffer from the
-         * upstream socket. This will be passed on to the WriteCacheService.
-         * 
-         * The application of the HAWriteMessage will propagate on the pipeline,
-         * whilst the RMI calls to writeCacheBuffer will set all downstream
-         * quorum members to wait for the message.
-         */
-        public Future<Void> replicate(final HAWriteMessage msg)
+        public Future<Void> receiveAndReplicate(final HAWriteMessage msg)
                 throws IOException {
 
-            // FIXME Get the buffer from the WriteCacheService.
-            final ByteBuffer buffer = null;
-
-            final WriteCache cache = getBufferStrategy()
-            .getWriteCacheService().newWriteCache();
-            
-            return getQuorumManager().getQuorum().replicate(msg, buffer);
+            return getQuorumManager().getQuorum().receiveAndReplicate(msg);
 
         }
 
@@ -4121,7 +4118,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 	 */
 	class HAEnvironment implements Environment {
 
-		private InetSocketAddress writePipelineAddr;
+		private final InetSocketAddress writePipelineAddr;
 		
 		HAEnvironment() {
             try {
@@ -4133,9 +4130,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 			}
 		}
 
-		public long getActiveFileExtent() {
-			return _bufferStrategy.getExtent();
-		}
+//		public long getActiveFileExtent() {
+//			return _bufferStrategy.getExtent();
+//		}
 
 		public AbstractJournal getJournal() {
 			return AbstractJournal.this;
@@ -4145,16 +4142,16 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 			return quorumManager;
 		}
 
-		public IBufferStrategy getStrategy() {
-			return _bufferStrategy;
-		}
+//		public IBufferStrategy getStrategy() {
+//			return _bufferStrategy;
+//		}
 
 		public InetSocketAddress getWritePipelineAddr() {
 			return writePipelineAddr;
 		}
 
 		public boolean isHighlyAvailable() {
-			return quorumManager != null && quorumManager.isHighlyAvailable();
+			return quorumManager.isHighlyAvailable();
 		}
 		
 	    protected int getPort(int suggestedPort) throws IOException {

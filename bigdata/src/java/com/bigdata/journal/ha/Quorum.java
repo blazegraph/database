@@ -175,7 +175,7 @@ public interface Quorum {
 
     /**
      * Return a {@link Future} for a task which will replicate an NIO buffer
-     * along the write pipeline.
+     * along the write pipeline.  This method is only invoked by the master.
      * 
      * @param msg
      *            The RMI metadata about the payload.
@@ -183,6 +183,17 @@ public interface Quorum {
      *            The payload.
      */
     Future<Void> replicate(HAWriteMessage msg, ByteBuffer b)
+            throws IOException;
+
+    /**
+     * Return a {@link Future} for a task which will replicate an NIO buffer
+     * along the write pipeline. This method is invoked for any node except the
+     * master, including the last node in the failover chain.
+     * 
+     * @param msg
+     *            The RMI metadata about the payload.
+     */
+    Future<Void> receiveAndReplicate(HAWriteMessage msg)
             throws IOException;
 
     /**

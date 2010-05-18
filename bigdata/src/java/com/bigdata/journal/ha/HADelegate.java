@@ -34,8 +34,8 @@ import com.bigdata.journal.Environment;
 import com.bigdata.journal.IRootBlockView;
 
 /**
- * The HADelegate provides the concrete implementation of the remote HAGlue
- * interface, delegated by the HADelegator class.
+ * The {@link HADelegate} provides the concrete implementation of the remote
+ * {@link HAGlue} interface, as delegated by the {@link HADelegator} class.
  * 
  * @author Martyn Cutcher
  * 
@@ -44,14 +44,24 @@ public abstract class HADelegate {
 
 	final protected Environment environment;
 
-	public HADelegate(Environment environment) {
-		this.environment = environment;
+	public HADelegate(final Environment environment) {
+		
+	    this.environment = environment;
+	    
 	}
 
 	public InetSocketAddress getWritePipelineAddr() {
-		return environment.getWritePipelineAddr();
+		
+	    return environment.getWritePipelineAddr();
+	    
 	}
 
+    public Environment getEnvironment() {
+
+        return environment;
+        
+	}
+	
 	public abstract RunnableFuture<Void> abort2Phase(long token) throws IOException;
 
 	public abstract RunnableFuture<Void> commit2Phase(final long commitTime) throws IOException;
@@ -60,6 +70,6 @@ public abstract class HADelegate {
 
 	public abstract RunnableFuture<ByteBuffer> readFromDisk(long token, long addr);
 
-	public abstract Future<Void> replicate(HAWriteMessage msg) throws IOException;
+	public abstract Future<Void> receiveAndReplicate(HAWriteMessage msg) throws IOException;
 
 }
