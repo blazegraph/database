@@ -136,7 +136,7 @@ public class MockQuorumManager implements QuorumManager {
 	        // Our local service listening for upstream messages - needed for all non-master nodes
 	        haServer = new HAServer(//
 	        		haGlueService.getWritePipelineAddr(),//
-	        		haGlueService.getWritePipelinePort(),//
+	        		// haGlueService.getWritePipelinePort(),//
 	                haClient,//
 	                false // No message drive
 	                );

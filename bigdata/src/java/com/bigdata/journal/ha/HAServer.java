@@ -67,8 +67,7 @@ public class HAServer extends Thread {
 
 	protected static final Logger log = Logger.getLogger(HAServer.class);
 
-	final InetAddress addr;
-	final int port;
+	final InetSocketAddress addr;
 	final IHAClient client;
 	private Selector selector;
 	private SelectionKey serverKey;
@@ -94,22 +93,21 @@ public class HAServer extends Thread {
 	 *            Determines if the process is message driven
 	 * @throws IOException
 	 */
-	public HAServer(InetAddress addr, int port, IHAClient client, boolean messageDrive) {
+	public HAServer(InetSocketAddress addr, IHAClient client, boolean messageDrive) {
 		this.addr = addr;
-		this.port = port;
 		this.client = client;
 		this.messageDrive = messageDrive;
 		this.setDaemon(true);
-		log.info("Created for " + addr + ":" + port);
+		log.info("Created for " + addr);
 	}
 
 	public void run() {
 		try {
 			selector = Selector.open();
 			server = ServerSocketChannel.open();
-			server.socket().bind(new InetSocketAddress(addr, port));
+			server.socket().bind(addr);
 			if(log.isInfoEnabled())
-			    log.info("Listening on" + addr + ":" + port);
+			    log.info("Listening on" + addr );
 			// server.socket().bind(new InetSocketAddress(port));
 			server.configureBlocking(true);
 			// serverKey = server.register(selector, SelectionKey.OP_ACCEPT);
@@ -280,7 +278,7 @@ public class HAServer extends Thread {
 	public void acknowledge(final AckMessage<?, ?> ack) throws IOException {
 
 		if (log.isTraceEnabled())
-			log.trace("Sending Acknowledge " + ack + " from " + addr + ":" + port);
+			log.trace("Sending Acknowledge " + ack + " from " + addr);
 
 		final ObjectOutputStream ostr = str.getOutputStream();
 		ostr.writeObject(ack);
