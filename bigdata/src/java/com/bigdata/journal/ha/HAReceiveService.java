@@ -70,6 +70,11 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
     private final InetSocketAddress addrNext;
 
     /**
+     * Optional callback hook.
+     */
+    private final IHAReceiveCallback<M> callback;
+    
+    /**
      * Used to relay data to a downstream service as it is received (optional
      * and may be <code>null</code>).
      */
@@ -132,12 +137,32 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
     public HAReceiveService(final InetSocketAddress addrSelf,
             final InetSocketAddress addrNext) {
 
+        this(addrSelf, addrNext, null/* callback */);
+        
+    }
+
+    /**
+     * Create a new service instance - you MUST {@link Thread#start()} the
+     * service.
+     * 
+     * @param addrSelf
+     *            The Internet socket address at which this service will listen.
+     * @param addrNext
+     *            The Internet socket address of a downstream service to which
+     *            each data transfer will be relayed as it is received
+     *            (optional).
+     */
+    public HAReceiveService(final InetSocketAddress addrSelf,
+            final InetSocketAddress addrNext, IHAReceiveCallback<M> callback) {
+
         if (addrSelf == null)
          throw new IllegalArgumentException();
 
         this.addrSelf = addrSelf;
 
         this.addrNext = addrNext;
+        
+        this.callback = callback;
 
         downstream = addrNext == null ? null : new HASendService(addrNext);
 
@@ -344,7 +369,7 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
                     
                     // setup task.
                     waitFuture = new FutureTask<Void>(new ReadTask(server, clientRef,
-                            message, localBuffer, downstream));
+                            message, localBuffer, downstream, callback));
                     readFuture = waitFuture;
                     message = null;
                     
@@ -485,13 +510,14 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
      *       <p>
      *       report the #of payloads.
      */
-    static private class ReadTask implements Callable<Void> {
+    static private class ReadTask<M extends HAWriteMessageBase> implements
+            Callable<Void> {
 
         private final ServerSocketChannel server;
 
         private final AtomicReference<Client> clientRef;
 
-        private final HAWriteMessageBase message;
+        private final M message;
 
         private final ByteBuffer localBuffer;
 
@@ -500,6 +526,11 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
          */
         private final HASendService downstream;
 
+        /**
+         * Optional callback.
+         */
+        private final IHAReceiveCallback<M> callback;
+        
         private final Adler32 chk = new Adler32();
 
         /**
@@ -525,10 +556,13 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
          *            The {@link HASendService} used to relay data to the
          *            downstream node (optional and <code>null</code> if this is
          *            the last node in the relay chain).
+         * @param callback
+         *            An optional callback.
          */
-        public ReadTask(final ServerSocketChannel server, final AtomicReference<Client> clientRef,
-                final HAWriteMessageBase message, final ByteBuffer localBuffer,
-                final HASendService downstream) {
+        public ReadTask(final ServerSocketChannel server,
+                final AtomicReference<Client> clientRef, final M message,
+                final ByteBuffer localBuffer, final HASendService downstream,
+                final IHAReceiveCallback<M> callback) {
 
             if (server == null)
                 throw new IllegalArgumentException();
@@ -544,6 +578,7 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
             this.message = message;
             this.localBuffer = localBuffer;
             this.downstream = downstream;
+            this.callback = callback;
         }
 
         /**
@@ -714,13 +749,18 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
                 
                 // prepare for reading.
                 localBuffer.flip();
-                    
+                
                 if (message.getChk() != (int) chk.getValue()) {
                     throw new ChecksumError();
                 }
 //                if (chk.checksum(localBuffer) != message.getChk()) {
 //                	throw new RuntimeException("Checksum Error");
 //                }
+
+                if (callback != null) {
+                    callback.callback(message, localBuffer);
+                }
+                
                 // success.
                 return null;
 
@@ -749,8 +789,8 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
      * 
      * @throws InterruptedException
      */
-    public Future<Void> receiveData(final HAWriteMessageBase msg,
-            final ByteBuffer buffer) throws InterruptedException {
+    public Future<Void> receiveData(final M msg, final ByteBuffer buffer)
+            throws InterruptedException {
 
         lock.lockInterruptibly();
         try {
@@ -786,6 +826,32 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
             waitFuture = null;
             lock.unlock();
         }
+
+    }
+
+    /**
+     * Hook to notice receive events.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * @param <M>
+     */
+    public interface IHAReceiveCallback<M extends HAWriteMessageBase> {
+
+        /**
+         * Hook invoked once a buffer has been received.
+         * 
+         * @param msg
+         *            The message.
+         * @param data
+         *            The buffer containing the data. The position() will be
+         *            ZERO (0). The limit() will be the #of bytes available. The
+         *            implementation MAY have side effects on the buffer state
+         *            (position, limit, etc).
+         * 
+         * @throws Exception
+         */
+        void callback(M msg, ByteBuffer data) throws Exception;
 
     }
 
