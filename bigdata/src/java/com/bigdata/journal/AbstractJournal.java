@@ -72,6 +72,7 @@ import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.io.WriteCache;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.ha.HADelegate;
 import com.bigdata.journal.ha.HADelegator;
@@ -1950,13 +1951,19 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
     }
 
+    public boolean isDoubleSync() {
+
+        return doubleSync;
+        
+    }
+    
     /**
      * Return <code>true</code> if the persistence store uses record level
      * checksums. When <code>true</code>, the store will detect bad reads by
      * comparing the record as read from the disk against the checksum for that
      * record.
      */
-    public boolean useChecksum() {
+    public boolean isChecked() {
         
         return _bufferStrategy.useChecksums();
         
@@ -3720,6 +3727,13 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         }
 
         /**
+         * NOP.
+         */
+        public void invalidate() {
+            // NOP
+        }
+        
+        /**
          * There are no other members in the quorum so failover reads are not
          * supported.
          * 
@@ -4089,16 +4103,15 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             // FIXME Get the buffer from the WriteCacheService.
             final ByteBuffer buffer = null;
 
+            final WriteCache cache = getBufferStrategy()
+            .getWriteCacheService().newWriteCache();
+            
             return getQuorumManager().getQuorum().replicate(msg, buffer);
 
         }
 
     };
 
-	public boolean isDoubleSync() {
-		return doubleSync;
-	}
-	
 	/**
 	 * Local class providing Environment hooks used by all objects supporting HA
 	 *

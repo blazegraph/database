@@ -188,50 +188,55 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
    
     /**
      * Immediate shutdown.
-     * @throws InterruptedException 
      */
-    public void terminate() throws InterruptedException {
-       
-        lock.lockInterruptibly();
+    public void terminate() {
+
+        lock.lock();
         try {
-            runState = RunState.ShuttingDown;
-            this.interrupt();
+            switch (runState) {
+            case ShuttingDown: // already shutting down.
+            case Shutdown: // already shutdown.
+                return;
+            default:
+                runState = RunState.ShuttingDown;
+                this.interrupt();
+            }
         } finally {
             lock.unlock();
         }
 
         if (downstream != null)
             downstream.terminate();
-        
+
         executor.shutdownNow();
 
-        /*
-         * Wait until we observe that the service is no longer running while
-         * holding the lock.
-         * 
-         * Note: When run() exits it MUST signalAll() on both [futureReady] and
-         * [messageReady] so that all threads watching those Conditions notice
-         * that the service is no longer running.
-         */
-        lock.lockInterruptibly();
-        try {
-            while (true) {
-                switch (runState) {
-                case Start:
-                case Running:
-                case ShuttingDown:
-                    futureReady.await();
-                    continue;
-                case Shutdown:
-                    // Exit terminate().
-                    return;
-                default:
-                    throw new AssertionError();
-                }
-            }
-        } finally {
-            lock.unlock();
-        }
+//        /*
+//         * Wait until we observe that the service is no longer running while
+//         * holding the lock.
+//         * 
+//         * Note: When run() exits it MUST signalAll() on both [futureReady] and
+//         * [messageReady] so that all threads watching those Conditions notice
+//         * that the service is no longer running.
+//         */
+//        lock.lockInterruptibly();
+//        try {
+//            while (true) {
+//                switch (runState) {
+//                case Start:
+//                case Running:
+//                case ShuttingDown:
+//                    futureReady.await();
+//                    continue;
+//                case Shutdown:
+//                    // Exit terminate().
+//                    return;
+//                default:
+//                    throw new AssertionError();
+//                }
+//            }
+//        } finally {
+//            lock.unlock();
+//        }
 
     }
    
