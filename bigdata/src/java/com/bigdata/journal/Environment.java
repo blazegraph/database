@@ -30,6 +30,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.UnknownHostException;
 
+import com.bigdata.journal.ha.HADelegate;
 import com.bigdata.journal.ha.MockSingletonQuorumManager;
 import com.bigdata.journal.ha.QuorumManager;
 
@@ -50,6 +51,8 @@ import com.bigdata.journal.ha.QuorumManager;
 public interface Environment {
 
 	public InetSocketAddress getWritePipelineAddr();
+
+	public HADelegate getHADelegate();
 
 	public AbstractJournal getJournal();
 
