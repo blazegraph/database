@@ -36,10 +36,7 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
-import com.bigdata.io.WriteCacheService;
-import com.bigdata.io.messages.IHAClient;
 import com.bigdata.journal.ha.HAWriteMessage;
-import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IAddressManager;
@@ -597,11 +594,12 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		return m_store;
 	}
 
-	// FIXME writeRawBuffer
-    public void writeRawBuffer(HAWriteMessage msg, ByteBuffer b) {
-        
+    // FIXME writeRawBuffer
+    public void writeRawBuffer(HAWriteMessage msg, ByteBuffer b)
+            throws IOException, InterruptedException {
+
         throw new UnsupportedOperationException();
-        
+
     }
-    
+
 }

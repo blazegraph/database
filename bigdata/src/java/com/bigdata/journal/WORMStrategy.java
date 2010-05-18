@@ -877,12 +877,13 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                         fileMetadata.writeCacheBufferCount, useChecksums,
                         extent, opener, environment) {
                     @Override
-                    protected WriteCache newWriteCache(final ByteBuffer buf,
+                    public WriteCache newWriteCache(final ByteBuffer buf,
                             final boolean useChecksum,
+                            final boolean bufferHasData,
                             final IReopenChannel<? extends Channel> opener)
                             throws InterruptedException {
-                        return new WriteCacheImpl(0/* baseOffset */,
-                                buf, useChecksum,
+                        return new WriteCacheImpl(0/* baseOffset */, buf,
+                                useChecksum, bufferHasData,
                                 (IReopenChannel<FileChannel>) opener);
                     }
                 };
@@ -915,11 +916,12 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         public WriteCacheImpl(final long baseOffset, final ByteBuffer buf,
                 final boolean useChecksum,
+                final boolean bufferHasData,
                 final IReopenChannel<FileChannel> opener)
                 throws InterruptedException {
 
             super(baseOffset, buf, useChecksum, environment
-                    .isHighlyAvailable(), opener);
+                    .isHighlyAvailable(), bufferHasData, opener);
 
         }
 
@@ -2196,10 +2198,12 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 		// NOP
 	}
 
-    public void writeRawBuffer(HAWriteMessage msg, ByteBuffer b) {
-        
-        throw new UnsupportedOperationException();
-        
+    public void writeRawBuffer(final HAWriteMessage msg, final ByteBuffer b)
+            throws IOException, InterruptedException {
+
+        writeCacheService.newWriteCache(b, useChecksums,
+                true/* bufferHasData */, opener).flush(false/* force */);
+
     }
-    
+
 }

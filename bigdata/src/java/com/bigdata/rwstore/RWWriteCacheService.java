@@ -60,13 +60,15 @@ public class RWWriteCacheService extends WriteCacheService {
      * Provide default FileChannelScatteredWriteCache
      */
     @Override
-    protected WriteCache newWriteCache(final ByteBuffer buf,
+    public WriteCache newWriteCache(final ByteBuffer buf,
             final boolean useChecksum,
+            final boolean bufferHasData,
             final IReopenChannel<? extends Channel> opener)
             throws InterruptedException {
 
         return new FileChannelScatteredWriteCache(buf, true/* useChecksum */,
         		environment.isHighlyAvailable(),
+        		bufferHasData,
                 (IReopenChannel<FileChannel>) opener);
 
     }

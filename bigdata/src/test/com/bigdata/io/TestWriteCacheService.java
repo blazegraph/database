@@ -29,10 +29,8 @@ package com.bigdata.io;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Random;
@@ -41,7 +39,6 @@ import junit.framework.AssertionFailedError;
 
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.Environment;
-import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.ha.HADelegate;
 import com.bigdata.journal.ha.MockSingletonQuorumManager;
 import com.bigdata.journal.ha.QuorumManager;
