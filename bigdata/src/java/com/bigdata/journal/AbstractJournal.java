@@ -3607,6 +3607,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     }
     private HAGlue haGlue;
 
+	private HADelegate haDelegate;
+
     /**
      * Factory for the {@link HAGlue} object for this {@link AbstractJournal}.
      * This may be overridden to publish additional methods for the low-level HA
@@ -3615,9 +3617,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     protected HAGlue newHAGlue() {
 
         if (haGlue == null) {
-        	BasicHA delegate = new BasicHA(environment);
+        	this.haDelegate = new BasicHA(environment);
     	
-    		haGlue = new HADelegator(delegate);
+    		haGlue = new HADelegator(haDelegate);
         }
 
         return haGlue;
@@ -4171,6 +4173,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 	        openSocket.close();
 	        return port;
 	    }
+
+		public HADelegate getHADelegate() {
+			return haDelegate;
+		}
 	}
 
 }
