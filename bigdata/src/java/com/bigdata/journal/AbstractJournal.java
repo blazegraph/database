@@ -72,11 +72,6 @@ import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.io.messages.HAConnect;
-import com.bigdata.io.messages.HAServer;
-import com.bigdata.io.messages.IHAClient;
-import com.bigdata.io.messages.SocketMessage;
-import com.bigdata.io.messages.SocketMessage.AckMessage;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.ha.HADelegate;
 import com.bigdata.journal.ha.HADelegator;
@@ -3660,29 +3655,6 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             // NOP - the quorum is static and does no asynchronous processing.
         }
 
-		public IBufferStrategy getLocalBufferStrategy() {
-			return _bufferStrategy;
-		}
-
-		public void setLocalBufferStrategy(IBufferStrategy strategy) {
-			// void since it should always be the outer instance
-			if (strategy != _bufferStrategy) {
-				throw new IllegalStateException("Unknown buffer strategy");
-			}
-		}
-
-		public HAConnect getHAConnect() {
-			return null;
-		}
-
-		public HAServer establishHAServer(IHAClient haClient) {
-			throw new IllegalStateException("SingletonForum should not receive this request");
-		}
-
-		public HAServer getHAServer() {
-			throw new IllegalStateException("SingletonForum should not receive this request");
-		}
-        
     }
 
     /**

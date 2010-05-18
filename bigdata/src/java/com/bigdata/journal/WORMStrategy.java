@@ -2198,25 +2198,15 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 	/**
 	 * Supports HAWrite protocol to keep bufferStrategy in sync with underlying WriteCacheService
 	 */
-	public void setNextOffset(long lastOffset) {
-		if (lastOffset > nextOffset.get()) {
-			nextOffset.set(lastOffset);
-		} else {
-			log.warn("unexpected nextOffset value: " + lastOffset + " <= " + nextOffset.get());
-		}
+    public void setNextOffset(long lastOffset) {
+        if (lastOffset > nextOffset.get()) {
+            nextOffset.set(lastOffset);
+        } else {
+            throw new IllegalArgumentException("nextOffset value: "
+                    + lastOffset + " <= " + nextOffset.get());
+        }
 	}
 
-//	/**
-//	 * Initially the HAClient was conceived as a link into a Socket message stream piping WriteCache
-//	 * modifications between Quorum members.
-//	 */
-//	public IHAClient getHAClient() {
-//		return writeCacheService.getHAClient();
-//	}
-
-    /**
-     * The {@link WriteCacheService} in use by this {@link IBufferStrategy}.
-     */
 	public WriteCacheService getWriteCacheService() {
 
 	    return writeCacheService;

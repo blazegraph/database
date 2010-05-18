@@ -596,15 +596,8 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 		return m_store;
 	}
 
-	/**
-	 * Protocol support for HAWrite
-	 */
 	public void setNextOffset(long lastOffset) {
-		// not needed for RW since last offset is not used for allocation
-	}
-
-	public IHAClient getHAClient() {
-		throw new UnsupportedOperationException("HAClient required for RWStrategy");
+		// NOP for RW since last offset is not used for allocation
 	}
 
 	public WriteCacheService getWriteCacheService() {
