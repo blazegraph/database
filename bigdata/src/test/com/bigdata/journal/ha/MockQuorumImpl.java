@@ -77,6 +77,10 @@ public class MockQuorumImpl implements Quorum {
         return index == 0;
     }
 
+    public boolean isLastInChain() {
+        return index == stores.length - 1;
+    }
+
     public int getIndex() {
         return index;
     }
@@ -515,38 +519,134 @@ public class MockQuorumImpl implements Quorum {
 
     public Future<Void> replicate(final HAWriteMessage msg, final ByteBuffer b)
             throws IOException, InterruptedException {
-        
-        assertMaster();
 
-        final FutureTask<Void> ft = new FutureTask<Void>(new Callable<Void>() {
-            public Void call() throws Exception {
+        final int indexSelf = getIndex();
 
-                final Future<Void> futRec = getHAGlue(1).replicate(msg);
-                
-                final Future<Void> futSnd = getHASendService().send(b);
-                
-                while (!futSnd.isDone() && !futRec.isDone()) {
-                    try {
-                        futSnd.get(10L, TimeUnit.MILLISECONDS);
-                    } catch (TimeoutException ignore) {
+        final FutureTask<Void> ft;
+        if (isMaster()) {
+
+            ft = new FutureTask<Void>(new Callable<Void>() {
+
+                public Void call() throws Exception {
+
+                    final Future<Void> futRec = isLastInChain() ? null
+                            : getHAGlue(indexSelf + 1).replicate(msg);
+
+                    final Future<Void> futSnd = isMaster() ? getHASendService()
+                            .send(b) : getHAReceiveService()
+                            .receiveData(msg, b);
+
+                    // @todo review options here for awaiting these futures.
+                    while (!futSnd.isDone()
+                            && (futRec != null && !futRec.isDone())) {
+                        try {
+                            futSnd.get(10L, TimeUnit.MILLISECONDS);
+                        } catch (TimeoutException ignore) {
+                        }
+                        if (futRec != null) {
+                            try {
+                                futRec.get(10L, TimeUnit.MILLISECONDS);
+                            } catch (TimeoutException ignore) {
+                            }
+                        }
                     }
-                    try {
-                        futRec.get(10L, TimeUnit.MILLISECONDS);
-                    } catch (TimeoutException ignore) {
-                    }
+                    futSnd.get();
+                    futRec.get();
+
+                    // done
+                    return null;
                 }
-                futSnd.get();
-                futRec.get();
-            
-            // done
-            return null;
-            }
-        });
-        
-        stores[0/* master */].getExecutorService().submit(ft);
-        
+
+            });
+
+        } else if (isLastInChain()) {
+
+            ft = new FutureTask<Void>(new Callable<Void>() {
+
+                public Void call() throws Exception {
+
+                    final Future<Void> futRec = isLastInChain() ? null
+                            : getHAGlue(indexSelf + 1).replicate(msg);
+
+                    final Future<Void> futSnd = isMaster() ? getHASendService()
+                            .send(b) : getHAReceiveService()
+                            .receiveData(msg, b);
+
+                    // @todo review options here for awaiting these futures.
+                    while (!futSnd.isDone()
+                            && (futRec != null && !futRec.isDone())) {
+                        try {
+                            futSnd.get(10L, TimeUnit.MILLISECONDS);
+                        } catch (TimeoutException ignore) {
+                        }
+                        if (futRec != null) {
+                            try {
+                                futRec.get(10L, TimeUnit.MILLISECONDS);
+                            } catch (TimeoutException ignore) {
+                            }
+                        }
+                    }
+                    futSnd.get();
+                    futRec.get();
+
+                    // done
+                    return null;
+                }
+
+            });
+
+        } else {
+
+            ft = new FutureTask<Void>(new Callable<Void>() {
+
+                public Void call() throws Exception {
+
+                    final Future<Void> futRec = isLastInChain() ? null
+                            : getHAGlue(indexSelf + 1).replicate(msg);
+
+                    final Future<Void> futSnd = isMaster() ? getHASendService()
+                            .send(b) : getHAReceiveService()
+                            .receiveData(msg, b);
+
+                    // @todo review options here for awaiting these futures.
+                    while (!futSnd.isDone()
+                            && (futRec != null && !futRec.isDone())) {
+                        try {
+                            futSnd.get(10L, TimeUnit.MILLISECONDS);
+                        } catch (TimeoutException ignore) {
+                        }
+                        if (futRec != null) {
+                            try {
+                                futRec.get(10L, TimeUnit.MILLISECONDS);
+                            } catch (TimeoutException ignore) {
+                            }
+                        }
+                    }
+                    futSnd.get();
+                    futRec.get();
+
+                    // done
+                    return null;
+                }
+
+            });
+
+        }
+
+        stores[indexSelf].getExecutorService().submit(ft);
+
         return ft;
-        
- 	}
+
+    }
+
+    public HAReceiveService<HAWriteMessage> getHAReceiveService() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException();
+    }
+
+    public HASendService getHASendService() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException();
+    }
 
 }
