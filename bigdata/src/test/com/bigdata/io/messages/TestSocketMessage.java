@@ -30,10 +30,8 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.RandomAccessFile;
 import java.net.BindException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Random;
@@ -44,10 +42,6 @@ import com.bigdata.io.ObjectSocketChannelStream;
 import com.bigdata.io.TestCase3;
 import com.bigdata.io.WriteCache;
 import com.bigdata.io.WriteCache.FileChannelScatteredWriteCache;
-import com.bigdata.io.messages.HAConnect;
-import com.bigdata.io.messages.HAServer;
-import com.bigdata.io.messages.IHAClient;
-import com.bigdata.io.messages.SocketMessage;
 import com.bigdata.io.messages.SocketMessage.HATruncateConfirm;
 import com.bigdata.io.messages.SocketMessage.ITruncateCallback;
 import com.bigdata.io.messages.SocketMessage.HAWriteMessage.HAWriteConfirm;
@@ -198,11 +192,11 @@ public class TestSocketMessage extends TestCase3 {
 			final File file3 = File.createTempFile("cache3", ".tmp");
 
 			cache1 = new WriteCache.FileChannelScatteredWriteCache(DirectBufferPool.INSTANCE.acquire(),
-                    false, false, new ReopenFileChannel(file1, "rw"));
+                    false, false, false, new ReopenFileChannel(file1, "rw"));
 			cache2 = new WriteCache.FileChannelScatteredWriteCache(DirectBufferPool.INSTANCE.acquire(),
-                    false, false, new ReopenFileChannel(file2, "rw"));
+                    false, false, false, new ReopenFileChannel(file2, "rw"));
 			cache3 = new WriteCache.FileChannelScatteredWriteCache(DirectBufferPool.INSTANCE.acquire(),
-                    false, false, new ReopenFileChannel(file3, "rw"));
+                    false, false, false, new ReopenFileChannel(file3, "rw"));
 			
 			final int port = 3800;
 			

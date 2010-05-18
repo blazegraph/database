@@ -38,8 +38,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.AssertionFailedError;
 
-import com.bigdata.journal.ha.MockSingletonQuorumManager;
-import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.ChecksumUtility;
 
@@ -114,6 +112,12 @@ public class TestWriteCache extends TestCase3 {
         final int no_checksum = 0;
         
         /*
+         * @todo unit tests when the buffer already has valid date (for
+         * replicated writes).
+         */
+        final boolean bufferHasData = false;
+
+        /*
          * Note: We need to assign the addresses in strictly increasing order
          * with the just like a WORM store with a known header length so we can
          * disk and read back below.
@@ -137,7 +141,8 @@ public class TestWriteCache extends TestCase3 {
 
                 // ctor correct rejection tests: baseOffset is negative.
                 try {
-                    new WriteCache.FileChannelWriteCache(-1L, buf, useChecksum, isHighlyAvailable, opener);
+                    new WriteCache.FileChannelWriteCache(-1L, buf, useChecksum,
+                            isHighlyAvailable, bufferHasData, opener);
                     fail("Expected: " + IllegalArgumentException.class);
                 } catch (IllegalArgumentException ex) {
                     if (log.isInfoEnabled())
@@ -146,7 +151,8 @@ public class TestWriteCache extends TestCase3 {
 
                 // ctor correct rejection tests: opener is null.
                 try {
-                    new WriteCache.FileChannelWriteCache(baseOffset, buf, useChecksum, isHighlyAvailable, null/* opener */);
+                    new WriteCache.FileChannelWriteCache(baseOffset, buf,
+                            useChecksum, isHighlyAvailable, bufferHasData, null/* opener */);
                     fail("Expected: " + IllegalArgumentException.class);
                 } catch (IllegalArgumentException ex) {
                     if (log.isInfoEnabled())
@@ -155,7 +161,8 @@ public class TestWriteCache extends TestCase3 {
 
                 // allocate write cache using our buffer.
                 final WriteCache writeCache = new WriteCache.FileChannelWriteCache(
-                        baseOffset, buf, useChecksum, isHighlyAvailable, opener);
+                        baseOffset, buf, useChecksum, isHighlyAvailable,
+                        bufferHasData, opener);
 
                 // verify the write cache self-reported capacity.
                 assertEquals(DirectBufferPool.INSTANCE.getBufferCapacity(),
@@ -498,7 +505,13 @@ public class TestWriteCache extends TestCase3 {
         try {
 
             final boolean isHighlyAvailable = false;
-            
+
+            /*
+             * @todo unit tests when the buffer already has valid date (for
+             * replicated writes).
+             */
+            final boolean bufferHasData = false;
+
             final ReopenFileChannel opener = new ReopenFileChannel(file, mode);
 
             final ByteBuffer buf = DirectBufferPool.INSTANCE.acquire();
@@ -510,7 +523,7 @@ public class TestWriteCache extends TestCase3 {
                 // ctor correct rejection tests: opener is null.
                 try {
                     new WriteCache.FileChannelScatteredWriteCache(buf,
-                            useChecksum, isHighlyAvailable, null/* opener */);
+                            useChecksum, isHighlyAvailable, bufferHasData, null/* opener */);
                     fail("Expected: " + IllegalArgumentException.class);
                 } catch (IllegalArgumentException ex) {
                     if (log.isInfoEnabled())
@@ -519,7 +532,7 @@ public class TestWriteCache extends TestCase3 {
 
                 // allocate write cache using our buffer.
                 final WriteCache writeCache = new WriteCache.FileChannelScatteredWriteCache(
-                        buf, useChecksum, isHighlyAvailable, opener);
+                        buf, useChecksum, isHighlyAvailable, bufferHasData, opener);
 
                 // verify the write cache self-reported capacity.
                 assertEquals(DirectBufferPool.INSTANCE.getBufferCapacity()
@@ -867,9 +880,15 @@ public class TestWriteCache extends TestCase3 {
          * data are restart safe.
          */
         final boolean force = false;
-        
+
         final boolean useChecksum = true;
-        
+
+        /*
+         * @todo unit tests when the buffer already has valid date (for
+         * replicated writes).
+         */
+        final boolean bufferHasData = false;
+
         /*
          * We will create a list of Random 0-1024 byte writes by creating single random buffer
          * of 2K and generating random views of differing positions and lengths 
@@ -902,7 +921,7 @@ public class TestWriteCache extends TestCase3 {
 
             // allocate write cache using our buffer.
             final WriteCache writeCache = new WriteCache.FileChannelScatteredWriteCache(
-                    buf, useChecksum, isHighlyAvailable, opener);
+                    buf, useChecksum, isHighlyAvailable, bufferHasData, opener);
 
             /*
              * First write 500 records into the cache and confirm they can all be read okay

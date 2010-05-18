@@ -59,6 +59,7 @@ import com.bigdata.io.messages.SocketMessage;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.StoreTypeEnum;
+import com.bigdata.journal.ha.HAReceiveService;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -320,8 +321,12 @@ abstract public class WriteCache implements IWriteCache {
      * current {@link #buf}. This is enabled for the high availability write
      * replication pipeline. The checksum over the entire {@link #buf} is
      * necessary in this context to ensure that the receiver can verify the
-     * contents of the {@link #buf}.  The per-record checksums CAN NOT be used
-     * for this purpose since large records may be broken across 
+     * contents of the {@link #buf}. The per-record checksums CAN NOT be used
+     * for this purpose since large records may be broken across
+     * 
+     * @todo use the {@link HAReceiveService} technique to bulk copy bytes from
+     *       a direct NIO buffer into a temporary byte[] to compute the
+     *       checksums.
      */
     final private ChecksumHelper checker;
     
@@ -371,13 +376,25 @@ abstract public class WriteCache implements IWriteCache {
      *            when <code>true</code> the whole record checksum is maintained
      *            for use when replicating the write cache to along the write
      *            pipeline.
+     * @param bufferHasData
+     *            when <code>true</code> the caller asserts that the buffer has
+     *            data (from a replicated write), in which case the position
+     *            should be the start of the data in the buffer and the limit
+     *            the #of bytes with valid data. when <code>false</code>, the
+     *            caller's buffer will be cleared. The code presumes that the
+     *            {@link WriteCache} instance will be used to lay down a single
+     *            buffer worth of data onto the backing file.
      * 
      * @throws InterruptedException
      */
     public WriteCache(ByteBuffer buf, final boolean scatteredWrites,
-            final boolean useChecksum, final boolean isHighlyAvailable)
+            final boolean useChecksum, final boolean isHighlyAvailable,
+            final boolean bufferHasData)
             throws InterruptedException {
 
+        if (bufferHasData && buf == null)
+            throw new IllegalArgumentException();
+        
         if (buf == null) {
 
             buf = DirectBufferPool.INSTANCE.acquire();
@@ -398,7 +415,8 @@ abstract public class WriteCache implements IWriteCache {
         this.useChecksum = useChecksum;
         this.prefixWrites = scatteredWrites;
 
-        if (isHighlyAvailable) {
+        if (isHighlyAvailable && !bufferHasData) {
+            // Note: No checker if buffer has data.
             checker = new ChecksumHelper();
         } else {
             checker = null;
@@ -414,8 +432,10 @@ abstract public class WriteCache implements IWriteCache {
 		 * Discard anything in the buffer, resetting the position to zero, the
 		 * mark to zero, and the limit to the capacity.
 		 */
-		buf.clear();
-
+		if(!bufferHasData) {
+            buf.clear();
+		}
+		    
 		/*
 		 * An estimate of the #of records that might fit within the write cache.
 		 * This is based on an assumption that the "average" record is 1k. This
@@ -423,27 +443,35 @@ abstract public class WriteCache implements IWriteCache {
 		 */
 		final int indexDefaultCapacity = capacity / (1 * Bytes.kilobyte32);
 
-		/*
-		 * allocate and initialize the write cache index.
-		 * 
-		 * For scattered writes we choose to use a sorted map so that we can
-		 * easily flush writes to the file channel in order. This may not be
-		 * important depending on the caching strategy of the underlying system
-		 * but it cannot be a bad thing.
-		 * 
-		 * If we do not need to support scattered writes then we have the option
-		 * to use the ConcurrentHashMap which has the advantage of constant
-		 * access time for read through support.
-		 * 
-		 * TODO: some literature indicates the ConcurrentSkipListMap scales
-		 * better with concurrency, so we should benchmark this option for
-		 * non-scattered writes as well.
-		 */
-		if (scatteredWrites) {
-			recordMap = new ConcurrentSkipListMap<Long, RecordMetadata>();
-		} else {
-			recordMap = new ConcurrentHashMap<Long, RecordMetadata>(indexDefaultCapacity);
-		}
+        /*
+         * allocate and initialize the write cache index.
+         * 
+         * For scattered writes we choose to use a sorted map so that we can
+         * easily flush writes to the file channel in order. This may not be
+         * important depending on the caching strategy of the underlying system
+         * but it cannot be a bad thing.
+         * 
+         * If we do not need to support scattered writes then we have the option
+         * to use the ConcurrentHashMap which has the advantage of constant
+         * access time for read through support.
+         * 
+         * TODO: some literature indicates the ConcurrentSkipListMap scales
+         * better with concurrency, so we should benchmark this option for
+         * non-scattered writes as well.
+         */
+        if (scatteredWrites) {
+            recordMap = new ConcurrentSkipListMap<Long, RecordMetadata>();
+        } else {
+            recordMap = new ConcurrentHashMap<Long, RecordMetadata>(
+                    indexDefaultCapacity);
+        }
+
+        if (bufferHasData) {
+            /*
+             * Populate the record map from the record.
+             */
+            resetRecordMapFromBuffer();
+        }
 
 	}
 
@@ -1516,10 +1544,12 @@ abstract public class WriteCache implements IWriteCache {
         public FileChannelWriteCache(final long baseOffset,
                 final ByteBuffer buf, final boolean useChecksum,
                 final boolean isHighlyAvailable,
+                final boolean bufferHasData,
                 final IReopenChannel<FileChannel> opener)
                 throws InterruptedException {
 
-			super(buf, false/*scatteredWrites*/, useChecksum, isHighlyAvailable);
+            super(buf, false/* scatteredWrites */, useChecksum,
+                    isHighlyAvailable, bufferHasData);
 
 			if (baseOffset < 0)
 				throw new IllegalArgumentException();
@@ -1595,15 +1625,17 @@ abstract public class WriteCache implements IWriteCache {
         public FileChannelScatteredWriteCache(final ByteBuffer buf,
                 final boolean useChecksum,
                 final boolean isHighlyAvailable,
+                final boolean bufferHasData,
                 final IReopenChannel<FileChannel> opener)
                 throws InterruptedException {
 
-            super(buf, true/* scatteredWrites */, useChecksum, isHighlyAvailable);
+            super(buf, true/* scatteredWrites */, useChecksum,
+                    isHighlyAvailable, bufferHasData);
 
-			if (opener == null)
-				throw new IllegalArgumentException();
+            if (opener == null)
+                throw new IllegalArgumentException();
 
-			this.opener = opener;
+            this.opener = opener;
 
 		}
 

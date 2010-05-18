@@ -432,20 +432,22 @@ abstract public class WriteCacheService implements IWriteCache {
 		buffers = new WriteCache[nbuffers];
 
 		// N-1 WriteCache instances.
-		for (int i = 0; i < nbuffers - 1; i++) {
+        for (int i = 0; i < nbuffers - 1; i++) {
 
-			final WriteCache tmp = newWriteCache(null/* buf */, useChecksum, opener);
+            final WriteCache tmp = newWriteCache(null/* buf */, useChecksum,
+                    false/* bufferHasData */, opener);
 
-			buffers[i] = tmp;
+            buffers[i] = tmp;
 
-			cleanList.add(tmp);
+            cleanList.add(tmp);
 
-		}
+        }
 
-		// One more WriteCache for [current].
-		current.set(buffers[nbuffers - 1] = newWriteCache(null/* buf */, useChecksum, opener));
+        // One more WriteCache for [current].
+        current.set(buffers[nbuffers - 1] = newWriteCache(null/* buf */,
+                useChecksum, false/* bufferHasData */, opener));
 
-		// Set the same counters object on each of the write cache instances.
+        // Set the same counters object on each of the write cache instances.
 		final WriteCacheServiceCounters counters = new WriteCacheServiceCounters();
 		for (int i = 0; i < buffers.length; i++) {
 			buffers[i].setCounters(counters);
@@ -822,24 +824,28 @@ abstract public class WriteCacheService implements IWriteCache {
 	//
 	// } // class ReceiverWriteTask
 
-	/**
-	 * Factory for {@link WriteCache} implementations.
-	 * 
-	 * @param buf
-	 *            The backing buffer (optional).
-	 * @param useChecksum
-	 *            <code>true</code> iff record level checksums are enabled.
-	 * @param opener
-	 *            The object which knows how to re-open the backing channel
-	 *            (required).
-	 * 
-	 * @return A {@link WriteCache} wrapping that buffer and able to write on
-	 *         that channel.
-	 * 
-	 * @throws InterruptedException
-	 */
-	abstract protected WriteCache newWriteCache(ByteBuffer buf, boolean useChecksum,
-			IReopenChannel<? extends Channel> opener) throws InterruptedException;
+    /**
+     * Factory for {@link WriteCache} implementations.
+     * 
+     * @param buf
+     *            The backing buffer (optional).
+     * @param useChecksum
+     *            <code>true</code> iff record level checksums are enabled.
+     * @param bufferHasData
+     *            <code>true</code> iff the buffer has data to be written onto
+     *            the local persistence store (from a replicated write).
+     * @param opener
+     *            The object which knows how to re-open the backing channel
+     *            (required).
+     * 
+     * @return A {@link WriteCache} wrapping that buffer and able to write on
+     *         that channel.
+     * 
+     * @throws InterruptedException
+     */
+    abstract public WriteCache newWriteCache(ByteBuffer buf,
+            boolean useChecksum, boolean bufferHasData,
+            IReopenChannel<? extends Channel> opener) throws InterruptedException;
 
 	/**
 	 * {@inheritDoc}

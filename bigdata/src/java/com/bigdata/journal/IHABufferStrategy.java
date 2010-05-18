@@ -27,20 +27,27 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import com.bigdata.journal.ha.HAWriteMessage;
 
 /**
+ * A highly available {@link IBufferStrategy}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public interface IHABufferStrategy extends IBufferStrategy {
 
     /**
-     * Write a buffer containing data replicated from the master onto the
-     * local persistence store.
+     * Write a buffer containing data replicated from the master onto the local
+     * persistence store.
+     * 
+     * @throws InterruptedException
+     * @throws IOException
      */
-    void writeRawBuffer(HAWriteMessage msg, ByteBuffer b);
-    
+    void writeRawBuffer(HAWriteMessage msg, ByteBuffer b) throws IOException,
+            InterruptedException;
+
 }

@@ -1486,7 +1486,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             leafWriteCache = plan.nleaves == 0 ? null
                     : new WriteCache.FileChannelWriteCache(
                             IndexSegmentCheckpoint.SIZE, null/* buf */,
-                            useChecksums, false/*isHighlyAvailable*/, new NOPReopener(out));
+                            useChecksums, false/* isHighlyAvailable */,
+                            false/* bufferHasData */, new NOPReopener(out));
 
             /*
              * Open the node buffer. We only do this if there will be at least
@@ -2920,7 +2921,9 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                 
                 // Setup a write cache.
                 final WriteCache.FileChannelWriteCache writeCache = new WriteCache.FileChannelWriteCache(
-                        offsetNodes, null/* buf */, useChecksums, false/*isHighlyAvailable*/,new NOPReopener(out));
+                        offsetNodes, null/* buf */, useChecksums,
+                        false/* isHighlyAvailable */, false/* bufferHasData */,
+                        new NOPReopener(out));
 
                 try {
 
