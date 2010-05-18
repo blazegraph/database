@@ -512,9 +512,9 @@ abstract public class WriteCacheService implements IWriteCache {
 
 				// Our local service listening for upstream messages - needed
 				// for all non-master nodes
-				final HAServer s = quorumManager.establishHAServer(newHAClient(quorumManager.getLocalBufferStrategy()));
-
-				haServer.set(s);
+//				final HAServer s = quorumManager.establishHAServer(newHAClient(quorumManager.getLocalBufferStrategy()));
+//
+//				haServer.set(s);
 
 			}
 
@@ -2082,6 +2082,6 @@ abstract public class WriteCacheService implements IWriteCache {
 	}
 
 	public IHAClient getHAClient() {
-		return newHAClient(quorumManager.getLocalBufferStrategy());
+		return null; // return newHAClient(quorumManager.getLocalBufferStrategy());
 	}
 }
