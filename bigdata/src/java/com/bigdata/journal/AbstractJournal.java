@@ -31,7 +31,6 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.net.BindException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.UnknownHostException;
@@ -41,6 +40,7 @@ import java.nio.channels.FileChannel;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
@@ -73,18 +73,19 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.journal.Name2Addr.Entry;
-import com.bigdata.journal.ha.HAClient;
 import com.bigdata.journal.ha.HAConnect;
 import com.bigdata.journal.ha.HADelegate;
 import com.bigdata.journal.ha.HADelegator;
 import com.bigdata.journal.ha.HAGlue;
+import com.bigdata.journal.ha.HAReceiveService;
+import com.bigdata.journal.ha.HASendService;
 import com.bigdata.journal.ha.HAServer;
+import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.journal.ha.IHAClient;
 import com.bigdata.journal.ha.Quorum;
 import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.journal.ha.SocketMessage;
 import com.bigdata.journal.ha.SocketMessage.AckMessage;
-import com.bigdata.journal.ha.SocketMessage.HAWriteMessage;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.rawstore.IRawStore;
@@ -3824,13 +3825,35 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         }
 
         /**
-         * For writeCacheBuffer this is a NOP in the SingletonQuorum since the local action
-         * is carried out directly by the WriteCacheService and not via the local HAGlue
-         * implementation.
+         * Not supported for a standalone journal.
+         * 
+         * @throws UnsupportedOperationException
+         *             always.
          */
-		public void writeCacheBuffer(long fileExtent) throws IOException, InterruptedException {
-			// NOP
-		}
+        public HASendService getHASendService() {
+            throw new UnsupportedOperationException();
+        }
+
+        /**
+         * Not supported for a standalone journal.
+         * 
+         * @throws UnsupportedOperationException
+         *             always.
+         */
+        public HAReceiveService<HAWriteMessage> getHAReceiveService() {
+            throw new UnsupportedOperationException();
+        }
+
+        /**
+         * Not supported for a standalone journal.
+         * 
+         * @throws UnsupportedOperationException
+         *             always.
+         */
+        public Future<Void> replicate(HAWriteMessage msg, ByteBuffer b)
+                throws IOException, InterruptedException {
+            throw new UnsupportedOperationException();
+        }
 
     }
 
@@ -4078,7 +4101,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
          * the RMI calls to writeCacheBuffer will set all downstream quorum members
          * to wait for the message.
          */
-		public RunnableFuture<Void> writeCacheBuffer(final long fileExtent) throws IOException {
+		public Future<Void> replicate(final HAWriteMessage msg) throws IOException {
             return new FutureTask<Void>(new Runnable() {
                 public void run() {
 

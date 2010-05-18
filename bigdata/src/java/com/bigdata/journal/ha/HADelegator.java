@@ -27,6 +27,7 @@ package com.bigdata.journal.ha;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.concurrent.Future;
 import java.util.concurrent.RunnableFuture;
 
 import com.bigdata.journal.IRootBlockView;
@@ -66,8 +67,8 @@ public class HADelegator implements HAGlue {
 		return delegate.readFromDisk(token, addr);
 	}
 
-	public RunnableFuture<Void> writeCacheBuffer(long fileExtent) throws IOException {
-		return delegate.writeCacheBuffer(fileExtent);
+	public Future<Void> replicate(final HAWriteMessage msg) throws IOException {
+		return delegate.replicate(msg);
 	}
 
 }

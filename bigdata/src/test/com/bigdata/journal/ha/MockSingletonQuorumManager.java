@@ -29,10 +29,10 @@ package com.bigdata.journal.ha;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 
 public class MockSingletonQuorumManager implements QuorumManager {
@@ -119,36 +119,37 @@ public class MockSingletonQuorumManager implements QuorumManager {
             return token;
         }
 
-		public void writeCacheBuffer(long fileExtent) throws IOException, InterruptedException {
-			// TODO Auto-generated method stub
-			
-		}
+        /**
+         * Not supported for a standalone journal.
+         * 
+         * @throws UnsupportedOperationException
+         *             always.
+         */
+        public HASendService getHASendService() {
+            throw new UnsupportedOperationException();
+        }
+
+        /**
+         * Not supported for a standalone journal.
+         * 
+         * @throws UnsupportedOperationException
+         *             always.
+         */
+        public HAReceiveService<HAWriteMessage> getHAReceiveService() {
+            throw new UnsupportedOperationException();
+        }
+
+        /**
+         * Not supported for a standalone journal.
+         * 
+         * @throws UnsupportedOperationException
+         *             always.
+         */
+        public Future<Void> replicate(HAWriteMessage msg, ByteBuffer b)
+                throws IOException, InterruptedException {
+            throw new UnsupportedOperationException();
+        }
         
     };
 
-    // Cannot be required since a singleton will have no downstream nodes
-	public IBufferStrategy getLocalBufferStrategy() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	public void setLocalBufferStrategy(IBufferStrategy strategy) {
-		// Void since only relevant for downstream		
-	}
-
-	public HAConnect getHAConnect() {
-		// No downstream Quorum member
-		return null;
-	}
-
-	public HAServer establishHAServer(IHAClient haClient) {
-		// No upstream member requiring messaging
-		return null;
-	}
-    
-	public HAServer getHAServer() {
-		// No upstream member requiring messaging
-		return null;
-	}
-    
 }

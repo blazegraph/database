@@ -6,14 +6,14 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import com.bigdata.io.WriteCache;
 import com.bigdata.journal.IRootBlockView;
 
 /**
- * An ordered collection of services. A quorum has a replication factor
- * <em>k</em> and is considered "met" only when the #of services in the quorum
- * is at least <code>(k + 1)/2</code>. Client reads and writes will block unless
- * the quorum is met.
+ * An ordered collection of services organized from the perspective of one
+ * member of that quorum. A quorum has a replication factor <em>k</em> and is
+ * considered "met" only when the #of services in the quorum is at least
+ * <code>(k + 1)/2</code>. Client reads and writes will block unless the quorum
+ * is met.
  * <p>
  * The first service in the chain is the master. Client writes are directed to
  * the master and are streamed from service to service in the order specified by
@@ -80,7 +80,6 @@ public interface Quorum {
      *             if the quorum is not met.
      */
     int getIndex();
-    
     
     /**
      * Return the remote interface used to perform HA operations on the members
@@ -167,13 +166,35 @@ public interface Quorum {
     void abort2Phase() throws IOException, InterruptedException;
 
     /**
-     * Return a {@link Future} for a task which will replicate a
-     * {@link WriteCache} buffer along the write pipeline.
+     * Return a {@link Future} for a task which will replicate an NIO buffer
+     * along the write pipeline.
      * 
-     * @param fileExtent
-     *            The current extent of the backing file on the disk.
+     * @param msg
+     *            The RMI metadata about the payload.
+     * @param b
+     *            The payload.
      */
-    Future<Void> replicate(HAWriteMessageBase msg, ByteBuffer b)
+    Future<Void> replicate(HAWriteMessage msg, ByteBuffer b)
             throws IOException, InterruptedException;
 
+    /**
+     * The service used by the master to transmit NIO buffers to the next node
+     * in the write pipeline. The life cycle of the {@link HASendService} is
+     * scoped by quorum and quorum membership changes.
+     * 
+     * @throws UnsupportedOperationException
+     *             if the quorum is not highly available.
+     */
+    HASendService getHASendService();
+
+    /**
+     * The service used by the secondaries to accept and relay NIO buffers along
+     * the write pipeline. The life cycle of the {@link HASendService} is scoped
+     * by quorum and quorum membership changes.
+     * 
+     * @throws UnsupportedOperationException
+     *             if the quorum is not highly available.
+     */
+    HAReceiveService<HAWriteMessage> getHAReceiveService();
+    
 }
