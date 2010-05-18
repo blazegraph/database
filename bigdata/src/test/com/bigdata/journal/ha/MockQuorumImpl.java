@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
@@ -50,6 +51,7 @@ public class MockQuorumImpl implements Quorum {
 
     private final HASendService sendService;
     private final HAReceiveService<HAWriteMessage> receiveService;
+    private final ByteBuffer receiveAndReplicateBuffer;
     
     /**
      * 
@@ -89,9 +91,20 @@ public class MockQuorumImpl implements Quorum {
             
             receiveService = null;
 
+            receiveAndReplicateBuffer = null;
+            
         } else {
 
             sendService = null;
+
+            try {
+                /*
+                 * Acquire buffer from the pool.
+                 */
+                receiveAndReplicateBuffer = DirectBufferPool.INSTANCE.acquire();
+            } catch (InterruptedException ex) {
+                throw new RuntimeException(ex);
+            }
 
             final InetSocketAddress addrSelf = getHAGlue(getIndex())
                     .getWritePipelineAddr();
@@ -139,9 +152,29 @@ public class MockQuorumImpl implements Quorum {
             sendService.terminate();
         
         } else {
-        
+
             receiveService.terminate();
-            
+
+            try {
+                /*
+                 * Await shutdown so we can be positive that no thread can
+                 * acquire() the direct buffer while the receive service might
+                 * still be writing on it!
+                 */
+                receiveService.awaitShutdown();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
+            try {
+                /*
+                 * Release the buffer back to the pool.
+                 */
+                DirectBufferPool.INSTANCE.release(receiveAndReplicateBuffer);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
         }
         
     }
@@ -689,12 +722,12 @@ public class MockQuorumImpl implements Quorum {
     public Future<Void> receiveAndReplicate(final HAWriteMessage msg)
             throws IOException {
 
-        final int indexSelf = getIndex();
-
-        final Future<Void> ft;
-
         if (isMaster())
             throw new UnsupportedOperationException();
+
+        final ByteBuffer b = receiveAndReplicateBuffer;
+
+        final Future<Void> ft;
 
         if (isLastInChain()) {
 
@@ -721,6 +754,8 @@ public class MockQuorumImpl implements Quorum {
             ft = new FutureTask<Void>(new Callable<Void>() {
 
                 public Void call() throws Exception {
+
+                    final int indexSelf = getIndex();
 
                     // Get Future for send() outcome on local service.
                     final Future<Void> futSnd = getHAReceiveService()
@@ -797,7 +832,7 @@ public class MockQuorumImpl implements Quorum {
         return sendService;
         
     }
-    
+
     /**
      * Core implementation causes the data to get written onto the local
      * persistence store.
