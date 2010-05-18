@@ -25,16 +25,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.ha;
 
 import java.io.IOException;
-import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
-import java.util.concurrent.atomic.AtomicReference;
 
-import com.bigdata.io.WriteCacheService;
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.Environment;
-import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 
 /**
@@ -52,12 +47,8 @@ public abstract class HADelegate {
 		this.environment = environment;
 	}
 
-	public InetAddress getWritePipelineAddr() {
+	public InetSocketAddress getWritePipelineAddr() {
 		return environment.getWritePipelineAddr();
-	}
-
-	public int getWritePipelinePort() {
-		return environment.getWritePipelinePort();
 	}
 
 	public abstract RunnableFuture<Void> abort2Phase(long token) throws IOException;
