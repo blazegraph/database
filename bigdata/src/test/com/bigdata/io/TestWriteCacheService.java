@@ -30,6 +30,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
@@ -41,6 +42,7 @@ import junit.framework.AssertionFailedError;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.Environment;
 import com.bigdata.journal.IBufferStrategy;
+import com.bigdata.journal.ha.HADelegate;
 import com.bigdata.journal.ha.MockSingletonQuorumManager;
 import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rwstore.RWWriteCacheService;
@@ -173,7 +175,7 @@ public class TestWriteCacheService extends TestCase3 {
 				return null;
 			}
 
-			public InetAddress getWritePipelineAddr() {
+			public InetSocketAddress getWritePipelineAddr() {
 				return null;
 			}
 
@@ -183,6 +185,10 @@ public class TestWriteCacheService extends TestCase3 {
 
 			public boolean isHighlyAvailable() {
 				return false;
+			}
+
+			public HADelegate getHADelegate() {
+				return null;
 			}};
 		
     }
