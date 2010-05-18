@@ -44,10 +44,14 @@ import com.bigdata.io.ObjectSocketChannelStream;
 import com.bigdata.io.TestCase3;
 import com.bigdata.io.WriteCache;
 import com.bigdata.io.WriteCache.FileChannelScatteredWriteCache;
-import com.bigdata.journal.ha.SocketMessage.HATruncateConfirm;
-import com.bigdata.journal.ha.SocketMessage.ITruncateCallback;
-import com.bigdata.journal.ha.SocketMessage.HAWriteMessage.HAWriteConfirm;
-import com.bigdata.journal.ha.SocketMessage.HAWriteMessage.IWriteCallback;
+import com.bigdata.io.messages.HAConnect;
+import com.bigdata.io.messages.HAServer;
+import com.bigdata.io.messages.IHAClient;
+import com.bigdata.io.messages.SocketMessage;
+import com.bigdata.io.messages.SocketMessage.HATruncateConfirm;
+import com.bigdata.io.messages.SocketMessage.ITruncateCallback;
+import com.bigdata.io.messages.SocketMessage.HAWriteMessage.HAWriteConfirm;
+import com.bigdata.io.messages.SocketMessage.HAWriteMessage.IWriteCallback;
 import com.bigdata.util.ChecksumError;
 
 /**
@@ -298,7 +302,7 @@ public class TestSocketMessage extends TestCase3 {
 			if(ack == null)
 				ack = new AckExceptionMessage(this.getId());
 			
-			return (com.bigdata.journal.ha.SocketMessage.AckMessage<Object, SocketMessage<Object>>) ack;
+			return (com.bigdata.io.messages.SocketMessage.AckMessage<Object, SocketMessage<Object>>) ack;
 		}
 		public static class AckExceptionMessage extends AckMessage<Object, SocketMessage<Object>> {
 

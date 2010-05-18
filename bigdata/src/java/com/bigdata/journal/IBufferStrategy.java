@@ -29,7 +29,7 @@ import java.nio.ByteBuffer;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.io.WriteCacheService;
-import com.bigdata.journal.ha.IHAClient;
+import com.bigdata.io.messages.IHAClient;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IMRMW;
 import com.bigdata.rawstore.IRawStore;

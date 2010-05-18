@@ -37,7 +37,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.io.WriteCacheService;
-import com.bigdata.journal.ha.IHAClient;
+import com.bigdata.io.messages.IHAClient;
 import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.AbstractRawStore;
