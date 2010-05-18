@@ -22,7 +22,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-package com.bigdata.journal.ha;
+package com.bigdata.io.messages;
 
 import java.io.File;
 import java.io.IOException;
@@ -52,6 +52,7 @@ import com.bigdata.io.messages.SocketMessage.HATruncateConfirm;
 import com.bigdata.io.messages.SocketMessage.ITruncateCallback;
 import com.bigdata.io.messages.SocketMessage.HAWriteMessage.HAWriteConfirm;
 import com.bigdata.io.messages.SocketMessage.HAWriteMessage.IWriteCallback;
+import com.bigdata.journal.ha.HAGlue;
 import com.bigdata.util.ChecksumError;
 
 /**
