@@ -258,20 +258,4 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
      */
     public boolean useChecksums();
 
-    /**
-     * Needed to support HAWrite protocol, setting the offset of most recent
-     * write.
-     * 
-     * @deprecated We do not think we need this any more for HA.
-     */
-	public void setNextOffset(long lastOffset);
-
-    /**
-     * The {@link WriteCacheService} in use by the {@link IBufferStrategy}.
-     * 
-     * @throws UnsupportedOperationException
-     *             if the strategy does not use a {@link WriteCacheService}.
-     */
-	public WriteCacheService getWriteCacheService();
-
 }

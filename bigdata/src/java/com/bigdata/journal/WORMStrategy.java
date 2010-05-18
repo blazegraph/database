@@ -47,6 +47,7 @@ import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.WriteCache;
 import com.bigdata.io.WriteCacheService;
+import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.journal.ha.Quorum;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.util.ChecksumError;
@@ -116,7 +117,7 @@ import com.bigdata.util.ChecksumUtility;
  * @see BufferMode#Temporary
  */
 public class WORMStrategy extends AbstractBufferStrategy implements
-        IDiskBasedStrategy {
+        IDiskBasedStrategy, IHABufferStrategy {
     
     /**
      * The file.
@@ -2195,27 +2196,10 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 		// NOP
 	}
 
-	/**
-	 * Supports HAWrite protocol to keep bufferStrategy in sync with underlying WriteCacheService
-	 */
-    public void setNextOffset(final long lastOffset) {
+    public void writeRawBuffer(HAWriteMessage msg, ByteBuffer b) {
         
-        if (lastOffset > nextOffset.get()) {
+        throw new UnsupportedOperationException();
         
-            nextOffset.set(lastOffset);
-            
-        } else {
-            
-            throw new IllegalArgumentException("nextOffset value: "
-                    + lastOffset + " <= " + nextOffset.get());
-        }
-        
-	}
-
-	public WriteCacheService getWriteCacheService() {
-
-	    return writeCacheService;
-	    
-	}
+    }
     
 }
