@@ -697,12 +697,14 @@ abstract public class WriteCacheService implements IWriteCache {
 						dirtyListLock.unlock();
 					}
 					
-                    if (remoteWriteService != null) {
-                        remoteWriteFuture = quorumManager.getQuorum()
-                                .replicate(
-                                        cache.newHAWriteMessage(quorumManager
-                                                .getQuorum().token()),
-                                        cache.peek());
+                    if (quorumManager.isHighlyAvailable()) {
+                        /*
+                         * Request replication of the write cache along the
+                         * write pipeline.
+                         */
+                        final Quorum q = quorumManager.getQuorum();
+                        remoteWriteFuture = q.replicate(cache
+                                .newHAWriteMessage(q.token()), cache.peek());
                     }
 
 					/*

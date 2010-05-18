@@ -4,15 +4,16 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.io.DirectBufferPool;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.util.concurrent.ExecutionExceptions;
@@ -121,9 +122,10 @@ public class MockQuorumImpl implements Quorum {
      * Cancel the requests on the remote services (RMI). Any RMI related errors
      * are trapped.
      */
-    private <T> void cancelRemoteFutures(final List<RunnableFuture<T>> remoteFutures) {
+    private <F extends Future<T>, T> void cancelRemoteFutures(
+            final List<F> remoteFutures) {
 
-        for (RunnableFuture<T> rf : remoteFutures) {
+        for (F rf : remoteFutures) {
         
             try {
 
@@ -511,81 +513,40 @@ public class MockQuorumImpl implements Quorum {
 
     }
 
-	public void writeCacheBuffer(final long fileExtent) throws IOException, InterruptedException {
-
-        /*
-         * To minimize latency, we first submit the futures for the other
-         * services and then do f.run() on the master. This will allow the other
-         * services to commit concurrently with the master's IO.
-         */
-
+    public Future<Void> replicate(final HAWriteMessage msg, final ByteBuffer b)
+            throws IOException, InterruptedException {
+        
         assertMaster();
 
-        final List<RunnableFuture<Void>> remoteFutures = new LinkedList<RunnableFuture<Void>>();
-        
-        
+        final FutureTask<Void> ft = new FutureTask<Void>(new Callable<Void>() {
+            public Void call() throws Exception {
 
-        /*
-         * For services (other than the master) in the quorum, submit the
-         * RunnableFutures to an Executor.
-         */
-        for (int i = 1; i < stores.length; i++) {
-
-            /*
-             * Runnable which will execute this message on the remote service.
-             */
-            final RunnableFuture<Void> rf = getHAGlue(i).writeCacheBuffer(fileExtent);
-
-            // add to list of futures we will check.
-            remoteFutures.add(rf);
-
-            /*
-             * Submit the runnable for execution by the master's
-             * ExecutorService. When the runnable runs it will execute the
-             * message on the remote service using RMI.
-             */
-            stores[0/* master */].getExecutorService().submit(rf);
-
-        }
-
-        /*
-         * Check the futures for the other services in the quorum.
-         */
-        final List<Throwable> causes = new LinkedList<Throwable>();
-        for (Future<Void> rf : remoteFutures) {
-            boolean done = false;
-            try {
-                rf.get();
-                done = true;
-            } catch (InterruptedException ex) {
-                log.error(ex, ex);
-                causes.add(ex);
-            } catch (ExecutionException ex) {
-                log.error(ex, ex);
-                causes.add(ex);
-            } finally {
-                if (!done) {
-                    // Cancel the request on the remote service (RMI).
+                final Future<Void> futRec = getHAGlue(1).replicate(msg);
+                
+                final Future<Void> futSnd = getHASendService().send(b);
+                
+                while (!futSnd.isDone() && !futRec.isDone()) {
                     try {
-                        rf.cancel(true/* mayInterruptIfRunning */);
-                    } catch (Throwable t) {
-                        // ignored.
+                        futSnd.get(10L, TimeUnit.MILLISECONDS);
+                    } catch (TimeoutException ignore) {
+                    }
+                    try {
+                        futRec.get(10L, TimeUnit.MILLISECONDS);
+                    } catch (TimeoutException ignore) {
                     }
                 }
+                futSnd.get();
+                futRec.get();
+            
+            // done
+            return null;
             }
-        }
-
-        /*
-         * If there were any errors, then throw an exception listing them.
-         */
-        if (causes.isEmpty()) {
-            // Cancel remote futures.
-            cancelRemoteFutures(remoteFutures);
-            // Throw exception back to the master.
-            throw new RuntimeException("remote errors: nfailures="
-                    + causes.size(), new ExecutionExceptions(causes));
-        }
-
+        });
+        
+        stores[0/* master */].getExecutorService().submit(ft);
+        
+        return ft;
+        
  	}
 
 }

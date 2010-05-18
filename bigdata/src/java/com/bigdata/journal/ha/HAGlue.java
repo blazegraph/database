@@ -31,11 +31,11 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.rmi.Remote;
+import java.util.concurrent.Future;
 import java.util.concurrent.RunnableFuture;
 
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IRootBlockView;
-import com.sun.corba.se.impl.orbutil.closure.Future;
 
 /**
  * A remote interface for methods supporting high availability for a set of
@@ -59,18 +59,6 @@ public interface HAGlue extends Remote {
      * bad reads
      */
 
-    /**
-     * Read the cache buffer from the input socket.
-     * 
-     * @param fileExtent
-     *            The extent of the file for which the buffer should be read and flushed
-     * 
-     * @return A runnable which will transfer the contents of the record into
-     *         the buffer returned by the future.
-     */
-    public RunnableFuture<Void> writeCacheBuffer(long fileExtent)
-            throws IOException;
-    
     /**
      * Read a record from disk.
      * 
@@ -121,7 +109,22 @@ public interface HAGlue extends Remote {
      *            The token for the quorum for which this request was made.
      */
     RunnableFuture<Void> abort2Phase(long token) throws IOException;
-    
+
+    /*
+     * Write replication pipeline.
+     */
+    /**
+     * Accept metadata describing an NIO buffer transfer along the write
+     * pipeline.
+     * 
+     * @param msg
+     *            The metadata.
+     * 
+     * @return The {@link Future} which will become available once the buffer
+     *         transfer is complete.
+     */
+    Future<Void> replicate(HAWriteMessage msg) throws IOException;
+
     /*
      * Resynchronization.
      * 

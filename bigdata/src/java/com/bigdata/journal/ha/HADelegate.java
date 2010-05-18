@@ -27,6 +27,7 @@ package com.bigdata.journal.ha;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.concurrent.Future;
 import java.util.concurrent.RunnableFuture;
 
 import com.bigdata.journal.Environment;
@@ -59,6 +60,6 @@ public abstract class HADelegate {
 
 	public abstract RunnableFuture<ByteBuffer> readFromDisk(long token, long addr);
 
-	public abstract RunnableFuture<Void> writeCacheBuffer(long fileExtent) throws IOException;
+	public abstract Future<Void> replicate(HAWriteMessage msg) throws IOException;
 
 }
