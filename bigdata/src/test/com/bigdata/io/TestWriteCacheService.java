@@ -159,10 +159,6 @@ public class TestWriteCacheService extends TestCase3 {
         final QuorumManager qm = new MockSingletonQuorumManager();
         return new Environment() {
 
-			public long getActiveFileExtent() {
-				return 0;
-			}
-
 			public AbstractJournal getJournal() {
 				return null;
 			}
@@ -171,16 +167,8 @@ public class TestWriteCacheService extends TestCase3 {
 				return qm;
 			}
 
-			public IBufferStrategy getStrategy() {
-				return null;
-			}
-
 			public InetSocketAddress getWritePipelineAddr() {
 				return null;
-			}
-
-			public int getWritePipelinePort() {
-				return 0;
 			}
 
 			public boolean isHighlyAvailable() {

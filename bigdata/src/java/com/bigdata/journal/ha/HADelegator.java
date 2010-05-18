@@ -67,8 +67,8 @@ public class HADelegator implements HAGlue {
 		return delegate.readFromDisk(token, addr);
 	}
 
-	public Future<Void> replicate(final HAWriteMessage msg) throws IOException {
-		return delegate.replicate(msg);
+	public Future<Void> receiveAndReplicate(final HAWriteMessage msg) throws IOException {
+		return delegate.receiveAndReplicate(msg);
 	}
 
 }

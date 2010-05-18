@@ -54,10 +54,10 @@ public interface Environment {
 
 	public boolean isHighlyAvailable();
 
-    /** @deprecated */
-    public long getActiveFileExtent();
-
-    /** @deprecated */
-    public IBufferStrategy getStrategy();
+//    /** @deprecated */
+//    public long getActiveFileExtent();
+//
+//    /** @deprecated */
+//    public IBufferStrategy getStrategy();
 
 }

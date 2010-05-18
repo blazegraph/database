@@ -163,6 +163,17 @@ public class MockSingletonQuorumManager implements QuorumManager {
             throw new UnsupportedOperationException();
         }
         
+        /**
+         * Not supported for a standalone journal.
+         * 
+         * @throws UnsupportedOperationException
+         *             always.
+         */
+        public Future<Void> receiveAndReplicate(HAWriteMessage msg)
+                throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
     };
 
 }

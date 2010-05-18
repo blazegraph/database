@@ -115,7 +115,8 @@ public interface HAGlue extends Remote {
      */
     /**
      * Accept metadata describing an NIO buffer transfer along the write
-     * pipeline.
+     * pipeline. This method is never invoked on the master. It is only invoked
+     * on the failover nodes, including the last node in the failover chain.
      * 
      * @param msg
      *            The metadata.
@@ -123,7 +124,7 @@ public interface HAGlue extends Remote {
      * @return The {@link Future} which will become available once the buffer
      *         transfer is complete.
      */
-    Future<Void> replicate(HAWriteMessage msg) throws IOException;
+    Future<Void> receiveAndReplicate(HAWriteMessage msg) throws IOException;
 
     /*
      * Resynchronization.
