@@ -26,6 +26,7 @@ package com.bigdata.journal.ha;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.RunnableFuture;
 
@@ -54,12 +55,8 @@ public class HADelegator implements HAGlue {
 		return delegate.commit2Phase(commitTime);
 	}
 
-	public InetAddress getWritePipelineAddr() {
+	public InetSocketAddress getWritePipelineAddr() {
 		return delegate.getWritePipelineAddr();
-	}
-
-	public int getWritePipelinePort() {
-		return delegate.getWritePipelinePort();
 	}
 
 	public RunnableFuture<Boolean> prepare2Phase(IRootBlockView rootBlock) throws IOException {

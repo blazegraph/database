@@ -225,9 +225,8 @@ abstract public class WriteCacheService implements IWriteCache {
 		if (c == null) {
 			final Quorum quorum = quorumManager.getQuorum();
 			final HAGlue glue = quorum.getHAGlue(quorum.getIndex() + 1);
-			final InetAddress addr = glue.getWritePipelineAddr();
-			final int port = glue.getWritePipelinePort();
-			c = new HAConnect(new InetSocketAddress(addr, port));
+			final InetSocketAddress addr = glue.getWritePipelineAddr();
+			c = new HAConnect(addr);
 			haConnect.set(c);
 			c.start();
 

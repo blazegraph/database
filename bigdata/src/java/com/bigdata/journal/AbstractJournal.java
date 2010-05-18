@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.net.BindException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
@@ -4122,21 +4123,16 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 	 */
 	class HAEnvironment implements Environment {
 
-		private InetAddress writePipelineAddr;
-		private int writePipelinePort;
+		private InetSocketAddress writePipelineAddr;
 		
 		HAEnvironment() {
             try {
-                writePipelineAddr = InetAddress
-                        .getByAddress(new byte[] { 127, 0, 0, 1 });
+                writePipelineAddr =  new InetSocketAddress(getPort(0));
             } catch (UnknownHostException e) {
                 throw new RuntimeException(e);
-            }
-            try {
-                writePipelinePort = getPort(0/* suggestedPort */);
             } catch (IOException e) {
                 throw new RuntimeException(e);
-            }
+			}
 		}
 
 		public long getActiveFileExtent() {
@@ -4155,12 +4151,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 			return _bufferStrategy;
 		}
 
-		public InetAddress getWritePipelineAddr() {
+		public InetSocketAddress getWritePipelineAddr() {
 			return writePipelineAddr;
-		}
-
-		public int getWritePipelinePort() {
-			return writePipelinePort;
 		}
 
 		public boolean isHighlyAvailable() {

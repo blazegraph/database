@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.ha;
 
 import java.io.IOException;
-import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.rmi.Remote;
 import java.util.concurrent.RunnableFuture;
@@ -53,13 +53,7 @@ public interface HAGlue extends Remote {
      * Return the address at which this service will listen for write pipeline
      * messages sent from the upstream service.
      */
-    InetAddress getWritePipelineAddr();
-
-    /**
-     * Return the port at which this service will listen for write pipeline
-     * messages send from the upstream service.
-     */
-    int getWritePipelinePort();
+    InetSocketAddress getWritePipelineAddr();
 
     /*
      * bad reads

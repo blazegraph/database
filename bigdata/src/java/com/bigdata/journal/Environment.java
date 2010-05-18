@@ -26,6 +26,7 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.net.BindException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.UnknownHostException;
 
@@ -48,9 +49,7 @@ import com.bigdata.journal.ha.QuorumManager;
  */
 public interface Environment {
 
-	public InetAddress getWritePipelineAddr();
-
-	public int getWritePipelinePort();
+	public InetSocketAddress getWritePipelineAddr();
 
 	public AbstractJournal getJournal();
 
