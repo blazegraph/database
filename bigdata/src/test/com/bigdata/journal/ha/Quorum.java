@@ -2,6 +2,7 @@ package com.bigdata.journal.ha;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -71,6 +72,13 @@ public interface Quorum {
      * Return <code>true</code> iff this node is the master.
      */
     boolean isMaster();
+
+    /**
+     * Return <code>true</code> iff the quorum is highly available and this node
+     * is last one in the write pipeline (it will not return true for a
+     * singleton quorum where the only node is the master).
+     */
+    boolean isLastInChain();
 
     /**
      * Return the index of this service in the ordered list of services in a met
@@ -175,7 +183,7 @@ public interface Quorum {
      *            The payload.
      */
     Future<Void> replicate(HAWriteMessage msg, ByteBuffer b)
-            throws IOException, InterruptedException;
+            throws IOException;
 
     /**
      * The service used by the master to transmit NIO buffers to the next node
@@ -196,5 +204,11 @@ public interface Quorum {
      *             if the quorum is not highly available.
      */
     HAReceiveService<HAWriteMessage> getHAReceiveService();
+
+    /**
+     * The local executor service.
+     * @return
+     */
+    ExecutorService getExecutorService();
     
 }

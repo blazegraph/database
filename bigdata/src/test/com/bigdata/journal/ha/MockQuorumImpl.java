@@ -6,6 +6,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
@@ -37,7 +38,8 @@ public class MockQuorumImpl implements Quorum {
     static protected final Logger log = Logger.getLogger(MockQuorumImpl.class);
     
     private final int index;
-    private final Journal[] stores;
+    private final ExecutorService executorService;
+    private final HAGlue[] stores;
 
     /**
      * 
@@ -49,9 +51,26 @@ public class MockQuorumImpl implements Quorum {
      */
     public MockQuorumImpl(final int index, final Journal[] stores) {
 
+        if (index < 0)
+            throw new IllegalArgumentException();
+
+        if (stores == null)
+            throw new IllegalArgumentException();
+
+        if (index >= stores.length)
+            throw new IllegalArgumentException();
+
         this.index = index;
 
-        this.stores = stores;
+        this.executorService = stores[index].getExecutorService();
+        
+        this.stores = new HAGlue[stores.length];
+        
+        for (int i = 0; i < stores.length; i++) {
+
+            this.stores[i] = stores[i].getHAGlue();
+
+        }
 
     }
     
@@ -90,7 +109,13 @@ public class MockQuorumImpl implements Quorum {
         if (index < 0 || index >= replicationFactor())
             throw new IndexOutOfBoundsException();
         
-        return stores[index].getHAGlue();
+        return stores[index];
+        
+    }
+    
+    public ExecutorService getExecutorService() {
+        
+        return executorService;
         
     }
 
@@ -199,7 +224,7 @@ public class MockQuorumImpl implements Quorum {
              * ExecutorService. When the runnable runs it will execute the
              * message on the remote service using RMI.
              */
-            stores[0/* master */].getExecutorService().submit(rf);
+            getExecutorService().submit(rf);
 
         }
 
@@ -294,7 +319,7 @@ public class MockQuorumImpl implements Quorum {
              * ExecutorService. When the runnable runs it will execute the
              * message on the remote service using RMI.
              */
-            stores[0/* master */].getExecutorService().submit(rf);
+            getExecutorService().submit(rf);
 
         }
 
@@ -392,7 +417,7 @@ public class MockQuorumImpl implements Quorum {
              * ExecutorService. When the runnable runs it will execute the
              * message on the remote service using RMI.
              */
-            stores[0/* master */].getExecutorService().submit(rf);
+            getExecutorService().submit(rf);
 
         }
 
@@ -518,7 +543,7 @@ public class MockQuorumImpl implements Quorum {
     }
 
     public Future<Void> replicate(final HAWriteMessage msg, final ByteBuffer b)
-            throws IOException, InterruptedException {
+            throws IOException {
 
         final int indexSelf = getIndex();
 
@@ -583,8 +608,7 @@ public class MockQuorumImpl implements Quorum {
             });
 
             // execute the FutureTask.
-            stores[indexSelf].getExecutorService()
-                    .submit((FutureTask<Void>) ft);
+            getExecutorService().submit((FutureTask<Void>) ft);
 
         } else if (isLastInChain()) {
 
@@ -596,7 +620,11 @@ public class MockQuorumImpl implements Quorum {
              * this host.
              */
             
-            ft = getHAReceiveService().receiveData(msg, b);
+            try {
+                ft = getHAReceiveService().receiveData(msg, b);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
 
         } else {
 
@@ -658,8 +686,7 @@ public class MockQuorumImpl implements Quorum {
             });
 
             // execute the FutureTask.
-            stores[indexSelf].getExecutorService()
-                    .submit((FutureTask<Void>) ft);
+            getExecutorService().submit((FutureTask<Void>) ft);
 
         }
 

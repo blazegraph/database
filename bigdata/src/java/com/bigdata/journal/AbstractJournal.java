@@ -3708,6 +3708,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             return true;
         }
 
+        public boolean isLastInChain() {
+            return false;
+        }
+
         public boolean isQuorumMet() {
             return true;
         }
@@ -3734,6 +3738,12 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 throw new IndexOutOfBoundsException();
             
             return AbstractJournal.this.getHAGlue();
+            
+        }
+
+        public ExecutorService getExecutorService() {
+            
+            return AbstractJournal.this.getExecutorService();
             
         }
 
@@ -3851,7 +3861,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
          *             always.
          */
         public Future<Void> replicate(HAWriteMessage msg, ByteBuffer b)
-                throws IOException, InterruptedException {
+                throws IOException {
             throw new UnsupportedOperationException();
         }
 
@@ -4092,46 +4102,24 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             }, t/* Void */);
             
         }
-        
-        /**
-         * Tells the downstream node to retrieve a writeCache buffer from the upstream socket.
-         * This will be passed on to the WriteCacheService.
-         * 
-         * The application of the HAWriteMessage will propagate on the pipeline, whilst
-         * the RMI calls to writeCacheBuffer will set all downstream quorum members
-         * to wait for the message.
-         */
-		public Future<Void> replicate(final HAWriteMessage msg) throws IOException {
-            return new FutureTask<Void>(new Runnable() {
-                public void run() {
 
-                HAServer srvr = getQuorumManager().getHAServer();
-                HAWriteMessage msg = null;
-                try {
-					msg = (HAWriteMessage) srvr.readMessage();
-					
-					msg.apply(_bufferStrategy.getHAClient());
-					
-					msg.acknowledge(msg.establishAck());
-				} catch (Exception e) {
-					log.error("Failure to process writeCacheBuffer request", e);
-					if (msg != null) {
-						AckMessage<?, ? extends SocketMessage<?>> ack = msg.establishAck();
-						ack.setError(e);
-						try {
-							msg.acknowledge(ack);
-						} catch (IOException e1) {
-							log.error("Failed to acknowledge message", e1);
-						}
-					}
-					
-                    _abort();
-				}
-                
-                    
-                }
-            }, null/* Void */);
-		}
+        /**
+         * Tells the downstream node to retrieve a writeCache buffer from the
+         * upstream socket. This will be passed on to the WriteCacheService.
+         * 
+         * The application of the HAWriteMessage will propagate on the pipeline,
+         * whilst the RMI calls to writeCacheBuffer will set all downstream
+         * quorum members to wait for the message.
+         */
+        public Future<Void> replicate(final HAWriteMessage msg)
+                throws IOException {
+
+            // FIXME Get the buffer from the WriteCacheService.
+            final ByteBuffer buffer = null;
+
+            return getQuorumManager().getQuorum().replicate(msg, buffer);
+
+        }
 
     };
 
