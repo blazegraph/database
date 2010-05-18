@@ -23,15 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal;
 
-import java.io.IOException;
-import java.net.BindException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.UnknownHostException;
 
 import com.bigdata.journal.ha.HADelegate;
-import com.bigdata.journal.ha.MockSingletonQuorumManager;
 import com.bigdata.journal.ha.QuorumManager;
 
 /**
@@ -46,7 +40,6 @@ import com.bigdata.journal.ha.QuorumManager;
  * as the first link into the HA functionality.
  * 
  * @author Martyn Cutcher
- *
  */
 public interface Environment {
 
@@ -54,13 +47,17 @@ public interface Environment {
 
 	public HADelegate getHADelegate();
 
+    /** @deprecated */
 	public AbstractJournal getJournal();
 
 	public QuorumManager getQuorumManager();
 
 	public boolean isHighlyAvailable();
 
-	public long getActiveFileExtent();
+    /** @deprecated */
+    public long getActiveFileExtent();
 
-	public IBufferStrategy getStrategy();
+    /** @deprecated */
+    public IBufferStrategy getStrategy();
+
 }

@@ -47,9 +47,9 @@ import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.WriteCache;
 import com.bigdata.io.WriteCacheService;
+import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.journal.ha.IHAClient;
 import com.bigdata.journal.ha.Quorum;
-import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
@@ -165,6 +165,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     /**
      * Extent of the file. This value should be valid since we obtain an
      * exclusive lock on the file when we open it.
+     * 
+     * @todo Atomic long to ensure visiblility of changes?
      */
     private long extent;
 

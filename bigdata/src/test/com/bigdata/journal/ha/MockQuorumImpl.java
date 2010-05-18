@@ -511,7 +511,7 @@ public class MockQuorumImpl implements Quorum {
 
     }
 
-	public void writeCacheBuffer(long fileExtent) throws IOException, InterruptedException {
+	public void writeCacheBuffer(final long fileExtent) throws IOException, InterruptedException {
 
         /*
          * To minimize latency, we first submit the futures for the other

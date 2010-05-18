@@ -120,19 +120,19 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 	}
 
 	private HASendService sendService;
-	private HAReceiveService<HAWriteMessage> receiveService1;
-	private HAReceiveService<HAWriteMessage> receiveService2;
+	private HAReceiveService<HAWriteMessageBase> receiveService1;
+	private HAReceiveService<HAWriteMessageBase> receiveService2;
 
 	protected void setUp() throws Exception {
 
 		final InetSocketAddress receiveAddr2 = new InetSocketAddress(getPort(0));
 
-		receiveService2 = new HAReceiveService<HAWriteMessage>(receiveAddr2, null/* downstream */);
+		receiveService2 = new HAReceiveService<HAWriteMessageBase>(receiveAddr2, null/* downstream */);
 		receiveService2.start();
 
 		final InetSocketAddress receiveAddr1 = new InetSocketAddress(getPort(0));
 
-		receiveService1 = new HAReceiveService<HAWriteMessage>(receiveAddr1, receiveAddr2);
+		receiveService1 = new HAReceiveService<HAWriteMessageBase>(receiveAddr1, receiveAddr2);
 		receiveService1.start();
 
 		sendService = new HASendService(receiveAddr1);
@@ -199,7 +199,7 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 
 	{
 		final ByteBuffer tst1 = getRandomData(50);
-		final HAWriteMessage msg1 = new HAWriteMessage(50, chk.checksum(tst1));
+		final HAWriteMessageBase msg1 = new HAWriteMessageBase(50, chk.checksum(tst1));
 		final ByteBuffer rcv1 = ByteBuffer.allocate(2000);
 		final ByteBuffer rcv2 = ByteBuffer.allocate(2000);
 		// rcv.limit(50);
@@ -227,7 +227,7 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 
 	{
 		final ByteBuffer tst1 = getRandomData(50);
-		final HAWriteMessage msg1 = new HAWriteMessage(50, chk.checksum(tst1) + 1);
+		final HAWriteMessageBase msg1 = new HAWriteMessageBase(50, chk.checksum(tst1) + 1);
 		final ByteBuffer rcv1 = ByteBuffer.allocate(2000);
 		final ByteBuffer rcv2 = ByteBuffer.allocate(2000);
 		// rcv.limit(50);
@@ -316,7 +316,7 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 
 				sze = 1 + r.nextInt(tst.capacity());
 				getRandomData(tst, sze);
-				final HAWriteMessage msg = new HAWriteMessage(sze, chk.checksum(tst));
+				final HAWriteMessageBase msg = new HAWriteMessageBase(sze, chk.checksum(tst));
 				assertEquals(0, tst.position());
 				assertEquals(sze, tst.limit());
 				// FutureTask return ensures remote ready for Socket data

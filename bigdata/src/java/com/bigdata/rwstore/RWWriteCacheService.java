@@ -24,9 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
@@ -38,7 +36,6 @@ import com.bigdata.io.WriteCache;
 import com.bigdata.io.WriteCacheService;
 import com.bigdata.io.WriteCache.FileChannelScatteredWriteCache;
 import com.bigdata.journal.Environment;
-import com.bigdata.journal.ha.QuorumManager;
 
 /**
  * Defines the WriteCacheService to be used by the RWStore.
@@ -73,5 +70,5 @@ public class RWWriteCacheService extends WriteCacheService {
                 (IReopenChannel<FileChannel>) opener);
 
     }
-
+    
 }
