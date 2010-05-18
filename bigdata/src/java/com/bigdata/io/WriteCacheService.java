@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.io;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
@@ -60,7 +59,6 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.WriteCache.WriteCacheCounters;
 import com.bigdata.journal.AbstractBufferStrategy;
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.Environment;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.RWStrategy;
@@ -698,24 +696,14 @@ abstract public class WriteCacheService implements IWriteCache {
 					} finally {
 						dirtyListLock.unlock();
 					}
-
-					// Start downstream IOs (network IO) iff highly availably.
-					boolean didDownstreamWrite = false;
 					
-					if (remoteWriteService != null) {
-						// establish connection or return existing connection.
-						final HAConnect cxn = establishHAConnect(quorumManager);
-						final Runnable r = cache.getDownstreamWriteRunnable(cxn);
-						if (r == null)
-							throw new AssertionError();
-						remoteWriteFuture = remoteWriteService.submit(r);
-						didDownstreamWrite = true;
-						
-						// also make the RMI call to the downstream HAGlue services to tell them
-						// to process the cache message.
-						// This will not return until all RMI requests have finished
-						quorumManager.getQuorum().writeCacheBuffer(environment.getActiveFileExtent());
-					}
+                    if (remoteWriteService != null) {
+                        remoteWriteFuture = quorumManager.getQuorum()
+                                .replicate(
+                                        cache.newHAWriteMessage(quorumManager
+                                                .getQuorum().token()),
+                                        cache.peek());
+                    }
 
 					/*
 					 * Do the local IOs.
@@ -729,12 +717,9 @@ abstract public class WriteCacheService implements IWriteCache {
 					cache.flush(false/* force */);
 
 					// Wait for the downstream IOs to finish.
-					if (didDownstreamWrite) {
-						final Future<?> tmp = remoteWriteFuture;
-						if (tmp != null) {
-							tmp.get();
-						}
-					}
+                    if (remoteWriteFuture != null) {
+                        remoteWriteFuture.get();
+                    }
 
 					/*
 					 * Add to the cleanList (all buffers are our buffers).

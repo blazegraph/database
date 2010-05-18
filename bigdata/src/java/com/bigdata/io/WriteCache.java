@@ -56,7 +56,9 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.DiskOnlyStrategy;
+import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.journal.ha.HAConnect;
+import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.journal.ha.SocketMessage;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -116,6 +118,9 @@ abstract public class WriteCache implements IWriteCache {
 	
 	/**
 	 * The buffer used to absorb writes that are destined for some channel.
+	 * <p>
+	 * Note: This is an {@link AtomicReference} since we want to clear this
+	 * field in {@link #close()}.
 	 */
 	final private AtomicReference<ByteBuffer> buf;
 
@@ -196,6 +201,20 @@ abstract public class WriteCache implements IWriteCache {
 //		latch.dec();
 
 	}
+
+    /**
+     * Return a read-only view of the backing {@link ByteBuffer}.
+     * 
+     * @return The read-only view -or- <code>null</code> if the
+     *         {@link WriteCache} has been closed.
+     */
+    ByteBuffer peek() {
+
+        final ByteBuffer b = buf.get();
+        
+        return b == null ? null : b.asReadOnlyBuffer();
+        
+    }
 
 	// /**
 	// * Return the buffer. No other thread will have access to the buffer. No
@@ -313,7 +332,7 @@ abstract public class WriteCache implements IWriteCache {
      * 
      * @see WriteCacheService#setExtent(long)
      */
-    private long fileExtent;
+    private final AtomicLong fileExtent = new AtomicLong();
 
     /**
      * Create a {@link WriteCache} from either a caller supplied buffer or a
@@ -348,6 +367,10 @@ abstract public class WriteCache implements IWriteCache {
      * @param useChecksum
      *            <code>true</code> iff the write cache will store the caller's
      *            checksum for a record and validate it on read.
+     * @param isHighlyAvailable
+     *            when <code>true</code> the whole record checksum is maintained
+     *            for use when replicating the write cache to along the write
+     *            pipeline.
      * 
      * @throws InterruptedException
      */
@@ -491,6 +514,15 @@ abstract public class WriteCache implements IWriteCache {
 	}
 
 	/**
+	 * The #of bytes written on the backing buffer.
+	 */
+	public final int bytesWritten() {
+	    
+	    return buf.get().position();
+	    
+	}
+	
+	/**
 	 * The capacity of the buffer.
 	 */
 	final public boolean isEmpty() {
@@ -518,13 +550,13 @@ abstract public class WriteCache implements IWriteCache {
         if (fileExtent < 0L)
             throw new IllegalArgumentException();
         
-        this.fileExtent = fileExtent;
+        this.fileExtent.set( fileExtent );
 
 	}
 
     public long getFileExtent() {
         
-        return fileExtent;
+        return fileExtent.get();
         
     }
 
@@ -1226,6 +1258,21 @@ abstract public class WriteCache implements IWriteCache {
         m_written = false;
         
 	}
+
+
+    /**
+     * Return the RMI message object that will accompany the payload from the
+     * {@link WriteCache} when it is replicated along the write pipeline.
+     * 
+     * @return cache A {@link WriteCache} to be replicated.
+     */
+    public HAWriteMessage newHAWriteMessage(final long quorumToken) {
+
+        return new HAWriteMessage(bytesWritten(), getWholeBufferChecksum(),
+                prefixWrites ? StoreTypeEnum.RW : StoreTypeEnum.WORM,
+                quorumToken, fileExtent.get(), firstOffset.get());
+
+    }
 
     /**
      * The current performance counters.

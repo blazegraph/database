@@ -54,7 +54,7 @@ import com.bigdata.util.ChecksumError;
  * @author Martyn Cutcher
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class HAReceiveService<M extends HAWriteMessage> extends Thread {
+public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
 
     protected static final Logger log = Logger
             .getLogger(HAReceiveService.class);
@@ -108,7 +108,7 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
     private final Condition futureReady  = lock.newCondition();
     private final Condition messageReady = lock.newCondition();
     private RunState runState = RunState.Start;
-    private HAWriteMessage message;
+    private HAWriteMessageBase message;
     private ByteBuffer localBuffer;
 
     public String toString() {
@@ -305,8 +305,8 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
 
     /**
      * Loops accepting requests and scheduling readTasks. Note that a local
-     * caller must hand us a buffer and {@link HAWriteMessage} using
-     * {@link #receiveData(HAWriteMessage, ByteBuffer)} before we will accept
+     * caller must hand us a buffer and {@link HAWriteMessageBase} using
+     * {@link #receiveData(HAWriteMessageBase, ByteBuffer)} before we will accept
      * data on the {@link SocketChannel}.
      *
      * @throws IOException
@@ -491,7 +491,7 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
 
         private final AtomicReference<Client> clientRef;
 
-        private final HAWriteMessage message;
+        private final HAWriteMessageBase message;
 
         private final ByteBuffer localBuffer;
 
@@ -527,7 +527,7 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
          *            the last node in the relay chain).
          */
         public ReadTask(final ServerSocketChannel server, final AtomicReference<Client> clientRef,
-                final HAWriteMessage message, final ByteBuffer localBuffer,
+                final HAWriteMessageBase message, final ByteBuffer localBuffer,
                 final HASendService downstream) {
 
             if (server == null)
@@ -749,7 +749,7 @@ public class HAReceiveService<M extends HAWriteMessage> extends Thread {
      * 
      * @throws InterruptedException
      */
-    public Future<Void> receiveData(final HAWriteMessage msg,
+    public Future<Void> receiveData(final HAWriteMessageBase msg,
             final ByteBuffer buffer) throws InterruptedException {
 
         lock.lockInterruptibly();

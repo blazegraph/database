@@ -2,11 +2,12 @@ package com.bigdata.journal.ha;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import com.bigdata.io.WriteCache;
 import com.bigdata.journal.IRootBlockView;
-import com.sun.corba.se.impl.orbutil.closure.Future;
 
 /**
  * An ordered collection of services. A quorum has a replication factor
@@ -166,11 +167,13 @@ public interface Quorum {
     void abort2Phase() throws IOException, InterruptedException;
 
     /**
-     * Send a message to each member of the quorum telling it to read a writeCache
-     * buffer from the pipeline.
-     * The fileExtent is the current active extent that is retrievable from the
-     * service evaluation Environment.
+     * Return a {@link Future} for a task which will replicate a
+     * {@link WriteCache} buffer along the write pipeline.
+     * 
+     * @param fileExtent
+     *            The current extent of the backing file on the disk.
      */
-    void writeCacheBuffer(long fileExtent) throws IOException, InterruptedException;
+    Future<Void> replicate(HAWriteMessageBase msg, ByteBuffer b)
+            throws IOException, InterruptedException;
 
 }
