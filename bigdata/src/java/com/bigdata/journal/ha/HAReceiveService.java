@@ -210,34 +210,39 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
 
         executor.shutdownNow();
 
-//        /*
-//         * Wait until we observe that the service is no longer running while
-//         * holding the lock.
-//         * 
-//         * Note: When run() exits it MUST signalAll() on both [futureReady] and
-//         * [messageReady] so that all threads watching those Conditions notice
-//         * that the service is no longer running.
-//         */
-//        lock.lockInterruptibly();
-//        try {
-//            while (true) {
-//                switch (runState) {
-//                case Start:
-//                case Running:
-//                case ShuttingDown:
-//                    futureReady.await();
-//                    continue;
-//                case Shutdown:
-//                    // Exit terminate().
-//                    return;
-//                default:
-//                    throw new AssertionError();
-//                }
-//            }
-//        } finally {
-//            lock.unlock();
-//        }
-
+    }
+    
+    /**
+     * Block until the service is shutdown.
+     */
+    public void awaitShutdown() throws InterruptedException {
+        /*
+         * Wait until we observe that the service is no longer running while
+         * holding the lock.
+         * 
+         * Note: When run() exits it MUST signalAll() on both [futureReady] and
+         * [messageReady] so that all threads watching those Conditions notice
+         * that the service is no longer running.
+         */
+        lock.lockInterruptibly();
+        try {
+            while (true) {
+                switch (runState) {
+                case Start:
+                case Running:
+                case ShuttingDown:
+                    futureReady.await();
+                    continue;
+                case Shutdown:
+                    // Exit terminate().
+                    return;
+                default:
+                    throw new AssertionError();
+                }
+            }
+        } finally {
+            lock.unlock();
+        }
     }
    
     public void run() {
