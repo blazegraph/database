@@ -102,6 +102,10 @@ public class MockSingletonQuorumManager implements QuorumManager {
             return null;
         }
 
+        public void invalidate() {
+            // TODO Auto-generated method stub
+        }
+        
         public ExecutorService getExecutorService() {
             throw new UnsupportedOperationException();
         }

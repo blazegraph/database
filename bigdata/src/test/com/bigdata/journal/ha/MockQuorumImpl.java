@@ -1,6 +1,7 @@
 package com.bigdata.journal.ha;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
@@ -12,6 +13,7 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
 
@@ -32,15 +34,21 @@ import com.bigdata.util.concurrent.ExecutionExceptions;
  *       the local service w/o an RMI proxy. Add method to enumerate over the
  *       non-master {@link HAGlue} objects. Refactor the implementation to avoid
  *       the direct references to {@link #stores}.
+ * 
+ * @todo add assertOpen() stuff to check for invalidation?
  */
 public class MockQuorumImpl implements Quorum {
 
     static protected final Logger log = Logger.getLogger(MockQuorumImpl.class);
-    
+
+    private final AtomicBoolean open = new AtomicBoolean(true);
     private final int index;
     private final ExecutorService executorService;
     private final HAGlue[] stores;
 
+    private final HASendService sendService;
+    private final HAReceiveService<HAWriteMessage> receiveService;
+    
     /**
      * 
      * @param index
@@ -72,6 +80,53 @@ public class MockQuorumImpl implements Quorum {
 
         }
 
+        if(isMaster()) {
+
+            sendService = new HASendService(getHAGlue(getIndex() + 1)
+                    .getWritePipelineAddr());
+            
+            receiveService = null;
+
+        } else {
+
+            sendService = null;
+
+            final InetSocketAddress addrSelf = getHAGlue(getIndex())
+                    .getWritePipelineAddr();
+
+            final InetSocketAddress addrNext = isLastInChain() ? null
+                    : getHAGlue(getIndex() + 1).getWritePipelineAddr();
+
+            receiveService = new HAReceiveService<HAWriteMessage>(addrSelf,
+                    addrNext, callback);
+
+        }
+        
+    }
+
+    protected void finalize() throws Throwable {
+        
+        _close();
+        
+        super.finalize();
+        
+    }
+
+    public void invalidate() {
+        _close();
+    }
+
+    protected void _close() {
+        
+        if (!open.compareAndSet(true/* expect */, false/* update */))
+            return;
+        
+        if(isMaster()) {
+            sendService.terminate();
+        } else {
+            receiveService.terminate();
+        }
+        
     }
     
     /** A fixed token value of ZERO (0L). */
@@ -695,15 +750,21 @@ public class MockQuorumImpl implements Quorum {
     }
 
     public HAReceiveService<HAWriteMessage> getHAReceiveService() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException();
+
+        if(isMaster())
+            throw new UnsupportedOperationException();
+        
+        return receiveService;
+        
     }
 
     public HASendService getHASendService() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException();
+        
+        if(!isMaster())
+            throw new UnsupportedOperationException();
+        
+        return sendService;
+        
     }
-
-    
     
 }
