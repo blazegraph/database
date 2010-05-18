@@ -25,12 +25,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Apr 21, 2010
  */
 
-package com.bigdata.journal.ha;
+package com.bigdata.io.messages;
 
 import com.bigdata.io.ObjectSocketChannelStream;
 import com.bigdata.io.WriteCache;
-import com.bigdata.journal.ha.SocketMessage.AckMessage;
-import com.bigdata.journal.ha.SocketMessage.HAWriteMessage.HAWriteConfirm;
+import com.bigdata.io.messages.SocketMessage.AckMessage;
+import com.bigdata.io.messages.SocketMessage.HAWriteMessage.HAWriteConfirm;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

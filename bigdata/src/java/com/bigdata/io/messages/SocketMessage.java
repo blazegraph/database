@@ -22,7 +22,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
-package com.bigdata.journal.ha;
+package com.bigdata.io.messages;
 
 import java.io.Externalizable;
 import java.io.IOException;
@@ -79,7 +79,7 @@ public abstract class SocketMessage<T> implements Externalizable {
 	
 	long id;
 	
-	void setId() {
+	protected void setId() {
 		id = ids.incrementAndGet();
 	}
 	
@@ -87,7 +87,7 @@ public abstract class SocketMessage<T> implements Externalizable {
 		return id;
 	}
 	
-	AckMessage<?,? extends SocketMessage<?>> ack;
+	protected AckMessage<?,? extends SocketMessage<?>> ack;
 	
 	private final ReentrantLock lock = new ReentrantLock();
 	/**
@@ -144,7 +144,7 @@ public abstract class SocketMessage<T> implements Externalizable {
 	Object handler = null;
 
 	private HAServer server;
-	void setHandler(Object handler) {
+	public void setHandler(Object handler) {
 		this.handler = handler;
 	}
 
@@ -367,7 +367,7 @@ public abstract class SocketMessage<T> implements Externalizable {
 			
 		}
 		
-		static class HAWriteConfirm extends AckMessage<IWriteCallback,HAWriteMessage> {
+		public static class HAWriteConfirm extends AckMessage<IWriteCallback,HAWriteMessage> {
 			
 			public HAWriteConfirm() {} // for deserialization
 
@@ -422,7 +422,7 @@ public abstract class SocketMessage<T> implements Externalizable {
 	 * 
 	 * The message will pass data on to the next service in the chain if present.
 	 */
-	static class HATruncateMessage extends SocketMessage<IHAClient> {
+	public static class HATruncateMessage extends SocketMessage<IHAClient> {
 		long extent;
 		
 		public HATruncateMessage() {}
@@ -473,7 +473,7 @@ public abstract class SocketMessage<T> implements Externalizable {
 						
 		}
 
-		public com.bigdata.journal.ha.SocketMessage.AckMessage<?, ? extends SocketMessage<?>> establishAck() {
+		public com.bigdata.io.messages.SocketMessage.AckMessage<?, ? extends SocketMessage<?>> establishAck() {
 			if (ack == null)
 				ack = new HATruncateConfirm(id);
 			
@@ -487,7 +487,7 @@ public abstract class SocketMessage<T> implements Externalizable {
 		
 	}
 	
-	static class HATruncateConfirm extends AckMessage<ITruncateCallback,HAWriteMessage> {
+	public static class HATruncateConfirm extends AckMessage<ITruncateCallback,HAWriteMessage> {
 		
 		public HATruncateConfirm() {} // for deserialization
 

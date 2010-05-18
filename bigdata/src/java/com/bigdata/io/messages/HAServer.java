@@ -22,7 +22,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-package com.bigdata.journal.ha;
+package com.bigdata.io.messages;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -41,7 +41,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.ObjectSocketChannelStream;
-import com.bigdata.journal.ha.SocketMessage.AckMessage;
+import com.bigdata.io.messages.SocketMessage.AckMessage;
 
 /**
  * The HAServer processes HAMessages and dispatches to a message client.

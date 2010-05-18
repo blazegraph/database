@@ -1,4 +1,4 @@
-package com.bigdata.journal.ha;
+package com.bigdata.io.messages;
 
 import com.bigdata.io.ObjectSocketChannelStream;
 import com.bigdata.io.WriteCache;
@@ -6,6 +6,7 @@ import com.bigdata.io.WriteCacheService;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.Environment;
 import com.bigdata.journal.IBufferStrategy;
+import com.bigdata.journal.ha.HADelegate;
 
 /**
  * Provides two interfaces, from both HAGlue RMI and the IHAClient

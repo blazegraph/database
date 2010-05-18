@@ -36,7 +36,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.WriteCacheService;
-import com.bigdata.journal.ha.IHAClient;
+import com.bigdata.io.messages.IHAClient;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.Bytes;

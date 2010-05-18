@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal.ha;
 
+import com.bigdata.io.messages.HAConnect;
+import com.bigdata.io.messages.HAServer;
+import com.bigdata.io.messages.IHAClient;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.Journal;
 
