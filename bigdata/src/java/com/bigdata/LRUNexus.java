@@ -208,10 +208,15 @@ public class LRUNexus {
 
         /**
          * The name of {@link IGlobalLRU} implementation class.
+         * 
+         * @see #DEFAULT_CLASS
          */
         String CLASS = LRUNexus.class.getName() + ".class";
 
         /**
+         * The default {@link IGlobalLRU} implementation class (
+         * {@value #DEFAULT_CLASS}).
+         * 
          * FIXME The {@link HardReferenceGlobalLRURecycler} has less throughput
          * than the {@link HardReferenceGlobalLRU} but I want to test the
          * {@link HardReferenceGlobalLRU} more throughly on high throughput
@@ -235,7 +240,8 @@ public class LRUNexus {
          * ideal for both scale-out and scale-up once it has been tested more
          * throughly. Even better would be a LIRS access policy for that class.
          */
-        String DEFAULT_CLASS = HardReferenceGlobalLRURecycler.class.getName();
+//        String DEFAULT_CLASS = HardReferenceGlobalLRURecycler.class.getName();
+        String DEFAULT_CLASS = BCHMGlobalLRU2.class.getName();
 
         /**
          * The load factor for the cache instances.
@@ -303,7 +309,7 @@ public class LRUNexus {
          */
         String ACCESS_POLICY = LRUNexus.class.getName() + ".accessPolicy";
         
-        String DEFAULT_ACCESS_POLICY = AccessPolicyEnum.LIRS.toString();
+        String DEFAULT_ACCESS_POLICY = AccessPolicyEnum.LRU.toString();
 
         /**
          * The minimum #of per-{@link IRawStore} cache instances that will be
@@ -410,12 +416,6 @@ public class LRUNexus {
          * @see Options#CLASS
          */
         public final Class<? extends IGlobalLRU> cls;
-
-//        /**
-//         * <code>true</code> iff the implementation {@link #cls class}
-//         * implements the {@link IGlobalLRU} interface.
-//         */
-//        final boolean validClass;
 
         /**
          * The load factor for the backing hash map(s).
@@ -713,16 +713,15 @@ public class LRUNexus {
          * public FooGlobalLRU(CacheSettings)
          * </pre>
          * 
-         * @return The new instance.
+         * @return The new instance -or- <code>null</code> if the cache is
+         *         disabled.
+         * 
          * @throws NoSuchMethodException
          * @throws SecurityException
-         * @throws InvocationTargetException 
-         * @throws IllegalAccessException 
-         * @throws InstantiationException 
-         * @throws IllegalArgumentException 
-         * 
-         * @throws RuntimeException
-         *             various causes.
+         * @throws InvocationTargetException
+         * @throws IllegalAccessException
+         * @throws InstantiationException
+         * @throws IllegalArgumentException
          * @throws UnsupportedOperationException
          *             if something is not supported....
          * 
@@ -737,80 +736,15 @@ public class LRUNexus {
                 InstantiationException, IllegalAccessException,
                 InvocationTargetException {
 
-            IGlobalLRU<Long, Object> tmp = null;
-            CacheSettings s = this;
+            if (enabled) {
 
-            if (s.enabled) {
+                if (maximumBytesInMemory > 0) {
 
-                if (s.maximumBytesInMemory > 0) {
-
-                    final Constructor<?> ctor = s.cls
+                    final Constructor<?> ctor = cls
                             .getConstructor(new Class[] { CacheSettings.class });
-                    
+
                     return (IGlobalLRU<Long, Object>) ctor
                             .newInstance(new Object[] { this });
-
-//                    if (s.cls == WeakReferenceGlobalLRU.class) {
-//
-//                        tmp = new WeakReferenceGlobalLRU(//
-//                                s.maximumBytesInMemory,//
-//                                s.minCacheSetSize,//
-//                                s.queueCapacity,//
-//                                s.nscan,
-//                                s.initialCacheCapacity,//
-//                                s.loadFactor,//
-//                                s.concurrencyLevel
-//                        );
-//
-//                    } else if (s.cls == HardReferenceGlobalLRU.class) {
-//
-//                        tmp = new HardReferenceGlobalLRU<Long, Object>(
-//                                s.maximumBytesInMemory, s.minCacheSetSize,
-//                                s.initialCacheCapacity, s.loadFactor);
-//
-//                    } else if (s.cls == HardReferenceGlobalLRURecycler.class) {
-//
-//                        tmp = new HardReferenceGlobalLRURecycler<Long, Object>(
-//                                s.maximumBytesInMemory, s.minCleared,
-//                                s.minCacheSetSize, s.initialCacheCapacity,
-//                                s.loadFactor);
-//
-//                    } else if (s.cls == HardReferenceGlobalLRURecyclerExplicitDeleteRequired.class) {
-//
-//                        tmp = new HardReferenceGlobalLRURecyclerExplicitDeleteRequired<Long, Object>(
-//                                s.maximumBytesInMemory, s.minCleared,
-//                                s.minCacheSetSize, s.initialCacheCapacity,
-//                                s.loadFactor);
-//
-//                    } else if (s.cls == StoreAndAddressLRUCache.class) {
-//
-//                        tmp = new StoreAndAddressLRUCache<Object>(
-//                                s.maximumBytesInMemory, s.minCacheSetSize,
-//                                s.initialCacheCapacity, s.loadFactor);
-//
-//                    } else if (s.cls == BCHMGlobalLRU.class) {
-//
-//                        tmp = new BCHMGlobalLRU<Object>(s.maximumBytesInMemory,
-//                                s.minCacheSetSize, s.limitingCacheCapacity,
-//                                s.loadFactor, s.accessPolicy);
-//
-//                    } else if (s.cls == BCHMGlobalLRU2.class) {
-//
-//                        tmp = new BCHMGlobalLRU2<Long, Object>(
-//                                s.maximumBytesInMemory, s.minCleared,
-//                                s.minCacheSetSize, s.initialCacheCapacity,
-//                                s.loadFactor, s.concurrencyLevel,
-//                                s.threadLocalBufferCapacity
-//                        // , s.accessPolicy
-//                        );
-//
-//                    } else {
-//
-//                        throw new UnsupportedOperationException(
-//                                "Can not create global cache: cls="
-//                                        + s.cls.getName());
-//
-//                    }
 
                 }
 
