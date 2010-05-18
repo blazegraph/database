@@ -526,28 +526,55 @@ public class MockQuorumImpl implements Quorum {
 
         if (isMaster()) {
 
+            /*
+             * This is the master, so send() the buffer.
+             */
+            
             ft = new FutureTask<Void>(new Callable<Void>() {
 
                 public Void call() throws Exception {
 
-                    final Future<Void> futRec = getHAGlue(indexSelf + 1)
-                            .replicate(msg);
-
+                    // Get Future for send() outcome on local service.
                     final Future<Void> futSnd = getHASendService().send(b);
 
-                    // @todo review options here for awaiting these futures.
-                    while (!futSnd.isDone() && !futRec.isDone()) {
+                    try {
+
+                        // Get Future for receive outcome on the remote service.
+                        final Future<Void> futRec = getHAGlue(indexSelf + 1)
+                                .replicate(msg);
+
                         try {
-                            futSnd.get(10L, TimeUnit.MILLISECONDS);
-                        } catch (TimeoutException ignore) {
+
+                            /*
+                             * Await the Futures, but spend more time waiting on
+                             * the local Future and only check the remote Future
+                             * every second. Timeouts are ignored during this
+                             * loop.
+                             */
+                            while (!futSnd.isDone() && !futRec.isDone()) {
+                                try {
+                                    futSnd.get(1L, TimeUnit.SECONDS);
+                                } catch (TimeoutException ignore) {
+                                }
+                                try {
+                                    futRec.get(10L, TimeUnit.MILLISECONDS);
+                                } catch (TimeoutException ignore) {
+                                }
+                            }
+                            futSnd.get();
+                            futRec.get();
+
+                        } finally {
+                            if (!futRec.isDone()) {
+                                // cancel remote Future unless done.
+                                futRec.cancel(true/* mayInterruptIfRunning */);
+                            }
                         }
-                        try {
-                            futRec.get(10L, TimeUnit.MILLISECONDS);
-                        } catch (TimeoutException ignore) {
-                        }
+
+                    } finally {
+                        // cancel the local Future.
+                        futSnd.cancel(true/* mayInterruptIfRunning */);
                     }
-                    futSnd.get();
-                    futRec.get();
 
                     // done
                     return null;
@@ -561,48 +588,78 @@ public class MockQuorumImpl implements Quorum {
 
         } else if (isLastInChain()) {
 
-            // receive service will execute.
+            /*
+             * This is the last node in the write pipeline, so just receive the
+             * buffer.
+             * 
+             * Note: The receive service is executing this Future locally on
+             * this host.
+             */
+            
             ft = getHAReceiveService().receiveData(msg, b);
 
         } else {
 
             /*
-             * A node in the middle of the 
+             * A node in the middle of the write pipeline.
              */
             
             ft = new FutureTask<Void>(new Callable<Void>() {
 
                 public Void call() throws Exception {
 
-                    final Future<Void> futRec = isLastInChain() ? null
-                            : getHAGlue(indexSelf + 1).replicate(msg);
-
-                    final Future<Void> futSnd = isMaster() ? getHASendService()
-                            .send(b) : getHAReceiveService()
+                    // Get Future for send() outcome on local service.
+                    final Future<Void> futSnd = getHAReceiveService()
                             .receiveData(msg, b);
 
-                    // @todo review options here for awaiting these futures.
-                    while (!futSnd.isDone()
-                            && (futRec != null && !futRec.isDone())) {
+                    try {
+
+                        // Get future for receive outcome on the remote service.
+                        final Future<Void> futRec = getHAGlue(indexSelf + 1)
+                                .replicate(msg);
+
                         try {
-                            futSnd.get(10L, TimeUnit.MILLISECONDS);
-                        } catch (TimeoutException ignore) {
-                        }
-                        if (futRec != null) {
-                            try {
-                                futRec.get(10L, TimeUnit.MILLISECONDS);
-                            } catch (TimeoutException ignore) {
+
+                            /*
+                             * Await the Futures, but spend more time waiting on
+                             * the local Future and only check the remote Future
+                             * every second. Timeouts are ignored during this
+                             * loop.
+                             */
+                            while (!futSnd.isDone() && !futRec.isDone()) {
+                                try {
+                                    futSnd.get(1L, TimeUnit.SECONDS);
+                                } catch (TimeoutException ignore) {
+                                }
+                                try {
+                                    futRec.get(10L, TimeUnit.MILLISECONDS);
+                                } catch (TimeoutException ignore) {
+                                }
+                            }
+                            futSnd.get();
+                            futRec.get();
+                            
+                        } finally {
+                            if (!futRec.isDone()) {
+                                // cancel remote Future unless done.
+                                futRec.cancel(true/* mayInterruptIfRunning */);
                             }
                         }
+                        
+                    } finally {
+                        // cancel the local Future.
+                        futSnd.cancel(true/* mayInterruptIfRunning */);
                     }
-                    futSnd.get();
-                    futRec.get();
 
                     // done
                     return null;
                 }
 
             });
+
+            // execute the FutureTask.
+            stores[indexSelf].getExecutorService()
+                    .submit((FutureTask<Void>) ft);
 
         }
 
