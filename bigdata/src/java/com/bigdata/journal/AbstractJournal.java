@@ -2466,8 +2466,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             /*
              * Verify that the last negotiated quorum is still in effect.
              */
-            final Quorum q = getQuorumManager().getQuorum();
-            getQuorumManager().assertQuorum(quorumToken);
+            final Quorum q = quorumManager.getQuorum();
+            quorumManager.assertQuorumLeader(quorumToken);
 
             /*
              * Prepare the new root block.
@@ -2631,6 +2631,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         assertOpen();
 
+        quorumManager.assertQuorum(quorumToken);
+
         return _bufferStrategy.read(addr);
 
     }
@@ -2645,6 +2647,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             
         }
 
+        quorumManager.assertQuorumLeader(quorumToken);
+        
         return _bufferStrategy.write(data);
 
     }
@@ -2660,6 +2664,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             
         }
 
+        quorumManager.assertQuorumLeader(quorumToken);
+
         return _bufferStrategy.write(data, oldAddr);
 
     }
@@ -2674,6 +2680,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             throw new UnsupportedOperationException();
             
         }
+        
+        quorumManager.assertQuorumLeader(quorumToken);
 
         _bufferStrategy.delete(addr);
         
