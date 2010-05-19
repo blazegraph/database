@@ -180,7 +180,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     }
 
-    protected void init() {
+    public void init() {
         
         super.init();
         

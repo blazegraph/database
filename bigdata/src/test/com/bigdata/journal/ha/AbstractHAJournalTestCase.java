@@ -129,6 +129,10 @@ abstract public class AbstractHAJournalTestCase
 
         }
 
+        for(int i=0; i<k; i++) {
+            stores[i].init();
+        }
+        
         // return the master.
         return stores[0];
 

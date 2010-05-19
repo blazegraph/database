@@ -804,7 +804,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
     }
 
-    protected void init() {
+    public void init() {
 
         if (quorumManager.isHighlyAvailable())
             System.err.println("HA JOURNAL INIT");
@@ -1559,7 +1559,6 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     public void deleteResources() {
 
-        assertOpen();
         if(isOpen()) throw new IllegalStateException();
 
         if (log.isInfoEnabled())
