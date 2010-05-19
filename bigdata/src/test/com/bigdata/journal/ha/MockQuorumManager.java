@@ -102,7 +102,7 @@ public class MockQuorumManager implements QuorumManager {
             
                 // Lazily initialization.
                 quorum = new MockQuorumImpl(index, stores);
-                if (quorum.getHAReceiveService() != null) {
+                if (!quorum.isMaster()) {
                 	quorum.getHAReceiveService().start();
                 }
                 
