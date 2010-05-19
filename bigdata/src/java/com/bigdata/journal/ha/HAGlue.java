@@ -52,6 +52,9 @@ public interface HAGlue extends Remote {
     /**
      * Return the address at which this service will listen for write pipeline
      * messages sent from the upstream service.
+     * 
+     * @todo This should be handled as a smart proxy so this method does not
+     *       actually perform RMI.
      */
     InetSocketAddress getWritePipelineAddr();
 
@@ -131,5 +134,18 @@ public interface HAGlue extends Remote {
      * 
      * @todo resynchronization API.
      */
-    
+
+    /**
+     * Create the backing file on the secondary and lay down its initial root
+     * blocks. The initial root blocks for the persistence store should both be
+     * copies of the given root block.
+     * 
+     * @param rootBlock
+     *            The initial root block.
+     * 
+     * @return A {@link Future} which evaluates to a yes/no vote on whether the
+     *         service is prepared to commit.
+     */
+    RunnableFuture<Void> create(IRootBlockView rootBlock) throws IOException;
+
 }
