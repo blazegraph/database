@@ -61,6 +61,7 @@ import com.bigdata.journal.Environment;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.WORMStrategy;
 import com.bigdata.journal.ha.Quorum;
+import com.bigdata.journal.ha.QuorumException;
 import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rwstore.RWStore;
@@ -689,33 +690,43 @@ abstract public class WriteCacheService implements IWriteCache {
 						}
 					} finally {
 						dirtyListLock.unlock();
-					}
-					
-                    if (quorumManager.isHighlyAvailable()) {
-                        /*
-                         * Request replication of the write cache along the
-                         * write pipeline. - But only if master!
-                         */
-                        final Quorum q = quorumManager.getQuorum();
-                        if (q.isMaster())
-	                        remoteWriteFuture = q.replicate(cache
-	                                .newHAWriteMessage(q.token()), cache.peek());
                     }
 
-					/*
-					 * Do the local IOs (concurrent w/ remote replication).
-					 * 
-					 * Note: This will not throw out an InterruptedException
-					 * unless this thread is actually interrupted. The local
-					 * storage managers all trap asynchronous close exceptions
-					 * arising from the interrupt of a concurrent IO operation
-					 * and retry until they succeed.
-					 */
-					cache.flush(false/* force */);
+                    if (!cache.isEmpty()) {
+                        
+                        /*
+                         * Only process non-empty cache buffers.
+                         */
+                        
+                        if (quorumManager.isHighlyAvailable()) {
+                            /*
+                             * Request replication of the write cache along the
+                             * write pipeline. - But only if master!
+                             */
+                            final Quorum q = quorumManager.getQuorum();
+                            if (!q.isMaster())
+                                throw new QuorumException("Not master");
+                            remoteWriteFuture = q.replicate(cache
+                                    .newHAWriteMessage(q.token()), cache
+                                    .peek());
+                        }
 
-					// Wait for the downstream IOs to finish.
-                    if (remoteWriteFuture != null) {
-                        remoteWriteFuture.get();
+                        /*
+                         * Do the local IOs (concurrent w/ remote replication).
+                         * 
+                         * Note: This will not throw out an InterruptedException
+                         * unless this thread is actually interrupted. The local
+                         * storage managers all trap asynchronous close
+                         * exceptions arising from the interrupt of a concurrent
+                         * IO operation and retry until they succeed.
+                         */
+                        cache.flush(false/* force */);
+
+                        // Wait for the downstream IOs to finish.
+                        if (remoteWriteFuture != null) {
+                            remoteWriteFuture.get();
+                        }
+
                     }
 
 					/*
@@ -1263,7 +1274,35 @@ abstract public class WriteCacheService implements IWriteCache {
 		if (!writeLock.tryLock(remaining, TimeUnit.NANOSECONDS))
 			throw new TimeoutException();
 		try {
-			final WriteCache tmp = current.get();
+            final WriteCache tmp = current.get();
+            if (tmp.remaining() == 0) {
+                /*
+                 * Handle an empty buffer by waiting until the dirtyList is
+                 * empty.
+                 */
+                // remaining := (total - elapsed).
+                remaining = nanos - (System.nanoTime() - begin);
+                if (!dirtyListLock.tryLock(remaining, TimeUnit.NANOSECONDS))
+                    throw new TimeoutException();
+                try {
+                    while (!dirtyList.isEmpty() && !halt) {
+                        // remaining := (total - elapsed).
+                        remaining = nanos - (System.nanoTime() - begin);
+                        if (!dirtyListEmpty.await(remaining,
+                                TimeUnit.NANOSECONDS)) {
+                            throw new TimeoutException();
+                        }
+                    }
+                    if (halt)
+                        throw new RuntimeException(firstCause.get());
+                } finally {
+                    dirtyListLock.unlock();
+                }
+                return true;
+            }
+            /*
+             * Otherwise, the current buffer is non-empty.
+             */
 			// remaining := (total - elapsed).
 			remaining = nanos - (System.nanoTime() - begin);
 			if (!dirtyListLock.tryLock(remaining, TimeUnit.NANOSECONDS))
