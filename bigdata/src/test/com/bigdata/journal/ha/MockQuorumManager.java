@@ -39,7 +39,7 @@ public class MockQuorumManager implements QuorumManager {
     
     final Journal[] stores;
 
-    final Quorum quorum;
+    private Quorum quorum;
 
     public int replicationFactor() {
 
@@ -58,7 +58,13 @@ public class MockQuorumManager implements QuorumManager {
         this.k = stores.length;
         this.index = index;
         this.stores = stores;
-        this.quorum = newQuorum(index, stores);
+        
+        /*
+         * Note: The Quorum can not be eagerly initialized to do invocation of
+         * the MockQuorumManager constructor from within the AbstractJournal
+         * constructor.
+         */
+//        this.quorum = newQuorum(index, stores);
 
         // Start the quorum as met on token ZERO (0).
         token = 0L;
@@ -89,14 +95,35 @@ public class MockQuorumManager implements QuorumManager {
     }
 
     public Quorum getQuorum() {
-        
-        return quorum;
+
+        synchronized (this) {
+            
+            if (quorum == null) {
+            
+                // Lazily initialization.
+                quorum = new MockQuorumImpl(index, stores);
+                
+            }
+            
+            return quorum;
+            
+        }
         
     }
 
     public void terminate() {
         
-        // NOP.
+        synchronized (this) {
+
+            if (quorum != null) {
+                
+                quorum.invalidate();
+                
+                quorum = null;
+                
+            }
+
+        }
         
     }
  
