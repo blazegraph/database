@@ -1,6 +1,8 @@
 package com.bigdata.resources;
 
 import java.lang.ref.SoftReference;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
@@ -8,9 +10,12 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.resources.StoreManager.ManagedJournal;
 
 /**
  * Class encapsulates a bunch of metadata used to make decisions about how to
@@ -143,27 +148,50 @@ class BTreeMetadata {
      * See src/architecture/mergePriority.xls.
      */
     final private int A = 3, B = 1;//, C = 10;
-    
+
     /**
-     * The computed merge priority is based on the complexity of the view.
+     * This is the inverse of the {@link #mergePriority}. If the merge priority
+     * is ZERO (0), then this is 1.0 (which is greater than the build priority
+     * which associated with any index partition with a non-zero merge
+     * priority).
+     */
+    public final double buildPriority;
+
+    /**
+     * The computed merge priority is based on the complexity of the view. This
+     * is ZERO (0) if there is no reason to perform a merge.
      */
     public final double mergePriority;
 
-    /**
-     * The split priority is based solely on {@link #sumSegBytes} (it is the
-     * ratio of that value to the nominal shard size) and is zero until
-     * {@link #sumSegBytes} is GTE the {@link OverflowManager#nominalShardSize}.
-     */
-    public final double splitPriority;
-    
+//    /**
+//     * The split priority is based solely on {@link #sumSegBytes} (it is the
+//     * ratio of that value to the nominal shard size) and is ZERO (0) until
+//     * {@link #sumSegBytes} is GTE the {@link OverflowManager#nominalShardSize}.
+//     *
+//     * @deprecated This did not consider the adjusted nominal shard size.
+//     */
+//    public final double splitPriority;
+
     /**
      * <code>true</code> iff this index partition meets the criteria for a
-     * mandatory compacting merge (too many journals in the view, too many
-     * index segments in the view, or too many sources in the view).
+     * mandatory compacting merge (too many journals in the view, too many index
+     * segments in the view, or too many sources in the view).
      * 
-     * @deprecated by {@link #mergePriority}
+     * @deprecated by {@link #mergePriority}.
+     *             <p>
+     *             Note: This field can be dropped once we are running split,
+     *             tailSplit, and scatterSplit as merge after actions. At the
+     *             same time, make sure that those tasks will not accept a view
+     *             unless it is a {@link #compactView}.
      */
     public final boolean mandatoryMerge;
+
+    /**
+     * <code>true</code> iff there are two sources in the view and the second
+     * source is an {@link IndexSegment} (the first will be the {@link BTree} on
+     * some {@link ManagedJournal}).
+     */
+    public final boolean compactView;
     
     /**
      * The entry count for the {@link BTree} itself NOT the view.
@@ -188,11 +216,71 @@ class BTreeMetadata {
     public final double percentTailSplits;
 
     /**
+     * A package private lock used to ensure that decisions concerning which
+     * index partition operation (build, merge, split, etc) to execute are
+     * serialized.
+     * 
+     * @see OverflowMetadata#setAction(String, OverflowActionEnum)
+     */
+    final ReentrantLock lock = new ReentrantLock();
+
+    /**
      * The action taken and <code>null</code> if no action has been taken for
      * this local index.
+     * <p>
+     * Note: An {@link AtomicReference} is used to permit inspection of the
+     * value without holding the {@link #lock}. If you want to make an atomic
+     * decision based on this value, then make sure that you are holding the
+     * {@link #lock} before you look at the value.
      */
-    public OverflowActionEnum action;
+    private final AtomicReference<OverflowActionEnum> actionRef = new AtomicReference<OverflowActionEnum>();
 
+    /**
+     * The action taken and <code>null</code> if no action has been taken for
+     * this local index (non-blocking). 
+     * <p>
+     * Note: An {@link AtomicReference} is used to permit inspection of the
+     * value without holding the {@link #lock}. If you want to make an atomic
+     * decision based on this value, then make sure that you are holding the
+     * {@link #lock} before you look at the value.
+     */
+    public OverflowActionEnum getAction() {
+        
+        return actionRef.get();
+        
+    }
+
+    /**
+     * Set the action to be taken.
+     * 
+     * @param action
+     *            The action.
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     * @throws IllegalMonitorStateException
+     *             unless the {@link #lock} is held by the caller.
+     * @throws IllegalStateException
+     *             if the action has already been set.
+     */
+    public void setAction(final OverflowActionEnum action) {
+        
+        if(action == null)
+            throw new IllegalArgumentException();
+
+        if (!lock.isHeldByCurrentThread())
+            throw new IllegalMonitorStateException();
+
+        if (actionRef.get() != null) {
+
+            throw new IllegalStateException("Already set: " + actionRef.get()
+                    + ", given=" + action);
+            
+        }
+        
+        actionRef.set(action);
+
+    }
+    
     /**
      * 
      * @param resourceManager
@@ -240,6 +328,7 @@ class BTreeMetadata {
         // #of sources in the view (very fast).
         int sourceCount = 0, sourceJournalCount = 0, sourceSegmentCount = 0;
         long sumSegBytes = 0L;
+        boolean secondSourceIsSeg = false;
         if (pmd != null) {
             for (IResourceMetadata x : pmd.getResources()) {
                 sourceCount++;
@@ -247,7 +336,21 @@ class BTreeMetadata {
                     sourceJournalCount++;
                 } else {
                     sourceSegmentCount++;
-                    sumSegBytes += x.getFile().length();
+                    /*
+                     * Note: This opens the backing segment store in order to
+                     * determine its size on the disk. This is a fairly light
+                     * weight operation (the nodes region is not read, just the
+                     * checkpoint record and the IndexMetadata record).
+                     * 
+                     * Note: This does not use IResourceMetadata#getFile() to
+                     * determine the size of the file in the backing file system
+                     * because it is not an absolute file path.
+                     */
+                    final IRawStore store = resourceManager.openStore(x.getUUID());
+                    sumSegBytes += store.size();//new File(x.getFile()).length();
+                    if (sourceCount == 2) {
+                        secondSourceIsSeg = true;
+                    }
                 }
             }
         }
@@ -255,10 +358,16 @@ class BTreeMetadata {
         this.sourceJournalCount = sourceJournalCount;
         this.sourceSegmentCount = sourceSegmentCount;
         this.sumSegBytes = sumSegBytes;
+        this.compactView = sourceCount == 2 && secondSourceIsSeg;
 
         if (sourceJournalCount + sourceSegmentCount < 2) {
-            // Nothing to merge.
+            /*
+             * Nothing to merge. The build priority is 1.0 for this case. The
+             * maximum build priority for an index partition with a non-zero
+             * mergePriority will always be less than one.
+             */
             this.mergePriority = 0d;
+            this.buildPriority = 1d;
         } else {
             /*
              * Compute a score that will be used to prioritize compacting merges
@@ -289,13 +398,16 @@ class BTreeMetadata {
                     + (sourceSegmentCount * B)
                     //+ ((sumSegBytes / resourceManager.nominalShardSize) * C)
                     ;
+            this.buildPriority = 1. / mergePriority;
         }
 
-        /*
-         * The splitPriority considers only sumSegBytes.
-         */
-        this.splitPriority = (sumSegBytes < resourceManager.nominalShardSize) ? 0
-                : (sumSegBytes / (double) resourceManager.nominalShardSize);
+//        /*
+//         * The splitPriority considers only sumSegBytes.
+//         * 
+//         * @todo This does not consider the adjustedNominalShardSize.
+//         */
+//        this.splitPriority = (sumSegBytes < resourceManager.nominalShardSize) ? 0
+//                : (sumSegBytes / (double) resourceManager.nominalShardSize);
 
         this.mandatoryMerge //
             =  sourceJournalCount >= resourceManager.maximumJournalsPerView //
@@ -316,27 +428,27 @@ class BTreeMetadata {
                 / (btreeCounters.leavesSplit + 1d);
 
     }
-    
+        
     public String toString() {
 
         final StringBuilder sb = new StringBuilder();
 
         sb.append("name=" + name);
 
-        sb.append(", action=" + action);
+        sb.append(", action=" + actionRef.get());
         
         sb.append(", entryCount=" + entryCount);
 
-        sb.append(", sourceCounts=" + "{all=" + sourceCount + ",journals="
-                + sourceJournalCount + ",segments=" + sourceSegmentCount + "}");
-        
         sb.append(", sumSegBytes=" + sumSegBytes);
 
         sb.append(", mergePriority=" + mergePriority);
 
-        sb.append(", splitPriority=" + splitPriority);
+//        sb.append(", splitPriority=" + splitPriority);
 
         sb.append(", manditoryMerge=" + mandatoryMerge);
+        
+        sb.append(", sourceCounts=" + "{all=" + sourceCount + ",journals="
+                + sourceJournalCount + ",segments=" + sourceSegmentCount + "}");
         
         sb.append(", #leafSplit=" + btreeCounters.leavesSplit);
         

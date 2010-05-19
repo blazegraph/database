@@ -83,12 +83,23 @@ public class GlobalRowStoreHelper {
                 try {
 
                     /*
+                     * Note: This specifies an split handler that keeps the
+                     * logical row together. This is a hard requirement. The
+                     * atomic read/update guarantee depends on this.
+                     * 
                      * @todo The global row store does not get properties so
                      * only system defaults are used when it is registered.
                      */
                     
-                    indexManager.registerIndex(new IndexMetadata(GLOBAL_ROW_STORE_INDEX,
-                            UUID.randomUUID()));
+                    final IndexMetadata indexMetadata = new IndexMetadata(
+                            GLOBAL_ROW_STORE_INDEX, UUID.randomUUID());
+
+                    // Ensure that splits do not break logical rows.
+                    indexMetadata
+                            .setSplitHandler(LogicalRowSplitHandler.INSTANCE);
+
+                    // Register the index.
+                    indexManager.registerIndex(indexMetadata);
 
                 } catch (Exception ex) {
 

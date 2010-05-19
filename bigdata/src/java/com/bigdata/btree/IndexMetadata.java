@@ -60,10 +60,8 @@ import com.bigdata.io.compression.IRecordCompressorFactory;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.AbstractFederation;
@@ -724,69 +722,68 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         /*
          * Split handler properties.
-         * 
-         * @see DefaultSplitHandler
-         * 
-         * Note: Use these settings to trigger splits sooner and thus enter the
-         * more interesting regions of the phase space more quickly BUT DO NOT
-         * use these settings for deployment!
-         * 
-         * final int minimumEntryCount = 1 * Bytes.kilobyte32; (or 10k)
-         * 
-         * final int entryCountPerSplit = 5 * Bytes.megabyte32; (or 50k)
          */
 
-        /**
-         * An index partition which has no more than this many tuples should be
-         * joined with its rightSibling (if any).
-         */
-        String SPLIT_HANDLER_MIN_ENTRY_COUNT = DefaultSplitHandler.class
-                .getName()
-                + ".minimumEntryCount";
-
-        /**
-         * The target #of tuples for an index partition.
-         */
-        String SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT = DefaultSplitHandler.class
-                .getName()
-                + ".entryCountPerSplit";
-
-        /**
-         * The index partition will be split when its actual entry count is GTE
-         * to <code>overCapacityMultiplier * entryCountPerSplit</code>
-         */
-        String SPLIT_HANDLER_OVER_CAPACITY_MULTIPLIER = DefaultSplitHandler.class
-                .getName()
-                + ".overCapacityMultiplier";
-
-        /**
-         * When an index partition will be split, the #of new index partitions
-         * will be chosen such that each index partition is approximately
-         * <i>underCapacityMultiplier</i> full.
-         */
-        String SPLIT_HANDLER_UNDER_CAPACITY_MULTIPLIER = DefaultSplitHandler.class
-                .getName()
-                + ".underCapacityMultiplier";
-
-        /**
-         * The #of samples to take per estimated split (non-negative, and
-         * generally on the order of 10s of samples). The purpose of the samples
-         * is to accommodate the actual distribution of the keys in the index.
-         */
-        String SPLIT_HANDLER_SAMPLE_RATE = DefaultSplitHandler.class.getName()
-                + ".sampleRate";
-
-        String DEFAULT_SPLIT_HANDLER_MIN_ENTRY_COUNT = ""
-                + (500 * Bytes.kilobyte32);
-
-        String DEFAULT_SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT = ""
-                + (1 * Bytes.megabyte32);
-
-        String DEFAULT_SPLIT_HANDLER_OVER_CAPACITY_MULTIPLIER = "1.5";
-
-        String DEFAULT_SPLIT_HANDLER_UNDER_CAPACITY_MULTIPLIER = ".75";
-
-        String DEFAULT_SPLIT_HANDLER_SAMPLE_RATE = "20"; 
+//        * @see DefaultSplitHandler
+//        * 
+//        * Note: Use these settings to trigger splits sooner and thus enter the
+//        * more interesting regions of the phase space more quickly BUT DO NOT
+//        * use these settings for deployment!
+//        * 
+//        * final int minimumEntryCount = 1 * Bytes.kilobyte32; (or 10k)
+//        * 
+//        * final int entryCountPerSplit = 5 * Bytes.megabyte32; (or 50k)
+//        /**
+//         * An index partition which has no more than this many tuples should be
+//         * joined with its rightSibling (if any).
+//         */
+//        String SPLIT_HANDLER_MIN_ENTRY_COUNT = DefaultSplitHandler.class
+//                .getName()
+//                + ".minimumEntryCount";
+//
+//        /**
+//         * The target #of tuples for an index partition.
+//         */
+//        String SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT = DefaultSplitHandler.class
+//                .getName()
+//                + ".entryCountPerSplit";
+//
+//        /**
+//         * The index partition will be split when its actual entry count is GTE
+//         * to <code>overCapacityMultiplier * entryCountPerSplit</code>
+//         */
+//        String SPLIT_HANDLER_OVER_CAPACITY_MULTIPLIER = DefaultSplitHandler.class
+//                .getName()
+//                + ".overCapacityMultiplier";
+//
+//        /**
+//         * When an index partition will be split, the #of new index partitions
+//         * will be chosen such that each index partition is approximately
+//         * <i>underCapacityMultiplier</i> full.
+//         */
+//        String SPLIT_HANDLER_UNDER_CAPACITY_MULTIPLIER = DefaultSplitHandler.class
+//                .getName()
+//                + ".underCapacityMultiplier";
+//
+//        /**
+//         * The #of samples to take per estimated split (non-negative, and
+//         * generally on the order of 10s of samples). The purpose of the samples
+//         * is to accommodate the actual distribution of the keys in the index.
+//         */
+//        String SPLIT_HANDLER_SAMPLE_RATE = DefaultSplitHandler.class.getName()
+//                + ".sampleRate";
+//
+//        String DEFAULT_SPLIT_HANDLER_MIN_ENTRY_COUNT = ""
+//                + (500 * Bytes.kilobyte32);
+//
+//        String DEFAULT_SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT = ""
+//                + (1 * Bytes.megabyte32);
+//
+//        String DEFAULT_SPLIT_HANDLER_OVER_CAPACITY_MULTIPLIER = "1.5";
+//
+//        String DEFAULT_SPLIT_HANDLER_UNDER_CAPACITY_MULTIPLIER = ".75";
+//
+//        String DEFAULT_SPLIT_HANDLER_SAMPLE_RATE = "20"; 
         
         /*
          * Asynchronous index write API.
@@ -1065,7 +1062,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private boolean versionTimestampFilters;
     private BloomFilterFactory bloomFilterFactory;
     private IOverflowHandler overflowHandler;
-    private ISplitHandler splitHandler;
+//    private ISplitHandler splitHandler;
+    private ISimpleSplitHandler splitHandler2;
 //    private Object historyPolicy;
     private AsynchronousIndexWriteConfiguration asynchronousIndexWriteConfiguration;
     private ScatterSplitConfiguration scatterSplitConfiguration;
@@ -1690,23 +1688,27 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
     /**
      * Object which decides whether and where to split an index partition into 2
-     * or more index partitions. The default is a {@link DefaultSplitHandler}
-     * using some reasonable values for its properties. You can override this
-     * property in order to tune or constrain the manner in which index split
-     * points are choosen.
+     * or more index partitions. The default is a <code>null</code> reference.
+     * The default behavior when no split handler is specified will work for
+     * nearly all use cases and will result in index partitions whose size on
+     * the disk is bounded by the parameter specified using
+     * {@link OverflowManager.Options#NOMINAL_SHARD_SIZE}. Indices which require
+     * certain guarantees for atomicity, such as the {@link SparseRowStore},
+     * must override this default.
      * 
-     * @return The {@link ISplitHandler}. If <code>null</code> then index
-     *         splits will be disabled.
+     * @return The {@link ISimpleSplitHandler} -or- <code>null</code> if the
+     *         application has not imposed any additional constraints on the
+     *         separator keys when splitting index partitions.
      */
-    public ISplitHandler getSplitHandler() {
+    public ISimpleSplitHandler getSplitHandler() {
 
-        return splitHandler;
+        return splitHandler2;
         
     }
     
-    public void setSplitHandler(final ISplitHandler splitHandler) {
+    public void setSplitHandler(final ISimpleSplitHandler splitHandler) {
         
-        this.splitHandler = splitHandler;
+        this.splitHandler2 = splitHandler;
         
     }
     
@@ -2113,39 +2115,49 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         // split handler setup (used iff scale-out).
         {
             
-            final int minimumEntryCount = Integer.parseInt(getProperty(
-                    indexManager, properties, namespace,
-                    Options.SPLIT_HANDLER_MIN_ENTRY_COUNT,
-                    Options.DEFAULT_SPLIT_HANDLER_MIN_ENTRY_COUNT));
+//            final int minimumEntryCount = Integer.parseInt(getProperty(
+//                    indexManager, properties, namespace,
+//                    Options.SPLIT_HANDLER_MIN_ENTRY_COUNT,
+//                    Options.DEFAULT_SPLIT_HANDLER_MIN_ENTRY_COUNT));
+//
+//            final int entryCountPerSplit = Integer.parseInt(getProperty(
+//                    indexManager, properties, namespace,
+//                    Options.SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT,
+//                    Options.DEFAULT_SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT));
+//
+//            final double overCapacityMultiplier = Double.parseDouble(getProperty(
+//                    indexManager, properties, namespace,
+//                    Options.SPLIT_HANDLER_OVER_CAPACITY_MULTIPLIER,
+//                    Options.DEFAULT_SPLIT_HANDLER_OVER_CAPACITY_MULTIPLIER));
+//
+//            final double underCapacityMultiplier = Double.parseDouble(getProperty(
+//                    indexManager, properties, namespace,
+//                    Options.SPLIT_HANDLER_UNDER_CAPACITY_MULTIPLIER,
+//                    Options.DEFAULT_SPLIT_HANDLER_UNDER_CAPACITY_MULTIPLIER));
+//
+//            final int sampleRate = Integer.parseInt(getProperty(
+//                    indexManager, properties, namespace,
+//                    Options.SPLIT_HANDLER_SAMPLE_RATE,
+//                    Options.DEFAULT_SPLIT_HANDLER_SAMPLE_RATE));
+//
+//            this.splitHandler = new DefaultSplitHandler(//
+//                    minimumEntryCount, //
+//                    entryCountPerSplit, //
+//                    overCapacityMultiplier, //
+//                    underCapacityMultiplier, //
+//                    sampleRate //
+//            );
 
-            final int entryCountPerSplit = Integer.parseInt(getProperty(
-                    indexManager, properties, namespace,
-                    Options.SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT,
-                    Options.DEFAULT_SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT));
-
-            final double overCapacityMultiplier = Double.parseDouble(getProperty(
-                    indexManager, properties, namespace,
-                    Options.SPLIT_HANDLER_OVER_CAPACITY_MULTIPLIER,
-                    Options.DEFAULT_SPLIT_HANDLER_OVER_CAPACITY_MULTIPLIER));
-
-            final double underCapacityMultiplier = Double.parseDouble(getProperty(
-                    indexManager, properties, namespace,
-                    Options.SPLIT_HANDLER_UNDER_CAPACITY_MULTIPLIER,
-                    Options.DEFAULT_SPLIT_HANDLER_UNDER_CAPACITY_MULTIPLIER));
-
-            final int sampleRate = Integer.parseInt(getProperty(
-                    indexManager, properties, namespace,
-                    Options.SPLIT_HANDLER_SAMPLE_RATE,
-                    Options.DEFAULT_SPLIT_HANDLER_SAMPLE_RATE));
-
-            this.splitHandler = new DefaultSplitHandler(//
-                    minimumEntryCount, //
-                    entryCountPerSplit, //
-                    overCapacityMultiplier, //
-                    underCapacityMultiplier, //
-                    sampleRate //
-            );
-        
+            /*
+             * Note: The default behavior when no split handler is specified
+             * will work for nearly all use cases and will result in index
+             * partitions whose size on the disk is bounded by the parameter
+             * specified to the OverflowManager class.  Indices which require
+             * certain guarantees for atomicity, such as the SparseRowStore or
+             * the SPO index, must override this default.
+             */
+            this.splitHandler2 = null;
+            
         }
 
         /*
@@ -2344,7 +2356,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 + (overflowHandler == null ? "N/A" : overflowHandler.getClass()
                         .getName()));
         sb.append(", splitHandler="
-                + (splitHandler == null ? "N/A" : splitHandler.toString()));
+                + (splitHandler2 == null ? "N/A" : splitHandler2.toString()));
         sb.append(", indexSegmentBranchingFactor=" + indexSegmentBranchingFactor);
         sb.append(", indexSegmentBufferNodes=" + indexSegmentBufferNodes);
 //        sb.append(", indexSegmentLeafCacheCapacity=" + indexSegmentLeafCacheCapacity);
@@ -2428,11 +2440,22 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * The childLocks feature was dropped in this version.
      */
     private static transient final int VERSION9 = 0x09;
-    
+
+    /**
+     * The split handler was changed from an implementation based on the #of
+     * tuples to one based on the size on disk of an index segment after a
+     * compacting merge. The old split handlers are replaced by a
+     * <code>null</code> reference when they are de-serialized.
+     * 
+     * @see ISplitHandler
+     * @see ISimpleSplitHandler
+     */
+    private static transient final int VERSION10 = 0x10;
+
     /**
      * The version that will be serialized by this class.
      */
-    private static transient final int CURRENT_VERSION = VERSION9;
+    private static transient final int CURRENT_VERSION = VERSION10;
     
     /**
      * @todo review generated record for compactness.
@@ -2453,6 +2476,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         case VERSION7:
         case VERSION8:
         case VERSION9:
+        case VERSION10:
             break;
         default:
             throw new IOException("Unknown version: version=" + version);
@@ -2542,7 +2566,26 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         overflowHandler = (IOverflowHandler)in.readObject();
 
-        splitHandler = (ISplitHandler)in.readObject();
+        if (version < VERSION10) {
+
+            /*
+             * The old style of split handler is discarded. The default behavior
+             * for the new style of split handler covers all known uses of the
+             * old style split handler. While some indices (the sparse row store
+             * for example) will have to register a new split handler for
+             * safety, those indices were not safe for splits historically.
+             */
+
+            // read and discard the old split handler.
+            in.readObject();
+
+            splitHandler2 = null;
+            
+        } else {
+
+            splitHandler2 = (ISimpleSplitHandler) in.readObject();
+            
+        }
 
         /*
          * IndexSegment.
@@ -2737,7 +2780,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         out.writeObject(overflowHandler);
 
-        out.writeObject(splitHandler);
+        out.writeObject(splitHandler2);
 
         /*
          * IndexSegment.

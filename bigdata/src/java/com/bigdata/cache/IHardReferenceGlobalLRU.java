@@ -53,6 +53,18 @@ public interface IHardReferenceGlobalLRU<K, V> extends IGlobalLRU<K, V> {
     public long getBytesInMemory();
 
     /**
+     * The #of bytes on the disk for the records in memory across all cache
+     * instances.
+     */
+    public long getBytesOnDisk();
+
+    /**
+     * The configured value for the maximum #of bytes in memory across all cache
+     * instances.
+     */
+    public long getMaximumBytesInMemory();
+
+    /**
      * Return the #of cache instances.
      */
     public int getCacheSetSize();

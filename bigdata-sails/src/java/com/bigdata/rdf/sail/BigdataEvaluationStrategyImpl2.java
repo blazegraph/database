@@ -704,7 +704,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             QueryEvaluationException {
 
         if (!(join instanceof StatementPattern || 
-              join instanceof Join || join instanceof LeftJoin)) {
+              join instanceof Join || join instanceof LeftJoin || 
+              join instanceof Filter)) {
             throw new AssertionError(
                     "only StatementPattern, Join, and LeftJoin supported");
         }
@@ -743,6 +744,9 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             IPredicate tail = generateTail(sp, optional);
             // encountered a value not in the database lexicon
             if (tail == null) {
+                if (DEBUG) {
+                    log.debug("could not generate tail for: " + sp);
+                }
                 if (optional) {
                     // for optionals, just skip the tail
                     continue;
@@ -990,8 +994,9 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         if (left instanceof Union) {
             Program p2 = (Program) createNativeQuery((Union) left);
             program.addSteps(p2.steps());
-        } else if (left instanceof Join || left instanceof LeftJoin) {
-            IRule rule = createNativeQuery((BinaryTupleOperator) left);
+        } else if (left instanceof Join || left instanceof LeftJoin || 
+                left instanceof Filter) {
+            IRule rule = createNativeQuery(left);
             if (rule != null) {
                 if (rule instanceof ProxyRuleWithSesameFilters) {
                     // unfortunately I think we just have to punt to be super safe
@@ -1013,6 +1018,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             if (rule != null) {
                 program.addStep(rule);
             }
+        } else {
+            throw new UnknownOperatorException(left);
         }
         
         TupleExpr right = union.getRightArg();
@@ -1020,8 +1027,9 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         if (right instanceof Union) {
             Program p2 = (Program) createNativeQuery((Union) right);
             program.addSteps(p2.steps());
-        } else if (right instanceof Join || right instanceof LeftJoin) {
-            IRule rule = createNativeQuery((BinaryTupleOperator) right);
+        } else if (right instanceof Join || right instanceof LeftJoin ||
+                right instanceof Filter) {
+            IRule rule = createNativeQuery(right);
             if (rule != null) {
                 if (rule instanceof ProxyRuleWithSesameFilters) {
                     // unfortunately I think we just have to punt to be super safe
@@ -1043,6 +1051,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             if (rule != null) {
                 program.addStep(rule);
             }
+        } else {
+            throw new UnknownOperatorException(right);
         }
         
         return program;

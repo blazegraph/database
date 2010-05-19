@@ -997,31 +997,56 @@ ${postInstallMessage}</echo>
 	<!--                                                                   -->
 	<!--                    STANDALONE FEDERATION TARGETS                  -->
 	<!--                                                                   -->
-		
-<!-- @todo this should explicitly start jini. The problem is metavariables
-     in the jini script.  We can not just use the unit test startLookup
-     target because it has different assumptions about how jar versions
-     are treated.  This could also be addressed by using system properties
-     instead of metavariable substution in startAll.config or by cloning
-     all of the jini config files for standalone. 
-<target name="standalone-start-jini" description="Start the jini services.">
-	<java classname="com.sun.jini.start.ServiceStarter"
-		failonerror="true" fork="true" logerror="true">
-		<classpath refid="runtime.classpath" />
-		<jvmarg value="-Xmx200m" />
-		<jvmarg value="-showversion"/>
-		<jvmarg value="-Djava.security.policy=policy.all"/>
-		<arg value="src/resources/config/jini/startAll.config" />
-	</java>
+
+<target name="standalone-setup" description="Setup properties used by the standalone federation and LUS start/stop.">
+    <property name="app.home" location="${bigdata.dir}" />
+    <property name="test.codebase.port" value="23333"/>
+    <property name="test.codebase.dir" location="${bigdata.dir}/bigdata-jini/lib/jini/lib-dl" />
+    <property name="test.codebase" value="http://${this.hostname}:${test.codebase.port}/jsk-dl.jar"/>
+    <property name="java.security.policy" value="${bigdata.dir}/policy.all"/>
+	<property name="log4j.configuration" value="${bigdata.dir}/src/resources/config/standalone/log4j.properties"/>
+    <property name="java.net.preferIPv4Stack" value="true"/>
+    <property name="bigdata.fedname" value="${standalone.fed}"/>
 </target>
--->
+
+<target name="standalone-startLookup" depends="jar,standalone-setup" description="Start the lookup service for the standalone federation.">
+  <java classname="com.bigdata.service.jini.util.LookupStarter"
+		fork="true" spawn="true">
+		<classpath refid="runtime.classpath" />
+    <sysproperty key="app.home" value="${app.home}"/>
+    <sysproperty key="jini.lib" value="${dist.lib}"/>
+    <sysproperty key="jini.lib.dl" value="${dist.lib.dl}"/>
+    <sysproperty key="java.security.policy" value="${java.security.policy}"/>
+    <sysproperty key="java.security.debug" value="off"/>
+    <sysproperty key="java.protocol.handler.pkgs" value="net.jini.url"/>
+    <sysproperty key="log4j.configuration" value="${log4j.configuration}"/>
+    <sysproperty key="codebase.port" value="${test.codebase.port}"/>
+    <sysproperty key="java.net.preferIPv4Stack" value="${java.net.preferIPv4Stack}"/>
+    <sysproperty key="bigdata.fedname" value="${bigdata.fedname}"/>
+  </java>
+</target>
+
+<target name="standalone-stopLookup" depends="jar,standalone-setup" description="Stop the lookup service for the standalone federation.">
+  <java classname="com.bigdata.service.jini.util.LookupStarter"
+	failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+    <sysproperty key="app.home" value="${app.home}"/>
+    <sysproperty key="jini.lib" value="${dist.lib}"/>
+    <sysproperty key="jini.lib.dl" value="${dist.lib.dl}"/>
+    <sysproperty key="java.security.policy" value="${java.security.policy}"/>
+    <sysproperty key="log4j.configuration" value="${log4j.configuration}"/>
+    <sysproperty key="java.net.preferIPv4Stack" value="${java.net.preferIPv4Stack}"/>
+    <sysproperty key="bigdata.fedname" value="${bigdata.fedname}"/>
+    <arg value="-stop" />
+  </java>
+</target>
 
 <!-- Note: You should 'nohup' this, e.g., "nohup ant standalone-start" to 
      avoid taking down the ServicesManagerServer if you are disconnected
      from a terminal. -->
-<target name="standalone-start" description="Start the standalone federation.">
-	<!-- @todo start jini automatically. -->
-    <!--<antcall target="standalone-start-jini" />-->
+<target name="standalone-start" depends="jar,standalone-setup" description="Start the standalone federation.">
+    <!-- Start the lookup service. -->
+	<antcall target="standalone-startLookup" />
 	<java classname="com.bigdata.jini.start.ServicesManagerServer"
 		failonerror="true" fork="true" logerror="true">
 		<classpath refid="runtime.classpath" />
@@ -1037,9 +1062,7 @@ ${postInstallMessage}</echo>
 	</java>
 </target>
 
-<target name="standalone-stop" description="Stop the standalone federation.">
-	<!-- @todo stop jini automatically. -->
-    <!--<antcall target="standalone-start-jini" />-->
+<target name="standalone-stop" depends="jar,standalone-setup" description="Stop the standalone federation.">
 	<java classname="com.bigdata.service.jini.util.ShutdownFederation"
 		failonerror="true" fork="true" logerror="true">
 		<classpath refid="runtime.classpath" />
@@ -1053,6 +1076,8 @@ ${postInstallMessage}</echo>
 		<jvmarg value="-Dlog4j.configuration=file:src/resources/config/standalone/log4j.properties"/>
 		<arg value="src/resources/config/standalone/bigdataStandalone.config" />
 	</java>
+	<!-- Then take down the lookup service as well. -->
+    <antcall target="standalone-stopLookup" />
 </target>
 
 <!-- @todo Add target to stand up a SPARQL endpoint for a KB namespace. Could be
@@ -1074,7 +1099,7 @@ ${postInstallMessage}</echo>
      for file in *; do mv $file $file.nt; done
      
      -->
-<target name="standalone-bulk-load" description="Bulk load RDF data into the standalone federation.">
+<target name="standalone-bulk-load" depends="jar" description="Bulk load RDF data into the standalone federation.">
 	<java classname="com.bigdata.rdf.load.MappedRDFDataLoadMaster"
 		failonerror="true" fork="true" logerror="true">
 		<classpath refid="runtime.classpath" />
@@ -1100,7 +1125,7 @@ ${postInstallMessage}</echo>
 		     d:/bigdata-perf-analysis/lubm/U10
 		     d:/bigdata-perf-analysis/bsbm/bsbm_2785/dataset.nt
 		-->
-		<jvmarg value="-Dbigdata.rdf.data=d:/bigdata-perf-analysis/bsbm/bsbm_2785/dataset.nt"/>
+		<jvmarg value="-Dbigdata.rdf.data=d:/bigdata-perf-analysis/lubm/U10"/>
 		<!-- The file or directory containing zero or more RDF ontology files to be loaded.
 		
 			 Note: If you do not want to load any "ontology" data you can point this at an
@@ -1112,7 +1137,8 @@ ${postInstallMessage}</echo>
 			bigdata-rdf/src/resources/data/lehigh/univ-bench.owl
 			d:/bigdata-perf-analysis/emptyDir
 		 -->
-		<jvmarg value="-Dbigdata.rdf.ontology=d:/bigdata-perf-analysis/emptyDir"/>
+		<jvmarg value="-Dbigdata.rdf.ontology=bigdata-rdf/src/resources/data/lehigh/univ-bench.owl"/>
+		<!-- The main configuration file. -->
 		<arg value="src/resources/config/standalone/bigdataStandalone.config" />
 	</java>
 </target>
@@ -1272,6 +1298,8 @@ ${postInstallMessage}</echo>
             tofile="${dist.lib}/cweb-commons.jar"/>
       <copy file="${bigdata.lib}/cweb-extser-0.1-b2-dev.jar"
             tofile="${dist.lib}/cweb-extser.jar"/>
+      <copy file="${bigdata.lib}/high-scale-lib-v1.1.2.jar"
+            tofile="${dist.lib}/highscalelib.jar"/>
       <copy file="${bigdata.lib}/dsi-utils-1.0-b5-dev-200410.jar"
             tofile="${dist.lib}/dsiutils.jar"/>
       <copy file="${bigdata.lib}/lgpl-utils-1.0-b5-dev-200410.jar"
@@ -1460,7 +1488,7 @@ ${postInstallMessage}</echo>
       <mkdir dir="${bigdata-test.lib}"/>
       <property name="bigdata-test.jar" location="${bigdata-test.lib}/bigdata-test.jar" />
 
-      <property name="javac.test.classpath" value="${classes.dir}:${junit.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/classserver.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/dsiutils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/log4j.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/zookeeper.jar"/>
+      <property name="javac.test.classpath" value="${classes.dir}:${junit.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/classserver.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/highscalelib.jar:${dist.lib}/dsiutils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/log4j.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/zookeeper.jar"/>
 
       <echo>javac
 </echo>
@@ -1616,6 +1644,10 @@ ${postInstallMessage}</echo>
 
       <antcall target="stopLookup" />
       <antcall target="stopHttpd" />
+    	
+      <!-- This message is noticed by the hudson build and is used to trigger
+           after various after actions. -->
+      <echo>JUNIT RUN COMPLETE</echo>
     </target>
 
     <target name="startHttpd">
@@ -1698,6 +1730,7 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/cweb-commons.jar"/>
         <pathelement location="${dist.lib}/cweb-extser.jar"/>
         <pathelement location="${dist.lib}/ctc_utils.jar"/>
+        <pathelement location="${dist.lib}/highscalelib.jar"/>
         <pathelement location="${dist.lib}/dsiutils.jar"/>
         <pathelement location="${dist.lib}/lgplutils.jar"/>
         <pathelement location="${dist.lib}/fastutil.jar"/>
@@ -1716,7 +1749,7 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/zookeeper.jar"/>
       </path>
 
-      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/dsiutils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
+      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/highscalelib.jar:${dist.lib}/dsiutils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
 
       <echo>    classpath:    ${run.class.path}
 </echo>
@@ -1800,6 +1833,7 @@ ${postInstallMessage}</echo>
         <sysproperty key="ctc_utils.jar" value="${dist.lib}/ctc_utils.jar" />
         <sysproperty key="cweb-commons.jar" value="${dist.lib}/cweb-commons.jar" />
         <sysproperty key="cweb-extser.jar" value="${dist.lib}/cweb-extser.jar" />
+        <sysproperty key="highscalelib.jar" value="${dist.lib}/highscalelib.jar" />
         <sysproperty key="dsiutils.jar" value="${dist.lib}/dsiutils.jar" />
         <sysproperty key="lgplutils.jar" value="${dist.lib}/lgplutils.jar" />
         <sysproperty key="fastutil.jar" value="${dist.lib}/fastutil.jar" />
@@ -1896,6 +1930,7 @@ ${postInstallMessage}</echo>
 	        <pathelement location="${dist.lib}/cweb-commons.jar"/>
 	        <pathelement location="${dist.lib}/cweb-extser.jar"/>
 	        <pathelement location="${dist.lib}/ctc_utils.jar"/>
+	        <pathelement location="${dist.lib}/highscalelib.jar"/>
 	        <pathelement location="${dist.lib}/dsiutils.jar"/>
 	        <pathelement location="${dist.lib}/lgplutils.jar"/>
 	        <pathelement location="${dist.lib}/fastutil.jar"/>
@@ -1911,7 +1946,7 @@ ${postInstallMessage}</echo>
 	        <pathelement location="${dist.lib}/slf4j-log4j.jar"/>
 	        <pathelement location="${dist.lib}/zookeeper.jar"/>
 	      </path>
-	      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/dsiutils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
+	      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/highscalelib.jar:${dist.lib}/dsiutils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
 		<!-- Generate the LUBM dataset. 
 		<mkdir dir="${data}"/>
 		<java classname="edu.lehigh.swat.bench.uba.Generator" dir="${data}" fork="yes">
