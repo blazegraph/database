@@ -4127,8 +4127,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         @Override
         public RunnableFuture<Void> create(IRootBlockView rootBlock) {
-            // TODO Auto-generated method stub
-            return null;
+            throw new UnsupportedOperationException();
         }
 
     };
