@@ -2627,6 +2627,28 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
     }
 
+    public ByteBuffer read(final long addr) {
+
+        assertOpen();
+
+        return _bufferStrategy.read(addr);
+
+    }
+
+    public long write(final ByteBuffer data) {
+
+        assertOpen();
+
+        if(isReadOnly()) {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+
+        return _bufferStrategy.write(data);
+
+    }
+
     // Note: RW store method.
     public long write(final ByteBuffer data, final long oldAddr) {
 
@@ -2657,28 +2679,6 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
     }
     
-    public long write(final ByteBuffer data) {
-
-        assertOpen();
-
-        if(isReadOnly()) {
-            
-            throw new UnsupportedOperationException();
-            
-        }
-        
-        return _bufferStrategy.write(data);
-
-    }
-
-    public ByteBuffer read(final long addr) {
-
-        assertOpen();
-
-        return _bufferStrategy.read(addr);
-
-    }
-
     final public long getRootAddr(final int index) {
 
         final ReadLock lock = _fieldReadWriteLock.readLock();
