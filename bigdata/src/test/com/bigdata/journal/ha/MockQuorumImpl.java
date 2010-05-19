@@ -131,7 +131,6 @@ public class MockQuorumImpl implements Quorum {
                         }
                 
                     });
-            receiveService.start();
 
         }
         
