@@ -39,6 +39,7 @@ import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
@@ -71,8 +72,6 @@ import com.bigdata.config.LongRangeValidator;
 import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
-import com.bigdata.io.DirectBufferPool;
-import com.bigdata.io.WriteCache;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.ha.HADelegate;
 import com.bigdata.journal.ha.HADelegator;
@@ -4058,45 +4057,24 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 //            
 //        }
 
+        /*
+         * FIXME ByteBuffer is not Serializable. Use byte[] instead? Since these
+         * are rare events it may not be worthwhile to setup a separate
+         * low-level socket service to send/receive the data.
+         */
         public RunnableFuture<ByteBuffer> readFromDisk(final long token,
                 final long addr) {
 
-            // Note: nbytes _includes_ the 4 byte checksum!
-            final int nbytes = getByteCount(addr);
-
-            final ByteBuffer t = ByteBuffer.allocate(nbytes-4/*noChecksum*/);
-
-            return new FutureTask<ByteBuffer>(new Runnable() {
-                public void run() {
+            return new FutureTask<ByteBuffer>(new Callable<ByteBuffer>() {
+                public ByteBuffer call() throws Exception {
+                    
                     getQuorumManager().assertQuorum(token);
-                    try {
-                        /*
-                         * FIXME Recover the record from the local buffer
-                         * strategy.
-                         */ 
-                        final ByteBuffer b = DirectBufferPool.INSTANCE
-                                .acquire();
-                        try {
-                            /*
-                             * FIXME For RMI, use NIO over a direct buffer to
-                             * send the data to the caller. The caller must
-                             * receive the data, validate the checksum, and then
-                             * strip it off of the record.
-                             * 
-                             * FIXME Either readFromDisk() MUST NOT validate the
-                             * checksum since that will cause it to not be
-                             * present on the wire or it must compute and add
-                             * the checksum to the message on the wire.
-                             */
-                            throw new UnsupportedOperationException();
-                        } finally {
-                            DirectBufferPool.INSTANCE.release(b);
-                        }
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
+                    
+                    // read from the local store.
+                    return ((IHABufferStrategy) getBufferStrategy())
+                            .readFromLocalStore(addr);
                 }
-            }, t/* Void */);
+            });
             
         }
 

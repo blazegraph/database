@@ -602,4 +602,11 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
     }
 
+    // FIXME readFromLocalStore
+    public ByteBuffer readFromLocalStore(long addr) throws InterruptedException {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+
 }

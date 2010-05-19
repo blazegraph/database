@@ -27,9 +27,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.Channel;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -92,9 +90,6 @@ import com.bigdata.util.ChecksumUtility;
  * @todo report whether or not the on-disk write cache is enabled for each
  *       platform in {@link AbstractStatisticsCollector}. offer guidance on how
  *       to disable that write cache.
- * 
- * @todo test verifying that large records are written directly and that the
- *       write cache is properly flush beforehand.
  * 
  * @todo test verifying that the write cache can be disabled.
  * 
@@ -1164,6 +1159,9 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         try {
             // Try reading from the local store.
             return readFromLocalStore(addr);
+        } catch (InterruptedException e) {
+            // wrap and rethrow.
+            throw new RuntimeException(e);
         } catch (ChecksumError e) {
             /*
              * Note: This assumes that the ChecksumError is not wrapped by
@@ -1202,17 +1200,14 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     }
 
     /**
-     * Read from the local store, testing the {@link WriteCacheService} first
-     * and then reading through to the local disk on a cache miss. This is
-     * automatically invoked by {@link #read(long)}. It is public so it may also
-     * be used to handle a {@link ChecksumError} by reading on another node in a
-     * highly available {@link Quorum}.
+     * {@inheritDoc}
      * <p>
-     * Note: {@link ClosedChannelException} and
-     * {@link AsynchronousCloseException} can get thrown out of this method
-     * (wrapped as {@link RuntimeException}s) if a reader task is interrupted.
+     * This implementation tests the {@link WriteCacheService} first
+     * and then reads through to the local disk on a cache miss. This is
+     * automatically invoked by {@link #read(long)}. 
      */
-    public ByteBuffer readFromLocalStore(final long addr) {
+    public ByteBuffer readFromLocalStore(final long addr)
+            throws InterruptedException {
         
         final long begin = System.nanoTime();
         
@@ -1258,13 +1253,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
              * throw a RuntimeException if there is a checksum error on the
              * record.
              */
-            ByteBuffer tmp;
-            try {
-                // Note: Can throw ChecksumError.
-                tmp = writeCacheService.read(offset);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
+            // Note: Can throw ChecksumError, InterruptedException
+            ByteBuffer tmp = writeCacheService.read(offset);
             if (tmp != null) {
                 /*
                  * Hit on the write cache.

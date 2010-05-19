@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import com.bigdata.journal.ha.HAWriteMessage;
+import com.bigdata.journal.ha.Quorum;
 
 /**
  * A highly available {@link IBufferStrategy}.
@@ -50,4 +51,12 @@ public interface IHABufferStrategy extends IBufferStrategy {
     void writeRawBuffer(HAWriteMessage msg, ByteBuffer b) throws IOException,
             InterruptedException;
 
+    /**
+     * Read from the local store in support of failover reads on nodes in a
+     * highly available {@link Quorum}.
+     * 
+     * @throws InterruptedException
+     */
+    ByteBuffer readFromLocalStore(final long addr) throws InterruptedException;
+    
 }
