@@ -481,9 +481,11 @@ abstract public class WriteCache implements IWriteCache {
     public String toString() { 
 
         return super.toString()//
-        +"{size="+recordMap.size()//
+        +"{recordCount="+recordMap.size()//
         +",firstOffset="+firstOffset//
         +",releaseBuffer="+releaseBuffer//
+        +",bytesWritten="+bytesWritten()//
+        +",bytesRemaining="+remaining()//
         +"}"
         ;
         

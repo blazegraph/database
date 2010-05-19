@@ -69,7 +69,8 @@ public interface Quorum {
 //    <T> void applyNext(RunnableFuture<T> r);
 
     /**
-     * Return <code>true</code> iff this node is the master.
+     * Return <code>true</code> iff this node is the master (this is always true
+     * when the {@link #replicationFactor()} is ONE (1)).
      */
     boolean isMaster();
 
