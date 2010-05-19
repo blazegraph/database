@@ -1315,48 +1315,48 @@ public class TestWriteCache extends TestCase3 {
 
     }
 
-    /**
-     * Helper method verifies that the contents of <i>actual</i> from
-     * position() to limit() are consistent with the expected byte[]. A
-     * read-only view of <i>actual</i> is used to avoid side effects on the
-     * position, mark or limit properties of the buffer.
-     * 
-     * @param expected
-     *            Non-null byte[].
-     * @param actual
-     *            Buffer.
-     */
-    public static void assertEquals(final byte[] expected, ByteBuffer actual) {
-
-        if (expected == null)
-            throw new IllegalArgumentException();
-
-        if (actual == null)
-            fail("actual is null");
-
-        if (actual.hasArray() && actual.arrayOffset() == 0) {
-
-            assertEquals(expected, actual.array());
-
-            return;
-
-        }
-
-        /*
-         * Create a read-only view on the buffer so that we do not mess with its
-         * position, mark, or limit.
-         */
-        actual = actual.asReadOnlyBuffer();
-
-        final int len = actual.remaining();
-
-        final byte[] actual2 = new byte[len];
-
-        actual.get(actual2);
-
-        // compare byte[]s.
-        assertEquals(expected, actual2);
-
-    }
+//    /**
+//     * Helper method verifies that the contents of <i>actual</i> from
+//     * position() to limit() are consistent with the expected byte[]. A
+//     * read-only view of <i>actual</i> is used to avoid side effects on the
+//     * position, mark or limit properties of the buffer.
+//     * 
+//     * @param expected
+//     *            Non-null byte[].
+//     * @param actual
+//     *            Buffer.
+//     */
+//    public static void assertEquals(final byte[] expected, ByteBuffer actual) {
+//
+//        if (expected == null)
+//            throw new IllegalArgumentException();
+//
+//        if (actual == null)
+//            fail("actual is null");
+//
+//        if (actual.hasArray() && actual.arrayOffset() == 0) {
+//
+//            assertEquals(expected, actual.array());
+//
+//            return;
+//
+//        }
+//
+//        /*
+//         * Create a read-only view on the buffer so that we do not mess with its
+//         * position, mark, or limit.
+//         */
+//        actual = actual.asReadOnlyBuffer();
+//
+//        final int len = actual.remaining();
+//
+//        final byte[] actual2 = new byte[len];
+//
+//        actual.get(actual2);
+//
+//        // compare byte[]s.
+//        assertEquals(expected, actual2);
+//
+//    }
 
 }
