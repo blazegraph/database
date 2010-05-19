@@ -25,7 +25,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.ha;
 
 import java.io.IOException;
+import java.net.BindException;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
@@ -50,6 +53,8 @@ public abstract class HADelegate {
 
 	final protected Environment environment;
 
+    private final InetSocketAddress writePipelineAddr;
+    
     public Environment getEnvironment() {
 
         return environment;
@@ -60,13 +65,34 @@ public abstract class HADelegate {
 		
 	    this.environment = environment;
 	    
+        try {
+            writePipelineAddr =  new InetSocketAddress(getPort(0));
+        } catch (UnknownHostException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
 	}
 
 	public InetSocketAddress getWritePipelineAddr() {
 		
-	    return environment.getWritePipelineAddr();
+	    return writePipelineAddr;
 	    
 	}
+
+    protected int getPort(int suggestedPort) throws IOException {
+        ServerSocket openSocket;
+        try {
+            openSocket = new ServerSocket(suggestedPort);
+        } catch (BindException ex) {
+            // the port is busy, so look for a random open port
+            openSocket = new ServerSocket(0);
+        }
+        final int port = openSocket.getLocalPort();
+        openSocket.close();
+        return port;
+    }
 
 	public abstract RunnableFuture<Void> abort2Phase(long token);
 

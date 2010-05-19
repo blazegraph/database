@@ -76,11 +76,28 @@ import com.bigdata.util.concurrent.ShutdownHelper;
 public class Journal extends AbstractJournal implements IConcurrencyManager,
         /*ILocalTransactionManager,*/ IResourceManager {
 
+    /*
+     * These fields were historically marked as [final] and set by the
+     * constructor. With the introduction of high availability these fields can
+     * not be final because the CREATE of the journal must be deferred until a
+     * quorum leader has been elected.
+     * 
+     * The pattern for these fields is that they are assigned by create() and
+     * are thereafter immutable. The fields are marked as [volatile] so the
+     * state change when they are set will be visible without explicit
+     * synchronization (many methods use volatile reads on these fields).
+     */
+    
     /**
      * Object used to manage local transactions. 
      */
-    private final AbstractLocalTransactionManager localTransactionManager; 
-    
+    private volatile AbstractLocalTransactionManager localTransactionManager; 
+
+    /**
+     * Object used to manage tasks executing against named indices.
+     */
+    private volatile ConcurrencyManager concurrencyManager;
+
     /**
      * Options understood by the {@link Journal}.
      * 
@@ -161,13 +178,19 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         resourceLockManager = new ResourceLockService();
 
+    }
+
+    protected void init() {
+        
+        super.init();
+        
         localTransactionManager = newLocalTransactionManager();
 
         concurrencyManager = new ConcurrencyManager(properties,
                 localTransactionManager, this);
-
+        
     }
-
+    
     protected AbstractLocalTransactionManager newLocalTransactionManager() {
 
         final JournalTransactionService abstractTransactionService = new JournalTransactionService(
@@ -768,8 +791,6 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * IConcurrencyManager
      */
     
-    private final ConcurrencyManager concurrencyManager;
-
     public ConcurrencyManager getConcurrencyManager() {
         
         return concurrencyManager;
