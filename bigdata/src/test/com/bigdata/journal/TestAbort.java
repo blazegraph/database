@@ -219,7 +219,6 @@ public class TestAbort extends ProxyTestCase<Journal> {
                  */
                 final ByteBuffer b = store.read(addr);
                 
-                assertEquals(a, b/*.array()*/);
                 assertEquals(a, b);
                 
             }

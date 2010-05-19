@@ -1687,7 +1687,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
 		// Small records should not take this code path.
 		if (remaining < capacity)
-			throw new RuntimeException();
+			throw new AssertionError();
 
 		/*
 		 * Put as much into each WriteCache instance as well fit, then transfer

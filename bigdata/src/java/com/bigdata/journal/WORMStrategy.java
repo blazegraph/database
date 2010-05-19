@@ -287,14 +287,13 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
+     * @version $Id$
+     * @param <T>
      * 
      * @todo report elapsed time and average latency for force, reopen, and
      *       writeRootBlock.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     * @version $Id$
-     * @param <T>
+     *       
+     * FIXME  CAT may be much faster than striped locks (2-3x faster).
      */
     static public class StoreCounters<T extends StoreCounters<T>> extends
             StripedCounters<T> {
