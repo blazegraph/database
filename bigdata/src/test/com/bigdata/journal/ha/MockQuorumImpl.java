@@ -92,7 +92,7 @@ public class MockQuorumImpl implements Quorum {
          */
         this.stores = stores;
         
-        if(isMaster()) {
+        if(isLeader()) {
 
             sendService = new HASendService(getHAGlue(getIndex() + 1)
                     .getWritePipelineAddr());
@@ -131,6 +131,8 @@ public class MockQuorumImpl implements Quorum {
                         }
                 
                     });
+            
+            receiveService.start();
 
         }
         
@@ -155,7 +157,7 @@ public class MockQuorumImpl implements Quorum {
         if (!open.compareAndSet(true/* expect */, false/* update */))
             return;
         
-        if(isMaster()) {
+        if(isLeader()) {
         
             sendService.terminate();
         
@@ -205,7 +207,7 @@ public class MockQuorumImpl implements Quorum {
         return true;
     }
 
-    public boolean isMaster() {
+    public boolean isLeader() {
         return index == 0;
     }
 
@@ -242,7 +244,7 @@ public class MockQuorumImpl implements Quorum {
     }
     
     protected void assertMaster() {
-        if (!isMaster())
+        if (!isLeader())
             throw new IllegalStateException();
     }
 
@@ -671,7 +673,7 @@ public class MockQuorumImpl implements Quorum {
 
         final Future<Void> ft;
 
-        if (!isMaster())
+        if (!isLeader())
             throw new UnsupportedOperationException("HA replicate called for non-master, index: " + index);
 
         /*
@@ -739,7 +741,7 @@ public class MockQuorumImpl implements Quorum {
     public Future<Void> receiveAndReplicate(final HAWriteMessage msg)
             throws IOException {
 
-        if (isMaster())
+        if (isLeader())
             throw new UnsupportedOperationException();
 
         final ByteBuffer b = receiveAndReplicateBuffer;
@@ -834,7 +836,7 @@ public class MockQuorumImpl implements Quorum {
 
     public HAReceiveService<HAWriteMessage> getHAReceiveService() {
 
-        if(isMaster())
+        if(isLeader())
             throw new UnsupportedOperationException();
         
         return receiveService;
@@ -843,7 +845,7 @@ public class MockQuorumImpl implements Quorum {
 
     public HASendService getHASendService() {
         
-        if(!isMaster())
+        if(!isLeader())
             throw new UnsupportedOperationException();
         
         try {

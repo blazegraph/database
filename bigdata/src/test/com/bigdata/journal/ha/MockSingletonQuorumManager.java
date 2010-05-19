@@ -41,9 +41,21 @@ public class MockSingletonQuorumManager implements QuorumManager {
     final int k = 1;
     final long token = 0L;
 
-    public void assertQuorum(long token) {
-        if (token != this.token)
-            throw new IllegalStateException();
+    public void assertQuorum(final long token) {
+
+        if (token == this.token) return;
+        
+        throw new IllegalStateException();
+        
+    }
+    
+    public void assertQuorumLeader(final long token) {
+
+        if (token == this.token)
+            return;
+
+        throw new IllegalStateException();
+
     }
 
     public Quorum awaitQuorum() throws InterruptedException {
@@ -68,7 +80,7 @@ public class MockSingletonQuorumManager implements QuorumManager {
     
     final Quorum quorum = new Quorum() {
 
-        public boolean isMaster() {
+        public boolean isLeader() {
             return true;
         }
 

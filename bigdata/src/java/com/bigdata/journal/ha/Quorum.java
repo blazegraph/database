@@ -16,9 +16,12 @@ import com.bigdata.journal.IRootBlockView;
  * <code>(k + 1)/2</code>. Client reads and writes will block unless the quorum
  * is met.
  * <p>
- * The first service in the chain is the master. Client writes are directed to
- * the master and are streamed from service to service in the order specified by
- * the quorum. Clients may read from any service in the quorum.
+ * The first service in the chain is the quorum <i>leader</i>. Client writes are
+ * directed to the leader (also known as the master) and are streamed from
+ * service to service in the order specified by the quorum. Clients may read
+ * from any service in the quorum, but only for historical commit points. The
+ * current uncommitted state is only available from the quorum leader as the
+ * followers are only guaranteed to be consistent as of each commit point.
  * <p>
  * If a quorum breaks, then a new quorum must be met before client operations
  * can proceed. The new quorum will have a distinct token from the old quorum.
@@ -69,10 +72,11 @@ public interface Quorum {
 //    <T> void applyNext(RunnableFuture<T> r);
 
     /**
-     * Return <code>true</code> iff this node is the master (this is always true
-     * when the {@link #replicationFactor()} is ONE (1)).
+     * Return <code>true</code> iff this node is the quorum leader. The quorum
+     * leader is the only node which will accept writes. Note that is always
+     * <code>true</code> when the {@link #replicationFactor()} is ONE (1).
      */
-    boolean isMaster();
+    boolean isLeader();
 
     /**
      * Return <code>true</code> iff the quorum is highly available and this node

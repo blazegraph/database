@@ -704,7 +704,7 @@ abstract public class WriteCacheService implements IWriteCache {
                              * write pipeline. - But only if master!
                              */
                             final Quorum q = quorumManager.getQuorum();
-                            if (!q.isMaster())
+                            if (!q.isLeader())
                                 throw new QuorumException("Not master");
                             remoteWriteFuture = q.replicate(cache
                                     .newHAWriteMessage(q.token()), cache

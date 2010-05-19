@@ -3663,6 +3663,13 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             // NOP - the quorum is static and always valid.
         }
 
+        public void assertQuorumLeader(long token) {
+            /*
+             * NOP - the quorum is static and always valid. There is only one
+             * node and it is always the leader.
+             */
+        }
+
         public void terminate() {
             // NOP - the quorum is static and does no asynchronous processing.
         }
@@ -3688,7 +3695,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             return 1;
         }
 
-        public boolean isMaster() {
+        public boolean isLeader() {
             return true;
         }
 
