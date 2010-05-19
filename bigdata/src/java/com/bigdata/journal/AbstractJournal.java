@@ -3933,8 +3933,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 //         * // validate the root block, obtaining a view. final IRootBlockView
 //         * view = new RootBlockView(rootBlock0, ByteBuffer.wrap(rootBlock),
 //         * ChecksumUtility.threadChk.get());
-        public RunnableFuture<Boolean> prepare2Phase(final IRootBlockView rootBlock)
-                throws IOException {
+        public RunnableFuture<Boolean> prepare2Phase(final IRootBlockView rootBlock) {
 
             if (rootBlock == null)
                 throw new IllegalStateException();
@@ -3996,8 +3995,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
          * across commitNow() and a different thread runs commit2Phase() for the
          * master since commit2Phase() must acquire the writeLock.
          */
-        public RunnableFuture<Void> commit2Phase(final long commitTime)
-                throws IOException {
+        public RunnableFuture<Void> commit2Phase(final long commitTime) {
 
             return new FutureTask<Void>(new Runnable() {
                 public void run() {
@@ -4046,8 +4044,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
          * across commitNow() and a different thread runs abort2Phase() for the
          * master since abort() will attempt to acquire the writeLock as well.
          */
-        public RunnableFuture<Void> abort2Phase(final long token)
-                throws IOException {
+        public RunnableFuture<Void> abort2Phase(final long token) {
 
             return new FutureTask<Void>(new Runnable() {
                 public void run() {
@@ -4062,22 +4059,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             }, null/* Void */);
 
         }
-
-//        public RunnableFuture<Void> truncate(final long token, final long extent)
-//                throws IOException {
-//
-//            return new FutureTask<Void>(new Runnable() {
-//                public void run() {
-//
-//                    getQuorumManager().assertQuorum(token);
-//
-//                    _bufferStrategy.truncate(extent);
-//                    
-//                }
-//            }, null/* Void */);
-//            
-//        }
-
+        
         /*
          * FIXME ByteBuffer is not Serializable. Use byte[] instead? Since these
          * are rare events it may not be worthwhile to setup a separate
@@ -4100,10 +4082,16 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         }
 
         public Future<Void> receiveAndReplicate(final HAWriteMessage msg)
-                throws IOException {
+            throws IOException {
 
             return getQuorumManager().getQuorum().receiveAndReplicate(msg);
 
+        }
+
+        @Override
+        public RunnableFuture<Void> create(IRootBlockView rootBlock) {
+            // TODO Auto-generated method stub
+            return null;
         }
 
     };

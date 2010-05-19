@@ -37,7 +37,7 @@ import com.bigdata.journal.IRootBlockView;
  * This enables the HADelegate implementation class to support multiple, possibly non-remote interfaces.
  * 
  * @author Martyn Cutcher
- *
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public class HADelegator implements HAGlue {
 	
@@ -71,4 +71,7 @@ public class HADelegator implements HAGlue {
 		return delegate.receiveAndReplicate(msg);
 	}
 
+    public RunnableFuture<Void> create(final IRootBlockView rootBlock) throws IOException {
+        return delegate.create(rootBlock);
+    }
 }

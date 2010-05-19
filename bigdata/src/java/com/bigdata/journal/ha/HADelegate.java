@@ -27,6 +27,8 @@ package com.bigdata.journal.ha;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.rmi.Remote;
+import java.rmi.RemoteException;
 import java.util.concurrent.Future;
 import java.util.concurrent.RunnableFuture;
 
@@ -36,14 +38,24 @@ import com.bigdata.journal.IRootBlockView;
 /**
  * The {@link HADelegate} provides the concrete implementation of the remote
  * {@link HAGlue} interface, as delegated by the {@link HADelegator} class.
+ * {@link HAGlue} is a {@link Remote} interface and its methods declare than
+ * they throw {@link IOException} or {@link RemoteException}.  The methods on
+ * this class have the same method signatures, but DO NOT declare these thrown
+ * exceptions since they are not being accessed using RMI.
  * 
  * @author Martyn Cutcher
- * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public abstract class HADelegate {
 
 	final protected Environment environment;
 
+    public Environment getEnvironment() {
+
+        return environment;
+        
+    }
+    
 	public HADelegate(final Environment environment) {
 		
 	    this.environment = environment;
@@ -56,20 +68,24 @@ public abstract class HADelegate {
 	    
 	}
 
-    public Environment getEnvironment() {
+	public abstract RunnableFuture<Void> abort2Phase(long token);
 
-        return environment;
-        
-	}
-	
-	public abstract RunnableFuture<Void> abort2Phase(long token) throws IOException;
+	public abstract RunnableFuture<Void> commit2Phase(final long commitTime);
 
-	public abstract RunnableFuture<Void> commit2Phase(final long commitTime) throws IOException;
-
-	public abstract RunnableFuture<Boolean> prepare2Phase(final IRootBlockView rootBlock) throws IOException;
+	public abstract RunnableFuture<Boolean> prepare2Phase(final IRootBlockView rootBlock);
 
 	public abstract RunnableFuture<ByteBuffer> readFromDisk(long token, long addr);
 
-	public abstract Future<Void> receiveAndReplicate(HAWriteMessage msg) throws IOException;
+    /**
+     * @param msg
+     * @return
+     * @throws IOException
+     *             This method uses RMI to talk with the downstream node and can
+     *             throw {@link IOException}s arising from the RMI.
+     */
+    public abstract Future<Void> receiveAndReplicate(HAWriteMessage msg)
+            throws IOException;
 
+    public abstract RunnableFuture<Void> create(final IRootBlockView rootBlock);
+    
 }
