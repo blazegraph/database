@@ -47,8 +47,14 @@ public class MockQuorumImpl implements Quorum {
 
     private final AtomicBoolean open = new AtomicBoolean(true);
     private final int index;
-    private final ExecutorService executorService;
-    private final HAGlue[] stores;
+
+    /**
+     * Note: This is a {@link Journal}[] in the {@link MockQuorumImpl} rather
+     * than an {@link HAGlue} since the {@link Journal}s are not yet initialized
+     * when our constructor is called so we have to lazily obtain their
+     * {@link HAGlue} interfaces.
+     */
+    private final Journal[] stores;
 
     private final HASendService sendService;
     private final HAReceiveService<HAWriteMessage> receiveService;
@@ -75,16 +81,16 @@ public class MockQuorumImpl implements Quorum {
 
         this.index = index;
 
-        this.executorService = stores[index].getExecutorService();
+        /*
+         * Note: Copy the array reference since the journals in the array have
+         * not yet been initialized so we can't copy the array values or reach
+         * through into their HAGlue interfaces yet.
+         * 
+         * Note: AbstractHAJournalTestCase creates the journals in reverse
+         * quorum order so we can do things like getHAGlue(index+1) here.
+         */
+        this.stores = stores;
         
-        this.stores = new HAGlue[stores.length];
-        
-        for (int i = 0; i < stores.length; i++) {
-
-            this.stores[i] = stores[i].getHAGlue();
-
-        }
-
         if(isMaster()) {
 
             sendService = new HASendService(getHAGlue(getIndex() + 1)
@@ -214,17 +220,14 @@ public class MockQuorumImpl implements Quorum {
 
         if (index < 0 || index >= replicationFactor())
             throw new IndexOutOfBoundsException();
-        
-        return stores[index];
-        
+
+        if (stores[index] == null)
+            throw new AssertionError("Journal not initialized: index=" + index);
+
+        return stores[index].getHAGlue();
+
     }
     
-    public ExecutorService getExecutorService() {
-        
-        return executorService;
-        
-    }
-
     protected void assertMaster() {
         if (!isMaster())
             throw new IllegalStateException();
@@ -835,6 +838,16 @@ public class MockQuorumImpl implements Quorum {
     }
 
     /**
+     * Tunnel through and get the local journal.
+     */
+    private AbstractJournal getLocalJournal() {
+        
+        return ((HADelegate) getHAGlue(getIndex())).getEnvironment()
+                .getJournal();
+
+    }
+    
+    /**
      * Core implementation causes the data to get written onto the local
      * persistence store.
      * 
@@ -848,10 +861,14 @@ public class MockQuorumImpl implements Quorum {
     private void handleReplicatedWrite(HAWriteMessage msg, ByteBuffer data)
             throws Exception {
 
-        final AbstractJournal jnl = ((HADelegate) getHAGlue(getIndex()))
-                .getEnvironment().getJournal();
+        ((IHABufferStrategy) getLocalJournal().getBufferStrategy())
+                .writeRawBuffer(msg, data);
 
-        ((IHABufferStrategy) jnl.getBufferStrategy()).writeRawBuffer(msg, data);
+    }
+
+    public ExecutorService getExecutorService() {
+
+        return getLocalJournal().getExecutorService();
 
     }
 

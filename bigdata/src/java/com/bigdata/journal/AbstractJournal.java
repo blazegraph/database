@@ -978,17 +978,13 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
          * Initialize the HA components.
          */
 
-        quorumManager = newQuorumManager();
+        this.quorumManager = newQuorumManager();
         
-        // The current quorum token.
-        quorumToken = quorumManager.getQuorum().token();
-        
-        /*
-         * Setenvironment
-         */
         this.environment = new HAEnvironment();
         
-        haGlue = newHAGlue();
+        this.haDelegate = newHADelegate(); 
+
+        this.haGlue = new HADelegator(haDelegate);
         
         /*
          * Create the appropriate IBufferStrategy object.
@@ -1244,6 +1240,15 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         ResourceManager.openJournal(getFile() == null ? null : getFile()
                 .toString(), size(), getBufferStrategy().getBufferMode());
 
+        /*
+         * The current quorum token.
+         * 
+         * Note: This is down way down at the bottom to help out with some
+         * unit test setups, which is a bit of a hack.  See AbstractHAJournalTest
+         * and friends.
+         */
+        this.quorumToken = quorumManager.getQuorum().token();
+        
         } finally {
             
             lock.unlock();
@@ -3598,6 +3603,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
     }
     
+    private final HAGlue haGlue;
+    private final HADelegate haDelegate;
+
     /**
      * The object which is used to coordinate various low-level operations among
      * the members of a {@link Quorum}.
@@ -3607,24 +3615,16 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         return haGlue;
         
     }
-    private HAGlue haGlue;
-
-	private HADelegate haDelegate;
 
     /**
-     * Factory for the {@link HAGlue} object for this {@link AbstractJournal}.
-     * This may be overridden to publish additional methods for the low-level HA
-     * API.
+     * Factory for the {@link HADelegate} object for this
+     * {@link AbstractJournal}. This may be overridden to publish additional
+     * methods for the low-level HA API.
      */
-    protected HAGlue newHAGlue() {
+    protected HADelegate newHADelegate() {
 
-        if (haGlue == null) {
-        	this.haDelegate = new BasicHA(environment);
+        return new BasicHA(environment);
     	
-    		haGlue = new HADelegator(haDelegate);
-        }
-
-        return haGlue;
     }
 
     /**
@@ -4108,10 +4108,6 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 			}
 		}
 
-//		public long getActiveFileExtent() {
-//			return _bufferStrategy.getExtent();
-//		}
-
 		public AbstractJournal getJournal() {
 			return AbstractJournal.this;
 		}
@@ -4119,10 +4115,6 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 		public QuorumManager getQuorumManager() {
 			return quorumManager;
 		}
-
-//		public IBufferStrategy getStrategy() {
-//			return _bufferStrategy;
-//		}
 
 		public InetSocketAddress getWritePipelineAddr() {
 			return writePipelineAddr;
