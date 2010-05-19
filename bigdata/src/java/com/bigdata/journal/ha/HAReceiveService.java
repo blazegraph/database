@@ -761,7 +761,7 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
                 localBuffer.flip();
                 
                 if (message.getChk() != (int) chk.getValue()) {
-                    throw new ChecksumError();
+                    throw new ChecksumError("msg="+message.toString()+", actual="+chk.getValue());
                 }
 //                if (chk.checksum(localBuffer) != message.getChk()) {
 //                	throw new RuntimeException("Checksum Error");

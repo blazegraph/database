@@ -83,6 +83,15 @@ public class HAWriteMessage extends HAWriteMessageBase {
         return firstOffset; 
     }
     
+    public String toString() {
+
+        return getClass().getName() + "{size=" + getSize() + ",chksum="
+                + getChk() + ",storeType=" + getStoreType() + ",quorumToken="
+                + getQuorumToken() + ",fileExtent=" + getFileExtent()
+                + ",firstOffset=" + getFirstOffset() + "}";
+        
+    }
+
     /**
      * De-serialization constructor.
      */
