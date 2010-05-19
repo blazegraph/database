@@ -27,10 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal.ha;
 
-import com.bigdata.journal.AbstractBufferStrategy;
-import com.bigdata.journal.IBufferStrategy;
-import com.bigdata.journal.WORMStrategy;
-
 /**
  * A manager for a set of physical services designated as prospective members of
  * the same logical service. The physical services must met in a {@link Quorum}
@@ -93,6 +89,18 @@ public interface QuorumManager {
      *             if the quorum is invalid.
      */
     void assertQuorum(long token);
+
+    /**
+     * Assert that the quorum associated with the token is still valid and that
+     * this node is the leader in the {@link Quorum}.
+     * 
+     * @param token
+     *            The token for the quorum.
+     * 
+     * @throws IllegalStateException
+     *             if the quorum is invalid.
+     */
+    void assertQuorumLeader(long token);
 
     /**
      * Terminate any asynchronous processing associated with the

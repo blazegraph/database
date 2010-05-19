@@ -80,11 +80,21 @@ public class MockQuorumManager implements QuorumManager {
         
     }
     
-    public void assertQuorum(long token) {
+    public void assertQuorum(final long token) {
 
-        if (token != this.token)
-            throw new IllegalStateException();
+        if (token == this.token) return;
         
+        throw new IllegalStateException();
+        
+    }
+    
+    public void assertQuorumLeader(final long token) {
+
+        if (token == this.token && index == 0)
+            return;
+
+        throw new IllegalStateException();
+
     }
 
     /** Assumes that the quorum is met. */
@@ -102,9 +112,6 @@ public class MockQuorumManager implements QuorumManager {
             
                 // Lazily initialization.
                 quorum = new MockQuorumImpl(index, stores);
-                if (!quorum.isMaster()) {
-                	quorum.getHAReceiveService().start();
-                }
                 
             }
             
