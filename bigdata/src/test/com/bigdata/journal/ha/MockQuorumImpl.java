@@ -67,6 +67,7 @@ public class MockQuorumImpl implements Quorum {
      *            at index ZERO (0) is the master.
      * @param stores
      *            The failover chain.
+     * @throws IOException 
      */
     public MockQuorumImpl(final int index, final Journal[] stores) {
 
@@ -225,6 +226,18 @@ public class MockQuorumImpl implements Quorum {
             throw new AssertionError("Journal not initialized: index=" + index);
 
         return stores[index].getHAGlue();
+
+    }
+    
+    public HADelegate getHADelegate() {
+
+        if (index < 0 || index >= replicationFactor())
+            throw new IndexOutOfBoundsException();
+
+        if (stores[index] == null)
+            throw new AssertionError("Journal not initialized: index=" + index);
+
+        return stores[index].getHADelegate();
 
     }
     
@@ -659,7 +672,7 @@ public class MockQuorumImpl implements Quorum {
         final Future<Void> ft;
 
         if (!isMaster())
-            throw new UnsupportedOperationException();
+            throw new UnsupportedOperationException("HA replicate called for non-master, index: " + index);
 
         /*
          * This is the master, so send() the buffer.
@@ -833,6 +846,13 @@ public class MockQuorumImpl implements Quorum {
         if(!isMaster())
             throw new UnsupportedOperationException();
         
+        try {
+			sendService.open();
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new RuntimeException(e);
+		}
+        
         return sendService;
         
     }
@@ -842,7 +862,7 @@ public class MockQuorumImpl implements Quorum {
      */
     private AbstractJournal getLocalJournal() {
         
-        return ((HADelegate) getHAGlue(getIndex())).getEnvironment()
+        return ((HADelegate) getHADelegate()).getEnvironment()
                 .getJournal();
 
     }

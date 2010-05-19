@@ -240,8 +240,8 @@ public class HASendService {
 	    if (log.isInfoEnabled())
             log.info(toString());
 
-//		incSocketChannel = SocketChannel.open(addr);
-        incSocketChannel = openChannel(addr);
+	    if (incSocketChannel == null) 	    	
+	    	incSocketChannel = openChannel(addr);
 	}
 
 //	/**

@@ -694,11 +694,12 @@ abstract public class WriteCacheService implements IWriteCache {
                     if (quorumManager.isHighlyAvailable()) {
                         /*
                          * Request replication of the write cache along the
-                         * write pipeline.
+                         * write pipeline. - But only if master!
                          */
                         final Quorum q = quorumManager.getQuorum();
-                        remoteWriteFuture = q.replicate(cache
-                                .newHAWriteMessage(q.token()), cache.peek());
+                        if (q.isMaster())
+	                        remoteWriteFuture = q.replicate(cache
+	                                .newHAWriteMessage(q.token()), cache.peek());
                     }
 
 					/*

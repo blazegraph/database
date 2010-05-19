@@ -3627,6 +3627,12 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     	
     }
 
+    public HADelegate getHADelegate() {
+        
+        return haDelegate;
+        
+    }
+
     /**
      * A manager for a quorum consisting of just this journal.
      * 
