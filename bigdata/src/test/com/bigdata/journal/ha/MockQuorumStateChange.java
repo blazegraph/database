@@ -22,52 +22,41 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Apr 28, 2010
+ * Created on May 19, 2010
  */
 
 package com.bigdata.journal.ha;
 
-import com.bigdata.journal.Journal;
-import com.bigdata.journal.ProxyTestCase;
-
 /**
- * Unit tests bootstrap 3 journals in a specified failover chain and demonstrate
- * pipelined writes and the commit protocol.
+ * A class which drives state change events for a collection of highly available
+ * journals belonging to the same logical service.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestHAWritePipeline extends ProxyTestCase<Journal> {
+public class MockQuorumStateChange {
 
-    /**
-     * 
-     */
-    public TestHAWritePipeline() {
+    private final int k;
+    
+    private final MockQuorumManager[] quorumManagers;
+    
+    public int replicationFactor() {
+        
+        return k;
+        
+    }
+    
+    public MockQuorumStateChange(final int k) {
+        
+        this.k = k;
+
+        this.quorumManagers = new MockQuorumManager[k];
+
     }
 
-    /**
-     * @param name
-     */
-    public TestHAWritePipeline(String name) {
-        super(name);
-    }
+    void add(final int index, final MockQuorumManager quorumManager) {
 
-    public void test_writePipeline() {
-
-        final Journal store = getStore(getProperties());
-        try {
-
-            System.err.println("a");
-
-            store.commit();
-
-            System.err.println("b");
-
-        } finally {
-
-            store.destroy();
-            
-        }
+        quorumManagers[index] = quorumManager;
 
     }
 

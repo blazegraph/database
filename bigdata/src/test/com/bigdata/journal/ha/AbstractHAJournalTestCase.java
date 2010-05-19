@@ -99,6 +99,7 @@ abstract public class AbstractHAJournalTestCase
 
     }
 
+    private MockQuorumStateChange fixture = null;
     private Journal[] stores = null;
 
     /**
@@ -113,6 +114,8 @@ abstract public class AbstractHAJournalTestCase
 
         final int k = 3; // @todo config by Properties?
 
+        fixture = new MockQuorumStateChange(k);
+        
         stores = new Journal[k];
 
         /*
@@ -136,10 +139,16 @@ abstract public class AbstractHAJournalTestCase
         return new Journal(properties) {
         
             protected QuorumManager newQuorumManager() {
-            	stores[index] = this;
-                return AbstractHAJournalTestCase.this.newQuorumManager(index,
-                        stores);
+            	
+                stores[index] = this;
+                
+                final MockQuorumManager quorumManager = AbstractHAJournalTestCase.this
+                        .newQuorumManager(index, stores);
 
+                fixture.add(index, quorumManager);
+                
+                return quorumManager;
+                
             };
             
         };

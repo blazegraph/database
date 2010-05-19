@@ -216,7 +216,7 @@ public class DumpJournal {
 
         try {
             
-            FileMetadata fmd = journal.fileMetadata;
+            FileMetadata fmd = journal.getFileMetadata();
 
             // dump the MAGIC and VERSION.
             System.err.println("magic="+Integer.toHexString(fmd.magic));

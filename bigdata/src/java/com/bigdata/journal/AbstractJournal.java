@@ -30,10 +30,6 @@ package com.bigdata.journal;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.net.BindException;
-import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
@@ -226,28 +222,43 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     final public File tmpDir;
     
     /**
-     * The metadata for a pre-existing journal -or- <code>null</code> if the journal was
-     * created for the first time.
-     */
-    final FileMetadata fileMetadata;
-    
-    /**
-     * The implementation logic for the current {@link BufferMode}.
-     */
-    final private IBufferStrategy _bufferStrategy;
-
-    /**
-     * A description of the journal as a resource.
-     */
-    final private JournalMetadata journalMetadata;
-    
-    /**
      * The object used by the journal to compute the checksums of its root
      * blocks (this object is NOT thread-safe so there is one instance per
      * journal).
      */
     private final ChecksumUtility checker = new ChecksumUtility();
 
+    /*
+     * These fields were historically marked as [final] and set by the
+     * constructor. With the introduction of high availability these fields can
+     * not be final because the CREATE of the journal must be deferred until a
+     * quorum leader has been elected.
+     * 
+     * The pattern for these fields is that they are assigned by create() and
+     * are thereafter immutable. The fields are marked as [volatile] so the
+     * state change when they are set will be visible without explicit
+     * synchronization (many methods use volatile reads on these fields).
+     */
+    
+    /**
+     * The metadata for a pre-existing journal -or- <code>null</code> if the journal was
+     * created for the first time.
+     */
+    private volatile FileMetadata fileMetadata;
+
+    /** package private method exported to {@link DumpJournal}. */
+    FileMetadata getFileMetadata() {return fileMetadata;}
+    
+    /**
+     * The implementation logic for the current {@link BufferMode}.
+     */
+    private volatile IBufferStrategy _bufferStrategy;
+
+    /**
+     * A description of the journal as a resource.
+     */
+    private volatile JournalMetadata journalMetadata;
+    
     /**
      * This lock is used to prevent clearing or setting of critical fields while
      * a concurrent thread is seeking to operate on the referenced objects. A
@@ -545,6 +556,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * @see Options#MAXIMUM_EXTENT
      */
     private final long maximumExtent;
+    private final long initialExtent;
+    private final long minimumExtension;
 
 	private final Environment environment;
     
@@ -671,57 +684,14 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     protected AbstractJournal(Properties properties) {
         
-//        this(properties, getWriteCache(properties));
-//        
-//    }
-//    
-//    /**
-//     * Create or re-open a journal.
-//     * <p>
-//     * Note: Creating a new journal registers some internal indices but does NOT
-//     * perform a commit. Those indices will become restart safe with the first
-//     * commit.
-//     * 
-//     * @param properties
-//     *            The properties as defined by {@link Options}.
-//     * @param writeCache
-//     *            When non-<code>null</code> and when {@link BufferMode#Disk}
-//     *            is selected, this {@link ByteBuffer} will be used as the write
-//     *            cache. This allows the same write cache to be used by the next
-//     *            journal when the current journal overflows. This is
-//     *            necessitated by JVM bug <a
-//     *            href="http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=8fab76d1d4479fffffffffa5abfb09c719a30?bug_id=6210541">
-//     *            6210541</a>
-//     *            which describes a failure by
-//     *            <code>releaseTemporaryDirectBuffer()</code> to release
-//     *            temporary direct {@link ByteBuffer}s that are allocated for
-//     *            channel IO.
-//     * 
-//     * @throws RuntimeException
-//     *             If there is a problem when creating, opening, or reading from
-//     *             the journal file.
-//     * 
-//     * @see Options
-//     */
-//    protected AbstractJournal(Properties properties, final ByteBuffer writeCache) {
-
-        boolean create = Boolean.parseBoolean(Options.DEFAULT_CREATE);
-        boolean isEmptyFile = false;
-
         if (properties == null)
             throw new IllegalArgumentException();
 
         this.properties = properties = (Properties) properties.clone();
-        
+
         /*
-         * "bufferMode" mode.
-         * 
-         * Note: very large journals MUST use the disk-based mode.
+         * Set various 'final' properties.
          */
-
-        final BufferMode bufferMode = BufferMode.valueOf(getProperty(
-                Options.BUFFER_MODE, Options.DEFAULT_BUFFER_MODE));
-
         {
             
             historicalIndexCacheCapacity = getProperty(
@@ -753,23 +723,109 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         }
 
-        // Note: 
-        final boolean useDirectBuffers = Boolean
-                .parseBoolean(getProperty(Options.USE_DIRECT_BUFFERS,
-                        Options.DEFAULT_USE_DIRECT_BUFFERS));
-            
-        final long initialExtent = getProperty(Options.INITIAL_EXTENT,
+        initialExtent = getProperty(Options.INITIAL_EXTENT,
                 Options.DEFAULT_INITIAL_EXTENT, new LongRangeValidator(
                         Options.minimumInitialExtent, Long.MAX_VALUE));
 
         maximumExtent = getProperty(Options.MAXIMUM_EXTENT,
                 Options.DEFAULT_MAXIMUM_EXTENT, new LongRangeValidator(
                         initialExtent, Long.MAX_VALUE));
-        
-        final long minimumExtension = getProperty(Options.MINIMUM_EXTENSION,
+
+        minimumExtension = getProperty(Options.MINIMUM_EXTENSION,
                 Options.DEFAULT_MINIMUM_EXTENSION, new LongRangeValidator(
                         Options.minimumMinimumExtension, Long.MAX_VALUE));
 
+        readOnly = Boolean.parseBoolean(getProperty(Options.READ_ONLY,
+                Options.DEFAULT_READ_ONLY));
+
+        forceOnCommit = ForceEnum.parse(getProperty(Options.FORCE_ON_COMMIT,
+                Options.DEFAULT_FORCE_ON_COMMIT));
+
+        doubleSync = Boolean.parseBoolean(getProperty(Options.DOUBLE_SYNC,
+                Options.DEFAULT_DOUBLE_SYNC));
+
+        deleteOnClose = Boolean.parseBoolean(getProperty(
+                Options.DELETE_ON_CLOSE, Options.DEFAULT_DELETE_ON_CLOSE));
+
+        // "tmp.dir"
+        {
+
+            tmpDir = new File(getProperty(Options.TMP_DIR, System
+                    .getProperty("java.io.tmpdir")));
+
+            if (!tmpDir.exists()) {
+
+                if (!tmpDir.mkdirs()) {
+
+                    throw new RuntimeException("Could not create directory: "
+                            + tmpDir.getAbsolutePath());
+
+                }
+
+            }
+
+            if (!tmpDir.isDirectory()) {
+
+                throw new RuntimeException("Not a directory: "
+                        + tmpDir.getAbsolutePath());
+
+            }
+            
+        }
+
+        /*
+         * Initialize the HA components.
+         */
+        final WriteLock lock = _fieldReadWriteLock.writeLock();
+
+        lock.lock();
+
+        try {
+
+            this.quorumManager = newQuorumManager();
+
+            this.environment = new HAEnvironment();
+
+            this.haDelegate = newHADelegate(environment);
+
+            this.haGlue = new HADelegator(haDelegate);
+
+            if (!quorumManager.isHighlyAvailable()) {
+                
+                init();
+                
+            }
+            
+        } finally {
+
+            lock.unlock();
+
+        }
+
+    }
+
+    protected void init() {
+
+        if (quorumManager.isHighlyAvailable())
+            System.err.println("HA JOURNAL INIT");
+        
+        boolean create = Boolean.parseBoolean(Options.DEFAULT_CREATE);
+        boolean isEmptyFile = false;
+
+        /*
+         * "bufferMode" mode.
+         * 
+         * Note: very large journals MUST use the disk-based mode.
+         */
+
+        final BufferMode bufferMode = BufferMode.valueOf(getProperty(
+                Options.BUFFER_MODE, Options.DEFAULT_BUFFER_MODE));
+
+        // Note: 
+        final boolean useDirectBuffers = Boolean
+                .parseBoolean(getProperty(Options.USE_DIRECT_BUFFERS,
+                        Options.DEFAULT_USE_DIRECT_BUFFERS));
+            
         /*
          * Note: The default depends on the AbstractJournal implementation.
          */
@@ -800,37 +856,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         }
 
-        // "tmp.dir"
-        {
-
-            tmpDir = new File(getProperty(Options.TMP_DIR, System
-                    .getProperty("java.io.tmpdir")));
-
-            if (!tmpDir.exists()) {
-
-                if (!tmpDir.mkdirs()) {
-
-                    throw new RuntimeException("Could not create directory: "
-                            + tmpDir.getAbsolutePath());
-
-                }
-
-            }
-
-            if (!tmpDir.isDirectory()) {
-
-                throw new RuntimeException("Not a directory: "
-                        + tmpDir.getAbsolutePath());
-
-            }
-            
-        }
-
         final boolean validateChecksum = Boolean.parseBoolean(getProperty(
                 Options.VALIDATE_CHECKSUM, Options.DEFAULT_VALIDATE_CHECKSUM));
-
-        readOnly = Boolean.parseBoolean(getProperty(Options.READ_ONLY,
-                Options.DEFAULT_READ_ONLY));
 
         if (readOnly) {
 
@@ -850,15 +877,6 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         final ForceEnum forceWrites = ForceEnum.parse(getProperty(
                 Options.FORCE_WRITES, Options.DEFAULT_FORCE_WRITES));
-
-        forceOnCommit = ForceEnum.parse(getProperty(Options.FORCE_ON_COMMIT,
-                Options.DEFAULT_FORCE_ON_COMMIT));
-
-        doubleSync = Boolean.parseBoolean(getProperty(Options.DOUBLE_SYNC,
-                Options.DEFAULT_DOUBLE_SYNC));
-
-        deleteOnClose = Boolean.parseBoolean(getProperty(
-                Options.DELETE_ON_CLOSE, Options.DEFAULT_DELETE_ON_CLOSE));
 
         final boolean deleteOnExit = Boolean.parseBoolean(getProperty(
                 Options.DELETE_ON_EXIT, Options.DEFAULT_DELETE_ON_EXIT));
@@ -953,17 +971,6 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         }
 
         /*
-         * Note: The caller SHOULD specify an explicit [createTime] when its
-         * value is critical. The default assigned here does NOT attempt to use
-         * a clock that is consistent with the commit protocol or even a clock
-         * that assigns unique timestamps.
-         */
-        final long createTime = Long.parseLong(getProperty(Options.CREATE_TIME,
-                "" + System.currentTimeMillis()));
-        
-        assert createTime != 0L;
-
-        /*
          * Note: the WriteLock is obtained here because various methods such as
          * _getCommitRecord() assert that the caller is holding the write lock
          * in order to provide runtime safety checks.
@@ -973,22 +980,20 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         lock.lock();
         
         try {
-
-        /*
-         * Initialize the HA components.
-         */
-
-        this.quorumManager = newQuorumManager();
-        
-        this.environment = new HAEnvironment();
-        
-        this.haDelegate = newHADelegate(); 
-
-        this.haGlue = new HADelegator(haDelegate);
-        
         /*
          * Create the appropriate IBufferStrategy object.
          */
+
+        /*
+         * Note: The caller SHOULD specify an explicit [createTime] when its
+         * value is critical. The default assigned here does NOT attempt to use
+         * a clock that is consistent with the commit protocol or even a clock
+         * that assigns unique timestamps.
+         */
+        final long createTime = Long.parseLong(getProperty(Options.CREATE_TIME,
+                "" + System.currentTimeMillis()));
+        
+        assert createTime != 0L;
 
         switch (bufferMode) {
 
@@ -1240,13 +1245,13 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         ResourceManager.openJournal(getFile() == null ? null : getFile()
                 .toString(), size(), getBufferStrategy().getBufferMode());
 
-        /*
-         * The current quorum token.
-         * 
-         * Note: This is down way down at the bottom to help out with some
-         * unit test setups, which is a bit of a hack.  See AbstractHAJournalTest
-         * and friends.
-         */
+            /*
+             * The current quorum token.
+             * 
+             * @todo This is down way down at the bottom to help out with some
+             * unit test setups, which is a bit of a hack. See
+             * AbstractHAJournalTest and friends.
+             */
         this.quorumToken = quorumManager.getQuorum().token();
         
         } finally {
@@ -1254,9 +1259,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             lock.unlock();
             
         }
-        
-    }
 
+    }
+    
     /**
      * @todo consider making the properties restart safe so that they can be
      *       read from the journal. This will let some properties be specified
@@ -1487,9 +1492,14 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 //    }
     
     final public File getFile() {
-        
-        return _bufferStrategy.getFile();
-        
+
+        final IBufferStrategy tmp = getBufferStrategy();
+
+        if (tmp == null)
+            return null;
+
+        return tmp.getFile();
+
     }
 
     /**
@@ -1549,22 +1559,29 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     public void deleteResources() {
 
+        assertOpen();
         if(isOpen()) throw new IllegalStateException();
 
         if (log.isInfoEnabled())
             log.info("");
-        
-        _bufferStrategy.deleteResources();
 
-        if (LRUNexus.INSTANCE != null) {
+        final IBufferStrategy bufferStrategy = getBufferStrategy();
 
-            try {
+        if (bufferStrategy != null) {
 
-                LRUNexus.INSTANCE.deleteCache(getUUID());
+            bufferStrategy.deleteResources();
 
-            } catch (Throwable t) {
+            if (LRUNexus.INSTANCE != null) {
 
-                log.error(t, t);
+                try {
+
+                    LRUNexus.INSTANCE.deleteCache(getUUID());
+
+                } catch (Throwable t) {
+
+                    log.error(t, t);
+
+                }
 
             }
 
@@ -1902,7 +1919,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     protected void assertOpen() {
 
-        if (!_bufferStrategy.isOpen()) {
+        if (_bufferStrategy != null && !_bufferStrategy.isOpen()) {
 
             throw new IllegalStateException("file=" + getFile());
 
@@ -1921,10 +1938,17 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         return journalMetadata;
         
     }
-    
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: This will report <code>false</code> for a new highly available
+     * journal until the quorum has met and {@link #init()} has been invoked
+     * for the {@link Quorum}.
+     */
     public boolean isOpen() {
-    	
-        return _bufferStrategy.isOpen();
+
+        return _bufferStrategy != null && _bufferStrategy.isOpen();
 
     }
 
@@ -1994,7 +2018,19 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         lock.lock();
         
         try {
-        
+
+            if (_rootBlock == null) {
+
+                /*
+                 * This can happen before the journal is create()d. Once it has
+                 * been create()d the root block will always be non-null when
+                 * viewed while holding the lock.
+                 */
+                
+                throw new IllegalStateException();
+                
+            }
+            
             return _rootBlock;
             
         } finally {
@@ -2309,6 +2345,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     abstract public AbstractLocalTransactionManager getLocalTransactionManager();
     
     public long commit() {
+
+        quorumManager.assertQuorumLeader(quorumToken);
         
         final ILocalTransactionManager transactionManager = getLocalTransactionManager();
         
@@ -3629,7 +3667,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * {@link AbstractJournal}. This may be overridden to publish additional
      * methods for the low-level HA API.
      */
-    protected HADelegate newHADelegate() {
+    protected HADelegate newHADelegate(final Environment environment) {
 
         return new BasicHA(environment);
     	
@@ -4105,16 +4143,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 	 */
 	class HAEnvironment implements Environment {
 
-		private final InetSocketAddress writePipelineAddr;
-		
 		HAEnvironment() {
-            try {
-                writePipelineAddr =  new InetSocketAddress(getPort(0));
-            } catch (UnknownHostException e) {
-                throw new RuntimeException(e);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-			}
 		}
 
 		public AbstractJournal getJournal() {
@@ -4125,27 +4154,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 			return quorumManager;
 		}
 
-		public InetSocketAddress getWritePipelineAddr() {
-			return writePipelineAddr;
-		}
-
 		public boolean isHighlyAvailable() {
 			return quorumManager.isHighlyAvailable();
 		}
 		
-	    protected int getPort(int suggestedPort) throws IOException {
-	        ServerSocket openSocket;
-	        try {
-	            openSocket = new ServerSocket(suggestedPort);
-	        } catch (BindException ex) {
-	            // the port is busy, so look for a random open port
-	            openSocket = new ServerSocket(0);
-	        }
-	        final int port = openSocket.getLocalPort();
-	        openSocket.close();
-	        return port;
-	    }
-
 		public HADelegate getHADelegate() {
 			return haDelegate;
 		}

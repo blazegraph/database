@@ -23,8 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal;
 
-import java.net.InetSocketAddress;
-
 import com.bigdata.journal.ha.HADelegate;
 import com.bigdata.journal.ha.QuorumManager;
 
@@ -43,8 +41,6 @@ import com.bigdata.journal.ha.QuorumManager;
  */
 public interface Environment {
 
-	public InetSocketAddress getWritePipelineAddr();
-
 	public HADelegate getHADelegate();
 
     /** @deprecated */
@@ -53,11 +49,5 @@ public interface Environment {
 	public QuorumManager getQuorumManager();
 
 	public boolean isHighlyAvailable();
-
-//    /** @deprecated */
-//    public long getActiveFileExtent();
-//
-//    /** @deprecated */
-//    public IBufferStrategy getStrategy();
 
 }
