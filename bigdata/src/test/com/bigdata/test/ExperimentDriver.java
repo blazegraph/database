@@ -797,15 +797,17 @@ public class ExperimentDriver {
                             
                             // disprove invariants from results.
                             {
-                                Iterator<Map.Entry<String,String>> itr2 = condition.result.entrySet().iterator();
+                                
+                                final Iterator<Map.Entry<String, String>> itr2 = condition.result
+                                        .entrySet().iterator();
                                 
                                 while(itr2.hasNext()) {
                                     
-                                    Map.Entry entry = itr2.next();
+                                    final Map.Entry<?,?> entry = itr2.next();
                                     
-                                    Object key = entry.getKey();
+                                    final Object key = entry.getKey();
                                     
-                                    Object val = entry.getValue();
+                                    final Object val = entry.getValue();
                                     
                                     if(!val.equals(invariants.get(key))) {
                                         
@@ -1246,7 +1248,7 @@ public class ExperimentDriver {
      * @param args
      *            The name of the XML file describing the experiment to be run.
      */
-    public static void main(String[] args) throws Exception {
+    public static void main(final String[] args) throws Exception {
 
         if (args.length == 0) {
 
@@ -1256,17 +1258,14 @@ public class ExperimentDriver {
 
         }
 
-        Experiment exp = new DTDParserHelper().parse(new InputSource(
-                new FileReader(args[0])));
-
         int nruns = 1;
-        
+
         if (args.length == 2) {
 
             nruns = Integer.parseInt(args[1]);
-            
+
         }
-        
+
         boolean randomize = true;
 
         if (args.length == 3) {
@@ -1274,7 +1273,29 @@ public class ExperimentDriver {
             randomize = Boolean.parseBoolean(args[2]);
 
         }
-        
+
+        doMain(new File(args[0]), nruns, randomize);
+
+    }
+
+    /**
+     * Run an experiment.
+     * 
+     * @param file
+     *            The file describing the experiment.
+     * @param nruns
+     *            The #of runs.
+     * @param randomize
+     *            <code>true</code> if the run order should be randomized.
+     *            
+     * @throws Exception
+     */
+    public static void doMain(File file, int nruns, boolean randomize)
+            throws Exception {
+
+        final Experiment exp = new DTDParserHelper().parse(new InputSource(
+                new FileReader(file)));
+
         exp.run(randomize, nruns);
         
     }

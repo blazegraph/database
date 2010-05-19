@@ -595,7 +595,7 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                  * merges (because all sources were used) then you need to look
                  * at the events log for the indexSegmentBuild operation.
                  */
-                resourceManager.indexPartitionBuildCounter.incrementAndGet();
+                resourceManager.overflowCounters.indexPartitionBuildCounter.incrementAndGet();
 
                 updateEvent.addDetail("newView", newView.toString());
                 

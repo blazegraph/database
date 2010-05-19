@@ -500,13 +500,18 @@ public interface IDataService extends ITxCommitProtocol, IService, IRemoteExecut
      * 
      * @todo could be moved to their own interface.
      */
-    
+
     /**
      * Method sets a flag that will force overflow processing during the next
-     * group commit and optionally forces a group commit. Normally there is no
-     * reason to invoke this method directly. Overflow processing is triggered
-     * automatically on a bottom-up basis when the extent of the live journal
-     * nears the {@link Options#MAXIMUM_EXTENT}.
+     * group commit and optionally forces a group commit <strong>(Note: This
+     * method exists primarily for unit tests and benchmarking activities and
+     * SHOULD NOT be used on a deployed federation as the overhead associated
+     * with a compacting merge of each index partition can be significant).
+     * </strong>
+     * <p>
+     * Normally there is no reason to invoke this method directly. Overflow
+     * processing is triggered automatically on a bottom-up basis when the
+     * extent of the live journal nears the {@link Options#MAXIMUM_EXTENT}.
      * 
      * @param immediate
      *            The purpose of this argument is to permit the caller to

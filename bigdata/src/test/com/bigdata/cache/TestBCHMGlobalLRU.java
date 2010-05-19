@@ -36,9 +36,7 @@ import com.bigdata.rawstore.Bytes;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo due to its design, it can not correctly report all of the counters
- *       declared by {@link IHardReferenceGlobalLRU} so it is failing various
- *       unit tests.
+ * @todo clone the test setup for LIRS.
  */
 public class TestBCHMGlobalLRU extends
         AbstractHardReferenceGlobalLRUTest {
@@ -67,10 +65,15 @@ public class TestBCHMGlobalLRU extends
         final int limitingCacheCapacity = 100000;
 
         final float loadFactor = .75f;
+        
+        final int concurrencyLevel = 16;
 
         lru = new BCHMGlobalLRU<Object>(maximumBytesInMemory,
                 minimumCacheSetCapacity, limitingCacheCapacity, loadFactor,
-                AccessPolicyEnum.LIRS);
+                concurrencyLevel,
+//                AccessPolicyEnum.LRU
+                AccessPolicyEnum.LIRS
+                );
 
     }
 
