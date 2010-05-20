@@ -72,6 +72,10 @@ public interface HAGlue extends Remote {
      * 
      * @return A runnable which will transfer the contents of the record into
      *         the buffer returned by the future.
+     * 
+     * @todo For scale-out this needs to pass in the UUID of the store from
+     *       which the record should be read. The store can be the live journal,
+     *       a historical journal, or an index segment.
      */
     public RunnableFuture<ByteBuffer> readFromDisk(long token, long addr)
             throws IOException;
@@ -130,22 +134,19 @@ public interface HAGlue extends Remote {
     Future<Void> receiveAndReplicate(HAWriteMessage msg) throws IOException;
 
     /*
-     * Resynchronization.
+     * Synchronization.
      * 
-     * @todo resynchronization API.
+     * Various methods to support synchronization between services as they join
+     * a quorum.
      */
 
     /**
-     * Create the backing file on the secondary and lay down its initial root
-     * blocks. The initial root blocks for the persistence store should both be
-     * copies of the given root block.
+     * Return the current root block for the persistence store. The initial root
+     * blocks are identical, so this may be used to create a new journal in a
+     * quorum by replicating the root blocks of the quorum leader.
      * 
-     * @param rootBlock
-     *            The initial root block.
-     * 
-     * @return A {@link Future} which evaluates to a yes/no vote on whether the
-     *         service is prepared to commit.
+     * @return The current root block.
      */
-    RunnableFuture<Void> create(IRootBlockView rootBlock) throws IOException;
+    IRootBlockView getRootBlock() throws IOException;
 
 }

@@ -27,14 +27,16 @@ package com.bigdata.journal.ha;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.rmi.Remote;
 import java.util.concurrent.Future;
 import java.util.concurrent.RunnableFuture;
 
 import com.bigdata.journal.IRootBlockView;
 
 /**
- * A delegate pattern is used to separate the implentaiton from the Remote HAGlue interface.
- * This enables the HADelegate implementation class to support multiple, possibly non-remote interfaces.
+ * A delegate pattern is used to separate the implementation from the
+ * {@link Remote} {@link HAGlue} interface. This enables the {@link HADelegate}
+ * implementation class to support multiple, possibly non-remote interfaces.
  * 
  * @author Martyn Cutcher
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -43,7 +45,7 @@ public class HADelegator implements HAGlue {
 	
 	private HADelegate delegate;
 	
-	public HADelegator(HADelegate delegate) {
+	public HADelegator(final HADelegate delegate) {
 		this.delegate = delegate;
 	}
 
@@ -71,7 +73,7 @@ public class HADelegator implements HAGlue {
 		return delegate.receiveAndReplicate(msg);
 	}
 
-    public RunnableFuture<Void> create(final IRootBlockView rootBlock) throws IOException {
-        return delegate.create(rootBlock);
+    public IRootBlockView getRootBlock() throws IOException {
+        return delegate.getRootBlock();
     }
 }

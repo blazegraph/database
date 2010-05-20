@@ -190,6 +190,26 @@ public interface IRootBlockView {
      * The unique journal identifier
      */
     public UUID getUUID();
+
+    /*
+     * @todo Consider putting the logical service UUID into the root blocks. It
+     * is already in the service Entry[] (and the file system path) for
+     * scale-out.
+     */
+//    /**
+//     * The unique identifier for the logical service to which this journal
+//     * belongs. All physical services for the same logical service will have the
+//     * same logical service {@link UUID}. The logical service {@link UUID} is
+//     * generated when the quorum leader creates the initial journal for a
+//     * service and is written into the root blocks. From the root blocks it is
+//     * replicated to the {@link Quorum} followers.
+//     * <p>
+//     * Note: The physical service UUID is NOT stored in the root blocks since
+//     * that would make the root blocks incompatible when they are replicated to
+//     * other nodes in the same logical service and high availability maintains
+//     * binary compatibility when replicating a journal.
+//     */
+//    public UUID getLogicalServiceUUID();
     
     /**
      * The #of bits in a 64-bit long integer address that are dedicated to the

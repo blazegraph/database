@@ -108,4 +108,10 @@ public interface QuorumManager {
      */
     void terminate();
 
+//    /**
+//     * Notify the {@link QuorumManager} of the current root block.
+//     * @param rootBlock
+//     */
+//    void notify(IRootBlock rootBlock);
+    
 }
