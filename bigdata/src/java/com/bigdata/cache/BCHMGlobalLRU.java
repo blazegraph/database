@@ -32,7 +32,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.infinispan.util.concurrent.BufferedConcurrentHashMap;
@@ -41,6 +40,7 @@ import org.infinispan.util.concurrent.BufferedConcurrentHashMap.EvictionListener
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.LRUNexus.AccessPolicyEnum;
+import com.bigdata.LRUNexus.CacheSettings;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
@@ -49,101 +49,23 @@ import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
 
 /**
- * A mostly non-blocking cache based on a {@link ConcurrentHashMap} and batched
- * updates to its access policy. This approach encapsulates:
- * <ul>
- * <li>
- * (a) an unmodified ConcurrentHashMap (CHM); combined with</li>
- * <li>
- * (b) non-thread-safe thread-local buffers (TLB) for touches, managed by an
- * inner CHM<ThreadId,TLB> instance. The reason for this inner map is to allow
- * the TLB instances to be discarded by clear(); The TLBs get batched onto;</li>
- * <li>
- * (c) a shared non-thread safe access policy (LIRS, LRU) built on double-linked
- * nodes (DLN) stored in the inner CHM. Updates are deferred until holding the
- * lock (d). The DLN reference to the cached value is final. The (prior, next,
- * delete) fields are only read or written while holding the lock (d). Other
- * fields could be defined by subclassing a newDLN() method to support LIRS,
- * etc. The access policy will need [head, tail] or similar fields, which would
- * also be guarded by the lock (d);</li>
- * <li>
- * (d) a single lock guarding mutation on the access policy. Since there is only
- * one lock, there can be no lock ordering problems. Both batching touches onto
- * (c) and eviction (per the access policy) require access to the lock, but that
- * is the only lock. If the access policy batches evictions, then lock requests
- * will be rare and the whole cache will be non-blocking, wait free, and not
- * spinning on CAS locks 99% of the time; and</li>
- * <li>
- * (e) explicit management of the threads used to access the cache. e.g., by
- * queuing accepted requests and servicing them out of a thread pool, which has
- * the benefit of managing the workload imposed by the clients.</li>
- * </ul>
+ * A cache based on the {@link BufferedConcurrentHashMap} from the infinispan
+ * project. This has good performance for the LRU and LIRS cache eviction
+ * algorithms, but the LRU algorithm in particular can get a bit out of whack if
+ * you hit it with a bunch of threads all at once.
  * <p>
- * This should have the best possible performance and the simplest
- * implementation. (b) The TLB could be a DLN[] or other simple data structure.
- * The access policy (c) is composed from linking DLN instances together while
- * holding the lock.
- * <ul>
- * <li>
- * A get() on the outer class looks up the DLN on the inner CHM and places it
- * into the TLB (if found).</li>
- * <li>
- * A put() or putIfAbsent() on the outer class creates a new DLN and either
- * unconditionally or conditionally puts it into the inner CHM. The new DLN is
- * added to the TLB IFF it was added to the inner CHM. The access order is NOT
- * updated at this time.</li>
- * <li>
- * A remove() on the outer class acquires the lock (d), looks up the DLN in the
- * cache, and synchronously unlinks the DLN if found and sets its [deleted]
- * flag. I would recommend that the clients do not call remove() directly, or
- * that an outer remove() method exists which only removes the DLN from the
- * inner CHM and queues up remove requests to be processed the next time any
- * thread batches its touches through the lock. The inner remove() method would
- * synchronously update the DLNs.</li>
- * <li>
- * A clear() clear the ConcurrentHashMap<Key,DLN<Val>> map. It would also clear
- * the inner ConcurrentHashMap<ThreadId,TLB> map, which would cause the existing
- * TLB instances to be discarded. It would have to obtain the lock in order to
- * clear the [head,tail] or related fields for the access policy.</li>
- * </ul>
- * When batching touches through the lock, only the access order is updated by
- * the appropriate updates of the DLN nodes. If the [deleted] flag is set, then
- * the DLN has been removed from the cache and its access order is NOT updated.
- * If the cache is over its defined maximums, then evictions are batched while
- * holding the lock. Evictions are only processed when batching touches through
- * the lock.
- * 
- * @todo Finish and test this implementation.
- *       <p>
- *       It is currently a copy of {@link StoreAndAddressLRUCache}. Replace it
- *       with a base implementation based on the
- *       {@link HardReferenceGlobalLRURecyclerExplicitDeleteRequired}.
- *       <p>
- *       Make the inner class a generic high concurrency cache sharing an LRU
- *       policy on the outer class. I guess the outer class needs to have the
- *       lock, which really leads us right back here.
- *       <p>
- *       Adapt to support LIRS as well as LRU.
- * 
- * @todo A main issue with this approach is managing the pool of threads used to
- *       access the TLBs in a manner which does not leak TLBs. If we do a hand
- *       off of the request from the caller's thread to an inner thread pool
- *       then that hand off can become a bottleneck. We could use a striped
- *       lock, but that is the same issue all over again. Maybe fork/join has
- *       sufficient concurrency for handing off requests? Another approach is to
- *       make the inner CHM<hash(ThreadId),TLB> and to impose locking for the
- *       TLB.  That will stripe access to the TLB instances.
+ * Note: This implementation was derived from the
+ * {@link StoreAndAddressLRUCache}. It manages the records for all stores within
+ * a single map having a complex key (UUID, recordAddr).
+ * <p>
+ * Note: The infinispan BCHM does not provide us with sufficient flexibility
+ * otherwise to manage the RAM burden of the records in the map. The
+ * {@link BCHMGlobalLRU2} class is intended to address that shortcoming.
  * 
  * @todo Support tx isolation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- *          FIXME THIS HAS NOT BEEN IMPLEMENTED YET USING BCHM!!!
- * 
- *          FIXME RE-DERIVE FROM
- *          {@link HardReferenceGlobalLRURecyclerExplicitDeleteRequired}, but
- *          Test {@link BufferedConcurrentHashMap} w/ LIRS first.
  */
 public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
 
@@ -261,6 +183,14 @@ public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
     /** The counters. */
     private final LRUCounters counters = new LRUCounters();
 
+    public BCHMGlobalLRU(final CacheSettings s) {
+
+        this(s.maximumBytesInMemory, s.minCacheSetSize,
+                s.limitingCacheCapacity, s.loadFactor, s.concurrencyLevel,
+                s.accessPolicy);
+
+    }
+    
     /**
      * 
      * @param maximumBytesInMemory
@@ -282,6 +212,7 @@ public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
             final int minimumCacheSetCapacity,//
             final int limitingCacheCapacity,//
             final float loadFactor,//
+            final int concurrencyLevel,
             final AccessPolicyEnum accessPolicy//
             ) {
 
@@ -293,9 +224,6 @@ public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
         cacheSet = new ConcurrentWeakValueCache<UUID, InnerCacheImpl>(
                 minimumCacheSetCapacity);
 
-        final int concurrencyLevel = 16; // @todo config
-        
-        // @todo impose a global memory capacity limit.
         final Eviction evictionMode;
         switch (accessPolicy) {
         case LRU:
@@ -318,6 +246,7 @@ public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
                 counters.bytesInMemory.addAndGet(key.bytesInMemory);
                 counters.bytesOnDisk.addAndGet(key.bytesOnDisk);
                 counters.evictionCount.incrementAndGet();
+                counters.evictionByteCount.addAndGet(key.bytesInMemory);
 
             }
 
@@ -343,15 +272,25 @@ public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
 
     public long getEvictionByteCount() {
 
-        // FIXME getEvictionByteCount
-        return 0L;
-//        return counters.evictionByteCount.get();
+        return counters.evictionByteCount.get();
+        
+    }
+    
+    public long getBytesOnDisk() {
+
+        return counters.bytesOnDisk.get();
         
     }
     
     public long getBytesInMemory() {
 
         return counters.bytesInMemory.get();
+        
+    }
+    
+    public long getMaximumBytesInMemory() {
+
+        return maximumBytesInMemory;
         
     }
     
@@ -477,6 +416,11 @@ public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
          */
         private final AtomicLong evictionCount = new AtomicLong();
         
+        /**
+         * The #of bytes that have been evicted.
+         */
+        private final AtomicLong evictionByteCount = new AtomicLong();
+        
         public void clear() {
             
             bytesOnDisk.set(0L);
@@ -484,7 +428,9 @@ public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
             bytesInMemory.set(0L);
             
             evictionCount.set(0L);
-                
+            
+            evictionByteCount.set(0L);
+            
         }
         
         public CounterSet getCounterSet() {
@@ -532,11 +478,20 @@ public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
                     });
 
             counters.addCounter(
-                    IGlobalLRU.IGlobalLRUCounters.BUFFERED_RECORD_COUNT,
+                    IGlobalLRU.IGlobalLRUCounters.BUFFERED_RECORD_EVICTION_COUNT,
                     new Instrument<Long>() {
                         @Override
                         protected void sample() {
                             setValue(evictionCount.get());
+                        }
+                    });
+
+            counters.addCounter(
+                    IGlobalLRU.IGlobalLRUCounters.BUFFERED_RECORD_EVICTION_BYTE_COUNT,
+                    new Instrument<Long>() {
+                        @Override
+                        protected void sample() {
+                            setValue(evictionByteCount.get());
                         }
                     });
 

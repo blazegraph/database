@@ -2573,8 +2573,11 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
              * for the new style of split handler covers all known uses of the
              * old style split handler. While some indices (the sparse row store
              * for example) will have to register a new split handler for
-             * safety, those indices were not save for splits historically.
+             * safety, those indices were not safe for splits historically.
              */
+
+            // read and discard the old split handler.
+            in.readObject();
 
             splitHandler2 = null;
             

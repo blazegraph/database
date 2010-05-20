@@ -35,6 +35,19 @@ public class QueryResult implements Serializable{
 			resultHash = new HashMap<String,Integer>();
 	}
 
+    /**
+     * Added by mikep
+     * 
+     * @return
+     */
+    public Iterator<String> getResults() {
+        if (sorted) {
+            return resultList.iterator();
+        } else {
+            return resultHash.keySet().iterator();
+        }
+    }
+    
 	public int getQueryNr() {
 		return queryNr;
 	}

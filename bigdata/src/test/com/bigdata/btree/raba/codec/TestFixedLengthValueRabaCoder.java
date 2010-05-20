@@ -22,59 +22,43 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Sep 16, 2009
+ * Created on Aug 6, 2009
  */
 
-package com.bigdata.cache;
-
-import com.bigdata.LRUNexus.AccessPolicyEnum;
-import com.bigdata.rawstore.Bytes;
+package com.bigdata.btree.raba.codec;
 
 /**
- * Some unit tests for the {@link BCHMGlobalLRU}.
+ * Test suite for the {@link FixedLengthValueRabaCoder}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo clone the test setup for LIRS.
  */
-public class TestBCHMGlobalLRU extends
-        AbstractHardReferenceGlobalLRUTest {
+public class TestFixedLengthValueRabaCoder extends AbstractRabaCoderTestCase {
 
     /**
      * 
      */
-    public TestBCHMGlobalLRU() {
+    public TestFixedLengthValueRabaCoder() {
     }
 
     /**
      * @param name
      */
-    public TestBCHMGlobalLRU(String name) {
+    public TestFixedLengthValueRabaCoder(String name) {
         super(name);
     }
 
     protected void setUp() throws Exception {
 
-        super.setUp();
-
-        final long maximumBytesInMemory = 10 * Bytes.kilobyte;
-
-        final int minimumCacheSetCapacity = 0;
-
-        final int limitingCacheCapacity = 100000;
-
-        final float loadFactor = .75f;
+        rabaCoder = new FixedLengthValueRabaCoder(64);
         
-        final int concurrencyLevel = 16;
+    }
 
-        lru = new BCHMGlobalLRU<Object>(maximumBytesInMemory,
-                minimumCacheSetCapacity, limitingCacheCapacity, loadFactor,
-                concurrencyLevel,
-//                AccessPolicyEnum.LRU
-                AccessPolicyEnum.LIRS
-                );
-
+    @Override
+    protected boolean isFixedLength() {
+        
+        return true;
+        
     }
 
 }
