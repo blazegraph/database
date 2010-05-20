@@ -125,6 +125,12 @@ public class IN<T> implements IConstraint {
         // true iff the bound value was found in the set.
         return pos >= 0;
 
-   }
+    }
+
+    public IVariable[] getVariables() {
+        
+        return new IVariable[] { x };
+        
+    }
 
 }

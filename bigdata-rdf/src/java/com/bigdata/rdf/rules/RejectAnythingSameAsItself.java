@@ -101,4 +101,10 @@ public class RejectAnythingSameAsItself implements IConstraint {
         
    }
 
+    public IVariable[] getVariables() {
+        
+        return new IVariable[] { s, p, o };
+        
+    }
+    
 }

@@ -60,4 +60,16 @@ public class OR implements IConstraint {
 
    }
 
+
+    public IVariable[] getVariables() {
+        
+        IVariable[] x = this.x.getVariables();
+        IVariable[] y = this.y.getVariables();
+        IVariable[] xy = new IVariable[x.length + y.length];
+        System.arraycopy(x, 0, xy, 0, x.length);
+        System.arraycopy(y, 0, xy, x.length, y.length);
+        return xy;
+        
+    }
+
 }
