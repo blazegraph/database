@@ -35,7 +35,9 @@ import java.rmi.RemoteException;
 import java.util.concurrent.Future;
 import java.util.concurrent.RunnableFuture;
 
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.Environment;
+import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.IRootBlockView;
 
 /**
@@ -51,16 +53,30 @@ import com.bigdata.journal.IRootBlockView;
  */
 public abstract class HADelegate {
 
-	final protected Environment environment;
+	final private Environment environment;
 
-    private final InetSocketAddress writePipelineAddr;
+    final private InetSocketAddress writePipelineAddr;
     
-    public Environment getEnvironment() {
+//    public Environment getEnvironment() {
+//
+//        return environment;
+//        
+//    }
 
-        return environment;
+    /**
+     * Return the current journal.
+     * 
+     * @todo reconcile with {@link IResourceManager#getLiveJournal()}
+     */
+    public AbstractJournal getLiveJournal() {
+        
+        return environment.getJournal();
         
     }
     
+    /**
+     * FIXME Use a jini configured port for the write pipeline.
+     */
 	public HADelegate(final Environment environment) {
 		
 	    this.environment = environment;
@@ -75,12 +91,23 @@ public abstract class HADelegate {
 
 	}
 
+	/** @see HAGlue#getWritePipelineAddr() */
 	public InetSocketAddress getWritePipelineAddr() {
 		
 	    return writePipelineAddr;
 	    
 	}
 
+    /**
+     * Return an unused port.
+     * 
+     * @param suggestedPort
+     *            The suggested port.
+     * @return The suggested port, unless it is zero or already in use, in which
+     *         case an unused port is returned.
+     * 
+     * @throws IOException
+     */
     protected int getPort(int suggestedPort) throws IOException {
         ServerSocket openSocket;
         try {
@@ -94,12 +121,16 @@ public abstract class HADelegate {
         return port;
     }
 
+    /** @see HAGlue#abort2Phase(long) */
 	public abstract RunnableFuture<Void> abort2Phase(long token);
 
+    /** @see HAGlue#commit2Phase(long) */
 	public abstract RunnableFuture<Void> commit2Phase(final long commitTime);
 
+	/** @see HAGlue#prepare2Phase(IRootBlockView) */
 	public abstract RunnableFuture<Boolean> prepare2Phase(final IRootBlockView rootBlock);
 
+	/** @see HAGlue#readFromDisk(long, long) */
 	public abstract RunnableFuture<ByteBuffer> readFromDisk(long token, long addr);
 
     /**
@@ -112,6 +143,9 @@ public abstract class HADelegate {
     public abstract Future<Void> receiveAndReplicate(HAWriteMessage msg)
             throws IOException;
 
-    public abstract RunnableFuture<Void> create(final IRootBlockView rootBlock);
+    /**
+     * @see HAGlue#getRootBlock()
+     */
+    public abstract IRootBlockView getRootBlock();
     
 }

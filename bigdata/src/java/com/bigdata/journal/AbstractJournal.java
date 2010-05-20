@@ -60,6 +60,7 @@ import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.cache.IGlobalLRU.ILRUCache;
 import com.bigdata.config.Configuration;
 import com.bigdata.config.IValidator;
 import com.bigdata.config.IntegerRangeValidator;
@@ -68,6 +69,9 @@ import com.bigdata.config.LongRangeValidator;
 import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.io.IByteArrayBuffer;
+import com.bigdata.io.IDataRecord;
+import com.bigdata.io.IDataRecordAccess;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.ha.HADelegate;
 import com.bigdata.journal.ha.HADelegator;
@@ -971,6 +975,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         }
 
         /*
+         * Create the appropriate IBufferStrategy object.
+         * 
          * Note: the WriteLock is obtained here because various methods such as
          * _getCommitRecord() assert that the caller is holding the write lock
          * in order to provide runtime safety checks.
@@ -980,270 +986,267 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         lock.lock();
         
         try {
-        /*
-         * Create the appropriate IBufferStrategy object.
-         */
-
-        /*
-         * Note: The caller SHOULD specify an explicit [createTime] when its
-         * value is critical. The default assigned here does NOT attempt to use
-         * a clock that is consistent with the commit protocol or even a clock
-         * that assigns unique timestamps.
-         */
-        final long createTime = Long.parseLong(getProperty(Options.CREATE_TIME,
-                "" + System.currentTimeMillis()));
-        
-        assert createTime != 0L;
-
-        switch (bufferMode) {
-
-        case Transient: {
-
+    
             /*
-             * Setup the buffer strategy.
+             * Note: The caller SHOULD specify an explicit [createTime] when its
+             * value is critical. The default assigned here does NOT attempt to use
+             * a clock that is consistent with the commit protocol or even a clock
+             * that assigns unique timestamps.
              */
-
-            if (readOnly) {
-
-                throw new RuntimeException(
-                        "readOnly not supported for transient journals.");
-
+            final long createTime = Long.parseLong(getProperty(Options.CREATE_TIME,
+                    "" + System.currentTimeMillis()));
+            
+            assert createTime != 0L;
+    
+            switch (bufferMode) {
+    
+            case Transient: {
+    
+                /*
+                 * Setup the buffer strategy.
+                 */
+    
+                if (readOnly) {
+    
+                    throw new RuntimeException(
+                            "readOnly not supported for transient journals.");
+    
+                }
+    
+                fileMetadata = null;
+                
+                _bufferStrategy = new TransientBufferStrategy(offsetBits,
+                        initialExtent, 0L/* soft limit for maximumExtent */,
+                        useDirectBuffers);
+    
+                /*
+                 * setup the root blocks.
+                 */
+                final int nextOffset = 0;
+                final long firstCommitTime = 0L;
+                final long lastCommitTime = 0L;
+                final long commitCounter = 0L;
+                final long commitRecordAddr = 0L;
+                final long commitRecordIndexAddr = 0L;
+                final UUID uuid = UUID.randomUUID(); // Journal's UUID.
+                final long closedTime = 0L;
+                final IRootBlockView rootBlock0 = new RootBlockView(true, offsetBits,
+                        nextOffset, firstCommitTime, lastCommitTime, commitCounter,
+                        commitRecordAddr, commitRecordIndexAddr, uuid, quorumToken,
+                        0L, // metaStartAddr
+                        0L, // metaStartBits
+                        StoreTypeEnum.WORM,//
+                        createTime, closedTime, checker);
+                final IRootBlockView rootBlock1 = new RootBlockView(false, offsetBits,
+                        nextOffset, firstCommitTime, lastCommitTime, commitCounter,
+                        commitRecordAddr, commitRecordIndexAddr, uuid, quorumToken,
+                        0L, // metaStartAddr
+                        0L, // metaStartBits
+                        StoreTypeEnum.WORM,//
+                        createTime, closedTime, checker);
+                _bufferStrategy.writeRootBlock(rootBlock0, ForceEnum.No);
+                _bufferStrategy.writeRootBlock(rootBlock1, ForceEnum.No);
+    
+                this._rootBlock = rootBlock1;
+    
+                break;
+    
             }
-
-            fileMetadata = null;
+    
+            case Direct: {
+    
+                /*
+                 * Setup the buffer strategy.
+                 */
+    
+                fileMetadata = new FileMetadata(file,
+                        BufferMode.Direct,
+                        useDirectBuffers, initialExtent, maximumExtent, create,
+                        isEmptyFile, deleteOnExit, readOnly, forceWrites,
+                        offsetBits, //0/* readCacheCapacity */,
+                        //0/* readCacheMaxRecordSize */,
+                        false, // writeCacheEnabled
+                        writeCacheBufferCount,//
+                        //null/* writeCache */,
+                        validateChecksum, createTime, quorumToken,
+                        checker, alternateRootBlock);
+    
+                _bufferStrategy = new DirectBufferStrategy(
+                        0L/* soft limit for maximumExtent */, fileMetadata);
+    
+                this._rootBlock = fileMetadata.rootBlock;
+    
+                break;
+    
+            }
+    
+            case Mapped: {
+    
+                /*
+                 * Setup the buffer strategy.
+                 */
+    
+                fileMetadata = new FileMetadata(file,
+                        BufferMode.Mapped, useDirectBuffers, initialExtent,
+                        maximumExtent, create,
+                        isEmptyFile, deleteOnExit, readOnly, forceWrites,
+                        offsetBits, //0/*readCacheCapacity*/,
+                        //0/* readCacheMaxRecordSize */,
+                        false, // writeCacheEnabled
+                        writeCacheBufferCount,//
+                        //null/* writeCache */,
+                        validateChecksum, createTime, quorumToken,
+                        checker, alternateRootBlock);
+    
+                /*
+                 * Note: the maximumExtent is a hard limit in this case only since
+                 * resize is not supported for mapped files.
+                 */
+                _bufferStrategy = new MappedBufferStrategy(
+                        maximumExtent /* hard limit for maximum extent */,
+                        fileMetadata);
+    
+                this._rootBlock = fileMetadata.rootBlock;
+    
+                break;
+    
+            }
+    
+            case Disk: {
+    
+                /*
+                 * Setup the buffer strategy.
+                 */
+    
+                fileMetadata = new FileMetadata(file, BufferMode.Disk,
+                        useDirectBuffers, initialExtent, maximumExtent, create,
+                        isEmptyFile, deleteOnExit, readOnly, forceWrites,
+                        offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
+                        //readOnly ? null : writeCache,
+                        writeCacheEnabled,//
+                        writeCacheBufferCount,//
+                        validateChecksum,//
+                        createTime, quorumToken,
+                        checker, alternateRootBlock);
+    
+                _bufferStrategy = new DiskOnlyStrategy(
+                        0L/* soft limit for maximumExtent */,
+    //                    minimumExtension,
+                        fileMetadata);
+    
+                this._rootBlock = fileMetadata.rootBlock;
+    
+                break;
+    
+            }
             
-            _bufferStrategy = new TransientBufferStrategy(offsetBits,
-                    initialExtent, 0L/* soft limit for maximumExtent */,
-                    useDirectBuffers);
-
-            /*
-             * setup the root blocks.
-             */
-            final int nextOffset = 0;
-            final long firstCommitTime = 0L;
-            final long lastCommitTime = 0L;
-            final long commitCounter = 0L;
-            final long commitRecordAddr = 0L;
-            final long commitRecordIndexAddr = 0L;
-            final UUID uuid = UUID.randomUUID(); // Journal's UUID.
-            final long closedTime = 0L;
-            final IRootBlockView rootBlock0 = new RootBlockView(true, offsetBits,
-                    nextOffset, firstCommitTime, lastCommitTime, commitCounter,
-                    commitRecordAddr, commitRecordIndexAddr, uuid, quorumToken,
-                    0L, // metaStartAddr
-                    0L, // metaStartBits
-                    StoreTypeEnum.WORM,//
-                    createTime, closedTime, checker);
-            final IRootBlockView rootBlock1 = new RootBlockView(false, offsetBits,
-                    nextOffset, firstCommitTime, lastCommitTime, commitCounter,
-                    commitRecordAddr, commitRecordIndexAddr, uuid, quorumToken,
-                    0L, // metaStartAddr
-                    0L, // metaStartBits
-                    StoreTypeEnum.WORM,//
-                    createTime, closedTime, checker);
-            _bufferStrategy.writeRootBlock(rootBlock0, ForceEnum.No);
-            _bufferStrategy.writeRootBlock(rootBlock1, ForceEnum.No);
-
-            this._rootBlock = rootBlock1;
-
-            break;
-
-        }
-
-        case Direct: {
-
-            /*
-             * Setup the buffer strategy.
-             */
-
-            fileMetadata = new FileMetadata(file,
-                    BufferMode.Direct,
-                    useDirectBuffers, initialExtent, maximumExtent, create,
-                    isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                    offsetBits, //0/* readCacheCapacity */,
-                    //0/* readCacheMaxRecordSize */,
-                    false, // writeCacheEnabled
-                    writeCacheBufferCount,//
-                    //null/* writeCache */,
-                    validateChecksum, createTime, quorumToken,
-                    checker, alternateRootBlock);
-
-            _bufferStrategy = new DirectBufferStrategy(
-                    0L/* soft limit for maximumExtent */, fileMetadata);
-
-            this._rootBlock = fileMetadata.rootBlock;
-
-            break;
-
-        }
-
-        case Mapped: {
-
-            /*
-             * Setup the buffer strategy.
-             */
-
-            fileMetadata = new FileMetadata(file,
-                    BufferMode.Mapped, useDirectBuffers, initialExtent,
-                    maximumExtent, create,
-                    isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                    offsetBits, //0/*readCacheCapacity*/,
-                    //0/* readCacheMaxRecordSize */,
-                    false, // writeCacheEnabled
-                    writeCacheBufferCount,//
-                    //null/* writeCache */,
-                    validateChecksum, createTime, quorumToken,
-                    checker, alternateRootBlock);
-
-            /*
-             * Note: the maximumExtent is a hard limit in this case only since
-             * resize is not supported for mapped files.
-             */
-            _bufferStrategy = new MappedBufferStrategy(
-                    maximumExtent /* hard limit for maximum extent */,
-                    fileMetadata);
-
-            this._rootBlock = fileMetadata.rootBlock;
-
-            break;
-
-        }
-
-        case Disk: {
-
-            /*
-             * Setup the buffer strategy.
-             */
-
-            fileMetadata = new FileMetadata(file, BufferMode.Disk,
-                    useDirectBuffers, initialExtent, maximumExtent, create,
-                    isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                    offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
-                    //readOnly ? null : writeCache,
-                    writeCacheEnabled,//
-                    writeCacheBufferCount,//
-                    validateChecksum,//
-                    createTime, quorumToken,
-                    checker, alternateRootBlock);
-
-            _bufferStrategy = new DiskOnlyStrategy(
-                    0L/* soft limit for maximumExtent */,
-//                    minimumExtension,
-                    fileMetadata);
-
-            this._rootBlock = fileMetadata.rootBlock;
-
-            break;
-
-        }
-        
-        case DiskWORM: {
-
-            /*
-             * Setup the buffer strategy.
-             */
-
-            fileMetadata = new FileMetadata(file, BufferMode.DiskWORM,
-                    useDirectBuffers, initialExtent, maximumExtent, create,
-                    isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                    offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
-                    //readOnly ? null : writeCache,
-                    writeCacheEnabled,//
-                    writeCacheBufferCount,//
-                    validateChecksum,
-                    createTime, quorumToken,
-                    checker, alternateRootBlock);
-
-            _bufferStrategy = new WORMStrategy(
-                    0L/* soft limit for maximumExtent */,
-                    minimumExtension,
-                    fileMetadata,
-                    environment);
-
-            this._rootBlock = fileMetadata.rootBlock;
-
-            break;
-
-        }
-        
-        case DiskRW: {
-
-            /*
-             * Setup the buffer strategy.
-             */
-
-            fileMetadata = new FileMetadata(file, BufferMode.DiskRW,
-                    useDirectBuffers, initialExtent, maximumExtent, create,
-                    isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                    offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
-                    //readOnly ? null : writeCache,
-                    writeCacheEnabled,//
-                    writeCacheBufferCount,//
-                    validateChecksum,
-                    createTime, quorumToken,
-                    checker, alternateRootBlock);
-
-            _bufferStrategy = new RWStrategy(fileMetadata, environment);
-
-            this._rootBlock = fileMetadata.rootBlock;
-
-            break;
-
-        }
-        
-        case Temporary: { 
+            case DiskWORM: {
+    
+                /*
+                 * Setup the buffer strategy.
+                 */
+    
+                fileMetadata = new FileMetadata(file, BufferMode.DiskWORM,
+                        useDirectBuffers, initialExtent, maximumExtent, create,
+                        isEmptyFile, deleteOnExit, readOnly, forceWrites,
+                        offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
+                        //readOnly ? null : writeCache,
+                        writeCacheEnabled,//
+                        writeCacheBufferCount,//
+                        validateChecksum,
+                        createTime, quorumToken,
+                        checker, alternateRootBlock);
+    
+                _bufferStrategy = new WORMStrategy(
+                        0L/* soft limit for maximumExtent */,
+                        minimumExtension,
+                        fileMetadata,
+                        environment);
+    
+                this._rootBlock = fileMetadata.rootBlock;
+    
+                break;
+    
+            }
             
-            /*
-             * Setup the buffer strategy.
-             * 
-             * FIXME Add test suite for this buffer mode. It should support MRMW
-             * but is not restart-safe.
-             */
-
-            fileMetadata = new FileMetadata(file, BufferMode.Temporary,
-                    useDirectBuffers, initialExtent, maximumExtent,
-                    true/* create */, isEmptyFile, true/* deleteOnExit */,
-                    false/* readOnly */, ForceEnum.No/* forceWrites */,
-                    offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
-                    writeCacheEnabled, // writeCacheEnabled
-                    writeCacheBufferCount,//
-                    //writeCache,
-                    false/* validateChecksum */, createTime, quorumToken,
-                    checker, alternateRootBlock);
-
-            // FIXME Change BufferMode.Temporary to use WORMStrategy
-            _bufferStrategy = new DiskOnlyStrategy(
-                    0L/* soft limit for maximumExtent */,
-//                    minimumExtension,
-                    fileMetadata);
-
-            this._rootBlock = fileMetadata.rootBlock;
+            case DiskRW: {
+    
+                /*
+                 * Setup the buffer strategy.
+                 */
+    
+                fileMetadata = new FileMetadata(file, BufferMode.DiskRW,
+                        useDirectBuffers, initialExtent, maximumExtent, create,
+                        isEmptyFile, deleteOnExit, readOnly, forceWrites,
+                        offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
+                        //readOnly ? null : writeCache,
+                        writeCacheEnabled,//
+                        writeCacheBufferCount,//
+                        validateChecksum,
+                        createTime, quorumToken,
+                        checker, alternateRootBlock);
+    
+                _bufferStrategy = new RWStrategy(fileMetadata, environment);
+    
+                this._rootBlock = fileMetadata.rootBlock;
+    
+                break;
+    
+            }
             
-            break;
+            case Temporary: { 
+                
+                /*
+                 * Setup the buffer strategy.
+                 * 
+                 * FIXME Add test suite for this buffer mode. It should support MRMW
+                 * but is not restart-safe.
+                 */
+    
+                fileMetadata = new FileMetadata(file, BufferMode.Temporary,
+                        useDirectBuffers, initialExtent, maximumExtent,
+                        true/* create */, isEmptyFile, true/* deleteOnExit */,
+                        false/* readOnly */, ForceEnum.No/* forceWrites */,
+                        offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
+                        writeCacheEnabled, // writeCacheEnabled
+                        writeCacheBufferCount,//
+                        //writeCache,
+                        false/* validateChecksum */, createTime, quorumToken,
+                        checker, alternateRootBlock);
+    
+                // FIXME Change BufferMode.Temporary to use WORMStrategy
+                _bufferStrategy = new DiskOnlyStrategy(
+                        0L/* soft limit for maximumExtent */,
+    //                    minimumExtension,
+                        fileMetadata);
+    
+                this._rootBlock = fileMetadata.rootBlock;
+                
+                break;
+                
+            }
+    
+            default:
+    
+                throw new AssertionError();
+    
+            }
+    
+            // Save resource description (sets value returned by getUUID()).
+            this.journalMetadata = new JournalMetadata(this);
+    
+            // new or reload from the store root block.
+            this._commitRecord = _getCommitRecord();
             
-        }
-
-        default:
-
-            throw new AssertionError();
-
-        }
-
-        // Save resource description (sets value returned by getUUID()).
-        this.journalMetadata = new JournalMetadata(this);
-
-        // new or reload from the store root block.
-        this._commitRecord = _getCommitRecord();
-        
-        // new or re-load commit record index from store via root block.
-        this._commitRecordIndex = _getCommitRecordIndex();
-
-        // Give the store a chance to set any committers that it defines.
-        setupCommitters();
-
-        // report event.
-        ResourceManager.openJournal(getFile() == null ? null : getFile()
-                .toString(), size(), getBufferStrategy().getBufferMode());
+            // new or re-load commit record index from store via root block.
+            this._commitRecordIndex = _getCommitRecordIndex();
+    
+            // Give the store a chance to set any committers that it defines.
+            setupCommitters();
+    
+            // report event.
+            ResourceManager.openJournal(getFile() == null ? null : getFile()
+                    .toString(), size(), getBufferStrategy().getBufferMode());
 
             /*
              * The current quorum token.
@@ -1252,8 +1255,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
              * unit test setups, which is a bit of a hack. See
              * AbstractHAJournalTest and friends.
              */
-        this.quorumToken = quorumManager.getQuorum().token();
-        
+  
+            this.quorumToken = quorumManager.getQuorum().token();
+            
         } finally {
             
             lock.unlock();
@@ -2021,9 +2025,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             if (_rootBlock == null) {
 
                 /*
-                 * This can happen before the journal is create()d. Once it has
-                 * been create()d the root block will always be non-null when
-                 * viewed while holding the lock.
+                 * This can happen before the journal file has been created.
+                 * Once it has been created the root block will always be
+                 * non-null when viewed while holding the lock.
                  */
                 
                 throw new IllegalStateException();
@@ -2172,6 +2176,13 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             if (log.isInfoEnabled())
                 log.info("start");
 
+            if (_bufferStrategy == null) {
+
+                // Nothing to do.
+                return;
+                
+            }
+            
             if (LRUNexus.INSTANCE != null) {
 
                 /*
@@ -2566,7 +2577,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
                 final int minYes = (q.replicationFactor() + 1) >> 1;
 
-                // @todo config prepare timeout.
+                // @todo config prepare timeout (Watch out for long GC pauses!)
                 final int nyes = q.prepare2Phase(newRootBlock,
                         1000/* timeout */, TimeUnit.MILLISECONDS);
 
@@ -3801,20 +3812,6 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
            throw new IllegalStateException(); 
         }
 
-//        /**
-//         * This is a NOP because the master handles this for its local backing
-//         * file and there are no other services in the singleton quorum.
-//         */
-//        public void truncate(final long extent) {
-//            try {
-//                final RunnableFuture<Void> f = haGlue.truncate(token(), extent);
-//                f.run();
-//                f.get();
-//            } catch (Throwable e) {
-//                throw new RuntimeException(e);
-//            }
-//        }
-
         public int prepare2Phase(final IRootBlockView rootBlock,
                 final long timeout, final TimeUnit unit)
                 throws InterruptedException, TimeoutException, IOException {
@@ -4096,11 +4093,24 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             }, null/* Void */);
 
         }
-        
-        /*
+
+        /**
+         * {@inheritDoc}
+         * 
+         * FIXME We should test the LRUNexus for failover reads and install
+         * records into the cache if there is a cache miss. Unfortunately the
+         * cache holds objects, some of which declare how to access the
+         * underlying {@link IDataRecord} using the {@link IDataRecordAccess}
+         * interface.
+         * 
          * FIXME ByteBuffer is not Serializable. Use byte[] instead? Since these
          * are rare events it may not be worthwhile to setup a separate
          * low-level socket service to send/receive the data.
+         * 
+         * FIXME Pass in the UUID of the store. Could be the live journal,
+         * historical journal, or an index segment. The {@link HADelegate}
+         * really needs to be elevated to the {@link IResourceManager} or the
+         * {@link QuorumManager} to support this.
          */
         public RunnableFuture<ByteBuffer> readFromDisk(final long token,
                 final long addr) {
@@ -4110,9 +4120,27 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     
                     getQuorumManager().assertQuorum(token);
                     
+                    final AbstractJournal store = getLiveJournal();
+
+//                    final ILRUCache<Long, Object> cache = (LRUNexus.INSTANCE == null) ? null
+//                            : LRUNexus.getCache(jnl);
+//
+//                    Object obj = cache.get(addr);
+//                    
+//                    if(obj != null && obj instanceof IDataRecordAccess) {
+//                        
+//                        return ((IDataRecordAccess)obj).data();
+//                        
+//                    }
+                    
                     // read from the local store.
-                    return ((IHABufferStrategy) getBufferStrategy())
+                    final ByteBuffer b = ((IHABufferStrategy) store.getBufferStrategy())
                             .readFromLocalStore(addr);
+                    
+//                    cache.putIfAbsent(addr, b);
+                    
+                    return b;
+                    
                 }
             });
             
@@ -4126,8 +4154,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         }
 
         @Override
-        public RunnableFuture<Void> create(IRootBlockView rootBlock) {
-            throw new UnsupportedOperationException();
+        public IRootBlockView getRootBlock() {
+
+            return AbstractJournal.this.getRootBlockView();
+            
         }
 
     };

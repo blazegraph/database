@@ -498,7 +498,7 @@ public class MockQuorumImpl implements Quorum {
         /*
          * If there were any errors, then throw an exception listing them.
          */
-        if (causes.isEmpty()) {
+        if (!causes.isEmpty()) {
             // Cancel remote futures.
             cancelRemoteFutures(remoteFutures);
             // Throw exception back to the master.
@@ -596,7 +596,7 @@ public class MockQuorumImpl implements Quorum {
         /*
          * If there were any errors, then throw an exception listing them.
          */
-        if (causes.isEmpty()) {
+        if (!causes.isEmpty()) {
             // Cancel remote futures.
             cancelRemoteFutures(remoteFutures);
             // Throw exception back to the master.
@@ -864,8 +864,7 @@ public class MockQuorumImpl implements Quorum {
      */
     private AbstractJournal getLocalJournal() {
         
-        return ((HADelegate) getHADelegate()).getEnvironment()
-                .getJournal();
+        return ((HADelegate) getHADelegate()).getLiveJournal();
 
     }
     
