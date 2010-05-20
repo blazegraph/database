@@ -66,4 +66,10 @@ public class NEConstant implements IConstraint {
 
    }
 
+    public IVariable[] getVariables() {
+        
+        return new IVariable[] { var };
+        
+    }
+
 }

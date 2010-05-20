@@ -515,6 +515,27 @@ public class OwlSameAsPropertiesExpandingIterator implements
             }
             return true;
         }
+        
+        public IVariable[] getVariables() {
+            
+            final IVariable[] vars = new IVariable[
+                (_s.isVar() ? 1 : 0) +
+                (_p.isVar() ? 1 : 0) +
+                (_o.isVar() ? 1 : 0)
+                ];
+            int i = 0;
+            if (_s.isVar()) {
+                vars[i++] = (IVariable) _s;
+            }
+            if (_p.isVar()) {
+                vars[i++] = (IVariable) _p;
+            }
+            if (_o.isVar()) {
+                vars[i++] = (IVariable) _o;
+            }
+            return vars;
+            
+        }
 
         public long getValue(IVariableOrConstant<Long> _x, IBindingSet bindings) {
             long val;

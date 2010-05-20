@@ -74,4 +74,10 @@ public class NE implements IConstraint {
 
    }
 
+    public IVariable[] getVariables() {
+        
+        return new IVariable[] { x, y };
+        
+    }
+
 }

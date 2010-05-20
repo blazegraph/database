@@ -72,6 +72,12 @@ public class EQ implements IConstraint {
         
         return x.equals(y); 
 
-   }
+    }
+    
+    public IVariable[] getVariables() {
+        
+        return new IVariable[] { x, y };
+        
+    }
 
 }

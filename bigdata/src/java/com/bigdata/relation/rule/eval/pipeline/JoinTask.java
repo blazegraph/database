@@ -1532,8 +1532,7 @@ abstract public class JoinTask implements Callable<Void> {
                          * Clone the binding set since it is tested for each
                          * element visited.
                          */
-                        //bset = bset.clone();
-                        bset = bset.copy(variablesToKeep);
+                        bset = bset.clone();
 
                         if (INFO) {
                             log.info("tailIndex: " + tailIndex);
@@ -1544,6 +1543,8 @@ abstract public class JoinTask implements Callable<Void> {
                         // propagate bindings from the visited element.
                         if (joinNexus.bind(rule, tailIndex, e, bset)) {
 
+                            bset = bset.copy(variablesToKeep);
+                            
                             // Accept this binding set.
                             unsyncBuffer.add(bset);
 

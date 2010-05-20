@@ -167,12 +167,19 @@ import cutthecrap.utils.striterators.Striterator;
  * Concurrent readers are possible, and can be very efficient. However, readers
  * MUST use a database commit point corresponding to a desired state of the
  * store, e.g., after loading some data set and (optionally) after computing the
- * closure of that data set. Use {@link #getDatabase()} .
- * {@link AbstractTripleStore#getIndexManager()} .
- * {@link IIndexStore#getLastCommitTime()} to obtain the commit time and then
- * {@link #getReadHistoricalView(long)} to obtain a read-only view as of that
- * commit time. In you are loading data incrementally, then you can use
- * {@link #asReadCommittedView()} instead.
+ * closure of that data set. Use {@link #getReadOnlyConnection()} to obtain
+ * a read-only view of the database as of the last commit time, or 
+ * {@link #getReadOnlyConnection(long)} to obtain a read-only view of the
+ * database as of some other historical point.  These connections are safe to
+ * use concurrently with the unisolated connection from {@link #getConnection()}.
+ * </p>
+ * <p>
+ * Read/write transaction are also implemented in the bigdata SAIL.  To turn
+ * on read/write transactions, use the option {@link Options#ISOLATABLE_INDICES}.
+ * If this option is set to true, then {@link #getConnection} will return an
+ * isolated read/write view of the database.  Multiple read/write transactions
+ * are allowed, and the database can resolve add/add conflicts between
+ * transactions.
  * </p>
  * <p>
  * The {@link BigdataSail} may be configured as as to provide a triple store
@@ -2822,7 +2829,67 @@ public class BigdataSail extends SailBase implements Sail {
             return evaluate(tupleExpr, dataset, bindings, includeInferred, new Properties());
         }
         
-        
+        /**
+         * Return the optimized operator tree.  Useful for debugging.
+         */
+        public synchronized TupleExpr optimize(
+                TupleExpr tupleExpr, Dataset dataset,
+                final BindingSet bindings, final boolean includeInferred,
+                final Properties queryHints) 
+                throws SailException {
+
+            if (log.isInfoEnabled())
+                log.info("Optimizing query: " + tupleExpr + ", dataSet="
+                        + dataset + ", includeInferred=" + includeInferred);
+
+            flushStatementBuffers(true/* assertions */, true/* retractions */);
+
+            // Clone the tuple expression to allow for more aggressive optimizations
+            tupleExpr = tupleExpr.clone();
+
+            if (!(tupleExpr instanceof QueryRoot)) {
+                // Add a dummy root node to the tuple expressions to allow the
+                // optimizers to modify the actual root node
+                tupleExpr = new QueryRoot(tupleExpr);
+            }
+
+            /*
+             * Convert the terms in the query with BigdataValues. Both the
+             * native joins and the BigdataEvaluationStatistics rely on
+             * this.
+             */
+                dataset = replaceValues(dataset, tupleExpr);
+
+            final TripleSource tripleSource = new BigdataTripleSource(this,
+                    includeInferred);
+
+            final BigdataEvaluationStrategyImpl2 strategy = new BigdataEvaluationStrategyImpl2(
+                    (BigdataTripleSource) tripleSource, dataset,
+                    nativeJoins);
+
+            final QueryOptimizerList optimizerList = new QueryOptimizerList();
+            optimizerList.add(new BindingAssigner());
+            optimizerList.add(new ConstantOptimizer(strategy));
+            optimizerList.add(new CompareOptimizer());
+            optimizerList.add(new ConjunctiveConstraintSplitter());
+            optimizerList.add(new SameTermFilterOptimizer());
+            // only need to optimize the join order this way if we are not
+            // using native joins
+            if (nativeJoins == false) {
+                optimizerList.add(new QueryJoinOptimizer(
+                        new BigdataEvaluationStatistics(this)));
+            }
+            optimizerList.add(new FilterOptimizer());
+
+            optimizerList.optimize(tupleExpr, dataset, bindings);
+
+            if (log.isInfoEnabled())
+                log.info("Optimized query: " + tupleExpr);
+
+            return tupleExpr;
+
+        }
+
         /**
          * Note: The <i>includeInferred</i> argument is applied in two ways.
          * First, inferences are stripped out of the {@link SPOAccessPath}.
