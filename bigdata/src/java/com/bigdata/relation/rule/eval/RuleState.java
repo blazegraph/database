@@ -324,26 +324,15 @@ public class RuleState implements IRuleState {
         // start at the back
         for (int orderIndex = tailCount-1; orderIndex >= 0; orderIndex--) {
 
-            final int tailIndex = order[orderIndex];
-
-            final IPredicate pred = rule.getTail(tailIndex);
-
             // guarantee uniqueness
             final HashSet<IVariable> required = new HashSet<IVariable>();
-            
-            // each tail needs its own variables
-            final int arity = pred.arity();
-            for (int j = 0; j < arity; j++) {
-                final IVariableOrConstant t = pred.get(j);
-                if (t.isVar()) {
-                    final IVariable v = (IVariable) t;
-                    required.add(v);
-                }
-            }
             
             if (orderIndex == tailCount-1) {
                 // attach the post-join required variables (projection and 
                 // aggregation) to the last tail
+                
+                // the last tail only needs to pass along the post-join
+                // required vars
                 
                 final Iterator it = rule.getRequiredVariables(); 
                 while (it.hasNext()) {
@@ -351,9 +340,25 @@ public class RuleState implements IRuleState {
                 }
                 
             } else {
-                // attach whatever next tail needs to this tail
+                // if we're not at the back, we need to pass along whatever the
+                // next tail itself needs plus whatever the next tail needs to
+                // pass along
                 
                 final int nextTailIndex = order[orderIndex+1];
+
+                final IPredicate nextPred = rule.getTail(nextTailIndex);
+
+                // add the next tail's variables
+                final int arity = nextPred.arity();
+                for (int j = 0; j < arity; j++) {
+                    final IVariableOrConstant t = nextPred.get(j);
+                    if (t.isVar()) {
+                        final IVariable v = (IVariable) t;
+                        required.add(v);
+                    }
+                }
+                
+                // plus next tail's passalongs
                 final IVariable[] nextRequired = a[nextTailIndex];
                 for (IVariable v : nextRequired) {
                     required.add(v);
@@ -361,14 +366,16 @@ public class RuleState implements IRuleState {
                 
             }
 
+            final int tailIndex = order[orderIndex];
+
             // save results.
             a[tailIndex] = required.toArray(new IVariable[required.size()]);
             
-            if (DEBUG)
+            if (DEBUG) {
                 log.debug("requiredVars=" + Arrays.toString(a[tailIndex]) + ", orderIndex=" + orderIndex
-                        + ", tailIndex=" + orderIndex + ", pred=" + pred
+                        + ", tailIndex=" + orderIndex + ", pred=" + rule.getTail(tailIndex)
                         + ", rule=" + rule);
-
+            }
         }
 
         if (DEBUG) {

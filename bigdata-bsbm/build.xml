@@ -121,6 +121,9 @@
 	ant run-qualification-1 (runs the queries)
 	ant run-qualification-2 (compares the actual query results to the correct query results)
 
+    Also, note that src/resources/bsbm-data/ignoreQueries.txt file MUST be empty
+    when you run the qualifications queries.
+
 	[1] http://www4.wiwiss.fu-berlin.de/bizer/BerlinSPARQLBenchmark/datasets/qualification.ttl.gz
 	[2] http://www4.wiwiss.fu-berlin.de/bizer/BerlinSPARQLBenchmark/datasets/td_data_q.zip
 	[3] http://www4.wiwiss.fu-berlin.de/bizer/BerlinSPARQLBenchmark/code/correct.qual

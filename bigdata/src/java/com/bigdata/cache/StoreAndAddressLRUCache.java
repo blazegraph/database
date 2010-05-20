@@ -37,6 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.BigdataStatics;
+import com.bigdata.LRUNexus.CacheSettings;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
@@ -173,6 +174,19 @@ public class StoreAndAddressLRUCache<V> implements IHardReferenceGlobalLRU<Long,
     private final LRUCounters counters = new LRUCounters();
 
     /**
+     * The designated constructor used by {@link CacheSettings}.
+     * 
+     * @param s
+     *            The {@link CacheSettings}.
+     */
+    public StoreAndAddressLRUCache(final CacheSettings s) {
+
+        this(s.maximumBytesInMemory, s.minCacheSetSize, s.initialCacheCapacity,
+                s.loadFactor);
+        
+    }
+
+    /**
      * 
      * @param maximumBytesInMemory
      *            The maximum bytes in memory for the cached records across all
@@ -213,6 +227,7 @@ public class StoreAndAddressLRUCache<V> implements IHardReferenceGlobalLRU<Long,
                     counters.bytesInMemory.addAndGet(eldest.getKey().bytesInMemory);
                     counters.bytesOnDisk.addAndGet(eldest.getKey().bytesOnDisk);
                     counters.evictionCount.incrementAndGet();
+                    counters.evictionByteCount.addAndGet(eldest.getKey().bytesInMemory);
                  
                     // implementation will remove the entry.
                     return true;
@@ -242,9 +257,13 @@ public class StoreAndAddressLRUCache<V> implements IHardReferenceGlobalLRU<Long,
 
     public long getEvictionByteCount() {
 
-        // FIXME getEvictionByteCount
-        return 0L;
-//        return counters.evictionByteCount.get();
+        return counters.evictionByteCount.get();
+        
+    }
+    
+    public long getBytesOnDisk() {
+
+        return counters.bytesOnDisk.get();
         
     }
     
@@ -253,7 +272,13 @@ public class StoreAndAddressLRUCache<V> implements IHardReferenceGlobalLRU<Long,
         return counters.bytesInMemory.get();
         
     }
-    
+
+    public long getMaximumBytesInMemory() {
+
+        return maximumBytesInMemory;
+        
+    }
+
     public int getCacheSetSize() {
         
         return cacheSet.size();
@@ -374,13 +399,20 @@ public class StoreAndAddressLRUCache<V> implements IHardReferenceGlobalLRU<Long,
          */
         private final AtomicLong evictionCount = new AtomicLong();
         
+        /**
+         * The #of cache bytes that have been evicted.
+         */
+        private final AtomicLong evictionByteCount = new AtomicLong();
+        
         public void clear() {
             
             bytesOnDisk.set(0L);
             
             bytesInMemory.set(0L);
-            
+
             evictionCount.set(0L);
+
+            evictionByteCount.set(0L);
                 
         }
         
@@ -429,11 +461,20 @@ public class StoreAndAddressLRUCache<V> implements IHardReferenceGlobalLRU<Long,
                     });
 
             counters.addCounter(
-                    IGlobalLRU.IGlobalLRUCounters.BUFFERED_RECORD_COUNT,
+                    IGlobalLRU.IGlobalLRUCounters.BUFFERED_RECORD_EVICTION_COUNT,
                     new Instrument<Long>() {
                         @Override
                         protected void sample() {
                             setValue(evictionCount.get());
+                        }
+                    });
+
+            counters.addCounter(
+                    IGlobalLRU.IGlobalLRUCounters.BUFFERED_RECORD_EVICTION_BYTE_COUNT,
+                    new Instrument<Long>() {
+                        @Override
+                        protected void sample() {
+                            setValue(evictionByteCount.get());
                         }
                     });
 
@@ -593,10 +634,13 @@ public class StoreAndAddressLRUCache<V> implements IHardReferenceGlobalLRU<Long,
                     final Map.Entry<K, V> e = itr.next();
                     if (e.getKey().storeUUID.equals(this.storeUUID)) {
                         /*
-                         * Note: itr.remove() invokes map.remove(k) which
-                         * updates bytesOnDisk/bytesInMemory.
+                         * Note: itr.remove() invokes map.remove(k), but that
+                         * does not update bytesOnDisk/bytesInMemory.
                          */
                         itr.remove();
+                        // update bytesOnDisk/bytesInMemory
+                        counters.bytesOnDisk.addAndGet(-e.getKey().bytesOnDisk);
+                        counters.bytesInMemory.addAndGet(-e.getKey().bytesInMemory);
                     }
                 }
             }
@@ -609,7 +653,7 @@ public class StoreAndAddressLRUCache<V> implements IHardReferenceGlobalLRU<Long,
         public V putIfAbsent(final Long k, final V v) {
             synchronized (map) {
                 final K k1 = new K(storeUUID,k,bytesOnDisk(k),bytesInMemory(v));
-                final V old = map.get(k);
+                final V old = map.get(k1);
                 if (old != null)
                     return old;
                 // update bytesOnDisk/bytesInMemory
@@ -625,8 +669,8 @@ public class StoreAndAddressLRUCache<V> implements IHardReferenceGlobalLRU<Long,
                 final V v = map.remove(new K(storeUUID, k));
                 if(v != null) {
                     // update bytesOnDisk/bytesInMemory
-                    counters.bytesOnDisk.addAndGet(bytesOnDisk(k));
-                    counters.bytesInMemory.addAndGet(bytesInMemory(v));
+                    counters.bytesOnDisk.addAndGet(-bytesOnDisk(k));
+                    counters.bytesInMemory.addAndGet(-bytesInMemory(v));
                 }
                 return v;
             }
