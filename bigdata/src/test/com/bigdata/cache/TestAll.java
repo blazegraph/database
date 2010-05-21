@@ -89,8 +89,9 @@ public class TestAll extends TestCase {
          * cache.  It has pretty much been replaced by the BCHMGlobalLRU2, 
          * which gets tested below.
          */
-        suite.addTestSuite(TestBCHMGlobalLRU.class); // w/ LRU access policy
-        suite.addTestSuite(TestBCHMGlobalLRUWithLIRS.class); // w/ LIRS 
+        // @todo commented out trying to track down a problem w/ the CI builds.
+//        suite.addTestSuite(TestBCHMGlobalLRU.class); // w/ LRU access policy
+//        suite.addTestSuite(TestBCHMGlobalLRUWithLIRS.class); // w/ LIRS 
 
         /*
          * These are test suites for the same high concurrency cache with
