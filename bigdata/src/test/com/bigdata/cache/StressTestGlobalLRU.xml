@@ -40,7 +40,7 @@
   <property name="com.bigdata.LRUNexus.accessPolicy">LIRS</property>
  </condition>
  -->
- <!-- condition#3 -->
+ <!-- infinispan cache implementations : these cause problems in the CI builds 
  <condition>
   <property name="com.bigdata.LRUNexus.class">com.bigdata.cache.BCHMGlobalLRU</property>
   <property name="com.bigdata.LRUNexus.accessPolicy">LRU</property>
@@ -49,4 +49,5 @@
   <property name="com.bigdata.LRUNexus.class">com.bigdata.cache.BCHMGlobalLRU</property>
   <property name="com.bigdata.LRUNexus.accessPolicy">LIRS</property>
  </condition>
+-->
 </experiment>

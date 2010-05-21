@@ -884,16 +884,21 @@ public class StressTestGlobalLRU extends TestCase implements IComparisonTest {
             //
             // Based on the infinispan BCHM.
             //
+            /*
+             * Note: These cache conditions have been commented out since they
+             * cause problems with the CI builds, have somewhat aberrant
+             * behavior, and are being replaced by our own non-blocking cache.
+             */
             
-            conditions.add(getCondition(defaultProperties, new NV[] {//
-                    new NV(TestOptions.CLASS,BCHMGlobalLRU.class.getName()),//
-                    new NV(TestOptions.ACCESS_POLICY,AccessPolicyEnum.LRU.toString()),//
-                }));
-
-            conditions.add(getCondition(defaultProperties, new NV[] {//
-                    new NV(TestOptions.CLASS,BCHMGlobalLRU.class.getName()),//
-                    new NV(TestOptions.ACCESS_POLICY,AccessPolicyEnum.LIRS.toString()),//
-                }));
+//            conditions.add(getCondition(defaultProperties, new NV[] {//
+//                    new NV(TestOptions.CLASS,BCHMGlobalLRU.class.getName()),//
+//                    new NV(TestOptions.ACCESS_POLICY,AccessPolicyEnum.LRU.toString()),//
+//                }));
+//
+//            conditions.add(getCondition(defaultProperties, new NV[] {//
+//                    new NV(TestOptions.CLASS,BCHMGlobalLRU.class.getName()),//
+//                    new NV(TestOptions.ACCESS_POLICY,AccessPolicyEnum.LIRS.toString()),//
+//                }));
 
             final Experiment exp = new Experiment(className, defaultProperties,
                     conditions);

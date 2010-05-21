@@ -86,10 +86,13 @@ public class TestAll extends TestCase {
          * A high concurrency cache based on the infinispan project w/o support
          * for memory cap. This implementation has the disadvantage that we can
          * not directly manage the amount of memory which will be used by the
-         * cache.  It has pretty much been replaced by the BCHMGlobalLRU2, 
-         * which gets tested below.
+         * cache. It has pretty much been replaced by the BCHMGlobalLRU2, which
+         * gets tested below.
+         *
+         * @todo commented out since causing a problem w/ the CI builds (live
+         * lock).  I am not sure which of these two access policies is at fault.
+         * I suspect the LRU since it has more aberrant behavior.
          */
-        // @todo commented out trying to track down a problem w/ the CI builds.
 //        suite.addTestSuite(TestBCHMGlobalLRU.class); // w/ LRU access policy
 //        suite.addTestSuite(TestBCHMGlobalLRUWithLIRS.class); // w/ LIRS 
 
@@ -109,8 +112,9 @@ public class TestAll extends TestCase {
          * @todo I have commented this out since it is suspect of failing the
          * build. Probably one of the cache implementations is experiencing high
          * contention on the CI machine (which has more cores). 5/21/2010 BBT.
+         * See above.  This appears to be one of the infinispan-based caches.
          */
-//        suite.addTestSuite(StressTests.class);
+        suite.addTestSuite(StressTests.class);
 
         return suite;
     }
