@@ -31,6 +31,7 @@ import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.util.Iterator;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.BigdataStatics;
@@ -240,6 +241,36 @@ public class WeakReferenceGlobalLRU implements IGlobalLRU<Long,Object> {
 
         return counters.getCounterSet();
 
+    }
+
+
+    @Override
+    public long getBytesInMemory() {
+        return counters.bytesInMemory.get();
+    }
+
+    public long getBytesOnDisk() {
+        return counters.bytesOnDisk.get();
+    }
+
+    @Override
+    public int getCacheSetSize() {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    public long getEvictionCount() {
+        return counters.evictionCount.get();
+    }
+
+    @Override
+    public long getMaximumBytesInMemory() {
+        return maximumBytesInMemory;
+    }
+
+    @Override
+    public int getRecordCount() {
+        return counters.lruDistinctCount.get();
     }
 
     /**
@@ -585,7 +616,7 @@ public class WeakReferenceGlobalLRU implements IGlobalLRU<Long,Object> {
          * {@link #lruDistinctCount} is the #of distinct records retained by the
          * canonicalizing weak value cache for decompressed records.
          */
-        private final AtomicLong lruDistinctCount = new AtomicLong();
+        private final AtomicInteger lruDistinctCount = new AtomicInteger();
 
         public CounterSet getCounterSet() {
 
@@ -624,7 +655,7 @@ public class WeakReferenceGlobalLRU implements IGlobalLRU<Long,Object> {
 
             counters.addCounter(
                     IGlobalLRU.IGlobalLRUCounters.BUFFERED_RECORD_COUNT,
-                    new Instrument<Long>() {
+                    new Instrument<Integer>() {
                         @Override
                         protected void sample() {
                             setValue(lruDistinctCount.get());

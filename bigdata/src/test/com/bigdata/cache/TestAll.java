@@ -89,7 +89,8 @@ public class TestAll extends TestCase {
          * cache.  It has pretty much been replaced by the BCHMGlobalLRU2, 
          * which gets tested below.
          */
-        suite.addTestSuite(TestBCHMGlobalLRU.class);
+        suite.addTestSuite(TestBCHMGlobalLRU.class); // w/ LRU access policy
+        suite.addTestSuite(TestBCHMGlobalLRUWithLIRS.class); // w/ LIRS 
 
         /*
          * These are test suites for the same high concurrency cache with
@@ -97,7 +98,9 @@ public class TestAll extends TestCase {
          * buffers or striped locks, so we test it both ways.
          */
         suite.addTestSuite(TestBCHMGlobalLRU2WithThreadLocalBuffers.class);
+//        suite.addTestSuite(TestBCHMGlobalLRU2WithThreadLocalBuffersAndLIRS.class);
         suite.addTestSuite(TestBCHMGlobalLRU2WithStripedLocks.class);
+//        suite.addTestSuite(TestBCHMGlobalLRU2WithStripedLocksAndLIRS.class);
 
         /*
          * Run the stress tests.

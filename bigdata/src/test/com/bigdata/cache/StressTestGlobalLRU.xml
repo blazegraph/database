@@ -20,19 +20,31 @@
   <property name="com.bigdata.LRUNexus.threadLocalBufferCapacity">128</property>
   <property name="com.bigdata.LRUNexus.accessPolicy">LRU</property>
  </condition>
- <!-- condition#2 -->
  <condition>
   <property name="com.bigdata.LRUNexus.class">com.bigdata.cache.BCHMGlobalLRU2</property>
   <property name="com.bigdata.LRUNexus.threadLocalBuffers">true</property>
   <property name="com.bigdata.LRUNexus.threadLocalBufferCapacity">128</property>
   <property name="com.bigdata.LRUNexus.accessPolicy">LRU</property>
  </condition>
+ <!-- condition#2 
+ <condition>
+  <property name="com.bigdata.LRUNexus.class">com.bigdata.cache.BCHMGlobalLRU2</property>
+  <property name="com.bigdata.LRUNexus.threadLocalBuffers">false</property>
+  <property name="com.bigdata.LRUNexus.threadLocalBufferCapacity">128</property>
+  <property name="com.bigdata.LRUNexus.accessPolicy">LIRS</property>
+ </condition>
+ <condition>
+  <property name="com.bigdata.LRUNexus.class">com.bigdata.cache.BCHMGlobalLRU2</property>
+  <property name="com.bigdata.LRUNexus.threadLocalBuffers">true</property>
+  <property name="com.bigdata.LRUNexus.threadLocalBufferCapacity">128</property>
+  <property name="com.bigdata.LRUNexus.accessPolicy">LIRS</property>
+ </condition>
+ -->
  <!-- condition#3 -->
  <condition>
   <property name="com.bigdata.LRUNexus.class">com.bigdata.cache.BCHMGlobalLRU</property>
   <property name="com.bigdata.LRUNexus.accessPolicy">LRU</property>
  </condition>
- <!-- condition#4 -->
  <condition>
   <property name="com.bigdata.LRUNexus.class">com.bigdata.cache.BCHMGlobalLRU</property>
   <property name="com.bigdata.LRUNexus.accessPolicy">LIRS</property>
