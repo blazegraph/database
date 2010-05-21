@@ -20,11 +20,11 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Coder for statement index with inference enabled but without SIDS. We encode
- * the value in 4 bits per statement. The 1st bit is the override flag. The
- * remaining next two bits are the statement type {inferred, explicit, or
- * axiom}. The last bit is not used. The bit sequence <code>0111</code> is used
- * as a place holder for a <code>null</code> value and de-serializes to a
+ * Coder for values in statement index with inference enabled but without SIDS.
+ * We encode the value in 4 bits per statement. The 1st bit is the override
+ * flag. The remaining next two bits are the statement type {inferred, explicit,
+ * or axiom}. The last bit is not used. The bit sequence <code>0111</code> is
+ * used as a place holder for a <code>null</code> value and de-serializes to a
  * [null]. This is just the low nibble of the {@link StatementEnum#code()}. This
  * "nibble" encoding makes it fast and easy to extract the value from the coded
  * record. The first value is stored in the low nibble, the next in the high
@@ -42,8 +42,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo Fast coder for SIDs+type? E.g., SID[size] followed by nibble[size]?
  * 
  * @todo A mutable coded value raba could be implemented for the statement
  *       indices. With a fixed bit length per value, we can represent the data
