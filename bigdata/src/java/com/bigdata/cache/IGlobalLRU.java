@@ -234,6 +234,43 @@ public interface IGlobalLRU<K,V> {
     /** The counters for the global LRU. */
     public CounterSet getCounterSet();
 
+    /*
+     * Various performance counters.
+     */
+    
+    /**
+     * The #of records in memory across all cache instances.
+     */
+    public int getRecordCount();
+
+    /**
+     * The #of records which have been evicted from memory to date across all
+     * cache instances.
+     */
+    public long getEvictionCount();
+
+    /**
+     * The #of bytes in memory across all cache instances.
+     */
+    public long getBytesInMemory();
+
+    /**
+     * The #of bytes on the disk for the records in memory across all cache
+     * instances.
+     */
+    public long getBytesOnDisk();
+
+    /**
+     * The configured value for the maximum #of bytes in memory across all cache
+     * instances.
+     */
+    public long getMaximumBytesInMemory();
+
+    /**
+     * Return the #of cache instances.
+     */
+    public int getCacheSetSize();
+    
     /**
      * Interface defines some standard counters for the global LRU.
      * 
