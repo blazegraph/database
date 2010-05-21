@@ -58,6 +58,7 @@ import com.bigdata.btree.isolation.IConflictResolver;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.LongAggregator;
 import com.bigdata.btree.raba.codec.EmptyRabaValueCoder;
+import com.bigdata.btree.raba.codec.FixedLengthValueRabaCoder;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
@@ -711,18 +712,26 @@ public class SPORelation extends AbstractRelation<ISPO> {
             /*
              * Note: this value coder does not know about statement identifiers.
              * Therefore it is turned off if statement identifiers are enabled.
-             * 
-             * @todo Examine some options for value compression for the
-             * statement indices when statement identifiers are enabled. Of
-             * course, the CanonicalHuffmanRabaCoder can always be used.
              */
 
             leafValSer = new FastRDFValueCoder2();
 //            leafValSer = SimpleRabaCoder.INSTANCE;
 
         } else {
-            
+
+            /*
+             * The default is canonical huffman coding, which is relatively slow
+             * and does not achieve very good compression on term identifiers.
+             */
             leafValSer = DefaultTupleSerializer.getDefaultValuesCoder();
+
+            /*
+             * @todo This is much faster than huffman coding, but less space
+             * efficient. However, it appears that there are some cases where
+             * SIDs are enabled but only the flag bits are persisted. What
+             * gives?
+             */
+//            leafValSer = new FixedLengthValueRabaCoder(1 + 8);
             
         }
         
