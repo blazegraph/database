@@ -670,6 +670,10 @@ public class BigdataSail extends SailBase implements Sail {
                 BigdataSail.Options.TRUTH_MAINTENANCE,
                 BigdataSail.Options.DEFAULT_TRUTH_MAINTENANCE));
         
+        final boolean justify = Boolean.parseBoolean(properties.getProperty(
+                BigdataSail.Options.JUSTIFY,
+                BigdataSail.Options.DEFAULT_JUSTIFY));
+        
         final boolean noAxioms = properties.getProperty(
                 BigdataSail.Options.AXIOMS_CLASS,
                 BigdataSail.Options.DEFAULT_AXIOMS_CLASS).equals(
@@ -707,6 +711,15 @@ public class BigdataSail extends SailBase implements Sail {
                         "Cannot use transactions with a vocabulary class. " +
                         "Set option " + Options.VOCABULARY_CLASS + 
                         " = " + NoVocabulary.class.getName());
+                
+            }
+
+            if (justify) {
+                
+                throw new UnsupportedOperationException(
+                        "Cannot use transactions with justification chains. " +
+                        "Set option " + Options.JUSTIFY + 
+                        " = " + Boolean.FALSE);
                 
             }
 
