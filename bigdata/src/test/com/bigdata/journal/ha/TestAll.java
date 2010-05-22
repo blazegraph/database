@@ -67,6 +67,9 @@ public class TestAll extends TestCase {
         // Test of HASendService and HAReceiveService (3 nodes).
         suite.addTestSuite(TestHASendAndReceive3Nodes.class);
 
+        // Test of WriteCacheService, HASendService and HAReceiveService w/o jnl
+        suite.addTestSuite(TestHAWritePipelineSolo.class);
+
         // HA test suite for the WORM strategy.
         suite.addTest(TestHAWORMStrategy.suite());
 

@@ -869,7 +869,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             try {
                 this.writeCacheService = new WriteCacheService(
                         fileMetadata.writeCacheBufferCount, useChecksums,
-                        extent, opener, environment) {
+                        extent, opener, environment.getQuorumManager()) {
                     @Override
                     public WriteCache newWriteCache(final ByteBuffer buf,
                             final boolean useChecksum,
@@ -1958,9 +1958,19 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                      * force it to the disk when we change the file size (unless
                      * the file system updates other aspects of file metadata
                      * during normal writes).
+                     * 
+                     * @todo make sure the journal has already forced the
+                     * writes, that forcing an empty cache buffer is a NOP, and
+                     * that we want to just force the channel after we write the
+                     * root blocks since writes were already forced on each node
+                     * in the quorum before we wrote the root blocks and the
+                     * root blocks are transmitted using RMI not the write
+                     * pipeline.
                      */
                     
-                    force(forceOnCommit == ForceEnum.ForceMetadata);
+                    // sync the disk.
+                    getChannel().force(forceOnCommit == ForceEnum.ForceMetadata);
+//                    force(forceOnCommit == ForceEnum.ForceMetadata);
                     
                 }
 

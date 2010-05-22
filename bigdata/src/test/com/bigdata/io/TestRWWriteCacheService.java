@@ -29,7 +29,6 @@ package com.bigdata.io;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
@@ -37,42 +36,39 @@ import java.util.Random;
 
 import junit.framework.AssertionFailedError;
 
-import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.Environment;
-import com.bigdata.journal.ha.HADelegate;
 import com.bigdata.journal.ha.MockSingletonQuorumManager;
 import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rwstore.RWWriteCacheService;
 import com.bigdata.util.ChecksumUtility;
 
 /**
- * Test suite for the {@link WriteCacheService}.
+ * Test suite for the {@link WriteCacheService} using scattered writes on a
+ * backing file.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TestWriteCacheService.java 2866 2010-05-18 18:36:35Z
+ *          thompsonbry $
+ * 
+ *          FIXME The stress tests need to be parameterized for the #of write
+ *          cache buffers in order to test for deadlock or starvation related
+ *          problems when there is only a single buffer or only two buffers.
  */
-public class TestWriteCacheService extends TestCase3 {
+public class TestRWWriteCacheService extends TestCase3 {
 
     /**
      * 
      */
-    public TestWriteCacheService() {
+    public TestRWWriteCacheService() {
     }
 
     /**
      * @param name
      */
-    public TestWriteCacheService(String name) {
+    public TestRWWriteCacheService(String name) {
         super(name);
     }
-
-    public void test_simpleService() {
-        
-        // TODO: write test for WORM WriteCacheService
-        
-    }
     
-    public void test_simpleRWService() throws IOException {
+    public void test_simpleRWService() throws IOException, InterruptedException {
         
         File file = null;
         ReopenFileChannel opener = null;
@@ -88,13 +84,13 @@ public class TestWriteCacheService extends TestCase3 {
 //		            final IReopenChannel<? extends Channel> opener,
 //		            final QuorumManager quorumManager)
 
+			final QuorumManager qm = new MockSingletonQuorumManager();
+			
 			writeCache = new RWWriteCacheService(5, fileExtent, opener,
-                    newDefaultEnvironment());
+                    qm);
 
             writeCache.close();
 
-		} catch (Exception e) {
-			fail("Unexpected  Exception", e);
 		} finally {
             if (writeCache != null)
                 try {
@@ -121,9 +117,10 @@ public class TestWriteCacheService extends TestCase3 {
 
             final long fileExtent = opener.reopenChannel().size();
 
-            writeCache = new RWWriteCacheService(5, fileExtent, opener,
-            		newDefaultEnvironment());
-			
+            final QuorumManager qm = new MockSingletonQuorumManager();
+
+            writeCache = new RWWriteCacheService(5, fileExtent, opener, qm);
+
             final ByteBuffer data1 = getRandomData();
             final long addr1 = 2048;
             {
@@ -152,31 +149,32 @@ public class TestWriteCacheService extends TestCase3 {
 		}        
     }
     
-    private Environment newDefaultEnvironment() {
-        final QuorumManager qm = new MockSingletonQuorumManager();
-        return new Environment() {
+//    private Environment newDefaultEnvironment() {
+//        final QuorumManager qm = new MockSingletonQuorumManager();
+//        return new Environment() {
+//
+//			public AbstractJournal getJournal() {
+//				return null;
+//			}
+//
+//			public QuorumManager getQuorumManager() {
+//				return qm;
+//			}
+//
+//			public InetSocketAddress getWritePipelineAddr() {
+//				return null;
+//			}
+//
+//			public boolean isHighlyAvailable() {
+//				return false;
+//			}
+//
+//			public HADelegate getHADelegate() {
+//				return null;
+//			}};
+//		
+//    }
 
-			public AbstractJournal getJournal() {
-				return null;
-			}
-
-			public QuorumManager getQuorumManager() {
-				return qm;
-			}
-
-			public InetSocketAddress getWritePipelineAddr() {
-				return null;
-			}
-
-			public boolean isHighlyAvailable() {
-				return false;
-			}
-
-			public HADelegate getHADelegate() {
-				return null;
-			}};
-		
-    }
     private void randomizeArray(ArrayList<AllocView> allocs) {
         for (int i = 0; i < 5000; i++) {
         	int swap1 = r.nextInt(10000);
@@ -226,8 +224,9 @@ public class TestWriteCacheService extends TestCase3 {
 
             final long fileExtent = opener.reopenChannel().size();
 
-            writeCache = new RWWriteCacheService(5, fileExtent, opener,
-            		newDefaultEnvironment());
+            final QuorumManager qm = new MockSingletonQuorumManager();
+            
+            writeCache = new RWWriteCacheService(5, fileExtent, opener, qm);
 
             /*
              * First write 500 records into the cache and confirm they can all be read okay
@@ -373,104 +372,6 @@ public class TestWriteCacheService extends TestCase3 {
         return ByteBuffer.wrap(bytes);
 
     }
-
-//    /**
-//     * Helper method verifies that the contents of <i>actual</i> from
-//     * position() to limit() are consistent with the expected byte[]. A
-//     * read-only view of <i>actual</i> is used to avoid side effects on the
-//     * position, mark or limit properties of the buffer.
-//     * 
-//     * @param expected
-//     *            Non-null byte[].
-//     * @param actual
-//     *            Buffer.
-//     */
-//    public static void assertEquals(ByteBuffer expectedBuffer, ByteBuffer actual) {
-//
-//        if (expectedBuffer == null)
-//            throw new IllegalArgumentException();
-//
-//        if (actual == null)
-//            fail("actual is null");
-//
-//        if (expectedBuffer.hasArray() && expectedBuffer.arrayOffset() == 0
-//                && expectedBuffer.position() == 0
-//                && expectedBuffer.limit() == expectedBuffer.capacity()) {
-//
-//            // evaluate byte[] against actual.
-//            assertEquals(expectedBuffer.array(), actual);
-//
-//            return;
-//
-//        }
-//        
-//        /*
-//         * Copy the expected data into a byte[] using a read-only view on the
-//         * buffer so that we do not mess with its position, mark, or limit.
-//         */
-//        final byte[] expected;
-//        {
-//
-//            expectedBuffer = expectedBuffer.asReadOnlyBuffer();
-//
-//            final int len = expectedBuffer.remaining();
-//
-//            expected = new byte[len];
-//
-//            expectedBuffer.get(expected);
-//
-//        }
-//
-//        // evaluate byte[] against actual.
-//        assertEquals(expected, actual);
-//
-//    }
-//
-//    /**
-//     * Helper method verifies that the contents of <i>actual</i> from
-//     * position() to limit() are consistent with the expected byte[]. A
-//     * read-only view of <i>actual</i> is used to avoid side effects on the
-//     * position, mark or limit properties of the buffer.
-//     * 
-//     * @param expected
-//     *            Non-null byte[].
-//     * @param actual
-//     *            Buffer.
-//     */
-//    public static void assertEquals(final byte[] expected, ByteBuffer actual) {
-//
-//        if (expected == null)
-//            throw new IllegalArgumentException();
-//
-//        if (actual == null)
-//            fail("actual is null");
-//
-//        if (actual.hasArray() && actual.arrayOffset() == 0
-//                && actual.position() == 0
-//                && actual.limit() == actual.capacity()) {
-//
-//            assertEquals(expected, actual.array());
-//
-//            return;
-//
-//        }
-//
-//        /*
-//         * Create a read-only view on the buffer so that we do not mess with its
-//         * position, mark, or limit.
-//         */
-//        actual = actual.asReadOnlyBuffer();
-//
-//        final int len = actual.remaining();
-//
-//        final byte[] actual2 = new byte[len];
-//
-//        actual.get(actual2);
-//
-//        // compare byte[]s.
-//        assertEquals(expected, actual2);
-//
-//    }
 
     /**
      * Simple implementation for a {@link RandomAccessFile} with hook for

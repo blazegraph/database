@@ -29,6 +29,7 @@ package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
 import java.sql.Date;
+import java.text.DateFormat;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
@@ -575,6 +576,7 @@ public class RootBlockView implements IRootBlockView {
         assert buf.limit() == SIZEOF_ROOT_BLOCK;
 
         buf.position(0);
+        
     }
 
     public ByteBuffer asReadOnlyBuffer() {
@@ -877,36 +879,46 @@ public class RootBlockView implements IRootBlockView {
 
     public String toString() {
     
-        StringBuilder sb = new StringBuilder();
+        final DateFormat df = DateFormat.getDateTimeInstance(
+                DateFormat.FULL/* dateStyle */, DateFormat.FULL/* timeStyle */);
+        
+        final StringBuilder sb = new StringBuilder();
         
         sb.append("rootBlock");
         
-        sb.append("{ rootBlock="+(isRootBlock0()?0:1));
-        sb.append(", challisField="+getChallisField());
-        sb.append(", version="+getVersion());
-        sb.append(", nextOffset="+getNextOffset());
-        sb.append(", localTime="+getLocalTime()+"["+new Date(getLocalTime())+"]");
-        sb.append(", firstCommitTime="+getFirstCommitTime()+"["+new Date(getFirstCommitTime())+"]");
-        sb.append(", lastCommitTime="+getLastCommitTime()+"["+new Date(getLastCommitTime())+"]");
-        sb.append(", commitCounter="+getCommitCounter());
-        sb.append(", commitRecordAddr="+am.toString(getCommitRecordAddr()));
+        sb.append("{ rootBlock=" + (isRootBlock0() ? 0 : 1));
+        sb.append(", challisField=" + getChallisField());
+        sb.append(", version=" + getVersion());
+        sb.append(", nextOffset=" + getNextOffset());
+        sb.append(", localTime=" + toString(df, getLocalTime()));
+        sb.append(", firstCommitTime=" + toString(df, getFirstCommitTime()));
+        sb.append(", lastCommitTime=" + toString(df, getLastCommitTime()));
+        sb.append(", commitCounter=" + getCommitCounter());
+        sb.append(", commitRecordAddr=" + am.toString(getCommitRecordAddr()));
         sb.append(", commitRecordIndexAddr="+am.toString(getCommitRecordIndexAddr()));
-        sb.append(", quorumToken="+getQuorumToken());
+        sb.append(", quorumToken=" + getQuorumToken());
         sb.append(", metaBitsAddr=" + getMetaBitsAddr());
         sb.append(", metaStartAddr=" + getMetaStartAddr());
-        sb.append(", storeType="+getStoreType().getType());
-        sb.append(", uuid="+getUUID());
-        sb.append(", offsetBits="+getOffsetBits());
+        sb.append(", storeType=" + getStoreType());
+        sb.append(", uuid=" + getUUID());
+        sb.append(", offsetBits=" + getOffsetBits());
         sb.append(", checksum="+(checker==null?"N/A":""+calcChecksum(checker)));
-        sb.append(", createTime="+getCreateTime()+"["+new Date(getCreateTime())+"]");
-        sb.append(", closeTime="+getCloseTime()+(getCloseTime()!=0L?"["+new Date(getCloseTime())+"]":""));
-        
+        sb.append(", createTime=" + toString(df, getCreateTime()));
+        sb.append(", closeTime=" + toString(df, getCloseTime()));
+
         sb.append("}");
         
         return sb.toString();
         
     }
 
+    private static final String toString(final DateFormat df, final long t) {
+     
+        return Long.toString(t)
+                + (t != 0L ? " [" + df.format(new Date(t)) + "]" : "");
+        
+    }
+    
     public long getMetaBitsAddr() {
         if (getVersion() < VERSION1) {
             // Always WORM store before VERSION1

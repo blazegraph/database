@@ -47,7 +47,6 @@ import com.bigdata.journal.Environment;
 import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RWStrategy.FileMetadataView;
-import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -233,8 +232,9 @@ public class RWStore implements IStore {
 			/**
 			 * TODO: Configure number of WriteCache buffers for WriteCacheService
 			 */
-           m_writeCache = new RWWriteCacheService(6, m_raf.length(),
-                    new ReopenFileChannel(m_fd, m_raf, "rw"), m_environment);
+            m_writeCache = new RWWriteCacheService(6, m_raf.length(),
+                    new ReopenFileChannel(m_fd, m_raf, "rw"), m_environment
+                            .getQuorumManager());
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {

@@ -131,73 +131,69 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
      * and reopens the store and finally verifies the write was lost.
      */
     public void test_restartSafe_oneWriteNoCommit() {
-        
-        IAtomicStore store = (IAtomicStore)getStore();
-        
+
+        IAtomicStore store = (IAtomicStore) getStore();
+
         try {
-        assertTrue(store.isStable());
-        
-        Random r = new Random();
-        
-        final int len = 100;
-        
-        byte[] expected = new byte[len];
-        
-        r.nextBytes(expected);
-        
-        ByteBuffer tmp = ByteBuffer.wrap(expected);
-        
-        long addr1 = store.write(tmp);
+            assertTrue(store.isStable());
 
-        // verify that the position is advanced to the limit.
-        assertEquals(len,tmp.position());
-        assertEquals(tmp.position(),tmp.limit());
+            final Random r = new Random();
 
-        // read the data back.
-        ByteBuffer actual = store.read(addr1);
-        
-        assertEquals(expected,actual);
-        
-        /*
-         * verify the position and limit after the read.
-         */
-        assertEquals(0,actual.position());
-        assertEquals(expected.length,actual.limit());
+            final int len = 100;
 
-//        /*
-//         * Commit the changes - if you do not commit the changes then the root
-//         * blocks are not updated and your data is lost on restart.
-//         */
-//        store.commit();
-        
-        // re-open the store.
-        store = (IAtomicStore)reopenStore(store);
-        
-        assertTrue( store.isStable() );
-        
-        /*
-         * attempt read the data back. this should throw an exception since the
-         * nextOffset in the root block will still be zero and the store can
-         * therefore correctly reject this address as never written.
-         */
-        try {
-            actual = store.read(addr1);
-            fail("Expecting: "+IllegalArgumentException.class);
-        }catch(IllegalArgumentException ex) {
-            System.err.println("Ignoring expected exception: "+ex);
-        }
-        
-//        // verify that the data are all zeros since we did not commit the store.
-//        assertEquals(new byte[len],actual);
+            final byte[] expected = new byte[len];
+
+            r.nextBytes(expected);
+
+            final ByteBuffer tmp = ByteBuffer.wrap(expected);
+
+            final long addr1 = store.write(tmp);
+
+            // verify that the position is advanced to the limit.
+            assertEquals(len, tmp.position());
+            assertEquals(tmp.position(), tmp.limit());
+
+            // read the data back.
+            final ByteBuffer actual = store.read(addr1);
+
+            assertEquals(expected, actual);
+
+            /*
+             * verify the position and limit after the read.
+             */
+            assertEquals(0, actual.position());
+            assertEquals(expected.length, actual.limit());
+
+            /*
+             * DO NOT COMMIT.
+             */
+
+            // re-open the store.
+            store = (IAtomicStore) reopenStore(store);
+
+            assertTrue(store.isStable());
+
+            /*
+             * attempt read the data back. this should throw an exception since
+             * the nextOffset in the root block will still be zero and the store
+             * can therefore correctly reject this address as never written.
+             */
+            try {
+                store.read(addr1);
+                fail("Expecting: " + IllegalArgumentException.class);
+            } catch (IllegalArgumentException ex) {
+                if (log.isInfoEnabled())
+                    log.info("Ignoring expected exception: " + ex);
+            }
 
         } finally {
-            
-        store.destroy();
+
+            store.destroy();
 
         }
-        
+
     }
-    
+
     /**
      * Writes a record, verifies the write then commits the store. Closes and
      * reopens the store and finally verifies the write on the reopened store.

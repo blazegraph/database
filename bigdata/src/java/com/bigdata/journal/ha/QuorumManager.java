@@ -65,10 +65,13 @@ public interface QuorumManager {
      *         available <em>in principle</code>
      */
     boolean isHighlyAvailable();
-    
+
     /**
      * Return the current quorum (non-blocking). The quorum may or may not be
      * "met".
+     * 
+     * @todo If this can return <code>null</code> (e.g., when there is no
+     *       quorum) then we have a lot of code which needs to test for != null.
      */
     Quorum getQuorum();
     
@@ -107,11 +110,5 @@ public interface QuorumManager {
      * {@link QuorumManager}.
      */
     void terminate();
-
-//    /**
-//     * Notify the {@link QuorumManager} of the current root block.
-//     * @param rootBlock
-//     */
-//    void notify(IRootBlock rootBlock);
     
 }

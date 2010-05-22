@@ -34,6 +34,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 
@@ -85,8 +86,10 @@ public class HASendService {
 
     /**
      * A single threaded executor on which {@link SendTask}s will be executed.
+     * 
+     * @see #start()
      */
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final AtomicReference<ExecutorService> executorRef = new AtomicReference<ExecutorService>();
 
     /**
      * The {@link SocketChannel} for communicating with the downstream
@@ -96,13 +99,11 @@ public class HASendService {
      *       reviewed. It is currently set by {@link #open()}, but that does not
      *       ensure safe publication or protect against "double-open". It is
      *       closed by {@link #terminate()}, which also tears down the
-     *       {@link #executor} (which is created by the constructor). You can
+     *       {@link #executorRef} (which is created by the constructor). You can
      *       not close and reopen the connection to the client due to the
      *       asymmetry of these operations.
      */
 	private SocketChannel incSocketChannel;
-
-//	private Future<Void> lastIncSendTask;
 
     public String toString() {
 
@@ -137,64 +138,32 @@ public class HASendService {
         super.finalize();
         
     }
-    
+
     /**
      * Immediate shutdown. Any transfer in process will be interrupted.
      */
-    public void terminate() {
+    synchronized public void terminate() {
         if (log.isInfoEnabled())
             log.info(toString());
+        final ExecutorService tmp = executorRef.getAndSet(null);
+        if (tmp == null) {
+            // Not running.
+            return;
+        }
         try {
             if (incSocketChannel != null) {
                 try {
                     incSocketChannel.close();
-                } catch(IOException ex) {
+                } catch (IOException ex) {
                     log.error("Ignoring exception during close: " + ex, ex);
                 } finally {
                     incSocketChannel = null;
                 }
             }
         } finally {
-            executor.shutdownNow();
+            tmp.shutdownNow();
         }
     }
-
-//    /**
-//     * Send the bytes {@link ByteBuffer#remaining()} in the buffer to the
-//     * configured {@link InetSocketAddress}. This operation DOES NOT have a side
-//     * effect on the position, limit or mark for the buffer.
-//     * <p>
-//     * Note: In order to use efficient NIO operations this MUST be a direct
-//     * {@link ByteBuffer}.
-//     * 
-//     * @param buffer
-//     *            The buffer.
-//     * 
-//     * @return The {@link Future} which can be used to await the outcome of this
-//     *         operation.
-//     * 
-//     * @throws IllegalArgumentException
-//     *             if the buffer is <code>null</code>.
-//     * @throws IllegalArgumentException
-//     *             if the buffer is empty (no bytes remaining).
-//     * @throws RejectedExecutionException
-//     *             if this service has been shutdown.
-//     * 
-//     * @deprecated by {@link #incSend(ByteBuffer)} which avoids problems with
-//     *             occasional missed socket reopens.
-//     */
-//	public Future<Void> send(final ByteBuffer buffer) {
-//
-//        if (buffer == null)
-//            throw new IllegalArgumentException();
-//
-//        if (buffer.remaining() == 0)
-//            throw new IllegalArgumentException();
-//	 
-//        // Note: wrapped as a read-only buffer to prevent side-effects.
-//	    return executor.submit(newSendTask(buffer.asReadOnlyBuffer()));
-//	    
-//	}
 
     /**
      * Send the bytes {@link ByteBuffer#remaining()} in the buffer to the
@@ -226,55 +195,34 @@ public class HASendService {
             throw new IllegalArgumentException();
 	 
         // Note: wrapped as a read-only buffer to prevent side-effects.
-//	    lastIncSendTask =  
-	        return executor.submit(newIncSendTask(buffer.asReadOnlyBuffer()));
-	    
-//	    return lastIncSendTask;
+        final ExecutorService tmp = executorRef.get();
+        
+        if (tmp == null)
+            throw new IllegalStateException();
+
+        return tmp.submit(newIncSendTask(buffer.asReadOnlyBuffer()));
+
 	}
-	
-	/**
-	 * Open the connection to the socket specified in the constructor.
-	 */
-	public void open() throws IOException {
-    
+
+    /**
+     * Open the connection to the socket specified in the constructor and
+     * start the thread pool on which the payloads will be send.
+     */
+	synchronized public void start() throws IOException {
+
+	    // already running?
+        if (executorRef.get() != null)
+            throw new IllegalStateException();
+	    
 	    if (log.isInfoEnabled())
             log.info(toString());
 
+	    executorRef.set(Executors.newSingleThreadExecutor());
+	    
 	    if (incSocketChannel == null) 	    	
 	    	incSocketChannel = openChannel(addr);
+
 	}
-
-//	/**
-//	 * @deprecated Use do in {@link #terminate()}
-//	 */
-//	public void closeIncSend() throws IOException {
-//	    if (log.isInfoEnabled())
-//	        log.info("closeIncSend: " + this);
-//		
-//		try {
-////			if (lastIncSendTask != null)
-////				lastIncSendTask.get();
-//		} finally {
-////			lastIncSendTask = null;
-//			incSocketChannel.close();
-//			incSocketChannel = null;
-//		}
-//	}
-
-//    /**
-//     * Factory for the {@link SendTask}.
-//     * 
-//     * @param buffer
-//     *            The buffer whose data are to be sent.
-//     *            
-//     * @return The task which will send the data to the configured
-//     *         {@link InetSocketAddress}.
-//     */
-//    protected Callable<Void> newSendTask(final ByteBuffer buffer) {
-//
-//        return new SendTask(addr, buffer);
-//	    
-//    }
 
     /**
      * Factory for the {@link SendTask}.
@@ -327,66 +275,6 @@ public class HASendService {
         return socketChannel;
         
     }
-
-//    /**
-//     * This task implements the raw data transfer. Each instance of this task
-//     * sends the {@link ByteBuffer#remaining()} bytes in a single
-//     * {@link ByteBuffer} to the receiving service on a specified
-//     * {@link InetSocketAddress}.
-//     */
-//    protected static class SendTask implements Callable<Void> {
-//
-//        private final InetSocketAddress addr;
-//        private final ByteBuffer data;
-//
-//        public SendTask(final InetSocketAddress addr, final ByteBuffer data) {
-//
-//            if (addr == null)
-//                throw new IllegalArgumentException();
-//
-//            if (data == null)
-//                throw new IllegalArgumentException();
-//
-//            this.addr = addr;
-//            
-//            this.data = data;
-//
-//        }
-//
-//        public Void call() throws Exception {
-//
-//            // The #of bytes to transfer.
-//            final int remaining = data.remaining();
-//            
-//            // Open the blocking-mode socket channel.
-//            final SocketChannel socketChannel = openChannel(addr);
-//            try {
-//
-//                /*
-//                 * Write the data -- should block until finished or until this
-//                 * thread is interrupted, e.g., by shutting down the thread pool
-//                 * on which it is running.
-//                 */
-//                socketChannel.write(data);
-//
-//            } finally {
-//
-//                // always close the socket.
-//                socketChannel.close();
-//
-//            }
-//
-//            if(log.isTraceEnabled())
-//                log.trace("Sent "+remaining+" bytes to "+addr);
-//            
-//            // check all data written
-//            assert data.remaining() == 0 : "remaining=" + data.remaining();
-//
-//            return null;
-//            
-//        }
-//
-//    }
     
     /**
      * This task implements the raw data transfer. Each instance of this task

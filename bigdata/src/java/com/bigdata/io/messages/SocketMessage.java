@@ -317,7 +317,11 @@ public abstract class SocketMessage<T> implements Externalizable {
             ostr.getOutputStream().writeObject(this);
 
             if (wc != null) {
-	            wc.sendTo(ostr);
+                /*
+                 * Note: 5/22/2010 BBT This was commented out so sentTo() could
+                 * be removed from the WriteCache object.
+                 */
+//	            wc.sendTo(ostr); 
 	            ostr.getOutputStream().flush();
             }
         }
@@ -350,7 +354,11 @@ public abstract class SocketMessage<T> implements Externalizable {
 			wc = client.getWriteCache();
 
             log.info("Calling receiveAndForward");
-            wc.receiveAndForward(in, out);
+            /*
+             * Note: 5/22/2010 BBT This was commented out so sentTo() could
+             * be removed from the WriteCache object.
+             */
+//            wc.receiveAndForward(in, out);
 
             if (out != null) {
                 log.info("Waiting on downstream ack");

@@ -176,13 +176,16 @@ public class MockQuorumImpl implements Quorum {
                 throw new RuntimeException(e);
             }
 
-            try {
-                /*
-                 * Release the buffer back to the pool.
-                 */
-                DirectBufferPool.INSTANCE.release(receiveAndReplicateBuffer);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+            if (receiveAndReplicateBuffer != null) {
+                try {
+                    /*
+                     * Release the buffer back to the pool.
+                     */
+                    DirectBufferPool.INSTANCE
+                            .release(receiveAndReplicateBuffer);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
 
         }
@@ -674,7 +677,8 @@ public class MockQuorumImpl implements Quorum {
         final Future<Void> ft;
 
         if (!isLeader())
-            throw new UnsupportedOperationException("HA replicate called for non-master, index: " + index);
+            throw new UnsupportedOperationException(
+                    "HA replicate called for non-master, index: " + index);
 
         /*
          * This is the master, so send() the buffer.
@@ -849,9 +853,9 @@ public class MockQuorumImpl implements Quorum {
             throw new UnsupportedOperationException();
         
         try {
-			sendService.open();
+            // FIXME should start() when allocated, not when accessed!
+			sendService.start();
 		} catch (IOException e) {
-			e.printStackTrace();
 			throw new RuntimeException(e);
 		}
         

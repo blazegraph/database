@@ -76,27 +76,27 @@ import com.bigdata.util.concurrent.ShutdownHelper;
 public class Journal extends AbstractJournal implements IConcurrencyManager,
         /*ILocalTransactionManager,*/ IResourceManager {
 
-    /*
-     * These fields were historically marked as [final] and set by the
-     * constructor. With the introduction of high availability these fields can
-     * not be final because the CREATE of the journal must be deferred until a
-     * quorum leader has been elected.
-     * 
-     * The pattern for these fields is that they are assigned by create() and
-     * are thereafter immutable. The fields are marked as [volatile] so the
-     * state change when they are set will be visible without explicit
-     * synchronization (many methods use volatile reads on these fields).
-     */
+//    /*
+//     * These fields were historically marked as [final] and set by the
+//     * constructor. With the introduction of high availability these fields can
+//     * not be final because the CREATE of the journal must be deferred until a
+//     * quorum leader has been elected.
+//     * 
+//     * The pattern for these fields is that they are assigned by create() and
+//     * are thereafter immutable. The fields are marked as [volatile] so the
+//     * state change when they are set will be visible without explicit
+//     * synchronization (many methods use volatile reads on these fields).
+//     */
     
     /**
      * Object used to manage local transactions. 
      */
-    private volatile AbstractLocalTransactionManager localTransactionManager; 
+    private final AbstractLocalTransactionManager localTransactionManager; 
 
     /**
      * Object used to manage tasks executing against named indices.
      */
-    private volatile ConcurrencyManager concurrencyManager;
+    private final ConcurrencyManager concurrencyManager;
 
     /**
      * Options understood by the {@link Journal}.
@@ -178,18 +178,23 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         resourceLockManager = new ResourceLockService();
 
-    }
-
-    public void init() {
-        
-        super.init();
-        
         localTransactionManager = newLocalTransactionManager();
 
         concurrencyManager = new ConcurrencyManager(properties,
                 localTransactionManager, this);
-        
+
     }
+
+//    public void init() {
+//        
+//        super.init();
+//        
+//        localTransactionManager = newLocalTransactionManager();
+//
+//        concurrencyManager = new ConcurrencyManager(properties,
+//                localTransactionManager, this);
+//        
+//    }
     
     protected AbstractLocalTransactionManager newLocalTransactionManager() {
 
@@ -864,13 +869,20 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      */
     synchronized public void shutdownNow() {
 
-        if(!isOpen()) return;
+        if (!isOpen())
+            return;
 
-        executorService.shutdownNow();
-        
-        concurrencyManager.shutdownNow();
-        
-        localTransactionManager.shutdownNow();
+        // Note: can be null if error in ctor.
+        if (executorService != null)
+            executorService.shutdownNow();
+
+        // Note: can be null if error in ctor.
+        if (concurrencyManager != null)
+            concurrencyManager.shutdownNow();
+
+        // Note: can be null if error in ctor.
+        if (localTransactionManager != null)
+            localTransactionManager.shutdownNow();
 
         super.shutdownNow();
         
@@ -880,8 +892,10 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
         super.deleteResources();
         
-        tempStoreFactory.closeAll();
-        
+        // Note: can be null if error in ctor.
+        if (tempStoreFactory != null)
+            tempStoreFactory.closeAll();
+
     }
 
     public <T> Future<T> submit(AbstractTask<T> task) {
@@ -1161,7 +1175,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         return resourceLockManager;
         
     }
-    private ResourceLockService resourceLockManager;
+    private final ResourceLockService resourceLockManager;
 
     public ExecutorService getExecutorService() {
         

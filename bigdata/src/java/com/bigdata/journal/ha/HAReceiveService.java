@@ -471,7 +471,7 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
                 
                 // Prepare downstream (if any) for incremental transfers
                 if (downstream != null) {
-                    downstream.open();
+                    downstream.start();
                 }
 
             } catch (IOException ex) {

@@ -40,6 +40,19 @@ public class MockSingletonQuorumManager implements QuorumManager {
 
     final int k = 1;
     final long token = 0L;
+    final Quorum quorum;
+    
+    protected Quorum newQuorum() {
+        
+        return new MockSingletonQuorum();
+        
+    }
+    
+    public MockSingletonQuorumManager() {
+        
+        quorum = newQuorum();
+        
+    }
 
     public void assertQuorum(final long token) {
 
@@ -78,7 +91,7 @@ public class MockSingletonQuorumManager implements QuorumManager {
         // NOP
     }
     
-    final Quorum quorum = new Quorum() {
+    protected class MockSingletonQuorum implements Quorum {
 
         public boolean isLeader() {
             return true;
@@ -96,15 +109,15 @@ public class MockSingletonQuorumManager implements QuorumManager {
         public int getIndex() {
             return 0;
         }
-        
+
         public void abort2Phase() throws IOException {
             // TODO Auto-generated method stub
-            
+
         }
 
         public void commit2Phase(long commitTime) throws IOException {
             // TODO Auto-generated method stub
-            
+
         }
 
         public HAGlue getHAGlue(int index) {
@@ -117,13 +130,14 @@ public class MockSingletonQuorumManager implements QuorumManager {
         public void invalidate() {
             // TODO Auto-generated method stub
         }
-        
+
         public ExecutorService getExecutorService() {
             throw new UnsupportedOperationException();
         }
-        
-        public int prepare2Phase(IRootBlockView rootBlock, long timeout, TimeUnit unit)
-                throws InterruptedException, TimeoutException, IOException {
+
+        public int prepare2Phase(IRootBlockView rootBlock, long timeout,
+                TimeUnit unit) throws InterruptedException, TimeoutException,
+                IOException {
             // TODO Auto-generated method stub
             return 0;
         }
@@ -174,7 +188,7 @@ public class MockSingletonQuorumManager implements QuorumManager {
                 throws IOException {
             throw new UnsupportedOperationException();
         }
-        
+
         /**
          * Not supported for a standalone journal.
          * 
@@ -186,6 +200,6 @@ public class MockSingletonQuorumManager implements QuorumManager {
             throw new UnsupportedOperationException();
         }
 
-    };
+    }
 
 }
