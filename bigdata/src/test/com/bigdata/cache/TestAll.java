@@ -114,7 +114,7 @@ public class TestAll extends TestCase {
          * contention on the CI machine (which has more cores). 5/21/2010 BBT.
          * See above.  This appears to be one of the infinispan-based caches.
          */
-        suite.addTestSuite(StressTests.class);
+//        suite.addTestSuite(StressTests.class);
 
         return suite;
     }
