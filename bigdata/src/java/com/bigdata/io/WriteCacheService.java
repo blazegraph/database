@@ -57,12 +57,11 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.WriteCache.WriteCacheCounters;
 import com.bigdata.journal.AbstractBufferStrategy;
-import com.bigdata.journal.Environment;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.WORMStrategy;
 import com.bigdata.journal.ha.Quorum;
-import com.bigdata.journal.ha.QuorumException;
 import com.bigdata.journal.ha.QuorumManager;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.util.ChecksumError;
@@ -140,8 +139,13 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @version $Id$
  * 
  * @todo There needs to be a unit test which verifies overwrite of a record in
- *       the {@link WriteCache}. It is possible for this to occur with the
- *       {@link RWStore} (highly unlikely, but possible).
+ *       the {@link WriteCache} (a write at the same offset in the backing file,
+ *       but at a different position in the {@link WriteCache} buffer). It is
+ *       possible for this to occur with the {@link RWStore} if a record is
+ *       written, deleted, and the immediately reallocated. Whether or not this
+ *       is a likely event depends on how aggressively the {@link RWStore}
+ *       reallocates addresses which were allocated and then deleted within the
+ *       same native transaction.
  * 
  * @todo When compression is enabled, it is applied above the level of the
  *       {@link WriteCache} and {@link WriteCacheService} (which after all
@@ -174,78 +178,10 @@ abstract public class WriteCacheService implements IWriteCache {
 	/**
 	 * The {@link Future} of the task running on the {@link #localWriteService}.
 	 * 
-	 * @see MasterWriteTask
+	 * @see WriteTask
 	 * @see #reset()
 	 */
 	private Future<Void> localWriteFuture;
-
-//	/**
-//	 * The IHAClient is created as required but then retained by newHAClient()
-//	 */
-//	private IHAClient haClient;
-//
-//	/**
-//	 * The {@link HAServer} is responsible for listening for messages from the
-//	 * upstream service in the write failover chain. This value will be
-//	 * <code>null</code> for the master since it is the first service in the
-//	 * chain.
-//	 */
-//	final AtomicReference<HAServer> haServer = new AtomicReference<HAServer>();
-//
-//	/**
-//	 * The {@link HAConnect} is the local process used to talk to the downstream
-//	 * {@link HAServer} instance.
-//	 */
-//	final AtomicReference<HAConnect> haConnect = new AtomicReference<HAConnect>();
-//
-//	/**
-//	 * TODO: Should this await a quorum before attempting to connect to the
-//	 * downstream?
-//	 * 
-//	 * TODO: Should this be moved to inside of the {@link WriteTask}? That way
-//	 * we can scope the {@link HAConnect} to the {@link WriteTask}, which seems
-//	 * correct.
-//	 * 
-//	 * @param quorumManager
-//	 * @return
-//	 * @throws IOException
-//	 */
-//	private HAConnect establishHAConnect(final QuorumManager quorumManager) throws IOException {
-//
-//		HAConnect c = haConnect.get();
-//		if (c == null) {
-//			final Quorum quorum = quorumManager.getQuorum();
-//			final HAGlue glue = quorum.getHAGlue(quorum.getIndex() + 1);
-//			final InetSocketAddress addr = glue.getWritePipelineAddr();
-//			c = new HAConnect(addr);
-//			haConnect.set(c);
-//			c.start();
-//
-//			try {
-//				Thread.sleep(1000);
-//			} catch (InterruptedException e) {
-//				// just a delay to make sure al is ready for testing
-//			}
-//		} else {
-//			if (!c.isAlive()) {
-//				/*
-//				 * Note: Throw out an exception. This is called from within
-//				 * WriteTask.call(). If the HAConnect is dead then we need to
-//				 * reestablish the write pipeline, so we need to abort the
-//				 * current WriteTask.call(), do a high-level abort, and then
-//				 * setup the WriteTask again.
-//				 */
-//				throw new RuntimeException("HAConnect is dead.");
-//			}
-//		}
-//		return c;
-//	}
-//
-//	/**
-//	 * A single threaded service which writes dirty {@link WriteCache}s onto the
-//	 * downstream service in the quorum.
-//	 */
-//	final private ExecutorService remoteWriteService;
 
 	/**
 	 * The {@link Future} of the task running on the {@link #remoteWriteService}
@@ -254,7 +190,7 @@ abstract public class WriteCacheService implements IWriteCache {
 	 * Note: Since this is <em>volatile</em> you MUST guard against concurrent
 	 * clear to <code>null</code> by {@link #reset()}.
 	 * 
-	 * @see MasterWriteTask
+	 * @see WriteTask
 	 * @see #reset()
 	 */
 	private volatile Future<?> remoteWriteFuture = null;
@@ -326,27 +262,25 @@ abstract public class WriteCacheService implements IWriteCache {
 	 */
 	final private AtomicReference<WriteCache> current = new AtomicReference<WriteCache>();
 
-	/**
-	 * Flag set if {@link MasterWriteTask} encounters an error. The cause is set
-	 * on {@link #firstCause} as well.
-	 * 
-	 * FIXME Error handling for this must cause the write cache service buffers
-	 * to be {@link #reset()} and make sure the HA write pipeline is correctly
-	 * configured.
-	 * <p>
-	 * A high-level abort() is necessary. It is NOT Ok to simply re-try writes
-	 * of partly filled buffers since they may already have been partly written
-	 * to the disk. A high-level abort() is necessary to ensure that we discard
-	 * any bad writes. abort() will have to reconfigure the WriteCacheService,
-	 * perhaps using a new instance. The abort() will need to propagate to all
-	 * members of the {@link Quorum} so they are all reset to the last commit
-	 * point and have reconfigured write cache services and write pipelines.
-	 */
+    /**
+     * Flag set if {@link WriteTask} encounters an error. The cause is set
+     * on {@link #firstCause} as well.
+     * <p>
+     * Note: Error handling MUST cause the write cache service buffers to be
+     * {@link #reset()} and make sure the HA write pipeline is correctly
+     * configured. This is handled by a high-level abort() on the journal. It is
+     * NOT Ok to simply re-try writes of partly filled buffers since they may
+     * already have been partly written to the disk. A high-level abort() is
+     * necessary to ensure that we discard any bad writes. The abort() will need
+     * to propagate to all members of the {@link Quorum} so they are all reset
+     * to the last commit point and have reconfigured write cache services and
+     * write pipelines.
+     */
 	private volatile boolean halt = false;
 
 	/**
 	 * The first cause of an error within the asynchronous
-	 * {@link MasterWriteTask}.
+	 * {@link WriteTask}.
 	 */
 	private final AtomicReference<Throwable> firstCause = new AtomicReference<Throwable>();
 
@@ -356,10 +290,10 @@ abstract public class WriteCacheService implements IWriteCache {
 	 */
 	final private int capacity;
 
-	/**
-	 * Object knows how to (re-)open the backing channel.
-	 */
-	final private IReopenChannel<? extends Channel> opener;
+//	/**
+//	 * Object knows how to (re-)open the backing channel.
+//	 */
+//	final private IReopenChannel<? extends Channel> opener;
 
 	/**
 	 * A map from the offset of the record on the backing file to the cache
@@ -380,34 +314,61 @@ abstract public class WriteCacheService implements IWriteCache {
 	 */
 	final private AtomicLong fileExtent = new AtomicLong(-1L);
 
-	/**
-	 * The environment in which this object participates
-	 */
-	protected final Environment environment;
+//	/**
+//	 * The environment in which this object participates
+//	 */
+//	protected final Environment environment;
 
-	/**
-	 * The environment in which this object participates
-	 */
+    /**
+     * The object which manages {@link Quorum} state changes on the behalf of
+     * this service.
+     */
 	final private QuorumManager quorumManager;
 
-	/**
-	 * Allocates N buffers from the {@link DirectBufferPool}.
-	 * 
-	 * @param nbuffers
-	 *            The #of buffers to allocate.
-	 * @param useChecksum
-	 *            <code>true</code> iff record level checksums are enabled.
-	 * @param fileExtent
-	 *            The current extent of the backing file.
-	 * @param opener
-	 *            The object which knows how to (re-)open the channel to which
-	 *            cached writes are flushed.
-	 * 
-	 * @throws InterruptedException
-	 */
-	public WriteCacheService(final int nbuffers, final boolean useChecksum, final long fileExtent,
-			final IReopenChannel<? extends Channel> opener, final Environment environment)
-			throws InterruptedException {
+    /**
+     * The {@link Quorum} token under which this {@link WriteCacheService}
+     * instance is valid.
+     * 
+     * @todo As long as a service is the leader, it could use the same
+     *       {@link WriteCacheService} instance. For example, adding a new
+     *       service to the pipeline in principle need not invalidate the
+     *       {@link WriteCacheService}. However, if the leader changes then much
+     *       more has to change in concert to setup the new {@link Quorum}.
+     */
+	final private long quorumToken;
+	
+    /**
+     * The object which manages {@link Quorum} state changes on the behalf of
+     * this service.
+     */
+	protected QuorumManager getQuorumManager() {
+	 
+	    return quorumManager;
+	    
+	}
+	
+    /**
+     * Allocates N buffers from the {@link DirectBufferPool}.
+     * 
+     * @param nbuffers
+     *            The #of buffers to allocate.
+     * @param useChecksum
+     *            <code>true</code> iff record level checksums are enabled.
+     * @param fileExtent
+     *            The current extent of the backing file.
+     * @param opener
+     *            The object which knows how to (re-)open the channel to which
+     *            cached writes are flushed.
+     * @param quorumManager
+     *            The object which manages {@link Quorum} state changes on the
+     *            behalf of this service.
+     * 
+     * @throws InterruptedException
+     */
+    public WriteCacheService(final int nbuffers, final boolean useChecksum,
+            final long fileExtent,
+            final IReopenChannel<? extends Channel> opener,
+            final QuorumManager quorumManager) throws InterruptedException {
 
 		if (nbuffers <= 0)
 			throw new IllegalArgumentException();
@@ -415,22 +376,29 @@ abstract public class WriteCacheService implements IWriteCache {
 		if (fileExtent < 0L)
 			throw new IllegalArgumentException();
 
-		if (opener == null)
-			throw new IllegalArgumentException();
+        if (opener == null)
+            throw new IllegalArgumentException();
+
+        if (quorumManager == null)
+            throw new IllegalArgumentException();
 
 		this.useChecksum = useChecksum;
 
-		this.opener = opener;
+//		this.opener = opener;
 
-		this.environment = environment;
+		this.quorumManager = quorumManager;
+
+		// the token under which the write cache service was established.
+		this.quorumToken = quorumManager.getQuorum().token();
 		
-		this.quorumManager = environment.getQuorumManager();
-
 		dirtyList = new LinkedBlockingQueue<WriteCache>();
 
 		cleanList = new LinkedBlockingQueue<WriteCache>();
 
 		buffers = new WriteCache[nbuffers];
+
+        // save the current file extent.
+        this.fileExtent.set(fileExtent);
 
 		// N-1 WriteCache instances.
         for (int i = 0; i < nbuffers - 1; i++) {
@@ -449,71 +417,28 @@ abstract public class WriteCacheService implements IWriteCache {
                 useChecksum, false/* bufferHasData */, opener));
 
         // Set the same counters object on each of the write cache instances.
-		final WriteCacheServiceCounters counters = new WriteCacheServiceCounters();
-		for (int i = 0; i < buffers.length; i++) {
-			buffers[i].setCounters(counters);
-		}
-		counters.nbuffers = nbuffers;
-		this.counters = new AtomicReference<WriteCacheServiceCounters>(counters);
+        final WriteCacheServiceCounters counters = new WriteCacheServiceCounters(
+                nbuffers);
 
-		// assume capacity is the same for each buffer instance.
-		capacity = current.get().capacity();
+        for (int i = 0; i < buffers.length; i++) {
+        
+            buffers[i].setCounters(counters);
+            
+        }
+        
+        this.counters = new AtomicReference<WriteCacheServiceCounters>(counters);
 
-		// set initial capacity based on an assumption of 1k buffers.
-		recordMap = new ConcurrentHashMap<Long, WriteCache>(nbuffers * (capacity / 1024));
+        // assume capacity is the same for each buffer instance.
+        capacity = current.get().capacity();
 
-		// start service to write on the backing channel.
-		localWriteService = Executors.newSingleThreadExecutor(new DaemonThreadFactory(getClass().getName()));
+        // set initial capacity based on an assumption of 1k buffers.
+        recordMap = new ConcurrentHashMap<Long, WriteCache>(nbuffers
+                * (capacity / 1024));
 
-//		if (quorumManager.isHighlyAvailable()) {
-//			final Quorum q = quorumManager.getQuorum();
-//			if (q.getIndex() + 1 < q.size()) {
-//				// service used to write on the downstream node in the quorum.
-//				remoteWriteService = Executors.newSingleThreadExecutor(new DaemonThreadFactory(getClass().getName()));
-//			} else {
-//				remoteWriteService = null;
-//			}
-//		} else {
-//			remoteWriteService = null;
-//		}
-
-		// save the current file extent.
-		this.fileExtent.set(fileExtent);
-
-//		/*
-//		 * @todo This needs to be redone a quorum change events, but not on
-//		 * abort() so not in reset(). That means it probably needs to be
-//		 * notified of the quorum change itself.
-//		 * 
-//		 * Should the write cache service remain available if the pipeline goes
-//		 * down so we can execute local operations for resynchronization
-//		 * purposes?
-//		 */
-//		if (quorumManager.isHighlyAvailable()) {
-//
-//			final int k = quorumManager.replicationFactor();
-//
-//			final Quorum quorum = quorumManager.getQuorum();
-//
-//			if (!quorum.isMaster()) {
-//
-//				// The index of this node in the ordered list of services in the
-//				// quorum.
-//				final int index = quorum.getIndex();
-//
-//				// if (index + 1 < k) { // this would rule out the final node!
-//
-//				final HAGlue haGlueService = quorum.getHAGlue(index);
-//
-//				// Our local service listening for upstream messages - needed
-//				// for all non-master nodes
-////				final HAServer s = quorumManager.establishHAServer(newHAClient(quorumManager.getLocalBufferStrategy()));
-////
-////				haServer.set(s);
-//
-//			}
-//
-//		}
+        // start service to write on the backing channel.
+        localWriteService = Executors
+                .newSingleThreadExecutor(new DaemonThreadFactory(getClass()
+                        .getName()));
 
 		// run the write task
 		localWriteFuture = localWriteService.submit(newWriteTask());
@@ -522,110 +447,9 @@ abstract public class WriteCacheService implements IWriteCache {
 
 	protected Callable<Void> newWriteTask() {
 
-		// if(quorumManager.getQuorum().isMaster()) {
-
-		return new MasterWriteTask();
-
-		// } else {
-		//            
-		// return new ReceiverWriteTask();
-		//            
-		// }
+		return new WriteTask();
 
 	}
-
-//	/**
-//	 * Return the local object which reads from the upstream service, writes on
-//	 * the downstream service, and operations against the local persistence
-//	 * store.
-//	 * <p>
-//	 * The write replication pipeline bundles two messages together:
-//	 * <ol>
-//	 * <li>Changes in the file extent.</li>
-//	 * <li>Dirty {@link WriteCache} buffers.</li>
-//	 * </ol>
-//	 * When a dirty {@link WriteCache} buffer is received, the {@link IHAClient}
-//	 * must first ensure that the current file extent is the extent specified in
-//	 * the message. If the extents differ, then it must adjust it using
-//	 * {@link IBufferStrategy#truncate(long)}.
-//	 * <p>
-//	 * Once the file extents are in agreement, the received {@link WriteCache}
-//	 * is simply placed onto the dirtyList. It will be taken and eventually
-//	 * drained onto the local persistence store.
-//	 * 
-//	 * FIXME There are three problems with the behavior of this interface as
-//	 * outlined above.
-//	 * <p>
-//	 * First, {@link IBufferStrategy#truncate(long)} would recursively invoke
-//	 * {@link #setExtent(long)} on this {@link WriteCacheService}, which is
-//	 * probably NOT desired.
-//	 * <p>
-//	 * Second, the change in the file extent can not be applied until the
-//	 * {@link MasterWriteTask} takes the {@link WriteCache} off of the dirtyList
-//	 * and begins to process it.
-//	 * <p>
-//	 * Third, in order to acknowledge the receipt of the message from the
-//	 * upstream service, we need a means to be notified when the
-//	 * {@link WriteCache} has been successfully written onto both the local
-//	 * persistence store and the downstream service (if any). Maybe we could do
-//	 * this with a message counter. The counter would be new for each quorum and
-//	 * would be incremented for each message set. Each time the
-//	 * {@link WriteCache} associated with a message counter (or messageId) was
-//	 * fully handled (on the local store and the downstream store), this class
-//	 * could then ACK that message to the upstream service. Message correlation
-//	 * would have to stitch that all back together.
-//	 * 
-//	 * @return
-//	 */
-//	protected IHAClient newHAClient(final IBufferStrategy bufferStrategy) {
-//		if (haClient == null) {
-//			haClient = new IHAClient() {
-//
-//				ObjectSocketChannelStream input = null;
-//
-//				// @Override
-//				public ObjectSocketChannelStream getInputSocket() {
-//					return input;
-//				}
-//
-//				public void truncate(long extent) {
-//					// TODO Auto-generated method stub
-//
-//				}
-//
-//				public void setInputSocket(ObjectSocketChannelStream in) {
-//					input = in;
-//				}
-//
-//				public WriteCache getWriteCache() {
-//					return current.get();
-//				}
-//
-//				public HAConnect getNextConnect() {
-//					if (remoteWriteService != null) {
-//						// establish connection or return existing connection.
-//						try {
-//							return establishHAConnect(quorumManager);
-//						} catch (IOException e) {
-//							throw new RuntimeException(e);
-//						}
-//					} else {
-//						return null;
-//					}
-//				}
-//
-//				// @Override
-//				public void setNextOffset(long lastOffset) {
-//					if (bufferStrategy != null)
-//						bufferStrategy.setNextOffset(lastOffset);
-//				}
-//
-//			};
-//		}
-//
-//		return haClient;
-//
-//	}
 
 	/**
 	 * The task responsible for writing dirty buffers onto the backing channel
@@ -635,7 +459,7 @@ abstract public class WriteCacheService implements IWriteCache {
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 	 *         Thompson</a>
 	 */
-	private class MasterWriteTask implements Callable<Void> {
+	private class WriteTask implements Callable<Void> {
 
 		/**
 		 * Note: If there is an error in this thread then it needs to be
@@ -646,10 +470,6 @@ abstract public class WriteCacheService implements IWriteCache {
 		 * of the write cache service (e.g., by reset()) must hold the writeLock
 		 * so as to occur when there are no outstanding reads executing against
 		 * the write cache service.
-		 * 
-		 * @todo The quorum token should be passed into the
-		 *       {@link WriteCacheService} so we can assert that the quorum is
-		 *       still valid.
 		 * 
 		 * @todo If resynchronization rolls back the lastCommitTime for a store,
 		 *       then we need to interrupt or otherwise invalidate any readers
@@ -697,17 +517,20 @@ abstract public class WriteCacheService implements IWriteCache {
                         /*
                          * Only process non-empty cache buffers.
                          */
+
+                        // Verify quorum still valid and we are the leader.
+                        final Quorum q = quorumManager.getQuorum();
+                        quorumManager.assertQuorumLeader(quorumToken);
                         
-                        if (quorumManager.isHighlyAvailable()) {
+                        if (q.size() > 1) {
                             /*
-                             * Request replication of the write cache along the
-                             * write pipeline. - But only if master!
+                             * Replicate from the leader to the first follower.
+                             * Each non-final follower will receiveAndReplicate
+                             * the write cache buffer.  The last follower will
+                             * receive the buffer.
                              */
-                            final Quorum q = quorumManager.getQuorum();
-                            if (!q.isLeader())
-                                throw new QuorumException("Not master");
                             remoteWriteFuture = q.replicate(cache
-                                    .newHAWriteMessage(q.token()), cache
+                                    .newHAWriteMessage(quorumToken), cache
                                     .peek());
                         }
 
@@ -742,11 +565,12 @@ abstract public class WriteCacheService implements IWriteCache {
 					}
 
 				} catch (InterruptedException t) {
-					/*
-					 * This task can only be interrupted by a thread with its
-					 * Future, so this interrupt is a clear signal that the
-					 * write cache service is closing down.
-					 */
+                    /*
+                     * This task can only be interrupted by a thread with its
+                     * Future (or by shutting down the thread pool on which it
+                     * is running), so this interrupt is a clear signal that the
+                     * write cache service is closing down.
+                     */
 					return null;
 				} catch (Throwable t) {
 					/*
@@ -794,47 +618,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
 		} // call()
 
-	} // class MasterWriteTask
-
-	// /**
-	// * The task responsible for receiving messages from the upstream service,
-	// * writing onto the local backing file, and passing on the messages to the
-	// * downstream {@link Quorum} member. If this is the last node in the write
-	// * pipeline, then it will acknowledge the messages once it has made the
-	// * changes in its local backing file.
-	// *
-	// * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-	// * Thompson</a>
-	// */
-	// private class ReceiverWriteTask implements Callable<Void> {
-	//
-	// /**
-	// * Note: If there is an error in this thread then it needs to be
-	// * propagated to the remote service sending messages to this service,
-	// * e.g., by closing the {@link SocketChannel} used to communicate with
-	// * the upstream service, and then exit. Once the existence of a problem
-	// * has propagated back to the master for the quorum, it will cause the
-	// * {@link MasterWriteTask} to terminate and the master will do an
-	// * abort(). We do not need to bother the readers since the read()
-	// * methods all allow for concurrent close().
-	// *
-	// * @todo In order to recover from that abort(), the master must know
-	// * that there is a problem with the write pipeline and perhaps we
-	// * will need to renegotiate the quorum and resynchronize some
-	// * node(s) in that quorum.
-	// *
-	// * @todo The quorum token should be passed into the
-	// * {@link WriteCacheService} so we can assert that the quorum is
-	// * still valid.
-	// */
-	// public Void call() throws Exception {
-	//
-	// // Integrate the receiver here.
-	// throw new UnsupportedOperationException();
-	//            
-	// } // call()
-	//
-	// } // class ReceiverWriteTask
+	} // class WriteTask
 
     /**
      * Factory for {@link WriteCache} implementations.
@@ -894,16 +678,6 @@ abstract public class WriteCacheService implements IWriteCache {
 					log.warn(t, t);
 				}
 			}
-//			/*
-//			 * If there is an HAConnect running, then interrupt it so it will
-//			 * terminate.
-//			 */
-//			{
-//				final HAConnect cxn = haConnect.getAndSet(null/* clear */);
-//				if (cxn != null) {
-//					cxn.interrupt();
-//				}
-//			}
 
 			// drain the dirty list.
 			dirtyListLock.lockInterruptibly();
@@ -951,6 +725,14 @@ abstract public class WriteCacheService implements IWriteCache {
 
 			// set the current buffer.
 			current.set(buffers[buffers.length - 1]);
+
+			// reset the counters.
+            {
+                final WriteCacheServiceCounters c = counters.get();
+                c.ndirty = 0;
+                c.nclean = buffers.length;
+                c.nreset++;
+            }
 
 			/*
 			 * Restart the WriteTask
@@ -1092,10 +874,10 @@ abstract public class WriteCacheService implements IWriteCache {
 
 	/**
 	 * This method is called ONLY by write threads and verifies that the service
-	 * is {@link #open}, that the {@link MasterWriteTask} has not been
-	 * {@link #halt halted}, and that the {@link MasterWriteTask} is still
+	 * is {@link #open}, that the {@link WriteTask} has not been
+	 * {@link #halt halted}, and that the {@link WriteTask} is still
 	 * executing (in case any uncaught errors are thrown out of
-	 * {@link MasterWriteTask#call()}.
+	 * {@link WriteTask#call()}.
 	 * <p>
 	 * Note: {@link #read(long)} DOES NOT throw an exception if the service is
 	 * closed, asynchronously closed, or even just plain dead. It just returns
@@ -1105,7 +887,7 @@ abstract public class WriteCacheService implements IWriteCache {
 	 * @throws IllegalStateException
 	 *             if the service is closed.
 	 * @throws RuntimeException
-	 *             if the {@link MasterWriteTask} has failed.
+	 *             if the {@link WriteTask} has failed.
 	 */
 	private void assertOpenForWriter() {
 
@@ -1237,34 +1019,34 @@ abstract public class WriteCacheService implements IWriteCache {
 
 	}
 
-	/**
-	 * {@inheritDoc}
-	 * <p>
-	 * flush() is a blocking method. At most one flush() operation may run at a
-	 * time. The {@link #current} buffer is moved to the {@link #dirtyList}
-	 * while holding the {@link WriteLock} and flush() then waits until the
-	 * dirtyList becomes empty, at which point all dirty records have been
-	 * written through to the backing file.
-	 * <p>
-	 * Note: Any exception thrown from this method MUST trigger error handling
-	 * resulting in a high-level abort() and {@link #reset()} of the
-	 * {@link WriteCacheService}.
-	 * 
-	 * @see MasterWriteTask
-	 * @see #dirtyList
-	 * @see #dirtyListEmpty
-	 * 
-	 * @todo Note: flush() is currently designed to block concurrent writes() in
-	 *       order to give us clean decision boundaries for the HA write
-	 *       pipeline and also to simplify the internal locking design. Once we
-	 *       get HA worked out cleanly we should explore whether or not we can
-	 *       relax this constraint such that writes can run concurrently with
-	 *       flush(). That would have somewhat higher throughput since mutable
-	 *       B+Tree evictions would no longer cause concurrent tasks to block
-	 *       during the commit protocol or the file extent protocol.
-	 */
-	public boolean flush(final boolean force, final long timeout, final TimeUnit units) throws TimeoutException,
-			InterruptedException {
+    /**
+     * {@inheritDoc}
+     * <p>
+     * flush() is a blocking method. At most one flush() operation may run at a
+     * time. The {@link #current} buffer is moved to the {@link #dirtyList}
+     * while holding the {@link WriteLock} and flush() then waits until the
+     * dirtyList becomes empty, at which point all dirty records have been
+     * written through to the backing file.
+     * <p>
+     * Note: Any exception thrown from this method MUST trigger error handling
+     * resulting in a high-level abort() and {@link #reset()} of the
+     * {@link WriteCacheService}.
+     * 
+     * @see WriteTask
+     * @see #dirtyList
+     * @see #dirtyListEmpty
+     * 
+     * @todo Note: flush() is currently designed to block concurrent writes() in
+     *       order to give us clean decision boundaries for the HA write
+     *       pipeline and also to simplify the internal locking design. Once we
+     *       get HA worked out cleanly we should explore whether or not we can
+     *       relax this constraint such that writes can run concurrently with
+     *       flush(). That would have somewhat higher throughput since mutable
+     *       B+Tree evictions would no longer cause concurrent tasks to block
+     *       during the commit protocol or the file extent protocol.
+     */
+    public boolean flush(final boolean force, final long timeout,
+            final TimeUnit units) throws TimeoutException, InterruptedException {
 
 		final long begin = System.nanoTime();
 		final long nanos = units.toNanos(timeout);
@@ -1357,46 +1139,40 @@ abstract public class WriteCacheService implements IWriteCache {
 			writeLock.unlock();
 		}
 	}
+    
+    /**
+     * Set the extent of the file on the current {@link WriteCache}. The then
+     * current value of the extent will be communicated together with the rest
+     * of the {@link WriteCache} state if it is written onto another service
+     * using the write replication pipeline (HA only). The receiver will use the
+     * value read from the {@link WriteCache} message to adjust the extent of
+     * its backing file.
+     * <p>
+     * Note: Changes in the file extent for persistence store implementations
+     * MUST (a) be mutually exclusive with reads and writes on the backing file
+     * (due to a JVM bug); and (b) force the file data and the file metadata to
+     * the disk. Thus any change in the {@link #fileExtent} MUST be followed by
+     * a {@link #flush(boolean, long, TimeUnit)}.
+     * <p>
+     * Note: You MUST set the file extent each time you invoke {@link #reset()}
+     * so the {@link WriteCacheService} is always aware of the correct file
+     * extent.
+     * 
+     * @throws InterruptedException
+     * @throws IllegalStateException
+     */
+    public void setExtent(final long fileExtent) throws IllegalStateException,
+            InterruptedException {
 
-	// public boolean write(long offset, ByteBuffer data)
-	// throws IllegalStateException, InterruptedException {
-	//
-	// return writeChk(offset, data, 0);
-	//
-	// }
+        if (fileExtent < 0L)
+            throw new IllegalArgumentException();
 
-	/**
-	 * Set the extent of the file on the current {@link WriteCache}. The then
-	 * current value of the extent will be communicated together with the rest
-	 * of the {@link WriteCache} state if it is written onto another service
-	 * using the write replication pipeline (HA only). The receiver will use the
-	 * value read from the {@link WriteCache} message to adjust the extent of
-	 * its backing file.
-	 * <p>
-	 * Note: Changes in the file extent for persistence store implementations
-	 * MUST (a) be mutually exclusive with reads and writes on the backing file
-	 * (due to a JVM bug); and (b) force the file data and the file metadata to
-	 * the disk. Thus any change in the {@link #fileExtent} MUST be followed by
-	 * a {@link #flush(boolean, long, TimeUnit)}.
-	 * <p>
-	 * Note: You MUST set the file extent each time you invoke {@link #reset()}
-	 * so the {@link WriteCacheService} is always aware of the correct file
-	 * extent.
-	 * 
-	 * @throws InterruptedException
-	 * @throws IllegalStateException
-	 */
-	public void setExtent(final long fileExtent) throws IllegalStateException, InterruptedException {
+        final WriteCache cache = acquireForWriter();
 
-		if (fileExtent < 0L)
-			throw new IllegalArgumentException();
+        try {
 
-		final WriteCache cache = acquireForWriter();
-
-		try {
-
-			// make a note of the current file extent.
-			this.fileExtent.set(fileExtent);
+            // make a note of the current file extent.
+            this.fileExtent.set(fileExtent);
 
 			// set the current file extent on the WriteCache.
 			cache.setFileExtent(fileExtent);
@@ -1409,66 +1185,68 @@ abstract public class WriteCacheService implements IWriteCache {
 
 	}
 
-	/**
-	 * Write the record onto the cache. If the record is too large for the cache
-	 * buffers, then it is written synchronously onto the backing channel.
-	 * Otherwise it is written onto a cache buffer which is lazily flushed onto
-	 * the backing channel. Cache buffers are written in order once they are
-	 * full. This method does not impose synchronization on writes which fit the
-	 * capacity of a cache buffer.
-	 * <p>
-	 * When integrating with the {@link RWStrategy} or the {@link WORMStrategy}
-	 * there needs to be a read/write lock such that file extension is mutually
-	 * exclusive with file read/write operations (due to a Sun bug). The caller
-	 * can override {@link #newWriteCache(ByteBuffer, IReopenChannel)} to
-	 * acquire the necessary lock (the read lock of a {@link ReadWriteLock}).
-	 * This is even true when the record is too large for the cache since we
-	 * delegate the write to a temporary {@link WriteCache} wrapping the
-	 * caller's buffer.
-	 * <p>
-	 * Note: Any exception thrown from this method MUST trigger error handling
-	 * resulting in a high-level abort() and {@link #reset()} of the
-	 * {@link WriteCacheService}.
-	 * 
-	 * @return <code>true</code> since the record is always accepted by the
-	 *         {@link WriteCacheService} (unless an exception is thrown).
-	 * 
-	 * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6371642
-	 * 
-	 * @todo The WORM serializes invocations on this method because it must put
-	 *       each record at a specific offset into the user extent of the file.
-	 *       However, the RW store does not do this. Therefore, for the RW store
-	 *       only, we could use a queue with lost cost access and scan for best
-	 *       fit packing into the write cache buffer. When a new buffer is set
-	 *       as [current], we could pack the larger records in the queue onto
-	 *       that buffer first. This might provide better throughput for the RW
-	 *       store but would require an override of this method specific to that
-	 *       implementation.
-	 */
-	public boolean write(final long offset, final ByteBuffer data, final int chk) throws InterruptedException,
-			IllegalStateException {
+    /**
+     * Write the record onto the cache. If the record is too large for the cache
+     * buffers, then it is written synchronously onto the backing channel.
+     * Otherwise it is written onto a cache buffer which is lazily flushed onto
+     * the backing channel. Cache buffers are written in order once they are
+     * full. This method does not impose synchronization on writes which fit the
+     * capacity of a cache buffer.
+     * <p>
+     * When integrating with the {@link RWStrategy} or the {@link WORMStrategy}
+     * there needs to be a read/write lock such that file extension is mutually
+     * exclusive with file read/write operations (due to a Sun bug). The caller
+     * can override {@link #newWriteCache(ByteBuffer, IReopenChannel)} to
+     * acquire the necessary lock (the read lock of a {@link ReadWriteLock}).
+     * This is even true when the record is too large for the cache since we
+     * delegate the write to a temporary {@link WriteCache} wrapping the
+     * caller's buffer.
+     * <p>
+     * Note: Any exception thrown from this method MUST trigger error handling
+     * resulting in a high-level abort() and {@link #reset()} of the
+     * {@link WriteCacheService}.
+     * 
+     * @return <code>true</code> since the record is always accepted by the
+     *         {@link WriteCacheService} (unless an exception is thrown).
+     * 
+     * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6371642
+     * 
+     * @todo The WORM serializes invocations on this method because it must put
+     *       each record at a specific offset into the user extent of the file.
+     *       However, the RW store does not do this. Therefore, for the RW store
+     *       only, we could use a queue with lost cost access and scan for best
+     *       fit packing into the write cache buffer. When a new buffer is set
+     *       as [current], we could pack the larger records in the queue onto
+     *       that buffer first. This might provide better throughput for the RW
+     *       store but would require an override of this method specific to that
+     *       implementation.
+     */
+    public boolean write(final long offset, final ByteBuffer data, final int chk)
+            throws InterruptedException, IllegalStateException {
 
-		if (log.isInfoEnabled()) {
-			log.info("offset: " + offset + ", length: " + data.limit() + ", chk=" + chk + ", useChecksum="
-					+ useChecksum);
-		}
+        if (log.isInfoEnabled()) {
+            log.info("offset: " + offset + ", length: " + data.limit()
+                    + ", chk=" + chk + ", useChecksum=" + useChecksum);
+        }
 
-		if (offset < 0)
-			throw new IllegalArgumentException();
+        if (offset < 0)
+            throw new IllegalArgumentException();
 
-		if (data == null)
-			throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_NULL);
+        if (data == null)
+            throw new IllegalArgumentException(
+                    AbstractBufferStrategy.ERR_BUFFER_NULL);
 
-		// #of bytes in the record.
-		final int remaining = data.remaining();
+        // #of bytes in the record.
+        final int remaining = data.remaining();
 
-		// #of bytes to be written.
-		final int nwrite = remaining + (useChecksum ? 4 : 0);
+        // #of bytes to be written.
+        final int nwrite = remaining + (useChecksum ? 4 : 0);
 
-		if (remaining == 0)
-			throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_EMPTY);
+        if (remaining == 0)
+            throw new IllegalArgumentException(
+                    AbstractBufferStrategy.ERR_BUFFER_EMPTY);
 
-		if (nwrite > capacity) {
+        if (nwrite > capacity) {
 
 			/*
 			 * Handle large records.
@@ -1834,58 +1612,6 @@ abstract public class WriteCacheService implements IWriteCache {
 			writeLock.unlock();
 		}
 
-		// try {
-		//
-		// /*
-		// * Wrap the caller's record as a ByteBuffer.
-		// *
-		// * Note: This code path must add the checksum to the record if
-		// * checksums are enabled.
-		// */
-		// final ByteBuffer t;
-		// if(useChecksum) {
-		// // Allocate a larger buffer
-		// t = ByteBuffer.allocate(nwrite);
-		// // Copy the caller's data.
-		// t.put(data);
-		// // Add in the record checksum.
-		// t.putInt(chk);
-		// // Prepare for reading.
-		// t.flip();
-		// } else {
-		// // just use the caller's data.
-		// t = data;
-		// }
-		//            
-		// final WriteCache tmp = newWriteCache(t, useChecksum, opener);
-		//
-		// /*
-		// * Write the record on the channel using write cache factory.
-		// *
-		// * Note: We need to pass in the offset of the sole record in
-		// * order to have it written at the correct offset in the backing
-		// * file (getFirstOffset() on [tmp] will be -1L since we never
-		// * added anything to [tmp] but instead initialized it with the
-		// * data already in the buffer.
-		// */
-		//
-		// // A singleton map for that record.
-		// final Map<Long, RecordMetadata> recordMap = Collections
-		// .singletonMap(offset, new RecordMetadata(offset,
-		// 0/* bufferOffset */, nwrite));
-		//
-		// if (!tmp.writeOnChannel(t, offset/* firstOffset */, recordMap,
-		// Long.MAX_VALUE/* nanos */))
-		// throw new RuntimeException();
-		//
-		// return true;
-		//
-		// } catch (Throwable e) {
-		//
-		// throw new RuntimeException(e);
-		//
-		// }
-
 	}
 
 	/**
@@ -1962,66 +1688,68 @@ abstract public class WriteCacheService implements IWriteCache {
 
 	}
 
-	/**
-	 * This is a non-blocking query of all write cache buffers (current, clean
-	 * and dirty).
-	 * <p>
-	 * This implementation DOES NOT throw an {@link IllegalStateException} if
-	 * the service is already closed NOR if there is an asynchronous close of
-	 * the service. Instead it just returns <code>null</code> to indicate a
-	 * cache miss.
-	 */
-	public ByteBuffer read(final long offset) throws InterruptedException, ChecksumError {
+    /**
+     * This is a non-blocking query of all write cache buffers (current, clean
+     * and dirty).
+     * <p>
+     * This implementation DOES NOT throw an {@link IllegalStateException} if
+     * the service is already closed NOR if there is an asynchronous close of
+     * the service. Instead it just returns <code>null</code> to indicate a
+     * cache miss.
+     */
+    public ByteBuffer read(final long offset) throws InterruptedException,
+            ChecksumError {
 
-		if (!open) {
-			/*
-			 * Not open. Return [null] rather than throwing an exception per the
-			 * contract for this implementation.
-			 */
-			return null;
+        if (!open) {
+            /*
+             * Not open. Return [null] rather than throwing an exception per the
+             * contract for this implementation.
+             */
+            return null;
 
-		}
+        }
 
-		final Long off = Long.valueOf(offset);
+        final Long off = Long.valueOf(offset);
 
-		final WriteCache cache = recordMap.get(off);
+        final WriteCache cache = recordMap.get(off);
 
-		if (cache == null) {
+        if (cache == null) {
 
-			// No match.
-			return null;
+            // No match.
+            return null;
 
-		}
+        }
 
-		/*
-		 * Ask the cache buffer if it has the record still. It will not if the
-		 * cache buffer has been concurrently reset.
-		 */
+        /*
+         * Ask the cache buffer if it has the record still. It will not if the
+         * cache buffer has been concurrently reset.
+         */
 
-		return cache.read(off.longValue());
+        return cache.read(off.longValue());
 
-	}
+    }
 
-	/**
-	 * Called to check if a write has already been flushed. This is only made if
-	 * a write has been made to previously committed data (in the current RW
-	 * session)
-	 * 
-	 * If dirt writeCaches are flushed in order then it does not matter,
-	 * however, if we want to be able to combine writeCaches then it makes sense
-	 * that there are no duplicate writes.
-	 * 
-	 * On reflection this is more likely needed since for the RWStore, depending
-	 * on session parameters, the same cached area could be overwritten. We
-	 * could still maintain multiple writes but we need a guarantee of order
-	 * when retrieving data from the write cache (newest first).
-	 * 
-	 * So the question is, whether it is better to keep cache consistent or to
-	 * constrain with read order.
-	 * 
-	 * @param offset
-	 *            the address to check
-	 */
+    /**
+     * Called to check if a write has already been flushed. This is only made if
+     * a write has been made to previously committed data (in the current RW
+     * session).
+     * <p>
+     * If dirty {@link WriteCache}s are flushed in order then it does not
+     * matter, however, if we want to be able to combine {@link WriteCache}s
+     * then it makes sense that there are no duplicate writes.
+     * <p>
+     * On reflection this is more likely needed since for the {@link RWStore},
+     * depending on session parameters, the same cached area could be
+     * overwritten. We could still maintain multiple writes but we need a
+     * guarantee of order when retrieving data from the write cache (newest
+     * first).
+     * <p>
+     * So the question is, whether it is better to keep cache consistent or to
+     * constrain with read order?
+     * 
+     * @param offset
+     *            the address to check
+     */
 	public void clearWrite(final long offset) {
 		try {
 			final WriteCache cache = recordMap.remove(offset);
@@ -2048,37 +1776,64 @@ abstract public class WriteCacheService implements IWriteCache {
 	public static class WriteCacheServiceCounters extends WriteCacheCounters {
 
 		/** #of configured buffers (immutable). */
-		public int nbuffers;
+		public final int nbuffers;
 
-		/** #of dirty buffers (instantaneous). */
-		public int ndirty;
+        /**
+         * #of dirty buffers (instantaneous).
+         * <p>
+         * Note: This is set by the {@link WriteTask} thread and by
+         * {@link WriteCacheService#reset()}. It is volatile so it is visible
+         * from a thread which looks at the counters and for correct publication
+         * from reset().
+         */
+		public volatile int ndirty;
 
-		/**
-		 * The maximum #of dirty buffers observed by the {@link MasterWriteTask}
-		 * (its maximum observed backlog).
-		 */
-		public int maxdirty;
+        /**
+         * #of clean buffers (instantaneous).
+         * <p>
+         * Note: This is set by the {@link WriteTask} thread and by
+         * {@link WriteCacheService#reset()}. It is volatile so it is visible
+         * from a thread which looks at the counters and for correct publication
+         * from reset().
+         */
+        public volatile int nclean;
 
-		/** #of clean buffers (instantaneous). */
-		public int nclean;
+        /**
+         * The maximum #of dirty buffers observed by the {@link WriteTask} (its
+         * maximum observed backlog). This is only set by the {@link WriteTask}
+         * thread, but it is volatile so it is visible from a thread which looks
+         * at the counters.
+         */
+		public volatile int maxdirty;
 
-		/**
-		 * #of times the {@link WriteCacheService} was reset (typically to
-		 * handle an error condition).
-		 */
-		public long nreset;
+        /**
+         * #of times the {@link WriteCacheService} was reset (typically to
+         * handle an error condition).
+         * <p>
+         * Note: This is set by {@link WriteCacheService#reset()}. It is
+         * volatile so it is visible from a thread which looks at the counters
+         * and for correct publication from reset().
+         */
+		public volatile long nreset;
 
+		public WriteCacheServiceCounters(final int nbuffers) {
+		    
+		    this.nbuffers = nbuffers;
+		    
+		}
+		
 		public CounterSet getCounters() {
 
-			final CounterSet root = super.getCounters();
+            final CounterSet root = super.getCounters();
 
-			root.addCounter("nbuffers", new OneShotInstrument<Integer>(nbuffers));
+            root.addCounter("nbuffers",
+                    new OneShotInstrument<Integer>(nbuffers));
 
-			root.addCounter("ndirty", new Instrument<Integer>() {
-				public void sample() {
-					setValue(ndirty);
-				}
-			});
+            root.addCounter("ndirty", new Instrument<Integer>() {
+                public void sample() {
+                    setValue(ndirty);
+                }
+            });
 
 			root.addCounter("maxDirty", new Instrument<Integer>() {
 				public void sample() {
@@ -2097,6 +1852,16 @@ abstract public class WriteCacheService implements IWriteCache {
 					setValue(nreset);
 				}
 			});
+
+            root.addCounter("mbPerSec", new Instrument<Double>() {
+                public void sample() {
+                    final double mbPerSec = (((double) bytesWritten)
+                            / Bytes.megabyte32 / (TimeUnit.NANOSECONDS
+                            .toSeconds(elapsedWriteNanos)));
+                    setValue(((long) (mbPerSec * 100)) / 100d);
+                    
+                }
+            });
 
 			return root;
 
@@ -2118,9 +1883,5 @@ abstract public class WriteCacheService implements IWriteCache {
 		return counters.get().getCounters();
 
 	}
-
-//	public IHAClient getHAClient() {
-//		return null; // return newHAClient(quorumManager.getLocalBufferStrategy());
-//	}
 
 }

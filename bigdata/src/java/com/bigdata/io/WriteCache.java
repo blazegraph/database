@@ -28,9 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.io;
 
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Collection;
@@ -54,8 +51,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
-import com.bigdata.io.messages.HAConnect;
-import com.bigdata.io.messages.SocketMessage;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.StoreTypeEnum;
@@ -326,7 +321,8 @@ abstract public class WriteCache implements IWriteCache {
      * 
      * @todo use the {@link HAReceiveService} technique to bulk copy bytes from
      *       a direct NIO buffer into a temporary byte[] to compute the
-     *       checksums.
+     *       checksums or adapt/implement {@link Adler32} for direct
+     *       {@link ByteBuffer}.
      */
     final private ChecksumHelper checker;
     
@@ -839,7 +835,7 @@ abstract public class WriteCache implements IWriteCache {
             counters.nhit.incrementAndGet();
 
 			if (log.isTraceEnabled()) {
-				show(dst, "read bytes");
+				log.trace(show(dst, "read bytes"));
 			}
 
             return dst;
@@ -851,9 +847,20 @@ abstract public class WriteCache implements IWriteCache {
 		}
 
 	}
-    
-    private void show(final ByteBuffer buf, final String prefix) {
-		StringBuffer str = new StringBuffer();
+
+    /**
+     * Dump some metadata and leading bytes from the buffer onto a
+     * {@link String}.
+     * 
+     * @param buf
+     *            The buffer.
+     * @param prefix
+     *            A prefix for the dump.
+     *            
+     * @return The {@link String}.
+     */
+    private String show(final ByteBuffer buf, final String prefix) {
+		final StringBuffer str = new StringBuffer();
 		int tpos = buf.position();
 		if (tpos == 0) {
 			tpos = buf.limit();
@@ -862,19 +869,21 @@ abstract public class WriteCache implements IWriteCache {
 		for (int tb = 0; tb < tpos && tb < 20; tb++) {
 			str.append(Integer.toString(buf.get(tb)) + ",");
 		}
-		log.trace(str.toString());
+//		log.trace(str.toString());
+		return str.toString();
     }
 
-    private void show(final byte[] buf, int len, final String prefix) {
-		StringBuffer str = new StringBuffer();
-		str.append(prefix + ": ");
-		int tpos = len;
-		str.append(prefix + ", length: " + tpos + " : ");
-		for (int tb = 0; tb < tpos && tb < 20; tb++) {
-			str.append(Integer.toString(buf[tb]) + ",");
-		}
-		log.trace(str.toString());
-    }
+//    private String show(final byte[] buf, int len, final String prefix) {
+//		final StringBuffer str = new StringBuffer();
+//		str.append(prefix + ": ");
+//		int tpos = len;
+//		str.append(prefix + ", length: " + tpos + " : ");
+//		for (int tb = 0; tb < tpos && tb < 20; tb++) {
+//			str.append(Integer.toString(buf[tb]) + ",");
+//		}
+////		log.trace(str.toString());
+//		return str.toString();
+//    }
 
 
 	/**
@@ -1102,49 +1111,6 @@ abstract public class WriteCache implements IWriteCache {
             final long firstOffset, final Map<Long, RecordMetadata> recordMap,
             final long nanos) throws InterruptedException, TimeoutException,
             IOException;
-
-    /**
-     * Return a {@link Runnable} which will write the cache contents onto the
-     * downstream service in the quorum. This method is not used unless the
-     * journal is highly available.
-     */
-
-    /**
-     * Return a Runnable that will send an HAWriteMessage
-     * @throws IOException 
-     */
-    protected Runnable getDownstreamWriteRunnable(final HAConnect connect)
-            throws IOException {
-
-        final WriteCache self = this;
-        
-        return new Runnable() {
-
-            public void run() {
-
-                final SocketMessage.HAWriteMessage msg = new SocketMessage.HAWriteMessage(
-                        self);
-
-                try {
-                    if (log.isTraceEnabled())
-                    	log.trace("sending and waiting for " + msg + ", Thread: " + Thread.currentThread());
-                   
-                    connect.send(msg, true);
-                    
-                    if (log.isTraceEnabled())
-                    	log.trace("returning from " + msg + ", Thread: " + Thread.currentThread());
-                   
-                } catch (Throwable e) {
-                	e.printStackTrace();
-                	
-                    throw new RuntimeException(e);
-                    
-                }
-                
-            }
-            
-        };
-    }
 
     /**
      * {@inheritDoc}.
@@ -1722,36 +1688,35 @@ abstract public class WriteCache implements IWriteCache {
 	}
 
     /**
-     * To support deletion we will remove any entries for the provided address
+     * To support deletion we will remove any entries for the provided address.
+     * This is just to yank something out of the cache which was created and
+     * then immediately deleted on the RW store before it could be written
+     * through to the disk. This does not reclaim any space in the write cache
+     * since allocations are strictly sequential within the cache and can only
+     * be used with the RW store. The RW store uses write prefixes in the cache
+     * buffer so we must zero the long address element as well to indicate that
+     * the record was removed from the buffer.
      * 
      * @param addr
-     * @throws InterruptedException 
-     * @throws IllegalStateException 
+     *            The address of a cache entry.
      * 
-     * @todo This seems a bit odd to me. How does this propagate over a write
-     *       replication chain? Why not leave the old record in the cache? Or is
-     *       this just to yank something out of the cache which was created and
-     *       then immediately deleted on the RW store before it could be written
-     *       through to the disk? BT 2/26/2010...  Yes MC
-     *       
-     * For HA if write prefixes are stored in the buffer we must zero the address
-     * element to indicate data removal from the buffer.
+     * @throws InterruptedException
+     * @throws IllegalStateException
      */
-	public void clearAddrMap(long addr) throws IllegalStateException, InterruptedException {
-		RecordMetadata entry = recordMap.remove(addr);
-		
+    public void clearAddrMap(final long addr) throws IllegalStateException,
+            InterruptedException {
+        final RecordMetadata entry = recordMap.remove(addr);
 		if (prefixWrites) {
-			int pos = entry.bufferOffset - 12;
-			ByteBuffer tmp = acquire();
+			final int pos = entry.bufferOffset - 12;
+			final ByteBuffer tmp = acquire();
 			try {
-				ByteBuffer view = tmp.duplicate();
+				final ByteBuffer view = tmp.duplicate();
 				view.limit(8);
 				view.position(pos);
 				view.putLong(0);
 			} finally {
 				release();
 			}
-			
 		}
 	}
 
@@ -1804,195 +1769,195 @@ abstract public class WriteCache implements IWriteCache {
 		throw new RuntimeException("setRecordMap NotImplemented");
 	}
 
-	/**
-	 * Method called by HA to send to socket.
-	 * 
-	 * WriteCache serializes the recordMap and then the buffer.  Enabling the use of DirectBuffers if
-	 * available.
-	 * 
-	 * @param ostr
-	 * @throws InterruptedException 
-	 * @throws IllegalStateException 
-	 */
-	public void sendTo(ObjectSocketChannelStream out) throws IllegalStateException, InterruptedException, IOException {
-		
-	    final ObjectOutputStream outstr = out.getOutputStream();
-		sendRecordMap(outstr);
-		
-		log.info("Acquiring Buffer");
-		final ByteBuffer tmp = acquire();
-		try {
-			int pos = tmp.position();
-			if (log.isTraceEnabled()) {
-				log.trace("sendTo, pos: " + pos);
-			}
-			outstr.writeInt(pos);
-			
-			ByteBuffer view = tmp.duplicate();
-			view.limit(pos);
-			view.position(0);
-			if (log.isTraceEnabled()) {
-				show(view, "sendTo bytes");
-			}
-			
-			out.write(view);
-		} finally {
-			release();
-		}
-		log.info("sendTo: done");
-	}
+//	/**
+//	 * Method called by HA to send to socket.
+//	 * 
+//	 * WriteCache serializes the recordMap and then the buffer.  Enabling the use of DirectBuffers if
+//	 * available.
+//	 * 
+//	 * @param ostr
+//	 * @throws InterruptedException 
+//	 * @throws IllegalStateException 
+//	 */
+//	public void sendTo(ObjectSocketChannelStream out) throws IllegalStateException, InterruptedException, IOException {
+//		
+//	    final ObjectOutputStream outstr = out.getOutputStream();
+//		sendRecordMap(outstr);
+//		
+//		log.info("Acquiring Buffer");
+//		final ByteBuffer tmp = acquire();
+//		try {
+//			int pos = tmp.position();
+//			if (log.isTraceEnabled()) {
+//				log.trace("sendTo, pos: " + pos);
+//			}
+//			outstr.writeInt(pos);
+//			
+//			ByteBuffer view = tmp.duplicate();
+//			view.limit(pos);
+//			view.position(0);
+//			if (log.isTraceEnabled()) {
+//				log.trace(show(view, "sendTo bytes"));
+//			}
+//			
+//			out.write(view);
+//		} finally {
+//			release();
+//		}
+//		log.info("sendTo: done");
+//	}
+//
+//	/**
+//	 * This is the HA chaining method for the writeCache.  Setting this writeCache to the
+//	 * state defined by the inputStream, and parsing data on to the output stream if not null
+//	 * 
+//	 * Note: The initial implementation populates the ByteBuffer from the input channel and
+//	 * then writes to the output.  We would like to be able to write concurrently with the
+//	 * input using non-blocking IO.  This isn't necessarily a huge win if the network IO is significantly
+//	 * faster than the disk IO, since we need a full buffer in order to write to start the write task.
+//	 * 
+//	 * @param in
+//	 * @param out
+//	 * @throws InterruptedException 
+//	 * @throws IllegalStateException 
+//	 */
+//    public void receiveAndForward(ObjectSocketChannelStream in,
+//            HAConnect out) throws IllegalStateException,
+//            InterruptedException, IOException {
+//        
+//        if (log.isInfoEnabled())
+//            log.info("receiveRecordMap from " + in);
+//        
+//        receiveRecordMap(in.getInputStream());
+//
+//        ObjectInputStream instr = in.getInputStream();
+//        int sze = instr.readInt();
+//        
+//        if (log.isTraceEnabled()) {
+//			log.trace("readByteArray: " + sze);
+//        }
+//        
+//        final byte[] buf = in.readByteArray(sze);
+//
+//        this.writeRaw(0, buf, sze);
+//
+//        // in.getChannel().read(tmp);
+//
+//        if (out != null) {
+//            ObjectOutputStream outstr = out.getOutputStream();
+//            sendRecordMap(outstr);
+//
+//            // would be nice to be able to send to the channel
+//            // BUT this dual mode approach causes problem with current naive
+//            // ObjectStreams
+//            if (false) {
+//                // out.getChannel().write(tmp);
+//            } else {
+//            	try {
+//	                outstr.writeInt(sze);
+//	                outstr.write(buf, 0, sze);
+//            	} catch (Exception e) {
+//            		throw new RuntimeException(e);
+//            	}
+//            }
+//            outstr.flush();
+//        }
+//
+//        // now should flush the WriteCache, but leave control to caller
+//        log.info("receiveAndForward done");
+//		
+//	}
 
-	/**
-	 * This is the HA chaining method for the writeCache.  Setting this writeCache to the
-	 * state defined by the inputStream, and parsing data on to the output stream if not null
-	 * 
-	 * FIXME: The initial implementation populates the ByteBuffer from the input channel and
-	 * then writes to the output.  We would like to be able to write concurrently with the
-	 * input using non-blocking IO.  This isn't necessarily a huge win if the network IO is significantly
-	 * faster than the disk IO, since we need a full buffer in order to write to start the write task.
-	 * 
-	 * @param in
-	 * @param out
-	 * @throws InterruptedException 
-	 * @throws IllegalStateException 
-	 */
-    public void receiveAndForward(ObjectSocketChannelStream in,
-            HAConnect out) throws IllegalStateException,
-            InterruptedException, IOException {
-        
-        if (log.isInfoEnabled())
-            log.info("receiveRecordMap from " + in);
-        
-        receiveRecordMap(in.getInputStream());
+//    /**
+//     * Writes bytes direct to underlying Buffer
+//     * 
+//     * @param i
+//     * @param buf2
+//     * @param sze
+//     * @throws InterruptedException 
+//     * @throws IllegalStateException 
+//     */
+//	private void writeRaw(int i, byte[] buf, int sze) throws IllegalStateException, InterruptedException {
+//		final ByteBuffer tmp = acquire();
+//		try {
+//			if (log.isTraceEnabled()) {
+//				log.trace(show(buf, sze, "writeRaw"));
+//			}
+//			tmp.put(buf, i, sze);
+//		} finally {
+//			release();
+//		}		
+//	}
 
-        ObjectInputStream instr = in.getInputStream();
-        int sze = instr.readInt();
-        
-        if (log.isTraceEnabled()) {
-			log.trace("readByteArray: " + sze);
-        }
-        
-        final byte[] buf = in.readByteArray(sze);
-
-        this.writeRaw(0, buf, sze);
-
-        // in.getChannel().read(tmp);
-
-        if (out != null) {
-            ObjectOutputStream outstr = out.getOutputStream();
-            sendRecordMap(outstr);
-
-            // would be nice to be able to send to the channel
-            // BUT this dual mode approach causes problem with current naive
-            // ObjectStreams
-            if (false) {
-                // out.getChannel().write(tmp);
-            } else {
-            	try {
-	                outstr.writeInt(sze);
-	                outstr.write(buf, 0, sze);
-            	} catch (Exception e) {
-            		throw new RuntimeException(e);
-            	}
-            }
-            outstr.flush();
-        }
-
-        // now should flush the WriteCache, but leave control to caller
-        log.info("receiveAndForward done");
-		
-	}
-
-    /**
-     * Writes bytes direct to underlying Buffer
-     * 
-     * @param i
-     * @param buf2
-     * @param sze
-     * @throws InterruptedException 
-     * @throws IllegalStateException 
-     */
-	private void writeRaw(int i, byte[] buf, int sze) throws IllegalStateException, InterruptedException {
-		ByteBuffer tmp = acquire();
-		try {
-			if (log.isTraceEnabled()) {
-				show(buf, sze, "writeRaw");
-			}
-			
-			tmp.put(buf, i, sze);
-		} finally {
-			release();
-		}		
-	}
-
-	/**
-	 * If scattered writes then send whole map... 
-	 * TODO: optimise for non-scattered! 
-	 */
-	private void sendRecordMap(ObjectOutputStream out) {
-		Collection<RecordMetadata> data = recordMap.values();
-		try {
-			if (log.isTraceEnabled())
-				log.trace("sendRecordMap, size: " + data.size());
-			out.writeInt(data.size());
-			Iterator<RecordMetadata> values = data.iterator();
-			while (values.hasNext()) {
-				RecordMetadata md = values.next();
-				if (log.isTraceEnabled())
-					log.trace("sendRecordMap, entry: " + md);
-				out.writeLong(md.fileOffset);
-				out.writeInt(md.bufferOffset);
-				out.writeInt(md.recordLength);
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-			throw new RuntimeException(e);
-		}
-	}
-
-	private void receiveRecordMap(ObjectInputStream in) {
-		try {
-			int mapsize = in.readInt();
-			if (log.isTraceEnabled())
-				log.trace("receiveRecordMap, size: " + mapsize);
-			while (mapsize-- > 0) {
-				long fileOffset = in.readLong();
-				int bufferOffset = in.readInt();
-				int recordLength = in.readInt();
-				
-				long endRec = fileOffset + recordLength;
-				if (endRec > lastOffset)
-					lastOffset = endRec; // update lastOffset for each entry
-				
-				if (log.isTraceEnabled())
-					log.trace("receiveRecordMap - entry fileOffset: " + fileOffset + ", bufferOffset: " + bufferOffset + ", recordLength: " + recordLength);
-
-				recordMap.put(fileOffset, new RecordMetadata(fileOffset, bufferOffset, recordLength));
-				if (recordMap.size() == 1) {
-					firstOffset.set(fileOffset);
-				}
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-			throw new RuntimeException(e);
-		} catch (Throwable e) {
-			e.printStackTrace();
-			throw new RuntimeException(e);
-		}
-		
-	}
+//	/**
+//	 * If scattered writes then send whole map... 
+//	 * 
+//	 * Optimize this for non-scattered writes! 
+//	 */
+//	private void sendRecordMap(ObjectOutputStream out) {
+//		final Collection<RecordMetadata> data = recordMap.values();
+//		try {
+//			if (log.isTraceEnabled())
+//				log.trace("sendRecordMap, size: " + data.size());
+//			out.writeInt(data.size());
+//			final Iterator<RecordMetadata> values = data.iterator();
+//			while (values.hasNext()) {
+//				final RecordMetadata md = values.next();
+//				if (log.isTraceEnabled())
+//					log.trace("sendRecordMap, entry: " + md);
+//				out.writeLong(md.fileOffset);
+//				out.writeInt(md.bufferOffset);
+//				out.writeInt(md.recordLength);
+//			}
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//			throw new RuntimeException(e);
+//		}
+//	}
+//
+//	private void receiveRecordMap(ObjectInputStream in) {
+//		try {
+//			int mapsize = in.readInt();
+//			if (log.isTraceEnabled())
+//				log.trace("receiveRecordMap, size: " + mapsize);
+//			while (mapsize-- > 0) {
+//				long fileOffset = in.readLong();
+//				int bufferOffset = in.readInt();
+//				int recordLength = in.readInt();
+//				
+//				long endRec = fileOffset + recordLength;
+//				if (endRec > lastOffset)
+//					lastOffset = endRec; // update lastOffset for each entry
+//				
+//				if (log.isTraceEnabled())
+//					log.trace("receiveRecordMap - entry fileOffset: " + fileOffset + ", bufferOffset: " + bufferOffset + ", recordLength: " + recordLength);
+//
+//				recordMap.put(fileOffset, new RecordMetadata(fileOffset, bufferOffset, recordLength));
+//				if (recordMap.size() == 1) {
+//					firstOffset.set(fileOffset);
+//				}
+//			}
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//			throw new RuntimeException(e);
+//		} catch (Throwable e) {
+//			e.printStackTrace();
+//			throw new RuntimeException(e);
+//		}
+//		
+//	}
 
     /**
      * Checksum helper computes the running checksum from series of
      * {@link ByteBuffer}s and <code>int</code> checksum values as written onto
      * the backing byte buffer for a {@link WriteCache} instance.
      */
-	private static class ChecksumHelper {
+	private static class ChecksumHelper extends ChecksumUtility {
 	   
-	    /**
-	     * Private helper object.
-	     */
-	    private final Adler32 chk = new Adler32();
+//	    /**
+//	     * Private helper object.
+//	     */
+//	    private final Adler32 chk = new Adler32();
 
         /**
          * A private buffer used to format the per-record checksums when they
@@ -2002,105 +1967,78 @@ abstract public class WriteCache implements IWriteCache {
 	    final private ByteBuffer chkbuf = ByteBuffer.allocate(4);
 
         /**
-         * Reset the checksum.
-         */
-	    public void reset() {
-
-	        chk.reset();
-            
-	    }
-
-	    /**
-	     * Return the Alder checksum, which is a 32bit value.
-	     */
-	    public int getChecksum() {
-	        
-	        return (int) chk.getValue();
-
-	    }
-	    
-	    /**
-	     * Compute the {@link Adler32} checksum of the buffer. The position, mark,
-	     * and limit are unchanged by this operation. The operation is optimized
-	     * when the buffer is backed by an array.
-	     * 
-	     * @param buf
-	     *            The buffer.
-	     *            
-	     * @return The checksum.
-	     */
-	    public void update(final ByteBuffer buf) {
-
-            assert buf != null;
-
-            final int pos = buf.position();
-	        final int limit = buf.limit();
-	        
-	        assert pos >= 0;
-	        assert limit > pos;
-
-	        if (buf.hasArray()) {
-
-	            /*
-	             * Optimized when the buffer is backed by an array.
-	             */
-	            
-	            final byte[] bytes = buf.array();
-	            
-	            final int len = limit - pos;
-	            
-	            if (pos > bytes.length - len) {
-	                
-	                throw new BufferUnderflowException();
-	            
-	            }
-	                
-	            chk.update(bytes, pos + buf.arrayOffset(), len);
-	            
-	        } else {
-	            
-	            for (int i = pos; i < limit; i++) {
-	                
-	                chk.update(buf.get(i));
-	                
-	            }
-	            
-	        }
-	        	        
-	    }
-
-        /**
          * Update the running checksum to reflect the 4 byte integer.
          * 
          * @param v
          *            The integer.
          */
-	    public void update(final int v) {
-	        
+        public void update(final int v) {
+            
             chkbuf.clear();
             chkbuf.putInt(v);
             chk.update(chkbuf.array(), 0/* off */, 4/* len */);
-	        
-	    }
-	    
-//	    public void update(final byte[] buf) {
+            
+        }
+
+        public int getChecksum() {
+            return super.getChecksum();
+        }
+
+        public void reset() {
+            super.reset();
+        }
+        
+        public void update(final ByteBuffer buf) {
+            super.update(buf);
+        }
+        
+//        /**
+//         * Update the {@link Adler32} checksum from the data in the buffer. The
+//         * position, mark, and limit are unchanged by this operation. The
+//         * operation is optimized when the buffer is backed by an array.
+//         * 
+//         * @param buf
+//         *            The buffer.
+//         * 
+//         * @return The checksum.
+//         */
+//	    public void update(final ByteBuffer buf) {
+//            assert buf != null;
 //
-//	        update(buf, 0, buf.length);
+//            final int pos = buf.position();
+//	        final int limit = buf.limit();
 //	        
-//	    }
+//	        assert pos >= 0;
+//	        assert limit > pos;
 //
-//	    public void update(final byte[] buf, int sze) {
-//	        
-//	        update(buf, 0, sze);
-//	        
-//	    }
-//	    
-//	    public void update(final byte[] buf, int off, int sze) {
-//	        
-//	        assert buf != null;
+//	        if (buf.hasArray()) {
 //
-//	        chk.update(buf, off, sze);
-//
+//	            /*
+//	             * Optimized when the buffer is backed by an array.
+//	             */
+//	            
+//	            final byte[] bytes = buf.array();
+//	            
+//	            final int len = limit - pos;
+//	            
+//	            if (pos > bytes.length - len) {
+//	                
+//	                throw new BufferUnderflowException();
+//	            
+//	            }
+//	                
+//	            chk.update(bytes, pos + buf.arrayOffset(), len);
+//	            
+//	        } else {
+//	            
+//	            for (int i = pos; i < limit; i++) {
+//	                
+//	                chk.update(buf.get(i));
+//	                
+//	            }
+//	            
+//	        }
+//	        	        
 //	    }
 
 	}

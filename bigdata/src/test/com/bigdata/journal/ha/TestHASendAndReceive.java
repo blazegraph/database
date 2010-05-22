@@ -117,10 +117,12 @@ public class TestHASendAndReceive extends TestCase3 {
     
 	private HASendService sendService;
 	private HAReceiveService<HAWriteMessageBase> receiveService;
-	private ChecksumUtility chk = new ChecksumUtility();
+	private ChecksumUtility chk;
 	
 	protected void setUp() throws Exception {
 
+	    chk = new ChecksumUtility();
+	    
         /*
          * Note: ZERO (0) indicates that a random free port will be selected. If
          * you use a fixed port then there is a danger that the port will not be
@@ -138,7 +140,7 @@ public class TestHASendAndReceive extends TestCase3 {
 		receiveService.start();
 
         sendService = new HASendService(addr);
-        sendService.open();
+        sendService.start();
 
     }
 

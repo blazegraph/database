@@ -54,7 +54,7 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 	/**
 	 * A random number generated - the seed is NOT fixed.
 	 */
-	protected final Random r = new Random();
+	private Random r = new Random();
 
 	/**
 	 * Returns random data that will fit in N bytes. N is chosen randomly in
@@ -136,7 +136,7 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 		receiveService1.start();
 
 		sendService = new HASendService(receiveAddr1);
-        sendService.open();
+        sendService.start();
 
 		if (log.isInfoEnabled()) {
 			log.info("receiveService1: addr=" + receiveAddr1);
@@ -164,6 +164,8 @@ public class TestHASendAndReceive3Nodes extends TestCase3 {
 		}
 		
 		chk = null;
+		
+		r = null;
 		
 	}
 

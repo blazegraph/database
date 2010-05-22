@@ -119,18 +119,47 @@ abstract public class AbstractHAJournalTestCase
         stores = new Journal[k];
 
         /*
-         * Note: Hacked into the reverse setup order so the WriteServiceCache
-         * can initialize using getHAGlue(index+1).
+         * FIXME [The create order SHOULD NOT matter. Modify to defer the write
+         * pipeline setup until the quorum "meets".]
+         * 
+         * Note: This was hacked into the reverse setup order so the
+         * WriteServiceCache can initialize using getHAGlue(index+1). However,
+         * that makes it impossible to setup the journals since the followers
+         * need to obtain their root blocks from the leader. The only way to
+         * handle this is to "await" the quorum before the followers obtain the
+         * leader's current root block and before the nodes setup the HA
+         * send/receive pipeline. We also need to run the "new Journal()"
+         * constructor in a Thread (or Runnable) in order to have these
+         * initialize concurrently, which is how life is in a distributed
+         * system.
+         * 
+         * FIXME Invoking init() from within the AbstractJournal constructor is
+         * a REALLY BAD idea. When you extend the AbstractJournal, the subclass
+         * will have its init() invoked before its constructor runs. For
+         * example, Journal#init() runs during super(properties) for the Journal
+         * constructor!
          */
         for (int i = k - 1; i >= 0; i--) {
-
+//        for (int i = 0; i < k; i++) {
+            
             // stores[i] = newJournal(i, properties);
             newJournal(i, properties); // journal initialization sets store index
 
         }
 
-        // initialize the master.
-        stores[0].init();
+        /*
+         * Initialize the master first. The followers will get their root blocks
+         * from the master.
+         * 
+         * @todo The master should set the quorum token before it does anything
+         * else.
+         */
+//        fixture.join(stores[0]);
+//        fixture.join(stores[1]);
+//        fixture.join(stores[2]);
+//
+//        stores[1].takeRootBlocksFromLeader();
+//        stores[2].takeRootBlocksFromLeader();
         
         // return the master.
         return stores[0];

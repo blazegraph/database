@@ -60,7 +60,6 @@ import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.HardReferenceQueue;
-import com.bigdata.cache.IGlobalLRU.ILRUCache;
 import com.bigdata.config.Configuration;
 import com.bigdata.config.IValidator;
 import com.bigdata.config.IntegerRangeValidator;
@@ -69,7 +68,6 @@ import com.bigdata.config.LongRangeValidator;
 import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
-import com.bigdata.io.IByteArrayBuffer;
 import com.bigdata.io.IDataRecord;
 import com.bigdata.io.IDataRecordAccess;
 import com.bigdata.journal.Name2Addr.Entry;
@@ -232,23 +230,23 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     private final ChecksumUtility checker = new ChecksumUtility();
 
-    /*
-     * These fields were historically marked as [final] and set by the
-     * constructor. With the introduction of high availability these fields can
-     * not be final because the CREATE of the journal must be deferred until a
-     * quorum leader has been elected.
-     * 
-     * The pattern for these fields is that they are assigned by create() and
-     * are thereafter immutable. The fields are marked as [volatile] so the
-     * state change when they are set will be visible without explicit
-     * synchronization (many methods use volatile reads on these fields).
-     */
+//    /*
+//     * These fields were historically marked as [final] and set by the
+//     * constructor. With the introduction of high availability these fields can
+//     * not be final because the CREATE of the journal must be deferred until a
+//     * quorum leader has been elected.
+//     * 
+//     * The pattern for these fields is that they are assigned by create() and
+//     * are thereafter immutable. The fields are marked as [volatile] so the
+//     * state change when they are set will be visible without explicit
+//     * synchronization (many methods use volatile reads on these fields).
+//     */
     
     /**
      * The metadata for a pre-existing journal -or- <code>null</code> if the journal was
      * created for the first time.
      */
-    private volatile FileMetadata fileMetadata;
+    private FileMetadata fileMetadata;
 
     /** package private method exported to {@link DumpJournal}. */
     FileMetadata getFileMetadata() {return fileMetadata;}
@@ -256,12 +254,16 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     /**
      * The implementation logic for the current {@link BufferMode}.
      */
-    private volatile IBufferStrategy _bufferStrategy;
+    private final IBufferStrategy _bufferStrategy;
 
     /**
      * A description of the journal as a resource.
      */
-    private volatile JournalMetadata journalMetadata;
+    private final JournalMetadata journalMetadata;
+    
+    /*
+     * 
+     */
     
     /**
      * This lock is used to prevent clearing or setting of critical fields while
@@ -578,57 +580,6 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
     }
 
-//    /**
-//     * Used to allocate the {@link ByteBuffer} for the {@link BufferMode#Disk}
-//     * write cache.
-//     * 
-//     * @param properties
-//     *            The properties that will be used to configure the journal.
-//     * 
-//     * @return The write cache buffer -or- <code>null</code> iff no buffer is
-//     *         required (either because the selected {@link BufferMode} does not
-//     *         support a write cache, because the journal would be opened in a
-//     *         read-only mode, or because the configured write cache capacity
-//     *         was ZERO(0)).
-//     * 
-//     * @see Options#BUFFER_MODE
-//     * @see Options#READ_ONLY
-//     * @see Options#WRITE_CACHE_CAPACITY
-//     */
-//    public static ByteBuffer getWriteCache(final Properties properties) {
-//
-//        final BufferMode bufferMode = BufferMode.valueOf(getProperty(
-//                properties, Options.BUFFER_MODE, Options.DEFAULT_BUFFER_MODE));
-//
-//        final boolean readOnly = Boolean.parseBoolean(getProperty(properties,
-//                Options.READ_ONLY, "" + Options.DEFAULT_READ_ONLY));
-//
-//        if (bufferMode.equals(BufferMode.Disk) && !readOnly) {
-//
-//            final int capacity = Integer.parseInt(getProperty(properties,
-//                    Options.WRITE_CACHE_CAPACITY,
-//                    Options.DEFAULT_WRITE_CACHE_CAPACITY));
-//
-//            final int minWriteCacheCapacity = (int) Math.min(
-//                    Options.minimumInitialExtent,
-//                    Options.minimumWriteCacheCapacity);
-//
-//            if (capacity > 0 && capacity < minWriteCacheCapacity) {
-//
-//                throw new RuntimeException(Options.WRITE_CACHE_CAPACITY
-//                        + " must be ZERO (0) or at least "
-//                        + minWriteCacheCapacity + " bytes");
-//
-//            }
-//
-//           return ByteBuffer.allocateDirect(capacity);
-//            
-//        }
-//        
-//        return null;
-//
-//    }
-    
     /**
      * Resolves the property value (static variant for ctor initialization).
      * 
@@ -780,42 +731,27 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         /*
          * Initialize the HA components.
          */
-        final WriteLock lock = _fieldReadWriteLock.writeLock();
 
-        lock.lock();
+        this.quorumManager = newQuorumManager();
 
-        try {
+        this.environment = new HAEnvironment();
 
-            this.quorumManager = newQuorumManager();
+        this.haDelegate = newHADelegate(environment);
 
-            this.environment = new HAEnvironment();
+        this.haGlue = new HADelegator(haDelegate);
 
-            this.haDelegate = newHADelegate(environment);
-
-            this.haGlue = new HADelegator(haDelegate);
-
-            if (!quorumManager.isHighlyAvailable()) {
-                
-                init();
-                
-            }
+        if(quorumManager.isHighlyAvailable()) {
+           
+            // Invalid quorum token until a quorum is met.
+            quorumToken = Quorum.NO_QUORUM;
             
-        } finally {
-
-            lock.unlock();
-
+        } else {
+            
+            // The token is a constant since we are not HA.
+            quorumToken = quorumManager.getQuorum().token();
+            
         }
-
-    }
-
-    public void init() {
-
-        if (quorumManager.isHighlyAvailable())
-            System.err.println("HA JOURNAL INIT");
         
-        boolean create = Boolean.parseBoolean(Options.DEFAULT_CREATE);
-        boolean isEmptyFile = false;
-
         /*
          * "bufferMode" mode.
          * 
@@ -825,29 +761,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         final BufferMode bufferMode = BufferMode.valueOf(getProperty(
                 Options.BUFFER_MODE, Options.DEFAULT_BUFFER_MODE));
 
-        // Note: 
-        final boolean useDirectBuffers = Boolean
-                .parseBoolean(getProperty(Options.USE_DIRECT_BUFFERS,
-                        Options.DEFAULT_USE_DIRECT_BUFFERS));
-            
-        /*
-         * Note: The default depends on the AbstractJournal implementation.
-         */
-        final int offsetBits = getProperty(
-                Options.OFFSET_BITS,
-                Integer
-                        .toString((this instanceof Journal ? WormAddressManager.SCALE_UP_OFFSET_BITS
-                                : WormAddressManager.SCALE_OUT_OFFSET_BITS)),
-                new IntegerRangeValidator(WormAddressManager.MIN_OFFSET_BITS,
-                        WormAddressManager.MAX_OFFSET_BITS));
-
-//        final int readCacheCapacity = getProperty(Options.READ_CACHE_CAPACITY,
-//                Options.DEFAULT_READ_CACHE_CAPACITY, IntegerValidator.GTE_ZERO);
-//
-//        final int readCacheMaxRecordSize = getProperty(
-//                Options.READ_CACHE_MAX_RECORD_SIZE,
-//                Options.DEFAULT_READ_CACHE_MAX_RECORD_SIZE,
-//                IntegerValidator.GT_ZERO);
+        boolean create = Boolean.parseBoolean(Options.DEFAULT_CREATE);
+        boolean isEmptyFile = false;
 
         final boolean createTempFile = Boolean.parseBoolean(getProperty(
                 Options.CREATE_TEMP_FILE, Options.DEFAULT_CREATE_TEMP_FILE));
@@ -860,37 +775,11 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         }
 
-        final boolean validateChecksum = Boolean.parseBoolean(getProperty(
-                Options.VALIDATE_CHECKSUM, Options.DEFAULT_VALIDATE_CHECKSUM));
-
         if (readOnly) {
 
             create = false;
 
         }
-
-        final boolean alternateRootBlock = Boolean.parseBoolean(getProperty(
-                Options.ALTERNATE_ROOT_BLOCK, "false"));
-        
-        if (alternateRootBlock && !readOnly) {
-
-            log.warn("*** Using the alternate root block: "
-                    + "Data will be lost on the next commit! ***");
-            
-        }
-
-        final ForceEnum forceWrites = ForceEnum.parse(getProperty(
-                Options.FORCE_WRITES, Options.DEFAULT_FORCE_WRITES));
-
-        final boolean deleteOnExit = Boolean.parseBoolean(getProperty(
-                Options.DELETE_ON_EXIT, Options.DEFAULT_DELETE_ON_EXIT));
-
-        final boolean writeCacheEnabled = Boolean.parseBoolean(getProperty(
-                Options.WRITE_CACHE_ENABLED, Options.DEFAULT_WRITE_CACHE_ENABLED));
-        
-        final int writeCacheBufferCount = Integer.parseInt(getProperty(
-                Options.WRITE_CACHE_BUFFER_COUNT,
-                Options.DEFAULT_WRITE_CACHE_BUFFER_COUNT));
 
         /*
          * "file"
@@ -987,6 +876,50 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
         try {
     
+            final ForceEnum forceWrites = ForceEnum.parse(getProperty(
+                    Options.FORCE_WRITES, Options.DEFAULT_FORCE_WRITES));
+
+            final boolean deleteOnExit = Boolean.parseBoolean(getProperty(
+                    Options.DELETE_ON_EXIT, Options.DEFAULT_DELETE_ON_EXIT));
+
+            final boolean writeCacheEnabled = Boolean.parseBoolean(getProperty(
+                    Options.WRITE_CACHE_ENABLED, Options.DEFAULT_WRITE_CACHE_ENABLED));
+            
+            final int writeCacheBufferCount = Integer.parseInt(getProperty(
+                    Options.WRITE_CACHE_BUFFER_COUNT,
+                    Options.DEFAULT_WRITE_CACHE_BUFFER_COUNT));
+
+            // Note: 
+            final boolean useDirectBuffers = Boolean
+                    .parseBoolean(getProperty(Options.USE_DIRECT_BUFFERS,
+                    Options.DEFAULT_USE_DIRECT_BUFFERS));
+
+            /*
+             * Note: The default depends on the AbstractJournal implementation.
+             */
+            final int offsetBits = getProperty(
+                    Options.OFFSET_BITS,
+                    Integer
+                            .toString((this instanceof Journal ? WormAddressManager.SCALE_UP_OFFSET_BITS
+                                    : WormAddressManager.SCALE_OUT_OFFSET_BITS)),
+                    new IntegerRangeValidator(
+                            WormAddressManager.MIN_OFFSET_BITS,
+                            WormAddressManager.MAX_OFFSET_BITS));
+
+            final boolean validateChecksum = Boolean.parseBoolean(getProperty(
+                    Options.VALIDATE_CHECKSUM, Options.DEFAULT_VALIDATE_CHECKSUM));
+
+            final boolean alternateRootBlock = Boolean
+                    .parseBoolean(getProperty(Options.ALTERNATE_ROOT_BLOCK,
+                            "false"));
+
+            if (alternateRootBlock && !readOnly) {
+
+                log.warn("*** Using the alternate root block: "
+                        + "Data will be lost on the next commit! ***");
+
+            }
+
             /*
              * Note: The caller SHOULD specify an explicit [createTime] when its
              * value is critical. The default assigned here does NOT attempt to use
@@ -1162,7 +1095,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                         minimumExtension,
                         fileMetadata,
                         environment);
-    
+
                 this._rootBlock = fileMetadata.rootBlock;
     
                 break;
@@ -1231,7 +1164,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 throw new AssertionError();
     
             }
-    
+
             // Save resource description (sets value returned by getUUID()).
             this.journalMetadata = new JournalMetadata(this);
     
@@ -1248,16 +1181,6 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             ResourceManager.openJournal(getFile() == null ? null : getFile()
                     .toString(), size(), getBufferStrategy().getBufferMode());
 
-            /*
-             * The current quorum token.
-             * 
-             * @todo This is down way down at the bottom to help out with some
-             * unit test setups, which is a bit of a hack. See
-             * AbstractHAJournalTest and friends.
-             */
-  
-            this.quorumToken = quorumManager.getQuorum().token();
-            
         } finally {
             
             lock.unlock();
@@ -1265,7 +1188,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         }
 
     }
-    
+
     /**
      * @todo consider making the properties restart safe so that they can be
      *       read from the journal. This will let some properties be specified
@@ -1966,6 +1889,21 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
         assertOpen();
         
+        /*
+         * In HA mode, the followers are read-only.
+         */
+        if(quorumManager.isHighlyAvailable()) {
+            
+            final Quorum q = quorumManager.getQuorum();
+
+            if (q != null && !q.isLeader()) {
+
+                return false;
+
+            }
+
+        }
+
         return _bufferStrategy.isReadOnly();
         
     }
@@ -2848,8 +2786,20 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     protected void setupCommitters() {
 
         assert _fieldReadWriteLock.writeLock().isHeldByCurrentThread();
-        
-        setupName2AddrBTree(getRootAddr(ROOT_NAME2ADDR));
+
+        if (!isReadOnly()) { //quorumManager.getQuorum().isLeader()) {
+
+            /*
+             * Only the leader can accept writes so only the leader will
+             * register the Name2Addr object. Followers can access the
+             * historical Name2Addr objects from the CommitRecordIndex for
+             * historical commit points, but not the live Name2Addr object,
+             * which is only on the leader.
+             */
+
+            setupName2AddrBTree(getRootAddr(ROOT_NAME2ADDR));
+            
+        }
 
     }
 
@@ -3028,11 +2978,14 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
              * then the store was never committed and the btree had since been
              * discarded. In any case we create a new btree now.
              * 
-             * Note: if the journal is read-only then we create the commit record
-             * index on an in-memory store in order to avoid triggering a write
-             * exception on the journal.
+             * Note: if the journal is read-only then we create the commit
+             * record index on an in-memory store in order to avoid triggering a
+             * write exception on the journal.
+             * 
+             * Note: if the journal is not the quorum leader then it is
+             * effectively read-only.
              */
-            if(isReadOnly()) {
+            if (isReadOnly()) {
 
                 ndx = CommitRecordIndex.createTransient();
 
@@ -4191,4 +4144,98 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 		}
 	}
 
+    /**
+     * Await a quorum (HA only).
+     * 
+     * @throws InterruptedException 
+     */
+    public void awaitQuorum() throws InterruptedException {
+
+        if (!quorumManager.isHighlyAvailable()) {
+            throw new UnsupportedOperationException();
+        }
+
+        final Quorum q;
+
+        System.err.println("HA : AWAITING QUORUM : k="
+                + quorumManager.replicationFactor());
+
+        // Block until we have a quorum.
+        q = quorumManager.awaitQuorum();
+
+        this.quorumToken = q.token();
+
+        System.err.println("HA : ACHIEVED QUORUM : k="
+                + quorumManager.replicationFactor() + ", size=" + q.size()
+                + ", token=" + quorumToken);
+
+    }
+
+    /**
+     * Replace out root blocks with those of the quorum leader (HA only).
+     * 
+     * FIXME This just grabs the root blocks of the quorum leader if there was
+     * no backing file.
+     * <p>
+     * In fact, we need to handle synchronization when the backing file exists
+     * and when it does not exist, however we will not be "in" the quorum on
+     * restart if we are not synchronized.
+     * <p>
+     * If we are not the leader of a quorum then we need to synchronize with the
+     * quorum leader.
+     * <p>
+     * Note: The delta can be obtained by comparing out current root block with
+     * the root block of the leader.
+     */
+    public void takeRootBlocksFromLeader() {
+
+        final Quorum q = quorumManager.getQuorum();
+        quorumManager.assertQuorum(quorumToken);
+
+        if (!quorumManager.isHighlyAvailable())
+            throw new UnsupportedOperationException();
+
+        if (q.isLeader())
+            throw new UnsupportedOperationException();
+
+        if(_rootBlock.getLastCommitTime()!=0L) {
+            /*
+             * Journal already has committed state.
+             */
+            throw new UnsupportedOperationException();            
+        }
+        
+        try {
+
+            if (quorumManager.isHighlyAvailable())
+                System.err.println("HA JOURNAL INIT");
+
+            System.err.println("Requesting root block from leader.");
+            // get the root blocks from the leader.
+            final IRootBlockView rootBlock = q.getHAGlue(0/* leader */)
+                    .getRootBlock();
+            System.err.println("Got root block from leader: " + rootBlock);
+            if (rootBlock.getCommitCounter() != 0L) {
+                throw new RuntimeException("Leader already has data: "
+                        + rootBlock);
+            }
+
+            // overwrite our root blocks with the leader's.
+            _bufferStrategy.writeRootBlock(rootBlock, ForceEnum.No);
+            _bufferStrategy.writeRootBlock(rootBlock, ForceEnum.No);
+
+            /*
+             * Do a low-level abort to discard the current write set and reload
+             * various things from the new root blocks.
+             */
+            _abort();
+
+        } catch (IOException ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
+    }
+    
 }

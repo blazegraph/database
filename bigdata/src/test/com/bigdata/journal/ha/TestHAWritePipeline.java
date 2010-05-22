@@ -30,6 +30,7 @@ package com.bigdata.journal.ha;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import com.bigdata.io.WriteCacheService;
 import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr;
