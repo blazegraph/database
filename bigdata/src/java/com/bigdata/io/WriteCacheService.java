@@ -533,6 +533,7 @@ abstract public class WriteCacheService implements IWriteCache {
                             final ByteBuffer b = cache.peek().duplicate();
                             // flip(limit=pos;pos=0)
                             b.flip();
+                            assert b.remaining() > 0 : "Empty cache: " + cache; 
                             // send to 1st follower.
                             remoteWriteFuture = q.replicate(cache
                                     .newHAWriteMessage(quorumToken), b);
