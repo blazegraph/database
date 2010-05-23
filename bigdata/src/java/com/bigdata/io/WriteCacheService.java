@@ -521,17 +521,21 @@ abstract public class WriteCacheService implements IWriteCache {
                         // Verify quorum still valid and we are the leader.
                         final Quorum q = quorumManager.getQuorum();
                         quorumManager.assertQuorumLeader(quorumToken);
-                        
+
                         if (q.size() > 1) {
                             /*
                              * Replicate from the leader to the first follower.
                              * Each non-final follower will receiveAndReplicate
-                             * the write cache buffer.  The last follower will
+                             * the write cache buffer. The last follower will
                              * receive the buffer.
                              */
+                            // duplicate the write cache's buffer.
+                            final ByteBuffer b = cache.peek().duplicate();
+                            // flip(limit=pos;pos=0)
+                            b.flip();
+                            // send to 1st follower.
                             remoteWriteFuture = q.replicate(cache
-                                    .newHAWriteMessage(quorumToken), cache
-                                    .peek());
+                                    .newHAWriteMessage(quorumToken), b);
                         }
 
                         /*

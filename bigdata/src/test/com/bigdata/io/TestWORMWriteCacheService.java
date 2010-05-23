@@ -39,7 +39,9 @@ import java.text.NumberFormat;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -47,6 +49,7 @@ import java.util.zip.Adler32;
 
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
+import com.bigdata.journal.ha.AbstractQuorum;
 import com.bigdata.journal.ha.HAGlue;
 import com.bigdata.journal.ha.HAReceiveService;
 import com.bigdata.journal.ha.HASendService;
@@ -54,8 +57,10 @@ import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.journal.ha.MockSingletonQuorumManager;
 import com.bigdata.journal.ha.Quorum;
 import com.bigdata.journal.ha.QuorumManager;
+import com.bigdata.journal.ha.HAReceiveService.IHAReceiveCallback;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Test suite for the {@link WriteCacheService} using pure append writes.
@@ -64,7 +69,8 @@ import com.bigdata.util.ChecksumUtility;
  * @version $Id: TestWriteCacheService.java 2866 2010-05-18 18:36:35Z
  *          thompsonbry $
  * 
- *          FIXME Also apply to the RW store. This will require prefix metadata.
+ *          FIXME Also apply to the RW store. This will require prefix metadata
+ *          and we also need to reorder the records before we write them.
  */
 public class TestWORMWriteCacheService extends TestCase3 {
 
@@ -114,14 +120,17 @@ public class TestWORMWriteCacheService extends TestCase3 {
      * @throws InterruptedException
      * @throws IOException
      */
-    public void test_writeCacheServiceWORM_1buffer() throws InterruptedException, IOException {
+    public void test_writeCacheService_WORM_1buffer() throws InterruptedException, IOException {
 
         final int nbuffers = 1;
         final boolean useChecksums = false;
         final boolean isHighlyAvailable = false;
 
+        // No write pipeline.
+        final QuorumManager qm = new MockSingletonQuorumManager();
+
         doWORMTest(nbuffers, nrecs, maxreclen, largeRecordRate, useChecksums,
-                isHighlyAvailable);
+                isHighlyAvailable, StoreTypeEnum.WORM, qm);
 
     }
 
@@ -130,14 +139,17 @@ public class TestWORMWriteCacheService extends TestCase3 {
      * @throws InterruptedException
      * @throws IOException
      */
-    public void test_writeCacheServiceWORM_2buffers() throws InterruptedException, IOException {
+    public void test_writeCacheService_WORM_2buffers() throws InterruptedException, IOException {
 
         final int nbuffers = 2;
         final boolean useChecksums = false;
         final boolean isHighlyAvailable = false;
 
+        // No write pipeline.
+        final QuorumManager qm = new MockSingletonQuorumManager();
+
         doWORMTest(nbuffers, nrecs, maxreclen, largeRecordRate, useChecksums,
-                isHighlyAvailable);
+                isHighlyAvailable, StoreTypeEnum.WORM, qm);
 
     }
 
@@ -147,15 +159,18 @@ public class TestWORMWriteCacheService extends TestCase3 {
      * @throws InterruptedException
      * @throws IOException
      */
-    public void test_writeCacheServiceWORM_6buffers_recordChecksums()
+    public void test_writeCacheService_WORM_6buffers_recordChecksums()
             throws InterruptedException, IOException {
 
         final int nbuffers = 6;
         final boolean useChecksums = true;
         final boolean isHighlyAvailable = false;
 
+        // No write pipeline.
+        final QuorumManager qm = new MockSingletonQuorumManager();
+
         doWORMTest(nbuffers, nrecs, maxreclen, largeRecordRate, useChecksums,
-                isHighlyAvailable);
+                isHighlyAvailable, StoreTypeEnum.WORM, qm);
 
     }
 
@@ -166,15 +181,18 @@ public class TestWORMWriteCacheService extends TestCase3 {
      * @throws InterruptedException
      * @throws IOException
      */
-    public void test_writeCacheServiceWORM_6buffers_recordChecksums_wholeBufferChecksums()
+    public void test_writeCacheService_WORM_6buffers_recordChecksums_wholeBufferChecksums()
             throws InterruptedException, IOException {
 
         final int nbuffers = 6;
         final boolean useChecksums = true;
         final boolean isHighlyAvailable = true;
 
+        // No write pipeline.
+        final QuorumManager qm = new MockSingletonQuorumManager();
+        
         doWORMTest(nbuffers, nrecs, maxreclen, largeRecordRate, useChecksums,
-                isHighlyAvailable);
+                isHighlyAvailable, StoreTypeEnum.WORM, qm);
 
     }
     
@@ -212,20 +230,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
 //        }
 //        
 //    }
-
-    protected void doWORMTest(final int nbuffers, final int nrecs,
-            final int maxreclen, final double largeRecordRate,
-            final boolean useChecksums, final boolean isHighlyAvailable)
-            throws InterruptedException, IOException {
-
-        // @todo override for replication
-        final QuorumManager qm = new MockSingletonQuorumManager();
-
-        doWORMTest(nbuffers, nrecs, maxreclen, largeRecordRate, useChecksums,
-                isHighlyAvailable, StoreTypeEnum.WORM, qm);
-
-    }
-
+    
     /**
      * A stress test for the {@link WriteCacheService} in the WORM mode.
      * 
@@ -865,34 +870,120 @@ public class TestWORMWriteCacheService extends TestCase3 {
     }
 
     /**
-     * A test of a quorum with k == 3, 2 running services, one buffer, and one
-     * record written.
+     * A test of the write pipeline driving from the {@link WriteCacheService}
+     * of the leader using a quorum with k := 3, 2 running services, one buffer,
+     * and one record written.
      * 
      * @throws InterruptedException
      * @throws IOException
-     * 
-     *             FIXME Verify the received data. Write on the disk and compare
-     *             bits or a bit bucket and just do checksums?
-     * 
-     *             FIXME Test w/ {@link HASendService} and
-     *             {@link HAReceiveService} otherwise we have no way to verify
-     *             the whole-buffer checksums.
-     *             <p>
-     *             This is getting close. I need to actually handle the
-     *             replicated records. For that purpose, it might be nice to
-     *             reconcile the {@link MockQuorum} here with the one in the
-     *             com.bigdata.journal.ha test package.
      */
-    public void test_writeCacheServiceWORM_1buffer_HA_k3_size2()
+    public void test_writeCacheService_WORM_1record_1buffer_HA_k3_size2()
             throws InterruptedException, IOException {
 
         final int nbuffers = 1;
         final int nrecs = 1;
         final double largeRecordRate = 0d;
         final boolean useChecksums = true;
+        // Note: This must be true for the write pipeline.
         final boolean isHighlyAvailable = true;
 
         final MockQuorumManager qm = new MockQuorumManager(3/* k */, 2/* size */);
+
+        try {
+
+            doWORMTest(nbuffers, nrecs, maxreclen, largeRecordRate,
+                    useChecksums, isHighlyAvailable, StoreTypeEnum.WORM, qm);
+
+        } finally {
+
+            qm.terminate();
+
+        }
+
+    }
+
+    /**
+     * A test of the write pipeline driving from the {@link WriteCacheService}
+     * of the leader using a quorum with k := 3, 2 running services, one buffer
+     * and the default #of records written and the default percentage of large
+     * records.
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void test_writeCacheService_WORM_1buffer_HA_k3_size2()
+            throws InterruptedException, IOException {
+
+        final int nbuffers = 1;
+        final boolean useChecksums = true;
+        // Note: This must be true for the write pipeline.
+        final boolean isHighlyAvailable = true;
+
+        final MockQuorumManager qm = new MockQuorumManager(3/* k */, 2/* size */);
+
+        try {
+
+            doWORMTest(nbuffers, nrecs, maxreclen, largeRecordRate,
+                    useChecksums, isHighlyAvailable, StoreTypeEnum.WORM, qm);
+
+        } finally {
+
+            qm.terminate();
+
+        }
+
+    }
+
+    /**
+     * A test of the write pipeline driving from the {@link WriteCacheService}
+     * of the leader using a quorum with k := 3, 2 running services, two buffers
+     * and the default #of records written and the default percentage of large
+     * records.
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void test_writeCacheService_WORM_2buffer_HA_k3_size2()
+            throws InterruptedException, IOException {
+
+        final int nbuffers = 2;
+        final boolean useChecksums = true;
+        // Note: This must be true for the write pipeline.
+        final boolean isHighlyAvailable = true;
+
+        final MockQuorumManager qm = new MockQuorumManager(3/* k */, 2/* size */);
+
+        try {
+
+            doWORMTest(nbuffers, nrecs, maxreclen, largeRecordRate,
+                    useChecksums, isHighlyAvailable, StoreTypeEnum.WORM, qm);
+
+        } finally {
+
+            qm.terminate();
+
+        }
+
+    }
+
+    /**
+     * A test of the write pipeline driving from the {@link WriteCacheService}
+     * of the leader using a quorum with k := 3, 3 running services, six buffers
+     * and the default #of records written and the default percentage of large
+     * records.
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void test_writeCacheService_WORM_2buffer_HA_k3_size3()
+            throws InterruptedException, IOException {
+
+        final int nbuffers = 6;
+        final boolean useChecksums = true;
+        // Note: This must be true for the write pipeline.
+        final boolean isHighlyAvailable = true;
+
+        final MockQuorumManager qm = new MockQuorumManager(3/* k */, 3/* size */);
 
         try {
 
@@ -915,19 +1006,25 @@ public class TestWORMWriteCacheService extends TestCase3 {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      */
-    private class MockQuorumManager implements QuorumManager {
+    static private class MockQuorumManager implements QuorumManager {
 
         /** the replication factor (desired replication count). */
         final private int k;
 
         /** the actual replication count. */
-        final private int size; 
-        
+        final private int size;
+
         /** one quorum per node. */
         final private Quorum[] quorums;
-        
-        /** the send/receive address of each service. */
+
+        /** The send/receive address of each service. */
         final InetSocketAddress[] addrs;
+
+        /**
+         * The HAGlue interface of each service (only the write replication API
+         * is implemented by the mock object).
+         */
+        final HAGlue[] haGlues;
 
         /** send service for the leader. */
         final private HASendService sendService;
@@ -942,15 +1039,21 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
         /**
          * The buffer used to relay the data. This is only allocated for a
-         * follower with a downstream follower. The indices are the quorum index
-         * values. Quorum members that do not relay will have a
-         * <code>null</code> at their corresponding index.
+         * follower. The indices are the quorum index values. Quorum members
+         * that do not relay will have a <code>null</code> at their
+         * corresponding index.
          */
-        private final ByteBuffer receiveAndReplicateBuffer[];
+        private final ByteBuffer receiveBuffers[];
+        
+        /**
+         * Thread pool used by the {@link Quorum} to relay messages to the
+         * downstream service.
+         */
+        final private ExecutorService executorService;
         
         /** The current quorum token. */
         private long token = Quorum.NO_QUORUM;
-
+        
         /**
          * 
          * @param k
@@ -960,6 +1063,8 @@ public class TestWORMWriteCacheService extends TestCase3 {
          * 
          * @throws IOException
          * @throws InterruptedException
+         * 
+         * @todo move all the startup stuff into an init().
          */
         public MockQuorumManager(final int k, final int size)
                 throws IOException, InterruptedException {
@@ -979,41 +1084,65 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
             this.addrs = new InetSocketAddress[k];
 
+            this.haGlues = new HAGlue[k];
+            
             this.receiveServices = new HAReceiveService[k];
             
-            this.receiveAndReplicateBuffer = new ByteBuffer[k];
+            this.receiveBuffers = new ByteBuffer[k];
             
             this.quorums = new Quorum[k];
 
+            this.executorService = Executors
+                    .newCachedThreadPool(DaemonThreadFactory
+                            .defaultThreadFactory());
+            
             HASendService sendService = null;
             
             for (int i = size - 1; i >= 0; i--) {
 
                 addrs[i] = new InetSocketAddress(getPort(0/* suggestedPort */));
 
+                haGlues[i] = new MockHAGlue(i);
+                
                 if (i == 0) {
                     
+                    /*
+                     * Leader.
+                     */
+                    
+                    // Setup the send service.
                     sendService = new HASendService(addrs[i + 1]);
 
+                    // Start the send service.
                     sendService.start();
 
                 } else {
 
-                    if (addrs[i + 1] != null) {
+                    /*
+                     * Follower.
+                     */
 
-                        /*
-                         * Acquire buffer from the pool iff there is a service
-                         * which is downstream from this service.
-                         */
-                        
-                        receiveAndReplicateBuffer[i] = DirectBufferPool.INSTANCE
-                                .acquire();
-                        
-                    }
-                    
+                    // Acquire buffer from the pool to receive data.
+                    receiveBuffers[i] = DirectBufferPool.INSTANCE.acquire();
+
+                    // Setup the receive service.
+                    final int index = i;
+                    final InetSocketAddress addrSelf = addrs[i];
+                    final InetSocketAddress addrNext = i + 1 == size ? null
+                            : addrs[i + 1];
                     receiveServices[i] = new HAReceiveService<HAWriteMessage>(
-                            addrs[i]/* self */, addrs[i + 1]/* next */);
+                            addrSelf, addrNext,
+                            new IHAReceiveCallback<HAWriteMessage>() {
 
+                                public void callback(HAWriteMessage msg,
+                                        ByteBuffer data) throws Exception {
+
+                                    handleReplicatedWrite(index, msg, data);
+
+                                }
+                            });
+                    
+                    // Start the receive service.
                     receiveServices[i].start();
 
                 }
@@ -1090,6 +1219,22 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
             }
 
+            for (ByteBuffer b : receiveBuffers) {
+
+                if (b != null) {
+
+                    try {
+                        DirectBufferPool.INSTANCE.release(b);
+                    } catch (InterruptedException e) {
+                        log.error(e, e);
+                    }
+                    
+                }
+                
+            }
+            
+            executorService.shutdownNow();
+            
         }
 
         /**
@@ -1099,7 +1244,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
          * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
          *         Thompson</a>
          */
-        private class MockQuorum implements Quorum {
+        private class MockQuorum extends AbstractQuorum {
 
             private final int index;
 
@@ -1130,6 +1275,12 @@ public class TestWORMWriteCacheService extends TestCase3 {
             public boolean isLeader() {
                 
                 return index == 0;
+                
+            }
+
+            public boolean isFollower() {
+                
+                return index > 0;
                 
             }
 
@@ -1167,18 +1318,28 @@ public class TestWORMWriteCacheService extends TestCase3 {
                         throw new RuntimeException(e);
                     }
 
-                    if (receiveAndReplicateBuffer[index] != null) {
+                    if (receiveBuffers[index] != null) {
                         try {
                             /*
                              * Release the buffer back to the pool.
                              */
                             DirectBufferPool.INSTANCE
-                                    .release(receiveAndReplicateBuffer[index]);
+                                    .release(receiveBuffers[index]);
                         } catch (InterruptedException e) {
                             throw new RuntimeException(e);
                         }
                     }
                 }
+            }
+
+            public HAGlue getHAGlue(int index) {
+                if (index < 0 || index >= replicationFactor())
+                    throw new IndexOutOfBoundsException();
+                return haGlues[index];
+            }
+
+            public ExecutorService getExecutorService() {
+                return executorService;
             }
 
             /*
@@ -1190,16 +1351,6 @@ public class TestWORMWriteCacheService extends TestCase3 {
             }
 
             public void commit2Phase(long commitTime) throws IOException {
-                throw new UnsupportedOperationException();
-            }
-
-            public HAGlue getHAGlue(int index) {
-                if (index < 0 || index >= replicationFactor())
-                    throw new IndexOutOfBoundsException();
-                throw new UnsupportedOperationException();
-            }
-
-            public ExecutorService getExecutorService() {
                 throw new UnsupportedOperationException();
             }
 
@@ -1235,34 +1386,117 @@ public class TestWORMWriteCacheService extends TestCase3 {
                 
             }
 
-            /**
-             * Not supported for a standalone journal.
-             * 
-             * @throws UnsupportedOperationException
-             *             always.
-             */
-            public Future<Void> replicate(HAWriteMessage msg, ByteBuffer b)
-                    throws IOException {
+            @Override
+            protected ByteBuffer getReceiveBuffer() {
 
-                if(!isLeader())
-                    throw new UnsupportedOperationException();
+                assertFollower();
                 
-                throw new UnsupportedOperationException();
+                return receiveBuffers[index];
                 
-            }
-
-            /**
-             * Not supported for a standalone journal.
-             * 
-             * @throws UnsupportedOperationException
-             *             always.
-             */
-            public Future<Void> receiveAndReplicate(HAWriteMessage msg)
-                    throws IOException {
-                throw new UnsupportedOperationException();
             }
 
         } // MockQuorum
+
+        /**
+         * Mock object implements only the methods to support write replication.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+         * @version $Id$
+         */
+        class MockHAGlue implements HAGlue {
+
+            /**
+             * Index into {@link MockQuorumManager#haGlues}
+             */
+            private final int index;
+            
+            MockHAGlue(final int index) {
+                this.index = index;
+            }
+            
+            public RunnableFuture<Void> abort2Phase(long token)
+                    throws IOException {
+                throw new UnsupportedOperationException();
+            }
+
+            public RunnableFuture<Void> commit2Phase(long commitTime)
+                    throws IOException {
+                throw new UnsupportedOperationException();
+            }
+
+            public IRootBlockView getRootBlock() throws IOException {
+                throw new UnsupportedOperationException();
+            }
+
+            public RunnableFuture<Boolean> prepare2Phase(
+                    IRootBlockView rootBlock) throws IOException {
+                throw new UnsupportedOperationException();
+            }
+
+            public RunnableFuture<ByteBuffer> readFromDisk(long token, long addr)
+                    throws IOException {
+                throw new UnsupportedOperationException();
+            }
+
+            public InetSocketAddress getWritePipelineAddr() {
+                return addrs[index];
+            }
+
+            /**
+             * Relay the message to the next service in the quorum index order.
+             */
+            public Future<Void> receiveAndReplicate(HAWriteMessage msg)
+                    throws IOException {
+
+                return quorums[index].receiveAndReplicate(msg);
+
+            }
+            
+        }
+
+        /**
+         * Core implementation handles the message and payload when received on
+         * a service.
+         * 
+         * @param index
+         *            The index of this service.
+         * @param msg
+         *            Metadata about a buffer containing data replicated to this
+         *            node.
+         * @param data
+         *            The buffer containing the data.
+         * @throws Exception
+         */
+        private void handleReplicatedWrite(final int index,
+                final HAWriteMessage msg, final ByteBuffer data)
+                throws Exception {
+
+            if (log.isTraceEnabled())
+                log.trace("message=" + msg + ", data=" + data);
+
+            final ChecksumUtility chk = ChecksumUtility.threadChk.get();
+
+            final int actualChk = chk.checksum(data);
+
+            if (msg.getChk() != actualChk) {
+
+                /*
+                 * Note: This is how we validate the write pipeline. The
+                 * HAReceiveService also has basically the same logic, so this
+                 * is not really adding much (if any) value here. Everyone is
+                 * using the same ChecksumUtility, so a correlated failure is
+                 * possible. If we wanted to go a little further, we could
+                 * collect the data in memory or write it to the disk, and then
+                 * verify it byte by byte.
+                 */
+                
+                fail("index=" + index + ", expected=" + msg.getChk()
+                        + ", actual=" + actualChk + ", msg=" + msg + ", data="
+                        + data);
+
+            }
+
+        }
 
     } // MockQuorumManager
 

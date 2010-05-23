@@ -66,11 +66,6 @@ public interface Quorum {
     /** Return true iff size GTE (capacity + 1). */
     boolean isQuorumMet();
 
-//    /**
-//     * Submits the message for execution by the next node in the quorum.
-//     */
-//    <T> void applyNext(RunnableFuture<T> r);
-
     /**
      * Return <code>true</code> iff this node is the quorum leader. The quorum
      * leader is the only node which will accept writes. Note that is always
@@ -78,6 +73,12 @@ public interface Quorum {
      */
     boolean isLeader();
 
+    /**
+     * Return <code>true</code> iff this node is a quorum follower. This is
+     * <code>true</code> of all nodes in a {@link Quorum} except for the leader.
+     */
+    boolean isFollower();
+    
     /**
      * Return <code>true</code> iff the quorum is highly available and this node
      * is last one in the write pipeline (it will not return true for a
@@ -180,7 +181,10 @@ public interface Quorum {
 
     /**
      * Return a {@link Future} for a task which will replicate an NIO buffer
-     * along the write pipeline.  This method is only invoked by the master.
+     * along the write pipeline. This method is only invoked by the master. The
+     * payload is replicated to the first follower in the write pipeline. That
+     * follower will accept the payload (and replicate it if necessary) using
+     * {@link #receiveAndReplicate(HAWriteMessage)}.
      * 
      * @param msg
      *            The RMI metadata about the payload.

@@ -96,6 +96,10 @@ public class MockSingletonQuorumManager implements QuorumManager {
         public boolean isLeader() {
             return true;
         }
+        
+        public boolean isFollower() {
+            return false;
+        }
 
         public boolean isLastInChain() {
             return false;
