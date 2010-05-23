@@ -140,6 +140,26 @@ public class HASendService {
     }
 
     /**
+     * Open the connection to the socket specified in the constructor and
+     * start the thread pool on which the payloads will be send.
+     */
+    synchronized public void start() throws IOException {
+
+        // already running?
+        if (executorRef.get() != null)
+            throw new IllegalStateException();
+        
+        if (log.isInfoEnabled())
+            log.info(toString());
+
+        executorRef.set(Executors.newSingleThreadExecutor());
+        
+        if (incSocketChannel == null)           
+            incSocketChannel = openChannel(addr);
+
+    }
+
+    /**
      * Immediate shutdown. Any transfer in process will be interrupted.
      */
     synchronized public void terminate() {
@@ -200,27 +220,10 @@ public class HASendService {
         if (tmp == null)
             throw new IllegalStateException();
 
+        if (log.isTraceEnabled())
+            log.trace("Will send " + buffer.remaining() + " bytes");
+
         return tmp.submit(newIncSendTask(buffer.asReadOnlyBuffer()));
-
-	}
-
-    /**
-     * Open the connection to the socket specified in the constructor and
-     * start the thread pool on which the payloads will be send.
-     */
-	synchronized public void start() throws IOException {
-
-	    // already running?
-        if (executorRef.get() != null)
-            throw new IllegalStateException();
-	    
-	    if (log.isInfoEnabled())
-            log.info(toString());
-
-	    executorRef.set(Executors.newSingleThreadExecutor());
-	    
-	    if (incSocketChannel == null) 	    	
-	    	incSocketChannel = openChannel(addr);
 
 	}
 

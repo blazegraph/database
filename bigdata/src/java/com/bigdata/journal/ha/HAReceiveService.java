@@ -802,6 +802,12 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
     public Future<Void> receiveData(final M msg, final ByteBuffer buffer)
             throws InterruptedException {
 
+        if (msg == null)
+            throw new IllegalArgumentException();
+
+        if (buffer == null)
+            throw new IllegalArgumentException();
+
         lock.lockInterruptibly();
         try {
             message = msg;

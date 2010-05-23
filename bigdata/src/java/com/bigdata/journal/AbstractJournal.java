@@ -3708,6 +3708,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             return true;
         }
 
+        public boolean isFollower() {
+            return false;
+        }
+
         public boolean isLastInChain() {
             return false;
         }
