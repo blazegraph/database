@@ -61,6 +61,7 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.concurrent.Memoizer;
 
 /**
  * This class provides a write cache with read-through for NIO writes on a
@@ -1567,13 +1568,18 @@ abstract public class WriteCache implements IWriteCache {
     /**
      * The scattered write cache is used by the {@link RWStore} since the writes
      * can be made to any part of the file assigned for data allocation.
-     * 
+     * <p>
      * The writeonChannel must therefore utilize the {@link RecordMetadata} to
      * write each update separately.
+     * <p>
+     * To support HA, we prefix each write with the file position and buffer
+     * length in the cache. This enables the cache buffer to be sent as a single
+     * stream and the RecordMap rebuilt downstream.
      * 
-     * To support HA, we prefix each write with the fileposition and buffer length in the cache.
-     * This enables the cache buffer to be sent as a single stream and the RecordMap
-     * rebuilt downstream.
+     * FIXME The throughput is much lower for the RW mode . Look into putting a
+     * thread pool to work on the scattered writes. This could be part of a
+     * refactor to apply a thread pool to IOs and related to prefetch and
+     * {@link Memoizer} behaviors.
      */
 	public static class FileChannelScatteredWriteCache extends WriteCache {
 

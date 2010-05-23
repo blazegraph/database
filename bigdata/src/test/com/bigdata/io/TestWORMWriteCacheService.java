@@ -36,7 +36,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.text.NumberFormat;
-import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -47,6 +46,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.Adler32;
 
+import com.bigdata.io.WriteCache.FileChannelScatteredWriteCache;
+import com.bigdata.io.WriteCache.FileChannelWriteCache;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.journal.ha.AbstractQuorum;
@@ -69,8 +70,10 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @version $Id: TestWriteCacheService.java 2866 2010-05-18 18:36:35Z
  *          thompsonbry $
  * 
- *          FIXME Also apply to the RW store. This will require prefix metadata
- *          and we also need to reorder the records before we write them.
+ * @todo This fails when large records are allowed. Review w/ Martyn handling of
+ *       large records for the RW store. I believe that they are by writing a
+ *       set of smaller records, in which case we just need to set the
+ *       largeRecordRate to ZERO (0d) for the RW (scattered write) mode tests.
  */
 public class TestWORMWriteCacheService extends TestCase3 {
 
@@ -98,9 +101,15 @@ public class TestWORMWriteCacheService extends TestCase3 {
      */
     
     /**
-     * The #of records to write. 10k is small. 100k is reasonable.
+     * The #of records to write. 10k is small and the file system cache can
+     * often absorb the data immediately. 100k is reasonable.
      */
     static final int nrecs = 100000;
+
+    /**
+     * The #of records to write for an RW store.
+     */
+    static final int nrecsRW = nrecs;
 
     /**
      * The maximum size of a normal record. The database averages 1k per record
@@ -120,7 +129,8 @@ public class TestWORMWriteCacheService extends TestCase3 {
      * @throws InterruptedException
      * @throws IOException
      */
-    public void test_writeCacheService_WORM_1buffer() throws InterruptedException, IOException {
+    public void test_writeCacheService_WORM_1buffer()
+            throws InterruptedException, IOException {
 
         final int nbuffers = 1;
         final boolean useChecksums = false;
@@ -129,17 +139,47 @@ public class TestWORMWriteCacheService extends TestCase3 {
         // No write pipeline.
         final QuorumManager qm = new MockSingletonQuorumManager();
 
-        doWORMTest(nbuffers, nrecs, maxreclen, largeRecordRate, useChecksums,
+        doStressTest(nbuffers, nrecs, maxreclen, largeRecordRate, useChecksums,
                 isHighlyAvailable, StoreTypeEnum.WORM, qm);
 
     }
 
     /**
-     * A test which looks for starvation conditions (2 buffers).
+     * A test which looks for deadlock conditions (one buffer).
+     * 
      * @throws InterruptedException
      * @throws IOException
      */
-    public void test_writeCacheService_WORM_2buffers() throws InterruptedException, IOException {
+    public void test_writeCacheService_RW_1buffer()
+            throws InterruptedException, IOException {
+
+        final int nbuffers = 1;
+        final int nrecs = nrecsRW;
+        /*
+         * Note: The RW store breaks large records into multiple allocations,
+         * each of which is LTE the size of the write cache so we do not test
+         * with large records here.
+         */
+        final double largeRecordRate = 0d;
+        final boolean useChecksums = false;
+        final boolean isHighlyAvailable = false;
+
+        // No write pipeline.
+        final QuorumManager qm = new MockSingletonQuorumManager();
+
+        doStressTest(nbuffers, nrecs, maxreclen, largeRecordRate, useChecksums,
+                isHighlyAvailable, StoreTypeEnum.RW, qm);
+
+    }
+
+    /**
+     * A test which looks for starvation conditions (2 buffers).
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void test_writeCacheService_WORM_2buffers()
+            throws InterruptedException, IOException {
 
         final int nbuffers = 2;
         final boolean useChecksums = false;
@@ -148,8 +188,36 @@ public class TestWORMWriteCacheService extends TestCase3 {
         // No write pipeline.
         final QuorumManager qm = new MockSingletonQuorumManager();
 
-        doWORMTest(nbuffers, nrecs, maxreclen, largeRecordRate, useChecksums,
+        doStressTest(nbuffers, nrecs, maxreclen, largeRecordRate, useChecksums,
                 isHighlyAvailable, StoreTypeEnum.WORM, qm);
+
+    }
+
+    /**
+     * A test which looks for starvation conditions (2 buffers).
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void test_writeCacheService_RW_2buffers()
+            throws InterruptedException, IOException {
+
+        final int nbuffers = 2;
+        final int nrecs = nrecsRW;
+        /*
+         * Note: The RW store breaks large records into multiple allocations,
+         * each of which is LTE the size of the write cache so we do not test
+         * with large records here.
+         */
+        final double largeRecordRate = 0d;
+        final boolean useChecksums = false;
+        final boolean isHighlyAvailable = false;
+
+        // No write pipeline.
+        final QuorumManager qm = new MockSingletonQuorumManager();
+
+        doStressTest(nbuffers, nrecs, maxreclen, largeRecordRate, useChecksums,
+                isHighlyAvailable, StoreTypeEnum.RW, qm);
 
     }
 
@@ -169,8 +237,36 @@ public class TestWORMWriteCacheService extends TestCase3 {
         // No write pipeline.
         final QuorumManager qm = new MockSingletonQuorumManager();
 
-        doWORMTest(nbuffers, nrecs, maxreclen, largeRecordRate, useChecksums,
+        doStressTest(nbuffers, nrecs, maxreclen, largeRecordRate, useChecksums,
                 isHighlyAvailable, StoreTypeEnum.WORM, qm);
+
+    }
+
+    /**
+     * A high throughput configuration with record level checksums.
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void test_writeCacheService_RW_6buffers_recordChecksums()
+            throws InterruptedException, IOException {
+
+        final int nbuffers = 6;
+        final int nrecs = nrecsRW;
+        /*
+         * Note: The RW store breaks large records into multiple allocations,
+         * each of which is LTE the size of the write cache so we do not test
+         * with large records here.
+         */
+        final double largeRecordRate = 0d;
+        final boolean useChecksums = true;
+        final boolean isHighlyAvailable = false;
+
+        // No write pipeline.
+        final QuorumManager qm = new MockSingletonQuorumManager();
+
+        doStressTest(nbuffers, nrecs, maxreclen, largeRecordRate, useChecksums,
+                isHighlyAvailable, StoreTypeEnum.RW, qm);
 
     }
 
@@ -191,48 +287,326 @@ public class TestWORMWriteCacheService extends TestCase3 {
         // No write pipeline.
         final QuorumManager qm = new MockSingletonQuorumManager();
         
-        doWORMTest(nbuffers, nrecs, maxreclen, largeRecordRate, useChecksums,
+        doStressTest(nbuffers, nrecs, maxreclen, largeRecordRate, useChecksums,
                 isHighlyAvailable, StoreTypeEnum.WORM, qm);
 
     }
     
-//    interface WriteCacheServiceFactory {
-//        
-//        WriteCacheService newWriteCacheService(final int nbuffers,
-//                final boolean useChecksums, final boolean isHighlyAvailable,
-//                final boolean );
-//
-//    }
-//    
-//    static class WORMWriteCacheServiceFactory implements WriteCacheServiceFactory {
-//
-//        public WriteCacheService newWriteCacheService() {
-//            
-//            final QuorumManager qm = new MockSingletonQuorumManager();
-//
-//            return new WriteCacheService(nbuffers, useChecksums,
-//                    fileExtent, opener, qm) {
-//
-//                @Override
-//                public WriteCache newWriteCache(ByteBuffer buf,
-//                        boolean useChecksum, boolean bufferHasData,
-//                        IReopenChannel<? extends Channel> opener)
-//                        throws InterruptedException {
-//
-//                    return new WORMWriteCacheImpl(0/* baseOffset */, buf,
-//                            useChecksum, isHighlyAvailable, bufferHasData,
-//                            (IReopenChannel<FileChannel>) opener);
-//
-//                }
-//
-//            };
-//
-//        }
-//        
-//    }
+    /**
+     * A high throughput configuration with record level checksums and whole
+     * buffer checksums.
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void test_writeCacheService_RW_6buffers_recordChecksums_wholeBufferChecksums()
+            throws InterruptedException, IOException {
+
+        final int nbuffers = 6;
+        final int nrecs = nrecsRW;
+        /*
+         * Note: The RW store breaks large records into multiple allocations,
+         * each of which is LTE the size of the write cache so we do not test
+         * with large records here.
+         */
+        final double largeRecordRate = 0d;
+        final boolean useChecksums = true;
+        final boolean isHighlyAvailable = true;
+
+        // No write pipeline.
+        final QuorumManager qm = new MockSingletonQuorumManager();
+        
+        doStressTest(nbuffers, nrecs, maxreclen, largeRecordRate, useChecksums,
+                isHighlyAvailable, StoreTypeEnum.RW, qm);
+
+    }
     
     /**
-     * A stress test for the {@link WriteCacheService} in the WORM mode.
+     * A test of the write pipeline driving from the {@link WriteCacheService}
+     * of the leader using a quorum with k := 3, 2 running services, one buffer,
+     * and one record written.
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void test_writeCacheService_HA_WORM_1record_1buffer_k3_size2()
+            throws InterruptedException, IOException {
+
+        final int nbuffers = 1;
+        final int nrecs = 1;
+        final double largeRecordRate = 0d;
+        final boolean useChecksums = true;
+        // Note: This must be true for the write pipeline.
+        final boolean isHighlyAvailable = true;
+
+        final MockQuorumManager qm = new MockQuorumManager(3/* k */, 2/* size */);
+
+        try {
+
+            doStressTest(nbuffers, nrecs, maxreclen, largeRecordRate,
+                    useChecksums, isHighlyAvailable, StoreTypeEnum.WORM, qm);
+
+        } finally {
+
+            qm.terminate();
+
+        }
+
+    }
+    
+    /**
+     * A test of the write pipeline driving from the {@link WriteCacheService}
+     * of the leader using a quorum with k := 3, 2 running services, one buffer,
+     * and one record written.
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void test_writeCacheService_HA_RW_1record_1buffer_k3_size2()
+            throws InterruptedException, IOException {
+
+        final int nbuffers = 1;
+        final int nrecs = 1;
+        /*
+         * Note: The RW store breaks large records into multiple allocations,
+         * each of which is LTE the size of the write cache so we do not test
+         * with large records here.
+         */
+        final double largeRecordRate = 0d;
+        final boolean useChecksums = true;
+        // Note: This must be true for the write pipeline.
+        final boolean isHighlyAvailable = true;
+
+        final MockQuorumManager qm = new MockQuorumManager(3/* k */, 2/* size */);
+
+        try {
+
+            doStressTest(nbuffers, nrecs, maxreclen, largeRecordRate,
+                    useChecksums, isHighlyAvailable, StoreTypeEnum.RW, qm);
+
+        } finally {
+
+            qm.terminate();
+
+        }
+
+    }
+
+    /**
+     * A test of the write pipeline driving from the {@link WriteCacheService}
+     * of the leader using a quorum with k := 3, 2 running services, one buffer
+     * and the default #of records written and the default percentage of large
+     * records.
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void test_writeCacheService_HA_WORM_1buffer_k3_size2()
+            throws InterruptedException, IOException {
+
+        final int nbuffers = 1;
+        final boolean useChecksums = true;
+        // Note: This must be true for the write pipeline.
+        final boolean isHighlyAvailable = true;
+
+        final MockQuorumManager qm = new MockQuorumManager(3/* k */, 2/* size */);
+
+        try {
+
+            doStressTest(nbuffers, nrecs, maxreclen, largeRecordRate,
+                    useChecksums, isHighlyAvailable, StoreTypeEnum.WORM, qm);
+
+        } finally {
+
+            qm.terminate();
+
+        }
+
+    }
+
+    /**
+     * A test of the write pipeline driving from the {@link WriteCacheService}
+     * of the leader using a quorum with k := 3, 2 running services, one buffer
+     * and the default #of records written and the default percentage of large
+     * records.
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void test_writeCacheService_HA_RW_1buffer_k3_size2()
+            throws InterruptedException, IOException {
+
+        final int nbuffers = 1;
+        final int nrecs = nrecsRW;
+        /*
+         * Note: The RW store breaks large records into multiple allocations,
+         * each of which is LTE the size of the write cache so we do not test
+         * with large records here.
+         */
+        final double largeRecordRate = 0d;
+        final boolean useChecksums = true;
+        // Note: This must be true for the write pipeline.
+        final boolean isHighlyAvailable = true;
+
+        final MockQuorumManager qm = new MockQuorumManager(3/* k */, 2/* size */);
+
+        try {
+
+            doStressTest(nbuffers, nrecs, maxreclen, largeRecordRate,
+                    useChecksums, isHighlyAvailable, StoreTypeEnum.WORM, qm);
+
+        } finally {
+
+            qm.terminate();
+
+        }
+
+    }
+
+    /**
+     * A test of the write pipeline driving from the {@link WriteCacheService}
+     * of the leader using a quorum with k := 3, 2 running services, two buffers
+     * and the default #of records written and the default percentage of large
+     * records.
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void test_writeCacheService_HA_WORM_2buffer_k3_size2()
+            throws InterruptedException, IOException {
+
+        final int nbuffers = 2;
+        final boolean useChecksums = true;
+        // Note: This must be true for the write pipeline.
+        final boolean isHighlyAvailable = true;
+
+        final MockQuorumManager qm = new MockQuorumManager(3/* k */, 2/* size */);
+
+        try {
+
+            doStressTest(nbuffers, nrecs, maxreclen, largeRecordRate,
+                    useChecksums, isHighlyAvailable, StoreTypeEnum.WORM, qm);
+
+        } finally {
+
+            qm.terminate();
+
+        }
+
+    }
+
+    /**
+     * A test of the write pipeline driving from the {@link WriteCacheService}
+     * of the leader using a quorum with k := 3, 2 running services, two buffers
+     * and the default #of records written and the default percentage of large
+     * records.
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void test_writeCacheService_HA_RW_2buffer_k3_size2()
+            throws InterruptedException, IOException {
+
+        final int nbuffers = 2;
+        final int nrecs = nrecsRW;
+        /*
+         * Note: The RW store breaks large records into multiple allocations,
+         * each of which is LTE the size of the write cache so we do not test
+         * with large records here.
+         */
+        final double largeRecordRate = 0d;
+        final boolean useChecksums = true;
+        // Note: This must be true for the write pipeline.
+        final boolean isHighlyAvailable = true;
+
+        final MockQuorumManager qm = new MockQuorumManager(3/* k */, 2/* size */);
+
+        try {
+
+            doStressTest(nbuffers, nrecs, maxreclen, largeRecordRate,
+                    useChecksums, isHighlyAvailable, StoreTypeEnum.WORM, qm);
+
+        } finally {
+
+            qm.terminate();
+
+        }
+
+    }
+
+    /**
+     * A test of the write pipeline driving from the {@link WriteCacheService}
+     * of the leader using a quorum with k := 3, 3 running services, six buffers
+     * and the default #of records written and the default percentage of large
+     * records.
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void test_writeCacheService_HA_WORM_2buffer_k3_size3()
+            throws InterruptedException, IOException {
+
+        final int nbuffers = 6;
+        final boolean useChecksums = true;
+        // Note: This must be true for the write pipeline.
+        final boolean isHighlyAvailable = true;
+
+        final MockQuorumManager qm = new MockQuorumManager(3/* k */, 3/* size */);
+
+        try {
+
+            doStressTest(nbuffers, nrecs, maxreclen, largeRecordRate,
+                    useChecksums, isHighlyAvailable, StoreTypeEnum.WORM, qm);
+
+        } finally {
+
+            qm.terminate();
+
+        }
+
+    }
+    
+    /**
+     * A test of the write pipeline driving from the {@link WriteCacheService}
+     * of the leader using a quorum with k := 3, 3 running services, six buffers
+     * and the default #of records written and the default percentage of large
+     * records.
+     * 
+     * @throws InterruptedException
+     * @throws IOException
+     */
+    public void test_writeCacheService_HA_RW_2buffer_k3_size3()
+            throws InterruptedException, IOException {
+
+        final int nbuffers = 6;
+        final int nrecs = nrecsRW;
+        /*
+         * Note: The RW store breaks large records into multiple allocations,
+         * each of which is LTE the size of the write cache so we do not test
+         * with large records here.
+         */
+        final double largeRecordRate = 0d;
+        final boolean useChecksums = true;
+        // Note: This must be true for the write pipeline.
+        final boolean isHighlyAvailable = true;
+
+        final MockQuorumManager qm = new MockQuorumManager(3/* k */, 3/* size */);
+
+        try {
+
+            doStressTest(nbuffers, nrecs, maxreclen, largeRecordRate,
+                    useChecksums, isHighlyAvailable, StoreTypeEnum.WORM, qm);
+
+        } finally {
+
+            qm.terminate();
+
+        }
+
+    }
+    
+    /**
+     * A stress test for the {@link WriteCacheService}.
      * 
      * @param nbuffers
      *            The #of {@link WriteCache} buffers.
@@ -252,11 +626,10 @@ public class TestWORMWriteCacheService extends TestCase3 {
      * @throws InterruptedException
      * @throws IOException
      */
-    protected void doWORMTest(final int nbuffers, final int nrecs,
+    protected void doStressTest(final int nbuffers, final int nrecs,
             final int maxreclen, final double largeRecordRate,
             final boolean useChecksums, final boolean isHighlyAvailable,
-            final StoreTypeEnum storeType,
-            final QuorumManager qm)
+            final StoreTypeEnum storeType, final QuorumManager qm)
             throws InterruptedException, IOException {
 
         if (log.isInfoEnabled()) {
@@ -272,19 +645,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         WriteCacheService writeCacheService = null;
         try {
 
-            if (StoreTypeEnum.WORM != storeType) {
-
-                /*
-                 * The RW store is a bit different and might require a different
-                 * test altogether since records are scattered not ordered (or
-                 * we can just randomize their write order once generated).
-                 */
-                
-                fail("RW not supported yet but this test suite");
-                
-            }
-            
-            file = File.createTempFile(getName(), ".worm.tmp");
+            file = File.createTempFile(getName(), "." + storeType + ".tmp");
 
             opener = new ReopenFileChannel(file, "rw");
             
@@ -299,9 +660,19 @@ public class TestWORMWriteCacheService extends TestCase3 {
                         IReopenChannel<? extends Channel> opener)
                         throws InterruptedException {
 
-                    return new WORMWriteCacheImpl(0/* baseOffset */, buf,
-                            useChecksum, isHighlyAvailable, bufferHasData,
-                            (IReopenChannel<FileChannel>) opener);
+                    switch (storeType) {
+                    case WORM:
+                        return new FileChannelWriteCache(0/* baseOffset */,
+                                buf, useChecksum, isHighlyAvailable,
+                                bufferHasData,
+                                (IReopenChannel<FileChannel>) opener);
+                    case RW:
+                        return new FileChannelScatteredWriteCache(buf,
+                                useChecksum, isHighlyAvailable, bufferHasData,
+                                (IReopenChannel<FileChannel>) opener);
+                    default:
+                        throw new UnsupportedOperationException();
+                    }
 
                 }
 
@@ -325,6 +696,27 @@ public class TestWORMWriteCacheService extends TestCase3 {
                         + (useChecksums ? 4 : 0);
 
                 lastOffset = offset;
+
+            }
+            
+            /*
+             * Randomize the record order for the RW mode.
+             */
+            if (storeType == StoreTypeEnum.RW) {
+
+                final int order[] = getRandomOrder(nrecs);
+                
+                final MockRecord[] tmp = new MockRecord[nrecs];
+
+                // create a random ordering of the records.
+                for (int i = 0; i < nrecs; i++) {
+                    tmp[i] = records[order[i]];
+                }
+
+                // replace with random ordering of the records.
+                for (int i = 0; i < nrecs; i++) {
+                    records[i] = tmp[i];
+                }
 
             }
 
@@ -547,56 +939,57 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
     }
 
-    /**
-     * Simple implementation for unit tests.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     */
-    static private class WORMWriteCacheImpl extends WriteCache.FileChannelWriteCache {
-
-        public WORMWriteCacheImpl(final long baseOffset, final ByteBuffer buf,
-                final boolean useChecksum,
-                final boolean isHighlyAvailable,
-                final boolean bufferHasData,
-                final IReopenChannel<FileChannel> opener)
-                throws InterruptedException {
-
-            super(baseOffset, buf, useChecksum, isHighlyAvailable,
-                    bufferHasData, opener);
-
-        }
-
-        @Override
-        protected boolean writeOnChannel(final ByteBuffer data,
-                final long firstOffset,
-                final Map<Long, RecordMetadata> recordMapIsIgnored,
-                final long nanos) throws InterruptedException, IOException {
-
-            final long begin = System.nanoTime();
-
-            final int dpos = data.position();
-
-            final int nbytes = data.remaining();
-
-            final int nwrites = FileChannelUtility.writeAll(opener, data,
-                    firstOffset);
-
-            final WriteCacheCounters counters = this.counters.get();
-            counters.nwrite += nwrites;
-            counters.bytesWritten += nbytes;
-            counters.elapsedWriteNanos += (System.nanoTime() - begin);
-
-            if (log.isInfoEnabled())
-                log.info("wroteOnDisk: dpos=" + dpos + ", nbytes=" + nbytes
-                        + ", firstOffset=" + firstOffset + ", nrecords="
-                        + recordMapIsIgnored.size());
-
-            return true;
-
-        }
-
-    }
+//    /**
+//     * Simple implementation for unit tests.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+//     *         Thompson</a>
+//     */
+//    static private class WORMWriteCacheImpl extends
+//            WriteCache.FileChannelWriteCache {
+//
+//        public WORMWriteCacheImpl(final long baseOffset, final ByteBuffer buf,
+//                final boolean useChecksum,
+//                final boolean isHighlyAvailable,
+//                final boolean bufferHasData,
+//                final IReopenChannel<FileChannel> opener)
+//                throws InterruptedException {
+//
+//            super(baseOffset, buf, useChecksum, isHighlyAvailable,
+//                    bufferHasData, opener);
+//
+//        }
+//
+//        @Override
+//        protected boolean writeOnChannel(final ByteBuffer data,
+//                final long firstOffset,
+//                final Map<Long, RecordMetadata> recordMapIsIgnored,
+//                final long nanos) throws InterruptedException, IOException {
+//
+//            final long begin = System.nanoTime();
+//
+//            final int dpos = data.position();
+//
+//            final int nbytes = data.remaining();
+//
+//            final int nwrites = FileChannelUtility.writeAll(opener, data,
+//                    firstOffset);
+//
+//            final WriteCacheCounters counters = this.counters.get();
+//            counters.nwrite += nwrites;
+//            counters.bytesWritten += nbytes;
+//            counters.elapsedWriteNanos += (System.nanoTime() - begin);
+//
+//            if (log.isInfoEnabled())
+//                log.info("wroteOnDisk: dpos=" + dpos + ", nbytes=" + nbytes
+//                        + ", firstOffset=" + firstOffset + ", nrecords="
+//                        + recordMapIsIgnored.size());
+//
+//            return true;
+//
+//        }
+//
+//    }
 
     /**
      * An allocation to be written at some offset on a backing channel.
@@ -870,135 +1263,6 @@ public class TestWORMWriteCacheService extends TestCase3 {
     }
 
     /**
-     * A test of the write pipeline driving from the {@link WriteCacheService}
-     * of the leader using a quorum with k := 3, 2 running services, one buffer,
-     * and one record written.
-     * 
-     * @throws InterruptedException
-     * @throws IOException
-     */
-    public void test_writeCacheService_WORM_1record_1buffer_HA_k3_size2()
-            throws InterruptedException, IOException {
-
-        final int nbuffers = 1;
-        final int nrecs = 1;
-        final double largeRecordRate = 0d;
-        final boolean useChecksums = true;
-        // Note: This must be true for the write pipeline.
-        final boolean isHighlyAvailable = true;
-
-        final MockQuorumManager qm = new MockQuorumManager(3/* k */, 2/* size */);
-
-        try {
-
-            doWORMTest(nbuffers, nrecs, maxreclen, largeRecordRate,
-                    useChecksums, isHighlyAvailable, StoreTypeEnum.WORM, qm);
-
-        } finally {
-
-            qm.terminate();
-
-        }
-
-    }
-
-    /**
-     * A test of the write pipeline driving from the {@link WriteCacheService}
-     * of the leader using a quorum with k := 3, 2 running services, one buffer
-     * and the default #of records written and the default percentage of large
-     * records.
-     * 
-     * @throws InterruptedException
-     * @throws IOException
-     */
-    public void test_writeCacheService_WORM_1buffer_HA_k3_size2()
-            throws InterruptedException, IOException {
-
-        final int nbuffers = 1;
-        final boolean useChecksums = true;
-        // Note: This must be true for the write pipeline.
-        final boolean isHighlyAvailable = true;
-
-        final MockQuorumManager qm = new MockQuorumManager(3/* k */, 2/* size */);
-
-        try {
-
-            doWORMTest(nbuffers, nrecs, maxreclen, largeRecordRate,
-                    useChecksums, isHighlyAvailable, StoreTypeEnum.WORM, qm);
-
-        } finally {
-
-            qm.terminate();
-
-        }
-
-    }
-
-    /**
-     * A test of the write pipeline driving from the {@link WriteCacheService}
-     * of the leader using a quorum with k := 3, 2 running services, two buffers
-     * and the default #of records written and the default percentage of large
-     * records.
-     * 
-     * @throws InterruptedException
-     * @throws IOException
-     */
-    public void test_writeCacheService_WORM_2buffer_HA_k3_size2()
-            throws InterruptedException, IOException {
-
-        final int nbuffers = 2;
-        final boolean useChecksums = true;
-        // Note: This must be true for the write pipeline.
-        final boolean isHighlyAvailable = true;
-
-        final MockQuorumManager qm = new MockQuorumManager(3/* k */, 2/* size */);
-
-        try {
-
-            doWORMTest(nbuffers, nrecs, maxreclen, largeRecordRate,
-                    useChecksums, isHighlyAvailable, StoreTypeEnum.WORM, qm);
-
-        } finally {
-
-            qm.terminate();
-
-        }
-
-    }
-
-    /**
-     * A test of the write pipeline driving from the {@link WriteCacheService}
-     * of the leader using a quorum with k := 3, 3 running services, six buffers
-     * and the default #of records written and the default percentage of large
-     * records.
-     * 
-     * @throws InterruptedException
-     * @throws IOException
-     */
-    public void test_writeCacheService_WORM_2buffer_HA_k3_size3()
-            throws InterruptedException, IOException {
-
-        final int nbuffers = 6;
-        final boolean useChecksums = true;
-        // Note: This must be true for the write pipeline.
-        final boolean isHighlyAvailable = true;
-
-        final MockQuorumManager qm = new MockQuorumManager(3/* k */, 3/* size */);
-
-        try {
-
-            doWORMTest(nbuffers, nrecs, maxreclen, largeRecordRate,
-                    useChecksums, isHighlyAvailable, StoreTypeEnum.WORM, qm);
-
-        } finally {
-
-            qm.terminate();
-
-        }
-
-    }
-
-    /**
      * A mock {@link QuorumManager} used to test the HA write pipeline. This
      * sets up one {@link HASendService} and <code>k-1</code>
      * {@link HAReceiveService}s in a pipeline. 
@@ -1053,7 +1317,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         
         /** The current quorum token. */
         private long token = Quorum.NO_QUORUM;
-        
+
         /**
          * 
          * @param k
@@ -1064,7 +1328,8 @@ public class TestWORMWriteCacheService extends TestCase3 {
          * @throws IOException
          * @throws InterruptedException
          * 
-         * @todo move all the startup stuff into an init().
+         * @todo Move all the startup stuff into an init() method on the
+         *       {@link QuorumManager} API.
          */
         public MockQuorumManager(final int k, final int size)
                 throws IOException, InterruptedException {
