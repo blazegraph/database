@@ -693,86 +693,86 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
 
                 // Accept a client connection (blocks)
                 awaitAccept();
-             
+
                 // New client connection.
                 client = new Client(server, downstream);
 
                 // save off reference.
                 clientRef.set(client);
-                
+
             }
 
-                /*
-                 * We should now have parameters ready in the WriteMessage and
-                 * can begin transferring data from the stream to the
-                 * writeCache.
-                 */
-                int rem = message.getSize();
-                while (rem > 0) {
+            /*
+             * We should now have parameters ready in the WriteMessage and can
+             * begin transferring data from the stream to the writeCache.
+             */
+            int rem = message.getSize();
+            while (rem > 0) {
 
-                    client.clientSelector.select();
-                    final Set<SelectionKey> keys = client.clientSelector.selectedKeys();
-                    final Iterator<SelectionKey> iter = keys.iterator();
-                    while (iter.hasNext()) {
-                        iter.next();
-                        iter.remove();
+                client.clientSelector.select();
+                final Set<SelectionKey> keys = client.clientSelector
+                        .selectedKeys();
+                final Iterator<SelectionKey> iter = keys.iterator();
+                while (iter.hasNext()) {
+                    iter.next();
+                    iter.remove();
 
-                        final int rdlen = client.client.read(localBuffer);
+                    final int rdlen = client.client.read(localBuffer);
+                    if (log.isTraceEnabled())
+                        log.trace("Read " + rdlen + " bytes");
+
+                    if (rdlen > 0)
+                        updateChk(rdlen);
+
+                    if (rdlen == -1)
+                        break;
+
+                    rem -= rdlen;
+
+                    /*
+                     * Now forward the most recent transfer bytes downstream
+                     * 
+                     * @todo Since the downstream writes are against a blocking
+                     * mode channel, the receiver on this node runs in sync with
+                     * the receiver on the downstream node. In fact, those
+                     * processes could be decoupled with a bit more effort and
+                     * are only required to synchronize by the end of each
+                     * received payload.
+                     */
+                    if (downstream != null) {
                         if (log.isTraceEnabled())
-                            log.trace("Read " + rdlen + " bytes");
-
-                        if (rdlen > 0)
-                            updateChk(rdlen);
-                        
-                        if (rdlen == -1) 
-                        	break;
-                        
-                        rem -= rdlen;
-
-                        /*
-                         * Now forward the most recent transfer bytes downstream
-                         * 
-                         * @todo Since the downstream writes are against a
-                         * blocking mode channel, the receiver on this node runs
-                         * in sync with the receiver on the downstream node. In
-                         * fact, those processes could be decoupled with a bit
-                         * more effort and are only required to synchronize by
-                         * the end of each received payload.
-                         */
-                        if (downstream != null) {
-                        	if (log.isTraceEnabled())
-                                log.trace("Incremental send of " + rdlen + " bytes");
-                        	final ByteBuffer out = localBuffer.asReadOnlyBuffer();
-                            out.position(localBuffer.position() - rdlen);
-                            out.limit(localBuffer.position());
-                            // send and await : @todo or run IncSendTask in this thread?
-                            downstream.send(out).get();
-                        }
+                            log
+                                    .trace("Incremental send of " + rdlen
+                                            + " bytes");
+                        final ByteBuffer out = localBuffer.asReadOnlyBuffer();
+                        out.position(localBuffer.position() - rdlen);
+                        out.limit(localBuffer.position());
+                        // Send and await Future.
+                        downstream.send(out).get();
                     }
-
-                } // while( rem > 0 )
-                
-                assert localBuffer.position() == message.getSize() : "localBuffer.pos="
-                        + localBuffer.position()
-                        + ", message.size="
-                        + message.getSize();
-                
-                // prepare for reading.
-                localBuffer.flip();
-                
-                if (message.getChk() != (int) chk.getValue()) {
-                    throw new ChecksumError("msg="+message.toString()+", actual="+chk.getValue());
                 }
-//                if (chk.checksum(localBuffer) != message.getChk()) {
-//                	throw new RuntimeException("Checksum Error");
-//                }
 
-                if (callback != null) {
-                    callback.callback(message, localBuffer);
-                }
-                
-                // success.
-                return null;
+            } // while( rem > 0 )
+
+            assert localBuffer.position() == message.getSize() : "localBuffer.pos="
+                    + localBuffer.position()
+                    + ", message.size="
+                    + message.getSize();
+
+            // prepare for reading.
+            localBuffer.flip();
+
+            if (message.getChk() != (int) chk.getValue()) {
+                throw new ChecksumError("msg=" + message.toString()
+                        + ", actual=" + chk.getValue());
+            }
+
+            if (callback != null) {
+                callback.callback(message, localBuffer);
+            }
+
+            // success.
+            return null;
 
         } // call()
             

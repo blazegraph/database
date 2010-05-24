@@ -319,11 +319,6 @@ abstract public class WriteCache implements IWriteCache {
      * necessary in this context to ensure that the receiver can verify the
      * contents of the {@link #buf}. The per-record checksums CAN NOT be used
      * for this purpose since large records may be broken across
-     * 
-     * @todo use the {@link HAReceiveService} technique to bulk copy bytes from
-     *       a direct NIO buffer into a temporary byte[] to compute the
-     *       checksums or adapt/implement {@link Adler32} for direct
-     *       {@link ByteBuffer}.
      */
     final private ChecksumHelper checker;
     
@@ -548,10 +543,18 @@ abstract public class WriteCache implements IWriteCache {
 	    return buf.get().position();
 	    
 	}
-	
-	/**
-	 * The capacity of the buffer.
-	 */
+
+    /**
+     * Return <code>true</code> if there are no records buffered on the cache.
+     * 
+     * @todo This currently tests the {@link #recordMap}. In fact, for at least
+     *       the {@link RWStore} the record map COULD be empty with cleared
+     *       writes on the backing {@link ByteBuffer}. Therefore this tests
+     *       whether the {@link WriteCache} has data to be written but does not
+     *       clearly report whether or not some data has been written onto the
+     *       buffer (and hence it has fewer bytes remaining than might otherwise
+     *       be expected).
+     */
 	final public boolean isEmpty() {
 
 		return recordMap.isEmpty();
@@ -1576,10 +1579,10 @@ abstract public class WriteCache implements IWriteCache {
      * length in the cache. This enables the cache buffer to be sent as a single
      * stream and the RecordMap rebuilt downstream.
      * 
-     * FIXME The throughput is much lower for the RW mode . Look into putting a
-     * thread pool to work on the scattered writes. This could be part of a
-     * refactor to apply a thread pool to IOs and related to prefetch and
-     * {@link Memoizer} behaviors.
+     * FIXME Once the file system cache fills up the throughput is much lower
+     * for the RW mode. Look into putting a thread pool to work on the scattered
+     * writes. This could be part of a refactor to apply a thread pool to IOs
+     * and related to prefetch and {@link Memoizer} behaviors.
      */
 	public static class FileChannelScatteredWriteCache extends WriteCache {
 
@@ -2073,11 +2076,16 @@ abstract public class WriteCache implements IWriteCache {
 		} finally {
 			writeLock.unlock();
 		}
-	}
-	
-	protected void resetRecordMapFromBuffer(final ByteBuffer buf, final Map<Long, RecordMetadata> recordMap) {
-		recordMap.clear();
-		recordMap.put(firstOffset.get(), new RecordMetadata(firstOffset.get(), 0, buf.limit()));
-	}
-	
+    }
+
+    protected void resetRecordMapFromBuffer(final ByteBuffer buf,
+            final Map<Long, RecordMetadata> recordMap) {
+     
+        recordMap.clear();
+        
+        recordMap.put(firstOffset.get(), new RecordMetadata(firstOffset.get(),
+                0, buf.limit()));
+        
+    }
+
 }

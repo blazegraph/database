@@ -70,10 +70,60 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @version $Id: TestWriteCacheService.java 2866 2010-05-18 18:36:35Z
  *          thompsonbry $
  * 
- * @todo This fails when large records are allowed. Review w/ Martyn handling of
- *       large records for the RW store. I believe that they are by writing a
- *       set of smaller records, in which case we just need to set the
- *       largeRecordRate to ZERO (0d) for the RW (scattered write) mode tests.
+ * @todo The RW mode unit tests currently fail with a mixture of checksum
+ *       errors, but this is not deterministic.
+ * 
+ * @todo An occasional error can be observed (at least for WORM) where the
+ *       {@link WriteCache} has no bytes written but a non-empty record map.
+ *       This would appear to be an problem with the record map maintenance.
+ * 
+ *       <pre>
+ * Caused by: java.lang.AssertionError: Empty cache: com.bigdata.io.WriteCache$FileChannelWriteCache@92dcdb{recordCount=1674,firstOffset=0,releaseBuffer=true,bytesWritten=0,bytesRemaining=1048576}
+ *     at com.bigdata.io.WriteCacheService$WriteTask.call(WriteCacheService.java:536)
+ *     at com.bigdata.io.WriteCacheService$WriteTask.call(WriteCacheService.java:1)
+ *     at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:303)
+ *     at java.util.concurrent.FutureTask.run(FutureTask.java:138)
+ *     at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:886)
+ *     at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:908)
+ *     at java.lang.Thread.run(Thread.java:619)
+ * </pre>
+ * 
+ * @todo The RW mode unit tests fail when large records are allowed. Review w/
+ *       Martyn handling of large records for the RW store. I believe that they
+ *       are by writing a set of smaller records, in which case we just need to
+ *       set the largeRecordRate to ZERO (0d) for the RW (scattered write) mode
+ *       tests.
+ * 
+ * @todo This test suite will occasionally throw an exception under Windows XP
+ *       on my laptop. This can occur with either the WORM or RW modes. The
+ *       exception indicates that a _writer_ has been interrupted. This could
+ *       occur if {@link WriteCacheService#flush(boolean, long, TimeUnit)} did
+ *       not block until the {@link WriteCache} was written out by
+ *       {@link FileChannelUtility#writeAll(IReopenChannel, ByteBuffer, long)}.
+ *       However, based on inspection of the code, this is unlikely and it
+ *       appears that this may be a problem in the JVM Windows IO instead. A
+ *       sample stack trace is below. The problem with this exception is that we
+ *       have no means to identify what thread interrupted the Thread executing
+ *       in the writeAll() method.
+ * 
+ *       <pre>
+ * ERROR: 179516      com.bigdata.io.TestWORMWriteCacheService$11 com.bigdata.io.WriteCacheService$WriteTask.call(WriteCacheService.java:614): java.nio.channels.ClosedByInterruptException
+ * java.nio.channels.ClosedByInterruptException
+ *     at java.nio.channels.spi.AbstractInterruptibleChannel.end(AbstractInterruptibleChannel.java:184)
+ *     at sun.nio.ch.FileChannelImpl.write(FileChannelImpl.java:653)
+ *     at com.bigdata.io.FileChannelUtility.writeAll(FileChannelUtility.java:402)
+ *     at com.bigdata.io.WriteCache$FileChannelScatteredWriteCache.writeOnChannel(WriteCache.java:1656)
+ *     at com.bigdata.io.WriteCache.flushAndReset(WriteCache.java:1045)
+ *     at com.bigdata.io.WriteCache.flush(WriteCache.java:961)
+ *     at com.bigdata.io.WriteCache.flush(WriteCache.java:907)
+ *     at com.bigdata.io.WriteCacheService$WriteTask.call(WriteCacheService.java:551)
+ *     at com.bigdata.io.WriteCacheService$WriteTask.call(WriteCacheService.java:1)
+ *     at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:303)
+ *     at java.util.concurrent.FutureTask.run(FutureTask.java:138)
+ *     at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:886)
+ *     at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:908)
+ *     at java.lang.Thread.run(Thread.java:619)
+ * </pre>
  */
 public class TestWORMWriteCacheService extends TestCase3 {
 
@@ -1212,15 +1262,19 @@ public class TestWORMWriteCacheService extends TestCase3 {
             this.raf = new RandomAccessFile(file, mode);
 
             /*
-             * As far as I can tell, this test suite should not cause the
-             * reopener to run more than once (in the constructor).
+             * @todo As far as I can tell, this test suite should not cause the
+             * reopener to run more than once (in the constructor). See the note
+             * at the top of the class concerning a ClosedByInterruptException
+             * in FileChannelUtility#writeAll(). This may be enabled to see the
+             * reopen of the file channel by the reader, but that does not
+             * really add much information since we do not know who is
+             * generating the interrupt. However, you can sometimes see that the
+             * file is reopened more than once.
              */
             final int nreopen = nrepen.incrementAndGet();
-            if (nreopen > 1) {
-//            if (log.isInfoEnabled()) {
+            if (nreopen > 1 && false) {
                 log.error("(Re-)opened file: " + file, new RuntimeException(
-                        "nreopen=" + nreopen+", test="+getName()));
-//            }
+                        "nreopen=" + nreopen + ", test=" + getName()));
             }
 
             return raf.getChannel();
