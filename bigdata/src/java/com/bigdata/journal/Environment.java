@@ -34,10 +34,14 @@ import com.bigdata.journal.ha.QuorumManager;
  * co-ordinate actions across layers that had not necessarily been developed
  * with this in mind.
  * 
- * Specifically, the Environment provides will provide access to the Quorum
- * as the first link into the HA functionality.
+ * Specifically, the Environment provides will provide access to the Quorum as
+ * the first link into the HA functionality.
  * 
  * @author Martyn Cutcher
+ * 
+ * @todo It seems likely that this might become the {@link QuorumManager} or
+ *       state used to initialize that object. There is also a relationship to
+ *       the {@link IResourceManager}.
  */
 public interface Environment {
 

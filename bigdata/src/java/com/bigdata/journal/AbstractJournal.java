@@ -55,7 +55,6 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
@@ -181,17 +180,6 @@ import com.bigdata.util.ChecksumUtility;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo Checksums and/or record compression are currently handled on a per-{@link BTree}
- *       or other persistence capable data structure basis. It is nice to be
- *       able to choose for which indices and when ( {@link Journal} vs
- *       {@link IndexSegment}) to apply these algorithms. However, it might be
- *       nice to factor their application out a bit into a layered api - as long
- *       as the right layering is correctly re-established on load of the
- *       persistence data structure. In that view the {@link IRawStore} either
- *       computes checksums or it does not and the checksums is stored in the
- *       record, perhaps in the last 4 bytes. The checksum itself would not be
- *       visible at the {@link IRawStore} API layer.
  * 
  * @todo There are lots of annoying ways in which asynchronously closing the
  *       journal, e.g., using {@link #close()} or {@link #shutdown()} can cause
@@ -2173,7 +2161,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
              * commit.
              * 
              * FIXME Verify this is not required. Historical index references
-             * should not be discard on abort as they remain valid. Discarding
+             * should not be discarded on abort as they remain valid. Discarding
              * them admits the possibility of a non-canonicalizing cache for the
              * historical indices since an existing historical index reference
              * will continue to be held but a new copy of the index will be
@@ -4119,13 +4107,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
     };
 
-	/**
-	 * Local class providing Environment hooks used by all objects supporting HA
-	 *
-	 * FIXME This should use the configured properties for the writePipelineAddr
-	 * and writePipelinePort.  It is important that these are well known values
-	 * when configuring on different hosts.
-	 */
+    /**
+     * Local class providing Environment hooks used by all objects supporting
+     * HA.
+     */
 	class HAEnvironment implements Environment {
 
 		HAEnvironment() {
