@@ -179,21 +179,28 @@ BufferDescriptor:
 
    - WORM
      
+     Leading.  Just get the root blocks and the file length. If the
+     file is too long, then truncate it.  Update the root blocks and
+     you are done.  The file extent comes with each write cache block,
+     so we can even get this from the write replication protocol.
+     Provide a failsafe check against arbitrary truncation of the
+     journal.
+
      Trailing.  Send the file delta.  This should be ultra direct.
      Just transmit the delta in the file from the channel to the
      socket.  Update the root blocks once the file delta is up to
      date.
-
-     Leading.  Just get the root blocks and the file length. If the
-     file is too long, then truncate it.  Update the root blocks and
-     you are done.
 
    - RW.  The RW store requires allocation block checkpoints (aka
      "session").  For example, maintaining 24 hours of session.
 
      Wrong session.  If you are past the session checkpoint then you
      can not do incremental synchronization and you must request the
-     entire store.  This is true whether you are leading or trailing.
+     entire store.  This is true whether you are leading or
+     trailing. (We could write out session checkpoints onto the store
+     itself to allow deltas which cross a restart or other session
+     boundary and define an index over the session boundaries for fast
+     access to those records.)
 
      Otherwise, first obtain a lock which prevents the master from
      expiring the session during resynchronization.
@@ -203,12 +210,22 @@ BufferDescriptor:
      transaction to transaction this is not a problem since the
      committed data is never re-used in the next transaction.  The
      final update should always be to the rootblock, but at the point
-     the allocation blocks are written this is could be out of sync.
-     The solution is to write the blocks in a two-phase update -
+     the allocation blocks are written this could be out of sync.  The
+     solution is to write the blocks in a two-phase update.  First,
      temporarily extend the file to store the new allocation blocks,
      then write the root block to reference these.  This secures the
      data, now we can write the allocation blocks to the correct area,
-     update the rootblock and lastly set the corect file extent.
+     update the rootblock and lastly set the correct file extent.
+
+          [See below, but also note that I would like to avoid
+	   updating the root blocks until the quorum join commit so as
+	   to not change the lastCommitTime or otherwise spoil the
+	   state of the store.  Martyn seems to have mapped out a
+	   solution below.  Another way to approach this might be to
+	   "patch" the root blocks with the correct offset and meta
+	   bits addr.  Another is to explicitly stage the RW store
+	   through each extension using a set of extension records
+	   written onto the store.]
 
      trailing. With a current session, we know that no current data
      has been overwritten.
