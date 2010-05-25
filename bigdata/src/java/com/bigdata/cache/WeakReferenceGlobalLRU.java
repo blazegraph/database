@@ -244,7 +244,7 @@ public class WeakReferenceGlobalLRU implements IGlobalLRU<Long,Object> {
     }
 
 
-    @Override
+//    @Override
     public long getBytesInMemory() {
         return counters.bytesInMemory.get();
     }
@@ -253,22 +253,21 @@ public class WeakReferenceGlobalLRU implements IGlobalLRU<Long,Object> {
         return counters.bytesOnDisk.get();
     }
 
-    @Override
+//    @Override
     public int getCacheSetSize() {
-        // TODO Auto-generated method stub
-        return 0;
+        return cacheSet.size();
     }
 
     public long getEvictionCount() {
         return counters.evictionCount.get();
     }
 
-    @Override
+//    @Override
     public long getMaximumBytesInMemory() {
         return maximumBytesInMemory;
     }
 
-    @Override
+//    @Override
     public int getRecordCount() {
         return counters.lruDistinctCount.get();
     }
