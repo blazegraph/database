@@ -2452,7 +2452,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * requests for a child will content to update the appropriate element in
      * {@link #childRefs}.
      * <p>
-     * I believe the contention to update {@link #childRefs} as unavoidable. If
+     * I believe the contention to update {@link #childRefs} is unavoidable. If
      * this object was made into an {@link AtomicReferenceArray} then we would
      * have difficulty when inserting and removing tuples since the backing
      * array is not visible. An array of {@link AtomicReference} objects would
@@ -2998,6 +2998,13 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
                     /*
                      * The child is a leaf.
+                     * 
+                     * @todo prefetch: This one place where we could use pre-fetch
+                     * to obtain the other children of the same parent spanned
+                     * by the designed key-range.  It would be better to intervene
+                     * in the other half of this if-then-else so we can schedule
+                     * the pre-fetch of the rightSibling as well and only test
+                     * once to determine which child leaves should be pre-fetched. 
                      */
 
                     // BTree.log.debug("child is leaf: " + child);
