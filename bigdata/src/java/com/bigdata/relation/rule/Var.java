@@ -3,6 +3,7 @@ package com.bigdata.relation.rule;
 import java.io.ObjectStreamException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * A variable.
@@ -116,6 +117,15 @@ final public class Var<E> implements IVariable<E>, Comparable<IVariable<E>>
      */
     static private final Map<String, Var> vars = new HashMap<String, Var>();
 
+    /**
+     * Generate an anonymous random variable.
+     */
+    static public Var var() {
+        
+        return Var.var(UUID.randomUUID().toString());
+        
+    }
+    
     /**
      * Singleton factory for {@link Var}s.
      * <p>
