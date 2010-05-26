@@ -790,14 +790,15 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
                 this.ruleState.getRequiredVars()[tailIndex];
             
             // clone binding set.
-            // final IBindingSet bset = bindingSet.clone();
-            final IBindingSet bset = bindingSet.copy(variablesToKeep);
+            IBindingSet bset = bindingSet.clone();
             
             // bind element to propagate bindings.
             if (joinNexus.bind(rule, tailIndex, e, bset)) {
 
                 ruleStats.subqueryCount[tailIndex]++;
 
+                bset = bindingSet.copy(variablesToKeep);
+                
                 // run the subquery.
                 apply(orderIndex + 1, bset, buffer);
 

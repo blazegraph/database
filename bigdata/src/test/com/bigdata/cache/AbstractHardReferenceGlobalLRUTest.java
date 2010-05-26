@@ -41,6 +41,7 @@ import com.bigdata.io.IFixedDataRecord;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
+import com.bigdata.test.ExperimentDriver.Result;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -346,6 +347,8 @@ public class AbstractHardReferenceGlobalLRUTest extends TestCase2 {
 
         StressTestGlobalLRU.doStressTest(timeout, nthreads, nops, nrecords,
                 nstores, gen, lru);
+        
+        System.err.println(lru.getCounterSet().toString());
 
     }
     

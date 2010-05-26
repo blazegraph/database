@@ -31,32 +31,30 @@ import com.bigdata.LRUNexus.AccessPolicyEnum;
 import com.bigdata.rawstore.Bytes;
 
 /**
- * Some unit tests for the {@link BCHMGlobalLRU2} using true thread local
- * buffers.
+ * Some unit tests for the {@link BCHMGlobalLRU2} using striped locks.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestBCHMGlobalLRU2WithThreadLocalBuffers.java 2792 2010-05-09
- *          20:54:39Z thompsonbry $
+ * @version $Id$
  * 
- * @see TestBCHMGlobalLRU2WithStripedLocks
+ * @see TestBCHMGlobalLRU2WithThreadLocalBuffers
  */
-public class TestBCHMGlobalLRU2WithThreadLocalBuffers extends
+public class TestBCHMGlobalLRU2WithStripedLocksAndLIRS extends
         AbstractHardReferenceGlobalLRUTest {
 
     /**
      * 
      */
-    public TestBCHMGlobalLRU2WithThreadLocalBuffers() {
+    public TestBCHMGlobalLRU2WithStripedLocksAndLIRS() {
     }
 
     /**
      * @param name
      */
-    public TestBCHMGlobalLRU2WithThreadLocalBuffers(String name) {
+    public TestBCHMGlobalLRU2WithStripedLocksAndLIRS(String name) {
         super(name);
     }
-
-    private final AccessPolicyEnum accessPolicy = AccessPolicyEnum.LRU;
+    
+    private final AccessPolicyEnum accessPolicy = AccessPolicyEnum.LIRS;
 
     private final static long maximumBytesInMemory = 10 * Bytes.kilobyte;
 
@@ -71,10 +69,10 @@ public class TestBCHMGlobalLRU2WithThreadLocalBuffers extends
 
     private final static int concurrencyLevel = 16;
 
-    private final static boolean threadLocalBuffers = true;
+    private final static boolean threadLocalBuffers = false;
 
     private final static int threadLocalBufferCapacity = 128;
-    
+
     protected void setUp() throws Exception {
 
         super.setUp();
@@ -117,7 +115,7 @@ public class TestBCHMGlobalLRU2WithThreadLocalBuffers extends
                 threadLocalBuffers, 1/* threadLocalBufferCapacity */);
 
         super.test_counters();
-
+        
     }
 
 }

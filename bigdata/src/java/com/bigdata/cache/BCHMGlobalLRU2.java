@@ -34,10 +34,15 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicStampedReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.BigdataStatics;
+import com.bigdata.LRUNexus.AccessPolicyEnum;
 import com.bigdata.LRUNexus.CacheSettings;
 import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
@@ -143,15 +148,13 @@ import com.bigdata.rawstore.IRawStore;
  * Note: {@link #deleteCache(UUID)} and {@link #discardAllCaches()} DO NOT
  * guarantee consistency if there are concurrent operations against the cache.
  * They have been written somewhat defensively as have {@link TLB#clear()} and
- * {@link TLB#doEvict(int, Object[])} in order to handle concurrent invocations
+ * {@link TLB#batchUpdates(int, Object[])} in order to handle concurrent invocations
  * safely.
  * <p>
  * Note: This implementation was derived from
  * {@link HardReferenceGlobalLRURecyclerExplicitDeleteRequired}. However, this
- * implementation DOES NOT permit recycling of the {@link DLN}s in order to have
- * a better guarantee of thread-safety.
- * 
- * FIXME Support LIRS as well as LRU.
+ * implementation DOES NOT permit recycling of the DLNs in order to have a
+ * better guarantee of thread-safety.
  * 
  * @todo Support tx isolation. This will involve a per-tx cache I believe, so
  *       maybe the tx gets a {@link UUID}? We can then delete that cache if the
@@ -162,6 +165,8 @@ import com.bigdata.rawstore.IRawStore;
  */
 public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
+    protected static final Logger log = Logger.getLogger(BCHMGlobalLRU2.class);
+    
     /**
      * A canonicalizing mapping for per-{@link IRawStore} caches. Cache
      * instances are retained when the backing store is closed and even if its
@@ -183,7 +188,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
      * When <code>true</code> true thread-local buffers will be used. Otherwise,
      * striped locks will be used and each lock will protect its own buffer.
      * 
-     * @see #add(DLN)
+     * @see #add(DLNLru)
      */
     private final boolean threadLocalBuffers;
 
@@ -202,37 +207,38 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
      * A double-linked node having a (key,value) pair with a (prior,next)
      * reference used to maintain a double-linked list reflecting an access
      * policy (LRU or LIRS). This {@link #prior} and {@link #next} fields are
-     * protected by the {@link BCHMGlobalLRU2#lock}. The other fields are final
-     * (no recycler).
+     * protected by the {@link BCHMGlobalLRU2#lock}. The other fields are final.
+     * The value field is NOT present in this base class since it will be final
+     * for the {@link LRUAccessPolicy} but not for the {@link LIRSAccessPolicy}.
      * 
      * @version $Id$
      * @author thompsonbry
      */
-    private static class DLN<K, V> {
+    abstract static class DLN<K, V> {
 
-        /** The owning cache for this entry. */
-        private final LRUCacheImpl<K, V> cache;
+        /** The owning ({@link IRawStore} specific) cache for this entry. */
+        final LRUCacheImpl<K, V> cache;
 
         /** The bytes in memory for this entry. */
-        private final int bytesInMemory;
+        final int bytesInMemory;
 
         /** The bytes on disk for this entry. */
-        private final int bytesOnDisk;
+        final int bytesOnDisk;
 
-        private final K k;
+        final K k;
 
-        private final V v;
+//      final V v;
 
         /**
          * The prior, next fields are protected by the [lock] on the outer
          * class. Unlike the rest of the fields, these are mutable and will be
          * changed when the access order is updated.
          */
-        private DLN<K, V> prior, next;
+        DLN<K, V> prior, next;
 
         /**
-         * When the delete flag is set the {@link DLN} will be unlinked when it
-         * is processed. Otherwise, the {@link DLN} will be added if
+         * When the delete flag is set the {@link DLNLru} will be unlinked when it
+         * is processed. Otherwise, the {@link DLNLru} will be added if
          * {@link #prior} and {@link #next} are <code>null</code> (since they
          * are <code>null</code> iff it has not yet been linked) and otherwise
          * it will be relinked into the MRU position.
@@ -241,10 +247,15 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
         DLN(final LRUCacheImpl<K, V> cache, final K k, final V v) {
 
+            if (cache == null || k == null || v == null)
+                throw new IllegalArgumentException();
+
             this.k = k;
 
-            this.v = v;
+//            this.v = v;
 
+            this.prior = this.next = null;
+            
             this.cache = cache;
 
             if (v instanceof IDataRecordAccess) {
@@ -271,17 +282,117 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
         }
 
+        /** The value. */
+        abstract V v();
+        
         /**
          * Human readable representation used for debugging in test cases.
          */
         public String toString() {
-            return "DLN{key=" + k + ",val=" + v + ",prior="
+            return "DLN{key=" + k + ",val=" + v() + ",prior="
                     + (prior == null ? "N/A" : "" + prior.k) + ",next="
                     + (next == null ? "N/A" : "" + next.k) + ",bytesInMemory="
                     + bytesInMemory + ",bytesOnDisk=" + bytesOnDisk + "}";
         }
 
-    } // class DLN
+    } // class AbstractDLN
+
+    /**
+     * Concrete implementation for {@link LRUAccessPolicy}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * @param <K>
+     * @param <V>
+     */
+    static class DLNLru<K, V> extends DLN<K,V> {
+
+        final V v;
+
+        protected V v() {
+
+            return v;
+            
+        }
+        
+        DLNLru(final LRUCacheImpl<K, V> cache, final K k, final V v) {
+
+            super(cache, k, v);
+            
+            this.v = v;
+
+        }
+
+    } // class DLNLru
+
+    /**
+     * Concrete implementation for {@link LIRSAccessPolicy}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * @param <K>
+     * @param <V>
+     */
+    static class DLNLirs<K, V> extends DLN<K,V> {
+
+        /**
+         * The value (aka block). This will be <code>null</code> iff this is a
+         * non-resident HIR node.
+         * 
+         * @todo The LIRS algorithm has resident LIR blocks and both resident
+         *       and non-resident HIR blocks. When we handle a cache miss on a
+         *       non-resident HIR block, that cache miss must atomically replace
+         *       the <code>null</code> reference for the value with the correct
+         *       reference. In order for that reference to be safely replaced it
+         *       either needs to be <em>volatile</em> (for visibility since the
+         *       state change will not be protected by a lock as it occurs
+         *       outside of the batched updates) or, perhaps better, an
+         *       {@link AtomicReference}. It is possible that we might need an
+         *       atomic state changes across the (v,lir) tuple, in which case
+         *       something like an {@link AtomicStampedReference} might be
+         *       warranted or an {@link AtomicLong} representing an update
+         *       counter. (We could also synchronize on the DLNLirs node, but I
+         *       would rather avoid that.)
+         */
+        V v;
+
+        /**
+         * Flag is <code>true</code> for LIR nodes (which are always resident)
+         * and <code>false</code> for HIR nodes (which MAY or MAY NOT be
+         * resident).
+         */
+        boolean lir;
+        
+        protected V v() {
+
+            return v;
+            
+        }
+
+        /**
+         * Create a new entry. New entries are LIR (versus HIR).
+         * 
+         * @param cache
+         *            The owning cache.
+         * @param k
+         *            The key.
+         * @param v
+         *            The value.
+         * @param lir
+         *            The initial status of the entry (either LIR or HIR).
+         */
+        DLNLirs(final LRUCacheImpl<K, V> cache, final K k, final V v,
+                final boolean lir) {
+
+            super(cache, k, v);
+
+            this.v = v;
+
+            this.lir = lir;
+
+        }
+
+    } // class DLNLru
 
     /**
      * A thread-local buffer (the buffer may be deployed in a true thread local
@@ -367,7 +478,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
          */
         protected void evict() {
 
-            doEvict(size, a);
+            batchUpdates(size, a);
 
 //            clear();
             size = 0;
@@ -407,7 +518,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
          * @param a
          *            The array of references.
          */
-        abstract protected void doEvict(int n, T[] a);
+        abstract protected void batchUpdates(int n, T[] a);
 
         /**
          * Add a reference to the thread local buffer. The references in the
@@ -475,6 +586,22 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         
     }
 
+    /**
+     * Factory for the {@link TLB} buffer objects.
+     * 
+     * @param id
+     *            The buffer identifier.
+     * @param capacity
+     *            The buffer capacity.
+     * @param tryLockSize
+     *            The threshold at which tryLock() will be tested. If the lock
+     *            is acquired, then the updates will be batched through at that
+     *            time (barging).
+     * @param lock
+     *            The lock protecting the {@link AccessPolicy}.
+     *            
+     * @return The buffer object.
+     */
     protected TLB<DLN<K, V>> newTLB(final int id, final int capacity,
             final int tryLockSize, final Lock lock) {
 
@@ -485,7 +612,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
              * Batch the touches through to the {@link AccessPolicy}.
              */
             @Override
-            protected void doEvict(final int n, final DLN<K, V>[] a) {
+            protected void batchUpdates(final int n, final DLN<K, V>[] a) {
 
                 for (int i = 0; i < n; i++) {
 
@@ -501,6 +628,13 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                         
                         continue;
                         
+                    }
+
+                    while (globalLRUCounters.bytesInMemory > maximumBytesInMemory) {
+
+                        // evict until under the memory threshold.
+                        BCHMGlobalLRU2.this.accessPolicy.evictEntry();
+
                     }
 
                     BCHMGlobalLRU2.this.accessPolicy.relink(ref);
@@ -680,6 +814,64 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
     }
     
+//    /**
+//     * If the global LRU is over capacity (based on the #of bytes buffered) then
+//     * purge entries from the cache(s) based on the access policy eviction order
+//     * until at least {@link #getMinCleared()} bytes are available. This batch
+//     * eviction strategy helps to minimize contention for the {@link #lock} when
+//     * cache records must be evicted.
+//     * 
+//     * @see #getMinCleared()
+//     * @see #getMaximumBytesInMemory()
+//     */
+//    private void purgeEntriesIfOverCapacity() {
+//
+//        if (globalLRUCounters.bytesInMemory < maximumBytesInMemory) {
+//
+//            return;
+//
+//        }
+//
+//        lock.lock();
+//
+//        int n = 0;
+//        
+//        try {
+//
+//            /*
+//             * The global LRU is over capacity. Purge entries from the cache
+//             * until until the #of bytes in memory falls below [threshold].
+//             */
+//            final long threshold = maximumBytesInMemory - minCleared;
+//
+//            assert threshold >= 0;
+//
+//            while (globalLRUCounters.bytesInMemory > threshold) {
+//
+//                accessPolicy.evictEntry();
+//                
+//                n++;
+//
+//            }
+//
+//        } finally {
+//
+//            lock.unlock();
+//
+//        }
+//
+//        if (log.isTraceEnabled()) {
+//            /*
+//             * Note: bytesInMemory does not reflect an atomic delta since this
+//             * is outside of the lock.
+//             */
+//            log.trace("evicted " + n + " records: recordCount="
+//                    + getRecordCount() + ", bytesInMemory="
+//                    + globalLRUCounters.bytesInMemory);
+//        }
+//
+//    }
+
     /**
      * The counters for the shared LRU.
      */
@@ -750,15 +942,17 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
      */
     public BCHMGlobalLRU2(final CacheSettings s) {
 
-        this(s.maximumBytesInMemory, s.minCleared, s.minCacheSetSize,
-                s.initialCacheCapacity, s.loadFactor, s.concurrencyLevel,
-                s.threadLocalBuffers,
+        this(s.accessPolicy, s.maximumBytesInMemory, s.minCleared,
+                s.minCacheSetSize, s.initialCacheCapacity, s.loadFactor,
+                s.concurrencyLevel, s.threadLocalBuffers,
                 s.threadLocalBufferCapacity);
-    
+
     }
 
     /**
      * 
+     * @param accessPolicyEnum
+     *            The {@link AccessPolicy} to use (LRU or LIRS).
      * @param maximumBytesInMemory
      *            The maximum bytes in memory for the cached records across all
      *            cache instances.
@@ -790,13 +984,14 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
      *            to update the access policy. If the lock could not obtained
      *            using {@link Lock#tryLock()} then then {@link Lock#lock()}
      *            will be used once the buffer is full. The buffer is cleared
-     *            each time the {@link DLN} references in the buffer are batched
-     *            through the {@link Lock}.
+     *            each time the {@link DLNLru} references in the buffer are
+     *            batched through the {@link Lock}.
      */
-    public BCHMGlobalLRU2(final long maximumBytesInMemory,
-            final long minCleared, final int minimumCacheSetCapacity,
-            final int initialCacheCapacity, final float loadFactor,
-            final int concurrencyLevel, final boolean threadLocalBuffers,
+    public BCHMGlobalLRU2(AccessPolicyEnum accessPolicyEnum,
+            final long maximumBytesInMemory, final long minCleared,
+            final int minimumCacheSetCapacity, final int initialCacheCapacity,
+            final float loadFactor, final int concurrencyLevel,
+            final boolean threadLocalBuffers,
             final int threadLocalBufferCapacity) {
 
         if (maximumBytesInMemory <= 0)
@@ -828,8 +1023,19 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         
         this.globalLRUCounters = new GlobalLRUCounters<K, V>(this);
 
-        this.accessPolicy = new LRUAccessPolicy<K, V>(lock, globalLRUCounters);
-        
+        switch (accessPolicyEnum) {
+        case LRU:
+            this.accessPolicy = new LRUAccessPolicy<K, V>(lock,
+                    globalLRUCounters);
+            break;
+        case LIRS:
+            this.accessPolicy = new LIRSAccessPolicy<K, V>(lock,
+                    globalLRUCounters);
+            break;
+        default:
+            throw new UnsupportedOperationException(accessPolicyEnum.toString());
+        }
+
         this.threadLocalBufferCapacity = threadLocalBufferCapacity;
         
         // Note: Set to 1/2 of the buffer capacity.
@@ -861,7 +1067,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         
     }
 
-    public ILRUCache<K, V> getCache(final UUID uuid, final IAddressManager am) {
+    public LRUCacheImpl<K, V> getCache(final UUID uuid, final IAddressManager am) {
 
         if (uuid == null)
             throw new IllegalArgumentException();
@@ -870,7 +1076,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
         if (cache == null) {
 
-            cache = new LRUCacheImpl<K, V>(uuid, am, this,
+            cache = new LRUCacheImpl<K, V>(uuid, am, this, lock,
                     initialCacheCapacity, loadFactor, concurrencyLevel);
 
             final LRUCacheImpl<K, V> oldVal = cacheSet.putIfAbsent(uuid, cache);
@@ -964,51 +1170,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         return cacheSet.size();
 
     }
-
-    /**
-     * If the global LRU is over capacity (based on the #of bytes buffered) then
-     * purge entries from the cache(s) based on the access policy eviction order
-     * until at least {@link #getMinCleared()} bytes are available. This batch
-     * eviction strategy helps to minimize contention for the {@link #lock} when
-     * cache records must be evicted.
-     * 
-     * @see #getMinCleared()
-     * @see #getMaximumBytesInMemory()
-     */
-    protected void purgeEntriesIfOverCapacity() {
-
-        if (globalLRUCounters.bytesInMemory < maximumBytesInMemory) {
-
-            return;
-
-        }
-
-        lock.lock();
-
-        try {
-
-            /*
-             * The global LRU is over capacity. Purge entries from the cache
-             * until until the #of bytes in memory falls below [threshold].
-             */
-            final long threshold = maximumBytesInMemory - minCleared;
-
-            assert threshold >= 0;
-
-            while (globalLRUCounters.bytesInMemory >= threshold) {
-
-                accessPolicy.evictEntry();
-
-            }
-
-        } finally {
-
-            lock.unlock();
-
-        }
-
-    }
-
+    
     /**
      * {@inheritDoc}
      * <p>
@@ -1341,8 +1503,8 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
     }
 
     /**
-     * An access policy maintains the {@link DLN}s in some particular order and
-     * decides which {@link DLN}s should be evicted when the cache is full (that
+     * An access policy maintains the {@link DLNLru}s in some particular order and
+     * decides which {@link DLNLru}s should be evicted when the cache is full (that
      * is, when the memory limit on the cache has been reached since that is how
      * we determine "full").
      * 
@@ -1350,7 +1512,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
      *         Thompson</a>
      * @version $Id$
      */
-    interface AccessPolicy<K, V> {
+    static interface AccessPolicy<K, V> {
 
         /**
          * Reset the access policy (unlink everything).
@@ -1363,7 +1525,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         int size();
         
         /**
-         * Accept the entry for processing. If {@link DLN#delete} is
+         * Accept the entry for processing. If {@link DLNLru#delete} is
          * <code>true</code> then the entry will be unlinked. Otherwise, the
          * entry will be added if its (prior,next) links are <code>null</code>.
          * Otherwise, the entry will be relinked to update its location in the
@@ -1378,6 +1540,18 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
          * Evict an entry from the access policy.
          */
         DLN<K,V> evictEntry();
+
+        /**
+         * Create a new DLN for the access policy.
+         * 
+         * @param cache
+         *            The {@link IGlobalLRU}.
+         * @param k
+         *            The key.
+         * @param v
+         *            The value.
+         */
+        DLN<K, V> newDLN(LRUCacheImpl<K, V> cache, K k, V v);
         
     }
 
@@ -1393,7 +1567,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
      * @param <V>
      *            The value type.
      */
-    private static class LRUAccessPolicy<K,V> implements AccessPolicy<K, V> {
+    static class LRUAccessPolicy<K,V> implements AccessPolicy<K, V> {
 
         /**
          * The current LRU linked list size (the entry count) across all cache
@@ -1411,13 +1585,13 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
          * <em>least recently used</em>) and <code>null</code> iff the cache is
          * empty.
          */
-        private DLN<K, V> first = null;
+        private DLNLru<K, V> first = null;
 
         /**
          * The entry which is last in the ordering (the <em>most recently used</em>)
          * and <code>null</code> iff the cache is empty.
          */
-        private DLN<K, V> last = null;
+        private DLNLru<K, V> last = null;
 
         /**
          * The lock protecting the mutable fields in this class.
@@ -1462,11 +1636,12 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
             if (!lock.isHeldByCurrentThread())
                 throw new IllegalMonitorStateException();
 
-            while (last != null) {
+            // evict entries from the LRU position until the list is empty.
+            while (first != null) {
                 
-                last.delete = true;
+                first.delete = true;
                 
-                removeEntry(last);
+                removeEntry(first);
 
             }
 
@@ -1497,30 +1672,37 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
             if (e.delete) {
 
                 // unlink from the access order.
-                removeEntry(e);
+                removeEntry((DLNLru<K, V>) e);
                 
             } else {
                 
                 if (e.prior == null && e.next == null) {
 
                     // insert into the access order.
-                    addEntry(e);
+                    addEntry((DLNLru<K, V>) e);
                     
                 } else {
                 
                     // update the position in the access order.
-                    touchEntry(e);
+                    touchEntry((DLNLru<K, V>) e);
                     
                 }
                 
             }
             
         }
-        
+
+        public DLNLru<K, V> newDLN(final LRUCacheImpl<K, V> cache, final K k,
+                final V v) {
+
+            return new DLNLru<K, V>(cache, k, v);
+
+        }
+
         /**
-         * Add an {@link DLN} to the tail of the linked list (the MRU position).
+         * Add the {@link DLNLru} to the tail of the linked list (the MRU position).
          */
-        void addEntry(final DLN<K, V> e) {
+        void addEntry(final DLNLru<K, V> e) {
             if (!lock.isHeldByCurrentThread())
                 throw new IllegalMonitorStateException();
             if (first == null) {
@@ -1537,19 +1719,18 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         }
 
         /**
-         * Remove an {@link DLN} from linked list that maintains the LRU
-         * ordering. The {@link DLN#prior} and {@link DLN#next} fields are
+         * Remove an {@link DLNLru} from linked list that maintains the LRU
+         * ordering. The {@link DLNLru#prior} and {@link DLNLru#next} fields are
          * cleared. The {@link #first} and {@link #last} fields are updated as
          * necessary. This DOES NOT remove the entry under that key from the
          * hash map (typically this has already been done).
          */
-        void removeEntry(final DLN<K, V> e) {
+        void removeEntry(final DLNLru<K, V> e) {
             if (!lock.isHeldByCurrentThread())
                 throw new IllegalMonitorStateException();
-            if (e.cache == null)
-                return;
-            final DLN<K, V> prior = e.prior;
-            final DLN<K, V> next = e.next;
+//            if (e.cache == null) return; // e.cache is final.
+            final DLNLru<K, V> prior = (DLNLru<K, V>) e.prior;
+            final DLNLru<K, V> next = (DLNLru<K, V>) e.next;
             if (e == first) {
                 first = next;
             }
@@ -1578,7 +1759,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         /**
          * Move the entry to the end of the linked list (the MRU position).
          */
-        void touchEntry(final DLN<K, V> e) {
+        void touchEntry(final DLNLru<K, V> e) {
 
             if (!lock.isHeldByCurrentThread())
                 throw new IllegalMonitorStateException();
@@ -1592,8 +1773,8 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
             // unlink entry
             // removeEntry(e);
             {
-                final DLN<K, V> prior = e.prior;
-                final DLN<K, V> next = e.next;
+                final DLNLru<K, V> prior = (DLNLru<K, V>) e.prior;
+                final DLNLru<K, V> next = (DLNLru<K, V>) e.next;
                 if (e == first) {
                     first = next;
                 }
@@ -1625,38 +1806,584 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         }
 
         /**
-         * Evict the LRU entry.
+         * Evict the LRU entry (unlink and remove from owning {@link ILRUCache}).
          */
-        public DLN<K, V> evictEntry() {
+        public DLNLru<K, V> evictEntry() {
 
             // entry in the LRU position.
-            final DLN<K, V> entry = first;
+            final DLNLru<K, V> e = first;
 
-            assert entry != null;
+            assert e != null;
             
-            // the key associated with the entry to be evicted.
-            final K evictedKey = entry.k;
+//            // the key associated with the entry to be evicted.
+//            final K evictedKey = e.k;
 
             // The cache from which the entry will be evicted.
-            final LRUCacheImpl<K, V> evictedFromCache = entry.cache;
+            final LRUCacheImpl<K, V> evictedFromCache = e.cache;
 
-            final int bytesOnDisk = entry.bytesOnDisk;
+//            final int bytesOnDisk = e.bytesOnDisk;
 
             // remove LRU entry from ordering.
-            removeEntry(entry);
+            removeEntry(e);
 
             // remove entry under that key from hash map for that store.
-            evictedFromCache.remove(evictedKey);// entry.k);
+//            evictedFromCache.remove(evictedKey);// entry.k);
+            evictedFromCache.map.remove(e.k);
 
             counters.evictionCount++;
-
-            counters.evictionByteCount += bytesOnDisk;
+            counters.evictionByteCount += e.bytesOnDisk;
             
-            return entry;
+            return e;
 
         }
         
     } // LRUAccessPolicy
+
+    /**
+     * LIRS implementation. The caller MUST be holding the shared lock when
+     * updating the access policy.
+     * <p>
+     * LIRS is an access policy with nearly the simplicity and throughput of LRU
+     * which is designed to overcome many of the shortcomings of an LRU policy
+     * (notably an LRU policy will evict frequently used blocks during a scan).
+     * LIRS tracks the Inter-Reference Recency (IRR) and uses this to
+     * dynamically partition blocks into LIR (low inter-reference recency) and
+     * HIR (high inter-reference recency). The basic idea is to keep the LIR
+     * blocks in the cache. The total size of the LIRS cache is the sum of the
+     * LIR blocks (which are always resident) and the HIR blocks (some of which
+     * are resident).
+     * <p>
+     * LIRS should be much more friendly to garbage collectors since frequently
+     * used blocks are essentially pinned while blocks which have been recently
+     * visited can be evicted quickly (this will tend to keep HIR blocks in the
+     * Eden heap on a JVM).
+     * 
+     * <h2>Implementation</h2>
+     * 
+     * LIRS maintains an LRU "stack" (a double linked list named <code>S</code>)
+     * and an additional stack of resident HIR blocks (another double linked
+     * list named <code>Q</code>). The {@link DLNLirs} nodes contains two
+     * additional metadata items : whether the block is LIR or HIR and whether
+     * or not the block is resident. When the block is not resident, the
+     * {@link DLNLru#v} is cleared to <code>null</code> to release the memory
+     * associated with the block.
+     * <p>
+     * There are two twists to this (specific) implementation.
+     * <ol>
+     * <li>The "blocks" are variable sized byte[]s and manage the cache size in
+     * terms of bytes buffered in memory and this imposes the constraint on the
+     * #of LIR and resident HIR blocks.</li>
+     * <li>An {@link ILRUCache} "miss" does not read through in terms of the
+     * API. Instead, the {@link ILRUCache} will report a "miss" (return
+     * <code>null</code>) and the cache miss case will be recognized by the
+     * application. The application will read through to the backing database
+     * and then do a "putIfAbsent()" with the record read from the database.
+     * putIfAbsent() will replace the <code>null</code> {@link DLNLirs#v}
+     * reference on the {@link DLNLirs} object with the caller's value.</li>
+     * </ol>
+     * <p>
+     * The three cases described by the journal article in section
+     * <code>3.3</code> are handled by {@link #touchEntry(DLNLirs)}. In
+     * addition, there is a fourth case when there is no entry in the map for
+     * the block which is handled by {@link #addEntry(DLNLirs)}.
+     * <p>
+     * Note: Unlike the journal paper, we will be batching evictions when the
+     * total memory is over capacity, therefore we DO NOT recycle blocks from
+     * the HIR list on a cache miss. See
+     * {@link BCHMGlobalLRU2#purgeEntriesIfOverCapacity()}.
+     * <dl>
+     * 
+     * <dt>1. Upon accessing a LIR block X (cache hit)</dt>
+     * 
+     * <dd>LIR blocks are (by definition) resident in the cache. The block is
+     * moved to the top of the LRU stack (S) (the MRU position). In addition, if
+     * the LIR block was originally on the bottom of the stack (the LRU
+     * position) then any HIR nodes on the bottom of the stack are {link
+     * #pruneStack() pruned}. See {@link #touchEntry(DLNLirs)}</dd>
+     * 
+     * <dt>2. Upon accessing a HIR resident block X (cache hit)</dt>
+     * 
+     * <dd>Move the entry to the top of the LRU stack (S) (the MRU position).
+     * There are two cases for block X.
+     * <ol>
+     * <li>If X is in the LRU stack (S), then we change is status to LIR and
+     * remove the block from HIR list (Q). The LIR block on the bottom (LRU
+     * position) of (S) is moved to (Q) and its status is changed to HIR. Since
+     * we have potentially uncovered a non-LIR block on the bottom of (S), we
+     * now {@link #pruneStack() prune} (S).</li>
+     * 
+     * <li>If X is not in the LRU stack (S), we leave its status as HIR and move
+     * it to the end of the HIR stack (Q) (the MRU position). (Note that we have
+     * already moved X to the top of the LRU stack (S).)</li>
+     * </ol>
+     * See {@link #touchEntry(DLNLirs)}</dd>
+     * 
+     * <dt>3. Upon accessing a HIR non-resident block X (cache miss)</dt>
+     * 
+     * <dd>Note: The LIRS algorithm calls for us "remove the HIR resident block
+     * at the front of list Q (it becomes a non-resident block) and replace it
+     * out of the cache". Because we are not managing a fixed pool of fixed size
+     * buffers we DO NOT take this step. Instead, a node entry is added to the
+     * top of the LRU stack (S) (the MRU position). <br/>
+     * See {@link #addEntry(DLNLirs)}</dd>
+     * 
+     * <dt>4. Upon accessing a block X not in the cache (cache miss)</dt>
+     * 
+     * <dd>This cases handles a miss when the entry is not in the cache map.
+     * Since we batch evictions only when the cache is over the
+     * maximumByteInMemory, this case is handled exactly like (3).<br/>
+     * See {@link #addEntry(DLNLirs)}</dd>
+     * 
+     * </dl>
+     * 
+     * <h2>References</h2>
+     * 
+     * See <a href="http://portal.acm.org/citation.cfm?doid=511334.511340">LIRS:
+     * an efficient low inter-reference recency set replacement policy to
+     * improve buffer cache performance</a> and <a
+     * href="http://www.ece.eng.wayne.edu/~sjiang/Projects/LIRS/sig02.ppt" >LIRS
+     * : An Efficient Replacement Policy to Improve Buffer Cache
+     * Performance.</a>
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     * @param <K>
+     *            The key type.
+     * @param <V>
+     *            The value type.
+     * 
+     * @todo The logic for 
+     * 
+     * @todo We do not directly impose a constraint on the #of non-resident HIR
+     *       {@link DLN}s. Do we need to or will this fall out of the algorithm?
+     *       For a cache where the block size is constant, a constraint on the
+     *       #of blocks directly translates into a constraint on the size of the
+     *       resident blocks in the LIR + HIR stacks.
+     * 
+     * @todo The [value] reference can be cleared any time updates are batched
+     *       through the lock to the access policy if the block is elected for
+     *       conversion from LIR or HIR to non-resident HIR.
+     *       <p>
+     *       This can lead to a <code>null</code> return on
+     *       {@link LRUCacheImpl#get(Object)} when an object is in the cache but
+     *       has had its value cleared concurrently.
+     *       <p>
+     *       This can lead to a possibly a consistency problem with
+     *       {@link LRUCacheImpl#putIfAbsent(Object, Object)} (the value is
+     *       cleared concurrently when we place a touch onto the buffer).
+     *       <p>
+     *       What kinds of problems can this cause for
+     *       {@link LRUCacheImpl#remove(Object)}.
+     * 
+     * @todo LIRs might not be a good idea for scale-out unless we "pin" the
+     *       journal during overflow processing (it could tend to let go of
+     *       records which we will need to revisit for overflow processing which
+     *       we only visited once during write).
+     * 
+     * @todo Update javadoc concerning batched evictions. In fact, we do not
+     *       batch evictions. Instead, we just batch updates to the access
+     *       policy through the lock. [The only remaining area of difference is
+     *       handling the LIRS cache miss conditions since we do not
+     *       "read through" to the database on a cache miss but instead rely on
+     *       the application to perform the read (while not holding the lock!)
+     *       and putIfAbsent() the recovered record.]
+     * 
+     * @todo Finish LIRS support. Create unit tests classes for this access
+     *       policy, but note that it will differ from the journal paper since
+     *       we batch evictions.
+     */
+    static class LIRSAccessPolicy<K,V> implements AccessPolicy<K, V> {
+
+        /**
+         * The current LRU linked list size (the entry count) across all cache
+         * instances.
+         * <p>
+         * Note: This is <code>volatile</code> since it can be read by
+         * {@link #getLRUSize()} without holding the shared {@link #lock}.
+         * However, threads performing updates to this field (and all other
+         * fields on this class) MUST hold the {@link #lock}.
+         */
+        private volatile int sizeLRU = 0;
+
+        /**
+         * The current resident HIR linked list size (the entry count) across
+         * all cache instances.
+         * <p>
+         * Note: This is <code>volatile</code> since it can be read by
+         * {@link #getHIRSize()} without holding the shared {@link #lock}.
+         * However, threads performing updates to this field (and all other
+         * fields on this class) MUST hold the {@link #lock}.
+         */
+        private volatile int sizeHIR = 0;
+
+        /**
+         * The entry which is first in the LRU stack (the
+         * <em>least recently used</em>) and <code>null</code> iff the cache is
+         * empty.
+         */
+        private DLNLirs<K, V> firstLRU = null;
+
+        /**
+         * The entry which is last in the LRU stack (the
+         * <em>most recently used</em>) and <code>null</code> iff the cache is
+         * empty.
+         */
+        private DLNLirs<K, V> lastLRU = null;
+
+        /**
+         * The entry which is first in the HIR stack (the least recently used
+         * HIR node) and <code>null</code> iff the HIR stack is empty.
+         */
+        private DLNLirs<K, V> firstHIR = null;
+
+        /**
+         * The entry which is last in the HIR stack (the most recently used HIR
+         * node) and <code>null</code> iff the HIR stack is empty.
+         */
+        private DLNLirs<K, V> lastHIR = null;
+
+        /**
+         * The lock protecting the mutable fields in this class.
+         * <p>
+         * Note: This is the lock on the outer class. It MUST be held across
+         * updates to the access policy. Those updates are batched from
+         * {@link TLB}s as they fill up. Since this lock is always held when
+         * those fields are updated, the fields do not need to be [volatile].
+         */
+        private final ReentrantLock lock;
+
+        private final GlobalLRUCounters<K, V> counters;
+
+        protected LIRSAccessPolicy(final ReentrantLock lock,
+                final GlobalLRUCounters<K, V> counters) {
+
+            this.lock = lock;
+
+            this.counters = counters;
+
+        }
+
+        /**
+         * Return the #of objects in the LRU. This is non-blocking and relies on
+         * a volatile read for visibility.
+         * 
+         * @todo add something to report size(HIRS) as well.
+         */
+        public int size() {
+
+            return sizeLRU;
+            
+        }
+
+        /**
+         * The #of objects in the LRU stack. This is non-blocking and relies on
+         * a volatile read for visibility.
+         * 
+         * @see #size()
+         */
+        public int getLRUSize() {
+
+            return sizeLRU;
+        
+        }
+
+        /**
+         * The #of objects in the resident HIR stack. This is non-blocking and
+         * relies on a volatile read for visibility.
+         * 
+         * @see #getLRUSize()
+         */
+        public int getHIRSize() {
+
+            return sizeHIR;
+        
+        }
+
+        /**
+         * Unlinks everything, updating the "bytesInMemory" and "bytesOnDisk"
+         * counters as it goes.
+         * 
+         * @throws IllegalMonitorStateException
+         *             unless the caller is holding the shared lock.
+         */
+        public void clear() {
+
+            if (!lock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
+
+            while (lastLRU != null) {
+                
+                lastLRU.delete = true;
+                
+                removeEntry(lastLRU);
+
+            }
+
+            /*
+             * Note: These asserts can be tripped if discardAllCaches() is
+             * invoked while there are concurrent operations against the store.
+             */
+            
+//            assert size == 0 && first == null && last == null : "size=" + size
+//                    + ", first=" + first + ",last=" + last;
+//
+//            assert counters.bytesInMemory.get() == 0 : "bytesInMemory="
+//                    + counters.bytesInMemory.get();
+//            
+//            assert counters.bytesOnDisk.get() == 0 : "bytesOnDisk="
+//                    + counters.bytesOnDisk.get();
+
+        }
+        
+        /**
+         * {@inheritDoc}
+         * 
+         * @throws IllegalMonitorStateException
+         *             unless the caller is holding the shared lock.
+         */
+        public void relink(final DLN<K,V> e) {
+
+            if (e.delete) {
+
+                // unlink from the access order.
+                removeEntry((DLNLirs<K, V>) e);
+                
+            } else {
+                
+                if (e.prior == null && e.next == null) {
+
+                    // insert into the access order.
+                    addEntry((DLNLirs<K, V>) e);
+                    
+                } else {
+                
+                    // update the position in the access order.
+                    touchEntry((DLNLirs<K, V>) e);
+                    
+                }
+                
+            }
+            
+        }
+
+        /**
+         * FIXME Per section <code>3.3</code>, LIR status is given to any new
+         * block until the cache is full. Thereafter, HIR status is given to any
+         * blocks that are referenced for the first time and to any blocks which
+         * have not been referenced in such a long time that they have fallen
+         * off of the LRU stack (S).
+         * <p>
+         * In this implementation there are two conditions when evictions can
+         * occur. The first is when we batch touches through the lock, in which
+         * case the evictions are driven by the normal LIRS algorithm. The
+         * second is when putIfAbsent() would cause the cache to exceed its
+         * maximum memory footprint, in which case we purge entries from the
+         * cache in order to drive down its in memory footprint.
+         * <p>
+         * Rather than batching evictions from putIfAbsent(), consider modifying
+         * the algorithm to allow a temporary over capacity condition until the
+         * next time updates are batched through the lock.  At that time, we can
+         * apply the {@link AccessPolicy} to evict nodes until we are once again
+         * in compliance.
+         */
+        public DLNLirs<K, V> newDLN(final LRUCacheImpl<K, V> cache, final K k,
+                final V v) {
+
+            // FIXME HIR versus LIR initial status depending on capacity.
+            boolean lir = true;
+            
+            return new DLNLirs<K,V>(cache, k, v, lir);
+
+        }
+        
+        /**
+         * Add an {@link DLN} to the tail of the linked list (the MRU position).
+         */
+        void addEntry(final DLNLirs<K, V> e) {
+            if (!lock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
+            if(log.isTraceEnabled())
+                log.trace("LRUSize=" + sizeLRU + ",HIRSize=" + sizeHIR + ",e="
+                        + e.toString());
+            if (firstLRU == null) {
+                firstLRU = e;
+                lastLRU = e;
+            } else {
+                lastLRU.next = e;
+                e.prior = lastLRU;
+                lastLRU = e;
+            }
+            sizeLRU++;
+            counters.bytesInMemory += e.bytesInMemory;
+            counters.bytesOnDisk += e.bytesOnDisk;
+        }
+
+        /**
+         * Remove an {@link DLNLru} from linked list that maintains the LRU
+         * ordering. The {@link DLNLru#prior} and {@link DLNLru#next} fields are
+         * cleared. The {@link #firstLRU} and {@link #lastLRU} fields are updated as
+         * necessary. This DOES NOT remove the entry under that key from the
+         * hash map (typically this has already been done).
+         */
+        void removeEntry(final DLNLirs<K, V> e) {
+            if (!lock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
+            if (e.cache == null)
+                return;
+            if(log.isTraceEnabled())
+                log.trace("LRUSize=" + sizeLRU + ",HIRSize=" + sizeHIR + ",e="
+                        + e.toString());
+            final DLNLirs<K, V> prior = (DLNLirs<K, V>) e.prior;
+            final DLNLirs<K, V> next = (DLNLirs<K, V>) e.next;
+            if (e == firstLRU) {
+                firstLRU = next;
+            }
+            if (lastLRU == e) {
+                lastLRU = prior;
+            }
+            if (prior != null) {
+                prior.next = next;
+            }
+            if (next != null) {
+                next.prior = prior;
+            }
+//            final V clearedValue = e.v;
+            e.prior = null;
+            e.next = null;
+            e.v = null; // clear the value reference.
+            sizeLRU--;
+            counters.bytesInMemory -= e.bytesInMemory;
+            counters.bytesOnDisk -= e.bytesOnDisk;
+//            return clearedValue;
+        }
+
+        /**
+         */
+        void touchEntry(final DLNLirs<K, V> e) {
+
+            if (!lock.isHeldByCurrentThread())
+                throw new IllegalMonitorStateException();
+
+            if (lastLRU == e) {
+                return;
+            }
+
+            if(log.isTraceEnabled())
+                log.trace("LRUSize=" + sizeLRU + ",HIRSize=" + sizeHIR + ",e="
+                        + e.toString());
+
+            // true iff node was on the bottom of the LIR stack (LRU position).
+            final boolean onBottom = firstLRU == e;
+            
+            // unlink entry
+            {
+                final DLNLirs<K, V> prior = (DLNLirs<K, V>) e.prior;
+                final DLNLirs<K, V> next = (DLNLirs<K, V>) e.next;
+                if (e == firstLRU) {
+                    firstLRU = next;
+                }
+                if (lastLRU == e) {
+                    lastLRU = prior;
+                }
+                if (prior != null) {
+                    prior.next = next;
+                }
+                if (next != null) {
+                    next.prior = prior;
+                }
+            }
+
+            // link entry as the new tail.
+            {
+                if (firstLRU == null) {
+                    firstLRU = e;
+                    lastLRU = e;
+                } else {
+                    lastLRU.next = e;
+                    e.prior = lastLRU;
+                    e.next = null; // must explicitly set to null.
+                    lastLRU = e;
+                }
+            }
+
+            if (onBottom) {
+                while (!firstLRU.lir) {
+                    evictEntry();
+                }
+            }
+            
+        }
+
+        /**
+         * Stack pruning is defined at the start of section <code>3.3</code>.
+         * 
+         * FIXME Prune HIR nodes from the bottom (LRU position) of the LRU stack
+         * (S). HIR nodes are discarded from the bottom (LRU position) until a
+         * LIR node is uncovered. The reference for each discarded HIR node is
+         * cleared from the {@link LRUCacheImpl#map} so the application will no
+         * longer find a cache entry for that record. If the HIR node was
+         * resident, then it is also unlinked from the HIR list (Q).
+         * <p>
+         * Note: For resident HIR nodes which are evicted by pruning, the blocks
+         * associated with these nodes are available for reuse. However, since
+         * this implementation manages a fixed memory burden rather than a fixed
+         * pool of fixed size blocks, we simply clear the reference to the
+         * record.
+         */
+        private void pruneStack() {
+            throw new UnsupportedOperationException();
+        }
+
+        /**
+         * Evict the LRU entry from the HIR list (Q).
+         * <p>
+         * Note: Unlike the {@link LRUAccessPolicy}, the
+         * {@link LIRSAccessPolicy} always evicts the least recently used HIR
+         * block. This eviction DOES NOT unlink the block from the LRU stack,
+         * but it's status is changed to non-resident (by clearing the value
+         * reference) when it is evicted.
+         * <p>
+         * Note: Blocks enter the HIR list (Q)
+         */
+        public DLNLirs<K, V> evictEntry() {
+
+            // entry in the LRU position.
+            final DLNLirs<K, V> e = firstLRU;
+
+            assert e != null;
+
+            if (log.isTraceEnabled())
+                log.trace("LRUSize=" + sizeLRU + ",HIRSize=" + sizeHIR + ",e="
+                        + e.toString());
+
+//            // the key associated with the entry to be evicted.
+//            final K evictedKey = e.k;
+
+            // The cache from which the entry will be evicted.
+            final LRUCacheImpl<K, V> evictedFromCache = e.cache;
+
+//            final int bytesOnDisk = e.bytesOnDisk;
+
+            // remove LRU entry from ordering.
+            removeEntry(e);
+
+            // Now a HIR node. @todo Do this in removeEntry() or evictEntry()
+            e.lir = false;
+//            e.v = null;
+
+            // remove entry under that key from hash map for that store.
+//            evictedFromCache.remove(evictedKey);// entry.k);
+            evictedFromCache.map.remove(e.k);
+            
+            counters.evictionCount++;
+            counters.evictionByteCount += e.bytesOnDisk;
+
+            return e;
+
+        }
+        
+    } // LIRSAccessPolicy
 
     /**
      * A hard reference hash map backed by a shared Least Recently Used (LRU)
@@ -1675,7 +2402,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
      * @param <V>
      *            The generic type of the value.
      */
-    private static class LRUCacheImpl<K, V> implements ILRUCache<K, V> {
+    static class LRUCacheImpl<K, V> implements ILRUCache<K, V> {
 
         /**
          * Counters for a {@link LRUCacheImpl} instance.
@@ -1797,11 +2524,6 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         private final UUID storeUUID;
 
         /**
-         * The {@link IRawStore} implementation class.
-         */
-        // private final Class<? extends IRawStore> cls;
-
-        /**
          * An {@link IAddressManager} that can decode the record byte count from
          * the record address without causing the {@link IRawStore} reference to
          * be retained.
@@ -1809,10 +2531,25 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
         private final IAddressManager am;
 
         /**
-         * The shared LRU.
+         * The outer cache.
+         * 
+         * @todo It would be nice to define this as {@link IGlobalLRU} rather
+         *       than the specific implementation. The dependencies right now
+         *       are {@link BCHMGlobalLRU2#add(DLN)} and
+         *       {@link BCHMGlobalLRU2#purgeEntriesIfOverCapacity()}.
          */
         private final BCHMGlobalLRU2<K, V> globalLRU;
 
+        /**
+         * The lock guarding the access policy updates.
+         */
+        private final Lock lock;
+
+        /**
+         * The {@link AccessPolicy} guarded by the {@link #lock}.
+         */
+        private final AccessPolicy<K,V> accessPolicy;
+        
         /**
          * The hash map from keys to entries wrapping cached object references.
          */
@@ -1832,6 +2569,10 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
          *            NOT provide a reference to an {@link IRawStore} here as
          *            that will cause the {@link IRawStore} to be retained by a
          *            hard reference!
+         * @param lru
+         *            The outer cache.
+         * @param lock
+         *            The lock guarding the access policy updates.
          * @param initialCapacity
          *            The capacity of the cache (must be positive).
          * @param loadFactor
@@ -1840,10 +2581,17 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
          *            The concurrency level for the internal hash table.
          */
         public LRUCacheImpl(final UUID storeUUID, final IAddressManager am,
-                final BCHMGlobalLRU2<K, V> lru, final int initialCapacity,
+                final BCHMGlobalLRU2<K, V> lru, final Lock lock,
+                final int initialCapacity,
                 final float loadFactor, final int concurrencyLevel) {
 
             if (storeUUID == null)
+                throw new IllegalArgumentException();
+
+            if (lru == null)
+                throw new IllegalArgumentException();
+
+            if (lock == null)
                 throw new IllegalArgumentException();
 
             // [am] MAY be null.
@@ -1864,6 +2612,10 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
             this.globalLRU = lru;
 
+            this.lock = lock;
+
+            this.accessPolicy = lru.accessPolicy;
+            
             this.map = new ConcurrentHashMap<K, DLN<K, V>>(initialCapacity,
                     loadFactor, concurrencyLevel);
 
@@ -1889,13 +2641,13 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
          * Note: If there are updates already buffered for the specified cache,
          * then the will be linked into the access policy when they get batched
          * through the lock. {@link #putIfAbsent(Object, Object)} can see these
-         * {@link DLN}s as they are evicted from the cache and the {@link DLN}s
+         * {@link DLNLru}s as they are evicted from the cache and the {@link DLNLru}s
          * will hold a hard reference to the {@link LRUCacheImpl} until they
          * have been evicted.  This should not be a problem.
          */
         public void clear() {
 
-            globalLRU.lock.lock();
+            lock.lock();
 
             try {
 
@@ -1911,7 +2663,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
                     // unlink entry from the LRU.
                     e.delete = true;
-                    globalLRU.accessPolicy.relink(e);
+                    accessPolicy.relink(e);
 
                 }
 
@@ -1919,7 +2671,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
             } finally {
 
-                globalLRU.lock.unlock();
+                lock.unlock();
 
             }
 
@@ -1962,24 +2714,33 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
                 globalLRU.add(entry);
 
                 // Return the old value.
-                return entry.v;
+                return entry.v();
 
             }
 
+//            /*
+//             * FIXME We should not need to purge entries here. Wait until the
+//             * touches are batched through the lock. The access policy can then
+//             * incrementally purge entries as needed based on the current
+//             * bytesInMemory and the semantics of that access policy. This will
+//             * allow us to keep LIRS semantics and should improve throughput by
+//             * allowing a temporary inconsistency between the data actually
+//             * buffered by the [map(s)] and the bytesInMemory as reported by the
+//             * IGlobalLRU. The hook for this just moves to doEvict(), which is
+//             * invoked to batch through each set of access policy updates in
+//             * turn.
+//             */
+//           globalLRU.purgeEntriesIfOverCapacity();
+
             /*
              * There is no entry under that key.
-             */
-            globalLRU.purgeEntriesIfOverCapacity();
-            
-            /*
-             * The map is not over capacity.
              * 
              * Create a new entry and buffer the entry to be linked into the
              * access policy.
              */
 
             // new entry.
-            entry = new DLN<K, V>(this, k, v);
+            entry = accessPolicy.newDLN(this, k, v);
 
             // put in the map.
             map.put(k, entry);
@@ -2041,7 +2802,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
 
             cacheCounters.nsuccess.increment(); // CAT counter.
 
-            return entry.v;
+            return entry.v();
 
         }
 
@@ -2061,7 +2822,7 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
             globalLRU.add(entry);
 
             // return the old value.
-            return entry.v;
+            return entry.v();
 
         }
 
@@ -2070,7 +2831,38 @@ public class BCHMGlobalLRU2<K,V> implements IHardReferenceGlobalLRU<K,V> {
             return super.toString() + "{" + cacheCounters.toString() + "}";
 
         }
+        
+        /*
+         * Package private methods for inspecting the state of the
+         * implementation for use by the unit tests.
+         */
 
+        /**
+         * Return the current {@link DLN} for that key.
+         * <p>
+         * Note: This is package private. It is used by the unit tests to
+         * inspect the maintenance of the {@link LIRSAccessPolicy}.
+         * 
+         * @param key
+         *            The key.
+         * 
+         * @return The DLN (double-linked node).
+         */
+        DLN<K, V> inspect(final K key) {
+
+            return map.get(key);
+
+        }
+
+        /**
+         * The backing {@link AccessPolicy}.
+         */
+        AccessPolicy<K,V> getAccessPolicy() {
+            
+            return accessPolicy;
+            
+        }
+        
     }
 
 }

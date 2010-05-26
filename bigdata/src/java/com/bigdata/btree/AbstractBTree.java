@@ -243,17 +243,6 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      */
     protected final ILRUCache<Long, Object> storeCache;
 
-//    /**
-//     * Global LRU on which we touch {@link INodeData} and {@link ILeafData}
-//     * instances. This replaces the historical readRetentionQueue, but touch is
-//     * for {@link INodeData} and {@link ILeafData} rather than {@link Node} or
-//     * {@link Leaf}.
-//     * 
-//     * @deprecated I think that this can be safely hidden. Also hide
-//     *             {@link LRUNexus#getGlobalLRU()}
-//     */
-//    final IHardReferenceQueue<Object> globalLRU;
-
     /**
      * The branching factor for the btree.
      */
@@ -263,7 +252,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * Helper class models a request to load a child node.
      * <p>
      * Note: This class must implement equals() and hashCode() since it is used
-     * within the Memoizer pattern.
+     * within the {@link Memoizer} pattern.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
@@ -377,13 +366,15 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 //            return cache.size();
 //            
 //        }
-        
+
         /**
          * Called by the thread which atomically sets the
          * {@link AbstractNode#childRefs} element to the computed
-         * {@link AbstractNode}.
+         * {@link AbstractNode}. At that point a reference exists to the child
+         * on the parent.
          * 
-         * @param addr
+         * @param req
+         *            The requst.
          */
         void removeFromCache(final LoadChildRequest req) {
 

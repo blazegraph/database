@@ -22,11 +22,14 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.BinaryTupleOperator;
+import org.openrdf.query.algebra.BinaryValueOperator;
 import org.openrdf.query.algebra.Compare;
 import org.openrdf.query.algebra.Filter;
+import org.openrdf.query.algebra.Group;
 import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.LeftJoin;
 import org.openrdf.query.algebra.MathExpr;
+import org.openrdf.query.algebra.MultiProjection;
 import org.openrdf.query.algebra.Or;
 import org.openrdf.query.algebra.Order;
 import org.openrdf.query.algebra.OrderElem;
@@ -40,6 +43,7 @@ import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.UnaryTupleOperator;
+import org.openrdf.query.algebra.UnaryValueOperator;
 import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
@@ -48,6 +52,7 @@ import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
+import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
 import com.bigdata.BigdataStatics;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -907,21 +912,28 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
          */
         Set<String> required = new HashSet<String>(); 
         
-        QueryModelNode p = join;
-        while (true) {
-            p = p.getParentNode();
-            if (p instanceof Projection) {
-                List<ProjectionElem> elems = 
-                    ((Projection) p).getProjectionElemList().getElements();
-                for (ProjectionElem elem : elems) {
-                    required.add(elem.getSourceName());
+        try {
+            QueryModelNode p = join;
+            while (true) {
+                p = p.getParentNode();
+                if (DEBUG) {
+                    log.debug(p.getClass());
                 }
-            } else if (p instanceof UnaryTupleOperator) {
-                required.addAll(
-                        ((UnaryTupleOperator) p).getAssuredBindingNames());
+                if (p instanceof UnaryTupleOperator) {
+                    required.addAll(collectVariables((UnaryTupleOperator) p));
+                }
+                if (p instanceof QueryRoot) {
+                    break;
+                }
             }
-            if (p instanceof QueryRoot) {
-                break;
+        } catch (Exception ex) {
+            throw new QueryEvaluationException(ex);
+        }
+
+        if (filters.size() > 0) {
+            for (Filter filter : filters) {
+                System.err.println(Arrays.toString(filter.getAssuredBindingNames().toArray()));
+                required.addAll(filter.getAssuredBindingNames());
             }
         }
         
@@ -967,6 +979,41 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         
     }
 
+    protected Set<String> collectVariables(UnaryTupleOperator uto) 
+        throws Exception {
+
+        final Set<String> vars = new HashSet<String>();
+        if (uto instanceof Projection) {
+            List<ProjectionElem> elems = 
+                ((Projection) uto).getProjectionElemList().getElements();
+            for (ProjectionElem elem : elems) {
+                vars.add(elem.getSourceName());
+            }
+        } else if (uto instanceof MultiProjection) {
+            List<ProjectionElemList> elemLists = 
+                ((MultiProjection) uto).getProjections();
+            for (ProjectionElemList list : elemLists) {
+                List<ProjectionElem> elems = list.getElements();
+                for (ProjectionElem elem : elems) {
+                    vars.add(elem.getSourceName());
+                }
+            }
+        } else if (uto instanceof Filter) {
+            Filter f = (Filter) uto;
+            ValueExpr ve = f.getCondition();
+            ve.visit(new QueryModelVisitorBase<Exception>() {
+                @Override
+                public void meet(Var v) throws Exception {
+                    vars.add(v.getName());
+                }
+            });
+        } else if (uto instanceof Group) {
+            Group g = (Group) uto;
+        }
+        return vars;
+
+    }
+    
     /**
      * This method will take a Union and attempt to turn it into a native
      * bigdata program. If either the left or right arg is a Union, the method

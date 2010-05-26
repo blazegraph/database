@@ -4,11 +4,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IBindingSet;
+import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IVariable;
@@ -320,6 +322,18 @@ public class RuleState implements IRuleState {
         final int tailCount = rule.getTailCount();
 
         final IVariable[][] a = new IVariable[tailCount][];
+
+        final Set<IVariable> constraintVars = new HashSet<IVariable>();
+        if (rule.getConstraintCount() > 0) {
+            final Iterator<IConstraint> constraints = rule.getConstraints();
+            while (constraints.hasNext()) {
+                IConstraint c = constraints.next();
+                IVariable[] vars = c.getVariables();
+                for (IVariable v : vars) {
+                    constraintVars.add(v);
+                }
+            }
+        }
         
         // start at the back
         for (int orderIndex = tailCount-1; orderIndex >= 0; orderIndex--) {
@@ -357,6 +371,9 @@ public class RuleState implements IRuleState {
                         required.add(v);
                     }
                 }
+                
+                // add the variables from the constraints on the rule
+                required.addAll(constraintVars);
                 
                 // plus next tail's passalongs
                 final IVariable[] nextRequired = a[nextTailIndex];
