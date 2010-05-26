@@ -44,7 +44,9 @@ import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IStarJoin;
 import com.bigdata.relation.rule.IVariable;
+import com.bigdata.relation.rule.IStarJoin.IStarConstraint;
 import com.bigdata.relation.rule.eval.ChunkTrace;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IRuleState;
@@ -1336,6 +1338,16 @@ abstract public class JoinTask implements Callable<Void> {
 
             stats.accessPathCount++;
 
+            if (accessPath.getPredicate() instanceof IStarJoin) {
+                
+                IStarJoin starJoin = (IStarJoin) accessPath.getPredicate();
+                
+//                return starJoin.getStarJoinHandler().handleStarJoin();
+                
+                return handleStarJoin(bindingSets, unsyncBuffer);
+                
+            }
+            
             // Obtain the iterator for the current join dimension.
             final IChunkedOrderedIterator itr = accessPath.iterator();
 
@@ -1390,6 +1402,153 @@ abstract public class JoinTask implements Callable<Void> {
 
             }
 
+        }
+
+        protected Object handleStarJoin(IBindingSet[] solutions, 
+                AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer) {
+
+            final IStarJoin starJoin = (IStarJoin) accessPath.getPredicate();
+            
+            // Obtain the iterator for the current join dimension.
+            final IChunkedOrderedIterator itr = accessPath.iterator();
+            
+            Object[] elements = null;
+            
+            try {
+
+                while (itr.hasNext()) {
+
+                    if (elements == null) {
+                        
+                        elements = (Object[]) itr.nextChunk();
+                        
+                    } else {
+                    
+                        final Object[] chunk = (Object[]) itr.nextChunk();
+                        
+                        final Object[] tmp = 
+                            new Object[elements.length + chunk.length];
+                        
+                        System.arraycopy(elements, 0, tmp, 0, elements.length);
+                        
+                        System.arraycopy(chunk, 0, tmp, elements.length-1, 
+                                chunk.length);
+                        
+                        elements = tmp;
+                            
+                    }
+
+                } // next chunk.
+
+                if (elements != null) {
+                    
+                    final Iterator<IStarConstraint> it = 
+                        starJoin.getStarConstraints();
+                    
+                    boolean constraintFailed = false;
+                    
+                    while (it.hasNext()) {
+                        
+                        final IStarConstraint constraint = it.next();
+                        
+                        Collection<IBindingSet> constraintSolutions = null;
+                        
+                        int numVars = constraint.getNumVars();
+                        
+                        for (Object e : elements) {
+
+                            if (constraint.isMatch(e)) {
+                                
+                                // for each match for the constraint, 
+                                // we clone the old solutions and create a new 
+                                // solutions that appends the varable bindings 
+                                // from this match
+                                
+                                // at the end, we set the old solutions 
+                                // collection to the new solutions collection 
+                                
+                                if (constraintSolutions == null) {
+                                    
+                                    constraintSolutions = 
+                                        new LinkedList<IBindingSet>();
+                                    
+                                }
+                                
+                                for (IBindingSet bs : solutions) {
+                                
+                                    if (numVars > 0) {
+                                        
+                                        bs = bs.clone();
+                                        
+                                        constraint.bind(bs, e);
+
+                                    }
+                                    
+                                    constraintSolutions.add(bs);
+
+                                }
+                                
+                                // no reason to keep testing SPOs, there can
+                                // be only one
+                                if (numVars == 0) {
+                                    
+                                    break;
+                                    
+                                }
+                                
+                            }
+                            
+                        }
+                        
+                        if (constraintSolutions == null) {
+                            
+                            // we did not find any matches to this constraint
+                            // that is ok, as long it's optional
+                            if (constraint.isOptional() == false) {
+                                
+                                constraintFailed = true;
+                                
+                                break;
+                                
+                            }
+                            
+                        } else {
+                            
+                            // set the old solutions to the new solutions, and
+                            // move on to the next constraint
+                            solutions = constraintSolutions.toArray(
+                                    new IBindingSet[constraintSolutions.size()]);
+                            
+                        }
+                        
+                    }
+                    
+                    if (!constraintFailed) {
+                        
+                        for (IBindingSet bs : solutions) {
+                            
+                            unsyncBuffer.add(bs);
+                            
+                        }
+                        
+                    }
+                    
+                }
+                
+                return null;
+
+            } catch (Throwable t) {
+
+                halt(t);
+
+                throw new RuntimeException(t);
+
+            } finally {
+
+                itr.close();
+
+            }
+            
         }
 
         /**

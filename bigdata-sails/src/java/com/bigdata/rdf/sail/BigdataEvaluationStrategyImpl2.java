@@ -65,6 +65,7 @@ import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
 import com.bigdata.rdf.spo.SPOFilter;
 import com.bigdata.rdf.spo.SPOPredicate;
+import com.bigdata.rdf.spo.SPOStarJoin;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BigdataSolutionResolverator;
@@ -737,7 +738,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         }
         
         // generate tails
-        final Collection<IPredicate> tails = new LinkedList<IPredicate>();
+        Collection<IPredicate> tails = new LinkedList<IPredicate>();
         // keep a list of free text searches for later to solve a named graphs
         // problem
         final Map<IPredicate, StatementPattern> searches = 
@@ -913,6 +914,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         Set<String> required = new HashSet<String>(); 
         
         try {
+            
             QueryModelNode p = join;
             while (true) {
                 p = p.getParentNode();
@@ -926,17 +928,17 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                     break;
                 }
             }
+
+            if (filters.size() > 0) {
+                for (Filter filter : filters) {
+                    required.addAll(collectVariables((UnaryTupleOperator) filter));
+                }
+            }
+            
         } catch (Exception ex) {
             throw new QueryEvaluationException(ex);
         }
 
-        if (filters.size() > 0) {
-            for (Filter filter : filters) {
-                System.err.println(Arrays.toString(filter.getAssuredBindingNames().toArray()));
-                required.addAll(filter.getAssuredBindingNames());
-            }
-        }
-        
         IVariable[] requiredVars = new IVariable[required.size()];
         int i = 0;
         for (String v : required) {
@@ -945,6 +947,13 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         
         if (DEBUG) {
             log.debug("required binding names: " + Arrays.toString(requiredVars));
+        }
+        
+        if (database.isQuads() == false) {
+            if (DEBUG) {
+                log.debug("generating star joins");
+            }
+            tails = generateStarJoins(tails);
         }
         
         // generate native rule
@@ -1753,6 +1762,103 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         
         // Return an iterator that converts the term identifiers to var bindings
         return new HitConvertor(database, itr, svar, bindings, graphs);
+        
+    }
+    
+    protected Collection<IPredicate> generateStarJoins(
+            Collection<IPredicate> tails) {
+        
+        Collection<IPredicate> newTails = new LinkedList<IPredicate>();
+        
+        Map<IVariable,Collection<IPredicate>> subjects = 
+            new HashMap<IVariable,Collection<IPredicate>>();
+        
+        for (IPredicate pred : tails) {
+            IVariableOrConstant s = pred.get(0);
+            if (s.isVar() && pred.getSolutionExpander() == null && 
+                    pred.getConstraint() == null) {
+                IVariable v = (IVariable) s;
+                Collection<IPredicate> preds = subjects.get(v);
+                if (preds == null) {
+                    preds = new LinkedList<IPredicate>();
+                    subjects.put(v, preds);
+                }
+                preds.add(pred);
+                if (DEBUG) {
+                    log.debug("found a star joinable tail: " + pred);
+                }
+            } else {
+                newTails.add(pred);
+            }
+        }
+        
+        for (Map.Entry<IVariable,Collection<IPredicate>> e : subjects.entrySet()) {
+            IVariable s = e.getKey();
+            Collection<IPredicate> preds = e.getValue();
+            IPredicate mostSelective = null;
+            long minRangeCount = Long.MAX_VALUE;
+            for (IPredicate pred : preds) {
+                long rangeCount = database.getSPORelation().getAccessPath(
+                        (SPOPredicate) pred).rangeCount(false);
+                if (rangeCount < minRangeCount) {
+                    minRangeCount = rangeCount;
+                    mostSelective = pred;
+                }
+            }
+            if (mostSelective == null) {
+                throw new RuntimeException("range counts not working?");
+            }
+            boolean sharedVars = false;
+            Collection<IVariable> vars = new LinkedList<IVariable>();
+            for (IPredicate pred : preds) {
+                if (pred instanceof SPOPredicate) {
+                    SPOPredicate spoPred = (SPOPredicate) pred;
+                    if (spoPred.p().isVar()) {
+                        IVariable v = (IVariable) spoPred.p();
+                        if (vars.contains(v)) {
+                            sharedVars = true;
+                            break;
+                        }
+                        vars.add(v);
+                    }
+                    if (spoPred.o().isVar()) {
+                        IVariable v = (IVariable) spoPred.o();
+                        if (vars.contains(v)) {
+                            sharedVars = true;
+                            break;
+                        }
+                        vars.add(v);
+                    }
+                }
+            }
+            if (!sharedVars) {
+                SPOStarJoin starJoin = new SPOStarJoin(
+                        (SPOPredicate) mostSelective);
+                for (IPredicate pred : preds) {
+                    if (pred == mostSelective) {
+                        continue;
+                    }
+                    starJoin.addStarConstraint(
+                            new SPOStarJoin.SPOStarConstraint(
+                                    pred.get(1), pred.get(2), pred.isOptional()));
+                }
+                newTails.add(starJoin);
+                newTails.add(mostSelective);
+            } else {
+                for (IPredicate pred : preds) {
+                    newTails.add(pred);
+                }
+            }
+        }
+        
+        if (DEBUG) {
+            log.debug(newTails.size());
+            for (IPredicate tail : newTails) {
+                log.debug(tail);
+            }
+        }
+        
+        return newTails;
         
     }
 
