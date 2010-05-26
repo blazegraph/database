@@ -499,15 +499,8 @@ abstract public class WriteCacheService implements IWriteCache {
 							c.maxdirty = c.ndirty;
 
 						// Guaranteed available.
-						cache = dirtyList.take();
+						cache = dirtyList.peek();
 
-						if (dirtyList.isEmpty()) {
-							/*
-							 * Signal Condition when we release the
-							 * dirtyListLock.
-							 */
-							dirtyListEmpty.signalAll();
-						}
 					} finally {
 						dirtyListLock.unlock();
                     }
@@ -556,6 +549,22 @@ abstract public class WriteCacheService implements IWriteCache {
                         }
 
                     }
+
+					// Now written, remove from dirtylist.
+					dirtyList.take();
+
+					dirtyListLock.lockInterruptibly();
+					try {
+						if (dirtyList.isEmpty()) {
+						/*
+						 * Signal Condition when we release the
+						 * dirtyListLock.
+						 */
+						dirtyListEmpty.signalAll();
+						}
+					} finally {
+						dirtyListLock.unlock();
+					}
 
 					/*
 					 * Add to the cleanList (all buffers are our buffers).
