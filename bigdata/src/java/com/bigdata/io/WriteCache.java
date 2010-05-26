@@ -709,12 +709,18 @@ abstract public class WriteCache implements IWriteCache {
                 	pos = spos;
                 }
 
+				tmp.put(data);
+				
 				// copy the record into the cache, updating position() as we go.
+				// TODO: Note that the checker must be invalidated if a RWCache "deletes" an entry
+				// by zeroing an address.
                 if (checker != null) {
                     // update the checksum (no side-effects on [data])
-                    checker.update(data);
+                	ByteBuffer chkBuf = tmp.asReadOnlyBuffer();
+                	chkBuf.position(spos);
+                	chkBuf.limit(tmp.position());
+                    checker.update(chkBuf);
                 }
-				tmp.put(data);
 
 				// write checksum - if any
                 if (writeChecksum && useChecksum) {
