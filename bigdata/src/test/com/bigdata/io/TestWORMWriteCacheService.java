@@ -46,6 +46,9 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.Adler32;
 
+import org.apache.log4j.Logger;
+
+import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.io.WriteCache.FileChannelScatteredWriteCache;
 import com.bigdata.io.WriteCache.FileChannelWriteCache;
 import com.bigdata.journal.IRootBlockView;
@@ -126,6 +129,10 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * </pre>
  */
 public class TestWORMWriteCacheService extends TestCase3 {
+
+    protected static final Logger log = Logger.getLogger
+    ( TestWORMWriteCacheService.class
+      );
 
     /**
      * 
@@ -503,7 +510,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         try {
 
             doStressTest(nbuffers, nrecs, maxreclen, largeRecordRate,
-                    useChecksums, isHighlyAvailable, StoreTypeEnum.WORM, qm);
+                    useChecksums, isHighlyAvailable, StoreTypeEnum.RW, qm);
 
         } finally {
 
@@ -574,7 +581,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         try {
 
             doStressTest(nbuffers, nrecs, maxreclen, largeRecordRate,
-                    useChecksums, isHighlyAvailable, StoreTypeEnum.WORM, qm);
+                    useChecksums, isHighlyAvailable, StoreTypeEnum.RW, qm);
 
         } finally {
 
@@ -645,7 +652,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         try {
 
             doStressTest(nbuffers, nrecs, maxreclen, largeRecordRate,
-                    useChecksums, isHighlyAvailable, StoreTypeEnum.WORM, qm);
+                    useChecksums, isHighlyAvailable, StoreTypeEnum.RW, qm);
 
         } finally {
 
@@ -854,8 +861,8 @@ public class TestWORMWriteCacheService extends TestCase3 {
 
                     final int actualChecksum = checker.checksum(actual);
                     
-                    if(log.isDebugEnabled())
-                        log.debug("read : i=" + i + ", prior=" + prior
+                    if(log.isTraceEnabled())
+                        log.trace("read : i=" + i + ", prior=" + prior
                             + ", " + (cacheHit ? "hit" : "miss") + ", rec="
                             + expected + ", actualChecksum=" + actualChecksum
                             + ", actual=" + actual);
@@ -878,6 +885,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             
             // close the write cache.
             log.info("Service close().");
+            // Thread.sleep(0);
             writeCacheService.close();
 
             // verify the file size is as expected (we presize the file).
@@ -1463,6 +1471,8 @@ public class TestWORMWriteCacheService extends TestCase3 {
                     
                     // Start the receive service.
                     receiveServices[i].start();
+                    
+                    Thread.sleep(100); // ensure we  give downstream chance to startup!
 
                 }
 
