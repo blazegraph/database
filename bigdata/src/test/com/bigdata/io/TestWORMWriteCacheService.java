@@ -1469,10 +1469,8 @@ public class TestWORMWriteCacheService extends TestCase3 {
                                 }
                             });
                     
-                    // Start the receive service.
+                    // Start the receive service - will not return until service is running
                     receiveServices[i].start();
-                    
-                    Thread.sleep(100); // ensure we  give downstream chance to startup!
 
                 }
 
@@ -1563,6 +1561,12 @@ public class TestWORMWriteCacheService extends TestCase3 {
             }
             
             executorService.shutdownNow();
+            
+            try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				// NOP
+			}
             
         }
 
