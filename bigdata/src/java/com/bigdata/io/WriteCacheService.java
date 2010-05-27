@@ -1199,7 +1199,11 @@ abstract public class WriteCacheService implements IWriteCache {
 
 	}
 
-    /**
+    public boolean write(final long offset, final ByteBuffer data, final int chk)
+    throws InterruptedException, IllegalStateException {
+    	return write(offset, data, chk, useChecksum);
+    }
+   /**
      * Write the record onto the cache. If the record is too large for the cache
      * buffers, then it is written synchronously onto the backing channel.
      * Otherwise it is written onto a cache buffer which is lazily flushed onto
@@ -1235,7 +1239,7 @@ abstract public class WriteCacheService implements IWriteCache {
      *       store but would require an override of this method specific to that
      *       implementation.
      */
-    public boolean write(final long offset, final ByteBuffer data, final int chk)
+    public boolean write(final long offset, final ByteBuffer data, final int chk, final boolean useChecksum)
             throws InterruptedException, IllegalStateException {
 
         if (log.isInfoEnabled()) {
@@ -1265,7 +1269,7 @@ abstract public class WriteCacheService implements IWriteCache {
 			/*
 			 * Handle large records.
 			 */
-			return writeLargeRecord(offset, data, chk);
+			return writeLargeRecord(offset, data, chk, useChecksum);
 
 		}
 
@@ -1282,7 +1286,7 @@ abstract public class WriteCacheService implements IWriteCache {
 			try {
 
 				// write on the cache.
-				if (cache.write(offset, data, chk)) {
+				if (cache.write(offset, data, chk, useChecksum)) {
 
 					if (recordMap.put(offset, cache) != null) {
 						throw new AssertionError("Record already in cache: offset=" + offset);
@@ -1331,7 +1335,7 @@ abstract public class WriteCacheService implements IWriteCache {
 				try {
 
 					// While holding the write lock, see if the record fits.
-					if (cache.write(offset, data, chk)) {
+					if (cache.write(offset, data, chk, useChecksum)) {
 
 						/*
 						 * It fits: someone already changed to a new cache,
@@ -1413,7 +1417,7 @@ abstract public class WriteCacheService implements IWriteCache {
 						current.set(cache = newBuffer);
 
 						// Try to write on the new buffer.
-						if (cache.write(offset, data, chk)) {
+						if (cache.write(offset, data, chk, useChecksum)) {
 
 							// This must be the only occurrence of this record.
 							if (recordMap.put(offset, cache) != null) {
@@ -1497,7 +1501,7 @@ abstract public class WriteCacheService implements IWriteCache {
 	 * WriteCacheService because the large record would not be replicated for
 	 * HA.
 	 */
-	protected boolean writeLargeRecord(final long offset, final ByteBuffer data, final int chk)
+	protected boolean writeLargeRecord(final long offset, final ByteBuffer data, final int chk, final boolean useChecksum)
 			throws InterruptedException, IllegalStateException {
 
 		if (log.isInfoEnabled()) {

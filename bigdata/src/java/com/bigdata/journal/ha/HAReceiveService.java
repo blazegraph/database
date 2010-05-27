@@ -245,6 +245,23 @@ public class HAReceiveService<M extends HAWriteMessageBase> extends Thread {
         }
     }
    
+    public void start() {
+    	super.start();
+    	lock.lock();
+    	try {
+            // Wait for state change from Start
+            while (runState == RunState.Start) {
+            	try {
+					futureReady.await();
+				} catch (InterruptedException e) {
+					// let's go around again
+				}
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+    
     public void run() {
         lock.lock();
         try {

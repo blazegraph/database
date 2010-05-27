@@ -617,7 +617,8 @@ public class RWStore implements IStore {
 				ByteBuffer bbuf = m_writeCache.read(paddr);
 				if (bbuf != null) {
 					byte[] in = bbuf.array(); // reads in with checksum - no need to check if in cache
-					if (in.length != (length+4)) {
+					// if (in.length != (length+4)) {
+					if (in.length != length) {
 						throw new IllegalStateException("Incompatible buffer size for addr: " + addr + ", " + in.length
 								+ " != " + length);
 					}
@@ -638,7 +639,7 @@ public class RWStore implements IStore {
 			} catch (Exception e) {
 				e.printStackTrace();
 				
-				throw new IllegalStateException("Unable to read data", e);
+				throw new IllegalArgumentException("Unable to read data", e);
 			}
 		}
 	}
@@ -974,7 +975,7 @@ public class RWStore implements IStore {
 
 		long addr = physicalAddress((int) m_metaBitsAddr);
 		try {
-			m_writeCache.write(addr, ByteBuffer.wrap(buf), 0);
+			m_writeCache.write(addr, ByteBuffer.wrap(buf), 0, false);
 		} catch (IllegalStateException e) {
 			throw new RuntimeException(e);
 		} catch (InterruptedException e) {
@@ -1073,7 +1074,7 @@ public class RWStore implements IStore {
 								+ naddr);
 
 					try {
-						m_writeCache.write(allocator.getDiskAddr(), ByteBuffer.wrap(allocator.write()), 0);
+						m_writeCache.write(allocator.getDiskAddr(), ByteBuffer.wrap(allocator.write()), 0, false); // do not use checksum
 					} catch (IllegalStateException e) {
 						throw new RuntimeException(e);
 					} catch (InterruptedException e) {
