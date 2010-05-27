@@ -61,6 +61,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.concurrent.LatchedExecutor;
 import com.bigdata.util.concurrent.ShutdownHelper;
 
 /**
@@ -125,6 +126,15 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         String DEFAULT_LOCATOR_CACHE_TIMEOUT = "" + (60 * 1000);
 
+        /**
+         * The #of threads that will be used to read on the local disk.
+         * 
+         * @see Journal#getReadExecutor()
+         */
+        String READ_POOL_SIZE = Journal.class.getName() + ".readPoolSize";
+
+        String DEFAULT_READ_POOL_SIZE = "0";
+
     }
     
     /**
@@ -141,6 +151,24 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
         executorService = Executors.newCachedThreadPool(new DaemonThreadFactory
                 (getClass().getName()+".executorService"));
+
+        {
+            
+            final int readPoolSize = Integer.valueOf(properties.getProperty(
+                    Options.READ_POOL_SIZE, Options.DEFAULT_READ_POOL_SIZE));
+            
+            if (readPoolSize > 0) {
+
+                readService = new LatchedExecutor(executorService,
+                        readPoolSize);
+
+            } else {
+
+                readService = null;
+                
+            }
+
+        }
 
         {
 
@@ -1151,4 +1179,28 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
     private final ExecutorService executorService;
 
+    /**
+     * An executor service used to read on the local disk.
+     * 
+     * @todo This is currently used by prefetch. We should generalize this
+     *       mechanism, probably moving it to the {@link IResourceManager}, and
+     *       use it to do all IO, ideally using the JSR 166 fork/join
+     *       mechanisms.
+     *       <p>
+     *       This should be reconciled with the {@link ConcurrencyManager},
+     *       which has distinct {@link ExecutorService}s for readers and writers
+     *       which control the per-task concurrency while this controls the disk
+     *       read concurrency.
+     *       <p>
+     *       We could use the same pool for readers and writers on the disk.
+     */
+    public LatchedExecutor getReadExecutor() {
+        
+        assertOpen();
+        
+        return readService;
+        
+    }
+    private final LatchedExecutor readService;
+    
 }

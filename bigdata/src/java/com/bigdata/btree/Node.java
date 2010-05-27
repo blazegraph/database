@@ -20,7 +20,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
+ */
 /*
  * Created on Nov 15, 2006
  */
@@ -31,6 +31,8 @@ import java.lang.ref.Reference;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceArray;
@@ -45,7 +47,9 @@ import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.concurrent.LatchedExecutor;
 import com.bigdata.util.concurrent.Memoizer;
 
 import cutthecrap.utils.striterators.EmptyIterator;
@@ -118,59 +122,60 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * @todo document why package private (AbstractBTree.loadChild uses this but
      *       maybe that method could be moved to Node).
      */
-    transient /*volatile*/ Reference<AbstractNode<?>>[] childRefs;
+    transient/* volatile */Reference<AbstractNode<?>>[] childRefs;
 
-//    /**
-//     * An array of objects used to provide a per-child lock in order to allow
-//     * maximum concurrency in {@link #getChild(int)}.
-//     * <p>
-//     * Note: this array is not allocated for a mutable btree since the caller
-//     * will be single threaded and locking is therefore not required in
-//     * {@link #getChild(int)}. We only need locking for read-only btrees since
-//     * they allow concurrent readers.
-//     * 
-//     * @todo There is a LOT of overhead to creating all these objects. They are
-//     *       only really useful in high concurrent read scenarios such as highly
-//     *       concurrent query against an index. However, those situations
-//     *       typically have a lot of buffered B+Tree nodes so the in-memory
-//     *       footprint for this array is not really worth it.
-//     *       <p>
-//     *       This might be viable if we had an AtomicBitVector class since we
-//     *       could typically get by with 1-2 longs of data in that case.
-//     */
-//    transient private Object[] childLocks;
+    // /**
+    // * An array of objects used to provide a per-child lock in order to allow
+    // * maximum concurrency in {@link #getChild(int)}.
+    // * <p>
+    // * Note: this array is not allocated for a mutable btree since the caller
+    // * will be single threaded and locking is therefore not required in
+    // * {@link #getChild(int)}. We only need locking for read-only btrees since
+    // * they allow concurrent readers.
+    // *
+    // * @todo There is a LOT of overhead to creating all these objects. They
+    // are
+    // * only really useful in high concurrent read scenarios such as highly
+    // * concurrent query against an index. However, those situations
+    // * typically have a lot of buffered B+Tree nodes so the in-memory
+    // * footprint for this array is not really worth it.
+    // * <p>
+    // * This might be viable if we had an AtomicBitVector class since we
+    // * could typically get by with 1-2 longs of data in that case.
+    // */
+    // transient private Object[] childLocks;
 
     /**
      * Return <code>((branchingFactor + 1) &lt;&lt; 1) - 1</code>
      */
     protected final int minKeys() {
 
-//        /*
-//         * Compute the minimum #of children/values. This is the same whether
-//         * this is a Node or a Leaf.
-//         */
-//        final int minChildren = (btree.branchingFactor + 1) >> 1;
-//
-//        // this.minKeys = isLeaf() ? minChildren : minChildren - 1;
-//
-//        return minChildren - 1;
+        // /*
+        // * Compute the minimum #of children/values. This is the same whether
+        // * this is a Node or a Leaf.
+        // */
+        // final int minChildren = (btree.branchingFactor + 1) >> 1;
+        //
+        // // this.minKeys = isLeaf() ? minChildren : minChildren - 1;
+        //
+        // return minChildren - 1;
         return btree.minChildren - 1;
-        
+
     }
-    
+
     /**
      * Return <code>branchingFactor - 1</code>, which is the maximum #of keys
      * for a {@link Node}.
      */
     protected final int maxKeys() {
-        
-//        // The maximum #of keys is easy to compute.
-//        this.maxKeys = isLeaf() ? branchingFactor : branchingFactor - 1;
+
+        // // The maximum #of keys is easy to compute.
+        // this.maxKeys = isLeaf() ? branchingFactor : branchingFactor - 1;
 
         return btree.branchingFactor - 1;
-        
+
     }
-    
+
     /**
      * Range check a child index.
      * 
@@ -182,12 +187,12 @@ public class Node extends AbstractNode<Node> implements INodeData {
      *             if the index is not in the legal range.
      */
     final protected boolean rangeCheckChildIndex(final int index) {
-        
+
         if (index < 0 || index > data.getKeyCount() + 1)
             throw new IndexOutOfBoundsException();
 
         return true;
-        
+
     }
 
     /**
@@ -205,21 +210,21 @@ public class Node extends AbstractNode<Node> implements INodeData {
     public final Reference<AbstractNode<?>> getChildRef(final int index) {
 
         assert rangeCheckChildIndex(index);
-        
+
         return childRefs[index];
 
     }
 
     final public INodeData getDelegate() {
-        
+
         return data;
 
     }
-    
+
     /*
      * INodeData.
      */
-    
+
     /**
      * Always returns <code>false</code>.
      */
@@ -237,45 +242,45 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * instance.
      */
     final public boolean isReadOnly() {
-        
+
         return data.isReadOnly();
-        
+
     }
 
     final public boolean isCoded() {
-        
+
         return data.isCoded();
-        
+
     }
-    
+
     final public AbstractFixedByteArrayBuffer data() {
-        
+
         return data.data();
-        
+
     }
 
     final public int getKeyCount() {
-        
+
         return data.getKeyCount();
-        
+
     }
-    
+
     final public IRaba getKeys() {
-        
+
         return data.getKeys();
-        
+
     }
-    
+
     final public int getChildCount() {
-        
+
         return data.getChildCount();
-        
+
     }
-    
+
     public final int getSpannedTupleCount() {
-        
+
         return data.getSpannedTupleCount();
-        
+
     }
 
     public final long getChildAddr(final int index) {
@@ -287,25 +292,25 @@ public class Node extends AbstractNode<Node> implements INodeData {
     final public int getChildEntryCount(final int index) {
 
         return data.getChildEntryCount(index);
-        
+
     }
 
     final public long getMaximumVersionTimestamp() {
-     
+
         return data.getMaximumVersionTimestamp();
-        
+
     }
 
     public long getMinimumVersionTimestamp() {
 
         return data.getMinimumVersionTimestamp();
-        
+
     }
 
     final public boolean hasVersionTimestamps() {
 
         return data.hasVersionTimestamps();
-        
+
     }
 
     /**
@@ -344,11 +349,11 @@ public class Node extends AbstractNode<Node> implements INodeData {
         assert data.nentries > 0;
 
         if (child.hasVersionTimestamps()) {
-            
+
             final long cmin = child.getMinimumVersionTimestamp();
-            
+
             final long cmax = child.getMaximumVersionTimestamp();
-            
+
             if (cmin < data.minimumVersionTimestamp)
                 data.minimumVersionTimestamp = cmin;
 
@@ -356,13 +361,13 @@ public class Node extends AbstractNode<Node> implements INodeData {
                 data.maximumVersionTimestamp = cmax;
 
         }
-        
-        if( parent != null ) {
-            
+
+        if (parent != null) {
+
             parent.get().updateEntryCount(this, delta);
-            
+
         }
-        
+
     }
 
     /**
@@ -397,7 +402,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
             parent.get().updateMinMaxVersionTimestamp(child);
 
         }
-        
+
     }
 
     /**
@@ -418,40 +423,40 @@ public class Node extends AbstractNode<Node> implements INodeData {
     protected Node(final AbstractBTree btree, final long addr,
             final INodeData data) {
 
-        super( btree, false /* The node is NOT dirty */ );
+        super(btree, false /* The node is NOT dirty */);
 
         final int branchingFactor = btree.branchingFactor;
-        
-//        assert branchingFactor >= Options.MIN_BRANCHING_FACTOR;
-//        
-//        assert nkeys < branchingFactor;
+
+        // assert branchingFactor >= Options.MIN_BRANCHING_FACTOR;
+        //        
+        // assert nkeys < branchingFactor;
 
         assert data != null;
-        
-//        assert childAddr.length == branchingFactor + 1;
-//
-//        assert childEntryCounts.length == branchingFactor + 1;
-        
+
+        // assert childAddr.length == branchingFactor + 1;
+        //
+        // assert childEntryCounts.length == branchingFactor + 1;
+
         setIdentity(addr);
 
         this.data = data;
-        
-//        this.nentries = nentries;
-//        
-////        this.nkeys = keys.size();
-//        
-//        this.keys = keys; // steal reference.
-//        
-//        this.childAddr = childAddr;
-//
-//        this.childEntryCounts = childEntryCounts;
+
+        // this.nentries = nentries;
+        //        
+        // // this.nkeys = keys.size();
+        //        
+        // this.keys = keys; // steal reference.
+        //        
+        // this.childAddr = childAddr;
+        //
+        // this.childEntryCounts = childEntryCounts;
 
         childRefs = new Reference[branchingFactor + 1];
 
-//        childLocks = newChildLocks(btree, data.getKeys().size());
+        // childLocks = newChildLocks(btree, data.getKeys().size());
 
-//        // must clear the dirty flag since we just de-serialized this node.
-//        setDirty(false);
+        // // must clear the dirty flag since we just de-serialized this node.
+        // setDirty(false);
 
     }
 
@@ -470,15 +475,15 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         childRefs = new Reference[branchingFactor + 1];
 
-//        childLocks = newChildLocks(btree, 0/* nkeys */);
+        // childLocks = newChildLocks(btree, 0/* nkeys */);
 
-//        nentries = 0;
-//
-//        keys = new MutableKeyBuffer(branchingFactor);
-//
-//        childAddr = new long[branchingFactor + 1];
-//
-//        childEntryCounts = new int[branchingFactor + 1];
+        // nentries = 0;
+        //
+        // keys = new MutableKeyBuffer(branchingFactor);
+        //
+        // childAddr = new long[branchingFactor + 1];
+        //
+        // childEntryCounts = new int[branchingFactor + 1];
 
     }
 
@@ -501,7 +506,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
     protected Node(final BTree btree, final AbstractNode oldRoot,
             final int nentries) {
 
-        super(btree, true /*dirty*/ );
+        super(btree, true /* dirty */);
 
         // Verify that this is the root.
         assert oldRoot == btree.root;
@@ -510,13 +515,14 @@ public class Node extends AbstractNode<Node> implements INodeData {
         assert oldRoot.isDirty();
 
         final int branchingFactor = btree.branchingFactor;
-        
+
         childRefs = new Reference[branchingFactor + 1];
 
         // Note: child locks are only for read-only btrees and this ctor is only
-        // for a split of the root leaf so we never use child locks for this case.
-        assert !btree.isReadOnly(); 
-//        childLocks = null; // newChildLocks(btree);
+        // for a split of the root leaf so we never use child locks for this
+        // case.
+        assert !btree.isReadOnly();
+        // childLocks = null; // newChildLocks(btree);
 
         final MutableNodeData data;
         this.data = data = new MutableNodeData(branchingFactor, btree
@@ -524,25 +530,25 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         // #of entries spanned by the old root _before_ this split.
         data.nentries = nentries;
-        
-//        keys = new MutableKeyBuffer(branchingFactor);
-//
-//        childAddr = new long[branchingFactor + 1];
-//
-//        childEntryCounts = new int[branchingFactor + 1];
+
+        // keys = new MutableKeyBuffer(branchingFactor);
+        //
+        // childAddr = new long[branchingFactor + 1];
+        //
+        // childEntryCounts = new int[branchingFactor + 1];
 
         /*
          * Replace the root node on the tree.
          */
-        
+
         final boolean wasDirty = btree.root.dirty;
-        
+
         btree.root = this;
-        
+
         if (!wasDirty) {
-            
+
             btree.fireDirtyEvent();
-            
+
         }
 
         /*
@@ -550,15 +556,15 @@ public class Node extends AbstractNode<Node> implements INodeData {
          */
 
         childRefs[0] = oldRoot.self;
-//        childRefs[0] = btree.newRef(oldRoot);
+        // childRefs[0] = btree.newRef(oldRoot);
 
         // #of entries from the old root _after_ the split.
         data.childEntryCounts[0] = oldRoot.getSpannedTupleCount();
-        
-//        dirtyChildren.add(oldRoot);
+
+        // dirtyChildren.add(oldRoot);
 
         oldRoot.parent = this.self;
-//        oldRoot.parent = btree.newRef(this);
+        // oldRoot.parent = btree.newRef(this);
 
         /*
          * The tree is deeper since we just split the root node.
@@ -566,9 +572,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
         btree.height++;
 
         final int requiredQueueCapacity = 2 * (btree.height + 2);
-        
-        if ( requiredQueueCapacity > btree.writeRetentionQueue.capacity()) {
-            
+
+        if (requiredQueueCapacity > btree.writeRetentionQueue.capacity()) {
+
             /*
              * FIXME Automatically extend the hard reference queue capacity such
              * that (a) this constraint described below is never violated; and
@@ -605,13 +611,14 @@ public class Node extends AbstractNode<Node> implements INodeData {
              * that we are never or only rarely visiting given the actual access
              * patterns in the application.
              */
-            
-            throw new UnsupportedOperationException("writeRetentionQueue: capacity="
-                    + btree.writeRetentionQueue.capacity() + ", but height="
-                    + btree.height);
-            
+
+            throw new UnsupportedOperationException(
+                    "writeRetentionQueue: capacity="
+                            + btree.writeRetentionQueue.capacity()
+                            + ", but height=" + btree.height);
+
         }
-        
+
         btree.nnodes++;
 
         btree.getBtreeCounters().rootsSplit++;
@@ -630,7 +637,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
             if (BigdataStatics.debug)
                 System.err.println(msg);
-            
+
         }
 
     }
@@ -666,9 +673,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
         super(src);
 
         assert !src.isDirty();
-        
+
         assert src.isReadOnly();
-//        assert src.isPersistent();
+        // assert src.isPersistent();
 
         /*
          * Steal/clone the data record.
@@ -690,13 +697,14 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * fields to the new node. Stealing the child means that it MUST NOT be
          * used by its previous ancestor (our source node for this copy).
          */
-        
-        childRefs = src.childRefs; src.childRefs = null;
 
-//        childLocks = src.childLocks; src.childLocks = null;
+        childRefs = src.childRefs;
+        src.childRefs = null;
+
+        // childLocks = src.childLocks; src.childLocks = null;
 
         final int nkeys = data.getKeyCount();
-        
+
         for (int i = 0; i <= nkeys; i++) {
 
             final AbstractNode child = childRefs[i] == null ? null
@@ -711,7 +719,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
              * [btree.store==null] test handles this condition and always steals
              * the child, setting its parent to this new node.
              * 
-             * FIXME It is clear that testing on child.identity is broken in 
+             * FIXME It is clear that testing on child.identity is broken in
              * some other places for the transient store.
              */
             if (child != null
@@ -725,35 +733,35 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
                 // Steal the child.
                 child.parent = this.self;
-//                child.parent = btree.newRef(this);
+                // child.parent = btree.newRef(this);
 
-//                // Keep a reference to the clean child.
-//                childRefs[i] = new WeakReference<AbstractNode>(child);
-                    
+                // // Keep a reference to the clean child.
+                // childRefs[i] = new WeakReference<AbstractNode>(child);
+
             }
-            
+
         }
 
     }
 
     @Override
     public void delete() {
-        
+
         super.delete();
-        
+
         // clear state.
         childRefs = null;
-//        childLocks = null;
+        // childLocks = null;
         data = null;
-        
+
     }
-    
+
     /**
      * This method must be invoked on a parent to notify the parent that the
-     * child has become persistent. The method scans the weak references for
-     * the children, finds the index for the specified child, and then sets
-     * the corresponding index in the array of child keys. The child is then
-     * removed from the dirty list for this node.
+     * child has become persistent. The method scans the weak references for the
+     * children, finds the index for the specified child, and then sets the
+     * corresponding index in the array of child keys. The child is then removed
+     * from the dirty list for this node.
      * 
      * @param child
      *            The child.
@@ -772,18 +780,18 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         }
 
-        final int i = getIndexOf( child );
+        final int i = getIndexOf(child);
 
         assert !isReadOnly();
-        
+
         ((MutableNodeData) data).childAddr[i] = child.getIdentity();
 
-//        if (!dirtyChildren.remove(child)) {
-//
-//            throw new AssertionError("Child was not on dirty list.");
-//
-//        }
-        
+        // if (!dirtyChildren.remove(child)) {
+        //
+        // throw new AssertionError("Child was not on dirty list.");
+        //
+        // }
+
     }
 
     /**
@@ -813,11 +821,11 @@ public class Node extends AbstractNode<Node> implements INodeData {
         assert !newChild.isPersistent();
 
         assert !isReadOnly();
-        
-        final MutableNodeData data = (MutableNodeData)this.data;
-        
+
+        final MutableNodeData data = (MutableNodeData) this.data;
+
         final int nkeys = getKeyCount();
-        
+
         // Scan for location in weak references.
         for (int i = 0; i <= nkeys; i++) {
 
@@ -832,41 +840,43 @@ public class Node extends AbstractNode<Node> implements INodeData {
                  * node was read-only), this entire section has been commented
                  * out.
                  */
-//                if (true) {
-//
-//                    /*
-//                     * Do some paranoia checks.
-//                     */
-//
-//                    final AbstractNode oldChild = childRefs[i] != null ? childRefs[i]
-//                            .get() : null;
-//
-//                    if (oldChild != null) {
-//
-////                        assert oldChild.isPersistent();
-//
-////                        assert !dirtyChildren.contains(oldChild);
-//
-//                    }
-//
-//                }
+                // if (true) {
+                //
+                // /*
+                // * Do some paranoia checks.
+                // */
+                //
+                // final AbstractNode oldChild = childRefs[i] != null ?
+                // childRefs[i]
+                // .get() : null;
+                //
+                // if (oldChild != null) {
+                //
+                // // assert oldChild.isPersistent();
+                //
+                // // assert !dirtyChildren.contains(oldChild);
+                //
+                // }
+                //
+                // }
 
                 // Clear the old key.
                 data.childAddr[i] = NULL;
-                
-                // remove from cache and free the oldChildAddr if the Strategy supports it
+
+                // remove from cache and free the oldChildAddr if the Strategy
+                // supports it
                 btree.storeCache.remove(oldChildAddr);
                 btree.store.delete(oldChildAddr);
 
                 // Stash reference to the new child.
-//                childRefs[i] = btree.newRef(newChild);
+                // childRefs[i] = btree.newRef(newChild);
                 childRefs[i] = newChild.self;
 
-//                // Add the new child to the dirty list.
-//                dirtyChildren.add(newChild);
+                // // Add the new child to the dirty list.
+                // dirtyChildren.add(newChild);
 
                 // Set the parent on the new child.
-//                newChild.parent = btree.newRef(this);
+                // newChild.parent = btree.newRef(this);
                 newChild.parent = this.self;
 
                 return;
@@ -875,8 +885,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         }
 
-//        System.err.println("this: "); dump(Level.DEBUG,System.err);
-//        System.err.println("newChild: "); newChild.dump(Level.DEBUG,System.err);
+        // System.err.println("this: "); dump(Level.DEBUG,System.err);
+        // System.err.println("newChild: ");
+        // newChild.dump(Level.DEBUG,System.err);
         throw new IllegalArgumentException("Not our child : oldChildAddr="
                 + oldChildAddr);
 
@@ -934,10 +945,11 @@ public class Node extends AbstractNode<Node> implements INodeData {
         final AbstractNode<?> child = getChild(childIndex);
 
         return child.remove(key, tuple);
-        
+
     }
-    
+
     /**
+     * {@inheritDoc}
      * @todo convert to batch api and handle searchKeyOffset.
      */
     @Override
@@ -956,7 +968,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * successful search at the key level in which case we do not need to
          * pass n down.
          */
-        
+
         int offset = 0;
 
         for (int i = 0; i < childIndex; i++) {
@@ -980,13 +992,13 @@ public class Node extends AbstractNode<Node> implements INodeData {
             return (-(ret) - 1);
 
         }
-        
+
         // add in the offset.
         ret += offset;
 
         // return the index position of the key relative to this node.
         return ret;
-        
+
     }
 
     /**
@@ -996,7 +1008,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      *            The key index.
      * 
      * @return <code>true</code>
-     *
+     * 
      * @throws IndexOutOfBoundsException
      *             if the index is LT ZERO (0) -or- GTE the
      *             {@link #getSpannedTupleCount()}
@@ -1004,7 +1016,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
     protected boolean rangeCheckSpannedTupleIndex(final int entryIndex) {
 
         final int nentries = data.getSpannedTupleCount();
-        
+
         if (entryIndex < 0)
             throw new IndexOutOfBoundsException("negative: " + entryIndex);
 
@@ -1016,9 +1028,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
         }
 
         return true;
-        
+
     }
-    
+
     /**
      * Recursive search for the key at the specified entry index.
      * 
@@ -1031,30 +1043,30 @@ public class Node extends AbstractNode<Node> implements INodeData {
     @Override
     final public byte[] keyAt(final int entryIndex) {
 
-        /*assert*/ rangeCheckSpannedTupleIndex(entryIndex);
-        
+        /* assert */rangeCheckSpannedTupleIndex(entryIndex);
+
         // index of the child that spans the desired entry.
         int childIndex = 0;
-        
+
         // corrects the #of spanned entries by #skipped over.
         int remaining = entryIndex;
 
         final int nkeys = getKeyCount();
-        
+
         // search for child spanning the desired entry index.
         for (; childIndex <= nkeys; childIndex++) {
 
             final int nspanned = getChildEntryCount(childIndex);
-            
+
             if (remaining < nspanned) {
-             
+
                 // found the child index spanning the desired entry.
                 break;
-                
+
             }
-            
+
             remaining -= nspanned;
-            
+
             assert remaining >= 0;
 
         }
@@ -1062,7 +1074,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         final AbstractNode<?> child = getChild(childIndex);
 
         return child.keyAt(remaining);
-        
+
     }
 
     /**
@@ -1076,13 +1088,13 @@ public class Node extends AbstractNode<Node> implements INodeData {
      */
     @Override
     final public void valueAt(final int entryIndex, final Tuple tuple) {
-        
+
         // Note: Made non-conditional since unit tests verify this.
-        /*assert*/rangeCheckSpannedTupleIndex(entryIndex);
+        /* assert */rangeCheckSpannedTupleIndex(entryIndex);
 
         // index of the child that spans the desired entry.
         int childIndex = 0;
-        
+
         // corrects the #of spanned entries by #skipped over.
         int remaining = entryIndex;
 
@@ -1114,7 +1126,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
     /**
      * Return the index of the child to be searched.
-     * 
+     * <p>
      * The interpretation of the key index for a node is as follows. When
      * searching nodes of the tree, we search for the index in keys[] of the
      * first key value greater than or equal (GTE) to the probe key. If the
@@ -1128,25 +1140,25 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * 
      * A probe with keys up to <code>4</code> matches at index zero (0) and we
      * choose the 1st child, a, which is at index zero (0).
-     * 
-     * A probe whose key is <code>5</code> matches at index zero (0) exactly
-     * and we choose the child at <code>index + 1</code>, b, which is at
-     * index one (1).
-     * 
+     * <p>
+     * A probe whose key is <code>5</code> matches at index zero (0) exactly and
+     * we choose the child at <code>index + 1</code>, b, which is at index one
+     * (1).
+     * <p>
      * A probe with keys in [6:8] matches at index one (1) and we choose the 2nd
      * child, b, which is at index one (1). A probe with <code>9</code> also
      * matches at index one (1), but we choose <code>index+1</code> equals two
      * (2) since this is an exact key match.
-     * 
+     * <p>
      * A probe with keys in [10:11] matches at index two (2) and we choose the
      * 3rd child, c, which is at index two (2). A probe with <code>12</code>
-     * also matches at index two (2), but we choose <code>index+1</code>
-     * equals three (3) since this is an exact key match.
-     * 
+     * also matches at index two (2), but we choose <code>index+1</code> equals
+     * three (3) since this is an exact key match.
+     * <p>
      * A probe with keys greater than 12 exceeds all keys in the node and always
      * matches the last child in that node. In this case, d, which is at index
      * three (3).
-     * 
+     * <p>
      * Note that we never stop a search on a node, even when there is an exact
      * match on a key. All values are stored in the leaves and we always descend
      * until we reach the leaf in which a value for the key would be stored. A
@@ -1174,9 +1186,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
             /*
              * There is no exact match on the key, so we convert the search
-             * result to find the insertion point. The insertion point is
-             * always an index whose current key (iff it is defined) is
-             * greater than the probe key.
+             * result to find the insertion point. The insertion point is always
+             * an index whose current key (iff it is defined) is greater than
+             * the probe key.
              * 
              * keys[] : [ 5 9 12 ]
              * 
@@ -1186,9 +1198,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
              * 
              * etc.
              * 
-             * When the probe key is greater than any existing key, then
-             * the insertion point is nkeys.  E.g., the insertion point
-             * for key == 20 is 3.
+             * When the probe key is greater than any existing key, then the
+             * insertion point is nkeys. E.g., the insertion point for key == 20
+             * is 3.
              */
 
             /*
@@ -1202,17 +1214,17 @@ public class Node extends AbstractNode<Node> implements INodeData {
         }
 
     }
-    
+
     /**
      * <p>
      * Split an over-capacity node (a node with <code>maxKeys+1</code> keys),
-     * creating a new rightSibling. The splitIndex is <code>(maxKeys+1)/2</code>.
-     * The key at the splitIndex is the separatorKey. Unlike when we split a
+     * creating a new rightSibling. The splitIndex is <code>(maxKeys+1)/2</code>
+     * . The key at the splitIndex is the separatorKey. Unlike when we split a
      * {@link Leaf}, the separatorKey is lifted into the parent and does not
      * appear in either this node or the rightSibling after the split. All keys
-     * and child references from <code>splitIndex+1</code> (inclusive) are
-     * moved to the new rightSibling. The child reference at
-     * <code>splitIndex</code> remains in this node.
+     * and child references from <code>splitIndex+1</code> (inclusive) are moved
+     * to the new rightSibling. The child reference at <code>splitIndex</code>
+     * remains in this node.
      * </p>
      * <p>
      * If this node is the root of the tree (no parent), then a new root
@@ -1231,7 +1243,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      */
     @Override
     protected IAbstractNode split() {
-       
+
         assert isDirty(); // MUST be mutable.
         assert getKeyCount() == maxKeys() + 1; // MUST be over capacity by one.
 
@@ -1244,7 +1256,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * The #of entries spanned by this node _before_ the split.
          */
         final int nentriesBeforeSplit = getSpannedTupleCount();
-        
+
         /*
          * The #of child references. (this is +1 since the node is over capacity
          * by one).
@@ -1255,7 +1267,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * Index at which to split the leaf. This is (maxKeys+1)/2, but that can
          * be simplified to branchingFactor/2 for a Node.
          */
-//        final int splitIndex = (maxKeys() + 1) / 2;
+        // final int splitIndex = (maxKeys() + 1) / 2;
         final int splitIndex = btree.branchingFactor >>> 1;
 
         /*
@@ -1268,7 +1280,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
          */
         final byte[] separatorKey = getKeys().get(splitIndex);
 
-        // Create the new rightSibling node.  It will be mutable.
+        // Create the new rightSibling node. It will be mutable.
         final Node rightSibling = new Node(btree);
 
         // Tunnel through to the mutable objects.
@@ -1278,62 +1290,61 @@ public class Node extends AbstractNode<Node> implements INodeData {
         final MutableKeyBuffer skeys = sdata.keys;
 
         if (INFO) {
-            log.info("this=" + this + ", nkeys=" + getKeyCount() + ", splitIndex="
-                    + splitIndex + ", separatorKey="
-                    + keyAsString(separatorKey)
-                    );
-//            if(DEBUG) dump(Level.DEBUG,System.err);
+            log.info("this=" + this + ", nkeys=" + getKeyCount()
+                    + ", splitIndex=" + splitIndex + ", separatorKey="
+                    + keyAsString(separatorKey));
+            // if(DEBUG) dump(Level.DEBUG,System.err);
         }
 
-        /* 
+        /*
          * copy keys and values to the new rightSibling.
          */
-        
-        int j = 0;
-        
-//        // #of spanned entries being moved to the new rightSibling.
-//        int nentriesMoved = 0;
-        
-        for (int i = splitIndex + 1 ; i < nchildren; i++, j++) {
 
-            if ( i + 1 < nchildren) {
-            
+        int j = 0;
+
+        // // #of spanned entries being moved to the new rightSibling.
+        // int nentriesMoved = 0;
+
+        for (int i = splitIndex + 1; i < nchildren; i++, j++) {
+
+            if (i + 1 < nchildren) {
+
                 /*
                  * Note: keys[nchildren-1] is undefined.
                  */
-//                rightSibling.setKey(j, getKey(i));
+                // rightSibling.setKey(j, getKey(i));
                 rightSibling.copyKey(j, this.getKeys(), i);
-                
+
             }
-            
+
             rightSibling.childRefs[j] = childRefs[i];
-            
+
             sdata.childAddr[j] = data.childAddr[i];
 
             final int childEntryCount = data.childEntryCounts[i];
-            
+
             sdata.childEntryCounts[j] = childEntryCount;
-            
+
             sdata.nentries += childEntryCount;
-            
+
             data.nentries -= childEntryCount;
-            
-//            nentriesMoved += childEntryCounts[i];
-            
+
+            // nentriesMoved += childEntryCounts[i];
+
             final AbstractNode tmp = (childRefs[i] == null ? null
                     : childRefs[i].get());
 
             if (tmp != null) {
-        
+
                 /*
                  * The child node is in memory.
                  * 
                  * Update its parent reference.
                  */
-                
-//                tmp.parent = btree.newRef(rightSibling);
+
+                // tmp.parent = btree.newRef(rightSibling);
                 tmp.parent = rightSibling.self;
-                
+
             }
 
             /*
@@ -1342,36 +1353,37 @@ public class Node extends AbstractNode<Node> implements INodeData {
              */
 
             if (i + 1 < nchildren) {
-            
-                keys.keys[i] = null;
-                
-                /*nkeys--; */keys.nkeys--; // one less key here.
 
-                /*rightSibling.nkeys++;*/ skeys.nkeys++; // more more key there.
-                
+                keys.keys[i] = null;
+
+                /* nkeys--; */keys.nkeys--; // one less key here.
+
+                /* rightSibling.nkeys++; */skeys.nkeys++; // more more key
+                                                          // there.
+
             }
-            
+
             childRefs[i] = null;
-            
+
             data.childAddr[i] = NULL;
 
             data.childEntryCounts[i] = 0;
-            
+
         }
 
-        /* 
+        /*
          * Clear the key that is being move into the parent.
          */
         keys.keys[splitIndex] = null;
-        
-        /*nkeys--;*/ keys.nkeys--;
-        
+
+        /* nkeys--; */keys.nkeys--;
+
         Node p = getParent();
 
         if (p == null) {
 
             /*
-             * Use a special constructor to split the root.  The result is a new
+             * Use a special constructor to split the root. The result is a new
              * node with zero keys and one child (this node).
              */
 
@@ -1398,7 +1410,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         return rightSibling;
 
     }
-    
+
     /**
      * Redistributes a key from the specified sibling into this node in order to
      * bring this node up to the minimum #of keys. This also updates a separator
@@ -1434,10 +1446,10 @@ public class Node extends AbstractNode<Node> implements INodeData {
         // the sibling of a Node must be a Node.
         final Node s = (Node) sibling;
         assert s != null;
- 
+
         final int nkeys = getKeyCount();
         final int snkeys = s.getKeyCount();
-        
+
         assert dirty;
         assert !deleted;
         assert !isPersistent();
@@ -1445,33 +1457,35 @@ public class Node extends AbstractNode<Node> implements INodeData {
         assert nkeys < minKeys();
         // verify that this leaf is under minimum capacity by one key.
         assert nkeys == minKeys() - 1;
-        
+
         // the sibling MUST be _OVER_ the minimum #of keys/values.
         assert snkeys > minKeys();
         assert s.dirty;
         assert !s.deleted;
         assert !s.isPersistent();
-        
+
         final Node p = getParent();
-        
+
         // children of the same node.
         assert s.getParent() == p;
-        
+
         if (INFO) {
-            log.info("this="+this+", sibling="+sibling+", rightSibling="+isRightSibling);
-//            if(DEBUG) {
-//                System.err.println("this"); dump(Level.DEBUG,System.err);
-//                System.err.println("sibling"); sibling.dump(Level.DEBUG,System.err);
-//                System.err.println("parent"); p.dump(Level.DEBUG,System.err);
-//            }
+            log.info("this=" + this + ", sibling=" + sibling
+                    + ", rightSibling=" + isRightSibling);
+            // if(DEBUG) {
+            // System.err.println("this"); dump(Level.DEBUG,System.err);
+            // System.err.println("sibling");
+            // sibling.dump(Level.DEBUG,System.err);
+            // System.err.println("parent"); p.dump(Level.DEBUG,System.err);
+            // }
         }
-        
+
         /*
-         * The index of this leaf in its parent. we note this before we
-         * start mucking with the keys.
+         * The index of this leaf in its parent. we note this before we start
+         * mucking with the keys.
          */
         final int index = p.getIndexOf(this);
-        
+
         // Tunnel through to the mutable keys object.
         final MutableKeyBuffer keys = (MutableKeyBuffer) this.getKeys();
         final MutableKeyBuffer skeys = (MutableKeyBuffer) s.getKeys();
@@ -1480,13 +1494,13 @@ public class Node extends AbstractNode<Node> implements INodeData {
         final MutableNodeData data = (MutableNodeData) this.data;
         final MutableNodeData sdata = (MutableNodeData) s.data;
         final MutableNodeData pdata = (MutableNodeData) p.data;
-        
+
         /*
-         * determine which leaf is earlier in the key ordering and get the
-         * index of the sibling.
+         * determine which leaf is earlier in the key ordering and get the index
+         * of the sibling.
          */
-        if( isRightSibling/*keys[nkeys-1] < s.keys[0]*/) {
-        
+        if (isRightSibling/* keys[nkeys-1] < s.keys[0] */) {
+
             /*
              * redistributeKeys(this,rightSibling). all we have to do is replace
              * the separatorKey in the parent with the first key from the
@@ -1496,33 +1510,45 @@ public class Node extends AbstractNode<Node> implements INodeData {
              */
 
             // Mopy the first key/child from the rightSibling.
-//            setKey(nkeys, p.getKey(index)); // copy the separatorKey from the parent.
-            copyKey(nkeys, p.getKeys(), index); // copy the separatorKey from the parent.
-//            p.setKey(index, s.getKey(0)); // update the separatorKey from the rightSibling.
-            p.copyKey(index, s.getKeys(), 0); // update the separatorKey from the rightSibling.
-            childRefs[nkeys+1] = s.childRefs[0]; // copy the child from the rightSibling.
-            data.childAddr[nkeys+1] = sdata.childAddr[0];
-            final int siblingChildCount = sdata.childEntryCounts[0]; // #of spanned entries being moved.
-            data.childEntryCounts[nkeys+1] = siblingChildCount;
+            // setKey(nkeys, p.getKey(index)); // copy the separatorKey from the
+            // parent.
+            copyKey(nkeys, p.getKeys(), index); // copy the separatorKey from
+                                                // the parent.
+            // p.setKey(index, s.getKey(0)); // update the separatorKey from the
+            // rightSibling.
+            p.copyKey(index, s.getKeys(), 0); // update the separatorKey from
+                                              // the rightSibling.
+            childRefs[nkeys + 1] = s.childRefs[0]; // copy the child from the
+                                                   // rightSibling.
+            data.childAddr[nkeys + 1] = sdata.childAddr[0];
+            final int siblingChildCount = sdata.childEntryCounts[0]; // #of
+                                                                     // spanned
+                                                                     // entries
+                                                                     // being
+                                                                     // moved.
+            data.childEntryCounts[nkeys + 1] = siblingChildCount;
             final AbstractNode child = childRefs[nkeys + 1] == null ? null
                     : childRefs[nkeys + 1].get();
             if (child != null) {
                 child.parent = this.self;
-//                child.parent = btree.newRef(this);
-//                if( child.isDirty() ) {
-//                    if(!s.dirtyChildren.remove(child)) throw new AssertionError();
-//                    if(!dirtyChildren.add(child)) throw new AssertionError();
-//                }
+                // child.parent = btree.newRef(this);
+                // if( child.isDirty() ) {
+                // if(!s.dirtyChildren.remove(child)) throw new
+                // AssertionError();
+                // if(!dirtyChildren.add(child)) throw new AssertionError();
+                // }
             }
-            
+
             // copy down the keys on the right sibling to cover up the hole.
-            System.arraycopy(skeys.keys, 1, skeys.keys, 0, snkeys-1);
+            System.arraycopy(skeys.keys, 1, skeys.keys, 0, snkeys - 1);
             System.arraycopy(s.childRefs, 1, s.childRefs, 0, snkeys);
             System.arraycopy(sdata.childAddr, 1, sdata.childAddr, 0, snkeys);
-            System.arraycopy(sdata.childEntryCounts, 1, sdata.childEntryCounts, 0, snkeys);
+            System.arraycopy(sdata.childEntryCounts, 1, sdata.childEntryCounts,
+                    0, snkeys);
 
-            // erase exposed key/value on rightSibling that is no longer defined.
-            skeys.keys[snkeys-1] = null;
+            // erase exposed key/value on rightSibling that is no longer
+            // defined.
+            skeys.keys[snkeys - 1] = null;
             s.childRefs[snkeys] = null;
             sdata.childAddr[snkeys] = NULL;
             sdata.childEntryCounts[snkeys] = 0;
@@ -1530,23 +1556,23 @@ public class Node extends AbstractNode<Node> implements INodeData {
             // update parent : N more entries spanned by this child.
             pdata.childEntryCounts[index] += siblingChildCount;
             // update parent : N fewer entries spanned by our right sibling.
-            pdata.childEntryCounts[index+1] -= siblingChildCount;
+            pdata.childEntryCounts[index + 1] -= siblingChildCount;
 
             // update #of entries spanned by this node.
             data.nentries += siblingChildCount;
             // update #of entries spanned by our rightSibling.
             sdata.nentries -= siblingChildCount;
 
-            /*s.nkeys--;*/skeys.nkeys--;
-            /*this.nkeys++;*/ keys.nkeys++;
-            
+            /* s.nkeys--; */skeys.nkeys--;
+            /* this.nkeys++; */keys.nkeys++;
+
             if (btree.debug) {
                 assertInvariants();
                 s.assertInvariants();
             }
 
         } else {
-            
+
             /*
              * redistributeKeys(leftSibling,this). all we have to do is copy
              * down the keys in this node by one position, copy the separatorKey
@@ -1554,18 +1580,23 @@ public class Node extends AbstractNode<Node> implements INodeData {
              * child data across, and update the separatorKey in the parent with
              * the last key from the leftSibling.
              */
-            
+
             // copy down by one.
             System.arraycopy(keys.keys, 0, keys.keys, 1, nkeys);
-            System.arraycopy(childRefs, 0, childRefs, 1, nkeys+1);
-            System.arraycopy(data.childAddr, 0, data.childAddr, 1, nkeys+1);
-            System.arraycopy(data.childEntryCounts, 0, data.childEntryCounts, 1, nkeys+1);
-            
+            System.arraycopy(childRefs, 0, childRefs, 1, nkeys + 1);
+            System.arraycopy(data.childAddr, 0, data.childAddr, 1, nkeys + 1);
+            System.arraycopy(data.childEntryCounts, 0, data.childEntryCounts,
+                    1, nkeys + 1);
+
             // move the last key/child from the leftSibling to this node.
-//            setKey(0, p.getKey(index-1)); // copy the separatorKey from the parent.
-            copyKey(0, p.getKeys(), index-1); // copy the separatorKey from the parent.
-//            p.setKey(index-1, s.getKey(s.nkeys-1)); // update the separatorKey
-            p.copyKey(index-1, s.getKeys(), snkeys-1); // update the separatorKey
+            // setKey(0, p.getKey(index-1)); // copy the separatorKey from the
+            // parent.
+            copyKey(0, p.getKeys(), index - 1); // copy the separatorKey from
+                                                // the parent.
+            // p.setKey(index-1, s.getKey(s.nkeys-1)); // update the
+            // separatorKey
+            p.copyKey(index - 1, s.getKeys(), snkeys - 1); // update the
+                                                           // separatorKey
             childRefs[0] = s.childRefs[snkeys];
             data.childAddr[0] = sdata.childAddr[snkeys];
             final int siblingChildCount = sdata.childEntryCounts[snkeys];
@@ -1574,23 +1605,24 @@ public class Node extends AbstractNode<Node> implements INodeData {
                     : childRefs[0].get();
             if (child != null) {
                 child.parent = this.self;
-//                child.parent = btree.newRef(this);
-//                if(child.isDirty()) {
-//                    if(!s.dirtyChildren.remove(child)) throw new AssertionError();
-//                    if(!dirtyChildren.add(child)) throw new AssertionError();
-//                }
+                // child.parent = btree.newRef(this);
+                // if(child.isDirty()) {
+                // if(!s.dirtyChildren.remove(child)) throw new
+                // AssertionError();
+                // if(!dirtyChildren.add(child)) throw new AssertionError();
+                // }
             }
-            skeys.keys[snkeys-1] = null;
+            skeys.keys[snkeys - 1] = null;
             s.childRefs[snkeys] = null;
             sdata.childAddr[snkeys] = NULL;
             sdata.childEntryCounts[snkeys] = 0;
-            /*s.nkeys--;*/ skeys.nkeys--;
-            /*this.nkeys++;*/ keys.nkeys++;
+            /* s.nkeys--; */skeys.nkeys--;
+            /* this.nkeys++; */keys.nkeys++;
 
             // update parent : N more entries spanned by this child.
             pdata.childEntryCounts[index] += siblingChildCount;
             // update parent : N fewer entries spanned by our leftSibling.
-            pdata.childEntryCounts[index-1] -= siblingChildCount;
+            pdata.childEntryCounts[index - 1] -= siblingChildCount;
             // update #of entries spanned by this node.
             data.nentries += siblingChildCount;
             // update #of entries spanned by our leftSibling.
@@ -1627,9 +1659,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         // Note: local var is updated within this method!
         int nkeys = getKeyCount();
-        
+
         final int snkeys = s.getKeyCount();
-        
+
         // verify that this node is deficient.
         assert nkeys < minKeys();
         // verify that this node is under minimum capacity by one key.
@@ -1638,25 +1670,26 @@ public class Node extends AbstractNode<Node> implements INodeData {
         assert snkeys == s.minKeys();
 
         final Node p = getParent();
-        
+
         // children of the same node.
         assert s.getParent() == p;
 
         if (INFO) {
             log.info("this=" + this + ", sibling=" + sibling
                     + ", rightSibling=" + isRightSibling);
-//            if(DEBUG) {
-//                System.err.println("this"); dump(Level.DEBUG,System.err);
-//                System.err.println("sibling"); sibling.dump(Level.DEBUG,System.err);
-//                System.err.println("parent"); p.dump(Level.DEBUG,System.err);
-//            }
+            // if(DEBUG) {
+            // System.err.println("this"); dump(Level.DEBUG,System.err);
+            // System.err.println("sibling");
+            // sibling.dump(Level.DEBUG,System.err);
+            // System.err.println("parent"); p.dump(Level.DEBUG,System.err);
+            // }
         }
 
         final int siblingEntryCount = s.getSpannedTupleCount();
-        
+
         /*
-         * The index of this node in its parent. we note this before we
-         * start mucking with the keys.
+         * The index of this node in its parent. we note this before we start
+         * mucking with the keys.
          */
         final int index = p.getIndexOf(this);
 
@@ -1674,28 +1707,30 @@ public class Node extends AbstractNode<Node> implements INodeData {
         // Tunnel through to the mutable keys objects.
         final MutableKeyBuffer keys = data.keys;
         final MutableKeyBuffer skeys = sdata.keys;
-        
-//        /*
-//         * Tunnel through to the mutable keys object.
-//         * 
-//         * Note: since we do not require the sibling to be mutable we have to
-//         * test and convert the key buffer for the sibling to a mutable key
-//         * buffer if the sibling is immutable. Also note that the sibling MUST
-//         * have the minimum #of keys for a merge so we set the capacity of the
-//         * mutable key buffer to that when we have to convert the siblings keys
-//         * into mutable form in order to perform the merge operation.
-//         */
-//        final MutableKeyBuffer keys = (MutableKeyBuffer) this.getKeys();
-//        final MutableKeyBuffer skeys = (s.getKeys() instanceof MutableKeyBuffer ? (MutableKeyBuffer) s.getKeys()
-//                : new MutableKeyBuffer(getBranchingFactor(), s.getKeys()));
+
+        // /*
+        // * Tunnel through to the mutable keys object.
+        // *
+        // * Note: since we do not require the sibling to be mutable we have to
+        // * test and convert the key buffer for the sibling to a mutable key
+        // * buffer if the sibling is immutable. Also note that the sibling MUST
+        // * have the minimum #of keys for a merge so we set the capacity of the
+        // * mutable key buffer to that when we have to convert the siblings
+        // keys
+        // * into mutable form in order to perform the merge operation.
+        // */
+        // final MutableKeyBuffer keys = (MutableKeyBuffer) this.getKeys();
+        // final MutableKeyBuffer skeys = (s.getKeys() instanceof
+        // MutableKeyBuffer ? (MutableKeyBuffer) s.getKeys()
+        // : new MutableKeyBuffer(getBranchingFactor(), s.getKeys()));
 
         /*
          * determine which node is earlier in the key ordering so that we know
          * whether the sibling's keys will be inserted at the front of this
          * nodes's keys or appended to this nodes's keys.
          */
-        if( isRightSibling/*keys[nkeys-1] < s.keys[0]*/) {
-            
+        if (isRightSibling/* keys[nkeys-1] < s.keys[0] */) {
+
             /*
              * merge( this, rightSibling ). the keys and values from this node
              * will appear in their current position, the separatorKey from the
@@ -1707,7 +1742,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
              * Get the separator key in the parent and append it to the keys in
              * this node.
              */
-//            this.setKey(nkeys++, p.getKey(index));
+            // this.setKey(nkeys++, p.getKey(index));
             this.copyKey(nkeys, p.getKeys(), index);
             nkeys++; // update local var!
             keys.nkeys++;
@@ -1719,29 +1754,31 @@ public class Node extends AbstractNode<Node> implements INodeData {
              * separatorKey that we copied from the parent.
              */
             System.arraycopy(skeys.keys, 0, keys.keys, nkeys, snkeys);
-            System.arraycopy(s.childRefs, 0, this.childRefs, nkeys, snkeys+1);
-            System.arraycopy(sdata.childAddr, 0, data.childAddr, nkeys, snkeys+1);
-            System.arraycopy(sdata.childEntryCounts, 0, data.childEntryCounts, nkeys, snkeys+1);
-            
+            System.arraycopy(s.childRefs, 0, this.childRefs, nkeys, snkeys + 1);
+            System.arraycopy(sdata.childAddr, 0, data.childAddr, nkeys,
+                    snkeys + 1);
+            System.arraycopy(sdata.childEntryCounts, 0, data.childEntryCounts,
+                    nkeys, snkeys + 1);
+
             // update parent on children
             final Reference<Node> ref = (Reference<Node>) this.self;
-//            final Reference<Node> weakRef = btree.newRef(this);
+            // final Reference<Node> weakRef = btree.newRef(this);
             for (int i = 0; i < snkeys + 1; i++) {
                 final AbstractNode child = s.childRefs[i] == null ? null
                         : s.childRefs[i].get();
                 if (child != null) {
                     child.parent = ref;
-//                    if( child.isDirty() ) {
-//                        // record hard references for dirty children.
-//                        dirtyChildren.add(child);
-//                    }
+                    // if( child.isDirty() ) {
+                    // // record hard references for dirty children.
+                    // dirtyChildren.add(child);
+                    // }
                 }
             }
-            
-            /* 
+
+            /*
              * Adjust the #of keys in this leaf.
              */
-            /*this.nkeys += s.nkeys;*/ keys.nkeys += snkeys;
+            /* this.nkeys += s.nkeys; */keys.nkeys += snkeys;
             /*
              * Note: in this case we have to replace the separator key for this
              * node with the separator key for its right sibling.
@@ -1751,17 +1788,18 @@ public class Node extends AbstractNode<Node> implements INodeData {
              * will be deleted when the sibling is removed from the parent
              * below.
              */
-//            p.setKey(index, p.getKey(index+1));
-            p.copyKey(index, p.getKeys(), index+1);
-            
+            // p.setKey(index, p.getKey(index+1));
+            p.copyKey(index, p.getKeys(), index + 1);
+
             // reallocate spanned entries from the sibling to this node.
             pdata.childEntryCounts[index] += siblingEntryCount;
             data.nentries += siblingEntryCount;
 
-            if(btree.debug) assertInvariants();
-            
+            if (btree.debug)
+                assertInvariants();
+
         } else {
-            
+
             /*
              * merge( leftSibling, this ). the keys and values from this node
              * will be move down by sibling.nkeys+1 positions, the keys and
@@ -1776,55 +1814,60 @@ public class Node extends AbstractNode<Node> implements INodeData {
              * the separatorKey will be removed when we remove the leftSibling
              * from the parent at the end of this method.
              */
-            
+
             // move keys and children down by sibling.nkeys+1 positions.
-            System.arraycopy(keys.keys, 0, keys.keys, snkeys+1, nkeys);
-            System.arraycopy(this.childRefs, 0, this.childRefs, snkeys+1, nkeys+1);
-            System.arraycopy(data.childAddr, 0, data.childAddr, snkeys+1, nkeys+1);
-            System.arraycopy(data.childEntryCounts, 0, data.childEntryCounts, snkeys+1, nkeys+1);
-            
+            System.arraycopy(keys.keys, 0, keys.keys, snkeys + 1, nkeys);
+            System.arraycopy(this.childRefs, 0, this.childRefs, snkeys + 1,
+                    nkeys + 1);
+            System.arraycopy(data.childAddr, 0, data.childAddr, snkeys + 1,
+                    nkeys + 1);
+            System.arraycopy(data.childEntryCounts, 0, data.childEntryCounts,
+                    snkeys + 1, nkeys + 1);
+
             // copy keys and values from the sibling to index 0 of this leaf.
             System.arraycopy(skeys.keys, 0, keys.keys, 0, snkeys);
-            System.arraycopy(s.childRefs, 0, this.childRefs, 0, snkeys+1);
-            System.arraycopy(sdata.childAddr, 0, data.childAddr, 0, snkeys+1);
-            System.arraycopy(sdata.childEntryCounts, 0, data.childEntryCounts, 0, snkeys+1);
+            System.arraycopy(s.childRefs, 0, this.childRefs, 0, snkeys + 1);
+            System.arraycopy(sdata.childAddr, 0, data.childAddr, 0, snkeys + 1);
+            System.arraycopy(sdata.childEntryCounts, 0, data.childEntryCounts,
+                    0, snkeys + 1);
 
             // copy the separatorKey from the parent.
-            //this.setKey(s.nkeys, p.getKey(index - 1));
+            // this.setKey(s.nkeys, p.getKey(index - 1));
             this.copyKey(snkeys, p.getKeys(), index - 1);
-            
+
             // update parent on children.
-            final Reference<Node> ref = (Reference<Node>)this.self;
-//            final Reference<Node> weakRef = btree.newRef(this);
+            final Reference<Node> ref = (Reference<Node>) this.self;
+            // final Reference<Node> weakRef = btree.newRef(this);
             for (int i = 0; i < snkeys + 1; i++) {
                 final AbstractNode child = s.childRefs[i] == null ? null
                         : s.childRefs[i].get();
                 if (child != null) {
                     child.parent = ref;
-//                    if( child.isDirty() ) {
-//                        // record hard references for dirty children.
-//                        dirtyChildren.add(child);
-//                    }
+                    // if( child.isDirty() ) {
+                    // // record hard references for dirty children.
+                    // dirtyChildren.add(child);
+                    // }
                 }
             }
 
             // we gain nkeys from the sibling and one key from the parent.
-            /*this.nkeys += s.nkeys + 1;*/ keys.nkeys += snkeys + 1;
+            /* this.nkeys += s.nkeys + 1; */keys.nkeys += snkeys + 1;
 
             // reallocate spanned entries from the sibling to this node.
             pdata.childEntryCounts[index] += s.getSpannedTupleCount();
             data.nentries += siblingEntryCount;
 
-            if(btree.debug) assertInvariants();
-            
+            if (btree.debug)
+                assertInvariants();
+
         }
-        
+
         /*
          * The sibling is now empty. We need to detach the sibling from its
          * parent node and then delete the sibling from the store.
          */
         p.removeChild(s);
-        
+
     }
 
     /**
@@ -1847,19 +1890,21 @@ public class Node extends AbstractNode<Node> implements INodeData {
      */
     protected void insertChild(final byte[] key, final AbstractNode child) {
 
-        if(btree.debug) assertInvariants();
-        
-//        assert key > IIndex.NEGINF && key < IIndex.POSINF;
+        if (btree.debug)
+            assertInvariants();
+
+        // assert key > IIndex.NEGINF && key < IIndex.POSINF;
         assert child != null;
-        assert child.isDirty() : "child not dirty"; // always dirty since it was just created.
+        assert child.isDirty() : "child not dirty"; // always dirty since it was
+                                                    // just created.
         assert isDirty() : "not dirty"; // must be dirty to permit mutation.
 
         /*
-         * Find the location where this key belongs. When a new node is
-         * created, the constructor sticks the child that demanded the split
-         * into childRef[0]. So, when nkeys == 1, we have nchildren==1 and
-         * the key goes into keys[0] but we have to copyDown by one anyway
-         * to avoid stepping on the existing child.
+         * Find the location where this key belongs. When a new node is created,
+         * the constructor sticks the child that demanded the split into
+         * childRef[0]. So, when nkeys == 1, we have nchildren==1 and the key
+         * goes into keys[0] but we have to copyDown by one anyway to avoid
+         * stepping on the existing child.
          */
         int childIndex = this.getKeys().search(key);
 
@@ -1869,8 +1914,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
              * The key is already present. This is an error.
              */
 
-//            btree.dump(Level.DEBUG,System.err);
-            
+            // btree.dump(Level.DEBUG,System.err);
+
             throw new AssertionError("Split on existing key: childIndex="
                     + childIndex + ", key=" + keyAsString(key) + "\nthis="
                     + this + "\nchild=" + child);
@@ -1878,7 +1923,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         }
 
         final int nkeys = getKeyCount();
-        
+
         // Convert the position to obtain the insertion point.
         childIndex = -childIndex - 1;
 
@@ -1904,43 +1949,46 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * copy down per-child data. #children == nkeys+1. child[0] is always
          * defined.
          */
-        System.arraycopy(childRefs, childIndex + 1, childRefs, childIndex + 2, length);
-        System.arraycopy(data.childAddr, childIndex + 1, data.childAddr, childIndex + 2, length);
-        System.arraycopy(data.childEntryCounts, childIndex + 1, data.childEntryCounts, childIndex + 2, length);
+        System.arraycopy(childRefs, childIndex + 1, childRefs, childIndex + 2,
+                length);
+        System.arraycopy(data.childAddr, childIndex + 1, data.childAddr,
+                childIndex + 2, length);
+        System.arraycopy(data.childEntryCounts, childIndex + 1,
+                data.childEntryCounts, childIndex + 2, length);
 
         /*
          * Insert key at index.
          */
-//        setKey(childIndex, key);
-          keys.keys[childIndex] = key;
-//        System.arraycopy(key, 0, keys.keys, childIndex, 1);
+        // setKey(childIndex, key);
+        keys.keys[childIndex] = key;
+        // System.arraycopy(key, 0, keys.keys, childIndex, 1);
 
         /*
          * Insert child at index+1.
          */
         childRefs[childIndex + 1] = child.self;
-//        childRefs[childIndex + 1] = btree.newRef(child);
+        // childRefs[childIndex + 1] = btree.newRef(child);
 
         data.childAddr[childIndex + 1] = NULL;
 
         final int childEntryCount = child.getSpannedTupleCount();
-        
-        data.childEntryCounts[ childIndex + 1 ] = childEntryCount;
-        
-//        if( parent != null ) {
-//            
-//            parent.get().updateEntryCount(this, childEntryCount);
-//            
-//        }
-        
-//        nentries += childEntryCount;
-        
-//        dirtyChildren.add(child);
+
+        data.childEntryCounts[childIndex + 1] = childEntryCount;
+
+        // if( parent != null ) {
+        //            
+        // parent.get().updateEntryCount(this, childEntryCount);
+        //            
+        // }
+
+        // nentries += childEntryCount;
+
+        // dirtyChildren.add(child);
 
         child.parent = this.self;
-//        child.parent = btree.newRef(this);
+        // child.parent = btree.newRef(this);
 
-        /*nkeys++;*/keys.nkeys++;
+        /* nkeys++; */keys.nkeys++;
 
         // Note: this tests the post-condition of the split.
         if (keys.nkeys == maxKeys() + 1) {
@@ -1958,15 +2006,16 @@ public class Node extends AbstractNode<Node> implements INodeData {
                 getParent().assertInvariants();
                 rightSibling.assertInvariants();
             }
-            
+
             return;
 
         }
 
-        if(btree.debug) assertInvariants();
+        if (btree.debug)
+            assertInvariants();
 
     }
-    
+
     /**
      * Return the left sibling. This is used by implementations of
      * {@link AbstractNode#join()} to explore their left sibling.
@@ -1985,7 +2034,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      */
     protected AbstractNode getLeftSibling(final AbstractNode child,
             final boolean materialize) {
-        
+
         final int i = getIndexOf(child);
 
         if (i == 0) {
@@ -1994,7 +2043,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
              * There is no left sibling for this child that is a child of the
              * same parent.
              */
-            
+
             return null;
 
         } else {
@@ -2005,11 +2054,11 @@ public class Node extends AbstractNode<Node> implements INodeData {
                     : childRefs[index].get();
 
             if (sibling == null) {
-                
-                if( materialize ) {
+
+                if (materialize) {
 
                     sibling = getChild(index);
-                    
+
                 }
 
             } else {
@@ -2023,10 +2072,13 @@ public class Node extends AbstractNode<Node> implements INodeData {
         }
 
     }
-    
+
     /**
-     * Return the right sibling. This is used by implementations of
-     * {@link AbstractNode#join()} to explore their right sibling.
+     * Return the right sibling of the specified child of a common parent. This
+     * method is invoked on the parent, passing in one child and returning its
+     * right sibling under that common parent (if any). This is used by
+     * implementations of {@link AbstractNode#join()} to explore their right
+     * sibling.
      * 
      * @param child
      *            The child (must be dirty).
@@ -2036,7 +2088,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * 
      * @return The left sibling or <code>null</code> if it does not exist -or-
      *         if it is not materialized and <code>materialized == false</code>.
-     *         If the sibling is returned, then is NOT guarenteed to be mutable
+     *         If the sibling is returned, then is NOT guaranteed to be mutable
      *         and the caller MUST invoke copy-on-write before attempting to
      *         modify the returned sibling.
      */
@@ -2045,13 +2097,13 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         final int i = getIndexOf(child);
 
-        if (i == getKeyCount() ) {
+        if (i == getKeyCount()) {
 
             /*
              * There is no right sibling for this child that is a child of the
              * same parent.
              */
-            
+
             return null;
 
         } else {
@@ -2061,18 +2113,18 @@ public class Node extends AbstractNode<Node> implements INodeData {
             AbstractNode sibling = childRefs[index] == null ? null
                     : childRefs[index].get();
 
-            if (sibling == null ) {
-                
-                if( materialize ) {
+            if (sibling == null) {
+
+                if (materialize) {
 
                     sibling = getChild(index);
-                    
+
                 }
 
             } else {
-                
+
                 btree.touch(sibling);
-                
+
             }
 
             return sibling;
@@ -2102,7 +2154,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         /*
          * Scan for location in weak references.
          * 
-         * Note: during reads, this method is used for range counts. During 
+         * Note: during reads, this method is used for range counts. During
          * writes it is used to update the entry counts on which the range
          * counts are based.
          * 
@@ -2113,14 +2165,14 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * called - for things to be coherent you would have to discover the
          * index of the children before modifying their keys.
          * 
-         * @todo for writes, 85% of the use of this method is updateEntryCount(). Since that
-         * method is only called on update, we would do well to buffer hard
-         * references during descent and test the buffer in this method before
-         * performing a full search. Since concurrent writers are not allowed,
-         * we only need a single buffer whose height is the height of the tree.
-         * This should prove especially beneficial for larger branching factors.
-         * For smaller branching factors the cost might be so small as to be
-         * ignorable.
+         * @todo for writes, 85% of the use of this method is
+         * updateEntryCount(). Since that method is only called on update, we
+         * would do well to buffer hard references during descent and test the
+         * buffer in this method before performing a full search. Since
+         * concurrent writers are not allowed, we only need a single buffer
+         * whose height is the height of the tree. This should prove especially
+         * beneficial for larger branching factors. For smaller branching
+         * factors the cost might be so small as to be ignorable.
          * 
          * @see Leaf#merge(Leaf sibling,boolean isRightSibling)
          */
@@ -2134,11 +2186,11 @@ public class Node extends AbstractNode<Node> implements INodeData {
                 return i;
 
             }
-            
+
         }
 
         throw new IllegalArgumentException("Not our child : child=" + child);
-        
+
     }
 
     /**
@@ -2164,11 +2216,11 @@ public class Node extends AbstractNode<Node> implements INodeData {
      *       data record. This is invoked by merge() on a leaf, then recursively
      *       if we need to join nodes. The caller should have already updated
      *       the min/max for the leaf's own data record and on this node's data
-     *       record for that leaf.  This method only needs to clear the min/max
+     *       record for that leaf. This method only needs to clear the min/max
      *       entry associated with the child that is being removed.
      */
     protected void removeChild(final AbstractNode child) {
-        
+
         assert child != null;
         assert !child.deleted;
         assert child.parent.get() == this;
@@ -2180,16 +2232,20 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         // cast to mutable implementation class.
         final BTree btree = (BTree) this.btree;
-        
-        if(btree.debug) assertInvariants();
+
+        if (btree.debug)
+            assertInvariants();
 
         if (INFO) {
-            log.info("this="+this+", child="+child);
-            /* Note: dumping [this] or the [child] will throw false exceptions at this point - they are in an intermediate state. */
-//            if(DEBUG) {
-//                System.err.println("this"); dump(Level.DEBUG,System.err);
-//                System.err.println("child"); child.dump(Level.DEBUG,System.err);
-//            }
+            log.info("this=" + this + ", child=" + child);
+            /*
+             * Note: dumping [this] or the [child] will throw false exceptions
+             * at this point - they are in an intermediate state.
+             */
+            // if(DEBUG) {
+            // System.err.println("this"); dump(Level.DEBUG,System.err);
+            // System.err.println("child"); child.dump(Level.DEBUG,System.err);
+            // }
         }
 
         final int i = getIndexOf(child);
@@ -2197,16 +2253,11 @@ public class Node extends AbstractNode<Node> implements INodeData {
         /*
          * Note: these comments may be dated and need review.
          * 
-         * Copy over the hole created when the child is removed
-         * from the node.
+         * Copy over the hole created when the child is removed from the node.
          * 
-         * Given:          v-- remove @ index = 0
-         *       index:    0  1  2
-         * root  keys : [ 21 24  0 ]
-         *                              index
-         * leaf1 keys : [  1  2  7  - ]   0 <--remove @ index = 0
-         * leaf2 keys : [ 21 22 23  - ]   1
-         * leaf4 keys : [ 24 31  -  - ]   2
+         * Given: v-- remove @ index = 0 index: 0 1 2 root keys : [ 21 24 0 ]
+         * index leaf1 keys : [ 1 2 7 - ] 0 <--remove @ index = 0 leaf2 keys : [
+         * 21 22 23 - ] 1 leaf4 keys : [ 24 31 - - ] 2
          * 
          * This can also be represented as
          * 
@@ -2214,23 +2265,15 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * 
          * and we remove the sequence ( leaf1, 21 ) leaving a well-formed node.
          * 
-         * Remove(leaf1):
-         * index := 0
-         * nkeys = 2 
-         * nchildren := nkeys(2) + 1 = 3
-         * lenChildCopy := #children(3) - index(0) - 1 = 2 
-         * lenKeyCopy := lengthChildCopy - 1 = 1
-         * copyChildren from index+1(1) to index(0) lengthChildCopy(2)
-         * copyKeys from index+1(1) to index(0) lengthKeyCopy(1)
-         * erase keys[ nkeys - 1 = 1 ]
-         * erase children[ nkeys = 2 ]
+         * Remove(leaf1): index := 0 nkeys = 2 nchildren := nkeys(2) + 1 = 3
+         * lenChildCopy := #children(3) - index(0) - 1 = 2 lenKeyCopy :=
+         * lengthChildCopy - 1 = 1 copyChildren from index+1(1) to index(0)
+         * lengthChildCopy(2) copyKeys from index+1(1) to index(0)
+         * lengthKeyCopy(1) erase keys[ nkeys - 1 = 1 ] erase children[ nkeys =
+         * 2 ]
          * 
-         * post-condition:
-         *       index:    0  1  2
-         * root  keys : [ 24  0  0 ]
-         *                              index
-         * leaf2 keys : [ 21 22 23  - ]   0
-         * leaf4 keys : [ 24 31  -  - ]   1
+         * post-condition: index: 0 1 2 root keys : [ 24 0 0 ] index leaf2 keys
+         * : [ 21 22 23 - ] 0 leaf4 keys : [ 24 31 - - ] 1
          */
 
         {
@@ -2241,73 +2284,73 @@ public class Node extends AbstractNode<Node> implements INodeData {
             final int index = i;
 
             final int nkeys = getKeyCount();
-    
+
             // #of children to copy (equivalent to nchildren - index - 1)
             final int lengthChildCopy = nkeys - index;
-    
+
             // #of keys to copy.
             final int lengthKeyCopy = lengthChildCopy - 1;
-    
+
             // Tunnel through to the mutable keys object.
             final MutableKeyBuffer keys = (MutableKeyBuffer) this.getKeys();
             final MutableNodeData data = (MutableNodeData) this.data;
-    
+
             if (lengthKeyCopy > 0) {
-    
+
                 System.arraycopy(keys.keys, index + 1, keys.keys, index,
                         lengthKeyCopy);
-    
+
             }
-    
+
             if (lengthChildCopy > 0) {
-    
+
                 System.arraycopy(childRefs, index + 1, childRefs, index,
                         lengthChildCopy);
-    
+
                 System.arraycopy(data.childAddr, index + 1, data.childAddr,
                         index, lengthChildCopy);
-    
+
                 System.arraycopy(data.childEntryCounts, index + 1,
                         data.childEntryCounts, index, lengthChildCopy);
-    
+
             }
-    
+
             /*
-             * Erase the data that were exposed by this operation. Note that there
-             * is one fewer keys than children so ....
+             * Erase the data that were exposed by this operation. Note that
+             * there is one fewer keys than children so ....
              */
-    
+
             if (nkeys > 0) {
-    
+
                 // erase the last key position.
                 keys.keys[nkeys - 1] = null;
-    
+
             }
-    
+
             // erase the last child position.
             childRefs[nkeys] = null;
             data.childAddr[nkeys] = NULL;
             data.childEntryCounts[nkeys] = 0;
-    
+
             // Clear the parent on the old child.
             child.parent = null;
-    
+
             // one less the key in this node.
-            /*nkeys--;*/keys.nkeys--;
-    
+            /* nkeys--; */keys.nkeys--;
+
             if (child.isLeaf()) {
-    
+
                 btree.nleaves--;
-    
+
             } else {
-    
+
                 btree.nnodes--;
-    
+
             }
-    
+
             // Deallocate the child.
             child.delete();
-            
+
         }
 
         if (btree.root == this) {
@@ -2321,29 +2364,33 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
                 final AbstractNode<?> lastChild = getChild(0);
 
-                if(btree.debug) lastChild.assertInvariants();
+                if (btree.debug)
+                    lastChild.assertInvariants();
 
-                if(INFO) {
+                if (INFO) {
                     log.info("replacing root: root=" + btree.root + ", node="
                             + this + ", lastChild=" + lastChild);
-//                    System.err.println("root"); btree.root.dump(Level.DEBUG,System.err);
-//                    System.err.println("this"); this.dump(Level.DEBUG,System.err);
-//                    System.err.println("lastChild"); lastChild.dump(Level.DEBUG,System.err);
+                    // System.err.println("root");
+                    // btree.root.dump(Level.DEBUG,System.err);
+                    // System.err.println("this");
+                    // this.dump(Level.DEBUG,System.err);
+                    // System.err.println("lastChild");
+                    // lastChild.dump(Level.DEBUG,System.err);
                 }
-                
+
                 final boolean wasDirty = btree.root.dirty;
-                
+
                 assert lastChild != null;
-                
+
                 // replace the root node with a root leaf.
                 btree.root = lastChild;
-                
+
                 if (!wasDirty) {
-                    
+
                     btree.fireDirtyEvent();
-                    
+
                 }
-                
+
                 // clear the parent reference since this is now the root.
                 lastChild.parent = null;
 
@@ -2356,11 +2403,11 @@ public class Node extends AbstractNode<Node> implements INodeData {
                 // one less node in the tree.
                 btree.nnodes--;
 
-                if(BTree.INFO) {
+                if (BTree.INFO) {
                     BTree.log.info("reduced tree height: height="
                             + btree.height + ", newRoot=" + btree.root);
                 }
-                
+
                 btree.getBtreeCounters().rootsJoined++;
 
             }
@@ -2384,61 +2431,63 @@ public class Node extends AbstractNode<Node> implements INodeData {
         }
 
     }
-    
-//    /**
-//     * This is invoked by {@link #removeChild(AbstractNode)} when the node is
-//     * reduced to a single child in order to replace the reference to the node
-//     * on its parent with the reference to the node's sole remaining child.
-//     * 
-//     * @param oldChild
-//     *            The node.
-//     * @param newChild
-//     *            The node's sole remaining child. This MAY be persistent since
-//     *            this operation does NOT change the persistent state of the
-//     *            newChild but only updates its transient state (e.g., its
-//     *            parent reference).
-//     */
-//    protected void replaceChild(AbstractNode oldChild,AbstractNode newChild) {
-//        
-//        assert oldChild != null;
-//        assert !oldChild.isDeleted();
-//        assert !oldChild.isPersistent();
-//        assert oldChild.parent.get() == this;
-//        assert oldChild.nkeys == 0;
-//        assertInvariants();
-//        oldChild.assertInvariants();
-//        newChild.assertInvariants();
-//
-//        assert newChild != null;
-//        assert !newChild.isDeleted();
-////        assert !newChild.isPersistent(); // MAY be persistent - does not matter.
-//        assert newChild.parent.get() == oldChild;
-//
-//        assert oldChild != newChild;
-//
-//        assert !isDeleted();
-//        assert !isPersistent();
-//
-//        int i = getIndexOf( oldChild );
-//
-////        dirtyChildren.remove(oldChild);
-////
-////        if (newChild.isDirty()) {
-////
-////            dirtyChildren.add(newChild);
-////
-////        }
-//
-//        // set the persistent key for the new child.
-//        childAddr[i] = (newChild.isPersistent() ? newChild.getIdentity() : NULL);
-//
-//        // set the reference to the new child.
-//        childRefs[i] = new WeakReference<AbstractNode>(newChild);
-//
-//        // Reuse the weak reference from the oldChild.
-//        newChild.parent = oldChild.parent;
-//
-//    }
+
+    // /**
+    // * This is invoked by {@link #removeChild(AbstractNode)} when the node is
+    // * reduced to a single child in order to replace the reference to the node
+    // * on its parent with the reference to the node's sole remaining child.
+    // *
+    // * @param oldChild
+    // * The node.
+    // * @param newChild
+    // * The node's sole remaining child. This MAY be persistent since
+    // * this operation does NOT change the persistent state of the
+    // * newChild but only updates its transient state (e.g., its
+    // * parent reference).
+    // */
+    // protected void replaceChild(AbstractNode oldChild,AbstractNode newChild)
+    // {
+    //        
+    // assert oldChild != null;
+    // assert !oldChild.isDeleted();
+    // assert !oldChild.isPersistent();
+    // assert oldChild.parent.get() == this;
+    // assert oldChild.nkeys == 0;
+    // assertInvariants();
+    // oldChild.assertInvariants();
+    // newChild.assertInvariants();
+    //
+    // assert newChild != null;
+    // assert !newChild.isDeleted();
+    // // assert !newChild.isPersistent(); // MAY be persistent - does not
+    // matter.
+    // assert newChild.parent.get() == oldChild;
+    //
+    // assert oldChild != newChild;
+    //
+    // assert !isDeleted();
+    // assert !isPersistent();
+    //
+    // int i = getIndexOf( oldChild );
+    //
+    // // dirtyChildren.remove(oldChild);
+    // //
+    // // if (newChild.isDirty()) {
+    // //
+    // // dirtyChildren.add(newChild);
+    // //
+    // // }
+    //
+    // // set the persistent key for the new child.
+    // childAddr[i] = (newChild.isPersistent() ? newChild.getIdentity() : NULL);
+    //
+    // // set the reference to the new child.
+    // childRefs[i] = new WeakReference<AbstractNode>(newChild);
+    //
+    // // Reuse the weak reference from the oldChild.
+    // newChild.parent = oldChild.parent;
+    //
+    // }
 
     /**
      * Return the child node or leaf at the specified index in this node. If the
@@ -2485,14 +2534,14 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * expensive!?! The interrupt status of the thread is now checked
          * exclusively when reading on the store.
          */
-//        if(Thread.interrupted()) {
-//            /*
-//             * This method is called relatively often - it is used each time we
-//             * descend the tree. We check whether or not the thread has been
-//             * interrupted so that we can abort running tasks quickly.
-//             */
-//            throw new RuntimeException(new InterruptedException());
-//        }
+        // if(Thread.interrupted()) {
+        // /*
+        // * This method is called relatively often - it is used each time we
+        // * descend the tree. We check whether or not the thread has been
+        // * interrupted so that we can abort running tasks quickly.
+        // */
+        // throw new RuntimeException(new InterruptedException());
+        // }
 
         if (index < 0 || index > data.getKeyCount()) {
 
@@ -2501,7 +2550,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         }
 
-//        if (!btree.isReadOnly()) {
+        // if (!btree.isReadOnly()) {
         if (btree.memo == null) {
 
             /*
@@ -2537,7 +2586,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
              * different threads for different operations. However, this
              * synchronization will never be contended for the mutable B+Tree.
              */
-            
+
             final Reference<AbstractNode<?>> childRef = childRefs[index];
 
             final AbstractNode child = childRef == null ? null : childRef.get();
@@ -2584,7 +2633,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      *            The key we need to remove the request from the
      *            {@link ChildMemoizer} cache (and <code>null</code> if this
      *            method is not invoked by the memoizer pattern).
-     *            
+     * 
      * @return The child and never <code>null</code>.
      */
     AbstractNode _getChild(final int index, final LoadChildRequest req) {
@@ -2698,94 +2747,96 @@ public class Node extends AbstractNode<Node> implements INodeData {
         }
 
         return child;
-        
+
     }
-    
-//    /**
-//     * Static helper method allocates the per-child lock objects.
-//     * <p>
-//     * Note that the mutable {@link BTree} imposes a single-threaded constraint
-//     * on its API so we do not need to do any locking for that case and this
-//     * method will therefore return <code>null</code> if the owning B+Tree is
-//     * mutable.
-//     * 
-//     * @param btree
-//     *            The owning B+Tree.
-//     * 
-//     * @param nkeys
-//     *            The #of keys, which is used to dimension the array.
-//     * 
-//     * @return The array of lock objects -or- <code>null</code> if the btree is
-//     *         mutable.
-//     * 
-//     * @see #childLocks
-//     * 
-//     * @todo Per-child locks will only be useful on nodes with a relatively high
-//     *       probability of concurrent access. Therefore they should be
-//     *       conditionally enabled only to a depth of 0 (for the root's direct
-//     *       children) or 1 (for the children of the root's direct children).
-//     *       There is just not going to be any utility to this beyond that
-//     *       point, especially not on an {@link IndexSegment} with a relatively
-//     *       high branching factor. We could directly compute the probability of
-//     *       access to any given child based on the branching factor and the
-//     *       depth of the node in the B+Tree and the assumption of a uniform
-//     *       distribution of reads by concurrent threads [in fact, in many
-//     *       benchmark situations we are more likely to content for the same
-//     *       child unless the queries are parameterized].
-//     */
-//    static private final Object[] newChildLocks(final AbstractBTree btree,
-//            final int nkeys) {
-//        
-//        /*
-//         * Note: Uncommenting this has the effect of disabling per-child
-//         * locking.
-//         */
-//        // if(true) return null;
-//        
-//        if (!btree.isReadOnly() || !btree.getIndexMetadata().getChildLocks()) {
-//
-//            /*
-//             * Either The mutable B+Tree has a single threaded constraint so we
-//             * do not need to do any locking for that case and therefore we do
-//             * not allocate the per-child locks here -or- child locks were
-//             * disabled as a configuration option.
-//             */
-//            
-//            return null;
-//            
-//        }
-//        
-//        /*
-//         * Note: The array is dimensioned to [branchingFactor] and not
-//         * [branchingFactor+1]. The "overflow" slot of the various arrays are
-//         * only used during node overflow/underflow operations. Those operations
-//         * do not occur for a read-only B+Tree.
-//         */
-////        final int n = btree.branchingFactor + 1;
-//        
-//        // Note: We only need locks for the child entries that exist!
-//        final int n = nkeys + 1;
-//        
-//        final Object[] a = new Object[n];
-//        
-//        for (int i = 0; i < n; i++) {
-//
-//            a[i] = new Object();
-//            
-//        }
-//        
-//        return a;
-//        
-//    }
+
+    // /**
+    // * Static helper method allocates the per-child lock objects.
+    // * <p>
+    // * Note that the mutable {@link BTree} imposes a single-threaded
+    // constraint
+    // * on its API so we do not need to do any locking for that case and this
+    // * method will therefore return <code>null</code> if the owning B+Tree is
+    // * mutable.
+    // *
+    // * @param btree
+    // * The owning B+Tree.
+    // *
+    // * @param nkeys
+    // * The #of keys, which is used to dimension the array.
+    // *
+    // * @return The array of lock objects -or- <code>null</code> if the btree
+    // is
+    // * mutable.
+    // *
+    // * @see #childLocks
+    // *
+    // * @todo Per-child locks will only be useful on nodes with a relatively
+    // high
+    // * probability of concurrent access. Therefore they should be
+    // * conditionally enabled only to a depth of 0 (for the root's direct
+    // * children) or 1 (for the children of the root's direct children).
+    // * There is just not going to be any utility to this beyond that
+    // * point, especially not on an {@link IndexSegment} with a relatively
+    // * high branching factor. We could directly compute the probability of
+    // * access to any given child based on the branching factor and the
+    // * depth of the node in the B+Tree and the assumption of a uniform
+    // * distribution of reads by concurrent threads [in fact, in many
+    // * benchmark situations we are more likely to content for the same
+    // * child unless the queries are parameterized].
+    // */
+    // static private final Object[] newChildLocks(final AbstractBTree btree,
+    // final int nkeys) {
+    //        
+    // /*
+    // * Note: Uncommenting this has the effect of disabling per-child
+    // * locking.
+    // */
+    // // if(true) return null;
+    //        
+    // if (!btree.isReadOnly() || !btree.getIndexMetadata().getChildLocks()) {
+    //
+    // /*
+    // * Either The mutable B+Tree has a single threaded constraint so we
+    // * do not need to do any locking for that case and therefore we do
+    // * not allocate the per-child locks here -or- child locks were
+    // * disabled as a configuration option.
+    // */
+    //            
+    // return null;
+    //            
+    // }
+    //        
+    // /*
+    // * Note: The array is dimensioned to [branchingFactor] and not
+    // * [branchingFactor+1]. The "overflow" slot of the various arrays are
+    // * only used during node overflow/underflow operations. Those operations
+    // * do not occur for a read-only B+Tree.
+    // */
+    // // final int n = btree.branchingFactor + 1;
+    //        
+    // // Note: We only need locks for the child entries that exist!
+    // final int n = nkeys + 1;
+    //        
+    // final Object[] a = new Object[n];
+    //        
+    // for (int i = 0; i < n; i++) {
+    //
+    // a[i] = new Object();
+    //            
+    // }
+    //        
+    // return a;
+    //        
+    // }
 
     /**
      * Return the right-most child of this node.
      * 
      * @param nodesOnly
-     *            when <code>true</code> the search will halt at the
-     *            right-most non-leaf. Otherwise it will return the right-most
-     *            leaf.
-     *            
+     *            when <code>true</code> the search will halt at the right-most
+     *            non-leaf. Otherwise it will return the right-most leaf.
+     * 
      * @return The right-most child of this node.
      */
     protected AbstractNode getRightMostChild(final boolean nodesOnly) {
@@ -2795,21 +2846,21 @@ public class Node extends AbstractNode<Node> implements INodeData {
         assert child != null;
 
         if (child.isLeaf()) {
-            
+
             if (nodesOnly) {
 
                 return this;
 
             } else {
-            
+
                 return child;
-                
+
             }
-            
+
         }
 
         return ((Node) child).getRightMostChild(nodesOnly);
-        
+
     }
 
     /**
@@ -2828,8 +2879,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         }
 
         /*
-         * Iterator append this node to the iterator in the post-order
-         * position.
+         * Iterator append this node to the iterator in the post-order position.
          */
 
         return new Striterator(postOrderIterator1(dirtyNodesOnly))
@@ -2857,8 +2907,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
     }
 
     /**
-     * Visits the children (recursively) using post-order traversal, but
-     * does NOT visit this node.
+     * Visits the children (recursively) using post-order traversal, but does
+     * NOT visit this node.
      */
     @SuppressWarnings("unchecked")
     private Iterator<AbstractNode> postOrderIterator1(
@@ -2883,62 +2933,65 @@ public class Node extends AbstractNode<Node> implements INodeData {
          */
 
         // BTree.log.debug("node: " + this);
-        return new Striterator(childIterator(dirtyNodesOnly)).addFilter(new Expander() {
+        return new Striterator(childIterator(dirtyNodesOnly))
+                .addFilter(new Expander() {
 
-            private static final long serialVersionUID = 1L;
-
-            /*
-             * Expand each child in turn.
-             */
-            protected Iterator expand(Object childObj) {
-
-                /*
-                 * A child of this node.
-                 */
-
-                final AbstractNode child = (AbstractNode) childObj;
-
-                if (dirtyNodesOnly && !child.dirty) {
-
-                    return EmptyIterator.DEFAULT;
-
-                }
-
-                if (child instanceof Node) {
+                    private static final long serialVersionUID = 1L;
 
                     /*
-                     * The child is a Node (has children).
+                     * Expand each child in turn.
                      */
+                    protected Iterator expand(Object childObj) {
 
-                    // BTree.log.debug("child is node: " + child);
-                    // visit the children (recursive post-order traversal).
-                    final Striterator itr = new Striterator(((Node) child)
-                            .postOrderIterator1(dirtyNodesOnly));
+                        /*
+                         * A child of this node.
+                         */
 
-                    // append this node in post-order position.
-                    itr.append(new SingleValueIterator(child));
+                        final AbstractNode child = (AbstractNode) childObj;
 
-                    return itr;
+                        if (dirtyNodesOnly && !child.dirty) {
 
-                } else {
+                            return EmptyIterator.DEFAULT;
 
-                    /*
-                     * The child is a leaf.
-                     */
+                        }
 
-                    // BTree.log.debug("child is leaf: " + child);
-                    // Visit the leaf itself.
-                    return new SingleValueIterator(child);
+                        if (child instanceof Node) {
 
-                }
-            }
-        });
+                            /*
+                             * The child is a Node (has children).
+                             */
+
+                            // BTree.log.debug("child is node: " + child);
+                            // visit the children (recursive post-order
+                            // traversal).
+                            final Striterator itr = new Striterator(
+                                    ((Node) child)
+                                            .postOrderIterator1(dirtyNodesOnly));
+
+                            // append this node in post-order position.
+                            itr.append(new SingleValueIterator(child));
+
+                            return itr;
+
+                        } else {
+
+                            /*
+                             * The child is a leaf.
+                             */
+
+                            // BTree.log.debug("child is leaf: " + child);
+                            // Visit the leaf itself.
+                            return new SingleValueIterator(child);
+
+                        }
+                    }
+                });
 
     }
 
     /**
-     * Visits the children (recursively) using post-order traversal, but
-     * does NOT visit this node.
+     * Visits the children (recursively) using post-order traversal, but does
+     * NOT visit this node.
      */
     @SuppressWarnings("unchecked")
     private Iterator<AbstractNode> postOrderIterator2(final byte[] fromKey,
@@ -2963,60 +3016,311 @@ public class Node extends AbstractNode<Node> implements INodeData {
          */
 
         // BTree.log.debug("node: " + this);
-        return new Striterator(childIterator(fromKey,toKey)).addFilter(new Expander() {
+        return new Striterator(childIterator(fromKey, toKey))
+                .addFilter(new Expander() {
 
-            private static final long serialVersionUID = 1L;
-
-            /*
-             * Expand each child in turn.
-             */
-            protected Iterator expand(Object childObj) {
-
-                /*
-                 * A child of this node.
-                 */
-
-                final AbstractNode child = (AbstractNode) childObj;
-
-                if (child instanceof Node) {
+                    private static final long serialVersionUID = 1L;
 
                     /*
-                     * The child is a Node (has children).
+                     * Expand each child in turn.
                      */
+                    protected Iterator expand(final Object childObj) {
 
-                    // BTree.log.debug("child is node: " + child);
-                    // visit the children (recursive post-order traversal).
-                    final Striterator itr = new Striterator(((Node) child)
-                            .postOrderIterator2(fromKey,toKey));
+                        /*
+                         * A child of this node.
+                         */
 
-                    // append this node in post-order position.
-                    itr.append(new SingleValueIterator(child));
+                        final AbstractNode child = (AbstractNode) childObj;
 
-                    return itr;
+                        if (child instanceof Node) {
 
-                } else {
+                            /*
+                             * The child is a Node (has children).
+                             * 
+                             * Visit the children (recursive post-order
+                             * traversal).
+                             */
 
-                    /*
-                     * The child is a leaf.
-                     * 
-                     * @todo prefetch: This one place where we could use pre-fetch
-                     * to obtain the other children of the same parent spanned
-                     * by the designed key-range.  It would be better to intervene
-                     * in the other half of this if-then-else so we can schedule
-                     * the pre-fetch of the rightSibling as well and only test
-                     * once to determine which child leaves should be pre-fetched. 
-                     */
+                            // BTree.log.debug("child is node: " + child);
+                            final Striterator itr = new Striterator(
+                                    ((Node) child).postOrderIterator2(fromKey,
+                                            toKey));
 
-                    // BTree.log.debug("child is leaf: " + child);
-                    // Visit the leaf itself.
-                    return new SingleValueIterator(child);
+                            // append this node in post-order position.
+                            itr.append(new SingleValueIterator(child));
 
-                }
-            }
-        });
+                            if ((btree.store instanceof Journal)
+                                    && (((Journal) btree.store)
+                                            .getReadExecutor() != null)) {
+
+                                /*
+                                 * Prefetch any child leaves we need to visit
+                                 * and prefetch the right sibling of the node we
+                                 * are about to visit if the iterator will span
+                                 * that node as well.
+                                 */
+                                prefetchChildLeaves((Node) child, fromKey,
+                                        toKey);
+
+                            }
+
+                            return itr;
+
+                        } else {
+
+                            /*
+                             * The child is a leaf.
+                             */
+
+                            // BTree.log.debug("child is leaf: " + child);
+                            
+                            // Visit the leaf itself.
+                            return new SingleValueIterator(child);
+
+                        }
+                    }
+                });
 
     }
 
+    /**
+     * When we visit a node whose children are leaves, schedule memoization of
+     * those leaves whose separator key in the node is LT the toKey
+     * (non-blocking). If the rightSibling of the node would be visited by the
+     * iterator, then prefetch of the rightSibling is also scheduled.
+     * 
+     * @param node
+     *            A node whose children are leaves.
+     * @param toKey
+     *            The exclusive upper bound of some iterator.
+     * 
+     * @todo All memoization should go through the same thread pool in order to
+     *       bound the #of threads actually reading on the disk. Right now, the
+     *       memoizer runs in the caller's thread. If we modified it to submit a
+     *       task to the readService to handle the memoization then we would
+     *       bound the #of threads involved.
+     * 
+     * @todo PREFETCH : JSR 166 Fork/join would also be a good choice here.
+     * 
+     * @todo PREFETCH : Prefetch will not break if the iterator is closed. This
+     *       is not a bug per se, but it might be something we want to support
+     *       in the future.
+     * 
+     * @todo PREFETCH : Prefetch should be cancelled if the btree is closed. We
+     *       could do this with an Executor wrapping the {@link LatchedExecutor}
+     *       that kept track of the work queue for that executor and allowed us
+     *       to cancel just the tasks submitted against it. This would also give
+     *       us a means to report on the prefetch work queue length.
+     * 
+     * @todo PREFETCH : Only journal is supported right now.
+     * 
+     * @todo PREFETCH : The {@link IRangeQuery#CURSOR} mode is not supported yet.
+     */
+    protected void prefetchChildLeaves(final Node node, final byte[] fromKey,
+                final byte[] toKey) {
+
+        final int nkeys = node.getKeyCount();
+        
+        // figure out the first index to visit.
+        final int fromIndex;
+        {
+
+            int index;
+
+            if (fromKey != null) {
+
+                index = node.getKeys().search(fromKey);
+
+                if (index < 0) {
+
+                    index = -index - 1;
+
+                }
+
+            } else {
+
+                index = 0;
+
+            }
+
+            fromIndex = index;
+
+        }
+
+        // figure out the first index to NOT visit.
+        final int toIndex;
+        {
+
+            int index;
+
+            if (toKey != null) {
+
+                index = node.getKeys().search(toKey);
+
+                if (index < 0) {
+
+                    index = -index - 1;
+
+                }
+
+            } else {
+
+                index = nkeys;
+
+            }
+
+            toIndex = index;
+
+        }
+
+        /*
+         * Submit taskS which will materialize the children in
+         * [fromIndex,toIndex).
+         * 
+         * Note: We do not track the futures of these tasks. The tasks have a
+         * side effect on the parent/child weak references among the nodes in
+         * the B+Tree, on the backing hard reference ring buffer, and on the
+         * cache of materialized disk records. That side effect is all that we
+         * are seeking.
+         * 
+         * Note: If the B+Tree is concurrently closed, then these tasks will
+         * error out. That is fine.
+         */
+        final Executor s = ((Journal) btree.store).getReadExecutor();
+
+        for (int i = fromIndex; i < toIndex; i++) {
+            
+            final int index = i;
+            
+            s.execute(new Runnable() {
+
+                public void run() {
+
+                    if (!node.btree.isOpen()) {
+                        // No longer open.
+                        return;
+
+                    }
+
+                    // Materialize the child.
+                    node.getChild(index);
+
+                }
+
+            });
+
+        }
+        
+        if (toIndex == nkeys - 1) {
+
+            /*
+             * Prefetch the right sibling.
+             */
+            
+            prefetchRightSibling(node, toKey);
+            
+        }
+        
+    }
+
+    /**
+     * If the caller's <i>toKey</i> is GT the separator keys for the children of
+     * this node then the iterator will need to visit the rightSibling of the
+     * node and this method will schedule the memoization of the node's
+     * rightSibling in order to reduce the IO latency when the iterator visit
+     * that rightSibling (non-blocking).
+     * 
+     * @param node
+     *            A node.
+     * @param toKey
+     *            The exclusive upper bound of some iterator.
+     */
+    protected void prefetchRightSibling(final Node node, final byte[] toKey) {
+        
+        final int nkeys = node.getKeyCount();
+
+        final byte[] lastSeparatorKey = node.getKeys().get(nkeys - 1);
+
+        if (BytesUtil.compareBytes(toKey, lastSeparatorKey) <= 0) {
+
+            /*
+             * Since the toKey is LTE to the lastSeparatorKey on this node the
+             * last tuple to be visited by the iterator is spanned by this node
+             * and we will not visit the node's rightSibling.
+             * 
+             * @todo This test could be optimized if IRaba exposed a method for
+             * unsigned byte[] comparisons against the coded representation of
+             * the keys.
+             */
+
+            return;
+
+        }
+
+        // The parent of this node.
+        final Node p = node.parent.get();
+
+//        /*
+//         * Test to see if the rightSibling is already materialized.
+//         */
+//        
+//        Note: Don't bother testing as we will test in the task below anyway.
+//        
+//        Node rightSibling = (Node) p.getRightSibling(node,
+//                false/* materialize */);
+//
+//        if (rightSibling != null) {
+//
+//            /*
+//             * The rightSibling is already materialized and getRightSibling()
+//             * touches the rightSibling as a side-effect so it will be retained
+//             * longer. Return now as there is nothing to do.
+//             */
+//
+//            return;
+//            
+//        }
+
+        /*
+         * Submit a task which will materialize that right sibling.
+         * 
+         * Note: This task will only materialize a rightSibling of a common
+         * parent. If [node] is the last child of the parent [p] then you would
+         * need to ascend to the parent of [p] and then desend again, which is
+         * not the specified behavior for getRightSibling(). Since this is just
+         * an optimization for IO scheduling, I think that it is fine as it is.
+         * 
+         * Note: We do not track the future of this task. The task will have a
+         * side effect on the parent/child weak references among the nodes in
+         * the B+Tree, on the backing hard reference ring buffer, and on the
+         * cache of materialized disk records. That side effect is all that we
+         * are seeking.
+         * 
+         * Note: If the B+Tree is concurrently closed, then this task will error
+         * out.  That is fine.
+         */
+        final Executor s = ((Journal) btree.store).getReadExecutor();
+
+        s.execute(new Runnable() {
+
+            public void run() {
+
+                if (!p.btree.isOpen()) {
+
+                    // No longer open.
+                    return;
+                    
+                }
+
+                // Materialize the right sibling.
+                p.getRightSibling(node, true/* materialize */);
+
+            }
+
+        });
+
+    }
+    
     /**
      * Iterator visits the direct child nodes in the external key ordering.
      * 
@@ -3025,14 +3329,14 @@ public class Node extends AbstractNode<Node> implements INodeData {
      */
     public Iterator<AbstractNode> childIterator(final boolean dirtyNodesOnly) {
 
-        if( dirtyNodesOnly ) {
-            
+        if (dirtyNodesOnly) {
+
             return new DirtyChildIterator(this);
-            
+
         } else {
-            
+
             return new ChildIterator(this);
-            
+
         }
 
     }
@@ -3046,7 +3350,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         return new ChildIterator(this, fromKey, toKey);
 
     }
-    
+
     @Override
     public boolean dump(final Level level, final PrintStream out,
             final int height, final boolean recursive) {
@@ -3061,7 +3365,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         final int nkeys = getKeyCount();
         final int minKeys = this.minKeys();
         final int maxKeys = this.maxKeys();
-        
+
         if (parent != null && nkeys < minKeys) {
             // min keys failure.
             out.println(indent(height) + "ERROR: too few keys: m="
@@ -3078,11 +3382,12 @@ public class Node extends AbstractNode<Node> implements INodeData {
             ok = false;
         }
 
-        {   // nentries
+        { // nentries
             if (this == btree.root) {
                 if (getSpannedTupleCount() != btree.getEntryCount()) {
                     out.println(indent(height)
-                            + "ERROR: root node has nentries=" + getSpannedTupleCount()
+                            + "ERROR: root node has nentries="
+                            + getSpannedTupleCount()
                             + ", but btree has nentries="
                             + btree.getEntryCount());
                     ok = false;
@@ -3143,66 +3448,66 @@ public class Node extends AbstractNode<Node> implements INodeData {
         try {
             assertKeysMonotonic();
         } catch (AssertionError ex) {
-            out.println(indent(height) + "  ERROR: "+ex);
+            out.println(indent(height) + "  ERROR: " + ex);
             ok = false;
         }
         if (debug) {
             out.println(indent(height) + toString());
-//            out.println(indent(height) + "  parent="
-//                    + (parent == null ? null : parent.get()));
-//            out.println(indent(height) + "  dirty=" + isDirty() + ", nkeys="
-//                    + nkeys + ", nchildren=" + (nkeys + 1) + ", minKeys="
-//                    + minKeys + ", maxKeys=" + maxKeys + ", branchingFactor="
-//                    + branchingFactor+", #entries="+getSpannedTupleCount());
-//            out.println(indent(height) + "  keys=" + getKeys());
-////            out.println(indent(height) + "  childAddr="
-////                    + Arrays.toString(childAddr));
-//            out.print(indent(height) + "  childAddr/Refs=[");
-//            for (int i = 0; i <= nkeys + 1; i++) {
-//                if (i > 0)
-//                    out.print(", ");
-//                out.print(getChildAddr(i));
-//                out.print('(');
-//                if (childRefs[i] == null) {
-//                    out.print("null");
-//                } else {
-//                    // Non-recursive print of the reference.
-//                    final AbstractNode<?> child = childRefs[i].get();
-//                    out.print(child.getClass().getName() + "@"
-//                            + Integer.toHexString(child.hashCode()));
-//                }
-//                out.print(')');
-//            }
-//            out.println("]");
-//            out.print(indent(height) + "  childEntryCounts=[");
-//            for (int i = 0; i <= nkeys; i++) {
-//                if (i > 0)
-//                    out.print(", ");
-//                out.print(getChildEntryCount(i));
-//            }
-//            out.println("]");
-////                    + Arrays.toString(childEntryCounts));
+            // out.println(indent(height) + "  parent="
+            // + (parent == null ? null : parent.get()));
+            // out.println(indent(height) + "  dirty=" + isDirty() + ", nkeys="
+            // + nkeys + ", nchildren=" + (nkeys + 1) + ", minKeys="
+            // + minKeys + ", maxKeys=" + maxKeys + ", branchingFactor="
+            // + branchingFactor+", #entries="+getSpannedTupleCount());
+            // out.println(indent(height) + "  keys=" + getKeys());
+            // // out.println(indent(height) + "  childAddr="
+            // // + Arrays.toString(childAddr));
+            // out.print(indent(height) + "  childAddr/Refs=[");
+            // for (int i = 0; i <= nkeys + 1; i++) {
+            // if (i > 0)
+            // out.print(", ");
+            // out.print(getChildAddr(i));
+            // out.print('(');
+            // if (childRefs[i] == null) {
+            // out.print("null");
+            // } else {
+            // // Non-recursive print of the reference.
+            // final AbstractNode<?> child = childRefs[i].get();
+            // out.print(child.getClass().getName() + "@"
+            // + Integer.toHexString(child.hashCode()));
+            // }
+            // out.print(')');
+            // }
+            // out.println("]");
+            // out.print(indent(height) + "  childEntryCounts=[");
+            // for (int i = 0; i <= nkeys; i++) {
+            // if (i > 0)
+            // out.print(", ");
+            // out.print(getChildEntryCount(i));
+            // }
+            // out.println("]");
+            // // + Arrays.toString(childEntryCounts));
         }
 
         /*
-         * Look for inconsistencies for children. A dirty child MUST NOT
-         * have an entry in childAddr[] since it is not persistent and MUST
-         * show up in dirtyChildren. Likewise if a child is NOT dirty, then
-         * it MUST have an entry in childAddr and MUST NOT show up in
-         * dirtyChildren.
+         * Look for inconsistencies for children. A dirty child MUST NOT have an
+         * entry in childAddr[] since it is not persistent and MUST show up in
+         * dirtyChildren. Likewise if a child is NOT dirty, then it MUST have an
+         * entry in childAddr and MUST NOT show up in dirtyChildren.
          * 
-         * This also verifies that all entries beyond nchildren (nkeys+1)
-         * are unused.
+         * This also verifies that all entries beyond nchildren (nkeys+1) are
+         * unused.
          */
         for (int i = 0; i < branchingFactor + 1; i++) {
 
             if (i > nkeys) {
 
                 /*
-                 * Scanning past the last valid child index. 
+                 * Scanning past the last valid child index.
                  */
 
-                if (!isReadOnly() && ((MutableNodeData)data).childAddr[i] != NULL) {
+                if (!isReadOnly()
+                        && ((MutableNodeData) data).childAddr[i] != NULL) {
 
                     out.println(indent(height) + "  ERROR childAddr[" + i
                             + "] should be " + NULL + ", not "
@@ -3226,59 +3531,61 @@ public class Node extends AbstractNode<Node> implements INodeData {
                 /*
                  * Scanning a valid child index.
                  * 
-                 * Note: This is not fetching the child if it is not in
-                 * memory -- perhaps it should using its persistent id?
+                 * Note: This is not fetching the child if it is not in memory
+                 * -- perhaps it should using its persistent id?
                  */
 
                 final AbstractNode<?> child = (childRefs[i] == null ? null
                         : childRefs[i].get());
 
                 if (child != null) {
-                    
-                    if( child.parent == null || child.parent.get() == null ) {
+
+                    if (child.parent == null || child.parent.get() == null) {
                         /*
                          * the reference to the parent MUST exist since the we
                          * are the parent and therefore the parent is strongly
                          * reachable.
                          */
-                        out.println(indent(height) + "  ERROR child["
-                                + i + "] does not have parent reference.");
+                        out.println(indent(height) + "  ERROR child[" + i
+                                + "] does not have parent reference.");
                         ok = false;
                     }
 
-                    if( child.parent.get() != this ) {
-                        out.println(indent(height) + "  ERROR child["
-                                + i + "] has wrong parent.");
-                        ok = false;                
-//                        // some extra stuff used to track down a bug.
-                        if(!ok) {
-                        if( level == Level.DEBUG ) {
-                            // dump the child also and exit.
-                            System.err.println("child"); child.dump(Level.DEBUG,System.err);
-                            throw new AssertionError();
-                        } else {
-                            // recursive call to get debug level dump.
-                            System.err.println("this"); this.dump(Level.DEBUG,System.err);
-                        }
+                    if (child.parent.get() != this) {
+                        out.println(indent(height) + "  ERROR child[" + i
+                                + "] has wrong parent.");
+                        ok = false;
+                        // // some extra stuff used to track down a bug.
+                        if (!ok) {
+                            if (level == Level.DEBUG) {
+                                // dump the child also and exit.
+                                System.err.println("child");
+                                child.dump(Level.DEBUG, System.err);
+                                throw new AssertionError();
+                            } else {
+                                // recursive call to get debug level dump.
+                                System.err.println("this");
+                                this.dump(Level.DEBUG, System.err);
+                            }
                         }
                     }
 
-                    if( getChildEntryCount(i) != child.getSpannedTupleCount() ) {
+                    if (getChildEntryCount(i) != child.getSpannedTupleCount()) {
                         out.println(indent(height) + "  ERROR child[" + i
                                 + "] spans " + child.getSpannedTupleCount()
                                 + " entries, but childEntryCount[" + i + "]="
                                 + getChildEntryCount(i));
-                        ok = false;                
+                        ok = false;
                     }
 
                     if (child.isDirty()) {
                         /*
-                         * Dirty child.  The parent of a dirty child MUST also
-                         * be dirty.
+                         * Dirty child. The parent of a dirty child MUST also be
+                         * dirty.
                          */
-                        if( ! isDirty() ) {
-                            out.println(indent(height) + "  ERROR child["
-                                    + i + "] is dirty, but its parent is clean");
+                        if (!isDirty()) {
+                            out.println(indent(height) + "  ERROR child[" + i
+                                    + "] is dirty, but its parent is clean");
                             ok = false;
                         }
                         if (childRefs[i] == null) {
@@ -3293,18 +3600,18 @@ public class Node extends AbstractNode<Node> implements INodeData {
                                     + " since the child is dirty");
                             ok = false;
                         }
-//                        if (!dirtyChildren.contains(child)) {
-//                            out
-//                                    .println(indent(height + 1)
-//                                            + "  ERROR child at index="
-//                                            + i
-//                                            + " is dirty, but not on the dirty list: child="
-//                                            + child);
-//                            ok = false;
-//                        }
+                        // if (!dirtyChildren.contains(child)) {
+                        // out
+                        // .println(indent(height + 1)
+                        // + "  ERROR child at index="
+                        // + i
+                        // + " is dirty, but not on the dirty list: child="
+                        // + child);
+                        // ok = false;
+                        // }
                     } else {
                         /*
-                         * Clean child (ie, persistent).  The parent of a clean
+                         * Clean child (ie, persistent). The parent of a clean
                          * child may be either clear or dirty.
                          */
                         if (getChildAddr(i) == NULL) {
@@ -3313,15 +3620,15 @@ public class Node extends AbstractNode<Node> implements INodeData {
                                     + ", but child is not dirty");
                             ok = false;
                         }
-//                        if (dirtyChildren.contains(child)) {
-//                            out
-//                                    .println(indent(height)
-//                                            + "  ERROR child at index="
-//                                            + i
-//                                            + " is not dirty, but is on the dirty list: child="
-//                                            + child);
-//                            ok = false;
-//                        }
+                        // if (dirtyChildren.contains(child)) {
+                        // out
+                        // .println(indent(height)
+                        // + "  ERROR child at index="
+                        // + i
+                        // + " is not dirty, but is on the dirty list: child="
+                        // + child);
+                        // ok = false;
+                        // }
                     }
 
                 }
@@ -3330,13 +3637,13 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         }
 
-        if( ! ok && ! debug ) {
-            
+        if (!ok && !debug) {
+
             // @todo show the node structure with the errors since we would not
             // have seen it otherwise.
-            
+
         }
-        
+
         if (recursive) {
 
             /*
@@ -3364,11 +3671,11 @@ public class Node extends AbstractNode<Node> implements INodeData {
                         ok = false;
 
                     } else {
-                        
+
                         /*
                          * We expect null child entries beyond nkeys+1.
                          */
-                        
+
                     }
 
                     continue;
@@ -3380,163 +3687,173 @@ public class Node extends AbstractNode<Node> implements INodeData {
                  * getChild(index) but is not able/willing to follow a childKey
                  * to a child that is not memory resident.
                  */
-//                AbstractNode child = getChild(i);
+                // AbstractNode child = getChild(i);
                 final AbstractNode<?> child = childRefs[i] == null ? null
                         : childRefs[i].get();
-                
-                if( child != null ) {
-                    
-                if (child.parent == null) {
 
-                    out
-                            .println(indent(height + 1)
-                                    + "ERROR child does not have parent reference at index="
-                                    + i);
+                if (child != null) {
 
-                    ok = false;
+                    if (child.parent == null) {
 
-                }
+                        out
+                                .println(indent(height + 1)
+                                        + "ERROR child does not have parent reference at index="
+                                        + i);
 
-                if (child.parent.get() != this) {
+                        ok = false;
 
-                    out
-                            .println(indent(height + 1)
-                                    + "ERROR child has incorrect parent reference at index="
-                                    + i);
+                    }
 
-                    ok = false;
+                    if (child.parent.get() != this) {
 
-                }
+                        out
+                                .println(indent(height + 1)
+                                        + "ERROR child has incorrect parent reference at index="
+                                        + i);
 
-//                if (child.isDirty() && !dirtyChildren.contains(child)) {
-//
-//                    out
-//                            .println(indent(height + 1)
-//                                    + "ERROR dirty child not in node's dirty list at index="
-//                                    + i);
-//
-//                    ok = false;
-//
-//                }
-//
-//                if (!child.isDirty() && dirtyChildren.contains(child)) {
-//
-//                    out
-//                            .println(indent(height + 1)
-//                                    + "ERROR clear child found in node's dirty list at index="
-//                                    + i);
-//
-//                    ok = false;
-//
-//                }
+                        ok = false;
 
-                if (child.isDirty()) {
+                    }
 
-                    dirty.add(child);
+                    // if (child.isDirty() && !dirtyChildren.contains(child)) {
+                    //
+                    // out
+                    // .println(indent(height + 1)
+                    // + "ERROR dirty child not in node's dirty list at index="
+                    // + i);
+                    //
+                    // ok = false;
+                    //
+                    // }
+                    //
+                    // if (!child.isDirty() && dirtyChildren.contains(child)) {
+                    //
+                    // out
+                    // .println(indent(height + 1)
+                    // +
+                    // "ERROR clear child found in node's dirty list at index="
+                    // + i);
+                    //
+                    // ok = false;
+                    //
+                    // }
 
-                }
+                    if (child.isDirty()) {
 
-                if (i == 0) {
+                        dirty.add(child);
 
-                    if (nkeys == 0) {
+                    }
 
-                        /*
-                         * Note: a node with zero keys is valid. It MUST have a
-                         * single child. Such nodes arise when splitting a node
-                         * in a btree of order m := 3 when the splitIndex is
-                         * computed as m/2-1 = 0.  This is perfectly normal.
-                         */
-                        
-                    } else {
-                        /*
-                         * Note: All keys on the first child MUST be LT the
-                         * first key on this node.
-                         */
-                        final byte[] k0 = getKeys().get(0);
-                        final byte[] ck0 = child.getKeys().get(0);
-                        if( BytesUtil.compareBytes(ck0,k0) >= 0 ) {
-//                          if( child.compare(0,keys,0) >= 0 ) {
+                    if (i == 0) {
 
-                            out
-                                    .println(indent(height + 1)
-                                            + "ERROR first key on first child must be LT "
-                                            + keyAsString(k0) + ", but found "
-                                            + keyAsString(ck0));
+                        if (nkeys == 0) {
 
-                            ok = false;
+                            /*
+                             * Note: a node with zero keys is valid. It MUST
+                             * have a single child. Such nodes arise when
+                             * splitting a node in a btree of order m := 3 when
+                             * the splitIndex is computed as m/2-1 = 0. This is
+                             * perfectly normal.
+                             */
 
-                        }
+                        } else {
+                            /*
+                             * Note: All keys on the first child MUST be LT the
+                             * first key on this node.
+                             */
+                            final byte[] k0 = getKeys().get(0);
+                            final byte[] ck0 = child.getKeys().get(0);
+                            if (BytesUtil.compareBytes(ck0, k0) >= 0) {
+                                // if( child.compare(0,keys,0) >= 0 ) {
 
-                        if (child.getKeyCount() >= 1 ) {
-                            
-                            final byte[] ckn = child.getKeys().get(child.getKeyCount()-1);
-                            if (BytesUtil.compareBytes(ckn, k0) >= 0) {
-//                            if (child.compare(child.nkeys-1, keys, 0) >= 0) {
+                                out
+                                        .println(indent(height + 1)
+                                                + "ERROR first key on first child must be LT "
+                                                + keyAsString(k0)
+                                                + ", but found "
+                                                + keyAsString(ck0));
 
-                            out.println(indent(height + 1)
-                                            + "ERROR last key on first child must be LT "
-                                            + keyAsString(k0) + ", but found "
-                                            + keyAsString(ckn));
+                                ok = false;
 
-                            ok = false;
-                            
+                            }
+
+                            if (child.getKeyCount() >= 1) {
+
+                                final byte[] ckn = child.getKeys().get(
+                                        child.getKeyCount() - 1);
+                                if (BytesUtil.compareBytes(ckn, k0) >= 0) {
+                                    // if (child.compare(child.nkeys-1, keys, 0)
+                                    // >= 0) {
+
+                                    out
+                                            .println(indent(height + 1)
+                                                    + "ERROR last key on first child must be LT "
+                                                    + keyAsString(k0)
+                                                    + ", but found "
+                                                    + keyAsString(ckn));
+
+                                    ok = false;
+
+                                }
+
                             }
 
                         }
-                        
+
+                    } else if (i < nkeys) {
+
+                        // Note: The delete rule does not preserve this
+                        // characteristic since we do not
+                        // update the separatorKey for a leaf when removing its
+                        // left most key.
+                        //
+                        // if (child.isLeaf() && keys[i - 1] != child.keys[0]) {
+                        //
+                        // /*
+                        // * While each key in a node always is the first key of
+                        // * some leaf, we are only testing the direct children
+                        // * here. Therefore if the children are not leaves then
+                        // * we can not cross check their first key with the
+                        // keys
+                        // * on this node.
+                        // */
+                        // out.println(indent(height + 1)
+                        // + "ERROR first key on child leaf must be "
+                        // + keys[i - 1] + ", not " + child.keys[0]
+                        // + " at index=" + i);
+                        //
+                        // ok = false;
+                        //
+                        // }
+
+                    } else {
+
+                        /*
+                         * While there is a child for the last index of a node,
+                         * there is no key for that index.
+                         */
+
                     }
-                    
-                } else if (i < nkeys) {
 
-// Note: The delete rule does not preserve this characteristic since we do not
-// update the separatorKey for a leaf when removing its left most key.
-//
-//                    if (child.isLeaf() && keys[i - 1] != child.keys[0]) {
-//
-//                        /*
-//                         * While each key in a node always is the first key of
-//                         * some leaf, we are only testing the direct children
-//                         * here. Therefore if the children are not leaves then
-//                         * we can not cross check their first key with the keys
-//                         * on this node.
-//                         */
-//                        out.println(indent(height + 1)
-//                                + "ERROR first key on child leaf must be "
-//                                + keys[i - 1] + ", not " + child.keys[0]
-//                                + " at index=" + i);
-//
-//                        ok = false;
-//
-//                    }
+                    if (!child.dump(level, out, height + 1, true)) {
 
-                } else {
+                        ok = false;
 
-                    /*
-                     * While there is a child for the last index of a node,
-                     * there is no key for that index.
-                     */
-
-                }
-
-                if (!child.dump(level, out, height + 1, true)) {
-
-                    ok = false;
-
-                }
+                    }
 
                 }
 
             }
 
-//            if (dirty.size() != dirtyChildren.size()) {
-//
-//                out.println(indent(height + 1) + "ERROR found " + dirty.size()
-//                        + " dirty children, but " + dirtyChildren.size()
-//                        + " in node's dirty list");
-//
-//                ok = false;
-//
-//            }
+            // if (dirty.size() != dirtyChildren.size()) {
+            //
+            // out.println(indent(height + 1) + "ERROR found " + dirty.size()
+            // + " dirty children, but " + dirtyChildren.size()
+            // + " in node's dirty list");
+            //
+            // ok = false;
+            //
+            // }
 
         }
 
@@ -3552,13 +3869,13 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         final StringBuilder sb = new StringBuilder();
 
-//        sb.append(getClass().getName());
+        // sb.append(getClass().getName());
         sb.append(super.toString());
 
-        sb.append("{ isDirty="+isDirty());
+        sb.append("{ isDirty=" + isDirty());
 
-        sb.append(", isDeleted="+isDeleted());
-        
+        sb.append(", isDeleted=" + isDeleted());
+
         sb.append(", addr=" + identity);
 
         final Node p = (parent == null ? null : parent.get());
@@ -3572,15 +3889,15 @@ public class Node extends AbstractNode<Node> implements INodeData {
             sb.append(", data=NA}");
 
             return sb.toString();
-            
+
         }
 
         sb.append(", nkeys=" + getKeyCount());
-        
+
         sb.append(", minKeys=" + minKeys());
 
         sb.append(", maxKeys=" + maxKeys());
-        
+
         DefaultNodeCoder.toString(this, sb);
 
         // indicate if each child is loaded or unloaded.
