@@ -463,6 +463,16 @@ public class RootBlockView implements IRootBlockView {
 
         }
         
+        if (commitRecordAddr != 0 && commitCounter == 0) {
+
+            throw new IllegalArgumentException(
+                    "The commit counter must be greter than zero if there is a commit record: commitRecordAddr="
+                            + commitRecordAddr
+                            + ", but commitCounter="
+                            + commitCounter);
+            
+        }
+        
         if (commitRecordAddr != 0 && commitRecordIndexAddr == 0) {
 
             throw new IllegalArgumentException(
