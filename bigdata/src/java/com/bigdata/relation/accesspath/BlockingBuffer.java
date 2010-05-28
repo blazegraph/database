@@ -1419,18 +1419,24 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                 } catch (ExecutionException e) {
 
-                    if (InnerCause.isInnerCause(e,
-                            ClosedByInterruptException.class)) {
+					if (InnerCause.isInnerCause(e,
+							ClosedByInterruptException.class)||
+						InnerCause.isInnerCause(e,
+									InterruptedException.class)) {
 
-                        /*
-                         * Note: ClosedByInterruptException indicates that the
-                         * producer was interrupted. This occurs any time the
-                         * iterator is closed prematurely. For example, if there
-                         * is a LIMIT on a query then the join will be broken
-                         * when the limit is satisfied. That causes the
-                         * producer's Future to be cancelled, which means that
-                         * it gets interrupted. This is not an error.
-                         */
+						/*
+						 * Note: ClosedByInterruptException indicates that the
+						 * producer was interrupted. This occurs any time the
+						 * iterator is closed prematurely. For example, if there
+						 * is a LIMIT on a query then the join will be broken
+						 * when the limit is satisfied. That causes the
+						 * producer's Future to be cancelled, which means that
+						 * it gets interrupted. This is not an error.
+						 * 
+						 * Note: a wrapped InterruptedException is handled the
+						 * same as an plain InterruptedException (above) or the
+						 * ClosedByInterruptException (here).
+						 */
 
                         if (log.isInfoEnabled())
                             log.info(e.getMessage());
