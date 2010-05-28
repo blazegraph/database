@@ -2442,6 +2442,13 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
              */
             final Quorum q = quorumManager.getQuorum();
             quorumManager.assertQuorumLeader(quorumToken);
+            
+            /*
+             * Call commit on buffer strategy prior to retrieving root block, required for RWStore
+             * since the metaBits allocations are not made until commit, leading to invalid addresses
+             * for recent store allocations.
+             */
+            _bufferStrategy.commit();
 
             /*
              * Prepare the new root block.
@@ -3941,7 +3948,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                      * must flush its write cache to the backing file (issue the
                      * writes).
                      */
-                    _bufferStrategy.commit();
+                    // _bufferStrategy.commit(); // lifted to before we retrieve RootBlock in commitNow
 
                     /*
                      * Force application data to stable storage _before_ we
