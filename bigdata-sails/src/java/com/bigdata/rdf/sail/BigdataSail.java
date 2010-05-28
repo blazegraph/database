@@ -345,6 +345,15 @@ public class BigdataSail extends SailBase implements Sail {
         
         public static final String DEFAULT_ISOLATABLE_INDICES = "false";
 
+        /**
+         * Experimental new star joins feature.  Not yet performant.
+         */
+        public static final String STAR_JOINS = BigdataSail.class
+                .getPackage().getName()
+                + ".starJoins";
+        
+        public static final String DEFAULT_STAR_JOINS = "false";
+
         
     }
 
@@ -465,9 +474,16 @@ public class BigdataSail extends SailBase implements Sail {
     /**
      * When true, read/write transactions are allowed.
      * 
-     * @see Options#ISOLATABLE_INDICES
+     * @see {@link Options#ISOLATABLE_INDICES}
      */
     final private boolean isolatable;
+    
+    /**
+     * When true, enable star joins.
+     * 
+     * @See {@link Options#STAR_JOINS}
+     */
+    final private boolean starJoins;
     
     /**
      * <code>true</code> iff the {@link BigdataSail} has been
@@ -871,6 +887,19 @@ public class BigdataSail extends SailBase implements Sail {
             if (log.isInfoEnabled())
                 log.info(BigdataSail.Options.ISOLATABLE_INDICES + "="
                         + isolatable);
+            
+        }
+
+        // star joins
+        { 
+            
+            starJoins = Boolean.parseBoolean(properties.getProperty(
+                    BigdataSail.Options.STAR_JOINS,
+                    BigdataSail.Options.DEFAULT_STAR_JOINS));
+
+            if (log.isInfoEnabled())
+                log.info(BigdataSail.Options.STAR_JOINS + "="
+                        + starJoins);
             
         }
 
@@ -2878,7 +2907,7 @@ public class BigdataSail extends SailBase implements Sail {
 
             final BigdataEvaluationStrategyImpl2 strategy = new BigdataEvaluationStrategyImpl2(
                     (BigdataTripleSource) tripleSource, dataset,
-                    nativeJoins);
+                    nativeJoins, starJoins);
 
             final QueryOptimizerList optimizerList = new QueryOptimizerList();
             optimizerList.add(new BindingAssigner());
@@ -2957,7 +2986,7 @@ public class BigdataSail extends SailBase implements Sail {
 
                 final BigdataEvaluationStrategyImpl2 strategy = new BigdataEvaluationStrategyImpl2(
                         (BigdataTripleSource) tripleSource, dataset,
-                        nativeJoins);
+                        nativeJoins, starJoins);
 
                 final QueryOptimizerList optimizerList = new QueryOptimizerList();
                 optimizerList.add(new BindingAssigner());

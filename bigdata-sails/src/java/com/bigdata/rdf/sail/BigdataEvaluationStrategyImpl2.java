@@ -265,6 +265,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
 
     private final boolean nativeJoins;
     
+    private final boolean starJoins;
+    
     // private boolean slice = false, distinct = false, union = false;
     //    
     // // Note: defaults are illegal values.
@@ -285,7 +287,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
      */
     public BigdataEvaluationStrategyImpl2(
             final BigdataTripleSource tripleSource, final Dataset dataset,
-            final boolean nativeJoins) {
+            final boolean nativeJoins, final boolean starJoins) {
         
         super(tripleSource, dataset);
         
@@ -293,6 +295,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         this.dataset = dataset;
         this.database = tripleSource.getDatabase();
         this.nativeJoins = nativeJoins;
+        this.starJoins = starJoins;
         
     }
 
@@ -949,7 +952,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             log.debug("required binding names: " + Arrays.toString(requiredVars));
         }
         
-        if (database.isQuads() == false) {
+        if (starJoins) { // database.isQuads() == false) {
             if (DEBUG) {
                 log.debug("generating star joins");
             }
@@ -1775,7 +1778,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         
         for (IPredicate pred : tails) {
             IVariableOrConstant s = pred.get(0);
-            if (s.isVar() && pred.getSolutionExpander() == null && 
+            if (s.isVar() && /*pred.getSolutionExpander() == null &&*/ 
                     pred.getConstraint() == null) {
                 IVariable v = (IVariable) s;
                 Collection<IPredicate> preds = subjects.get(v);
@@ -1793,11 +1796,20 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         }
         
         for (Map.Entry<IVariable,Collection<IPredicate>> e : subjects.entrySet()) {
-            IVariable s = e.getKey();
             Collection<IPredicate> preds = e.getValue();
+            if (preds.size() <= 2) {
+                newTails.addAll(preds);
+                continue;
+            }
+            IVariable s = e.getKey();
             IPredicate mostSelective = null;
             long minRangeCount = Long.MAX_VALUE;
+            int numOptionals = 0;
             for (IPredicate pred : preds) {
+                if (pred.isOptional()) {
+                    numOptionals++;
+                    continue;
+                }
                 long rangeCount = database.getSPORelation().getAccessPath(
                         (SPOPredicate) pred).rangeCount(false);
                 if (rangeCount < minRangeCount) {
@@ -1805,8 +1817,13 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                     mostSelective = pred;
                 }
             }
+            if (preds.size() - numOptionals < 2) {
+                newTails.addAll(preds);
+                continue;
+            }
             if (mostSelective == null) {
-                throw new RuntimeException("range counts not working?");
+                throw new RuntimeException(
+                        "??? could not find a most selective tail for: " + s);
             }
             boolean sharedVars = false;
             Collection<IVariable> vars = new LinkedList<IVariable>();
@@ -1845,14 +1862,12 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                 newTails.add(starJoin);
                 newTails.add(mostSelective);
             } else {
-                for (IPredicate pred : preds) {
-                    newTails.add(pred);
-                }
+                newTails.addAll(preds);
             }
         }
         
         if (DEBUG) {
-            log.debug(newTails.size());
+            log.debug("number of new tails: " + newTails.size());
             for (IPredicate tail : newTails) {
                 log.debug(tail);
             }
