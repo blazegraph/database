@@ -124,9 +124,7 @@ public class TestSPOStarJoin extends AbstractTripleStoreTestCase {
             
             final SPOStarJoin starJoin = new SPOStarJoin(
                     store.getSPORelation().getNamespace(),
-                    Var.var("frameClass"),
-                    Var.var("star-p"),
-                    Var.var("star-o")
+                    Var.var("frameClass")
                     );
             
             starJoin.addStarConstraint(new SPOStarJoin.SPOStarConstraint(
@@ -273,9 +271,7 @@ public class TestSPOStarJoin extends AbstractTripleStoreTestCase {
             
             final SPOStarJoin starJoin = new SPOStarJoin(
                     store.getSPORelation().getNamespace(),
-                    Var.var("frameProperty"),
-                    Var.var("star-p"),
-                    Var.var("star-o")
+                    Var.var("frameProperty")
                     );
             
             starJoin.addStarConstraint(new SPOStarJoin.SPOStarConstraint(
