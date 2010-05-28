@@ -540,8 +540,10 @@ public class FileMetadata {
                  * we rollback the journal and override the current root block
                  * with the alternate root block.
                  */
+                long cc0 = rootBlock0.getCommitCounter();
+                long cc1 = rootBlock1.getCommitCounter();
                 this.rootBlock =
-                    ( rootBlock0.getCommitCounter() > rootBlock1.getCommitCounter()
+                    ( cc0 > cc1
                         ? (alternateRootBlock ?rootBlock1 :rootBlock0)
                         : (alternateRootBlock ?rootBlock0 :rootBlock1)
                         );
