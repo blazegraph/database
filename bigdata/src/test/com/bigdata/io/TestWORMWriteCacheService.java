@@ -1561,13 +1561,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             }
             
             executorService.shutdownNow();
-            
-            try {
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {
-				// NOP
-			}
-            
+          
         }
 
         /**
