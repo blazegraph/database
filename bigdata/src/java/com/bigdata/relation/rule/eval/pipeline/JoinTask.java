@@ -1412,35 +1412,23 @@ abstract public class JoinTask implements Callable<Void> {
             // Obtain the iterator for the current join dimension.
             final IChunkedOrderedIterator itr = accessPath.iterator();
             
-            Object[] elements = null;
+            int numElements = 0;
+            
+            Object[] elements = new Object[(int)accessPath.rangeCount(false)];
             
             try {
 
                 while (itr.hasNext()) {
 
-                    if (elements == null) {
-                        
-                        elements = (Object[]) itr.nextChunk();
-                        
-                    } else {
+                    final Object[] chunk = (Object[]) itr.nextChunk();
                     
-                        final Object[] chunk = (Object[]) itr.nextChunk();
-                        
-                        final Object[] tmp = 
-                            new Object[elements.length + chunk.length];
-                        
-                        System.arraycopy(elements, 0, tmp, 0, elements.length);
-                        
-                        System.arraycopy(chunk, 0, tmp, elements.length-1, 
-                                chunk.length);
-                        
-                        elements = tmp;
-                            
-                    }
-
+                    System.arraycopy(chunk, 0, elements, numElements, chunk.length);
+                    
+                    numElements += chunk.length;
+                    
                 } // next chunk.
 
-                if (elements != null) {
+                if (numElements > 0) {
                     
                     final Iterator<IStarConstraint> it = 
                         starJoin.getStarConstraints();
@@ -1455,8 +1443,10 @@ abstract public class JoinTask implements Callable<Void> {
                         
                         int numVars = constraint.getNumVars();
                         
-                        for (Object e : elements) {
+                        for (int i = 0; i < numElements; i++) {
 
+                            Object e = elements[i];
+                            
                             if (constraint.isMatch(e)) {
                                 
                                 // for each match for the constraint, 
