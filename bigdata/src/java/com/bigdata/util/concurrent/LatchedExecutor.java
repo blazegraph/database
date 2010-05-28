@@ -56,6 +56,17 @@ public class LatchedExecutor implements Executor {
      */
     private final BlockingQueue<Runnable> queue = new LinkedBlockingDeque<Runnable>();
 
+    private final int nparallel;
+    
+    /**
+     * Return the maximum parallelism allowed by this {@link Executor}.
+     */
+    public int getNParallel() {
+    	
+    	return nparallel;
+    	
+    }
+    
     public LatchedExecutor(final Executor executor, final int nparallel) {
 
         if (executor == null)
@@ -66,6 +77,8 @@ public class LatchedExecutor implements Executor {
 
         this.executor = executor;
 
+        this.nparallel = nparallel;
+        
         this.semaphore = new Semaphore(nparallel);
 
     }
