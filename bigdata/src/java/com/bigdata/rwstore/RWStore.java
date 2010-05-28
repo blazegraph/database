@@ -344,6 +344,8 @@ public class RWStore implements IStore {
 																					// empty
 																					// file
 		}
+		
+		long commitCounter = rbv.getCommitCounter();
 
 		int metaStartAddr = (int) -(metaAddr >> 32);
 		int fileSize = (int) -(metaAddr & 0xFFFFFFFF);
@@ -358,7 +360,7 @@ public class RWStore implements IStore {
 
 		if (log.isDebugEnabled())
 			log.debug("m_allocation: " + nxtalloc + ", m_metaStartAddr: " + metaStartAddr + ", m_metaBitsAddr: "
-					+ metaBitsAddr);
+					+ metaBitsAddr + ", m_commitCounter: " + commitCounter);
 	}
 
 	/**
