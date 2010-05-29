@@ -169,16 +169,16 @@ public class Latch {
 
             if (c == 0) {
                 
-                try {
+//                try {
 
                     // signal blocked threads.
                     _signal();
 
-                } catch (InterruptedException ex) {
-
-                    throw new RuntimeException(ex);
-
-                }
+//                } catch (InterruptedException ex) {
+//
+//                    throw new RuntimeException(ex);
+//
+//                }
 
             }
 
@@ -219,16 +219,16 @@ public class Latch {
 
             if (c == 0) {
                
-                try {
+//                try {
 
                     // signal blocked threads.
                     _signal();
 
-                } catch (InterruptedException ex) {
-
-                    throw new RuntimeException(ex);
-
-                }
+//                } catch (InterruptedException ex) {
+//
+//                    throw new RuntimeException(ex);
+//
+//                }
 
             }
 
@@ -244,12 +244,18 @@ public class Latch {
 
     /**
      * Signal any threads blocked in {@link #await(long, TimeUnit)}.
-     * 
-     * @throws InterruptedException
      */
-    private final void _signal() throws InterruptedException {
+	/*
+	 * Modified 28 May 2010 by BBT to not be interruptable. This is called from
+	 * within inc() and dec() and we want those methods to complete normally so
+	 * the counter does not get out of whack.
+	 */
+//    * 
+//    * @throws InterruptedException
+    private final void _signal() { //throws InterruptedException {
 
-        lock.lockInterruptibly();
+        lock.lock();
+//        lock.lockInterruptibly();
         try {
 
             if (log.isInfoEnabled())
@@ -267,9 +273,9 @@ public class Latch {
         try {
             // allow extensions, but not while holding the lock.
             signal();
-        } catch (InterruptedException t) {
-            // propagate to the caller.
-            throw t;
+//        } catch (InterruptedException t) {
+//            // propagate to the caller.
+//            throw t;
         } catch (Throwable t) {
             // log anything else thrown out.
             log.error(toString(), t);
