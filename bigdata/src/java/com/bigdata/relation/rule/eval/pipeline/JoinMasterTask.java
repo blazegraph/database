@@ -540,14 +540,16 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                 
             } catch (CancellationException ex) {
 
-                /*
-                 * A JoinTask will be canceled if any of its output buffers
-                 * are asynchronously closed. This will occur if a
-                 * downstream JoinTask discovers that it has satisfied a
-                 * SLICE or encountered an error during processing. Either
-                 * way, we treat the CancellationException as a "info" NOT
-                 * an error.
-                 */
+				/*
+				 * A JoinTask will be canceled if any of its output buffers are
+				 * asynchronously closed. This will occur if a downstream
+				 * JoinTask discovers that it has satisfied a SLICE or
+				 * encountered an error during processing. Either way, we treat
+				 * the CancellationException as a "info" NOT an error.
+				 * 
+				 * Note: This exception can also be wrapped, in which case we
+				 * catch it below.
+				 */
 
                 if (log.isInfoEnabled())
                     log.info(ex.getLocalizedMessage(), ex);
@@ -556,7 +558,8 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
 
                 if (InnerCause.isInnerCause(ex, InterruptedException.class)||
                     InnerCause.isInnerCause(ex, ClosedByInterruptException.class)||
-                    InnerCause.isInnerCause(ex, BufferClosedException.class)) {
+                    InnerCause.isInnerCause(ex, BufferClosedException.class) ||
+                    InnerCause.isInnerCause(ex, CancellationException.class)) {
 
                     /*
                      * The root cause was the asynchronous close of the
