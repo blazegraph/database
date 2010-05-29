@@ -507,7 +507,8 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
 
         final long begin = System.nanoTime();
         
-        long remaining = unit.toNanos(timeout);
+        final long nanos = unit.toNanos(timeout);
+        long remaining = nanos;
         
         // errors.
         final List<ExecutionException> errors = new LinkedList<ExecutionException>();
@@ -626,7 +627,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
             }
 
             // subtract out the elapsed time so far.
-            remaining -= (System.nanoTime() - begin);
+            remaining = nanos - (System.nanoTime() - begin);
             
         }
 
