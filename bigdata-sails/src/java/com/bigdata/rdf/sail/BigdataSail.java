@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
 Portions of this code are:
 
-Copyright Aduna (http://www.aduna-software.com/) © 2001-2007
+Copyright Aduna (http://www.aduna-software.com/) ï¿½ 2001-2007
 
 All rights reserved.
 
@@ -353,7 +353,6 @@ public class BigdataSail extends SailBase implements Sail {
                 + ".starJoins";
         
         public static final String DEFAULT_STAR_JOINS = "false";
-
         
     }
 
@@ -417,6 +416,15 @@ public class BigdataSail extends SailBase implements Sail {
 
         return quads;
         
+    }
+    
+    /**
+     * Return <code>true</code> iff star joins are enabled.
+     */
+    public boolean isStarJoins() {
+    	
+    	return starJoins;
+    	
     }
     
     /**
