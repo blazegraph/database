@@ -50,6 +50,7 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
@@ -77,6 +78,7 @@ import com.bigdata.relation.AbstractResource;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.httpd.AbstractHTTPD;
+import com.bigdata.util.httpd.NanoHTTPD;
 
 /**
  * A flyweight SPARQL endpoint using HTTP.
@@ -94,6 +96,12 @@ import com.bigdata.util.httpd.AbstractHTTPD;
  */
 public class NanoSparqlServer extends AbstractHTTPD {
 
+	/**
+	 * The logger for the concrete {@link NanoSparqlServer} class.  The {@link NanoHTTPD}
+	 * class has its own logger.
+	 */
+	static protected final Logger log = Logger.getLogger(NanoSparqlServer.class); 
+	
 	/**
 	 * A SPARQL results set in XML.
 	 */
@@ -228,10 +236,13 @@ public class NanoSparqlServer extends AbstractHTTPD {
 			 */
 			if (tripleStore.getIndexManager() instanceof IJournal) {
 
+				final IJournal jnl = ((Journal) ((IJournal) sail.getDatabase()
+						.getIndexManager()));
+
+				sb.append("file=" + jnl.getFile()+"\n");
+
 				sb.append("nextOffset\t= "
-						+ ((Journal) ((IJournal) sail.getDatabase()
-								.getIndexManager())).getRootBlockView()
-								.getNextOffset() + "\n");
+						+ jnl.getRootBlockView().getNextOffset() + "\n");
 
 				/*
 				 * @todo The rest of this is all metadata that is only
@@ -717,7 +728,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 			}
 			System.out.println("port: " + port);
 			System.out.println("namespace: " + namespace);
-			System.out.println("file: " + file);
+			System.out.println("file: " + file.getAbsoluteFile());
 
 			/*
 			 * Connect to the database.
