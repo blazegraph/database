@@ -1,4 +1,7 @@
 <!-- $Id: build.xml 2266 2009-10-26 18:21:50Z mrpersonick $ -->
+<!--                                                        -->
+<!-- do "ant bundle-jar" in the parent directory first.     -->
+<!--                                                        -->
 <project name="bsbm" default="compile" basedir=".">
 
 	<property file="build.properties" />
@@ -8,19 +11,17 @@
 		<fileset dir="${bsbm.dir}/lib">
 			<include name="**/*.jar" />
 		</fileset>
-		<fileset dir="${bigdata.build.dir}/lib">
-			<include name="**/*.jar" />
-		</fileset>
 	</path>
 
 	<!-- runtime classpath w/o install. -->
 	<path id="runtime.classpath">
-		<!-- the compiled classes. -->
+		<!-- The compiled BSBM classes. -->
 		<pathelement location="${build.dir}/classes" />
-		<!-- and the dependencies. -->
+		<!-- The BSBM dependencies. -->
 		<fileset dir="${bsbm.dir}/lib">
 			<include name="**/*.jar" />
 		</fileset>
+		<!-- The bigdata dependencies (for the nano-server). -->
 		<fileset dir="${bigdata.build.dir}/lib">
 			<include name="**/*.jar" />
 		</fileset>
@@ -38,8 +39,7 @@
 		<mkdir dir="${build.dir}/bin" />
 	</target>
 
-	<!-- Note: This depends on the bundleJar target of the top-level bigdata ant script. -->
-	<target name="compile" depends="prepare">
+	<target name="compile" depends="prepare" description="Compile the benchmark.">
 		<javac destdir="${build.dir}/classes" classpathref="build.classpath" debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}" encoding="${javac.encoding}">
 			<src path="${bsbm.dir}/src/java" />
 			<compilerarg value="-version" />
@@ -85,6 +85,17 @@
 		</java>
 	</target>
 
+	<target name="start-nano-qual-server" depends="compile" description="Start a small http server for the qualification data set.">
+		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true" dir="${build.dir}/bin">
+			<arg line="${bsbm.nanoServerPort} ${bsbm.qualNamespace} ${bsbm.journalPropertyFile}" />
+			<!-- specify/override the journal file name. -->
+			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${bsbm.qualJournal}" />
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+
 	<target name="start-nano-server" depends="compile" description="Start a small http server fronting for a bigdata database instance.">
 		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true" dir="${build.dir}/bin">
 			<arg line="${bsbm.nanoServerPort} ${bsbm.namespace} ${bsbm.journalPropertyFile}" />
@@ -96,7 +107,7 @@
 		</java>
 	</target>
 
-	<target name="stop-nano-server" depends="compile" description="Stop the small http server running at the configured port.">
+	<target name="stop-nano-server" depends="compile" description="Stop the small http server running at the configured port (either qualification or normal trials).">
 		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true" dir="${build.dir}/bin">
 			<arg line="${bsbm.nanoServerPort} -stop" />
 			<classpath>
@@ -111,11 +122,8 @@
 		<delete file="${bsbm.journalFile}" />
 		<java classname="com.bigdata.rdf.sail.bench.BigdataLoader" fork="true" failonerror="true" dir="${build.dir}/bin">
 			<arg line="${bsbm.namespace} ${bsbm.journalPropertyFile} ${bsbm.outputFile}.${bsbm.outputType}${bsbm.compressType}" />
-			<jvmarg value="-server" />
-			<jvmarg value="-Xmx${bsbm.maxMem}" />
-			<jvmarg value="-Dlog4j.configuration=log4j.properties" />
 			<!-- specify/override the journal file name. -->
-			<jvmarg value="-Dcom.bigdata.journal.AbstractJournal.file=${bsbm.journalFile}" />
+			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${bsbm.journalFile}" />
 			<classpath>
 				<path refid="runtime.classpath" />
 			</classpath>
@@ -146,13 +154,10 @@
 
 	<target name="run-load-qualification" depends="compile" description="Load the qualification data set.">
 		<delete file="${bsbm.qualJournal}" />
-		<java classname="benchmark.bigdata.BigdataLoader" fork="true" failonerror="true" dir="${build.dir}/bin">
-			<arg line="qual ${bsbm.journalPropertyFile} ${bsbm.qualDataDir}/dataset_1m.ttl" />
-			<jvmarg value="-server" />
-			<jvmarg value="-Xmx${bsbm.maxMem}" />
+		<java classname="com.bigdata.rdf.sail.bench.BigdataLoader" fork="true" failonerror="true" dir="${build.dir}/bin">
+			<arg line="${bsbm.qualNamespace} ${bsbm.journalPropertyFile} ${bsbm.qualDataDir}/dataset_1m.ttl" />
 			<!-- specify/override the journal file name. -->
-			<jvmarg value="-Dcom.bigdata.journal.AbstractJournal.file=${bsbm.qualJournal}" />
-			<jvmarg value="-Dlog4j.configuration=log4j.properties" />
+			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${bsbm.qualJournal}" />
 			<classpath>
 				<path refid="runtime.classpath" />
 			</classpath>
@@ -160,12 +165,8 @@
 	</target>
 
 	<target name="run-qualification-1" depends="compile" description="Run the qualification queries.">
-		<java classname="benchmark.bigdata.BigdataQueryDriver" fork="true" failonerror="true" dir="${build.dir}/bin">
-			<arg line="-idir ${bsbm.qualDataDir}/td_data -q http://dummyendpoint qual ${bsbm.journalPropertyFile}" />
-			<jvmarg value="-server" />
-			<jvmarg value="-Xmx${bsbm.maxMem}" />
-			<jvmarg value="-Dlog4j.configuration=log4j.properties" />
-			<jvmarg value="-Dcom.bigdata.journal.AbstractJournal.file=${bsbm.qualJournal}" />
+		<java classname="benchmark.testdriver.TestDriver" fork="true" failonerror="true" dir="${build.dir}/bin">
+			<arg line="-idir ${bsbm.qualDataDir}/td_data -q http://localhost:${bsbm.nanoServerPort}" />
 			<classpath>
 				<path refid="runtime.classpath" />
 			</classpath>
@@ -175,9 +176,6 @@
 	<target name="run-qualification-2" depends="compile" description="Compare qualification query run against ground truth.">
 		<java classname="benchmark.qualification.Qualification" fork="true" failonerror="true" dir="${build.dir}/bin">
 			<arg line="${bsbm.qualDataDir}/correct.qual run.qual" />
-			<jvmarg value="-server" />
-			<jvmarg value="-Xmx${bsbm.maxMem}" />
-			<jvmarg value="-Dlog4j.configuration=log4j.properties" />
 			<classpath>
 				<path refid="runtime.classpath" />
 			</classpath>
@@ -242,49 +240,6 @@
 
 			<!-- The SPARQL endpoint. -->
 			<arg value="http://localhost:${bsbm.nanoServerPort}" />
-
-			<classpath>
-				<path refid="runtime.classpath" />
-			</classpath>
-		</java>
-	</target>
-
-	<target name="run-query-embedded" depends="compile" description="Runs the benchmark queries against the loaded data.">
-		<java classname="benchmark.bigdata.BigdataQueryDriver" fork="true" failonerror="true" dir="${build.dir}/bin">
-			<!-- -runs # is the #of query mix runs (default is 500). -->
-			<arg value="-runs" />
-			<arg value="${bsbm.runs}" />
-
-			<!-- -w # is the #of warmup query mixes (default is 50). -->
-			<arg value="-w" />
-			<arg value="${bsbm.w}" />
-
-			<!-- -mt # is the #of concurrent clients. -->
-			<arg value="-mt" />
-			<arg value="${bsbm.mt}" />
-
-			<!-- -qdir dir is the query directory (default is queries). -->
-			<!--<arg value="-qdir"/><arg value="src/resources/bsbm_data"/>-->
-
-			<!-- -idir dir is the test data directory (default td_data). -->
-			<arg value="-idir" />
-			<arg value="${bsbm.dataDir}" />
-
-			<!-- The randomizer seed. -->
-			<arg value="-seed" />
-			<arg value="${bsbm.seed}" />
-
-			<!-- -o file is the name of the xml output file. -->
-			<arg value="-o" />
-			<arg value="${bsbm.resultsDir}/benchmark_result_pc${bsbm.pc}_runs${bsbm.runs}_mt${bsbm.mt}.xml" />
-
-			<!-- The namespace of the KB instance. -->
-			<arg value="${bsbm.namespace}" />
-
-			<!-- The property file for the database instance. -->
-			<arg value="${bsbm.journalPropertyFile}" />
-
-			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${bsbm.journalFile}" />
 
 			<classpath>
 				<path refid="runtime.classpath" />
