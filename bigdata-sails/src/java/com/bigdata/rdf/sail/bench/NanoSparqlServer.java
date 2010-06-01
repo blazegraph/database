@@ -451,9 +451,17 @@ public class NanoSparqlServer extends AbstractHTTPD {
 				 * Otherwise, an HTTP error status will be used instead.
 				 */
 				t.printStackTrace(new PrintWriter(os));
+				// flush the output stream.
+				os.flush();
 			} finally {
 				// ignore any problems here.
-		}
+			}
+			try {
+				// ensure output stream is closed.
+				os.close();
+			} catch (Throwable t2) {
+				// ignore any problems here.
+			}
 		}
 		try {
 			// log an error for the service.
