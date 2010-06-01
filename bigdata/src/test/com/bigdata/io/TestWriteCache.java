@@ -844,6 +844,56 @@ public class TestWriteCache extends TestCase3 {
         }
 
     }
+    
+    /**
+     * To test the buffer restore, we will share a buffer between two WriteCache instances then
+     * write data to the first cache and update its recordMap from the buffer.  This short circuits
+     * the HA pipeline that streams the ByteBuffer from one cache to the other.
+     * @throws IOException 
+     */
+    public void test_writeCacheScatteredBufferRestore() throws InterruptedException, IOException {
+        final File file = File.createTempFile(getName(), ".tmp");
+        final ReopenFileChannel opener = new ReopenFileChannel(file, mode);
+
+    	ByteBuffer buf = ByteBuffer.allocate(2 * 1024 * 1024);
+    	ByteBuffer buf2 = buf.duplicate();
+    	
+    	long addr1 = 12800;
+    	ByteBuffer data1 = getRandomData(20 * 1024);
+    	int chk1 = ChecksumUtility.threadChk.get().checksum(data1, 0/* offset */, data1.limit());
+    	ByteBuffer data2 = getRandomData(20 * 1024);
+    	int chk2 = ChecksumUtility.threadChk.get().checksum(data2, 0/* offset */, data2.limit());
+    	WriteCache cache1 = new WriteCache.FileChannelScatteredWriteCache(buf, true, true,
+    			false, opener);   	
+    	WriteCache cache2 = new WriteCache.FileChannelScatteredWriteCache(buf2, true, true,
+    			false, opener);
+    	
+    	// write first data buffer
+    	cache1.write(addr1, data1, chk1);
+    	data1.flip();
+    	buf2.limit(buf.position());
+    	buf2.position(0);
+    	cache2.resetRecordMapFromBuffer();
+       	assertEquals(cache1.read(addr1), data1);
+       	assertEquals(cache2.read(addr1), data1);
+    	
+    	// now simulate removal/delete
+    	cache1.clearAddrMap(addr1);
+    	buf2.limit(buf.position());
+    	buf2.position(0);
+    	cache2.resetRecordMapFromBuffer();
+    	assertTrue(cache2.read(addr1) == null);
+    	assertTrue(cache1.read(addr1) == null);
+    	
+    	// now write second data buffer
+    	cache1.write(addr1, data2, chk2);
+    	data2.flip();
+    	buf2.limit(buf.position());
+    	buf2.position(0);
+    	cache2.resetRecordMapFromBuffer();
+    	assertEquals(cache2.read(addr1), data2);
+    	assertEquals(cache1.read(addr1), data2);
+    }
 
     /*
      * Now generate randomviews, first an ordered view of 10000 random lengths
