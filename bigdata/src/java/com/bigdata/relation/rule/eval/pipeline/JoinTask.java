@@ -829,7 +829,7 @@ abstract public class JoinTask implements Callable<Void> {
          */
         final int maxParallel = 0;
 //        final int maxParallel = joinNexus.getMaxParallelSubqueries();
-//        final int maxParallel = 5;
+//        final int maxParallel = 10;
 
 		/*
 		 * Note: There is no reason for parallelism in the first join dimension
@@ -1610,25 +1610,71 @@ abstract public class JoinTask implements Callable<Void> {
 			// Obtain the iterator for the current join dimension.
 			final IChunkedOrderedIterator<?> itr = accessPath.iterator();
 
+			// The actual #of elements scanned.
+            int numElements = 0;
+
 			try {
 
-                final Object[] elements = new Object[(int)accessPath.rangeCount(false)];
-                
-                int numElements = 0;
-                
-                while (itr.hasNext()) {
+				/*
+				 * Note: The fast range count would give us an upper bound,
+				 * unless expanders are used, in which case there can be more
+				 * elements visited.
+				 */
+				final Object[] elements;
+				{
 
-                    final Object[] chunk = (Object[]) itr.nextChunk();
-                    
-                    System.arraycopy(chunk, 0, elements, numElements, chunk.length);
-                    
-                    numElements += chunk.length;
-                    
-                } // next chunk.
+					/*
+					 * First, gather all chunks.
+					 */
+					int nchunks = 0;
+					final List<Object[]> chunks = new LinkedList<Object[]>();
+					while (itr.hasNext()) {
 
-                if (numElements > 0) {
+						final Object[] chunk = (Object[]) itr.nextChunk();
+
+						// add to list of chunks.
+						chunks.add(chunk);
+						
+						numElements += chunk.length;
+
+	                    stats.chunkCount++;
+	                    
+	                    nchunks++;
+
+					} // next chunk.
+
+					/*
+					 * Now flatten the chunks into a simple array.
+					 */
+					if (nchunks == 0) {
+						// No match.
+						return;
+					}
+					if (nchunks == 1) {
+						// A single chunk.
+						elements = chunks.get(0);
+					} else {
+						// Flatten the chunks.
+						elements = new Object[numElements];
+						{
+							int n = 0;
+							for (Object[] chunk : chunks) {
+
+								System.arraycopy(chunk/* src */, 0/* srcPos */,
+										elements/* dst */, n/* dstPos */,
+										chunk.length/* len */);
+
+								n += chunk.length;
+							}
+						}
+					} 
+					stats.elementCount += numElements;
+
+				}
+
+				if (numElements > 0) {
                     
-                    final Iterator<IStarConstraint> it = 
+                    final Iterator<IStarConstraint<?>> it = 
                         starJoin.getStarConstraints();
                     
                     boolean constraintFailed = false;
@@ -1646,14 +1692,16 @@ abstract public class JoinTask implements Callable<Void> {
                             Object e = elements[i];
                             
                             if (constraint.isMatch(e)) {
-                                
-                                // for each match for the constraint, 
-                                // we clone the old solutions and create a new 
-                                // solutions that appends the variable bindings 
-                                // from this match
-                                
-                                // at the end, we set the old solutions 
-                                // collection to the new solutions collection 
+
+								/*
+								 * For each match for the constraint, we clone
+								 * the old solutions and create a new solutions
+								 * that appends the variable bindings from this
+								 * match.
+								 * 
+								 * At the end, we set the old solutions
+								 * collection to the new solutions collection.
+								 */ 
                                 
                                 if (constraintSolutions == null) {
                                     
@@ -1877,7 +1925,7 @@ abstract public class JoinTask implements Callable<Void> {
 
                     for (IBindingSet bset : bindingSets) {
 
-                        IVariable[] variablesToKeep = requiredVars[tailIndex];
+                        final IVariable<?>[] variablesToKeep = requiredVars[tailIndex];
                         
                         if (INFO) {
                             log.info("tailIndex: " + tailIndex);
