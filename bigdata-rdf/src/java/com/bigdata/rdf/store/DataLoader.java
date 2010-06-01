@@ -481,13 +481,15 @@ public class DataLoader {
 
         this.database = database;
 
+        inferenceEngine = database.getInferenceEngine();
+
         if (closureEnum != ClosureEnum.None) {
 
             /*
              * Truth maintenance: buffer will write on a tempStore.
              */
 
-            inferenceEngine = database.getInferenceEngine();
+//            inferenceEngine = database.getInferenceEngine();
 
             tm = new TruthMaintenance(inferenceEngine);
 
@@ -497,7 +499,7 @@ public class DataLoader {
              * No truth maintenance: buffer will write on the database.
              */
 
-            inferenceEngine = null;
+//            inferenceEngine = null;
 
             tm = null;
 
@@ -1179,7 +1181,7 @@ public class DataLoader {
      * support multiple data files within a single archive.
      * 
      * @param args
-     *            [-namespace <i>namespace</i>] propertyFile (fileOrDir)+
+     *            [-closure][-namespace <i>namespace</i>] propertyFile (fileOrDir)+
      * 
      * @throws IOException
      */
@@ -1187,6 +1189,7 @@ public class DataLoader {
 
         // default namespace.
         String namespace = "kb";
+        boolean doClosure = false;
         
         int i = 0;
 
@@ -1197,8 +1200,12 @@ public class DataLoader {
             if(arg.startsWith("-")) {
                 
                 if(arg.equals("-namespace")) {
-        
+                    
                     namespace = args[++i];
+                
+                } else if(arg.equals("-closure")) {
+                        
+                	doClosure = true;
                     
                 } else {
                     
@@ -1247,6 +1254,14 @@ public class DataLoader {
                     is.close();
                 }
             }
+			if (System.getProperty(com.bigdata.journal.Options.FILE) != null) {
+				// Override/set from the environment.
+				final String file = System
+						.getProperty(com.bigdata.journal.Options.FILE);
+				System.out.println("Using: " + com.bigdata.journal.Options.FILE
+						+ "=" + file);
+                properties.setProperty(com.bigdata.journal.Options.FILE, file);
+            }
         }
 
         final List<File> files = new LinkedList<File>();
@@ -1269,6 +1284,8 @@ public class DataLoader {
         Journal jnl = null;
         try {
 
+        	final long begin = System.currentTimeMillis();
+        	
             jnl = new Journal(properties);
             
             final long firstOffset = jnl.getRootBlockView().getNextOffset();
@@ -1287,24 +1304,45 @@ public class DataLoader {
                 
             }
 
+            final LoadStats totals = new LoadStats();
             final DataLoader dataLoader = kb.getDataLoader();
             
             for (File fileOrDir : files) {
 
-                dataLoader.loadFiles(fileOrDir, null/* baseURI */,
-                        null/* rdfFormat */, filter);
+//                dataLoader.loadFiles(fileOrDir, null/* baseURI */,
+//                        null/* rdfFormat */, filter);
+
+				dataLoader.loadFiles(totals, 0/* depth */, fileOrDir,
+						null/* baseURI */, null/* rdfFormat */, filter, true/* endOfBatch */
+				);
 
             }
             
             dataLoader.endSource();
+
+			System.out.println("Load: " + totals);
+            
+			if (dataLoader.closureEnum == ClosureEnum.None && doClosure) {
+
+				System.out.println("Computing closure.");
+
+                final ClosureStats stats = dataLoader.doClosure();
+                
+                System.out.println("Closure: "+stats.toString());
+
+			}
             
             jnl.commit();
             
             final long lastOffset = jnl.getRootBlockView().getNextOffset();
 
-            System.out.println("Wrote: " + (lastOffset - firstOffset)
-                    + " bytes.");
-            
+			System.out.println("Wrote: " + (lastOffset - firstOffset)
+					+ " bytes.");
+
+			final long elapsedTotal = System.currentTimeMillis() - begin;
+			
+			System.out.println("Total elapsed=" + elapsedTotal + "ms");
+			
         } finally {
 
             if (jnl != null) {
@@ -1362,8 +1400,8 @@ public class DataLoader {
                     || (name.endsWith(".gz") && RDFFormat.forFileName(name
                             .substring(0, name.length() - 3)) != null);
 
-            System.err.println("dir=" + dir + ", name=" + name + " : isRDF="
-                    + isRDF);
+			if (log.isInfoEnabled())
+				log.info("dir=" + dir + ", name=" + name + " : isRDF=" + isRDF);
 
             return isRDF;
 

@@ -1,0 +1,11 @@
+# This configuration file is designed to connect to a bigdata instance using
+# an http SPARQL endpoint.  The [ontology] and [data] fields will be ignored.
+# The ontology and data must be loaded into the database using a separate
+# utility, such as the DataLoader.  See build.xml.  The [database] is just
+# the SPARQL endpoint.
+
+[BIGDATA_SPARQL_ENDPOINT]
+class=edu.lehigh.swat.bench.ubt.bigdata.SparqlRepositoryFactory
+ontology=ignored
+data=ignored
+database=http://localhost:80

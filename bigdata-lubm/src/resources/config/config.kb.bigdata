@@ -37,10 +37,19 @@
 #database=d:/LTS.U20
 
 [BIGDATA_LTS_50]
-class=edu.lehigh.swat.bench.ubt.bigdata.LTS
-ontology=d:/bigdata-perf-analysis/lubm/univ-bench.owl
-data=d:/bigdata-perf-analysis/lubm/U50
-database=d:/LTS.U50.jnl
+class=edu.lehigh.swat.bench.ubt.bigdata.SparqlRepositoryFactory
+ontology=/nas/data/lubm/univ-bench.owl
+data=/nas/data/lubm/U50
+database=http://localhost:80
+#database=/data/lubm/LTS.U50.jnl
+#database=/data/lubm/LTS.U50.m32.rw
+#database=/data/lubm/LTS.U50.m64.rw
+
+#[BIGDATA_LTS_1000]
+#class=edu.lehigh.swat.bench.ubt.bigdata.LTS
+#ontology=/nas/data/lubm/univ-bench.owl
+#data=/nas/data/lubm/U1000
+#database=/data/LTS.U1000.m64.rw
 
 #[BIGDATA_LTS_100]
 #class=edu.lehigh.swat.bench.ubt.bigdata.LTS

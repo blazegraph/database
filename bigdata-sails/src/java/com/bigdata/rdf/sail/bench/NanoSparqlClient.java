@@ -67,7 +67,10 @@ public class NanoSparqlClient {
 	 */
 	static private final int DEFAULT_TIMEOUT = 5000;
 
-	static enum QueryType {
+	/**
+	 * Helper class to figure out the type of a query.
+	 */
+	public static enum QueryType {
 		
 		ASK(0),
 		DESCRIBE(1),
@@ -168,7 +171,7 @@ public class NanoSparqlClient {
 	/**
 	 * Class submits a SPARQL query using httpd and writes the result on stdout.
 	 */
-	static private class Query implements Callable<Long> {
+	static public class Query implements Callable<Long> {
 
 //		private final HttpClient client;
 		final QueryOptions opts;
@@ -188,6 +191,9 @@ public class NanoSparqlClient {
 		}
 
 		public Long call() throws Exception {
+
+			// used to measure the total execution time.
+			final long begin = System.nanoTime();
 
 			/*
 			 * Parse the query so we can figure out how it will need to be
@@ -266,8 +272,6 @@ public class NanoSparqlClient {
 
 				// connect.
 				conn.connect();
-
-				final long begin = System.nanoTime();
 
 				final int rc = conn.getResponseCode();
 					if(rc < 200 || rc >= 300) {
