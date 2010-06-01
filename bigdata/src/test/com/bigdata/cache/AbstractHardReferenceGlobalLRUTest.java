@@ -204,6 +204,9 @@ public class AbstractHardReferenceGlobalLRUTest extends TestCase2 {
         assertNull(cache1.get(1L));
         assertNull(cache1.get(2L));
         
+		if (log.isInfoEnabled())
+			log.info(lru.getCounterSet().toString());
+
     }
 
     /**
