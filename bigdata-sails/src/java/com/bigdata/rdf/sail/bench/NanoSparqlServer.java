@@ -64,11 +64,13 @@ import org.openrdf.rio.rdfxml.RDFXMLWriter;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
 import com.bigdata.rdf.sail.BigdataSailRepository;
@@ -236,10 +238,12 @@ public class NanoSparqlServer extends AbstractHTTPD {
 			 */
 			if (tripleStore.getIndexManager() instanceof IJournal) {
 
-				final IJournal jnl = ((Journal) ((IJournal) sail.getDatabase()
-						.getIndexManager()));
+				final AbstractJournal jnl = (AbstractJournal) sail.getDatabase()
+						.getIndexManager();
 
-				sb.append("file=" + jnl.getFile()+"\n");
+				sb.append("file\t= " + jnl.getFile()+"\n");
+
+				sb.append("BufferMode\t= " + jnl.getBufferStrategy().getBufferMode()+"\n");
 
 				sb.append("nextOffset\t= "
 						+ jnl.getRootBlockView().getNextOffset() + "\n");
@@ -390,7 +394,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		 * rather than running on in the background with a disconnected client.
 		 */
 		final PipedOutputStream os = new PipedOutputStream();
-		final InputStream is = new PipedInputStream(os);
+		final InputStream is = new PipedInputStream(os);//Bytes.kilobyte32*8/*pipeSize*/);
 		final FutureTask<Void> ft = new FutureTask<Void>(getQueryTask(queryStr,
 				os));
 		try {

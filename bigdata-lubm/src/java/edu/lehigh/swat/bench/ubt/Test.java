@@ -556,12 +556,14 @@ public class Test extends RepositoryCreator {
     }
     System.out.println();
     System.out.println("query\tTime\tResult#");
+    long totalDuration = 0;
     for (int j = 0; j < queryList_.size(); j++) {
       query = (QuerySpecification)queryList_.get(j);
       System.out.print(query.id_);
       for (int i = 0; i < kbList_.size(); i++) {
         kb = (KbSpecification)kbList_.get(i);
         result = queryTestResults_[i][j];
+        totalDuration += result.duration_;
         System.out.print("\t" + result.duration_ + "\t" + result.resultNum_);
         if(!result.consistent) {
             System.out.print("\tINCONSISTENT");
@@ -569,5 +571,6 @@ public class Test extends RepositoryCreator {
       }
       System.out.println();
     }
+    System.out.println("Total\t"+totalDuration);
   }
 }
