@@ -140,14 +140,15 @@ public class SparqlRepository implements Repository {
 	}
 
 	/**
+	 * The default connection timeout (ms).  This needs to be large enough so that queries which take
+	 *  a while to materialize their initial/next binding set do not timeout. 
+	 */
+	static private final int DEFAULT_TIMEOUT = Integer.MAX_VALUE;
+
+	/**
 	 * Options for the query.
 	 */
 	private static class QueryOptions {
-
-		/**
-		 * The default connection timeout (ms).
-		 */
-		static private final int DEFAULT_TIMEOUT = 5000;
 
 		/** The URL of the SPARQL endpoint. */
 		public String serviceURL = null;
