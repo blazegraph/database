@@ -71,6 +71,8 @@ public class Test extends RepositoryCreator {
   /** name of file to hold the query test result */
   private static final String QUERY_TEST_RESULT_FILE;
     static {
+    	final String resultFile = System.getProperty("lubm.resultFile");
+    	if(resultFile== null) {
         /*
          * Note: the hostname is used as part of the filename to help keep track
          * of the results and to allow runs when the test harness is on an
@@ -84,6 +86,9 @@ public class Test extends RepositoryCreator {
             hostname = "localhost";
         }
         QUERY_TEST_RESULT_FILE = hostname + "-result.txt";
+    	} else {
+    	QUERY_TEST_RESULT_FILE = resultFile;
+    	}
   }
 
   /** list of target systems */
@@ -169,6 +174,7 @@ public class Test extends RepositoryCreator {
       createKbList(kbConfigFile);
       createQueryList(queryConfigFile);
       doTestQuery();
+      queryTestResultFile_.flush();
       queryTestResultFile_.close();
     }
     catch (IOException e) {
