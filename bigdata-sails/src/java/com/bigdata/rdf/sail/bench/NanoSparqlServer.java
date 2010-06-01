@@ -95,6 +95,8 @@ import com.bigdata.util.httpd.NanoHTTPD;
  *       parameter or header).
  * 
  * @todo Add an "EXPLAIN" query type and show the execution plan and costs.
+ * 
+ * @todo Add command to drop the LRUNexus cache.
  */
 public class NanoSparqlServer extends AbstractHTTPD {
 
