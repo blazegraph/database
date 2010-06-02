@@ -2205,4 +2205,13 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
     }
 
+    /**
+     * Extend file if required for HAWriteMessage - just call through to truncate
+     */
+	public void setExtentForLocalStore(long extent) throws IOException, InterruptedException {
+        
+        truncate(extent);
+        
+	}
+
 }
