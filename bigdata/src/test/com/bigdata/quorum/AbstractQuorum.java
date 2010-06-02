@@ -264,6 +264,8 @@ public class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             this.eventService = Executors
                     .newSingleThreadExecutor(new DaemonThreadFactory(
                             "QuorumEventService"));
+            if (log.isDebugEnabled())
+                log.debug("client=" + client);
         } finally {
             lock.unlock();
         }
@@ -277,6 +279,8 @@ public class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                 // No client is attached.
                 return;
             }
+            if (log.isDebugEnabled())
+                log.debug("client=" + client);
             eventService.shutdown();
             try {
                 eventService.awaitTermination(1000, TimeUnit.MILLISECONDS);
@@ -291,27 +295,30 @@ public class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             if (client instanceof QuorumMember<?>) {
                 /*
                  * @todo Issue events to the client telling it to leave the
-                 * quorum and remove itself as a member service of the quorum.
-                 * 
-                 * @todo Should we rely on the client to do these things before
-                 * it invokes terminate() here instead?
+                 * quorum and remove itself as a member service of the quorum?
+                 * (I think not because these actions should be generated in
+                 * response to observed changes in the shared quorum state. If a
+                 * client simply terminates quorum processing, then it will no
+                 * longer be informed of quorum state changes, which makes it a
+                 * bad citizen unless it also shuts down, e.g., by terminating
+                 * its zookeeper connection).
                  */
-                final UUID clientId = ((QuorumMember<S>) client).getServiceId();
-                if (joined.contains(clientId)) {
-                    log.error("Client is joined: " + clientId);
-                    // force service leave.
-                    serviceLeave(clientId);
-                }
-                if (pipeline.contains(clientId)) {
-                    log.error("Client in pipeline: " + clientId);
-                    // force pipeline remove.
-                    pipelineRemove(clientId);
-                }
-                if (members.contains(clientId)) {
-                    log.error("Client is member: " + clientId);
-                    // force member remove.
-                    memberRemove(clientId);
-                }
+//                final UUID clientId = ((QuorumMember<S>) client).getServiceId();
+//                if (joined.contains(clientId)) {
+//                    log.error("Client is joined: " + clientId);
+//                    // force service leave.
+//                    serviceLeave(clientId);
+//                }
+//                if (pipeline.contains(clientId)) {
+//                    log.error("Client in pipeline: " + clientId);
+//                    // force pipeline remove.
+//                    pipelineRemove(clientId);
+//                }
+//                if (members.contains(clientId)) {
+//                    log.error("Client is member: " + clientId);
+//                    // force member remove.
+//                    memberRemove(clientId);
+//                }
             }
             this.client = null;
         } finally {
@@ -329,9 +336,7 @@ public class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
     }
 
     final public boolean isHighlyAvailable() {
-
         return replicationFactor() > 1;
-        
     }
 
     public long lastValidToken() {
