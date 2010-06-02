@@ -58,5 +58,13 @@ public interface IHABufferStrategy extends IBufferStrategy {
      * @throws InterruptedException
      */
     ByteBuffer readFromLocalStore(final long addr) throws InterruptedException;
+
+    /**
+     * Extend local store for a highly available {@link Quorum}.
+     * 
+     * @throws InterruptedException
+     */
+    void setExtentForLocalStore(final long extent) throws IOException,
+    		InterruptedException;
     
 }

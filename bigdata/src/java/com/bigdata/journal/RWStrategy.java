@@ -325,7 +325,9 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	public long getNextOffset() {
 		return m_store.getNextOffset();
 	}
-
+	/**
+	 * TODO: Should this mean the same
+	 */
 	public long getUserExtent() {
 		// TODO Auto-generated method stub
 		return 0;
@@ -336,7 +338,16 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		return 0;
 	}
 
-	public void truncate(long extent) {
+	/**
+	 * This method means more to a WORM than a RW since it assumes an allocation strategy
+	 */
+    public long ensureMinFree(final long minFree) {
+
+        throw new UnsupportedOperationException();
+
+    }
+
+    public void truncate(long extent) {
 		// TODO Auto-generated method stub
 
 	}
@@ -608,5 +619,12 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
         throw new UnsupportedOperationException();
         
     }
+
+	// FIXME setExtentForLocalStore
+	public void setExtentForLocalStore(long extent) throws IOException, InterruptedException {
+        
+        throw new UnsupportedOperationException();
+        
+	}
 
 }
