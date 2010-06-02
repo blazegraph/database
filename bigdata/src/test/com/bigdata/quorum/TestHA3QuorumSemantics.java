@@ -27,42 +27,39 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.quorum;
 
-import java.rmi.Remote;
-
 /**
- * The shared state for a {@link MockQuorum}. This class provides a factory for
- * {@link MockQuorum} instances which track the shared quorum state.
+ * Test the quorum semantics for a highly available quorum of 3 services. The
+ * main points to test here are the particulars of events not observable with a
+ * singleton quorum, including a service join which does not trigger a quorum
+ * meet, a service leave which does not trigger a quorum break, a leader leave,
+ * etc.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class MockQuorumState<S extends Remote, C extends QuorumClient<S>, Q extends AbstractQuorum<S, C>>
-        extends AbstractQuorum<S, C> {
+public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
 
     /**
-     * @param k
+     * 
      */
-    protected MockQuorumState(final int k) {
-        super(k);
+    public TestHA3QuorumSemantics() {
     }
 
     /**
-     * Factory for a {@link Quorum} running for a client.
-     * 
-     * @param client
-     *            The client.
-     * 
-     * @return
+     * @param name
      */
-    public Q newQuorum(final C client) {
+    public TestHA3QuorumSemantics(String name) {
+        super(name);
+    }
 
-        final Q quorum = (Q) new AbstractQuorum(replicationFactor()) {
-        };
+    @Override
+    protected void setUp() throws Exception {
+        k = 3;
+        super.setUp();
+    }
 
-        quorum.start(client);
-
-        return quorum;
-
+    public void test_something() {
+        fail("write tests");
     }
 
 }
