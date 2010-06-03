@@ -33,6 +33,8 @@ import java.util.UUID;
 import com.bigdata.journal.ha.QuorumException;
 
 /**
+ * Abstract base class for a {@link QuorumMember}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -67,6 +69,36 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
 
     public UUID getServiceId() {
         return serviceId;
+    }
+
+    public boolean isMember() {
+        final UUID[] a = getQuorum().getMembers();
+        for(UUID t : a) {
+            if(serviceId.equals(t))
+                return true;
+        }
+        return false;
+    }
+
+    public boolean isPipelineMember() {
+        final UUID[] a = getQuorum().getPipeline();
+        for(UUID t : a) {
+            if(serviceId.equals(t))
+                return true;
+        }
+        return false;
+    }
+
+    public boolean isJoinedMember(final long token) {
+        final UUID[] a = getQuorum().getJoinedMembers();
+        for(UUID t : a) {
+            if(serviceId.equals(t)) {
+                // verify the token is still valid.
+                assertQuorum(token);
+                return true;
+            }
+        }
+        return false;
     }
 
     public boolean isLeader(final long token) {
@@ -141,6 +173,116 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
     protected void assertFollower(final long token) {
         if (!isFollower(token))
             throw new QuorumException();
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * The default implementation logs the message but does not handle it.
+     */
+    public void electedFollower(long token) {
+        if (log.isDebugEnabled())
+            log.debug("token=" + token);
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * The default implementation logs the message but does not handle it.
+     */
+    public void electedLeader(long token) {
+        if (log.isDebugEnabled())
+            log.debug("token=" + token);
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * The default implementation logs the message but does not handle it.
+     */
+    public void leaderLeft(UUID leaderId) {
+        if (log.isDebugEnabled())
+            log.debug("token=" + leaderId);
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * The default implementation logs the message but does not handle it.
+     */
+    public void memberAdd() {
+        if (log.isDebugEnabled())
+            log.debug("");
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * The default implementation logs the message but does not handle it.
+     */
+    public void memberRemove() {
+        if (log.isDebugEnabled())
+            log.debug("");
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * The default implementation logs the message but does not handle it.
+     */
+    public void pipelineAdd() {
+        if (log.isDebugEnabled())
+            log.debug("");
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * The default implementation logs the message but does not handle it.
+     */
+    public void pipelineRemove() {
+        if (log.isDebugEnabled())
+            log.debug("");
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * The default implementation logs the message but does not handle it.
+     */
+    public void pipelineChange(UUID oldDownStreamId, UUID newDownStreamId) {
+        if (log.isDebugEnabled())
+            log.debug("old=" + oldDownStreamId + ",new=" + newDownStreamId);
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * The default implementation logs the message but does not handle it.
+     */
+    public void quorumBroke() {
+        if (log.isDebugEnabled())
+            log.debug("");
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * The default implementation logs the message but does not handle it.
+     */
+    public void serviceJoin() {
+        if (log.isDebugEnabled())
+            log.debug("");
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * The default implementation logs the message but does not handle it.
+     */
+    public void serviceLeave() {
+        if (log.isDebugEnabled())
+            log.debug("");
     }
 
 }

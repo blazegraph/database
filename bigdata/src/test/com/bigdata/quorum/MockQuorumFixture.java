@@ -203,19 +203,20 @@ public class MockQuorumFixture<S extends Remote, C extends QuorumClient<S>, Q ex
      *         Thompson</a>
      * @version $Id$
      */
-    static class MockQuorumClient extends AbstractQuorumClient {
+    static class MockQuorumMember<S extends Remote> extends
+            AbstractQuorumMember<S> {
 
         /**
          * @param quorum
          */
-        protected MockQuorumClient(Quorum quorum) {
-            super(quorum);
+        protected MockQuorumMember(Quorum quorum) {
+            super(quorum, UUID.randomUUID());
         }
 
-        public Remote getService(UUID serviceId) {
+        public S getService(UUID serviceId) {
             throw new UnsupportedOperationException();
         }
-        
+
     }
-    
+
 }

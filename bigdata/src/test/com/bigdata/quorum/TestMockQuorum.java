@@ -32,7 +32,7 @@ import java.util.UUID;
 import junit.framework.TestCase2;
 
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum;
-import com.bigdata.quorum.MockQuorumFixture.MockQuorumClient;
+import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorumFixtureClient;
 
 /**
@@ -101,7 +101,7 @@ public class TestMockQuorum extends TestCase2 {
 
         final int k = 1;
         Quorum q = new MockQuorumFixture(k);
-        QuorumClient c = new MockQuorumClient(q);
+        QuorumClient c = new MockQuorumMember(q);
         q.start(c);
         q.terminate();
 
