@@ -48,6 +48,41 @@ public interface QuorumMember<S extends Remote> extends QuorumClient<S> {
      * The identifier for this service.
      */
     UUID getServiceId();
+
+    /**
+     * Return <code>true</code>if the quorum recognizes the service as a member
+     * of that quorum. The quorum token is not required for this method because
+     * membership status does not change with a quorum meet or break.
+     */
+    boolean isMember();
+
+    /**
+     * Return <code>true</code> if quorum recognizes the service is part of the
+     * write pipeline. The quorum token is not required for this method because
+     * pipeline status does not change with a quorum meet or break. Once a
+     * service is receiving synchronous messages from a {@link Quorum} it will
+     * notice when it enters and leaves the pipeline and when the downstream
+     * service for this service changes in the quorum.
+     */
+    boolean isPipelineMember();
+    
+    /**
+     * Return <code>true</code> iff the quorum is highly available and this
+     * node is last one in the write pipeline (it will not return true for a
+     * singleton quorum where the only node is the master).
+     * 
+     * @param token
+     *            The quorum token for which the request was made.
+     */
+    boolean isLastInChain(long token);
+
+    /**
+     * Return <code>true</code> if the service is joined with the quorum.
+     * 
+     * @param token
+     *            The quorum token for which the request was made.
+     */
+    boolean isJoinedMember(long token);
     
     /**
      * Return <code>true</code> iff this node is the quorum leader. The
@@ -68,16 +103,6 @@ public interface QuorumMember<S extends Remote> extends QuorumClient<S> {
      *            The quorum token for which the request was made.
      */
     boolean isFollower(long token);
-
-    /**
-     * Return <code>true</code> iff the quorum is highly available and this
-     * node is last one in the write pipeline (it will not return true for a
-     * singleton quorum where the only node is the master).
-     * 
-     * @param token
-     *            The quorum token for which the request was made.
-     */
-    boolean isLastInChain(long token);
 
     /**
      * Return metadata used to communicate with the downstream node in the write
@@ -109,14 +134,32 @@ public interface QuorumMember<S extends Remote> extends QuorumClient<S> {
     UUID getDownstreamService(long token);
 
     /**
-     * Invoked when the write pipeline has changed.
-     * 
-     * @param serviceId
-     *            The {@link UUID} of a service which was either added to or
-     *            removed from the write pipeline.
+     * Invoked when the service is added to the write pipeline. The service
+     * always enters at the of the pipeline.
      */
-    void pipelineChanged(UUID serviceId);
+    void pipelineAdd();
 
+    /**
+     * Invoked when this service is removed from the write pipeline.
+     */
+    void pipelineRemove();
+
+    /**
+     * Invoked when the downstream service in the write pipeline has changed.
+     * Services always enter at the end of the write pipeline, but may be
+     * removed at any position in the write pipeline.
+     * 
+     * @param oldDownstreamId
+     *            The {@link UUID} of the service which <em>was</em> downstream
+     *            from this service in the write pipeline and <code>null</code>
+     *            iff this service was the last service in the pipeline.
+     * @param newDownstreamId
+     *            The {@link UUID} of the service which <em>is</em> downstream
+     *            from this service in the write pipeline and <code>null</code>
+     *            iff this service <em>is</em> the last service in the pipeline.
+     */
+    void pipelineChange(UUID oldDownStreamId,UUID newDownStreamId);
+    
     /**
      * Invoked when <em>this</em> quorum member is elected as the quorum leader.
      * This event only occurs when the quorum meets.
@@ -140,10 +183,25 @@ public interface QuorumMember<S extends Remote> extends QuorumClient<S> {
     void electedFollower(long token);
 
     /**
+     * Invoked when this service is added as a quorum member.
+     */
+    void memberAdd();
+    
+    /**
+     * Invoked when this service is removed as a quorum member.
+     */
+    void memberRemove();
+
+    /**
+     * Invoked when this service joins the quorum.
+     */
+    void serviceJoin();
+    
+    /**
      * Invoked when this service was joined with the quorum and it leaves the
      * quorum.
      */
-    void serviceLeft();
+    void serviceLeave();
 
     /**
      * Invoked for all quorum members when the leader leaves the quorum.
@@ -151,7 +209,7 @@ public interface QuorumMember<S extends Remote> extends QuorumClient<S> {
      * @param leaderId
      *            The {@link UUID} of the leader which left the quorum.
      */
-    void leaderLeft(UUID leaderLeft);
+    void leaderLeft(UUID leaderId);
 
     /**
      * Invoked for all quorum member when the quorum breaks.

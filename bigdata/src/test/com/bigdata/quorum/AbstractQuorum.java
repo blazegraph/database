@@ -2,6 +2,7 @@ package com.bigdata.quorum;
 
 import java.rmi.Remote;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.SortedSet;
@@ -42,7 +43,19 @@ import com.bigdata.zookeeper.ZooKeeperAccessor;
 public class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
         implements Quorum<S, C> {
 
-    static protected final Logger log = Logger.getLogger(AbstractQuorum.class);
+    static protected final transient Logger log = Logger.getLogger(AbstractQuorum.class);
+
+    /**
+     * Text when an operation is not permitted because the service is not a
+     * quorum member.
+     */
+    static protected final transient String ERR_NOT_MEMBER = "Not a quorum member : ";
+
+    /**
+     * Text when an operation is not permitted because the service is not part
+     * of the write pipeline.
+     */
+    static protected final transient String ERR_NOT_PIPELINE = "Not a pipeline member : ";
 
     /**
      * The replication factor.
@@ -375,6 +388,46 @@ public class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
         }
     }
 
+    public UUID getLastInPipeline() {
+        lock.lock();
+        try {
+            final Iterator<UUID> itr = pipeline.iterator();
+            UUID lastId = null;
+            while (itr.hasNext()) {
+                lastId = itr.next();
+            }
+            return lastId;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public UUID[] getPipelinePriorAndNext(final UUID serviceId) {
+        if (serviceId == null)
+            throw new IllegalArgumentException();
+        lock.lock();
+        try {
+            final Iterator<UUID> itr = pipeline.iterator();
+            UUID priorId = null;
+            while (itr.hasNext()) {
+                final UUID current = itr.next();
+                if (serviceId.equals(current)) {
+                    /*
+                     * Found the caller's service in the pipeline so we return
+                     * the prior service, which is its upstream, service, and
+                     * the next service, which is its downstream service.
+                     */
+                    final UUID nextId = itr.hasNext() ? itr.next() : null;
+                    return new UUID[] { priorId, nextId };
+                }
+            }
+            // The caller's service was not in the pipeline.
+            return null;
+        } finally {
+            lock.unlock();
+        }
+    }
+    
     public UUID getLeaderId() {
         lock.lock();
         try {
@@ -450,9 +503,18 @@ public class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             if (members.add(serviceId)) {
                 // service was added as quorum member.
 //                memberAdd.signalAll();
-//              if (client instanceof QuorumMember<?>) {
-//              ((QuorumMember<?>) client).memberAdded(serviceId);
-//          }
+                if (client instanceof QuorumMember<?>) {
+                    final QuorumMember<?> client = (QuorumMember<?>) this.client;
+                    final UUID clientId = client.getServiceId();
+                    if(serviceId.equals(clientId)) {
+                        /*
+                         * The service which was added is our client, so we send
+                         * it a synchronous message so it can handle that add
+                         * event.
+                         */
+                        client.memberAdd();
+                    }
+                }
                 // queue client event.
                 sendEvent(new E(QuorumEventEnum.MEMBER_ADDED, token(), serviceId));
                 if (log.isInfoEnabled())
@@ -478,13 +540,22 @@ public class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             if (members.remove(serviceId)) {
                 // service is no longer a member.
 //                memberRemove.signalAll();
+                if (client instanceof QuorumMember<?>) {
+                    final QuorumMember<?> client = (QuorumMember<?>) this.client;
+                    final UUID clientId = client.getServiceId();
+                    if(serviceId.equals(clientId)) {
+                        /*
+                         * The service which was removed is our client, so we
+                         * send it a synchronous message so it can handle that
+                         * add event.
+                         */
+                        client.memberRemove();
+                    }
+                }
                 // remove from the pipeline @todo can non-member services exist in the pipeline?
                 pipelineRemove(serviceId);
                 // service leave iff joined.
                 serviceLeave(serviceId);
-//                if (client instanceof QuorumMember<?>) {
-//                    ((QuorumMember<?>) client).memberRemoved(serviceId);
-//                }
                 // queue client event.
                 sendEvent(new E(QuorumEventEnum.MEMBER_REMOVED, token(), serviceId));
                 if (log.isInfoEnabled())
@@ -507,10 +578,43 @@ public class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             throw new IllegalArgumentException();
         lock.lock();
         try {
+            if (!members.contains(serviceId))
+                throw new QuorumException(ERR_NOT_MEMBER + serviceId);
+//            if(!members.contains(serviceId)) {
+//                /*
+//                 * Ensure that the service is a member.
+//                 * 
+//                 * Note: We do this as a general policy since the various events
+//                 * in the distributed quorum state might occur out of order and
+//                 * a pipeline add always implies a member add.
+//                 */
+//                memberAdd(serviceId);
+//            }
             if (pipeline.add(serviceId)) {
                 pipelineChange.signalAll();
                 if (client instanceof QuorumMember<?>) {
-                    ((QuorumMember<?>) client).pipelineChanged(serviceId);
+                    final QuorumMember<?> client = (QuorumMember<?>) this.client;
+                    final UUID clientId = client.getServiceId();
+                    if(serviceId.equals(clientId)) {
+                        /*
+                         * The service which was added to the write pipeline is
+                         * our client, so we send it a synchronous message so it
+                         * can handle that add event, e.g., by setting itself up
+                         * to receive data.
+                         */
+                        client.pipelineAdd();
+                    }
+                    final UUID lastId = getLastInPipeline();
+                    if (lastId != null && clientId.equals(lastId)) {
+                        /*
+                         * Notify the client that a service has been added as
+                         * its downstream service in the write pipeline. The
+                         * client needs to handle this event by configuring
+                         * itself to send data to that service.
+                         */
+                        client.pipelineChange(null/* oldDownStream */,
+                                serviceId/* newDownStream */);
+                    }
                 }
                 // queue client event.
                 sendEvent(new E(QuorumEventEnum.PIPELINE_ADDED, token(), serviceId));
@@ -537,7 +641,34 @@ public class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             if (pipeline.remove(serviceId)) {
                 pipelineChange.signalAll();
                 if (client instanceof QuorumMember<?>) {
-                    ((QuorumMember<?>) client).pipelineChanged(serviceId);
+                    final QuorumMember<?> client = (QuorumMember<?>) this.client;
+                    final UUID clientId = client.getServiceId();
+                    if(serviceId.equals(clientId)) {
+                        /*
+                         * The service which was removed from the write pipeline is
+                         * our client, so we send it a synchronous message so it
+                         * can handle that add event, e.g., by tearing down its
+                         * service which is receiving writes from the pipeline.
+                         */
+                        client.pipelineRemove();
+                    }
+                    /*
+                     * Look for the service before/after the one being removed
+                     * from the pipeline. If the service *before* the one being
+                     * removed is our client, then we will notify it that its
+                     * downstream service has changed.
+                     */
+                    final UUID[] priorNext = getPipelinePriorAndNext(serviceId);
+                    if (priorNext != null && priorNext[0].equals(clientId)) {
+                        /*
+                         * Notify the client that its downstream service was
+                         * removed from the write pipeline. The client needs to
+                         * handle this event by configuring itself to send data
+                         * to that service.
+                         */
+                        client.pipelineChange(serviceId/* oldDownStream */,
+                                priorNext[1]/* newDownStream */);
+                    }
                 }
                 // queue client event.
                 sendEvent(new E(QuorumEventEnum.PIPELINE_REMOVED, token(), serviceId));
@@ -562,10 +693,9 @@ public class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
         lock.lock();
         try {
             if (!members.contains(serviceId))
-                throw new IllegalStateException("Not a member: " + serviceId);
+                throw new QuorumException(ERR_NOT_MEMBER + serviceId);
             if (!pipeline.contains(serviceId))
-                throw new IllegalStateException("Not in the pipeline: "
-                        + serviceId);
+                throw new QuorumException(ERR_NOT_PIPELINE + serviceId);
             if (!joined.add(serviceId)) {
                 // Already joined.
                 return;
@@ -718,7 +848,7 @@ public class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             }
             if ((client instanceof QuorumMember<?>)) {
                 final QuorumMember<S> client = (QuorumMember<S>) this.client;
-                client.serviceLeft();
+                client.serviceLeave();
                 if (wasJoined) {
                     // the serviceId of the leader.
                     final UUID leaderId = joined.iterator().next();

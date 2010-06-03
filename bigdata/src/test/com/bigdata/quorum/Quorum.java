@@ -1,6 +1,7 @@
 package com.bigdata.quorum;
 
 import java.rmi.Remote;
+import java.util.Iterator;
 import java.util.UUID;
 
 import com.bigdata.journal.ha.AsynchronousQuorumCloseException;
@@ -173,6 +174,34 @@ public interface Quorum<S extends Remote, C extends QuorumClient<S>> {
      */
     UUID[] getPipeline();
 
+    /**
+     * Return the {@link UUID} of the service which is the last service in the
+     * write pipeline.
+     * 
+     * @return The {@link UUID} of the last service in the write pipeline or
+     *         <code>null</code> if there are no services in the write pipeline.
+     */
+    UUID getLastInPipeline();
+
+    /**
+     * Return the {@link UUID}of the service in the pipeline which is
+     * immediately upstream from (prior to) and downstream from (next to) the
+     * specified service. These are, respectively, the service from which it
+     * receives data (upstream) and to which it sends data (downstream).
+     * 
+     * @param serviceId
+     *            The service id.
+     * 
+     * @return Either <code>null</code> if the <i>serviceId</i> does not appear
+     *         in the write pipeline -or- an array of two elements whose values
+     *         are: [0] The upstream serviceId in the write pipeline, which will
+     *         be <code>null</code> iff <i>serviceId</i> is the first service in
+     *         the write pipeline; and [1] The downstream service in the write
+     *         pipeline, which will be <code>null</code> iff <i>serviceId</i> is
+     *         the last service in the write pipeline.
+     */
+    UUID[] getPipelinePriorAndNext(final UUID serviceId);
+    
     /**
      * Await a met quorum (blocking). If the {@link Quorum}is not met, then this
      * will block until the {@link Quorum} meets.

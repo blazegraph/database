@@ -30,7 +30,7 @@ package com.bigdata.quorum;
 import java.util.UUID;
 
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum;
-import com.bigdata.quorum.MockQuorumFixture.MockQuorumClient;
+import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorumFixtureClient;
 
 import junit.framework.TestCase2;
@@ -69,7 +69,7 @@ public class TestMockQuorumFixture extends TestCase2 {
         final int k = 3;
         // The per-client quorum objects.
         final MockQuorum[] quorums = new MockQuorum[k];
-        final MockQuorumClient[] clients = new MockQuorumClient[k];
+        final MockQuorumMember[] clients = new MockQuorumMember[k];
         // The mock shared quorum state object.
         final MockQuorumFixture fixture = new MockQuorumFixture(k);
         try {
@@ -82,7 +82,7 @@ public class TestMockQuorumFixture extends TestCase2 {
              */
             for (int i = 0; i < k; i++) {
                 quorums[i] = new MockQuorum(k);
-                clients[i] = new MockQuorumClient(quorums[i]);
+                clients[i] = new MockQuorumMember(quorums[i]);
                 quorums[i].start(clients[i]);
                 fixture.addQuorumToFixture(quorums[i]);
             }
