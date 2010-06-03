@@ -113,11 +113,14 @@
 	<target name="javadoc" depends="prepare" if="javadoc">
 		<mkdir dir="${build.dir}/docs/api" />
 		<!-- overview="....overview.html"  -->
-		<javadoc destdir="${build.dir}/docs/api" defaultexcludes="yes" author="true" version="true" use="true" windowtitle="lgpl-utils&#174;" classpathref="build.classpath">
+		<javadoc destdir="${build.dir}/docs/api" defaultexcludes="yes"
+			author="true" version="true" use="true"
+			windowtitle="lgpl-utils"
+			classpathref="build.classpath">
 			<arg value="-J-Xmx1000m"/>
 			<packageset dir="${lgpl-utils.dir}/src/java" />
 			<doctitle>
-				<![CDATA[<h1>lgpl-utils&#174;</h1>]]></doctitle>
+				<![CDATA[<h1>lgpl-utils</h1>]]></doctitle>
 		<bottom>
 			<![CDATA[
 <i>
