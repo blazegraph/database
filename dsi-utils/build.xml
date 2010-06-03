@@ -16,6 +16,9 @@
         <path refid="build.classpath"/>
     </path>
 
+	<target name="all" depends="clean, jar">
+    </target>
+
 	<target name="clean" description="cleans everything in [build.dir], but not the releases.">
         <delete dir="${build.dir}"/>
     </target>

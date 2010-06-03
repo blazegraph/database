@@ -1,6 +1,5 @@
 package com.bigdata.rdf.sail;
 
-import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -128,18 +127,23 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
             if (hiterator == null) {
                 assert database!=null;
                 assert query != null;
-                if (database.getSearchEngine() == null)
+                if (database.getLexiconRelation().getSearchEngine() == null)
                     throw new UnsupportedOperationException(
                             "No free text index?");
 //                final long begin = System.nanoTime();
-                hiterator = database.getSearchEngine().search
-                    ( query.getLabel(),
-                      query.getLanguage(), 
-                      0d, // @todo param for minCosine,
-                      10000 // @todo param for maxRank,
-//                      timeout,
-//                      unit
-                      );
+                hiterator = database.getLexiconRelation()
+                        .getSearchEngine().search(query.getLabel(),
+                                query.getLanguage(), false/* prefixMatch */,
+                                0d/* minCosine */, 10000/* maxRank */,
+                                1000L/* timeout */, TimeUnit.MILLISECONDS);
+//                hiterator = database.getSearchEngine().search
+//                    ( query.getLabel(),
+//                      query.getLanguage(), 
+//                      0d, // @todo param for minCosine,
+//                      10000 // @todo param for maxRank,
+////                      timeout,
+////                      unit
+//                      );
 //                final long elapsed = System.nanoTime() - begin;
 //                log.warn("search time="
 //                        + TimeUnit.MILLISECONDS.convert(elapsed,

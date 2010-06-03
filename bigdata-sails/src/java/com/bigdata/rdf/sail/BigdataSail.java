@@ -115,6 +115,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.TruthMaintenance;
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValue;
@@ -1388,7 +1389,7 @@ public class BigdataSail extends SailBase implements Sail {
          * FIXME bnodes : resolution of term identifiers to blank nodes for
          * JOINs in {@link BigdataSolutionResolverator}.
          */
-        private Map<String, BigdataBNodeImpl> bnodes;
+        private Map<String, BigdataBNode> bnodes;
 
         /**
          * A reverse mapping from the assigned term identifiers for blank nodes
@@ -1397,7 +1398,7 @@ public class BigdataSail extends SailBase implements Sail {
          * {@link SailConnection} without loosing the blank node identifier.
          * This behavior is required by the contract for {@link SailConnection}.
          */
-        private Map<Long, BigdataBNodeImpl> bnodes2;
+        private Map<Long, BigdataBNode> bnodes2;
         
         /**
          * Used to coordinate between read/write transactions and the unisolated
@@ -1580,8 +1581,8 @@ public class BigdataSail extends SailBase implements Sail {
                  * explicit synchronization during iterators, which breaks
                  * encapsulation.
                  */
-                bnodes = new ConcurrentHashMap<String, BigdataBNodeImpl>();
-                bnodes2 = new ConcurrentHashMap<Long, BigdataBNodeImpl>();
+                bnodes = new ConcurrentHashMap<String, BigdataBNode>();
+                bnodes2 = new ConcurrentHashMap<Long, BigdataBNode>();
 //                bnodes = Collections
 //                        .synchronizedMap(new HashMap<String, BigdataBNodeImpl>(
 //                                bufferCapacity));

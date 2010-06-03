@@ -74,8 +74,12 @@ public class BindingSetSortKeyBuilder implements ISortKeyBuilder<IBindingSet> {
             
             final IVariable var = vars[i];
             
-            final Object val = bindingSet.get(var);
-            
+            Object val = bindingSet.get(var);
+            if(val==null) {
+            	val=Long.valueOf(0);
+            }else if(val instanceof Constant) {
+                val=((Constant)val).get();
+            }
             keyBuilder.append( val );
 
         }

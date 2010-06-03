@@ -41,7 +41,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.model.BigdataBNode;
-import com.bigdata.rdf.model.BigdataBNodeImpl;
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
@@ -135,7 +135,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * loading a large document with a lot of blank nodes the map will also
      * become large.
      */
-    private Map<String, BigdataBNodeImpl> bnodes;
+    private Map<String, BigdataBNode> bnodes;
     
     /**
      * Statements which use blank nodes in their {s,p,o} positions must be
@@ -398,7 +398,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * <ol>
      * 
      * <li> Collect all deferred statements whose blank node bindings never show
-     * up in the context position of a statement ({@link BigdataBNodeImpl#statementIdentifier}
+     * up in the context position of a statement ({@link BigdataBNode#getStatementIdentifier()}
      * is <code>false</code>). Those blank nodes are NOT statement
      * identifiers so we insert them into the lexicon and the insert the
      * collected statements as well. </li>
@@ -456,11 +456,11 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                     final BigdataStatement stmt = itr.next();
                     
                     if (stmt.getSubject() instanceof BNode
-                            && ((BigdataBNodeImpl) stmt.getSubject()).statementIdentifier)
+                            && ((BigdataBNode) stmt.getSubject()).isStatementIdentifier())
                         continue;
 
                     if (stmt.getObject() instanceof BNode
-                            && ((BigdataBNodeImpl) stmt.getObject()).statementIdentifier)
+                            && ((BigdataBNode) stmt.getObject()).isStatementIdentifier())
                         continue;
 
                     if(DEBUG) {
@@ -511,12 +511,12 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                         final BigdataStatement stmt = itr.next();
 
                         if (stmt.getSubject() instanceof BNode
-                                && ((BigdataBNodeImpl) stmt.getSubject()).statementIdentifier
+                                && ((BigdataBNode) stmt.getSubject()).isStatementIdentifier()
                                 && stmt.s() == NULL)
                             continue;
 
                         if (stmt.getObject() instanceof BNode
-                                && ((BigdataBNodeImpl) stmt.getObject()).statementIdentifier
+                                && ((BigdataBNode) stmt.getObject()).isStatementIdentifier()
                                 && stmt.o() == NULL)
                             continue;
 
@@ -606,7 +606,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     /**
      * @todo could be replaced with {@link BigdataValueFactory
      */
-    public void setBNodeMap(final Map<String, BigdataBNodeImpl> bnodes) {
+    public void setBNodeMap(final Map<String, BigdataBNode> bnodes) {
     
         if (bnodes == null)
             throw new IllegalArgumentException();
@@ -678,7 +678,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                                     + values[i].getTermId()
                                     + ")"
                                     + ((values[i] instanceof BNode) ? "sid="
-                                            + ((BigdataBNodeImpl) values[i]).statementIdentifier
+                                            + ((BigdataBNode) values[i]).isStatementIdentifier()
                                             : ""));
                 }
             }
@@ -692,7 +692,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                                     + values[i].getTermId()
                                     + ")"
                                     + ((values[i] instanceof BNode) ? "sid="
-                                            + ((BigdataBNodeImpl) values[i]).statementIdentifier
+                                            + ((BigdataBNode) values[i]).isStatementIdentifier()
                                             : ""));
                 }
             }
@@ -1040,7 +1040,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
              * another source.
              */
             
-            final BigdataBNodeImpl bnode = (BigdataBNodeImpl)term;
+            final BigdataBNode bnode = (BigdataBNode)term;
             
             // the BNode's ID.
             final String id = bnode.getID();
@@ -1048,7 +1048,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
             if (bnodes == null) {
 
                 // allocating canonicalizing map for blank nodes.
-                bnodes = new HashMap<String, BigdataBNodeImpl>(capacity);
+                bnodes = new HashMap<String, BigdataBNode>(capacity);
 
                 // insert this blank node into the map.
                 bnodes.put(id, bnode);
@@ -1313,7 +1313,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                      * node's ID.
                      */
 
-                    ((BigdataBNodeImpl) c).statementIdentifier = true;
+                    ((BigdataBNode) c).setStatementIdentifier( true);
 
                 }
 

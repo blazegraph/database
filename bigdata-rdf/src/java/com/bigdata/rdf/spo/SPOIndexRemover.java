@@ -43,6 +43,8 @@ public class SPOIndexRemover implements Callable<Long> {
     
     final private SPOKeyOrder keyOrder;
 
+	final private boolean primaryIndex;
+
     final private ISPO[] a;
 
     final private int numStmts;
@@ -57,6 +59,7 @@ public class SPOIndexRemover implements Callable<Long> {
     
     public SPOIndexRemover(final SPORelation spoRelation, final ISPO[] stmts,
             final int numStmts, final SPOKeyOrder keyOrder,
+			final boolean primaryIndex,
             final boolean clone, final AtomicLong sortTime,
             final AtomicLong writeTime,
             final AtomicLong mutationCount, 
@@ -77,7 +80,7 @@ public class SPOIndexRemover implements Callable<Long> {
         this.spoRelation = spoRelation;
 
         this.keyOrder = keyOrder;
-
+		this.primaryIndex = primaryIndex;
         if (clone) {
 
             this.a = new ISPO[numStmts];
@@ -219,7 +222,7 @@ public class SPOIndexRemover implements Callable<Long> {
 
         }
         
-        if (keyOrder.isPrimaryIndex()) {
+		if (primaryIndex) {
 
             /*
              * Note: Only the task writing on the primary index takes

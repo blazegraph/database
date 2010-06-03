@@ -90,6 +90,8 @@ public class SPOIndexWriter implements Callable<Long> {
     
     private final boolean reportMutation;
 
+	private final boolean primaryIndex;
+
     /**
      * Writes statements on a statement index (batch api).
      * 
@@ -128,7 +130,8 @@ public class SPOIndexWriter implements Callable<Long> {
      */
     public SPOIndexWriter(final SPORelation spoRelation, final ISPO[] a,
             final int numStmts, final boolean clone,
-            final SPOKeyOrder keyOrder, final IElementFilter<ISPO> filter,
+			final SPOKeyOrder keyOrder, final boolean primaryIndex,
+			final IElementFilter<ISPO> filter,
             final AtomicLong sortTime, final AtomicLong insertTime,
             final AtomicLong numWritten,
             final boolean reportMutations) {
@@ -140,7 +143,7 @@ public class SPOIndexWriter implements Callable<Long> {
             throw new IllegalArgumentException();
 
         this.keyOrder = keyOrder;
-        
+		this.primaryIndex = primaryIndex;
         this.filter = filter;
         
         if (clone) {
@@ -335,7 +338,7 @@ public class SPOIndexWriter implements Callable<Long> {
         
         insertTime.addAndGet(System.currentTimeMillis() - _begin);
 
-        if (keyOrder.isPrimaryIndex()) {
+		if (primaryIndex) {
 
             /*
              * Note: Only the task writing on the primary index takes

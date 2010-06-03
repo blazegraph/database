@@ -2,8 +2,9 @@
  * Created on Oct 1, 2008
  */
 
-package it.unimi.dsi.fastutil.bytes;
+package it.unimi.dsi.fastutil.bytes.custom;
 
+import it.unimi.dsi.fastutil.bytes.custom.CustomByteArrayFrontCodedList;
 import it.unimi.dsi.fastutil.objects.ObjectListIterator;
 
 import java.io.ByteArrayInputStream;
