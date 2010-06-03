@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
@@ -1737,8 +1739,11 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             log.debug("languageCode=" + languageCode + ", label=" + label);
         }
         
-        final Iterator<IHit> itr = database.getSearchEngine().search(label,
-                languageCode, 0d/* minCosine */, 10000/* maxRank */);
+        final Iterator<IHit> itr = database.getLexiconRelation()
+                .getSearchEngine().search(label, languageCode,
+                        false/* prefixMatch */, 0d/* minCosine */,
+                        10000/* maxRank */, 1000L/* timeout */,
+                        TimeUnit.MILLISECONDS);
         
         // ensure that named graphs are handled correctly for quads
         Set<URI> graphs = null;

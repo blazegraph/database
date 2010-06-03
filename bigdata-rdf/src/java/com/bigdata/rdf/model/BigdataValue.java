@@ -60,7 +60,7 @@ import com.bigdata.rdf.store.TempTripleStore;
  * @version $Id$
  */
 public interface BigdataValue extends Value {//, Comparable<BigdataValue> {
-
+    public BigdataValueFactory getValueFactory();
     /**
      * A value which corresponds to an unassigned term identifier.
      * 

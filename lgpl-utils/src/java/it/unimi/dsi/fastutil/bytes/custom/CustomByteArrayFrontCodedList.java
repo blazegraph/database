@@ -19,8 +19,9 @@
  *
  */
 
-package it.unimi.dsi.fastutil.bytes;
+package it.unimi.dsi.fastutil.bytes.custom;
 
+import it.unimi.dsi.fastutil.bytes.ByteArrays;
 import it.unimi.dsi.fastutil.ints.IntArrays;
 import it.unimi.dsi.fastutil.objects.AbstractObjectList;
 import it.unimi.dsi.fastutil.objects.AbstractObjectListIterator;
