@@ -2261,7 +2261,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             }
             
             // read committed view IFF it exists otherwise [null]
-            return new GlobalRowStoreHelper(this).getReadCommitted();
+            return new GlobalRowStoreHelper(this).get(ITx.READ_COMMITTED);
             
         }
         
