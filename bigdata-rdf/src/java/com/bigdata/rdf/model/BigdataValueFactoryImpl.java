@@ -102,7 +102,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
      * @param namespace
      *            The namespace of the {@link LexiconRelation}.
      */
-    public static BigdataValueFactoryImpl getInstance(final String namespace) {
+    public static BigdataValueFactory/*Impl*/ getInstance(final String namespace) {
         
         if (namespace == null)
             throw new IllegalArgumentException();
@@ -136,7 +136,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
      * @param namespace
      *            The namespace of the {@link LexiconRelation}.
      */
-    public static void remove(final String namespace) {
+    public void remove(final String namespace) {
         
         if (namespace == null)
             throw new IllegalArgumentException();
@@ -383,10 +383,10 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     /**
      * (De-)serializer paired with this {@link BigdataValueFactoryImpl}.
      */
-    private final transient BigdataValueSerializer<BigdataValueImpl> valueSer = new BigdataValueSerializer<BigdataValueImpl>(
+    private final transient BigdataValueSerializer<BigdataValue> valueSer = new BigdataValueSerializer<BigdataValue>(
             this);
 
-    public BigdataValueSerializer<BigdataValueImpl> getValueSerializer() {
+    public BigdataValueSerializer<BigdataValue> getValueSerializer() {
 
         return valueSer;
 

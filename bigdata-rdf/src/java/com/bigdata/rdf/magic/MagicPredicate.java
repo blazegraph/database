@@ -24,8 +24,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.magic;
 
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 
@@ -333,6 +336,20 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
         
         return i;
         
+    }
+    
+    public Iterator<IVariable> getVariables() {
+        
+        final Set<IVariable> vars = new HashSet<IVariable>();
+
+        for (int i = 0; i < arity(); i++) {
+            if (get(i).isVar()) {
+                vars.add((IVariable) get(i));
+            }
+        }
+        
+        return vars.iterator();
+
     }
     
     public MagicPredicate asBound(IBindingSet bindingSet) {

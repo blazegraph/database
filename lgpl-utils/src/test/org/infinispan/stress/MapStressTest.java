@@ -62,7 +62,8 @@ public class MapStressTest extends TestCase {
     
 //    @Test(invocationCount=5)
     public void testConcurrentHashMap() throws Exception {                        
-        doTest(new ConcurrentHashMap<Integer, Integer>(MAP_CAPACITY, MAP_LOAD_FACTOR, CONCURRENCY));
+        doTest(new ConcurrentHashMap<Integer, Integer>(MAP_CAPACITY,
+                MAP_LOAD_FACTOR, CONCURRENCY));
     }
    
 //    @Test(invocationCount=5)
@@ -70,18 +71,37 @@ public class MapStressTest extends TestCase {
 //        doTest(new BufferedConcurrentHashMap<Integer, Integer>(MAP_CAPACITY, MAP_LOAD_FACTOR, CONCURRENCY, EvictionStrategy.LRU,null));
 //    }
     public void testBufferedConcurrentHashMapLRU() throws Exception {
-        doTest(new BufferedConcurrentHashMap<Integer, Integer>(MAP_CAPACITY, MAP_LOAD_FACTOR, CONCURRENCY, Eviction.LRU,null));
+        doTest(new BufferedConcurrentHashMap<Integer, Integer>(
+                MAP_CAPACITY,
+                MAP_LOAD_FACTOR,
+                CONCURRENCY,
+                Eviction.LRU,
+                new BufferedConcurrentHashMap.EvictionListener<Integer, Integer>() {
+                    public void evicted(Integer arg0, Integer arg1) {
+                    }
+                }));
     }
 
     public void testBufferedConcurrentHashMapLIRS() throws Exception {
-        doTest(new BufferedConcurrentHashMap<Integer, Integer>(MAP_CAPACITY, MAP_LOAD_FACTOR, CONCURRENCY, Eviction.LIRS,null));
+        doTest(new BufferedConcurrentHashMap<Integer, Integer>(
+                MAP_CAPACITY,
+                MAP_LOAD_FACTOR,
+                CONCURRENCY,
+                Eviction.LIRS,
+                new BufferedConcurrentHashMap.EvictionListener<Integer, Integer>() {
+                    public void evicted(Integer arg0, Integer arg1) {
+                    }
+                }));
     }
 
     public void testLRUStress() throws Exception {
         for (int i = 0; i < 20; i++) {
             doTest(new BufferedConcurrentHashMap<Integer, Integer>(
                     MAP_CAPACITY, MAP_LOAD_FACTOR, CONCURRENCY, Eviction.LRU,
-                    null),
+                    new BufferedConcurrentHashMap.EvictionListener<Integer, Integer>() {
+                        public void evicted(Integer arg0, Integer arg1) {
+                        }
+                    }),
                     48,// nreaders
                     6, // nwriters
                     4, // nremoves

@@ -1689,7 +1689,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	public boolean isStable() {
 
-		return _bufferStrategy.isStable();
+	    return _bufferStrategy.isStable();
 
 	}
 
@@ -1761,7 +1761,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
-	final public long getLastCommitTime() {
+    final public long getLastCommitTime() {
 
 		final ReadLock lock = _fieldReadWriteLock.readLock();
 
@@ -2263,12 +2263,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 					 * block.
 					 */
 
-					if (commitTime <= priorCommitTime) {
-
-						throw new RuntimeException("Time goes backwards: commitTime=" + commitTime
-								+ ", but lastCommitTime=" + priorCommitTime + " on the current root block");
-
-					}
+                    assertPriorCommitTimeAdvances(commitTime, priorCommitTime);
 
 				}
 
@@ -2368,6 +2363,30 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		}
 
 	}
+
+    /**
+     * Method verifies that the commit time strictly advances on the local store
+     * by checking against the current root block.
+     * 
+     * @param commitTime
+     *            The proposed commit time.
+     * 
+     * @throws IllegalArgumentException
+     *             if the <i>commitTime</i> is LTE the value reported by
+     *             {@link IRootBlockView#getLastCommitTime()}.
+     */
+    protected void assertPriorCommitTimeAdvances(final long currentCommitTime,
+            final long priorCommitTime) {
+
+        if (currentCommitTime <= priorCommitTime) {
+
+            throw new RuntimeException("Time goes backwards: commitTime="
+                    + currentCommitTime + ", but lastCommitTime="
+                    + priorCommitTime + " on the current root block");
+
+        }
+
+    }
 
 	public void force(final boolean metadata) {
 
