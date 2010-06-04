@@ -574,7 +574,8 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
     final public int pos(final int pos) {
 
         if (pos < 0 || pos >= buf.length)
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("pos=" + pos + ", capacity="
+                    + buf.length);
 
         int v = this.pos;
 
@@ -769,6 +770,27 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
         
     }
 
+    /**
+     * Relative method advances the position and the limit by <i>len</i> bytes
+     * (this simulates a relative <i>put</i> method, but does not write any
+     * data).
+     * 
+     * @param len
+     *            The #of bytes to advance (non-negative).
+     */
+    final public void advancePosAndLimit(final int len) {
+
+        if (len < 0)
+            throw new IllegalArgumentException();
+
+        ensureCapacity(pos + len);
+
+        this.pos += len;
+
+        this.limit = this.pos;
+        
+    }
+    
     /**
      * Relative <i>put</i> method for writing a byte[] on the buffer.
      * 

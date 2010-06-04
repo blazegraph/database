@@ -27,7 +27,7 @@ package com.bigdata.striterator;
 import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Logger;
 
@@ -125,27 +125,44 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
      * @param service
      *            The service on which the task will be executed.
      */
+    // Note: Synchronized for atomic decision making and publication of [resolvedItr].
+    synchronized 
     public AbstractChunkedResolverator<E, F, S> start(final ExecutorService service) {
-        
+    
         if (resolvedItr != null)
             throw new IllegalStateException();
-        
-        /*
-         * Create and run a task which reads chunks from the source iterator and
-         * writes resolved chunks on the buffer.
-         */
-        final Future<?> f = service.submit(new ChunkConsumerTask());
 
-        /*
-         * Set the future for that task on the buffer.
-         */
-        buffer.setFuture(f);
-        
+		/*
+		 * Create a task which reads chunks from the source iterator and writes
+		 * resolved chunks on the buffer.
+		 */
+		final FutureTask<Long> ft = new FutureTask<Long>(
+				new ChunkConsumerTask());
+
+		/*
+		 * Set the future for that task on the buffer.
+		 */
+		buffer.setFuture(ft);
+
         /*
          * This class will read resolved chunks from the [resolvedItr] and then
          * hand out BigdataStatements from the current [chunk].
          */
         resolvedItr = buffer.iterator();
+        
+		// Submit the task for execution.
+		service.execute(ft);
+
+//        /*
+//         * Create and run a task which reads chunks from the source iterator and
+//         * writes resolved chunks on the buffer.
+//         */
+//        final Future<?> f = service.submit(new ChunkConsumerTask());
+//
+//        /*
+//         * Set the future for that task on the buffer.
+//         */
+//        buffer.setFuture(f);
         
         return this;
         

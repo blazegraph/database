@@ -40,23 +40,23 @@ import com.bigdata.util.InnerCause;
 
 /**
  * Pattern using a {@link FutureTask} to force synchronization only on tasks
- * waiting for the same computation.  This is based on Java Concurrency in
+ * waiting for the same computation. This is based on Java Concurrency in
  * Practice, page 108.
+ * <p>
+ * Concrete implementations MUST provide a means to limit the size of the
+ * {@link #cache}. Because the {@link #cache} is unbounded, it will just take on
+ * more and more memory as new results are computed. This could be handled by
+ * imposing a capacity constraint on the cache, by the use of
+ * {@link WeakReference}s if they can be made to stand for the specific
+ * computation to be performed, or by the use of a timeout on the cache entries.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Memoizer<A, V> implements Computable<A, V> {
+abstract public class Memoizer<A, V> implements Computable<A, V> {
 
     /**
      * Cache accumulates results.
-     * 
-     * @todo Because the cache is unbounded, it will just take on more and more
-     *       memory as new results are computed. This could be handled by
-     *       imposing a capacity constraint on the cache, by the use of
-     *       {@link WeakReference}s if they can be made to stand for the
-     *       specific computation to be performed, or by the use of a timeout on
-     *       the cache entries.
      */
     protected final ConcurrentMap<A, Future<V>> cache = new ConcurrentHashMap<A, Future<V>>();
 
@@ -92,6 +92,18 @@ public class Memoizer<A, V> implements Computable<A, V> {
             } catch (CancellationException e) {
                 // remove cancelled task iff still our task.
                 cache.remove(arg, f);
+			} catch (InterruptedException e) {
+				/*
+				 * Wrap the exception to indicate whether or not the interrupt
+				 * occurred in the thread of the caller that executed the
+				 * FutureTask in its thread. This is being done as an aid to
+				 * diagosing situations where f.get() throws out an
+				 * InterruptedException.
+				 */
+				final InterruptedException e2 = new InterruptedException(
+						"Interrupted: willRun=" + willRun);
+				e2.initCause(e);
+				throw e2;
             } catch (ExecutionException e) {
                 if (!willRun
                         && InnerCause.isInnerCause(e,

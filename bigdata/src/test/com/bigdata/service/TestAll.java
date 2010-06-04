@@ -98,16 +98,22 @@ public class TestAll extends TestCase {
         // unit tests of single-phase and distributed tx commit protocol.
         suite.addTestSuite(TestDistributedTransactionService.class);
         
-        // test journal overflow scenarios (split/join).
-        suite.addTestSuite( TestOverflow.class );
+        // test basic journal overflow scenario.
+        suite.addTestSuite(TestOverflow.class);
         
-        // test journal overflow scenarios (move) 
-        suite.addTestSuite( TestIndexPartitionMove.class );
-        
+        // test split/join (inserts eventually split; deletes eventually join).
+        suite.addTestSuite(TestSplitJoin.class);
+
+        // test scatter splits with 2DS.
+        suite.addTestSuite(TestScatterSplit.class);
+
+        // test journal overflow scenarios (move)
+        suite.addTestSuite(TestMove.class);
+
         /*
          * Stress test of concurrent clients writing on a single data service.
          */
-        suite.addTestSuite( StressTestConcurrent.class );
+        suite.addTestSuite(StressTestConcurrent.class);
 
         return suite;
         

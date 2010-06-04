@@ -648,8 +648,8 @@ public abstract class AbstractNode<T extends AbstractNode
             
         }
         
-        public PostOrderEntryIterator(AbstractBTree btree,
-                Iterator postOrderNodeIterator, final byte[] fromKey,
+        public PostOrderEntryIterator(final AbstractBTree btree,
+                final Iterator postOrderNodeIterator, final byte[] fromKey,
                 final byte[] toKey, int flags) {
             
             assert postOrderNodeIterator != null;

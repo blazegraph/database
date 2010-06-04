@@ -71,6 +71,8 @@ public class Test extends RepositoryCreator {
   /** name of file to hold the query test result */
   private static final String QUERY_TEST_RESULT_FILE;
     static {
+    	final String resultFile = System.getProperty("lubm.resultFile");
+    	if(resultFile== null) {
         /*
          * Note: the hostname is used as part of the filename to help keep track
          * of the results and to allow runs when the test harness is on an
@@ -84,6 +86,9 @@ public class Test extends RepositoryCreator {
             hostname = "localhost";
         }
         QUERY_TEST_RESULT_FILE = hostname + "-result.txt";
+    	} else {
+    	QUERY_TEST_RESULT_FILE = resultFile;
+    	}
   }
 
   /** list of target systems */
@@ -169,6 +174,7 @@ public class Test extends RepositoryCreator {
       createKbList(kbConfigFile);
       createQueryList(queryConfigFile);
       doTestQuery();
+      queryTestResultFile_.flush();
       queryTestResultFile_.close();
     }
     catch (IOException e) {
@@ -556,12 +562,14 @@ public class Test extends RepositoryCreator {
     }
     System.out.println();
     System.out.println("query\tTime\tResult#");
+    long totalDuration = 0;
     for (int j = 0; j < queryList_.size(); j++) {
       query = (QuerySpecification)queryList_.get(j);
       System.out.print(query.id_);
       for (int i = 0; i < kbList_.size(); i++) {
         kb = (KbSpecification)kbList_.get(i);
         result = queryTestResults_[i][j];
+        totalDuration += result.duration_;
         System.out.print("\t" + result.duration_ + "\t" + result.resultNum_);
         if(!result.consistent) {
             System.out.print("\tINCONSISTENT");
@@ -569,5 +577,6 @@ public class Test extends RepositoryCreator {
       }
       System.out.println();
     }
+    System.out.println("Total\t"+totalDuration);
   }
 }

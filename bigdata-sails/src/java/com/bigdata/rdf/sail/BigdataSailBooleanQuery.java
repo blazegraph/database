@@ -14,7 +14,8 @@ import org.openrdf.sail.SailException;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.store.BD;
 
-public class BigdataSailBooleanQuery extends SailBooleanQuery {
+public class BigdataSailBooleanQuery extends SailBooleanQuery 
+        implements BigdataSailQuery {
     
     /**
      * Query hints are embedded in query strings as namespaces.  
@@ -63,4 +64,19 @@ public class BigdataSailBooleanQuery extends SailBooleanQuery {
             throw new QueryEvaluationException(e.getMessage(), e);
         }
     }
+
+    public TupleExpr getTupleExpr() throws QueryEvaluationException {
+        TupleExpr tupleExpr = getParsedQuery().getTupleExpr();
+        try {
+            BigdataSailConnection sailCon =
+                (BigdataSailConnection) getConnection().getSailConnection();
+            tupleExpr = sailCon.optimize(tupleExpr, getActiveDataset(), 
+                    getBindings(), getIncludeInferred(), queryHints);
+            return tupleExpr;
+        }
+        catch (SailException e) {
+            throw new QueryEvaluationException(e.getMessage(), e);
+        }
+    }
+
 }

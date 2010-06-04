@@ -150,7 +150,7 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
 
     public void test_U1() throws InterruptedException {
         
-        final File file = new File("../rdf-data/lehigh/U1");
+        final File file = new File("bigdata-rdf/src/resources/data/lehigh/U1");
 //      final File file = new File("../rdf-data/lehigh/U1/University0_0.owl");
       
         RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client
@@ -167,7 +167,8 @@ public class TestTripleStoreLoadRateWithEmbeddedFederation extends
     
     public void test_U10() throws InterruptedException {
 
-        final File file = new File("../rdf-data/lehigh/U10");
+        final File file = new File("bigdata-rdf/src/resources/data/lehigh/U10.zip");
+//        final File file = new File("../rdf-data/lehigh/U10");
 
         RDFLoadAndValidateHelper helper = new RDFLoadAndValidateHelper(client.getFederation(),
                 nthreads, bufferCapacity, file, filter);

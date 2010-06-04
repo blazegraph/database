@@ -72,4 +72,17 @@ public class TestStoreAndAddressLRUCache extends
 
     }
 
+//    /**
+//     * This is a hook for running just this test under the profiler.
+//     * 
+//     * @throws ExecutionException
+//     * @throws InterruptedException
+//     */
+//    public void test_concurrentOperations() throws InterruptedException,
+//            ExecutionException {
+//
+//        super.test_concurrentOperations();
+//
+//    }
+
 }

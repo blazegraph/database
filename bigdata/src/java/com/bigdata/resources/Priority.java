@@ -1,6 +1,5 @@
 package com.bigdata.resources;
 
-import java.util.Comparator;
 
 /**
  * Class used to place {@link ViewMetadata} objects into a total order based on

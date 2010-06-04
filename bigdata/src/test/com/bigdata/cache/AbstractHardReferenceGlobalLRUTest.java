@@ -29,16 +29,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.cache;
 
 import java.util.Random;
+import java.util.concurrent.ExecutionException;
 
 import junit.framework.TestCase2;
 
 import com.bigdata.cache.IGlobalLRU.ILRUCache;
+import com.bigdata.cache.StressTestGlobalLRU.Op;
 import com.bigdata.io.FixedByteArrayBuffer;
 import com.bigdata.io.IDataRecordAccess;
 import com.bigdata.io.IFixedDataRecord;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
+import com.bigdata.test.ExperimentDriver.Result;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -116,9 +119,37 @@ public class AbstractHardReferenceGlobalLRUTest extends TestCase2 {
 
     /**
      * Unit test explores tracking of the {@link ILRUCache#size()} and the
-     * bytesInMemory for the {@link HardReferenceGlobalLRU}.
+     * bytesInMemory for the {@link IGlobalLRU}.
+     * <p>
+     * Note: This test assumes that the updates to the counters are synchronous.
+     * Therefore it MUST be overridden for {@link IGlobalLRU} implementations
+     * using lock amortization strategies based on buffering access policy
+     * updates since otherwise the updates will reside in buffers rather than
+     * being pushed through synchronously and the counters will not reflect the
+     * API invocations in a synchronous manner.
+     * 
+     * @see BCHMGlobalLRU
+     * @see BCHMGlobalLRU2
      */
     public void test_counters() {
+        
+        if (lru instanceof BCHMGlobalLRU<?>) {
+
+            /*
+             * Note: This test will <em>fail</em> if the {@link IGlobalLRU}
+             * buffers references since the counters will not be updated until
+             * the reference is batched through to the backing access policy
+             * even though the cache map has been updated. {@link BCHMGlobalLRU}
+             * CAN NOT pass this test because we can not dial down the buffer
+             * size to ONE (1) for that implementation.
+             */
+
+            if (log.isInfoEnabled())
+                log.info("Skipping unit test: " + lru.getClass());
+            
+            return;
+            
+        }
 
         // initial state.
         assertEquals(0, lru.getRecordCount());
@@ -167,12 +198,15 @@ public class AbstractHardReferenceGlobalLRUTest extends TestCase2 {
         // now clear the cache and verify the counters all go to zero and
         // that the entries in the cache were removed.
         cache1.clear();
-        assertEquals(0, lru.getRecordCount());
-        assertEquals(0, lru.getBytesInMemory());
-        assertEquals(0, lru.getEvictionCount());
+        assertEquals("recordCount", 0, lru.getRecordCount());
+        assertEquals("bytesInMemory", 0, lru.getBytesInMemory());
+        assertEquals("evictionCount", 0, lru.getEvictionCount());
         assertNull(cache1.get(1L));
         assertNull(cache1.get(2L));
         
+		if (log.isInfoEnabled())
+			log.info(lru.getCounterSet().toString());
+
     }
 
     /**
@@ -207,16 +241,18 @@ public class AbstractHardReferenceGlobalLRUTest extends TestCase2 {
                 nremoved++;
             }
         }
-        assertEquals(recordCount0 - nremoved, lru.getRecordCount());
+        final int remaining = recordCount0 - nremoved;
+        assertEquals("remaining records(nremoved=" + nremoved + ")", remaining,
+                lru.getRecordCount());
 
 //        // before clear
 //        System.out.println(lru.toString());
 
         // clear the cache and verify all counters were cleared.
         cache1.clear();
-        assertEquals(0, lru.getRecordCount());
-        assertEquals(0, lru.getBytesInMemory());
-        assertEquals(0, lru.getEvictionCount());
+        assertEquals("recordCount", 0, lru.getRecordCount());
+        assertEquals("bytesInMemory", 0, lru.getBytesInMemory());
+        assertEquals("evictionCount", 0, lru.getEvictionCount());
 
 //        // after clear.
 //        System.out.println(lru.toString());
@@ -229,37 +265,47 @@ public class AbstractHardReferenceGlobalLRUTest extends TestCase2 {
         
         // add a first record.
         assertNull(cache2.putIfAbsent(1L, new MockDataRecord(new byte[1])));
-        assertEquals(1, lru.getRecordCount());
-        assertEquals(1, lru.getBytesInMemory());
-        assertEquals(0, lru.getEvictionCount());
+        assertEquals("recordCount", 1, lru.getRecordCount());
+        assertEquals("bytesInMemory", 1, lru.getBytesInMemory());
+        assertEquals("evictionCount", 0, lru.getEvictionCount());
 
         // add a 2nd record.
         assertNull(cache2.putIfAbsent(2L, new MockDataRecord(new byte[2])));
-        assertEquals(2, lru.getRecordCount());
-        assertEquals(3, lru.getBytesInMemory());
-        assertEquals(0, lru.getEvictionCount());
+        assertEquals("recordCount", 2, lru.getRecordCount());
+        assertEquals("bytesInMemory", 3, lru.getBytesInMemory());
+        assertEquals("evictionCount", 0, lru.getEvictionCount());
 
 //        // before clear
 //        System.out.println(lru.toString());
 
         // clear the cache and verify all counters were cleared.
         cache2.clear();
-        assertEquals(0, lru.getRecordCount());
-        assertEquals(0, lru.getBytesInMemory());
-        assertEquals(0, lru.getEvictionCount());
+        assertEquals("recordCount", 0, lru.getRecordCount());
+        assertEquals("bytesInMemory", 0, lru.getBytesInMemory());
+        assertEquals("evictionCount", 0, lru.getEvictionCount());
 
 //        // after clear.
 //        System.out.println(lru.toString());
 
     }
 
+    /**
+     * Wraps a byte[] as a mock data record.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     */
     protected static class MockDataRecord implements IDataRecordAccess {
 
         private final byte[] data;
         
         public MockDataRecord(final byte[] data) {
+            
             assert data != null;
+            
             this.data = data;
+            
         }
         
         public IFixedDataRecord data() {
@@ -270,4 +316,43 @@ public class AbstractHardReferenceGlobalLRUTest extends TestCase2 {
         
     }
 
+    /**
+     * Run a stress test on the {@link IGlobalLRU}.
+     * 
+     * @throws ExecutionException
+     * @throws InterruptedException
+     * 
+     * @see StressTestGlobalLRU, which is used to measure the throughput of the
+     *      various {@link IGlobalLRU} implementations.
+     */
+    final public void test_concurrentOperations() throws InterruptedException,
+            ExecutionException {
+        
+        final long timeout = 20L;// seconds
+        final int nthreads = Runtime.getRuntime().availableProcessors() + 1;
+        final int nops = 100000000;// should finish w/in 20s.
+        final int nrecords = 10000;
+        final int nstores = 5;
+
+        /*
+         * get, put, remove, clearCache, deleteCache, discardAllCaches.
+         * 
+         * @todo any clearing of caches is might be too much based on the
+         * XorShift pseudo-random generator. Certainly, I am seeing too much
+         * when those parameters are non-zero.
+         * 
+         * Note: deleteCache and discardAllCaches DO NOT guarantee consistency
+         * if there are concurrent operations against the cache and MIGHT NOT
+         * be safe for all implementations.
+         */
+        final Op gen = new Op(.8f, .2f, .005f, .0001f, .00005f, .00001f);
+////        final Op gen = new Op(.8f, .2f, .005f, 0f, 0f, 0f);
+
+        StressTestGlobalLRU.doStressTest(timeout, nthreads, nops, nrecords,
+                nstores, gen, lru);
+        
+        System.err.println(lru.getCounterSet().toString());
+
+    }
+    
 }

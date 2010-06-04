@@ -30,9 +30,6 @@ package com.bigdata.btree;
 
 import java.io.Serializable;
 
-import com.bigdata.resources.IPartitionIdFactory;
-import com.bigdata.resources.ResourceManager;
-import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
@@ -42,7 +39,7 @@ import com.bigdata.sparse.SparseRowStore;
  * <p>
  * Note: applications frequency must constrain the allowable separator keys when
  * splitting an index partition into two or more index partitions. For example,
- * the {@link SparseRowStore} must to maintain an guarentee of atomic operations
+ * the {@link SparseRowStore} must to maintain an guarantee of atomic operations
  * for a logical row, which is in turn defined as the ordered set of index
  * entries sharing the same primary key. You can use this interface to impose
  * application specific constraints such that the index partition boundaries
@@ -50,70 +47,73 @@ import com.bigdata.sparse.SparseRowStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by {@link ISimpleSplitHandler}. This is only kept around to
+ *             deserialize existing instances.
  */
 public interface ISplitHandler extends Serializable {
 
-    /**
-     * Return <code>true</code> if a cursory examination of an index partition
-     * suggests that it SHOULD be split into 2 or more index partitions.
-     * 
-     * @param rangeCount
-     *            A fast range count (may overestimate).
-     * 
-     * @return <code>true</code> if the index partition should be split.
-     */
-    public boolean shouldSplit(long rangeCount);
-
-    /**
-     * Return the percentage of a single nominal split that would be satisified
-     * by an index partition based on the specified range count. If the index
-     * partition has exactly the desired number of tuples, then return ONE
-     * (1.0). If the index partition has 50% of the desired #of tuples, then
-     * return <code>.5</code>. If the index partition could be used to build
-     * two splits, then return TWO (2.0), etc.
-     * 
-     * @param rangeCount
-     *            A fast range count (may overestimate).
-     * 
-     * @return The percentage of a split per above.
-     */
-    public double percentOfSplit(long rangeCount);
-    
-    /**
-     * Return <code>true</code> if a cursory examination of an index partition
-     * suggests that it SHOULD be joined with either its left or right sibling.
-     * The basic determination is that the index partition is "undercapacity".
-     * Normally this is decided in terms of the range count of the index
-     * partition.
-     * 
-     * @param rangeCount
-     *            A fast range count (may overestimate).
-     * 
-     * @return <code>true</code> if the index partition should be joined.
-     */
-    public boolean shouldJoin(long rangeCount);
-
-    /**
-     * Choose a set of splits that completely span the key range of the index
-     * view. The first split MUST use the leftSeparator of the index view as its
-     * leftSeparator. The last split MUST use the rightSeparator of the index
-     * view as its rightSeparator. The #of splits SHOULD be chosen such that the
-     * resulting index partitions are each at least 50% full.
-     * 
-     * @param partitionIdFactory
-     * 
-     * @param ndx
-     *            The source index partition.
-     * 
-     * @return A {@link Split}[] array contains everything that we need to
-     *         define the new index partitions -or- <code>null</code> if a more
-     *         detailed examination reveals that the index SHOULD NOT be split
-     *         at this time.
-     */
-//    * @param btreeCounters
-//    *            Performance counters for the index partition view collected
-//    *            since the last overflow.
-    public Split[] getSplits(IPartitionIdFactory partitionIdFactory,
-            ILocalBTreeView ndx);//, BTreeCounters btreeCounters);
+//    /**
+//     * Return <code>true</code> if a cursory examination of an index partition
+//     * suggests that it SHOULD be split into 2 or more index partitions.
+//     * 
+//     * @param rangeCount
+//     *            A fast range count (may overestimate).
+//     * 
+//     * @return <code>true</code> if the index partition should be split.
+//     */
+//    public boolean shouldSplit(long rangeCount);
+//
+//    /**
+//     * Return the percentage of a single nominal split that would be satisified
+//     * by an index partition based on the specified range count. If the index
+//     * partition has exactly the desired number of tuples, then return ONE
+//     * (1.0). If the index partition has 50% of the desired #of tuples, then
+//     * return <code>.5</code>. If the index partition could be used to build
+//     * two splits, then return TWO (2.0), etc.
+//     * 
+//     * @param rangeCount
+//     *            A fast range count (may overestimate).
+//     * 
+//     * @return The percentage of a split per above.
+//     */
+//    public double percentOfSplit(long rangeCount);
+//    
+//    /**
+//     * Return <code>true</code> if a cursory examination of an index partition
+//     * suggests that it SHOULD be joined with either its left or right sibling.
+//     * The basic determination is that the index partition is "undercapacity".
+//     * Normally this is decided in terms of the range count of the index
+//     * partition.
+//     * 
+//     * @param rangeCount
+//     *            A fast range count (may overestimate).
+//     * 
+//     * @return <code>true</code> if the index partition should be joined.
+//     */
+//    public boolean shouldJoin(long rangeCount);
+//
+//    /**
+//     * Choose a set of splits that completely span the key range of the index
+//     * view. The first split MUST use the leftSeparator of the index view as its
+//     * leftSeparator. The last split MUST use the rightSeparator of the index
+//     * view as its rightSeparator. The #of splits SHOULD be chosen such that the
+//     * resulting index partitions are each at least 50% full.
+//     * 
+//     * @param partitionIdFactory
+//     * 
+//     * @param ndx
+//     *            The source index partition.
+//     * 
+//     * @return A {@link Split}[] array contains everything that we need to
+//     *         define the new index partitions -or- <code>null</code> if a more
+//     *         detailed examination reveals that the index SHOULD NOT be split
+//     *         at this time.
+//     */
+////    * @param btreeCounters
+////    *            Performance counters for the index partition view collected
+////    *            since the last overflow.
+//    public Split[] getSplits(IPartitionIdFactory partitionIdFactory,
+//            ILocalBTreeView ndx);//, BTreeCounters btreeCounters);
 
 }

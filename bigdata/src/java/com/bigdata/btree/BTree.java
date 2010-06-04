@@ -633,13 +633,13 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
         
         if (INFO)
             log.info("old=" + this.lastCommitTime + ", new=" + lastCommitTime);
-        
-        if (this.lastCommitTime != 0L && this.lastCommitTime > lastCommitTime) {
+        // Note: Commented out to allow replay of historical transactions.
+        /*if (this.lastCommitTime != 0L && this.lastCommitTime > lastCommitTime) {
 
             throw new IllegalStateException("Updated lastCommitTime: old="
                     + this.lastCommitTime + ", new=" + lastCommitTime);
             
-        }
+        }*/
 
         this.lastCommitTime = lastCommitTime;
         
@@ -2008,7 +2008,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
          * The purpose of this stack is to ensure that the ancestors of the
          * current leaf remain strongly reachable while the cursor is positioned
          * on that leaf. This is necessary in order for the methods that change
-         * the cursor position {@link #next()} {@link #prior()} to succeeed
+         * the cursor position {@link #next()} {@link #prior()} to succeed
          * since they depend on the parent references which could otherwise be
          * cleared (parent references of nodes and leaves are weak references).
          * This means that hard references MUST be held to all {@link Node}s
@@ -2048,7 +2048,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
         /**
          * Save a copy of the {@link #stack}.
          */
-        @SuppressWarnings("unchecked")
+//        @SuppressWarnings("unchecked")
         private void backup() {
             
             assert stack != null;

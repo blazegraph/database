@@ -37,7 +37,7 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
-import com.bigdata.rdf.model.BigdataBNodeImpl;
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -148,6 +148,6 @@ public interface IStatementBuffer<F extends Statement> extends IBuffer<F> {
      * @throws IllegalStateException
      *             if the map has already been allocated.
      */
-    public void setBNodeMap(Map<String, BigdataBNodeImpl> bnodes);
+    public void setBNodeMap(Map<String, BigdataBNode> bnodes);
     
 }

@@ -38,6 +38,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.ISolutionExpander;
+import com.bigdata.relation.rule.IStarJoin;
 import com.bigdata.relation.rule.IVariableOrConstant;
 
 /**
@@ -454,7 +455,8 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
      * if not optional and infinite if optional.
      */
     public long cardinality(final int tailIndex) {
-        if (rule.getTail(tailIndex).isOptional()) {
+        IPredicate tail = rule.getTail(tailIndex);
+        if (tail.isOptional() || tail instanceof IStarJoin) {
             return Long.MAX_VALUE;
         } else {
             return rangeCount(tailIndex);

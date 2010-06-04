@@ -36,6 +36,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.TimestampUtility;
 
 /**
  * Helper class.
@@ -51,9 +52,9 @@ public class GlobalRowStoreHelper {
     
     protected static final transient Logger log = Logger.getLogger(GlobalRowStoreHelper.class);
     
-    protected static final boolean INFO = log.isInfoEnabled();
+//    protected static final boolean INFO = log.isInfoEnabled();
     
-    public GlobalRowStoreHelper(IIndexManager indexManager) {
+    public GlobalRowStoreHelper(final IIndexManager indexManager) {
         
         if (indexManager == null)
             throw new IllegalArgumentException();
@@ -67,7 +68,7 @@ public class GlobalRowStoreHelper {
      */
     synchronized public SparseRowStore getGlobalRowStore() {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("");
 
         if (globalRowStore == null) {
@@ -77,18 +78,29 @@ public class GlobalRowStoreHelper {
 
             if (ndx == null) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Global row store does not exist - will try to register now");
                 
                 try {
 
                     /*
+                     * Note: This specifies an split handler that keeps the
+                     * logical row together. This is a hard requirement. The
+                     * atomic read/update guarantee depends on this.
+                     * 
                      * @todo The global row store does not get properties so
                      * only system defaults are used when it is registered.
                      */
                     
-                    indexManager.registerIndex(new IndexMetadata(GLOBAL_ROW_STORE_INDEX,
-                            UUID.randomUUID()));
+                    final IndexMetadata indexMetadata = new IndexMetadata(
+                            GLOBAL_ROW_STORE_INDEX, UUID.randomUUID());
+
+                    // Ensure that splits do not break logical rows.
+                    indexMetadata
+                            .setSplitHandler(LogicalRowSplitHandler.INSTANCE);
+
+                    // Register the index.
+                    indexManager.registerIndex(indexMetadata);
 
                 } catch (Exception ex) {
 
@@ -117,15 +129,16 @@ public class GlobalRowStoreHelper {
     private transient SparseRowStore globalRowStore;
 
     /**
-     * Return an {@link ITx#READ_COMMITTED} view IFF the backing index exists.
+     * Return a view of the global row store as of the specified timestamp IFF
+     * the backing index exists as of that timestamp.
      */
-    synchronized public SparseRowStore getReadCommitted() {
+    public SparseRowStore get(final long timestamp) {
 
-        if (INFO)
-            log.info("");
+        if (log.isInfoEnabled())
+            log.info(TimestampUtility.toString(timestamp));
 
         final IIndex ndx = indexManager.getIndex(GLOBAL_ROW_STORE_INDEX,
-                ITx.READ_COMMITTED);
+                timestamp);
 
         if (ndx == null) {
 

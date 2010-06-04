@@ -36,6 +36,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.bigdata.BigdataStatics;
+import com.bigdata.LRUNexus.CacheSettings;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
@@ -148,6 +149,20 @@ public class HardReferenceGlobalLRURecyclerExplicitDeleteRequired<K, V> implemen
     private volatile Entry<K, V> last = null;
 
     /**
+     * The designated constructor used by {@link CacheSettings}.
+     * 
+     * @param s
+     *            The {@link CacheSettings}.
+     */
+    public HardReferenceGlobalLRURecyclerExplicitDeleteRequired(
+            final CacheSettings s) {
+
+        this(s.maximumBytesInMemory, s.minCleared, s.minCacheSetSize,
+                s.initialCacheCapacity, s.loadFactor);
+
+    }
+
+    /**
      * 
      * @param maximumBytesInMemory
      *            The maximum bytes in memory for the cached records across all
@@ -251,12 +266,24 @@ public class HardReferenceGlobalLRURecyclerExplicitDeleteRequired<K, V> implemen
         
     }
     
+    public long getBytesOnDisk() {
+
+        return counters.bytesOnDisk.get();
+        
+    }
+    
     public long getBytesInMemory() {
 
         return counters.bytesInMemory.get();
         
     }
     
+    public long getMaximumBytesInMemory() {
+
+        return maximumBytesInMemory;
+        
+    }
+
     public int getCacheSetSize() {
         
         return cacheSet.size();

@@ -119,16 +119,23 @@ public class DataServicesClient extends
      */
     public IDataService getDataService(final UUID serviceUUID) {
 
-        if (serviceUUID.equals(thisServiceUUID)) {
-
-            /*
-             * Return the actual service reference rather than a proxy to avoid
-             * RMI when this service makes a request to itself.
-             */
-
-            return (IDataService) thisService;
-
-        }
+        /*
+         * Note: I have backed out this optimization as it raises concerns that
+         * code written to assume RMI might rely on the deserialized objects
+         * returned from the proxy being independent of the objects on the
+         * remote service. Since the main optimization of interest is joins, I
+         * will handle this explicitly from within the distributed join logic.
+         */
+//        if (serviceUUID.equals(thisServiceUUID)) {
+//
+//            /*
+//             * Return the actual service reference rather than a proxy to avoid
+//             * RMI when this service makes a request to itself.
+//             */
+//
+//            return (IDataService) thisService;
+//
+//        }
         
         final ServiceItem serviceItem = getServiceItem(serviceUUID);
         

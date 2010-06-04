@@ -24,7 +24,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.spo;
 
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
 
+import com.bigdata.rdf.spo.SPOStarJoin.SPOStarConstraint;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.ArrayBindingSet;
 import com.bigdata.relation.rule.Constant;
@@ -34,6 +38,7 @@ import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
+import com.bigdata.relation.rule.IStarJoin.IStarConstraint;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -57,24 +62,24 @@ public class SPOPredicate implements IPredicate<ISPO> {
      */
     private static final long serialVersionUID = 1396017399712849975L;
 
-    private final String[] relationName;
+    protected final String[] relationName;
 
-    private final int partitionId;
+    protected final int partitionId;
     
-    private final IVariableOrConstant<Long> s;
+    protected final IVariableOrConstant<Long> s;
 
-    private final IVariableOrConstant<Long> p;
+    protected final IVariableOrConstant<Long> p;
 
-    private final IVariableOrConstant<Long> o;
+    protected final IVariableOrConstant<Long> o;
 
     /** The context position MAY be <code>null</code>. */
-    private final IVariableOrConstant<Long> c;
+    protected final IVariableOrConstant<Long> c;
 
-    private final boolean optional;
+    protected final boolean optional;
     
-    private final IElementFilter<ISPO> constraint;
+    protected final IElementFilter<ISPO> constraint;
 
-    private final ISolutionExpander<ISPO> expander;
+    protected final ISolutionExpander<ISPO> expander;
     
     public String getOnlyRelationName() {
         
@@ -387,6 +392,28 @@ public class SPOPredicate implements IPredicate<ISPO> {
     }
 
     /**
+     * Pure copy constructor.
+     */
+    protected SPOPredicate(final SPOPredicate src) {
+
+        this.relationName = src.relationName;
+        
+        this.partitionId = src.partitionId;
+        
+        this.s = src.s;
+        this.p = src.p;
+        this.o = src.o;
+        this.c = src.c;
+        
+        this.optional = src.optional;
+        
+        this.constraint = src.constraint;
+        
+        this.expander = src.expander;
+        
+    }
+
+    /**
      * Constrain the predicate by setting the context position. If the context
      * position on the {@link SPOPredicate} is non-<code>null</code>, then you
      * must use {@link #asBound(IBindingSet)} to replace all occurrences of the
@@ -583,7 +610,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
      * The #of arguments in the predicate that are variables (the context
      * position iff it is non-null).
      */
-    final public int getVariableCount() {
+    public int getVariableCount() {
 
         return (s.isVar() ? 1 : 0) + (p.isVar() ? 1 : 0) + (o.isVar() ? 1 : 0)
                 + (c == null ? 0 : (c.isVar() ? 1 : 0));
@@ -782,7 +809,13 @@ public class SPOPredicate implements IPredicate<ISPO> {
     }
 
     public String toString(final IBindingSet bindingSet) {
-
+        
+        return toStringBuilder(bindingSet).toString();
+        
+    }
+    
+    protected StringBuilder toStringBuilder(final IBindingSet bindingSet) {
+        
         final StringBuilder sb = new StringBuilder();
 
         sb.append("(");
@@ -858,7 +891,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
             
         }
         
-        return sb.toString();
+        return sb;
 
     }
 

@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.service;
 
-import com.bigdata.btree.IndexSegment;
 import com.bigdata.mdi.IPartitionMetadata;
 
 /**
@@ -81,11 +80,6 @@ public class Split {
      * @param toIndex
      *            The index of the first key that will NOT enter that index
      *            partition (exclusive upper bound).
-     * 
-     * @todo The fromKey, toKey in the {@link IPartitionMetadata} fully specify
-     *       the split so the fromIndex,toIndex here are really redundent.
-     *       Perhaps the help when building an {@link IndexSegment} from the
-     *       {@link Split}?
      */
     public Split(final IPartitionMetadata pmd, final int fromIndex,
             final int toIndex) {
@@ -105,7 +99,7 @@ public class Split {
 
         this.toIndex = toIndex;
 
-        this.ntuples = toIndex - fromIndex;
+        this.ntuples = toIndex - fromIndex; // @todo this is off by one? (to - from + 1)?
 
     }
 
