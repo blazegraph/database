@@ -1876,11 +1876,11 @@ ${postInstallMessage}</echo>
         <test name="com.bigdata.quorum.TestAll" todir="${test.results.dir}" unless="testName" />
 <!-- @todo restore 
         <test name="com.bigdata.journal.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.journal.ha.TestAll" todir="${test.results.dir}" unless="testName" />
         -->
         <test name="com.bigdata.journal.TestWORMStrategy" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.rwstore.TestRWJournal" todir="${test.results.dir}" unless="testName" />
 <!-- end of specific journal test suite runs. -->
-        <test name="com.bigdata.journal.ha.TestAll" todir="${test.results.dir}" unless="testName" />
 
         <test name="com.bigdata.resources.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.mdi.TestAll" todir="${test.results.dir}" unless="testName" />
