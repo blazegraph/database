@@ -57,7 +57,8 @@ public class TestHardReferenceGlobalLRURecyclerExplicitDeleteRequired extends
 
         final long maximumBytesInMemory = 10 * Bytes.kilobyte;
 
-        final long minCleared = 0L;
+        // clear at least 25% of the memory.
+        final long minCleared = maximumBytesInMemory / 4;
 
         final int minimumCacheSetCapacity = 0;
 
@@ -71,4 +72,17 @@ public class TestHardReferenceGlobalLRURecyclerExplicitDeleteRequired extends
 
     }
 
+//    /**
+//     * This is a hook for running just this test under the profiler.
+//     * 
+//     * @throws ExecutionException
+//     * @throws InterruptedException
+//     */
+//    public void test_concurrentOperations() throws InterruptedException,
+//            ExecutionException {
+//
+//        super.test_concurrentOperations();
+//
+//    }
+    
 }

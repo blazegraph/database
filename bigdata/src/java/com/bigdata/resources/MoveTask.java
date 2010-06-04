@@ -148,7 +148,7 @@ import com.bigdata.service.ResourceService;
  * 
  * </ol>
  * 
- * FIXME javadoc update & unit tests.
+ * FIXME javadoc
  * <p>
  * Note: There are only two entry points: a simple move and a move where the
  * compacting merge has already been performed, e.g., by a split, and we just
@@ -552,11 +552,10 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
 
                 final long sourceCommitTime = src.getLastCommitTime();
 
-                bufferedWritesBuildResult = resourceManager
-                        .buildIndexSegment(sourceIndexName, src,
-                                true/* compactingMerge */, sourceCommitTime,
-                                null/* fromKey */, null/* toKey */,
-                                parentEvent);
+                bufferedWritesBuildResult = resourceManager.buildIndexSegment(
+                        sourceIndexName, src, false/* compactingMerge */,
+                        sourceCommitTime, null/* fromKey */, null/* toKey */,
+                        parentEvent);
 
                 {
 
@@ -661,7 +660,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
                     getJournal().dropIndex(getOnlyResource());
 
                     // notify successful index partition move.
-                    resourceManager.indexPartitionMoveCounter.incrementAndGet();
+                    resourceManager.overflowCounters.indexPartitionMoveCounter.incrementAndGet();
 
                 }
                 
@@ -733,7 +732,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
              * 
              * Note: It is not possible for the target index partition to be
              * successfully registered on the target data service unless the MDS
-             * was also updated successfully - this is guarenteed because the
+             * was also updated successfully - this is guaranteed because the
              * MDS update occurs within the UNISOLATED task which registers the
              * target index partition.
              */
@@ -747,7 +746,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
                  * This way, even if the Future was not returned correctly for
                  * the task which we submitted to receive the index partition on
                  * the target data service (due to an RMI error) then we are
-                 * guarenteed that our test WILL NOT execute until it can gain a
+                 * guaranteed that our test WILL NOT execute until it can gain a
                  * lock on the target index partition. This prevents us from
                  * attempting to verify the outcome of the task before it has
                  * completed in the odd case where it is running asynchronously
@@ -1003,7 +1002,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
                         )).get();
 
                 // update the index partition receive counter.
-                resourceManager.indexPartitionReceiveCounter.incrementAndGet();
+                resourceManager.overflowCounters.indexPartitionReceiveCounter.incrementAndGet();
 
                 return null;
                 

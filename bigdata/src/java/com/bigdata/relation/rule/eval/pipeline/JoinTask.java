@@ -12,17 +12,19 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
@@ -44,18 +46,18 @@ import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IStarJoin;
 import com.bigdata.relation.rule.IVariable;
+import com.bigdata.relation.rule.IStarJoin.IStarConstraint;
 import com.bigdata.relation.rule.eval.ChunkTrace;
 import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.relation.rule.eval.IRuleState;
 import com.bigdata.relation.rule.eval.ISolution;
-import com.bigdata.relation.rule.eval.RuleState;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.util.InnerCause;
-import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.concurrent.LatchedExecutor;
 
 /**
  * Consumes {@link IBindingSet} chunks from the previous join dimension.
@@ -112,18 +114,26 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       chunks when each {@link IAccessPath} realizes only a few accepted
  *       {@link IBindingSet}s). For an {@link ExecutorService} with a
  *       parallelism limit of N, there are therefore N
- *       {@link UnsynchronizedOutputBuffer}s. Those buffers must be flushed
- *       when the {@link JoinTask} exhausts its source(s).
- *       <p>
- *       Parallel {@link ChunkTask} processing may be useful when an
+ *       {@link UnsynchronizedOutputBuffer}s. Those buffers must be flushed when
+ *       the {@link JoinTask} exhausts its source(s). If the same set of threads
+ *       is not known to be reused for each {@link AccessPathTask} then the
+ *       actual #of buffers will be the #of distinct threads used. To reduce the
+ *       potential memory demand. striped locks could be used to protect a pool
+ *       of {@link UnsynchronizedArrayBuffer}s, but could lead to deadlock if
+ *       the buffer reference was exposed to the task (as opposed to adding the
+ *       object to the buffer within a private method, which hides that
+ *       reference) since there more than one thread demanding access to the
+ *       same buffer.
+ * 
+ * @todo Parallel {@link ChunkTask} processing may be useful when an
  *       {@link AccessPathTask} will consume a large #of chunks. Since the
  *       {@link IAccessPath#iterator()} is NOT thread-safe, reads on the
  *       {@link IAccessPath} must be sequential, but the chunks read from the
  *       {@link IAccessPath} can be placed onto a queue and parallel
- *       {@link ChunkTask}s can drain that queue, consuming the chunks. This
- *       can help by reducing the latency to materialize any given chunk.
+ *       {@link ChunkTask}s can drain that queue, consuming the chunks. This can
+ *       help by reducing the latency to materialize any given chunk.
  *       <p>
- *       the required change is to have a per-thread
+ *       The required change is to have a per-thread
  *       {@link UnsynchronizedArrayBuffer} feeding a thread-safe
  *       {@link UnsyncDistributedOutputBuffer} (potentially via a queue) which
  *       maps each generated binding set across the index partition(s) for the
@@ -149,7 +159,7 @@ abstract public class JoinTask implements Callable<Void> {
     static final protected boolean DEBUG = log.isDebugEnabled();
 
     /** The rule that is being evaluated. */
-    final protected IRule rule;
+    final protected IRule<?> rule;
 
     /**
      * The #of predicates in the tail of that rule.
@@ -173,13 +183,13 @@ abstract public class JoinTask implements Callable<Void> {
      * The {@link IPredicate} on which we are reading for this join
      * dimension.
      */
-    final protected IPredicate predicate;
+    final protected IPredicate<?> predicate;
 
     /**
      * The {@link IRelation} view on which we are reading for this join
      * dimensions.
      */
-    final protected IRelation relation;
+    final protected IRelation<?> relation;
 
     /**
      * The index into the evaluation {@link #order} for the predicate on
@@ -204,7 +214,7 @@ abstract public class JoinTask implements Callable<Void> {
      * A list of variables required for each tail, by tailIndex. Used to filter 
      * downstream variable binding sets.  
      */
-    final protected IVariable[][] requiredVars;
+    final protected IVariable<?>[][] requiredVars;
     
     /**
      * The {@link IJoinNexus} for the local {@link IIndexManager}, which
@@ -213,8 +223,6 @@ abstract public class JoinTask implements Callable<Void> {
      * inside of the {@link ConcurrencyManager}. The {@link #joinNexus} is
      * created from the {@link #joinNexusFactory} once the task begins to
      * execute.
-     * 
-     * @todo javadoc
      */
     protected IJoinNexus joinNexus;
 
@@ -305,53 +313,203 @@ abstract public class JoinTask implements Callable<Void> {
     /**
      * The statistics for this {@link JoinTask}.
      */
-    final JoinStats stats;
+	final JoinStats stats;
 
-    /**
-     * This list is used to accumulate the references to the per-{@link Thread}
-     * unsynchronized output buffers. The list is processed by either
-     * {@link #flushUnsyncBuffers()} or {@link #resetUnsyncBuffers()}
-     * depending on whether the {@link JoinTask} completes successfully or
-     * not.
-     * 
-     * FIXME Examine in the debugger to see whether we are accumulating a
-     * bunch of {@link ThreadLocal}s with buffers per thread or if their
-     * life cycle is in fact scoped to the {@link JoinTask}.
-     * <p>
-     * Note: The real danger is that old buffers might hang around with
-     * partial results which would cause {@link IBindingSet}s from other
-     * {@link JoinTask}s to be emitted by the current {@link JoinTask}.
-     */
-    final private List<AbstractUnsynchronizedArrayBuffer<IBindingSet>> unsyncBufferList = new LinkedList<AbstractUnsynchronizedArrayBuffer<IBindingSet>>();
+	/**
+	 * A factory pattern for per-thread objects whose life cycle is tied to some
+	 * container. For example, there may be an instance of this pool for a
+	 * {@link JoinTask} or an {@link AbstractBTree}. The pool can be torn down
+	 * when the container is torn down, which prevents its thread-local
+	 * references from escaping.
+	 * 
+	 * @author thompsonbry@users.sourceforge.net
+	 * @param <T>
+	 *            The generic type of the thread-local object.
+	 * 
+	 * @todo There should be two implementations of a common interface or
+	 *       abstract base class: one based on a private
+	 *       {@link ConcurrentHashMap} and the other on striped locks. The
+	 *       advantage of the {@link ConcurrentHashMap} is approximately 3x
+	 *       higher concurrency. The advantage of striped locks is that you can
+	 *       directly manage the #of buffers when when the threads using those
+	 *       buffers is unbounded. However, doing so could lead to deadlock
+	 *       since two threads can be hashed onto the same buffer object.
+	 */
+	abstract public class ThreadLocalFactory<T extends IBuffer<E>, E> {
 
-    /**
-     * A factory for the per-{@link Thread} buffers used to accumulate chunks
-     * of output {@link IBindingSet}s across the {@link AccessPathTask}s for
-     * this {@link JoinTask}.
-     * <p>
-     * Note: This is not <code>static</code> because access is required to be
-     * per- {@link JoinTask#newUnsyncOutputBuffer()}.
-     */
-    final protected ThreadLocal<AbstractUnsynchronizedArrayBuffer<IBindingSet>> threadLocalBufferFactory = new ThreadLocal<AbstractUnsynchronizedArrayBuffer<IBindingSet>>() {
+		/**
+		 * The thread-local queues.
+		 */
+		private final ConcurrentHashMap<Thread, T> map;
 
-        protected synchronized AbstractUnsynchronizedArrayBuffer<IBindingSet> initialValue() {
+		/**
+		 * A list of all objects visible to the caller. This is used to ensure
+		 * that any objects allocated by the factory are visited.
+		 * 
+		 * <p>Note: Since the
+		 * collection is not thread-safe, synchronization is required when
+		 * adding to the collection and when visiting the elements of the
+		 * collection.
+		 */
+		private final LinkedList<T> list = new LinkedList<T>();
 
-            // new buffer created by the concrete JoinClass impl.
-            final AbstractUnsynchronizedArrayBuffer<IBindingSet> buffer = newUnsyncOutputBuffer();
+		protected ThreadLocalFactory() {
 
-            /*
-             * Note: List#add() is safe since initialValue() is
-             * synchronized.
-             */
+			this(16/* initialCapacity */, .75f/* loadFactor */, 16/* concurrencyLevel */);
 
-            unsyncBufferList.add(buffer);
+		}
 
-            return buffer;
+		protected ThreadLocalFactory(final int initialCapacity,
+				final float loadFactor, final int concurrencyLevel) {
 
-        }
+			map = new ConcurrentHashMap<Thread, T>(initialCapacity, loadFactor,
+					concurrencyLevel);
 
-    };
+		}
 
+		/**
+		 * Return the #of thread-local objects.
+		 */
+		final public int size() {
+
+			return map.size();
+
+		}
+
+		/**
+		 * Add the element to the thread-local buffer.
+		 * 
+		 * @param e
+		 *            An element.
+		 * 
+		 * @throws IllegalStateException
+		 *             if the factory is asynchronously closed.
+		 */
+		public void add(E e) {
+
+			get().add(e);
+
+		}
+
+		/**
+		 * Return a thread-local buffer
+		 * 
+		 * @return The thread-local buffer.
+		 * 
+		 * @throws RuntimeException
+		 *             if the join is halted.
+		 */
+		final private T get() {
+			final Thread t = Thread.currentThread();
+			T tmp = map.get(t);
+			if (tmp == null) {
+				if (map.put(t, tmp = initialValue()) != null) {
+					/*
+					 * Note: Since the key is the thread it is not possible for
+					 * there to be a concurrent put of an entry under the same
+					 * key so we do not have to use putIfAbsent().
+					 */
+					throw new AssertionError();
+				}
+				// Add to list.
+				synchronized(list) {
+					list.add(tmp);
+				}
+			}
+			if (halt)
+				throw new RuntimeException(firstCause.get());
+			return tmp;
+		}
+
+		/**
+		 * Flush each of the unsynchronized buffers onto their backing
+		 * synchronized buffer.
+		 * 
+		 * @throws RuntimeException
+		 *             if the join is halted.
+		 */
+		public void flush() {
+			synchronized (list) {
+				int n = 0;
+				long m = 0L;
+				for (T b : list) {
+					if (halt)
+						throw new RuntimeException(firstCause.get());
+					// #of elements to be flushed.
+					final int size = b.size();
+					// flush, returning total #of elements written onto this
+					// buffer.
+					final long counter = b.flush();
+					m += counter;
+					if (DEBUG)
+						log.debug("Flushed buffer: size=" + size + ", counter="
+								+ counter);
+				}
+				if (INFO)
+					log.info("Flushed " + n
+							+ " unsynchronized buffers totalling " + m
+							+ " elements");
+			}
+		}
+
+		/**
+		 * Reset each of the synchronized buffers, discarding their buffered
+		 * writes.
+		 * <p>
+		 * Note: This method is used during error processing, therefore it DOES
+		 * NOT check {@link JoinTask#halt}.
+		 */
+		public void reset() {
+			synchronized (list) {
+				int n = 0;
+				for (T b : list) {
+					// #of elements in the buffer before reset().
+					final int size = b.size();
+					// reset the buffer.
+					b.reset();
+					if (DEBUG)
+						log.debug("Reset buffer: size=" + size);
+				}
+				if (INFO)
+					log.info("Reset " + n + " unsynchronized buffers");
+			}
+		}
+
+//	    /**
+//	     * Reset the per-{@link Thread} unsynchronized output buffers (used as
+//	     * part of error handling for the {@link JoinTask}).
+//	     */
+//	    final protected void resetUnsyncBuffers() throws Exception {
+	//
+//			final int n = threadLocalBufferFactory.reset();
+//					.close(new Visitor<AbstractUnsynchronizedArrayBuffer<IBindingSet>>() {
+	//
+//						@Override
+//						public void meet(
+//								final AbstractUnsynchronizedArrayBuffer<IBindingSet> b)
+//								throws Exception {
+	//
+	//
+//		}
+
+		/**
+		 * Create and return a new object.
+		 */
+		abstract protected T initialValue();
+
+	}
+
+	final private ThreadLocalFactory<AbstractUnsynchronizedArrayBuffer<IBindingSet>, IBindingSet> threadLocalBufferFactory = new ThreadLocalFactory<AbstractUnsynchronizedArrayBuffer<IBindingSet>, IBindingSet>() {
+
+		@Override
+		protected AbstractUnsynchronizedArrayBuffer<IBindingSet> initialValue() {
+
+			// new buffer created by the concrete JoinClass impl.
+			return newUnsyncOutputBuffer();
+
+		}
+	};
+    
     /**
      * A method used by the {@link #threadLocalBufferFactory} to create new
      * output buffer as required. The output buffer will be used to
@@ -496,7 +654,8 @@ abstract public class JoinTask implements Callable<Void> {
              */
 
             // flush the unsync buffers.
-            flushUnsyncBuffers();
+//            flushUnsyncBuffers();
+            threadLocalBufferFactory.flush();
 
             // flush the sync buffer and await the sink JoinTasks
             flushAndCloseBuffersAndAwaitSinks();
@@ -520,7 +679,7 @@ abstract public class JoinTask implements Callable<Void> {
             
             /*
              * This is used for processing errors and also if this task is
-             * interrupted (because a SLICE has been satisified).
+             * interrupted (because a SLICE has been satisfied).
              * 
              * @todo For a SLICE, consider that the query solution buffer
              * proxy could return the #of solutions added so far so that we
@@ -538,7 +697,8 @@ abstract public class JoinTask implements Callable<Void> {
 
             // reset the unsync buffers.
             try {
-                resetUnsyncBuffers();
+//                resetUnsyncBuffers();
+            	threadLocalBufferFactory.reset();
             } catch (Throwable t2) {
                 log.error(t2.getLocalizedMessage(), t2);
             }
@@ -626,6 +786,8 @@ abstract public class JoinTask implements Callable<Void> {
 
     private boolean didReport = false;
 
+//    static private AtomicBoolean firstJoin = new AtomicBoolean(false);
+    
     /**
      * Consume {@link IBindingSet} chunks from source(s). The first join
      * dimension always has a single source - the initialBindingSet
@@ -663,83 +825,50 @@ abstract public class JoinTask implements Callable<Void> {
          * 
          * FIXME parallel execution requires some thread-local unsynchronized
          * buffers -- see my notes elsewhere in this class for what has to be
-         * done to support this.
+         * done to support this (actually, it all appears to work just fine).
          */
         final int maxParallel = 0;
-//        maxParallel = joinNexus.getMaxParallelSubqueries();
-        //            maxParallel = 10;
+//        final int maxParallel = joinNexus.getMaxParallelSubqueries();
+//        final int maxParallel = 10;
 
-        /*
-         * Note: There is little reason for parallelism in the first join
-         * dimension as there will be only a single source bindingSet so the
-         * thread pool is just overhead.
-         */
+		/*
+		 * Note: There is no reason for parallelism in the first join dimension
+		 * as there will be only a single source bindingSet and hence a single
+		 * AccessPathTask so the Executor is just overhead.
+		 * 
+		 * @todo this will not be true when we support binding set joins as the
+		 * input could be a stream of binding sets (basically, when the first
+		 * join dimension is a subrule, it can have lots of access path tasks).
+		 */
         if (orderIndex > 0 && maxParallel > 0) {
 
-            /*
-             * Setup parallelism limitedService that will be used to run the
-             * access path tasks. Note that this is layered over the shared
-             * ExecutorService.
-             * 
-             * FIXME The parallelism limited executor service is clearly
-             * broken. When enabled here it will fail to progress. However
-             * the code runs just fine if you use a standard executor
-             * service in its place.
-             */
+//			/*
+//			 * Setup parallelism limited executor that will be used to run the
+//			 * access path tasks.
+//			 */
+//        	if(firstJoin.compareAndSet(false/*expect*/,true/*update*/)) {
+//				System.err.println("maxParallel=" + maxParallel);
+//        	}
 
-            //                // the sharedService.
-            //                final ExecutorService sharedService = joinNexus
-            //                        .getIndexManager().getExecutorService();
-            //
-            //                final ParallelismLimitedExecutorService limitedService = new ParallelismLimitedExecutorService(//
-            //                        sharedService, //
-            //                        maxParallel, //
-            //                        joinNexus.getChunkCapacity() * 2// workQueueCapacity
-            //                );
-            final ExecutorService limitedService = Executors
-                    .newFixedThreadPool(maxParallel, new DaemonThreadFactory
-                            (getClass().getName()+".joinService"));
+			// the sharedService.
+			final ExecutorService sharedService = joinNexus.getIndexManager()
+					.getExecutorService();
 
-            try {
+//			final ExecutorService limitedService = Executors
+//            .newFixedThreadPool(maxParallel, new DaemonThreadFactory
+// (getClass().getName()+".joinService"));
 
-                /*
-                 * consume chunks until done (using caller's thread to
-                 * consume and service to run subtasks).
-                 */
-                new BindingSetConsumerTask(limitedService).call();
+			final Executor limitedService = new LatchedExecutor(sharedService,
+					maxParallel);
 
-                // normal shutdown.
-                limitedService.shutdown();
+			/*
+			 * consume chunks until done (using caller's thread to consume and
+			 * service to run subtasks).
+			 */
+			new BindingSetConsumerTask(limitedService).call();
 
-                // wait for AccessPathTasks to complete.
-                limitedService.awaitTermination(Long.MAX_VALUE,
-                        TimeUnit.SECONDS);
-
-                //                    if (limitedService.getErrorCount() > 0) {
-                //
-                //                        // at least one AccessPathTask failed.
-                //
-                //                        if (INFO)
-                //                            log.info("Task failure(s): " + limitedService);
-                //
-                //                        throw new RuntimeException(
-                //                                "Join failure(s): errorCount="
-                //                                        + limitedService.getErrorCount());
-                //
-                //                    }
-                if (halt)
-                    throw new RuntimeException(firstCause.get());
-
-            } finally {
-
-                if (!limitedService.isTerminated()) {
-
-                    // shutdown the parallelism limitedService.
-                    limitedService.shutdownNow();
-
-                }
-
-            }
+			if (halt)
+				throw new RuntimeException(firstCause.get());
 
         } else {
 
@@ -759,74 +888,85 @@ abstract public class JoinTask implements Callable<Void> {
      */
     abstract void closeSources();
 
-    /**
-     * Flush the per-{@link Thread} unsynchronized output buffers (they
-     * write onto the thread-safe output buffer).
-     */
-    protected void flushUnsyncBuffers() {
+//    /**
+//     * Flush the per-{@link Thread} unsynchronized output buffers (they
+//     * write onto the thread-safe output buffer).
+//     */
+//    final protected void flushUnsyncBuffers() throws Exception {
+//
+//		final int n = threadLocalBufferFactory.flush();
 
-        if (INFO)
-            log.info("Flushing " + unsyncBufferList.size()
-                    + " unsynchronized buffers");
+//		close(new Visitor<AbstractUnsynchronizedArrayBuffer<IBindingSet>>() {
+//
+//					public void meet(
+//							final AbstractUnsynchronizedArrayBuffer<IBindingSet> b) {
+//
+//						// unless halted
+//						if (halt)
+//							throw new RuntimeException(firstCause.get());
+//
+//						// #of elements to be flushed.
+//						final int size = b.size();
+//
+//						// flush, returning total #of elements written onto this
+//						// buffer.
+//						final long counter = b.flush();
+//
+//						if (DEBUG)
+//							log.debug("Flushed buffer: size=" + size
+//									+ ", counter=" + counter);
+//
+//					}
+//
+//				});
+//
+//		if (INFO)
+//			log.info("Flushed " + n + " unsynchronized buffers");
+//
+//	}
 
-        for (AbstractUnsynchronizedArrayBuffer<IBindingSet> b : unsyncBufferList) {
+//    /**
+//     * Reset the per-{@link Thread} unsynchronized output buffers (used as
+//     * part of error handling for the {@link JoinTask}).
+//     */
+//    final protected void resetUnsyncBuffers() throws Exception {
+//
+//		final int n = threadLocalBufferFactory.reset();
+//				.close(new Visitor<AbstractUnsynchronizedArrayBuffer<IBindingSet>>() {
+//
+//					@Override
+//					public void meet(
+//							final AbstractUnsynchronizedArrayBuffer<IBindingSet> b)
+//							throws Exception {
+//
+//						// #of elements in the buffer before reset().
+//						final int size = b.size();
+//
+//						// flush the buffer.
+//						b.reset();
+//
+//						if (DEBUG)
+//							log.debug("Reset buffer: size=" + size);
+//					}
+//				});
+//
+//		if (INFO)
+//			log.info("Reset " + n + " unsynchronized buffers");
+//
+//	}
 
-            // unless halted
-            if (halt)
-                throw new RuntimeException(firstCause.get());
-
-            // #of elements to be flushed.
-            final int size = b.size();
-
-            // flush, returning total #of elements written onto this buffer.
-            final long counter = b.flush();
-
-            if (DEBUG)
-                log.debug("Flushed buffer: size=" + size + ", counter="
-                        + counter);
-
-        }
-
-    }
-
-    /**
-     * Reset the per-{@link Thread} unsynchronized output buffers (used as
-     * part of error handling for the {@link JoinTask}).
-     */
-    protected void resetUnsyncBuffers() {
-
-        if (INFO)
-            log.info("Resetting " + unsyncBufferList.size()
-                    + " unsynchronized buffers");
-
-        for (AbstractUnsynchronizedArrayBuffer<IBindingSet> b : unsyncBufferList) {
-
-            // #of elements in the buffer before reset().
-            final int size = b.size();
-
-            // flush the buffer.
-            b.reset();
-
-            if (DEBUG)
-                log.debug("Reset buffer: size=" + size);
-
-        }
-
-    }
-
-    /**
-     * Flush and close all output buffers and await sink {@link JoinTask}(s).
-     * <p>
-     * Note: You MUST close the {@link BlockingBuffer} from which each sink
-     * reads <em>before</em> invoking thise method in order for those
-     * sinks to terminate. Otherwise the source
-     * {@link IAsynchronousIterator}(s) on which the sink is reading will
-     * remain open and the sink will never decide that it has exhausted its
-     * source(s).
-     * 
-     * @throws InterruptedException
-     * @throws ExecutionException
-     */
+	/**
+	 * Flush and close all output buffers and await sink {@link JoinTask}(s).
+	 * <p>
+	 * Note: You MUST close the {@link BlockingBuffer} from which each sink
+	 * reads <em>before</em> invoking this method in order for those sinks to
+	 * terminate. Otherwise the source {@link IAsynchronousIterator}(s) on which
+	 * the sink is reading will remain open and the sink will never decide that
+	 * it has exhausted its source(s).
+	 * 
+	 * @throws InterruptedException
+	 * @throws ExecutionException
+	 */
     abstract protected void flushAndCloseBuffersAndAwaitSinks()
             throws InterruptedException, ExecutionException;
 
@@ -861,9 +1001,9 @@ abstract public class JoinTask implements Callable<Void> {
      *         Thompson</a>
      * @version $Id$
      */
-    protected class BindingSetConsumerTask implements Callable {
+    protected class BindingSetConsumerTask implements Callable<Void> {
 
-        private final ExecutorService executor;
+        private final Executor executor;
 
         /**
          * 
@@ -873,7 +1013,7 @@ abstract public class JoinTask implements Callable<Void> {
          *            you want the {@link AccessPathTask}s to be executed
          *            in the caller's thread.
          */
-        public BindingSetConsumerTask(final ExecutorService executor) {
+        public BindingSetConsumerTask(final Executor executor) {
 
             this.executor = executor;
 
@@ -901,7 +1041,7 @@ abstract public class JoinTask implements Callable<Void> {
          *             true for query on the lastJoin) and that
          *             {@link IBlockingBuffer} has been closed.
          */
-        public Object call() throws Exception {
+        public Void call() throws Exception {
 
             try {
 
@@ -927,7 +1067,7 @@ abstract public class JoinTask implements Callable<Void> {
                      * Aggregate the source bindingSets that license the
                      * same asBound predicate.
                      */
-                    final Map<IPredicate, Collection<IBindingSet>> map = combineBindingSets(chunk);
+                    final Map<IPredicate<?>, Collection<IBindingSet>> map = combineBindingSets(chunk);
 
                     /*
                      * Generate an AccessPathTask from each distinct
@@ -986,7 +1126,7 @@ abstract public class JoinTask implements Callable<Void> {
          *         bindingSets in the chunk from which the predicate was
          *         generated.
          */
-        protected Map<IPredicate, Collection<IBindingSet>> combineBindingSets(
+        protected Map<IPredicate<?>, Collection<IBindingSet>> combineBindingSets(
                 final IBindingSet[] chunk) {
 
             if (DEBUG)
@@ -994,7 +1134,7 @@ abstract public class JoinTask implements Callable<Void> {
 
             final int tailIndex = getTailIndex(orderIndex);
 
-            final Map<IPredicate, Collection<IBindingSet>> map = new LinkedHashMap<IPredicate, Collection<IBindingSet>>(
+            final Map<IPredicate<?>, Collection<IBindingSet>> map = new LinkedHashMap<IPredicate<?>, Collection<IBindingSet>>(
                     chunk.length);
 
             for (IBindingSet bindingSet : chunk) {
@@ -1003,7 +1143,7 @@ abstract public class JoinTask implements Callable<Void> {
                     throw new RuntimeException(firstCause.get());
 
                 // constrain the predicate to the given bindings.
-                IPredicate predicate = rule.getTail(tailIndex).asBound(
+                IPredicate<?> predicate = rule.getTail(tailIndex).asBound(
                         bindingSet);
 
                 if (partitionId != -1) {
@@ -1076,7 +1216,7 @@ abstract public class JoinTask implements Callable<Void> {
          * @throws Exception
          */
         protected AccessPathTask[] getAccessPathTasks(
-                final Map<IPredicate, Collection<IBindingSet>> map) {
+                final Map<IPredicate<?>, Collection<IBindingSet>> map) {
 
             final int n = map.size();
 
@@ -1085,7 +1225,7 @@ abstract public class JoinTask implements Callable<Void> {
 
             final AccessPathTask[] tasks = new AccessPathTask[n];
 
-            final Iterator<Map.Entry<IPredicate, Collection<IBindingSet>>> itr = map
+            final Iterator<Map.Entry<IPredicate<?>, Collection<IBindingSet>>> itr = map
                     .entrySet().iterator();
 
             int i = 0;
@@ -1095,7 +1235,7 @@ abstract public class JoinTask implements Callable<Void> {
                 if (halt)
                     throw new RuntimeException(firstCause.get());
 
-                final Map.Entry<IPredicate, Collection<IBindingSet>> entry = itr
+                final Map.Entry<IPredicate<?>, Collection<IBindingSet>> entry = itr
                         .next();
 
                 tasks[i++] = new AccessPathTask(entry.getKey(), entry.getValue());
@@ -1119,7 +1259,7 @@ abstract public class JoinTask implements Callable<Void> {
         protected void reorderTasks(final AccessPathTask[] tasks) {
 
             // @todo layered access paths do not expose a fromKey.
-            if (tasks[0].accessPath instanceof AbstractAccessPath) {
+            if (tasks[0].accessPath instanceof AbstractAccessPath<?>) {
 
                 // reorder the tasks.
                 Arrays.sort(tasks);
@@ -1140,39 +1280,80 @@ abstract public class JoinTask implements Callable<Void> {
         protected void executeTasks(final AccessPathTask[] tasks)
                 throws Exception {
 
-            int i = 0;
-            for (AccessPathTask task : tasks) {
+			if (executor == null) {
 
-                if (halt)
-                    throw new RuntimeException(firstCause.get());
+				/*
+				 * No Executor, so run each task in the caller's thread.
+				 */
+				
+				for (AccessPathTask task : tasks) {
 
-                if (executor != null) {
+					task.call();
 
-                    /*
-                     * Queue the AccessPathTask for execution.
-                     * 
-                     * Note: The caller MUST verify that no tasks submitted
-                     * to the [executor] result in errors. This is done by
-                     * checking the errorCount for that [executor], so you
-                     * need to run the tasks on a service which exposes that
-                     * information.
-                     */
+				}
 
-                    executor.submit(task);
+				return;
 
-                } else {
+			}
 
-                    /*
-                     * Execute the AccessPathTask in the caller's thread.
-                     */
+			/*
+			 * Build list of FutureTasks. This list is used to check all tasks
+			 * for errors and ensure that any running tasks are cancelled.
+			 */
+			
+        	final List<FutureTask<Void>> futureTasks = new LinkedList<FutureTask<Void>>();
+			
+        	for (AccessPathTask task : tasks) {
+			
+        		final FutureTask<Void> ft = new FutureTask<Void>(task);
+        		
+				futureTasks.add(ft);
+				
+			}
 
-                    task.call();
+			try {
 
-                }
+	        	/*
+	        	 * Execute all tasks.
+	        	 */
+				for (FutureTask<Void> ft : futureTasks) {
 
-                i++;
+					if (halt)
+						throw new RuntimeException(firstCause.get());
 
-            } // next task.
+					// Queue for execution.
+					executor.execute(ft);
+
+				} // next task.
+
+				/*
+				 * Wait for each task. If any task throws an exception, then
+				 * [halt] will become true and any running tasks will error out
+				 * quickly. Once [halt := true], we do not wait for any more
+				 * tasks, but proceed to cancel all tasks in the finally {}
+				 * clause below.
+				 */
+				for (FutureTask<Void> ft : futureTasks) {
+
+					// Wait for a task.
+					if (!halt)
+						ft.get();
+
+				}
+				
+			} finally {
+
+				/*
+				 * Ensure that all tasks are cancelled, regardless of whether
+				 * they were started or have already finished.
+				 */
+				for (FutureTask<Void> ft : futureTasks) {
+
+					ft.cancel(true/* mayInterruptIfRunning */);
+					
+				}
+				
+			}
 
         }
 
@@ -1190,7 +1371,8 @@ abstract public class JoinTask implements Callable<Void> {
      *         Thompson</a>
      * @version $Id$
      */
-    protected class AccessPathTask implements Callable, Comparable<AccessPathTask> {
+	protected class AccessPathTask implements Callable<Void>,
+			Comparable<AccessPathTask> {
 
         /**
          * The {@link IBindingSet}s from the source join dimension to be
@@ -1212,7 +1394,7 @@ abstract public class JoinTask implements Callable<Void> {
          * {@link IPredicate} for this join dimension. The asBound
          * {@link IPredicate} is {@link IAccessPath#getPredicate()}.
          */
-        final private IAccessPath accessPath;
+        final private IAccessPath<?> accessPath;
 
         /**
          * Return the <em>fromKey</em> for the {@link IAccessPath} generated
@@ -1227,7 +1409,7 @@ abstract public class JoinTask implements Callable<Void> {
          */
         protected byte[] getFromKey() {
 
-            return ((AbstractAccessPath) accessPath).getFromKey();
+            return ((AbstractAccessPath<?>) accessPath).getFromKey();
 
         }
 
@@ -1265,7 +1447,7 @@ abstract public class JoinTask implements Callable<Void> {
          *            join dimension that all result in the same asBound
          *            {@link IPredicate}.
          */
-        public AccessPathTask(final IPredicate predicate,
+        public AccessPathTask(final IPredicate<?> predicate,
                 final Collection<IBindingSet> bindingSets) {
 
             if (predicate == null)
@@ -1324,22 +1506,46 @@ abstract public class JoinTask implements Callable<Void> {
          *             true for query on the lastJoin) and that
          *             {@link IBlockingBuffer} has been closed.
          */
-        public Object call() throws Exception {
+        public Void call() throws Exception {
 
             if (halt)
                 throw new RuntimeException(firstCause.get());
 
-            final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer = threadLocalBufferFactory
-                    .get();
-
-            boolean nothingAccepted = true;
-
             stats.accessPathCount++;
 
+            if (accessPath.getPredicate() instanceof IStarJoin<?>) {
+                
+                handleStarJoin();
+                
+            } else {
+            	
+            	handleJoin();
+            	
+            }
+
+            return null;
+            
+        }
+        
+		/**
+		 * A vectored pipeline join (chunk at a time processing).
+		 */
+        protected void handleJoin() {
+            
+            boolean nothingAccepted = true;
+
             // Obtain the iterator for the current join dimension.
-            final IChunkedOrderedIterator itr = accessPath.iterator();
+            final IChunkedOrderedIterator<?> itr = accessPath.iterator();
 
             try {
+
+				/*
+				 * @todo In order to run the chunks on a thread pool, pass in
+				 * [null] for the unsyncBuffer and each chunk will get its own
+				 * buffer.
+				 */
+				final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer = threadLocalBufferFactory
+						.get();
 
                 while (itr.hasNext()) {
 
@@ -1348,9 +1554,9 @@ abstract public class JoinTask implements Callable<Void> {
                     stats.chunkCount++;
 
                     // process the chunk in the caller's thread.
-                    final boolean somethingAccepted = new ChunkTask(
-                            bindingSets, unsyncBuffer, chunk).call();
-                    
+					final boolean somethingAccepted = new ChunkTask(
+							bindingSets, unsyncBuffer, chunk).call();
+
                     if (somethingAccepted) {
 
                         // something in the chunk was accepted.
@@ -1376,7 +1582,7 @@ abstract public class JoinTask implements Callable<Void> {
 
                 }
 
-                return null;
+                return;
 
             } catch (Throwable t) {
 
@@ -1390,6 +1596,195 @@ abstract public class JoinTask implements Callable<Void> {
 
             }
 
+        }
+
+		protected void handleStarJoin() {
+
+			IBindingSet[] solutions = this.bindingSets;
+
+			final IStarJoin starJoin = (IStarJoin) accessPath.getPredicate();
+
+			final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer = threadLocalBufferFactory
+					.get();
+
+			// Obtain the iterator for the current join dimension.
+			final IChunkedOrderedIterator<?> itr = accessPath.iterator();
+
+			// The actual #of elements scanned.
+            int numElements = 0;
+
+			try {
+
+				/*
+				 * Note: The fast range count would give us an upper bound,
+				 * unless expanders are used, in which case there can be more
+				 * elements visited.
+				 */
+				final Object[] elements;
+				{
+
+					/*
+					 * First, gather all chunks.
+					 */
+					int nchunks = 0;
+					final List<Object[]> chunks = new LinkedList<Object[]>();
+					while (itr.hasNext()) {
+
+						final Object[] chunk = (Object[]) itr.nextChunk();
+
+						// add to list of chunks.
+						chunks.add(chunk);
+						
+						numElements += chunk.length;
+
+	                    stats.chunkCount++;
+	                    
+	                    nchunks++;
+
+					} // next chunk.
+
+					/*
+					 * Now flatten the chunks into a simple array.
+					 */
+					if (nchunks == 0) {
+						// No match.
+						return;
+					}
+					if (nchunks == 1) {
+						// A single chunk.
+						elements = chunks.get(0);
+					} else {
+						// Flatten the chunks.
+						elements = new Object[numElements];
+						{
+							int n = 0;
+							for (Object[] chunk : chunks) {
+
+								System.arraycopy(chunk/* src */, 0/* srcPos */,
+										elements/* dst */, n/* dstPos */,
+										chunk.length/* len */);
+
+								n += chunk.length;
+							}
+						}
+					} 
+					stats.elementCount += numElements;
+
+				}
+
+				if (numElements > 0) {
+                    
+                    final Iterator<IStarConstraint<?>> it = 
+                        starJoin.getStarConstraints();
+                    
+                    boolean constraintFailed = false;
+                    
+                    while (it.hasNext()) {
+                        
+                        final IStarConstraint constraint = it.next();
+                        
+                        Collection<IBindingSet> constraintSolutions = null;
+                        
+                        int numVars = constraint.getNumVars();
+                        
+                        for (int i = 0; i < numElements; i++) {
+
+                            Object e = elements[i];
+                            
+                            if (constraint.isMatch(e)) {
+
+								/*
+								 * For each match for the constraint, we clone
+								 * the old solutions and create a new solutions
+								 * that appends the variable bindings from this
+								 * match.
+								 * 
+								 * At the end, we set the old solutions
+								 * collection to the new solutions collection.
+								 */ 
+                                
+                                if (constraintSolutions == null) {
+                                    
+                                    constraintSolutions = 
+                                        new LinkedList<IBindingSet>();
+                                    
+                                }
+                                
+                                for (IBindingSet bs : solutions) {
+                                
+                                    if (numVars > 0) {
+                                        
+                                        bs = bs.clone();
+                                        
+                                        constraint.bind(bs, e);
+
+                                    }
+                                    
+                                    constraintSolutions.add(bs);
+
+                                }
+                                
+                                // no reason to keep testing SPOs, there can
+                                // be only one
+                                if (numVars == 0) {
+                                    
+                                    break;
+                                    
+                                }
+                                
+                            }
+                            
+                        }
+                        
+                        if (constraintSolutions == null) {
+                            
+                            // we did not find any matches to this constraint
+                            // that is ok, as long it's optional
+                            if (constraint.isOptional() == false) {
+                                
+                                constraintFailed = true;
+                                
+                                break;
+                                
+                            }
+                            
+                        } else {
+                            
+                            // set the old solutions to the new solutions, and
+                            // move on to the next constraint
+                            solutions = constraintSolutions.toArray(
+                                    new IBindingSet[constraintSolutions.size()]);
+                            
+                        }
+                        
+                    }
+                    
+                    if (!constraintFailed) {
+                        
+                        for (IBindingSet bs : solutions) {
+                            
+                            unsyncBuffer.add(bs);
+                            
+                        }
+                        
+                    }
+                    
+                }
+                
+                return;
+
+            } catch (Throwable t) {
+
+                halt(t);
+
+                throw new RuntimeException(t);
+
+            } finally {
+
+                itr.close();
+
+            }
+            
         }
 
         /**
@@ -1450,19 +1845,22 @@ abstract public class JoinTask implements Callable<Void> {
          */
         private final Object[] chunk;
 
-        /**
-         * 
-         * @param bindingSet
-         *            The bindings with which the each element in the chunk
-         *            will be paired to create the bindings for the
-         *            downstream join dimension.
-         * @param unsyncBuffer
-         *            A per-{@link Thread} buffer used to accumulate chunks
-         *            of generated {@link IBindingSet}s.
-         * @param chunk
-         *            A chunk of elements read from the {@link IAccessPath}
-         *            for the current join dimension.
-         */
+		/**
+		 * 
+		 * @param bindingSet
+		 *            The bindings with which the each element in the chunk will
+		 *            be paired to create the bindings for the downstream join
+		 *            dimension.
+		 * @param unsyncBuffer
+		 *            A per-{@link Thread} buffer used to accumulate chunks of
+		 *            generated {@link IBindingSet}s (optional). When the
+		 *            {@link ChunkTask} will be run in its own thread, pass
+		 *            <code>null</code> and the buffer will be obtained in
+		 *            {@link #call()}.
+		 * @param chunk
+		 *            A chunk of elements read from the {@link IAccessPath} for
+		 *            the current join dimension.
+		 */
         public ChunkTask(
                 final IBindingSet[] bindingSet,
                 final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer,
@@ -1471,8 +1869,9 @@ abstract public class JoinTask implements Callable<Void> {
             if (bindingSet == null)
                 throw new IllegalArgumentException();
 
-            if (unsyncBuffer == null)
-                throw new IllegalArgumentException();
+            // Allow null!
+//            if (unsyncBuffer == null)
+//                throw new IllegalArgumentException();
 
             if (chunk == null)
                 throw new IllegalArgumentException();
@@ -1509,7 +1908,12 @@ abstract public class JoinTask implements Callable<Void> {
 
                 boolean nothingAccepted = true;
 
-                for (Object e : chunk) {
+				// Use caller's or obtain our own as necessary.
+				final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer = (this.unsyncBuffer == null) ? threadLocalBufferFactory
+						.get()
+						: this.unsyncBuffer;
+
+        		for (Object e : chunk) {
 
                     if (halt)
                         return nothingAccepted;
@@ -1521,7 +1925,7 @@ abstract public class JoinTask implements Callable<Void> {
 
                     for (IBindingSet bset : bindingSets) {
 
-                        IVariable[] variablesToKeep = requiredVars[tailIndex];
+                        final IVariable<?>[] variablesToKeep = requiredVars[tailIndex];
                         
                         if (INFO) {
                             log.info("tailIndex: " + tailIndex);
@@ -1532,8 +1936,7 @@ abstract public class JoinTask implements Callable<Void> {
                          * Clone the binding set since it is tested for each
                          * element visited.
                          */
-                        //bset = bset.clone();
-                        bset = bset.copy(variablesToKeep);
+                        bset = bset.clone();
 
                         if (INFO) {
                             log.info("tailIndex: " + tailIndex);
@@ -1544,6 +1947,8 @@ abstract public class JoinTask implements Callable<Void> {
                         // propagate bindings from the visited element.
                         if (joinNexus.bind(rule, tailIndex, e, bset)) {
 
+                            bset = bset.copy(variablesToKeep);
+                            
                             // Accept this binding set.
                             unsyncBuffer.add(bset);
 

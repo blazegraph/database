@@ -150,34 +150,18 @@ public class OverflowMetadata {
         return views.size();
         
     }
-    
+
     /**
      * True if the tuples for the index were copied to the new live journal
      * during synchronous overflow.
      * 
      * @param name
+     *            The name of the index partition.
      * 
      * @return
      */
     public boolean isCopied(final String name) {
        
-        return OverflowActionEnum.Copy.equals(getAction(name));
-
-//        return copied.contains(name);
-        
-    }
-    
-    /**
-     * The action to take / taken for the index partition.
-     * 
-     * @param name
-     *            The name of the index partition.
-     * 
-     * @return The action taken or <code>null</code> if no action has been
-     *         selected.
-     */
-    public OverflowActionEnum getAction(final String name) {
-
         if (name == null)
             throw new IllegalArgumentException();
 
@@ -186,13 +170,32 @@ public class OverflowMetadata {
         if (vmd == null)
             throw new IllegalArgumentException();
 
-        synchronized (vmd) {
-
-            return vmd.action;
-            
-        }
+        return OverflowActionEnum.Copy.equals(vmd.getAction());
         
     }
+    
+//    /**
+//     * The action to take / taken for the index partition.
+//     * 
+//     * @param name
+//     *            The name of the index partition.
+//     * 
+//     * @return The action taken or <code>null</code> if no action has been
+//     *         selected.
+//     */
+//    public OverflowActionEnum getAction(final String name) {
+//
+//        if (name == null)
+//            throw new IllegalArgumentException();
+//
+//        final ViewMetadata vmd = views.get(name);
+//
+//        if (vmd == null)
+//            throw new IllegalArgumentException();
+//
+//        return vmd.getAction();
+//        
+//    }
     
     /**
      * Specify the action to be taken.
@@ -215,14 +218,16 @@ public class OverflowMetadata {
         if (vmd == null)
             throw new IllegalArgumentException();
 
-        synchronized (vmd) {
-
-            if (vmd.action != null)
-                throw new IllegalStateException("Already set: " + vmd.action
-                        + ", given=" + action);
+        /*
+         * Note: The caller generally should already be holding this lock so
+         * they can make an atomic decision regarding the action to take for
+         * this index partition.
+         */
+        vmd.lock.lock();
+        try {
 
             // set on the ViewMetadata object itself.
-            vmd.action = action;
+            vmd.setAction(action);
 
             // update counters.
             synchronized (actionCounts) {
@@ -243,18 +248,38 @@ public class OverflowMetadata {
 
             }
             
+        } finally {
+
+            vmd.lock.unlock();
+            
         }
 
     }
-    
+
     /**
      * Return the #of index partitions for which the specified action was
      * chosen.
      * 
      * @param action
      *            The action.
-     *            
+     * 
      * @return The #of index partitions where that action was chosen.
+     * 
+     * @todo This is only used by the unit tests as a means of verifying that
+     *       they have set {@link OverflowManager#copyIndexThreshold} to zero.
+     *       This stands in the way of decoupling asynchronous overflow from a
+     *       fixed cycle such that index partition build, merge, split, etc.
+     *       tasks can run at any time (other than while some other task is
+     *       running).
+     *       <p>
+     *       Note: we must also give
+     *       {@link OverflowManager#doSynchronousOverflow()} exclusive access so
+     *       it can propagate the index partition declarations without blocking.
+     *       Right now, asynchronous index tasks do not execute during
+     *       synchronous overflow so there is no problem. This does have the
+     *       consequence that the set of locks is per {@link OverflowMetadata}
+     *       instance (and hence only valid for the epoch between one
+     *       synchronous overflow and the next).
      */
     public int getActionCount(final OverflowActionEnum action) {
 
@@ -323,7 +348,7 @@ public class OverflowMetadata {
             views = new LinkedHashMap<String, ViewMetadata>(numIndices);
 
             // the name2addr view as of the last commit time.
-            final ITupleIterator itr = oldJournal.getName2Addr(lastCommitTime)
+            final ITupleIterator<?> itr = oldJournal.getName2Addr(lastCommitTime)
                     .rangeIterator();
             
             final Map<String, BTreeCounters> delta = resourceManager
@@ -331,7 +356,7 @@ public class OverflowMetadata {
 
             while (itr.hasNext()) {
 
-                final ITuple tuple = itr.next();
+                final ITuple<?> tuple = itr.next();
 
                 final Entry entry = EntrySerializer.INSTANCE
                         .deserialize(new DataInputBuffer(tuple.getValue()));

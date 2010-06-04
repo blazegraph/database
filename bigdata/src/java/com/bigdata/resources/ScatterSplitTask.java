@@ -8,8 +8,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import com.bigdata.btree.ILocalBTreeView;
-import com.bigdata.btree.ISplitHandler;
-import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.ISimpleSplitHandler;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.resources.SplitIndexPartitionTask.AtomicUpdateSplitIndexPartitionTask;
@@ -55,10 +55,6 @@ import com.bigdata.sparse.SparseRowStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME There should be a unit test for scatter split. It currently gets
- * excercised when we scatter split the POS index on the RDF DB during a
- * scale-out index data load.
  */
 public class ScatterSplitTask extends
         AbstractPrepareTask<AbstractResult> {
@@ -78,13 +74,13 @@ public class ScatterSplitTask extends
      * corresponding index partition will not be moved.
      */
     protected final UUID[] moveTargets;
-    
+
     /**
-     * The split handler to be applied. Note that this MAY have been overriden
-     * in order to promote a split so you MUST use this instance and NOT the one
-     * in the {@link IndexMetadata} object.
+     * The target size of a shard for the scatter split. This is computed by
+     * dividing the size of the compact segment on the disk by the #of desired
+     * splits.
      */
-    private final ISplitHandler splitHandler;
+    protected final long adjustedNominalShardSize;
     
     /**
      * 
@@ -116,6 +112,12 @@ public class ScatterSplitTask extends
             throw new IllegalStateException("Not an index partition.");
 
         }
+        
+        if(!vmd.compactView) {
+            
+            throw new IllegalStateException("Not a compact view.");
+            
+        }
 
         if (vmd.pmd.getSourcePartitionId() != -1) {
 
@@ -146,10 +148,7 @@ public class ScatterSplitTask extends
         
         this.moveTargets = moveTargets;
 
-        // A split handler that will produce equal sized splits.
-        this.splitHandler = ((DefaultSplitHandler) vmd.indexMetadata
-                .getSplitHandler()).getAdjustedSplitHandlerForEqualSplits(
-                nsplits, vmd.getRangeCount());
+        this.adjustedNominalShardSize = vmd.sumSegBytes / (nsplits / 2);
 
     }
 
@@ -173,10 +172,10 @@ public class ScatterSplitTask extends
     protected AbstractResult doTask() throws Exception {
 
         final Event e = new Event(resourceManager.getFederation(),
-                new EventResource(vmd.indexMetadata), OverflowActionEnum.Split,
+                new EventResource(vmd.indexMetadata), OverflowActionEnum.ScatterSplit,
                 vmd.getParams()).addDetail(
                 "summary",
-                OverflowActionEnum.Split + "+" + OverflowActionEnum.Move + "("
+                OverflowActionEnum.ScatterSplit + "+" + OverflowActionEnum.Move + "("
                         + vmd.name + ", nsplits=" + nsplits + ")").addDetail(
                 "moveTargets", Arrays.toString(moveTargets)).start();
 
@@ -201,15 +200,66 @@ public class ScatterSplitTask extends
                  * splits.
                  */
 
-                final Split[] splits = splitHandler.getSplits(resourceManager,
-                        src);
+                // The application split handler (if any).
+                final ISimpleSplitHandler splitHandler = vmd.indexMetadata
+                        .getSplitHandler();
+
+                final Split[] splits = SplitUtility.getSplits(resourceManager,
+                        vmd.pmd, (IndexSegment) src.getSources()[1],
+                        adjustedNominalShardSize, splitHandler);
 
                 if (splits == null) {
 
-                    // Incremental build.
+                    final double overextension = ((double) vmd.sumSegBytes)
+                            / resourceManager.nominalShardSize;
+
+                    if (overextension > resourceManager.shardOverextensionLimit
+                            && !resourceManager.isDisabledWrites(vmd.name)) {
+
+                        /*
+                         * The shard is overextended (it is at least two times
+                         * its nominal maximum size) and is refusing a split.
+                         * Continuing to do incremental builds here will mask
+                         * the problem and cause the cost of a merge on the
+                         * shard to increase over time and will drag down
+                         * performance for this DS. In order to prevent this we
+                         * MUST disallow further writes on the shard. The shard
+                         * can be re-enabled for writes by an administrative
+                         * action once the problem has been fixed.
+                         * 
+                         * Note: The default split behavior should always find a
+                         * separator key to split the shard. The mostly likely
+                         * cause for a problem is an application defined split
+                         * handler. Rather than allowing a poorly written split
+                         * handler to foul up the works, we disallow further
+                         * writes onto this shard until the application has
+                         * fixed their split handler.
+                         */
+
+                        log.error("Shard will not split - writes are disabled"
+                                + ": name="
+                                + vmd.name
+                                + ", size="
+                                + vmd.sumSegBytes
+                                + ", overextended="
+                                + (int) overextension
+                                + "x"
+                                + ", splitHandler="
+                                + (splitHandler == null ? "N/A" : splitHandler
+                                        .getClass().getName()));
+
+                        // Disable writes on the index partition.
+                        resourceManager.disableWrites(vmd.name);
+                        
+                    }
+                    
+                    /*
+                     * Do an incremental build.
+                     */
 
                     log.warn("No splits identified: will build: " + vmd);
 
+                    // Incremental build.
                     return concurrencyManager.submit(
                             new IncrementalBuildTask(vmd)).get();
 
@@ -242,9 +292,14 @@ public class ScatterSplitTask extends
             /*
              * Do the atomic update.
              */
-            SplitIndexPartitionTask.doSplitAtomicUpdate(resourceManager, vmd,
-                    splitResult, OverflowActionEnum.Split,
-                    resourceManager.indexPartitionSplitCounter, e);
+            SplitIndexPartitionTask
+                    .doSplitAtomicUpdate(
+                            resourceManager,
+                            vmd,
+                            splitResult,
+                            OverflowActionEnum.ScatterSplit,
+                            resourceManager.overflowCounters.indexPartitionSplitCounter,
+                            e);
 
             /*
              * Note: Unlike a normal move where there are writes on the old
@@ -325,9 +380,9 @@ public class ScatterSplitTask extends
                     .getConcurrencyManager().invokeAll(moveTasks);
             
             /*
-             * Log error if any move task failed (other than being cancelled).
+             * Log error if any move task failed (other than being canceled).
              */
-            for (Future f : futures) {
+            for (Future<?> f : futures) {
 
                 if (!f.isCancelled()) {
 

@@ -8,7 +8,18 @@
         </fileset>
     </path>
 
-    <path id="runtime.classpath">
+  	<path id="test.classpath">
+        <pathelement location="${build.dir}/classes"/>
+        <pathelement location="${build.dir}/test"/>
+        <fileset dir="${build.lib.unimi.dir}">
+            <include name="**/*.jar"/>
+        </fileset>
+        <fileset dir="${build.lib.junit.dir}">
+            <include name="junit*.jar"/>
+        </fileset>
+	</path>
+
+	<path id="runtime.classpath">
         <pathelement location="${build.dir}/classes"/>
         <path refid="build.classpath"/>
     </path>
@@ -17,6 +28,40 @@
         <delete dir="${build.dir}"/>
     </target>
 
+	<target name="test" depends="compile">
+		<javac destdir="${build.dir}/test"
+		 debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}"
+	     encoding="${javac.encoding}"
+	     	>
+	      	<classpath refid="test.classpath"/>
+			<src path="${lgpl-utils.dir}/src/test" />
+		</javac>
+		<!-- copy resources. -->
+		<copy toDir="${build.dir}/test">
+			<fileset dir="${lgpl-utils.dir}/src/test">
+				<exclude name="**/*.java" />
+			</fileset>
+		</copy>
+      <junit printsummary="on" haltonfailure="yes" fork="no" dir="${classes.dir}" timeout="60000">
+      	<classpath refid="test.classpath"/>
+        <formatter type="xml"/>
+        <!-- Individual test suite to run when -DtestName is set -->
+        <!-- to the fully-qualified name of the test suite       -->
+        <!-- ant -DtestName=com.bigdata.cache.TestAll junit      -->
+        <test name="${testName}" todir="${test.results.dir}" if="testName"/>
+        <!-- Test suites to run when -DtestName is not set -->
+        <test name="it.unimi.dsi.fastutil.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="org.infinispan.stress.MapStressTest" todir="${test.results.dir}" unless="testName" />
+      </junit>
+      <!-- Generate an HTML report. -->
+      <junitreport todir="${build.dir}">
+        <fileset dir="${test.results.dir}">
+          <include name="TEST-*.xml"/>
+         </fileset>
+         <report format="frames" todir="${test.results.dir}/report"/>
+      </junitreport>
+	</target>
+	
 	<target name="prepare">
 		<!-- setup ${version} for regular or snapshot. -->
 		<tstamp>
@@ -32,10 +77,11 @@
 		<mkdir dir="${build.dir}/classes" />
 		<mkdir dir="${build.dir}/docs" />
 		<mkdir dir="${build.dir}/lib" />
+		<mkdir dir="${build.dir}/test" />
+		<mkdir dir="${build.dir}/test-results" />
 	</target>
 
 	<target name="compile" depends="prepare">
-		<mkdir dir="${build.dir}" />
 		<javac destdir="${build.dir}/classes" classpathref="build.classpath"
 		 debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}"
 	     encoding="${javac.encoding}"
@@ -67,11 +113,14 @@
 	<target name="javadoc" depends="prepare" if="javadoc">
 		<mkdir dir="${build.dir}/docs/api" />
 		<!-- overview="....overview.html"  -->
-		<javadoc destdir="${build.dir}/docs/api" defaultexcludes="yes" author="true" version="true" use="true" windowtitle="lgpl-utils&#174;" classpathref="build.classpath">
+		<javadoc destdir="${build.dir}/docs/api" defaultexcludes="yes"
+			author="true" version="true" use="true"
+			windowtitle="lgpl-utils"
+			classpathref="build.classpath">
 			<arg value="-J-Xmx1000m"/>
 			<packageset dir="${lgpl-utils.dir}/src/java" />
 			<doctitle>
-				<![CDATA[<h1>lgpl-utils&#174;</h1>]]></doctitle>
+				<![CDATA[<h1>lgpl-utils</h1>]]></doctitle>
 		<bottom>
 			<![CDATA[
 <i>
@@ -86,6 +135,6 @@ Portions copyright &#169; 2005-2009 Sebastiano Vigna
 		</javadoc>
 	</target>
 
-	<target name="all" depends="clean, jar, javadoc" description="clean, jar, javadoc."/>
+	<target name="all" depends="clean, test, jar, javadoc" description="clean, jar, javadoc."/>
 	
 </project>

@@ -180,7 +180,11 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
         
         if (LRUNexus.INSTANCE != null) {
             // flush everything before/after a unit test.
-            LRUNexus.INSTANCE.discardAllCaches();
+            try {
+                LRUNexus.INSTANCE.discardAllCaches();
+            } catch (Throwable t) {
+                log.error(t, t);
+            }
         }
 
         super.tearDown();
@@ -207,9 +211,9 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
             }
             
         }
-        
-        if(log.isInfoEnabled())
-            log.info("Removing: "+f);
+
+        if (log.isInfoEnabled())
+            log.info("Deleting: length=" + f.length() + ", file=" + f);
         
         if (!f.delete())
             throw new RuntimeException("Could not remove: " + f);
@@ -304,9 +308,9 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
     }
 
     /**
-     * Waits until the overflow counter has been incremented, indicating that
-     * overflow processing has occurred and that post-processing for the
-     * overflow event is complete.
+     * Waits until the asynchronous overflow counter has been incremented,
+     * indicating that overflow processing has occurred and that post-processing
+     * for the overflow event is complete.
      * <p>
      * Note: Normally you use bring the data service to the brink of the desired
      * overflow event, note the current overflow counter using
@@ -324,20 +328,22 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
      * 
      * @throws IOException
      */
-    protected long awaitOverflow(IDataService dataService,
-            long priorOverflowCounter) throws IOException {
+    protected long awaitAsynchronousOverflow(final IDataService dataService,
+            final long priorOverflowCounter) throws IOException {
 
         final long begin = System.currentTimeMillis();
 
         long newOverflowCounter;
 
-        while ((newOverflowCounter = dataService.getAsynchronousOverflowCounter()) == priorOverflowCounter) {
+        while ((newOverflowCounter = dataService
+                .getAsynchronousOverflowCounter()) == priorOverflowCounter) {
 
             final long elapsed = System.currentTimeMillis() - begin;
-            
-            log.info("\n**** Awaiting overflow: priorOverflowCounter="
-                    + priorOverflowCounter + ", elapsed=" + elapsed
-                    + ", service=" + dataService);
+
+            if (log.isInfoEnabled())
+                log.info("\n**** Awaiting overflow: priorOverflowCounter="
+                        + priorOverflowCounter + ", elapsed=" + elapsed
+                        + ", service=" + dataService);
 
             /*
              * FIXME You can change this constant if you are debugging so that
@@ -346,11 +352,11 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
              * should be [2000] ms.
              */
             if (elapsed > 2000) {
-             
+
                 fail("No overflow after " + elapsed + "ms?");
-                
+
             }
-            
+
             try {
                 Thread.sleep(250/* ms */);
             } catch (InterruptedException e) {
@@ -361,31 +367,30 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
 
         final long elapsed = System.currentTimeMillis() - begin;
 
-        log.info("\nOverflow complete: elapsed=" + elapsed
-                + " ms : priorOverflowCounter=" + priorOverflowCounter
-                + ", newOverflowCounter=" + newOverflowCounter);
+        if (log.isInfoEnabled())
+            log.info("\nOverflow complete: elapsed=" + elapsed
+                    + " ms : priorOverflowCounter=" + priorOverflowCounter
+                    + ", newOverflowCounter=" + newOverflowCounter);
 
         assertTrue(newOverflowCounter > priorOverflowCounter);
 
         return newOverflowCounter;
         
     }
-    
+
     /**
      * Return the #of index partitions in a scale-out index.
      * <p>
      * Note: This uses an key range scan to count only the non-deleted index
-     * partition entries.
+     * partition entries (the {@link MetadataIndex} does not use delete markers
+     * so a normal range count is exact).
      * 
      * @param name
      *            The name of the scale-out index.
      * 
      * @return The #of index partitions.
-     * 
-     * @todo note that the {@link MetadataIndex} does not use delete markers so
-     *       a range count would be exact.
      */
-    protected int getPartitionCount(String name) {
+    protected int getPartitionCount(final String name) {
         
         final ITupleIterator itr = new RawDataServiceTupleIterator(
                 fed.getMetadataService(),//

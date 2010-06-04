@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 
 import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.journal.ITx;
@@ -11,7 +12,6 @@ import com.bigdata.journal.Journal;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.ISolution;
@@ -22,12 +22,12 @@ import com.bigdata.service.IBigdataFederation;
  * <p>
  * Note: Just like a nested subquery join, when used for mutation this must
  * read and write on the {@link ITx#UNISOLATED} indices and an
- * {@link UnisolatedReadWriteIndex} will be used to serialize exclusive
- * access to the unisolated index for writers while allowing readers
- * concurrent access.
+ * {@link UnisolatedReadWriteIndex} will be used to serialize exclusive access
+ * to the unisolated index for writers while allowing readers concurrent access.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: LocalJoinMasterTask.java 2625 2010-04-16 21:11:44Z mrpersonick
+ *          $
  */
 public class LocalJoinMasterTask extends JoinMasterTask {
 
@@ -41,8 +41,8 @@ public class LocalJoinMasterTask extends JoinMasterTask {
 
         super(rule, joinNexus, buffer);
 
-        if ((joinNexus.getIndexManager() instanceof IBigdataFederation)
-                && (((IBigdataFederation) joinNexus.getIndexManager())
+        if ((joinNexus.getIndexManager() instanceof IBigdataFederation<?>)
+                && (((IBigdataFederation<?>) joinNexus.getIndexManager())
                         .isScaleOut())) {
             
             /*
@@ -77,9 +77,6 @@ public class LocalJoinMasterTask extends JoinMasterTask {
         // Future for each JoinTask.
         final List<Future<Void>> futures = new ArrayList<Future<Void>>(tailCount); 
         
-        // The JoinTasks will be run on this service.
-        final ExecutorService executorService = joinNexus.getIndexManager().getExecutorService();
-        
         // the previous JoinTask and null iff this is the first join dimension.
         LocalJoinTask priorJoinTask = null;
 
@@ -88,9 +85,6 @@ public class LocalJoinMasterTask extends JoinMasterTask {
 
             // true iff this is the last JOIN in the evaluation order.
             final boolean lastJoin = orderIndex + 1 == tailCount;
-
-            // the predicate for this join dimension.
-            final IPredicate predicate = rule.getTail(orderIndex);
 
             // source for this join dimension.
             final IAsynchronousIterator<IBindingSet[]> src = sources[orderIndex];
@@ -111,40 +105,54 @@ public class LocalJoinMasterTask extends JoinMasterTask {
 
             }
 
-            /*
-             * Submit the JoinTask.
-             * 
-             * When the JoinTask for the 1st join dimension executes it will
-             * consume the [initialBindingSet]. That bindingSet will be used to
-             * obtain the first access path and merged with the elements drawn
-             * from that access path. Intermediate bindingSets will be
-             * propagated to the JoinTask for the next predicate in the
-             * evaluation order.
-             */
+			/*
+			 * Submit the JoinTask.
+			 * 
+			 * When the JoinTask for the 1st join dimension executes it will
+			 * consume the [initialBindingSet]. That bindingSet will be used to
+			 * obtain the first access path and merged with the elements drawn
+			 * from that access path. Intermediate bindingSets will be
+			 * propagated to the JoinTask for the next predicate in the
+			 * evaluation order.
+			 * 
+			 * Note: This creates the FutureTasks in one pass and sets them on
+			 * the various references. It then goes through a second pass to
+			 * start the tasks running. This way the [priorJoinTask] (if any)
+			 * will always have its sinkFuture set before it begins to execute.
+			 */
 
-            // Submit the JoinTask for execution.
-            final Future<Void> future = executorService.submit(joinTask);
+			final FutureTask<Void> ft = new FutureTask<Void>(joinTask);
 
-            // Save reference to the Future.
-            futures.add( future );
-            
-            // Set the Future on the BlockingBuffer.
-            if (!lastJoin) {
+			// Save reference to the Future.
+			futures.add(ft);
 
-                joinTask.syncBuffer.setFuture(future);
-                
-            }
+			// Set the Future on the BlockingBuffer.
+			if (!lastJoin) {
 
-            // Set the Future on the JoinTask for the previous join dimension.
-            if (priorJoinTask != null) {
-                
-                priorJoinTask.sinkFuture = future;
-                
-            }
+				joinTask.syncBuffer.setFuture(ft);
+
+			}
+
+			// Set the Future on the JoinTask for the previous join dimension.
+			if (priorJoinTask != null) {
+
+				priorJoinTask.setSinkFuture(ft);
+
+			}
             
             priorJoinTask = joinTask;
             
         }            
+
+        // The JoinTasks will be run on this service.
+        final ExecutorService executorService = joinNexus.getIndexManager().getExecutorService();
+        
+        // Submit the JoinTask for execution.
+        for(Future<Void> f : futures) {
+
+			executorService.execute((FutureTask<Void>) f);
+
+        }
 
         return futures;
         

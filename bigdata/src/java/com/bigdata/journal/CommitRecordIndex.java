@@ -453,13 +453,14 @@ public class CommitRecordIndex extends BTree {
         
         final byte[] key = getKey(commitTime);
         
-        if(super.contains(key)) {
-            
-            throw new IllegalArgumentException(
-                    "commit record exists: timestamp=" + commitTime);
-            
-        }
-        
+// Note: modified to allow replay of historical transactions.
+//        if(super.contains(key)) {
+//            
+//            throw new IllegalArgumentException(
+//                    "commit record exists: timestamp=" + commitTime);
+//            
+//        }
+        if(!super.contains(key)) {
         // add a serialized entry to the persistent index.
         super.insert(key,
                 ser.serializeEntry(new Entry(commitTime, commitRecordAddr)));
@@ -469,7 +470,9 @@ public class CommitRecordIndex extends BTree {
         
         // add to the transient cache.
         cache.put(commitTime, commitRecord, false/*dirty*/);
-        
+  	    } else {
+			log.warn("Historical commit record exists: timestamp="+commitTime);
+		}
     }
 
     /**

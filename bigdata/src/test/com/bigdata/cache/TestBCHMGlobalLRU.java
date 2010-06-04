@@ -31,14 +31,12 @@ import com.bigdata.LRUNexus.AccessPolicyEnum;
 import com.bigdata.rawstore.Bytes;
 
 /**
- * Some unit tests for the {@link BCHMGlobalLRU}.
+ * Some unit tests for the {@link BCHMGlobalLRU} usings its LRU access policy.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo due to its design, it can not correctly report all of the counters
- *       declared by {@link IHardReferenceGlobalLRU} so it is failing various
- *       unit tests.
+ * @see TestBCHMGlobalLRUWithLIRS
  */
 public class TestBCHMGlobalLRU extends
         AbstractHardReferenceGlobalLRUTest {
@@ -67,10 +65,14 @@ public class TestBCHMGlobalLRU extends
         final int limitingCacheCapacity = 100000;
 
         final float loadFactor = .75f;
+        
+        final int concurrencyLevel = 16;
 
         lru = new BCHMGlobalLRU<Object>(maximumBytesInMemory,
                 minimumCacheSetCapacity, limitingCacheCapacity, loadFactor,
-                AccessPolicyEnum.LIRS);
+                concurrencyLevel,
+                AccessPolicyEnum.LRU
+                );
 
     }
 

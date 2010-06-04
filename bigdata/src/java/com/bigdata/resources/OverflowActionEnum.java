@@ -63,6 +63,13 @@ public enum OverflowActionEnum {
      * Split an index partition that has overflowed into 2 or more siblings.
      */
     Split,
+
+    /**
+     * Split the first index partition for a new scale-out index into N siblings
+     * and distribute those siblings across the federation in order to improve
+     * the data distribution and improve the potential concurrency of the index.
+     */
+    ScatterSplit,
     
     /**
      * Split an index partition receiving a lot of writes on the tail of the key

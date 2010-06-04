@@ -59,6 +59,8 @@ public class LogicalRowSplitHandler implements ISimpleSplitHandler, Externalizab
     protected static transient final Logger log = Logger
             .getLogger(LogicalRowSplitHandler.class);
 
+    public static transient final ISimpleSplitHandler INSTANCE = new LogicalRowSplitHandler();
+    
     public byte[] getSeparatorKey(final IndexSegment seg, final int fromIndex,
             final int toIndex, final int splitAt) {
 

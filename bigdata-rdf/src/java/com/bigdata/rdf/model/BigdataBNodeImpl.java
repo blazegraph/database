@@ -148,5 +148,10 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
         return id;
         
     }
-
+    final public void setStatementIdentifier(boolean isStmtIdentifier) {
+        this.statementIdentifier=isStmtIdentifier;
+    }
+    final public boolean isStatementIdentifier() {
+        return this.statementIdentifier;
+    }
 }

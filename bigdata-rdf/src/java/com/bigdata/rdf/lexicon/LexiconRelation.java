@@ -28,8 +28,8 @@
 package com.bigdata.rdf.lexicon;
 
 import java.io.IOException;
-import java.io.StringReader;
-import java.lang.ref.SoftReference;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -45,6 +45,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 import org.omg.CORBA.portable.ValueFactory;
@@ -78,10 +79,10 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc.Term2IdWriteProcConstructor;
-import com.bigdata.rdf.model.BigdataBNodeImpl;
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
-import com.bigdata.rdf.model.BigdataValueImpl;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.TermIdComparator2;
 import com.bigdata.rdf.rio.IStatementBuffer;
@@ -98,7 +99,6 @@ import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.search.FullTextIndex;
-import com.bigdata.search.TokenBuffer;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.Split;
 import com.bigdata.striterator.ChunkedArrayIterator;
@@ -138,6 +138,59 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
     private final Set<String> indexNames;
 
+    private final AtomicReference<ITextIndexer> viewRef = new AtomicReference<ITextIndexer>();
+
+	@SuppressWarnings("unchecked")
+    protected Class<BigdataValueFactory> determineValueFactoryClass() {
+
+        final String className = getProperty(
+                AbstractTripleStore.Options.VALUE_FACTORY_CLASS,
+                AbstractTripleStore.Options.DEFAULT_VALUE_FACTORY_CLASS);
+        final Class<?> cls;
+        try {
+            cls = Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("Bad option: "
+                    + AbstractTripleStore.Options.VALUE_FACTORY_CLASS, e);
+        }
+
+        if (!BigdataValueFactory.class.isAssignableFrom(cls)) {
+            throw new RuntimeException(
+                    AbstractTripleStore.Options.VALUE_FACTORY_CLASS
+                            + ": Must implement: "
+                            + BigdataValueFactory.class.getName());
+        }
+
+        return (Class<BigdataValueFactory>) cls;
+
+	}
+
+    @SuppressWarnings("unchecked")
+    protected Class<ITextIndexer> determineTextIndexerClass() {
+
+        final String className = getProperty(
+                AbstractTripleStore.Options.TEXT_INDEXER_CLASS,
+                AbstractTripleStore.Options.DEFAULT_TEXT_INDEXER_CLASS);
+        
+        final Class<?> cls;
+        try {
+            cls = Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("Bad option: "
+                    + AbstractTripleStore.Options.TEXT_INDEXER_CLASS, e);
+        }
+
+        if (!ITextIndexer.class.isAssignableFrom(cls)) {
+            throw new RuntimeException(
+                    AbstractTripleStore.Options.TEXT_INDEXER_CLASS
+                            + ": Must implement: "
+                            + ITextIndexer.class.getName());
+        }
+
+        return (Class<ITextIndexer>) cls;
+
+    }
+
     /**
      * Note: The term:id and id:term indices MUST use unisolated write operation
      * to ensure consistency without write-write conflicts. The only exception
@@ -174,18 +227,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
             if (textIndex)
                 properties.setProperty(AbstractTripleStore.Options.OVERWRITE,
                         "false");
-
-            if (textIndex) {
-                /*
-                 * Also index datatype literals?
-                 */
-                textIndexDatatypeLiterals = Boolean
-                        .parseBoolean(getProperty(
-                                AbstractTripleStore.Options.TEXT_INDEX_DATATYPE_LITERALS,
-                                AbstractTripleStore.Options.DEFAULT_TEXT_INDEX_DATATYPE_LITERALS));
-            } else {
-                textIndexDatatypeLiterals = false;
-            }
 
         }
         
@@ -272,7 +313,21 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
          * read-committed, and unisolated views of the lexicon for a given
          * triple store.
          */
-        valueFactory = BigdataValueFactoryImpl.getInstance(namespace);
+//        valueFactory = BigdataValueFactoryImpl.getInstance(namespace);
+        try {
+			final Class<BigdataValueFactory> vfc = determineValueFactoryClass();
+			final Method gi = vfc.getMethod("getInstance", String.class);
+			this.valueFactory = (BigdataValueFactory) gi.invoke(null, namespace);
+		} catch (NoSuchMethodException e) {
+			throw new IllegalArgumentException(
+					AbstractTripleStore.Options.VALUE_FACTORY_CLASS, e);
+		} catch (InvocationTargetException e) {
+			throw new IllegalArgumentException(
+					AbstractTripleStore.Options.VALUE_FACTORY_CLASS, e);
+		} catch (IllegalAccessException e) {
+			throw new IllegalArgumentException(
+					AbstractTripleStore.Options.VALUE_FACTORY_CLASS, e);
+		}
 
         /*
          * @todo This should be a high concurrency LIRS or similar cache in
@@ -285,7 +340,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                     AbstractTripleStore.Options.TERM_CACHE_CAPACITY,
                     AbstractTripleStore.Options.DEFAULT_TERM_CACHE_CAPACITY));
 
-            termCache = new ConcurrentWeakValueCacheWithBatchedUpdates<Long, BigdataValueImpl>(//
+			termCache = new ConcurrentWeakValueCacheWithBatchedUpdates<Long, BigdataValue>(//
                     termCacheCapacity, // queueCapacity
                     .75f, // loadFactor (.75 is the default)
                     16 // concurrency level (16 is the default)
@@ -299,12 +354,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * The canonical {@link BigdataValueFactoryImpl} reference (JVM wide) for the
      * lexicon namespace.
      */
-    public BigdataValueFactoryImpl getValueFactory() {
+	public BigdataValueFactory getValueFactory() {
         
         return valueFactory;
         
     }
-    final private BigdataValueFactoryImpl valueFactory;
+
+	final private BigdataValueFactory valueFactory;
     
     /**
      * Strengthens the return type.
@@ -351,7 +407,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
                 // create the full text index
                 
-                final FullTextIndex tmp = getSearchEngine();
+				final ITextIndexer tmp = getSearchEngine();
 
                 tmp.create();
 
@@ -397,12 +453,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
                 getSearchEngine().destroy();
 
-                searchEngineRef.clear();
+                viewRef.set(null);
 
             }
 
             // discard the value factory for the lexicon's namespace.
-            BigdataValueFactoryImpl.remove(getNamespace());
+			this.valueFactory.remove(getNamespace());
             
             if (termCache != null) {
 
@@ -421,7 +477,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     volatile private IIndex id2term;
     volatile private IIndex term2id;
     private final boolean textIndex;
-    private final boolean textIndexDatatypeLiterals;
     final boolean storeBlankNodes;
     final int termIdBitsToReverse;
 
@@ -538,32 +593,50 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      *       already imposes a canonicalizing mapping within for the index name
      *       and timestamp inside of a JVM.
      */
-    public FullTextIndex getSearchEngine() {
+    public ITextIndexer getSearchEngine() {
 
         if (!textIndex)
             return null;
-        
-        synchronized(this) {
-        
-            FullTextIndex view = searchEngineRef == null ? null
-                    : searchEngineRef.get();
-            
-            if(view == null) {
-                
-                view = new FullTextIndex(getIndexManager(), getNamespace(),
-                        getTimestamp(), getProperties());
-                
-                searchEngineRef = new SoftReference<FullTextIndex>(view);
-                
-            }
-            
-            return view; 
-        
-        }
-        
-    }
-    private SoftReference<FullTextIndex> searchEngineRef;
 
+        /*
+         * Note: Double-checked locking pattern requires [volatile] variable or
+         * AtomicReference. This uses the AtomicReference since that gives us a
+         * lock object which is specific to this request.
+         */
+        if (viewRef.get() == null) {
+
+            synchronized (viewRef) {
+
+                if (viewRef.get() == null) {
+
+                    final ITextIndexer tmp;
+                    try {
+                        final Class<?> vfc = determineTextIndexerClass();
+                        final Method gi = vfc.getMethod("getInstance",
+                                IIndexManager.class, String.class, Long.class,
+                                Properties.class);
+                        tmp = (ITextIndexer) gi.invoke(null/* object */,
+                                getIndexManager(), getNamespace(),
+                                getTimestamp(), getProperties());
+//                        new FullTextIndex(getIndexManager(),
+//                                getNamespace(), getTimestamp(), getProperties())
+                        viewRef.set(tmp);
+                    } catch (Throwable e) {
+                        throw new IllegalArgumentException(
+                                AbstractTripleStore.Options.TEXT_INDEXER_CLASS,
+                                e);
+                    }
+
+                }
+
+            }
+
+        }
+
+        return viewRef.get();
+
+    }
+    
     protected IndexMetadata getTerm2IdIndexMetadata(final String name) {
 
         final IndexMetadata metadata = newIndexMetadata(name);
@@ -579,7 +652,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         final IndexMetadata metadata = newIndexMetadata(name);
 
         metadata.setTupleSerializer(new Id2TermTupleSerializer(
-                getNamespace()));
+				getNamespace(), getValueFactory()));
 
         return metadata;
 
@@ -808,7 +881,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
             final LexiconKeyBuilder keyBuilder, final BigdataValue[] terms,
             final int numTerms) {
 
-        final KVO<BigdataValue>[] a = (KVO<BigdataValue>[]) new KVO[numTerms];
+		final KVO<BigdataValue>[] a = new KVO[numTerms];
         
         for (int i = 0; i < numTerms; i++) {
 
@@ -1232,7 +1305,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * @param itr
      *            Iterator visiting the terms to be indexed.
      * 
-     * @see #textSearch(String, String)
+     * @throws UnsupportedOperationException
+     *             unless full text indexing was enabled.
+     * 
+     * @see ITextIndexer
+     * @see AbstractTripleStore.Options#TEXT_INDEX
      * 
      * @todo allow registeration of datatype specific tokenizers (we already
      *       have language family based lookup).
@@ -1243,68 +1320,15 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     protected void indexTermText(final int capacity,
             final Iterator<BigdataValue> itr) {
 
-        final FullTextIndex ndx = getSearchEngine();
-
-        final TokenBuffer buffer = new TokenBuffer(capacity, ndx);
-
-        int n = 0;
-
-        while (itr.hasNext()) {
-
-            final BigdataValue val = itr.next();
-
-            if (!(val instanceof Literal)) {
-
-                /*
-                 * Note: If you allow URIs to be indexed then the code which is
-                 * responsible for free text search for quads must impose a
-                 * filter on the subject and predicate positions to ensure that
-                 * free text search can not be used to materialize literals or
-                 * URIs from other graphs. This matters when the named graphs
-                 * are used as an ACL mechanism. This would also be an issue if
-                 * literals were allowed into the subject position.
-                 */
-                continue;
-                
-            }
-
-            final Literal lit = (Literal) val;
-
-            if (!textIndexDatatypeLiterals && lit.getDatatype() != null) {
-
-                // do not index datatype literals in this manner.
-                continue;
-
-            }
-
-            final String languageCode = lit.getLanguage();
-
-            // Note: May be null (we will index plain literals).
-            // if(languageCode==null) continue;
-
-            final String text = lit.getLabel();
-
-            /*
-             * Note: The OVERWRITE option is turned off to avoid some of the
-             * cost of re-indexing each time we see a term.
-             */
-
-            final long termId = val.getTermId();
-            
-            assert termId != IRawTripleStore.NULL; // the termId must have been assigned.
-
-            ndx.index(buffer, termId, 0/* fieldId */, languageCode,
-                    new StringReader(text));
-
-            n++;
-
-        }
-
-        // flush writes to the text index.
-        buffer.flush();
-
-        if (log.isInfoEnabled())
-            log.info("indexed " + n + " new terms");
+		final ITextIndexer ndx = getSearchEngine();
+		
+		if(ndx == null) {
+		    
+		    throw new UnsupportedOperationException();
+		    
+		}
+		
+		ndx.index(capacity, itr);
 
     }
 
@@ -1351,7 +1375,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         
         for (Long lid : ids) {
 
-            final BigdataValueImpl value = _getTermId(lid);
+			final BigdataValue value = _getTermId(lid);
             
             if (value != null) {
 
@@ -1594,7 +1618,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                      * Note: This automatically sets the valueFactory reference
                      * on the de-serialized value.
                      */
-                    BigdataValueImpl value = valueFactory.getValueSerializer()
+					BigdataValue value = valueFactory.getValueSerializer()
                             .deserialize(data);
                     
                     // Set the term identifier.
@@ -1612,7 +1636,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 //                            
 //                        }
                         
-                        final BigdataValueImpl tmp = termCache.putIfAbsent(lid,
+						final BigdataValue tmp = termCache.putIfAbsent(lid,
                                 value);
 
                         if (tmp != null) {
@@ -1631,7 +1655,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                      */
                     assert value.getTermId() == lid : "expecting id=" + lid
                             + ", but found " + value.getTermId();
-                    assert ((BigdataValueImpl) value).getValueFactory() == valueFactory;
+					assert (value).getValueFactory() == valueFactory;
 
                     // save in caller's concurrent map.
                     map.put(lid, value);
@@ -1827,7 +1851,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      *       Or perhaps this can be rolled into the {@link ValueFactory} impl
      *       along with the reverse bnodes mapping?
      */
-    private ConcurrentWeakValueCacheWithBatchedUpdates<Long, BigdataValueImpl> termCache;
+	private ConcurrentWeakValueCacheWithBatchedUpdates<Long, BigdataValue> termCache;
 
     /**
      * Constant for the {@link LexiconRelation} namespace component.
@@ -1863,7 +1887,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * @throws IllegalArgumentException
      *             if <i>id</i> is {@link IRawTripleStore#NULL}.
      */
-    private BigdataValueImpl _getTermId(final Long lid) {
+	private BigdataValue _getTermId(final Long lid) {
 
         final long id = lid.longValue();
         
@@ -1881,14 +1905,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
              * BNode corresponds to a statement identifier.
              */
 
-            final BigdataBNodeImpl stmt = valueFactory.createBNode("S"
+			final BigdataBNode stmt = valueFactory.createBNode("S"
                     + Long.toString(id));
 
             // set the term identifier on the object.
             stmt.setTermId(id);
 
             // mark as a statement identifier.
-            stmt.statementIdentifier = true;
+			stmt.setStatementIdentifier(true);
 
             return stmt;
 
@@ -1909,7 +1933,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
              * @see TestAddTerms
              */
 
-            final BigdataBNodeImpl bnode = valueFactory.createBNode("B"
+			final BigdataBNode bnode = valueFactory.createBNode("B"
                     + Long.toString(id));
 
             // set the term identifier on the object.
@@ -1960,7 +1984,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         final Long lid = Long.valueOf(id);
         
         // handle NULL, bnodes, statement identifiers, and the termCache.
-        BigdataValueImpl value = _getTermId(lid);
+        BigdataValue value = _getTermId(lid);
         
         if (value != null)
             return value;
@@ -2006,7 +2030,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 //            }
             
             // Note: passing the Long object as the key.
-            final BigdataValueImpl tmp = termCache.putIfAbsent(lid, value);
+			final BigdataValue tmp = termCache.putIfAbsent(lid, value);
 
             if (tmp != null) {
 
@@ -2084,7 +2108,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
         if(value instanceof BigdataValue) {
 
-            final BigdataValueImpl impl = (BigdataValueImpl)value;
+			final BigdataValue impl = (BigdataValue) value;
             
             // set as side-effect.
             impl.setTermId(termId);

@@ -32,6 +32,7 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOFilter;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
 
 /**
@@ -77,7 +78,7 @@ public class DoNotAddFilter extends SPOFilter {
      *            rdf:type rdfs:Resource) when the closure of the database is
      *            updated.
      */
-    public DoNotAddFilter(Vocabulary vocab, Axioms axioms,
+    public DoNotAddFilter(final Vocabulary vocab, final Axioms axioms,
             boolean forwardChainRdfTypeRdfsResource) {
 
         if (vocab == null)
@@ -88,12 +89,35 @@ public class DoNotAddFilter extends SPOFilter {
         
         this.axioms = axioms;
 
-        this.rdfType = vocab.get(RDF.TYPE);
-
-        this.rdfsResource = vocab.get(RDFS.RESOURCE);
-        
         this.forwardChainRdfTypeRdfsResource = forwardChainRdfTypeRdfsResource;
-        
+
+        if (!forwardChainRdfTypeRdfsResource && axioms.isRdfSchema()) {
+
+            /*
+             * If we are not forward chaining the type resource entailments then
+             * we want to keep those statements out of the database since they
+             * are materialized by the backward chainer. For that purpose we
+             * need to save off the term identifier for rdf:type and
+             * rdfs:Resource.
+             */
+            
+            this.rdfType = vocab.get(RDF.TYPE);
+
+            this.rdfsResource = vocab.get(RDFS.RESOURCE);
+
+        } else {
+
+            /*
+             * These will not be used unless we are forward chaining type
+             * resource entailments and they will not be defined unless the rdfs
+             * axioms were specified (really, unless the RDFSVocabulary was
+             * defined).
+             */
+         
+            this.rdfType = this.rdfsResource = IRawTripleStore.NULL;
+
+        }
+
     }
     
     public boolean accept(final ISPO spo) {

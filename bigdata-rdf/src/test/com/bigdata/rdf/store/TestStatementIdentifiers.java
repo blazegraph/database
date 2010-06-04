@@ -64,7 +64,6 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rio.StatementCyclesException;
@@ -732,7 +731,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
             }
 
-            final BigdataValueFactoryImpl valueFactory = store.getValueFactory();
+            final BigdataValueFactory valueFactory = store.getValueFactory();
             final BigdataURI A = valueFactory.createURI("http://www.foo.org/A");
             final BigdataURI rdfType = valueFactory.createURI(RDF.TYPE.stringValue());
             final BigdataBNode sid1 = valueFactory.createBNode("_S1");
@@ -794,7 +793,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
             }
 
-            final BigdataValueFactoryImpl valueFactory = store.getValueFactory();
+            final BigdataValueFactory valueFactory = store.getValueFactory();
             final BigdataURI B = valueFactory.createURI("http://www.foo.org/B");
             final BigdataURI rdfType = valueFactory.createURI(RDF.TYPE.stringValue());
             final BigdataBNode sid1 = valueFactory.createBNode("_S1");

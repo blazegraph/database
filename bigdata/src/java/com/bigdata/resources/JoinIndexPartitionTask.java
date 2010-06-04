@@ -523,7 +523,7 @@ public class JoinIndexPartitionTask extends AbstractPrepareTask<JoinResult> {
                 }
 
                 // notify successful index partition join.
-                resourceManager.indexPartitionJoinCounter.incrementAndGet();
+                resourceManager.overflowCounters.indexPartitionJoinCounter.incrementAndGet();
 
                 return null;
 

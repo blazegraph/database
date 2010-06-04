@@ -47,9 +47,13 @@
 		<!-- setup ${version} for regular or snapshot. -->
 		<tstamp>
 			<format property="today" pattern="ddMMyy" locale="en,US" />
+			<format property="osgiDate" pattern="yyyyMMdd" locale="en,US" />
 		</tstamp>
 		<condition property="version" value="bigdata-${build.ver}-${today}" else="bigdata-${build.ver}">
 			<istrue value="${snapshot}" />
+		</condition>
+		<condition property="osgi.version" value="${build.ver.osgi}.${osgiDate}" else="${build.ver.osgi}.0">
+					<istrue value="${snapshot}" />
 		</condition>
 		<!--<echo message="today=${today}"/>-->
 		<echo message="version=${version}" />
@@ -128,171 +132,197 @@
 		</jar>
 	</target>
 
+	
+	
+	
 	<!-- This generates an osgi bundle jar, and does not bundled the dependencies.
 		 See 'bundleJar'. -->
-	<target name="osgi" depends="compile" description="Generates the osgi bundle jar (see also bundleJar).">
-		<jar destfile="${build.dir}/com.bigdata-${build.ver.osgi}.jar">
+	<target name="osgi" depends="compile, bundle" description="Generates the osgi bundle jar (see also bundleJar).">
+		<jar destfile="${build.dir}/com.bigdata.source_${osgi.version}.jar">
+			<manifest>
+							<attribute name="Eclipse-SourceBundle" value='com.bigdata;version="${osgi.version}";roots="."'/>
+							<attribute name="Bundle-Vendor" value="Systap"/>
+							<attribute name="Bundle-Version" value="${build.ver.osgi}"/>
+							<attribute name="Bundle-ManifestVersion" value="2"/>
+							<attribute name="Bundle-SymbolicName" value="com.bigdata.source"/>
+							<attribute name="Bundle-DocURL" value="http://www.bigdata.com"/>
+							<attribute name="Bundle-Description" value="Bigdata Source"/>
+			</manifest>
+			<fileset dir="bigdata/src/java"/>
+				<fileset dir="bigdata/src/java" />
+				<fileset dir="bigdata-jini/src/java" />
+				<fileset dir="bigdata-rdf/src/java" />
+				<fileset dir="bigdata-sails/src/java" />
+				<fileset dir="lgpl-utils/src/java" />
+		</jar>
+		<jar destfile="${build.dir}/com.bigdata-${osgi.version}.jar">
 			<fileset dir="${build.dir}/classes"  />
+			<fileset dir="bigdata/LEGAL"  />
+			<zipfileset src="${build.dir}/lib/unimi/colt-1.2.0.jar"/>
+			<zipfileset src="${build.dir}/lib/unimi/fastutil-5.1.5.jar" />
+			<zipfileset src="${build.dir}/lib/ctc_utils-5-4-2005.jar" />
+			<zipfileset src="${build.dir}/lib/cweb-commons-1.1-b2-dev.jar" />
+			<zipfileset src="${build.dir}/lib/cweb-extser-0.1-b2-dev.jar" />
+			<zipfileset src="${build.dir}/lib/dsi-utils-1.0.6-020610.jar" />
+			<zipfileset src="${build.dir}/lib/iris-0.58.jar" />
+			<zipfileset src="${build.dir}/lib/lgpl-utils-1.0.6-020610.jar" />
+			<zipfileset src="${build.dir}/lib/high-scale-lib-v1.1.2.jar" />
+			
 			<manifest>
 				<attribute name="Bundle-Name" value="com.bigdata"/>
 				<attribute name="Bundle-Vendor" value="Systap"/>
-				<attribute name="Bundle-Version" value="${build.ver.osgi}"/>
+				<attribute name="Bundle-Version" value="${osgi.version}"/>
 				<attribute name="Bundle-ManifestVersion" value="2"/>
 				<attribute name="Bundle-SymbolicName" value="com.bigdata"/>
 				<attribute name="Bundle-DocURL" value="http://www.bigdata.com"/>
 				<attribute name="Bundle-Description" value="Bigdata API"/>
-				
-				
+				<attribute name="DynamicImport-Package" value="*"/>
+				<attribute name="Bundle-ClassPath" value="."/>
 				<attribute name="Export-Package" value='
-com.bigdata;version="${build.ver.osgi}",
-com.bigdata.bfs;version="${build.ver.osgi}",
-com.bigdata.btree;version="${build.ver.osgi}",
-com.bigdata.btree.data;version="${build.ver.osgi}",
-com.bigdata.btree.filter;version="${build.ver.osgi}",
-com.bigdata.btree.isolation;version="${build.ver.osgi}",
-com.bigdata.btree.keys;version="${build.ver.osgi}",
-com.bigdata.btree.proc;version="${build.ver.osgi}",
-com.bigdata.btree.raba;version="${build.ver.osgi}",
-com.bigdata.btree.raba.codec;version="${build.ver.osgi}",
-com.bigdata.btree.view;version="${build.ver.osgi}",
-com.bigdata.cache;version="${build.ver.osgi}",
-com.bigdata.concurrent;version="${build.ver.osgi}",
-com.bigdata.config;version="${build.ver.osgi}",
-com.bigdata.counters;version="${build.ver.osgi}",
-com.bigdata.counters.httpd;version="${build.ver.osgi}",
-com.bigdata.counters.linux;version="${build.ver.osgi}",
-com.bigdata.counters.query;version="${build.ver.osgi}",
-com.bigdata.counters.render;version="${build.ver.osgi}",
-com.bigdata.counters.store;version="${build.ver.osgi}",
-com.bigdata.counters.win;version="${build.ver.osgi}",
-com.bigdata.gis;version="${build.ver.osgi}",
-com.bigdata.io;version="${build.ver.osgi}",
-com.bigdata.io.compression;version="${build.ver.osgi}",
-com.bigdata.jini.lookup.entry;version="${build.ver.osgi}",
-com.bigdata.jini.start;version="${build.ver.osgi}",
-com.bigdata.jini.start.config;version="${build.ver.osgi}",
-com.bigdata.jini.start.process;version="${build.ver.osgi}",
-com.bigdata.jini.util;version="${build.ver.osgi}",
-com.bigdata.journal;version="${build.ver.osgi}",
-com.bigdata.mdi;version="${build.ver.osgi}",
-com.bigdata.net;version="${build.ver.osgi}",
-com.bigdata.rawstore;version="${build.ver.osgi}",
-com.bigdata.rdf.axioms;version="${build.ver.osgi}",
-com.bigdata.rdf.inf;version="${build.ver.osgi}",
-com.bigdata.rdf.lexicon;version="${build.ver.osgi}",
-com.bigdata.rdf.load;version="${build.ver.osgi}",
-com.bigdata.rdf.magic;version="${build.ver.osgi}",
-com.bigdata.rdf.model;version="${build.ver.osgi}",
-com.bigdata.rdf.rio;version="${build.ver.osgi}",
-com.bigdata.rdf.rules;version="${build.ver.osgi}",
-com.bigdata.rdf.spo;version="${build.ver.osgi}",
-com.bigdata.rdf.store;version="${build.ver.osgi}",
-com.bigdata.rdf.vocab;version="${build.ver.osgi}",
-com.bigdata.relation;version="${build.ver.osgi}",
-com.bigdata.relation.accesspath;version="${build.ver.osgi}",
-com.bigdata.relation.locator;version="${build.ver.osgi}",
-com.bigdata.relation.rule;version="${build.ver.osgi}",
-com.bigdata.relation.rule.eval;version="${build.ver.osgi}",
-com.bigdata.relation.rule.eval.pipeline;version="${build.ver.osgi}",
-com.bigdata.resources;version="${build.ver.osgi}",
-com.bigdata.search;version="${build.ver.osgi}",
-com.bigdata.service;version="${build.ver.osgi}",
-com.bigdata.service.jini;version="${build.ver.osgi}",
-com.bigdata.service.jini.benchmark;version="${build.ver.osgi}",
-com.bigdata.service.jini.lookup;version="${build.ver.osgi}",
-com.bigdata.service.jini.master;version="${build.ver.osgi}",
-com.bigdata.service.jini.util;version="${build.ver.osgi}",
-com.bigdata.service.mapred;version="${build.ver.osgi}",
-com.bigdata.service.mapred.jini;version="${build.ver.osgi}",
-com.bigdata.service.mapred.jobs;version="${build.ver.osgi}",
-com.bigdata.service.mapred.tasks;version="${build.ver.osgi}",
-com.bigdata.service.ndx;version="${build.ver.osgi}",
-com.bigdata.service.ndx.pipeline;version="${build.ver.osgi}",
-com.bigdata.service.proxy;version="${build.ver.osgi}",
-com.bigdata.sparse;version="${build.ver.osgi}",
-com.bigdata.striterator;version="${build.ver.osgi}",
-com.bigdata.util;version="${build.ver.osgi}",
-com.bigdata.util.concurrent;version="${build.ver.osgi}",
-com.bigdata.util.httpd;version="${build.ver.osgi}",
-com.bigdata.zookeeper;version="${build.ver.osgi}",
-org.apache.system;version="${build.ver.osgi}",
-org.openrdf.rio.rdfxml;version="${build.ver.osgi}"'/>
+com.bigdata;version="${osgi.version}",
+com.bigdata.bfs;version="${osgi.version}",
+com.bigdata.btree;version="${osgi.version}",
+com.bigdata.btree.data;version="${osgi.version}",
+com.bigdata.btree.filter;version="${osgi.version}",
+com.bigdata.btree.isolation;version="${osgi.version}",
+com.bigdata.btree.keys;version="${osgi.version}",
+com.bigdata.btree.proc;version="${osgi.version}",
+com.bigdata.btree.raba;version="${osgi.version}",
+com.bigdata.btree.raba.codec;version="${osgi.version}",
+com.bigdata.btree.view;version="${osgi.version}",
+com.bigdata.cache;version="${osgi.version}",
+com.bigdata.concurrent;version="${osgi.version}",
+com.bigdata.config;version="${osgi.version}",
+com.bigdata.counters;version="${osgi.version}",
+com.bigdata.counters.httpd;version="${osgi.version}",
+com.bigdata.counters.linux;version="${osgi.version}",
+com.bigdata.counters.query;version="${osgi.version}",
+com.bigdata.counters.render;version="${osgi.version}",
+com.bigdata.counters.store;version="${osgi.version}",
+com.bigdata.counters.win;version="${osgi.version}",
+com.bigdata.gis;version="${osgi.version}",
+com.bigdata.io;version="${osgi.version}",
+com.bigdata.io.compression;version="${osgi.version}",
+com.bigdata.jini.lookup.entry;version="${osgi.version}",
+com.bigdata.jini.start;version="${osgi.version}",
+com.bigdata.jini.start.config;version="${osgi.version}",
+com.bigdata.jini.start.process;version="${osgi.version}",
+com.bigdata.jini.util;version="${osgi.version}",
+com.bigdata.journal;version="${osgi.version}",
+com.bigdata.mdi;version="${osgi.version}",
+com.bigdata.net;version="${osgi.version}",
+com.bigdata.rawstore;version="${osgi.version}",
+com.bigdata.rdf.axioms;version="${osgi.version}",
+com.bigdata.rdf.inf;version="${osgi.version}",
+com.bigdata.rdf.lexicon;version="${osgi.version}",
+com.bigdata.rdf.load;version="${osgi.version}",
+com.bigdata.rdf.magic;version="${osgi.version}",
+com.bigdata.rdf.model;version="${osgi.version}",
+com.bigdata.rdf.rio;version="${osgi.version}",
+com.bigdata.rdf.rules;version="${osgi.version}",
+com.bigdata.rdf.spo;version="${osgi.version}",
+com.bigdata.rdf.store;version="${osgi.version}",
+com.bigdata.rdf.vocab;version="${osgi.version}",
+com.bigdata.relation;version="${osgi.version}",
+com.bigdata.relation.accesspath;version="${osgi.version}",
+com.bigdata.relation.locator;version="${osgi.version}",
+com.bigdata.relation.rule;version="${osgi.version}",
+com.bigdata.relation.rule.eval;version="${osgi.version}",
+com.bigdata.relation.rule.eval.pipeline;version="${osgi.version}",
+com.bigdata.resources;version="${osgi.version}",
+com.bigdata.search;version="${osgi.version}",
+com.bigdata.service;version="${osgi.version}",
+com.bigdata.service.jini;version="${osgi.version}",
+com.bigdata.service.jini.benchmark;version="${osgi.version}",
+com.bigdata.service.jini.lookup;version="${osgi.version}",
+com.bigdata.service.jini.master;version="${osgi.version}",
+com.bigdata.service.jini.util;version="${osgi.version}",
+com.bigdata.service.mapred;version="${osgi.version}",
+com.bigdata.service.mapred.jini;version="${osgi.version}",
+com.bigdata.service.mapred.jobs;version="${osgi.version}",
+com.bigdata.service.mapred.tasks;version="${osgi.version}",
+com.bigdata.service.ndx;version="${osgi.version}",
+com.bigdata.service.ndx.pipeline;version="${osgi.version}",
+com.bigdata.service.proxy;version="${osgi.version}",
+com.bigdata.sparse;version="${osgi.version}",
+com.bigdata.striterator;version="${osgi.version}",
+com.bigdata.util;version="${osgi.version}",
+com.bigdata.util.concurrent;version="${osgi.version}",
+com.bigdata.util.httpd;version="${osgi.version}",
+com.bigdata.zookeeper;version="${osgi.version}",
+org.apache.system;version="${osgi.version}"'/>				
 				<attribute name="Import-Package" value='
-cern.clhep;version="1.2.0",
-cern.colt;version="1.2",
-cern.colt.bitvector;version="1.2.0",
-cern.colt.function;version="1.2",
-com.bigdata;version="${build.ver.osgi}",
-com.bigdata.bfs;version="${build.ver.osgi}",
-com.bigdata.btree;version="${build.ver.osgi}",
-com.bigdata.btree.data;version="${build.ver.osgi}",
-com.bigdata.btree.filter;version="${build.ver.osgi}",
-com.bigdata.btree.isolation;version="${build.ver.osgi}",
-com.bigdata.btree.keys;version="${build.ver.osgi}",
-com.bigdata.btree.proc;version="${build.ver.osgi}",
-com.bigdata.btree.raba;version="${build.ver.osgi}",
-com.bigdata.btree.raba.codec;version="${build.ver.osgi}",
-com.bigdata.btree.view;version="${build.ver.osgi}",
-com.bigdata.cache;version="${build.ver.osgi}",
-com.bigdata.concurrent;version="${build.ver.osgi}",
-com.bigdata.config;version="${build.ver.osgi}",
-com.bigdata.counters;version="${build.ver.osgi}",
-com.bigdata.counters.httpd;version="${build.ver.osgi}",
-com.bigdata.counters.linux;version="${build.ver.osgi}",
-com.bigdata.counters.query;version="${build.ver.osgi}",
-com.bigdata.counters.render;version="${build.ver.osgi}",
-com.bigdata.counters.store;version="${build.ver.osgi}",
-com.bigdata.counters.win;version="${build.ver.osgi}",
-com.bigdata.gis;version="${build.ver.osgi}",
-com.bigdata.io;version="${build.ver.osgi}",
-com.bigdata.io.compression;version="${build.ver.osgi}",
-com.bigdata.jini.lookup.entry;version="${build.ver.osgi}",
-com.bigdata.jini.start;version="${build.ver.osgi}",
-com.bigdata.jini.start.config;version="${build.ver.osgi}",
-com.bigdata.jini.start.process;version="${build.ver.osgi}",
-com.bigdata.jini.util;version="${build.ver.osgi}",
-com.bigdata.journal;version="${build.ver.osgi}",
-com.bigdata.mdi;version="${build.ver.osgi}",
-com.bigdata.net;version="${build.ver.osgi}",
-com.bigdata.rawstore;version="${build.ver.osgi}",
-com.bigdata.rdf.axioms;version="${build.ver.osgi}",
-com.bigdata.rdf.inf;version="${build.ver.osgi}",
-com.bigdata.rdf.lexicon;version="${build.ver.osgi}",
-com.bigdata.rdf.load;version="${build.ver.osgi}",
-com.bigdata.rdf.magic;version="${build.ver.osgi}",
-com.bigdata.rdf.model;version="${build.ver.osgi}",
-com.bigdata.rdf.rio;version="${build.ver.osgi}",
-com.bigdata.rdf.rules;version="${build.ver.osgi}",
-com.bigdata.rdf.spo;version="${build.ver.osgi}",
-com.bigdata.rdf.store;version="${build.ver.osgi}",
-com.bigdata.rdf.vocab;version="${build.ver.osgi}",
-com.bigdata.relation;version="${build.ver.osgi}",
-com.bigdata.relation.accesspath;version="${build.ver.osgi}",
-com.bigdata.relation.locator;version="${build.ver.osgi}",
-com.bigdata.relation.rule;version="${build.ver.osgi}",
-com.bigdata.relation.rule.eval;version="${build.ver.osgi}",
-com.bigdata.relation.rule.eval.pipeline;version="${build.ver.osgi}",
-com.bigdata.resources;version="${build.ver.osgi}",
-com.bigdata.search;version="${build.ver.osgi}",
-com.bigdata.service;version="${build.ver.osgi}",
-com.bigdata.service.jini;version="${build.ver.osgi}",
-com.bigdata.service.jini.benchmark;version="${build.ver.osgi}",
-com.bigdata.service.jini.lookup;version="${build.ver.osgi}",
-com.bigdata.service.jini.master;version="${build.ver.osgi}",
-com.bigdata.service.jini.util;version="${build.ver.osgi}",
-com.bigdata.service.mapred;version="${build.ver.osgi}",
-com.bigdata.service.mapred.jini;version="${build.ver.osgi}",
-com.bigdata.service.mapred.jobs;version="${build.ver.osgi}",
-com.bigdata.service.mapred.tasks;version="${build.ver.osgi}",
-com.bigdata.service.ndx;version="${build.ver.osgi}",
-com.bigdata.service.ndx.pipeline;version="${build.ver.osgi}",
-com.bigdata.service.proxy;version="${build.ver.osgi}",
-com.bigdata.sparse;version="${build.ver.osgi}",
-com.bigdata.striterator;version="${build.ver.osgi}",
-com.bigdata.util;version="${build.ver.osgi}",
-com.bigdata.util.concurrent;version="${build.ver.osgi}",
-com.bigdata.util.httpd;version="${build.ver.osgi}",
-com.bigdata.zookeeper;version="${build.ver.osgi}",
+com.bigdata;version="${osgi.version}",
+com.bigdata.bfs;version="${osgi.version}",
+com.bigdata.btree;version="${osgi.version}",
+com.bigdata.btree.data;version="${osgi.version}",
+com.bigdata.btree.filter;version="${osgi.version}",
+com.bigdata.btree.isolation;version="${osgi.version}",
+com.bigdata.btree.keys;version="${osgi.version}",
+com.bigdata.btree.proc;version="${osgi.version}",
+com.bigdata.btree.raba;version="${osgi.version}",
+com.bigdata.btree.raba.codec;version="${osgi.version}",
+com.bigdata.btree.view;version="${osgi.version}",
+com.bigdata.cache;version="${osgi.version}",
+com.bigdata.concurrent;version="${osgi.version}",
+com.bigdata.config;version="${osgi.version}",
+com.bigdata.counters;version="${osgi.version}",
+com.bigdata.counters.httpd;version="${osgi.version}",
+com.bigdata.counters.linux;version="${osgi.version}",
+com.bigdata.counters.query;version="${osgi.version}",
+com.bigdata.counters.render;version="${osgi.version}",
+com.bigdata.counters.store;version="${osgi.version}",
+com.bigdata.counters.win;version="${osgi.version}",
+com.bigdata.gis;version="${osgi.version}",
+com.bigdata.io;version="${osgi.version}",
+com.bigdata.io.compression;version="${osgi.version}",
+com.bigdata.jini.lookup.entry;version="${osgi.version}",
+com.bigdata.jini.start;version="${osgi.version}",
+com.bigdata.jini.start.config;version="${osgi.version}",
+com.bigdata.jini.start.process;version="${osgi.version}",
+com.bigdata.jini.util;version="${osgi.version}",
+com.bigdata.journal;version="${osgi.version}",
+com.bigdata.mdi;version="${osgi.version}",
+com.bigdata.net;version="${osgi.version}",
+com.bigdata.rawstore;version="${osgi.version}",
+com.bigdata.rdf.axioms;version="${osgi.version}",
+com.bigdata.rdf.inf;version="${osgi.version}",
+com.bigdata.rdf.lexicon;version="${osgi.version}",
+com.bigdata.rdf.load;version="${osgi.version}",
+com.bigdata.rdf.magic;version="${osgi.version}",
+com.bigdata.rdf.model;version="${osgi.version}",
+com.bigdata.rdf.rio;version="${osgi.version}",
+com.bigdata.rdf.rules;version="${osgi.version}",
+com.bigdata.rdf.spo;version="${osgi.version}",
+com.bigdata.rdf.store;version="${osgi.version}",
+com.bigdata.rdf.vocab;version="${osgi.version}",
+com.bigdata.relation;version="${osgi.version}",
+com.bigdata.relation.accesspath;version="${osgi.version}",
+com.bigdata.relation.locator;version="${osgi.version}",
+com.bigdata.relation.rule;version="${osgi.version}",
+com.bigdata.relation.rule.eval;version="${osgi.version}",
+com.bigdata.relation.rule.eval.pipeline;version="${osgi.version}",
+com.bigdata.resources;version="${osgi.version}",
+com.bigdata.search;version="${osgi.version}",
+com.bigdata.service;version="${osgi.version}",
+com.bigdata.service.jini;version="${osgi.version}",
+com.bigdata.service.jini.benchmark;version="${osgi.version}",
+com.bigdata.service.jini.lookup;version="${osgi.version}",
+com.bigdata.service.jini.master;version="${osgi.version}",
+com.bigdata.service.jini.util;version="${osgi.version}",
+com.bigdata.service.mapred;version="${osgi.version}",
+com.bigdata.service.mapred.jini;version="${osgi.version}",
+com.bigdata.service.mapred.jobs;version="${osgi.version}",
+com.bigdata.service.mapred.tasks;version="${osgi.version}",
+com.bigdata.service.ndx;version="${osgi.version}",
+com.bigdata.service.ndx.pipeline;version="${osgi.version}",
+com.bigdata.service.proxy;version="${osgi.version}",
+com.bigdata.sparse;version="${osgi.version}",
+com.bigdata.striterator;version="${osgi.version}",
+com.bigdata.util;version="${osgi.version}",
+com.bigdata.util.concurrent;version="${osgi.version}",
+com.bigdata.util.httpd;version="${osgi.version}",
+com.bigdata.zookeeper;version="${osgi.version}",
 com.ibm.icu.text,
 com.ibm.icu.util;version="3.8.1",
 com.sun.jini.admin;version="2.1",
@@ -300,19 +330,8 @@ com.sun.jini.config;version="2.1.0",
 com.sun.jini.resource;version="2.1.0",
 com.sun.jini.start;version="2.1",
 com.sun.jini.tool;version="2.1.0",
-cutthecrap.utils.striterators;version="5.4",
 info.aduna.net,
 info.aduna.xml,
-it.unimi.dsi.bits;version="5.1",
-it.unimi.dsi.compression;version="5.1",
-it.unimi.dsi.fastutil.booleans;version="5.1",
-it.unimi.dsi.fastutil.bytes;version="5.1",
-it.unimi.dsi.fastutil.ints;version="5.1",
-it.unimi.dsi.fastutil.io;version="5.1",
-it.unimi.dsi.fastutil.longs;version="5.1",
-it.unimi.dsi.fastutil.objects;version="5.1",
-it.unimi.dsi.io;version="5.1",
-it.unimi.dsi.util;version="5.1",
 javax.xml.datatype,
 javax.xml.namespace,
 javax.xml.parsers,
@@ -330,7 +349,6 @@ net.jini.jeri.tcp;version="2.1",
 net.jini.lease;version="2.1",
 net.jini.lookup;version="2.1",
 net.jini.lookup.entry;version="2.1",
-org.CognitiveWeb.extser;version="1.1",
 org.apache.commons.io;version="1.4",
 org.apache.log4j,
 org.apache.lucene.analysis;version="3.0.0",
@@ -347,20 +365,10 @@ org.apache.lucene.analysis.standard;version="3.0.0",
 org.apache.lucene.analysis.th;version="3.0.0",
 org.apache.lucene.analysis.tokenattributes;version="3.0.0",
 org.apache.lucene.util;version="3.0.0",
-org.apache.system;version="${build.ver.osgi}",
 org.apache.zookeeper;version="3.1",
 org.apache.zookeeper.data;version="3.1",
 org.apache.zookeeper.server;version="3.2.1",
 org.apache.zookeeper.server.quorum;version="3.1",
-org.deri.iris.api;version="0.58",
-org.deri.iris.api.basics;version="0.58",
-org.deri.iris.api.builtins;version="0.58",
-org.deri.iris.api.factory;version="0.58",
-org.deri.iris.api.terms;version="0.58",
-org.deri.iris.basics;version="0.58",
-org.deri.iris.builtins;version="0.58",
-org.deri.iris.optimisations.magicsets;version="0.58",
-org.deri.iris.terms;version="0.58",
 org.openrdf.model;version="2.0",
 org.openrdf.model.datatypes;version="2.0",
 org.openrdf.model.impl;version="2.0",
@@ -997,31 +1005,56 @@ ${postInstallMessage}</echo>
 	<!--                                                                   -->
 	<!--                    STANDALONE FEDERATION TARGETS                  -->
 	<!--                                                                   -->
-		
-<!-- @todo this should explicitly start jini. The problem is metavariables
-     in the jini script.  We can not just use the unit test startLookup
-     target because it has different assumptions about how jar versions
-     are treated.  This could also be addressed by using system properties
-     instead of metavariable substution in startAll.config or by cloning
-     all of the jini config files for standalone. 
-<target name="standalone-start-jini" description="Start the jini services.">
-	<java classname="com.sun.jini.start.ServiceStarter"
-		failonerror="true" fork="true" logerror="true">
-		<classpath refid="runtime.classpath" />
-		<jvmarg value="-Xmx200m" />
-		<jvmarg value="-showversion"/>
-		<jvmarg value="-Djava.security.policy=policy.all"/>
-		<arg value="src/resources/config/jini/startAll.config" />
-	</java>
+
+<target name="standalone-setup" description="Setup properties used by the standalone federation and LUS start/stop.">
+    <property name="app.home" location="${bigdata.dir}" />
+    <property name="test.codebase.port" value="23333"/>
+    <property name="test.codebase.dir" location="${bigdata.dir}/bigdata-jini/lib/jini/lib-dl" />
+    <property name="test.codebase" value="http://${this.hostname}:${test.codebase.port}/jsk-dl.jar"/>
+    <property name="java.security.policy" value="${bigdata.dir}/policy.all"/>
+	<property name="log4j.configuration" value="${bigdata.dir}/src/resources/config/standalone/log4j.properties"/>
+    <property name="java.net.preferIPv4Stack" value="true"/>
+    <property name="bigdata.fedname" value="${standalone.fed}"/>
 </target>
--->
+
+<target name="standalone-startLookup" depends="jar,standalone-setup" description="Start the lookup service for the standalone federation.">
+  <java classname="com.bigdata.service.jini.util.LookupStarter"
+		fork="true" spawn="true">
+		<classpath refid="runtime.classpath" />
+    <sysproperty key="app.home" value="${app.home}"/>
+    <sysproperty key="jini.lib" value="${dist.lib}"/>
+    <sysproperty key="jini.lib.dl" value="${dist.lib.dl}"/>
+    <sysproperty key="java.security.policy" value="${java.security.policy}"/>
+    <sysproperty key="java.security.debug" value="off"/>
+    <sysproperty key="java.protocol.handler.pkgs" value="net.jini.url"/>
+    <sysproperty key="log4j.configuration" value="${log4j.configuration}"/>
+    <sysproperty key="codebase.port" value="${test.codebase.port}"/>
+    <sysproperty key="java.net.preferIPv4Stack" value="${java.net.preferIPv4Stack}"/>
+    <sysproperty key="bigdata.fedname" value="${bigdata.fedname}"/>
+  </java>
+</target>
+
+<target name="standalone-stopLookup" depends="jar,standalone-setup" description="Stop the lookup service for the standalone federation.">
+  <java classname="com.bigdata.service.jini.util.LookupStarter"
+	failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+    <sysproperty key="app.home" value="${app.home}"/>
+    <sysproperty key="jini.lib" value="${dist.lib}"/>
+    <sysproperty key="jini.lib.dl" value="${dist.lib.dl}"/>
+    <sysproperty key="java.security.policy" value="${java.security.policy}"/>
+    <sysproperty key="log4j.configuration" value="${log4j.configuration}"/>
+    <sysproperty key="java.net.preferIPv4Stack" value="${java.net.preferIPv4Stack}"/>
+    <sysproperty key="bigdata.fedname" value="${bigdata.fedname}"/>
+    <arg value="-stop" />
+  </java>
+</target>
 
 <!-- Note: You should 'nohup' this, e.g., "nohup ant standalone-start" to 
      avoid taking down the ServicesManagerServer if you are disconnected
      from a terminal. -->
-<target name="standalone-start" description="Start the standalone federation.">
-	<!-- @todo start jini automatically. -->
-    <!--<antcall target="standalone-start-jini" />-->
+<target name="standalone-start" depends="jar,standalone-setup" description="Start the standalone federation.">
+    <!-- Start the lookup service. -->
+	<antcall target="standalone-startLookup" />
 	<java classname="com.bigdata.jini.start.ServicesManagerServer"
 		failonerror="true" fork="true" logerror="true">
 		<classpath refid="runtime.classpath" />
@@ -1037,9 +1070,7 @@ ${postInstallMessage}</echo>
 	</java>
 </target>
 
-<target name="standalone-stop" description="Stop the standalone federation.">
-	<!-- @todo stop jini automatically. -->
-    <!--<antcall target="standalone-start-jini" />-->
+<target name="standalone-stop" depends="jar,standalone-setup" description="Stop the standalone federation.">
 	<java classname="com.bigdata.service.jini.util.ShutdownFederation"
 		failonerror="true" fork="true" logerror="true">
 		<classpath refid="runtime.classpath" />
@@ -1053,6 +1084,8 @@ ${postInstallMessage}</echo>
 		<jvmarg value="-Dlog4j.configuration=file:src/resources/config/standalone/log4j.properties"/>
 		<arg value="src/resources/config/standalone/bigdataStandalone.config" />
 	</java>
+	<!-- Then take down the lookup service as well. -->
+    <antcall target="standalone-stopLookup" />
 </target>
 
 <!-- @todo Add target to stand up a SPARQL endpoint for a KB namespace. Could be
@@ -1074,7 +1107,7 @@ ${postInstallMessage}</echo>
      for file in *; do mv $file $file.nt; done
      
      -->
-<target name="standalone-bulk-load" description="Bulk load RDF data into the standalone federation.">
+<target name="standalone-bulk-load" depends="jar" description="Bulk load RDF data into the standalone federation.">
 	<java classname="com.bigdata.rdf.load.MappedRDFDataLoadMaster"
 		failonerror="true" fork="true" logerror="true">
 		<classpath refid="runtime.classpath" />
@@ -1100,7 +1133,7 @@ ${postInstallMessage}</echo>
 		     d:/bigdata-perf-analysis/lubm/U10
 		     d:/bigdata-perf-analysis/bsbm/bsbm_2785/dataset.nt
 		-->
-		<jvmarg value="-Dbigdata.rdf.data=d:/bigdata-perf-analysis/bsbm/bsbm_2785/dataset.nt"/>
+		<jvmarg value="-Dbigdata.rdf.data=d:/bigdata-perf-analysis/lubm/U10"/>
 		<!-- The file or directory containing zero or more RDF ontology files to be loaded.
 		
 			 Note: If you do not want to load any "ontology" data you can point this at an
@@ -1112,7 +1145,8 @@ ${postInstallMessage}</echo>
 			bigdata-rdf/src/resources/data/lehigh/univ-bench.owl
 			d:/bigdata-perf-analysis/emptyDir
 		 -->
-		<jvmarg value="-Dbigdata.rdf.ontology=d:/bigdata-perf-analysis/emptyDir"/>
+		<jvmarg value="-Dbigdata.rdf.ontology=bigdata-rdf/src/resources/data/lehigh/univ-bench.owl"/>
+		<!-- The main configuration file. -->
 		<arg value="src/resources/config/standalone/bigdataStandalone.config" />
 	</java>
 </target>
@@ -1272,9 +1306,11 @@ ${postInstallMessage}</echo>
             tofile="${dist.lib}/cweb-commons.jar"/>
       <copy file="${bigdata.lib}/cweb-extser-0.1-b2-dev.jar"
             tofile="${dist.lib}/cweb-extser.jar"/>
-      <copy file="${bigdata.lib}/dsi-utils-1.0-b5-dev-200410.jar"
+      <copy file="${bigdata.lib}/high-scale-lib-v1.1.2.jar"
+            tofile="${dist.lib}/highscalelib.jar"/>
+      <copy file="${bigdata.lib}/dsi-utils-1.0.6-020610.jar"
             tofile="${dist.lib}/dsiutils.jar"/>
-      <copy file="${bigdata.lib}/lgpl-utils-1.0-b5-dev-200410.jar"
+      <copy file="${bigdata.lib}/lgpl-utils-1.0.6-020610.jar"
             tofile="${dist.lib}/lgplutils.jar"/>
       <copy file="${bigdata.lib}/unimi/fastutil-5.1.5.jar"
             tofile="${dist.lib}/fastutil.jar"/>
@@ -1460,7 +1496,7 @@ ${postInstallMessage}</echo>
       <mkdir dir="${bigdata-test.lib}"/>
       <property name="bigdata-test.jar" location="${bigdata-test.lib}/bigdata-test.jar" />
 
-      <property name="javac.test.classpath" value="${classes.dir}:${junit.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/classserver.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/dsiutils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/log4j.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/zookeeper.jar"/>
+      <property name="javac.test.classpath" value="${classes.dir}:${junit.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/classserver.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/highscalelib.jar:${dist.lib}/dsiutils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/log4j.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/zookeeper.jar"/>
 
       <echo>javac
 </echo>
@@ -1616,6 +1652,10 @@ ${postInstallMessage}</echo>
 
       <antcall target="stopLookup" />
       <antcall target="stopHttpd" />
+    	
+      <!-- This message is noticed by the hudson build and is used to trigger
+           after various after actions. -->
+      <echo>JUNIT RUN COMPLETE</echo>
     </target>
 
     <target name="startHttpd">
@@ -1698,6 +1738,7 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/cweb-commons.jar"/>
         <pathelement location="${dist.lib}/cweb-extser.jar"/>
         <pathelement location="${dist.lib}/ctc_utils.jar"/>
+        <pathelement location="${dist.lib}/highscalelib.jar"/>
         <pathelement location="${dist.lib}/dsiutils.jar"/>
         <pathelement location="${dist.lib}/lgplutils.jar"/>
         <pathelement location="${dist.lib}/fastutil.jar"/>
@@ -1716,7 +1757,7 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/zookeeper.jar"/>
       </path>
 
-      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/dsiutils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
+      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/highscalelib.jar:${dist.lib}/utils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
 
       <echo>    classpath:    ${run.class.path}
 </echo>
@@ -1793,11 +1834,14 @@ ${postInstallMessage}</echo>
 
         <sysproperty key="log4j.path" value="${bigdata.test.log4j.abs.path}"/>
 
+        <sysproperty key="app.home" value="${app.home}"/>
+
         <sysproperty key="classserver.jar" value="${dist.lib}/classserver.jar" />
         <sysproperty key="colt.jar" value="${dist.lib}/colt.jar" />
         <sysproperty key="ctc_utils.jar" value="${dist.lib}/ctc_utils.jar" />
         <sysproperty key="cweb-commons.jar" value="${dist.lib}/cweb-commons.jar" />
         <sysproperty key="cweb-extser.jar" value="${dist.lib}/cweb-extser.jar" />
+        <sysproperty key="highscalelib.jar" value="${dist.lib}/highscalelib.jar" />
         <sysproperty key="dsiutils.jar" value="${dist.lib}/dsiutils.jar" />
         <sysproperty key="lgplutils.jar" value="${dist.lib}/lgplutils.jar" />
         <sysproperty key="fastutil.jar" value="${dist.lib}/fastutil.jar" />
@@ -1894,6 +1938,7 @@ ${postInstallMessage}</echo>
 	        <pathelement location="${dist.lib}/cweb-commons.jar"/>
 	        <pathelement location="${dist.lib}/cweb-extser.jar"/>
 	        <pathelement location="${dist.lib}/ctc_utils.jar"/>
+	        <pathelement location="${dist.lib}/highscalelib.jar"/>
 	        <pathelement location="${dist.lib}/dsiutils.jar"/>
 	        <pathelement location="${dist.lib}/lgplutils.jar"/>
 	        <pathelement location="${dist.lib}/fastutil.jar"/>
@@ -1909,7 +1954,7 @@ ${postInstallMessage}</echo>
 	        <pathelement location="${dist.lib}/slf4j-log4j.jar"/>
 	        <pathelement location="${dist.lib}/zookeeper.jar"/>
 	      </path>
-	      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/dsiutils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
+	      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/highscalelib.jar:${dist.lib}/dsiutils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
 		<!-- Generate the LUBM dataset. 
 		<mkdir dir="${data}"/>
 		<java classname="edu.lehigh.swat.bench.uba.Generator" dir="${data}" fork="yes">

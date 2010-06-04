@@ -40,7 +40,6 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.ISimpleSplitHandler;
-import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.Leaf;
@@ -52,7 +51,7 @@ import com.bigdata.service.Split;
 import com.bigdata.util.concurrent.ExecutionExceptions;
 
 /**
- * Utility methods for {@link ISplitHandler}s and friends.
+ * Utility methods for {@link ISimpleSplitHandler}s and friends.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -275,7 +274,7 @@ public class SplitUtility {
     /**
      * Identifies the splits for an index with heavy write append behavior.
      * <p>
-     * The split point is choosen by locating the right-most non-leaf node. The
+     * The split point is chosen by locating the right-most non-leaf node. The
      * key range which would enter that node is placed within the new
      * right-sibling index partition (the tail). The rest of the key range is
      * placed within the new left-sibling index partition (the head).
@@ -639,7 +638,7 @@ public class SplitUtility {
             
             final ILocalBTreeView src = (ILocalBTreeView)getIndex(name);
 
-            if (INFO) {
+            if (log.isInfoEnabled()) {
                 
                 // note: the mutable btree - accessed here for debugging only.
                 final BTree btree = src.getMutableBTree();
@@ -750,8 +749,7 @@ public class SplitUtility {
          * 
          * @see src/architecture/SplitMath.xls for this formula.
          */
-//        final int N1 = (int) (seg.getStore().size() / ((nominalShardSize+1) / 2));
-        final int N1 = (int) (seg.getStore().size() / (nominalShardSize / 2));
+        final int N1 = (int)(seg.getStore().size() / (nominalShardSize / 2.));
         
         if (N1 < 2) {
 

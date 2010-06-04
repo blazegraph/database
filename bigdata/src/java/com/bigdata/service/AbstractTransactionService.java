@@ -573,7 +573,7 @@ abstract public class AbstractTransactionService extends AbstractService
 
     }
 
-    final public long nextTimestamp() {
+    public long nextTimestamp() {
 
 //        setupLoggingContext();
 //

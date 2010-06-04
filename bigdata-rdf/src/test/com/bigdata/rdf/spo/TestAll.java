@@ -91,6 +91,9 @@ public class TestAll extends TestCase {
         // test suite for the access path used for SPARQL default graphs (quads
         // only).
         suite.addTestSuite(TestDefaultGraphAccessPath.class);
+
+        // star joins
+        suite.addTestSuite(TestSPOStarJoin.class);
         
         return suite;
         

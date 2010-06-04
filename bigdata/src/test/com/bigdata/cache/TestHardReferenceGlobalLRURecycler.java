@@ -57,7 +57,8 @@ public class TestHardReferenceGlobalLRURecycler extends
 
         final long maximumBytesInMemory = 10 * Bytes.kilobyte;
 
-        final long minCleared = 0L;
+        // clear at least 25% of the memory.
+        final long minCleared = maximumBytesInMemory / 4;
         
         final int minimumCacheSetCapacity = 0;
 

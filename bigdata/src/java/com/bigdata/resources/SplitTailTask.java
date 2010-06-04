@@ -159,10 +159,15 @@ public class SplitTailTask extends AbstractPrepareTask {
             }
         
             // Do the atomic update
-            SplitIndexPartitionTask.doSplitAtomicUpdate(resourceManager, vmd,
-                    splitResult, OverflowActionEnum.TailSplit,
-                    resourceManager.indexPartitionTailSplitCounter, e);
-            
+            SplitIndexPartitionTask
+                    .doSplitAtomicUpdate(
+                            resourceManager,
+                            vmd,
+                            splitResult,
+                            OverflowActionEnum.TailSplit,
+                            resourceManager.overflowCounters.indexPartitionTailSplitCounter,
+                            e);
+
             if (moveTarget != null) {
              
                 /*

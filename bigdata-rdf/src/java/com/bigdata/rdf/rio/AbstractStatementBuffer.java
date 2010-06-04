@@ -17,7 +17,7 @@ import org.openrdf.model.impl.ContextStatementImpl;
 import org.openrdf.model.impl.StatementImpl;
 
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.rdf.model.BigdataBNodeImpl;
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
@@ -159,7 +159,7 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
      * Note: This is allocated lazily so that we can implement
      * {@link IStatementBuffer#setBNodeMap(Map)}
      */
-    private Map<String, BigdataBNodeImpl> bnodes = null;
+    private Map<String, BigdataBNode> bnodes = null;
 
     /**
      * The database from the ctor.
@@ -241,7 +241,7 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
 
     }
 
-    public void setBNodeMap(Map<String, BigdataBNodeImpl> bnodes) {
+    public void setBNodeMap(Map<String, BigdataBNode> bnodes) {
     
         if (bnodes == null)
             throw new IllegalArgumentException();
@@ -299,11 +299,11 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
             if (bnodes == null) {
 
                 // allocate map lazily.
-                bnodes = new HashMap<String, BigdataBNodeImpl>(capacity);
+                bnodes = new HashMap<String, BigdataBNode>(capacity);
 
             }
             
-            BigdataBNodeImpl b = bnodes.get(id);
+            BigdataBNode b = bnodes.get(id);
 
             if (b == null) {
 
@@ -411,7 +411,7 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
         final G stmt = (G) getValueFactory().createStatement(//
                 (BigdataResource) convertValue(e.getSubject()), //
                 (BigdataURI)      convertValue(e.getPredicate()), //
-                (BigdataValue)    convertValue(e.getObject()), //
+                    convertValue(e.getObject()), //
                 (BigdataResource) convertValue(e.getContext()),
                 (e instanceof BigdataStatement ? ((BigdataStatement) e)
                         .getStatementType() : StatementEnum.Explicit));
@@ -470,7 +470,7 @@ abstract public class AbstractStatementBuffer<F extends Statement, G extends Big
         final G stmt = (G)  getValueFactory().createStatement(//
                 (BigdataResource) convertValue(s), //
                 (BigdataURI)      convertValue(p), //
-                (BigdataValue)    convertValue(o), //
+                                  convertValue(o), //
                 (BigdataResource) convertValue(c), //
                 type);
         

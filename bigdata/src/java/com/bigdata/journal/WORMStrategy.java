@@ -899,7 +899,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             
         }
 
-        System.err.println("WARNING: alpha impl: " + this.getClass().getName());
+        // System.err.println("WARNING: alpha impl: " + this.getClass().getName());
         
     }
 

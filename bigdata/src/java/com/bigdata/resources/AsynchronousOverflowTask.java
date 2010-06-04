@@ -13,23 +13,28 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.Queue;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
@@ -39,12 +44,10 @@ import com.bigdata.btree.proc.BatchLookup;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
 import com.bigdata.btree.view.FusedView;
-import com.bigdata.counters.ICounter;
-import com.bigdata.counters.ICounterSet;
-import com.bigdata.counters.IRequiredHostCounters;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
@@ -52,9 +55,7 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.resources.ResourceManager.IResourceManagerCounters;
-import com.bigdata.resources.StoreManager.IStoreManagerCounters;
-import com.bigdata.service.AbstractFederation;
+import com.bigdata.resources.OverflowManager.ResourceScores;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
@@ -62,9 +63,9 @@ import com.bigdata.service.EventType;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.MetadataService;
-import com.bigdata.service.DataService.IDataServiceCounters;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.concurrent.LatchedExecutor;
 
 /**
  * This class examines the named indices defined on the journal identified by
@@ -188,6 +189,14 @@ public class AsynchronousOverflowTask implements Callable<Object> {
      *       as well.
      *       <p>
      *       The value here is pretty much action+"("+vmd+")".
+     *       
+     * @deprecated This is no longer valid as many index partitions are entered
+     *             onto BOTH the buildQueue and the mergeQueue rather than
+     *             exclusively being assigned one task or the other.
+     *             <p>
+     *             {@link ViewMetadata#getAction()} will report the action which
+     *             is actually being executed and <code>null</code> until an
+     *             action starts to execute.
      */
     private final Map<String, String> used = new TreeMap<String, String>();
 
@@ -198,8 +207,22 @@ public class AsynchronousOverflowTask implements Callable<Object> {
      * 
      * @param name
      *            The name of the index partition.
+     * 
+     * @deprecated This is no longer valid as many index partitions are entered
+     *             onto BOTH the buildQueue and the mergeQueue rather than
+     *             exclusively being assigned one task or the other.
+     *             <p>
+     *             {@link ViewMetadata#getAction()} will report the action which
+     *             is actually being executed and <code>null</code> until an
+     *             action starts to execute.
+     *             <p>
+     *             This could still be used to track those index partitions for
+     *             which we have determined that we will do a move, join, or
+     *             scatter split rather than build or merge (split only follows
+     *             a merge). [Note that scatterSplit does not have its own
+     *             {@link OverflowActionEnum} right now.]
      */
-    protected boolean isUsed(final String name) {
+    private boolean isUsed(final String name) {
         
         if (name == null)
             throw new IllegalArgumentException();
@@ -207,7 +230,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
         return used.containsKey(name);
         
     }
-    
+
     /**
      * This method is invoked each time an index partition is "used" by
      * assigning it to participate in some build, split, join, or move
@@ -222,6 +245,10 @@ public class AsynchronousOverflowTask implements Callable<Object> {
      * 
      * @todo could be replaced by index on {@link BTreeMetadata} in the
      *       {@link OverflowMetadata} object and {@link BTreeMetadata#action}
+     * 
+     * @deprecated This is no longer valid as many index partitions are entered
+     *             onto BOTH the buildQueue and the mergeQueue rather than
+     *             exclusively being assigned one task or the other.
      */
     protected void putUsed(final String name, final String action) {
         
@@ -242,104 +269,6 @@ public class AsynchronousOverflowTask implements Callable<Object> {
     }
     
     /**
-     * Return the value of a host counter.
-     * 
-     * @param path
-     *            The path (relative to the host root).
-     * @param defaultValue
-     *            The default value to use if the counter was not found.
-     *            
-     * @return The value if found and otherwise the defaultValue.
-     */
-    protected double getHostCounter(final String path, final double defaultValue) {
-
-        final AbstractFederation fed = (AbstractFederation) resourceManager
-                .getFederation();
-
-        final ICounterSet hostRoot = fed.getHostCounterSet();
-
-        if (hostRoot == null) {
-
-            /*
-             * Log warning but continue since may be executing before counters
-             * were reported or in a test harness.
-             */
-
-            log.warn("Host counters not available?");
-
-            return defaultValue;
-
-        }
-
-        final ICounter c = (ICounter) hostRoot.getPath(path);
-
-        if (c != null) {
-
-            return ((Number) c.getInstrument().getValue()).doubleValue();
-
-        }
-
-        /*
-         * Log warning but continue since may be executing before counters were
-         * reported or in a test harness.
-         */
-        log.warn("Host counter not found? " + path);
-
-        return defaultValue;
-
-    }
-
-    /**
-     * Return the value of a service counter.
-     * 
-     * @param path
-     *            The path (relative to the service root).
-     * @param defaultValue
-     *            The default value to use if the counter was not found.
-     * 
-     * @return The value if found and otherwise the defaultValue.
-     */
-    protected double getServiceCounter(final String path,
-            final double defaultValue) {
-
-        final AbstractFederation fed = (AbstractFederation) resourceManager
-                .getFederation();
-
-        final ICounterSet serviceRoot = fed.getServiceCounterSet();
-
-        if (serviceRoot == null) {
-
-            /*
-             * Log warning but continue since may be executing before counters
-             * were reported or in a test harness.
-             */
-
-            log.warn("Service counters not available?");
-
-            return defaultValue;
-
-        }
-
-        final ICounter c = (ICounter) serviceRoot.getPath(path);
-
-        if (c != null) {
-
-            return ((Number) c.getInstrument().getValue()).doubleValue();
-
-        }
-
-        /*
-         * Log warning but continue since may be executing before counters were
-         * reported or in a test harness.
-         */
-
-        log.warn("Service counter not found? " + path);
-
-        return defaultValue;
-
-    }
-
-    /**
      * 
      * @param resourceManager
      * @param overflowMetadata
@@ -358,9 +287,445 @@ public class AsynchronousOverflowTask implements Callable<Object> {
         this.overflowMetadata = overflowMetadata;
         
         this.lastCommitTime = overflowMetadata.lastCommitTime;
+
+    }
+
+    /**
+     * This class implements the handshaking when taking a task from its work
+     * queue to drop the task if it has already been taken by another executor.
+     * The typical scenario is that an index partition is on both the buildQueue
+     * and the mergeQueue, each of which is drained by its own
+     * {@link ExecutorService}. {@link #call()} will atomically set the
+     * {@link OverflowActionEnum planned action} on the associated
+     * {@link ViewMetadata} object. This decision is made atomic by holding the
+     * {@link ViewMetadata#lock}. If there is a subsequent attempt to run a task
+     * for that index partition, this class will notice that the action is now
+     * non-<code>null</code> and will drop the task (it turns it into a NOP).
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     */
+    private class AtomicCallable<T> implements Callable<T> {
+        
+        private final OverflowActionEnum action;
+        private final ViewMetadata vmd;
+        private final AbstractTask<T> task;
+
+        /**
+         * 
+         * @param action
+         *            The type of action that will be taken.
+         * @param vmd
+         *            The {@link ViewMetadata} for the index partition for which
+         *            that action will be taken.
+         * @param task
+         *            The task which implements that action.
+         */
+        public AtomicCallable(final OverflowActionEnum action,
+                final ViewMetadata vmd, final AbstractTask<T> task) {
+
+            if (action == null)
+                throw new IllegalArgumentException();
+
+            if (vmd == null)
+                throw new IllegalArgumentException();
+
+            if (task == null)
+                throw new IllegalArgumentException();
+
+            this.action = action;
+            
+            this.vmd = vmd;
+            
+            this.task = task;
+            
+        }
+        
+        public T call() throws Exception {
+        
+            final Lock lock = vmd.lock;
+
+            lock.lock();
+            try {
+
+                if (vmd.getAction() != null) {
+
+                    /*
+                     * The task has already been started by some worker thread
+                     * so we will not run it here.
+                     */
+                    
+                    if (log.isInfoEnabled())
+                        log.info("Dropping task: runningAs=" + vmd.getAction()
+                                + ", plannedAction=" + action);
+
+                    // Task is a NOP.
+                    return null;
+                    
+                }
+ 
+                /*
+                 * Set the action and then drop through so that we release the
+                 * lock before running the task.
+                 */
+
+                vmd.setAction(action);
+
+            } finally {
+                
+                lock.unlock();
+                
+            }
+
+            if(action.equals(OverflowActionEnum.Merge)) {
+
+                if (((ConcurrencyManager) resourceManager
+                        .getConcurrencyManager())
+                        .getJournalOverextended() > resourceManager.overflowThreshold) {
+
+                    /*
+                     * Do not let new merges task start once the journal is
+                     * nearing its maximum extent.
+                     */
+                    
+                    return null;
+                    
+                }
+
+            }
+            
+            /*
+             * Execute the task for the index partition.
+             * 
+             * Note: The AbstractTask MUST execute on the ConcurrencyManager!
+             */
+
+            return resourceManager.getConcurrencyManager().submit(task).get();
+
+        }
         
     }
 
+    /**
+     * Schedule a build for each shard and a merge for each shard with a
+     * non-zero merge priority. Whether a build or a merge is performed for a
+     * shard will depend on which action is initiated first. When an build or
+     * merge action is initiated, that choice is atomically registered on the
+     * {@link ViewMetadata} and any subsequent attempt (within this method
+     * invocation) to start a build or merge for the same shard will be dropped.
+     * Processing ends once all tasks scheduled on a "build" service are
+     * complete.
+     * <p>
+     * After actions are considered for each shard for which a compacting merge
+     * is executed. These after actions can cause a shard split, join, or move.
+     * Deferring such actions until we have a compact view (comprised of one
+     * journal and one index segment) greatly improves our ability to decide
+     * whether a shard should be split or joined and simplifies the logic and
+     * effort required to split, join or move a shard.
+     * <p>
+     * The following is a brief summary of some after actions on compact shards.
+     * <dl>
+     * <dt>split</dt>
+     * <dd>A shard is split when its size on the disk exceeds the (adjusted)
+     * nominal size of a shard (overflow). By waiting until the shard view is
+     * compact we have exact information about the size of the shard (it is
+     * contained in a single {@link IndexSegment}) and we are able to easily
+     * select the separator key to split the shard.</dd>
+     * <dt>tailSplit</dt>
+     * <dd>A tail split may be selected for a shard which has a mostly append
+     * access pattern. For such access patterns, a normal split would leave the
+     * left sibling 50% full and the right sibling would quickly fill up with
+     * continued writes on the tail of the key range. To compensate for this
+     * access pattern, a tail split chooses a separator key near the end of the
+     * key range of a shard. This results in a left sibling which is mostly full
+     * and a right sibling which is mostly empty. If the pattern of heavy tail
+     * append continues, then the left sibling will remain mostly full and the
+     * new writes will flow mostly into the right sibling.</dd>
+     * <dt>scatterSplit</dt>
+     * <dd>A scatter split breaks the first shard for a new scale-out index into
+     * N shards and scatters those shards across the data services in a
+     * federation in order to improve the data distribution and potential
+     * concurrency of the index. By waiting until the shard view is compact we
+     * are able to quickly select appropriate separator keys for the shard
+     * splits.</dd>
+     * <dt>move</dt>
+     * <dd>A move transfer a shard from this data service to another data
+     * service in order to reduce the load on this data service. By waiting
+     * until the shard view is compact we are able to rapidly transfer the bulk
+     * of the data in the form of a single {@link IndexSegment}.</dd>
+     * <dt>join</dt>
+     * <dd>A join combines a shard which is under 50% of its (adjusted) nominal
+     * maximum size on the disk (underflow) with its right sibling. Joins are
+     * driven by deletes of tuples from a key range. Since deletes are handled
+     * as writes where a delete marker is set on the tuple, neither the shard
+     * size on the disk nor the range count of the shard will decrease until a
+     * compacting merge. A join is indicated if the size on disk for the shard
+     * has shrunk considerably since the last time a compacting merge was
+     * performed for the view (this covers both the case of deletes, which
+     * reduce the range count, and updates which replace the values in the
+     * tuples with more compact data). <br>
+     * There are actually three cases for a join.
+     * <ol>
+     * <li>If the right sibling is local, then the shard will be joined with its
+     * right sibling.</li>
+     * <li>If the right sibling is remote, then the shard will be moved to the
+     * data service on which the right sibling is found.</li>
+     * <li>If the right sibling does not exist, then nothing is done (the last
+     * shard in a scale-out index does not have a right sibling). The right most
+     * sibling will remain undercapacity until and unless its left sibling also
+     * underflows, at which point the left sibling will cause itself to be
+     * joined with the right sibling (this is done to simplify the logic which
+     * searches for a sibling with which to join an undercapacity shard).</li>
+     * </ol>
+     * </dl>
+     * 
+     * @param forceCompactingMerges
+     *            When <code>true</code> a compacting merge will be forced for
+     *            each non-compact view.
+     * 
+     * @throws InterruptedException
+     * 
+     * @todo The size of the merge queue (or its sum of priorities) may be an
+     *       indication of the load of the node which could be used to decide
+     *       that index partitions should be shed/moved.
+     * 
+     * @todo For HA, this needs to be a shared priority queue using zk or the
+     *       like since any node in the failover set could do the merge (or
+     *       build). [Alternatively, nodes do the build/merge for the shards for
+     *       which they have the highest affinity out of the failover set.]
+     * 
+     *       FIXME tailSplits currently operate on the mutable BTree rather than
+     *       a compact view). This task does not require a compact view (at
+     *       least, not yet) and generating one for it might be a waste of time.
+     *       Instead it examines where the inserts are occurring in the index
+     *       and splits of the tail if the index is heavy for write append. It
+     *       probably could defer that choice until a compact view was some
+     *       percentage of a split (maybe .6?) So, probably an after action for
+     *       the mergeQ.
+     * 
+     *       FIXME joins must track metadata about the previous size on disk of
+     *       the compact view in order to decide when underflow has resulted. In
+     *       order to handle the change in the value of the acceleration factor,
+     *       this data should be stored as the percentage of an adjusted split
+     *       of the last compact view. We can update that metadata each time we
+     *       do a compacting merge.
+     */
+    private List<Future<?>> scheduleAndAwaitTasks(
+            final boolean forceCompactingMerges) throws InterruptedException {
+
+        // set of index partition views to consider.
+        final Iterator<ViewMetadata> itr = overflowMetadata.views();
+
+        /*
+         * Any index on the old journal whose buffered writes were not simply
+         * copied over is scheduled for a build. The buildPriority is the
+         * inverse of the mergePriority so builds are executed first for index
+         * partitions which are the least likely to have a merge performed.
+         */
+        final Queue<Priority<ViewMetadata>> buildList = new PriorityBlockingQueue<Priority<ViewMetadata>>(
+                overflowMetadata.getIndexCount());
+
+        /*
+         * Put a merge task on the merge queue. The mergePriority reflects the
+         * complexity of the view. It is ZERO (0) if there is no reason to
+         * perform a merge. The mergePriority DOES NOT reflect the size on disk
+         * as that would make merges more frequent as we approach the
+         * nominalShardSize. That would increase the workload as we are nearing
+         * a split, which is undesirable.
+         */
+        final Queue<Priority<ViewMetadata>> mergeList = new PriorityBlockingQueue<Priority<ViewMetadata>>(
+                overflowMetadata.getIndexCount());
+
+        while (itr.hasNext()) {
+
+            final ViewMetadata vmd = itr.next();
+            
+            final String name = vmd.name;
+
+            // @todo could just skip any shard with an assigned action.
+            if (overflowMetadata.isCopied(name)) {
+
+                /*
+                 * The write set from the old journal was already copied to the
+                 * new journal so we do not need to do a build.
+                 */
+
+                if (log.isInfoEnabled())
+                    log.info("was  copied : " + vmd);
+
+                continue;
+
+            }
+
+            buildList.add(new Priority<ViewMetadata>(vmd.buildPriority, vmd));
+
+            if (vmd.mergePriority > 0d) {
+
+                mergeList
+                        .add(new Priority<ViewMetadata>(vmd.mergePriority, vmd));
+
+            }
+
+        } // itr.hasNext()
+
+        /*
+         * Schedule build and merge tasks and await their futures. The tasks are
+         * submitted from a PriorityQueue, so the order in which the tasks are
+         * started will reflect the priority for each task.
+         * 
+         * All build tasks will run to completion.
+         * 
+         * New merge tasks may start until the journal nears its nominal maximum
+         * extent, at which point they are dropped on the floor.
+         * 
+         * Whether a build or a merge is performed depends on which one begins
+         * to execute first. The AtomicCallable will set the action atomically
+         * on the ViewMetadata object and the other task will be dropped on the
+         * floor.
+         * 
+         * The potential parallelism of the build and merge tasks is limited by
+         * a LatchedExecutorService. A new task can only be run when a permit is
+         * available. This allows us to manage the #of threads dedicated to
+         * index partition builds and index partition merges independently.
+         * 
+         * Both builds and merges actually execute on the ConcurrencyManager.
+         * The AtomicCallable is responsible for submitting the AbstractTask to
+         * the ConcurrencyManager once the task begins to execute.
+         */
+        final List<Future<?>> mergeFutures = new LinkedList<Future<?>>();
+        final List<Future<?>> buildFutures = new LinkedList<Future<?>>();
+        try {
+
+            final Executor buildService = new LatchedExecutor(
+                    resourceManager.getFederation().getExecutorService(),
+                    resourceManager.buildServiceCorePoolSize);
+
+            final Executor mergeService = new LatchedExecutor(
+                    resourceManager.getFederation().getExecutorService(),
+                    resourceManager.mergeServiceCorePoolSize);
+
+            // Schedule merge tasks.
+            if (!forceCompactingMerges) {
+
+                for (Priority<ViewMetadata> p : mergeList) {
+
+                    final ViewMetadata vmd = p.v;
+
+                    if (vmd.mergePriority > 0) {
+
+                        // Schedule a compacting merge.
+                        final FutureTask<?> ft = new FutureTask(
+                                new AtomicCallable(OverflowActionEnum.Merge,
+                                        vmd, new CompactingMergeTask(vmd)));
+                        mergeFutures.add(ft);
+                        mergeService.execute(ft);
+
+                    }
+
+                }
+
+            }
+
+            // Schedule build tasks.
+            for (Priority<ViewMetadata> p : buildList) {
+
+                final ViewMetadata vmd = p.v;
+
+                if (forceCompactingMerges && !vmd.compactView) {
+
+                    // Force a compacting merge.
+                    final FutureTask<?> ft = new FutureTask(new AtomicCallable(
+                            OverflowActionEnum.Merge, vmd,
+                            new CompactingMergeTask(vmd)));
+                    mergeFutures.add(ft);
+                    mergeService.execute(ft);
+
+                } else {
+
+                    // Schedule a build.
+                    final FutureTask<?> ft = new FutureTask(new AtomicCallable(
+                            OverflowActionEnum.Build, vmd,
+                            new IncrementalBuildTask(vmd)));
+                    buildFutures.add(ft);
+                    buildService.execute(ft);
+
+                }
+
+            }
+
+            // Await build tasks.
+            {
+                for (Future<?> f : buildFutures) {
+                    if (!f.isDone()) {
+                        try {
+                            f.get();
+                        } catch (CancellationException ignore) {
+                        } catch (ExecutionException ignore) {
+                        }
+                    }
+                }
+            }
+
+            /*
+             * Await merge tasks.
+             * 
+             * Note: Once the live journal is nearing its nominal maximum extent
+             * the AtomicCallable will drop merge tasks on the floor in order to
+             * prevent over-extension of the live journal.
+             */
+            {
+                for (Future<?> f : mergeFutures) {
+                    if (!f.isDone()) {
+                        try {
+                            f.get();
+                        } catch (CancellationException ignore) {
+                        } catch (ExecutionException ignore) {
+                        }
+                    }
+                }
+            }
+
+            /*
+             * Combine all the futures together and return them to the caller.
+             * The caller can test each Future and decide whether or not an
+             * error occurred and then log that error.
+             */
+
+            final List<Future<?>> allFutures = new LinkedList<Future<?>>();
+            allFutures.addAll(buildFutures);
+            allFutures.addAll(mergeFutures);
+
+            return allFutures;
+
+        } finally {
+
+            /*
+             * Cancel all build and merge futures (this is a NOP if the task has
+             * already completed).
+             */
+
+            for (Future<?> f : buildFutures)
+                f.cancel(true);
+
+            for (Future<?> f : mergeFutures)
+                f.cancel(true);
+
+            /*
+             * Note: DO NOT shutdown these services. They are fronting for the
+             * federation's ExecutorService. Shutting them down will shutdown
+             * the federation's ExecutorService!
+             */
+            // if (buildService != null)
+            // buildService.shutdownNow();
+            //
+            // if (mergeService != null)
+            // mergeService.shutdownNow();
+
+        }
+
+    }
+    
     /**
      * Choose index partitions for scatter split operations. The scatter split
      * divides an index partition into N index partitions, one per data service,
@@ -392,7 +757,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                 continue;
                 
             }
-            
+
             /*
              * Scatter split.
              * 
@@ -400,26 +765,6 @@ public class AsynchronousOverflowTask implements Callable<Object> {
              * onto this data service. Split, join, and move are all disallowed
              * until the index partition move is complete since each of them
              * would cause the index partition to become invalidated.
-             * 
-             * FIXME This can be fooled if there are a more or less even mixture
-             * of inserts and deletes on an ongoing basis. It will look like a
-             * split based on getPercentOfSplit() but examination by the split
-             * handler will see that there are not enough tuples to do a split.
-             * 
-             * FIXME The scatter split can be fooled in another way for the same
-             * use case. It creates an adjusted split handler based on the fast
-             * range count. With a lot of deletes mixed in there the actual
-             * range count will be much less and a split will be refused since
-             * there are not enough tuples to fill a split.
-             * 
-             * FIXME Both this case and the one mentioned above (which also
-             * applies to normal splits) can be observed using the
-             * StressTestConcurrent test. One way to handle this might be to
-             * move the scatter split inside of the normal split and then to
-             * decide how to split once we have done a more detailed inspection.
-             * This would break encapsulation on the split handler and require
-             * access to the potential move targets, #of index partitions for
-             * the scale-out index, etc.
              */
 
             final ScatterSplitConfiguration ssc = vmd.indexMetadata
@@ -433,6 +778,8 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                 && resourceManager.scatterSplitEnabled//
                 // scatter splits enabled for index
                 && ssc.isEnabled()//
+                // The view is compact (only one segment).
+                && vmd.compactView//
                 // trigger scatter split before too much data builds up in one place.
                 && vmd.getPercentOfSplit() >= ssc.getPercentOfSplitThreshold()
             ) {
@@ -499,7 +846,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                 // add to set of tasks to be run.
                 tasks.add(task);
 
-                overflowMetadata.setAction(vmd.name, OverflowActionEnum.Split);
+                overflowMetadata.setAction(vmd.name, OverflowActionEnum.ScatterSplit);
 
                 putUsed(name, "willScatter(name=" + vmd + ")");
 
@@ -599,8 +946,8 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 
                 }
 
-                // handler decides when and where to split an index partition.
-                final ISplitHandler splitHandler = vmd.getAdjustedSplitHandler();
+//                // handler decides when and where to split an index partition.
+//                final ISplitHandler splitHandler = vmd.getAdjustedSplitHandler();
 
                 // index partition metadata
                 final LocalPartitionMetadata pmd = vmd.pmd;
@@ -624,10 +971,13 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                 if (log.isInfoEnabled())
                     log.info("Considering join: name=" + name + ", rangeCount="
                             + vmd.getRangeCount() + ", pmd=" + pmd);
-                
-                if (splitHandler != null
-                        && pmd.getRightSeparatorKey() != null
-                        && splitHandler.shouldJoin(vmd.getRangeCount())) {
+
+//                if (splitHandler != null
+//                        && pmd.getRightSeparatorKey() != null
+//                        && splitHandler.shouldJoin(vmd.getRangeCount())) {
+
+                if (pmd.getRightSeparatorKey() != null
+                        && vmd.getPercentOfSplit() < .5) {
 
                     /*
                      * Add to the set of index partitions that are candidates
@@ -974,62 +1324,6 @@ public class AsynchronousOverflowTask implements Callable<Object> {
     }
 
     /**
-     * Helper class reports performance counters of interest for this service.
-     * <p>
-     * Note: Default values are used when the performance counter is not
-     * available. Reasonable defaults are choosen, but they could still trigger
-     * inappropriate behavior depending on the thresholds set for move/split and
-     * if the host is selected as "highly utilized" by the LBS.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    class ResourceScores {
-        
-        final double percentCPUTime;
-//        final double bytesFree;
-//        final double bytesAvailable;
-        final double majorPageFaultsPerSec;
-        final double dataDirBytesFree;
-        final double tmpDirBytesFree;
-        
-        ResourceScores() {
-
-            percentCPUTime = getHostCounter(
-                    IRequiredHostCounters.CPU_PercentProcessorTime, .5d/* defaultValue */);
-
-            majorPageFaultsPerSec = getHostCounter(
-                    IRequiredHostCounters.Memory_majorFaultsPerSecond, .0d/* defaultValue */);
-
-//            // @todo not collected for Windows
-//            bytesFree = getHostCounter(IHostCounters.Memory_Bytes_Free,
-//                    Bytes.megabyte * 500/* defaultValue */);
-//
-//            // @todo not collected for Windows or Linux.
-//            bytesAvailable = getHostCounter(
-//                    IHostCounters.Memory_Bytes_Available, Bytes.gigabyte * 4/* defaultValue */);
-            
-            dataDirBytesFree = getServiceCounter(
-                    IDataServiceCounters.resourceManager
-                            + ICounterSet.pathSeparator
-                            + IResourceManagerCounters.StoreManager
-                            + ICounterSet.pathSeparator
-                            + IStoreManagerCounters.DataDirBytesAvailable,
-                    Bytes.gigabyte * 20/* defaultValue */);
-
-            tmpDirBytesFree = getServiceCounter(
-                    IDataServiceCounters.resourceManager
-                            + ICounterSet.pathSeparator
-                            + IResourceManagerCounters.StoreManager
-                            + ICounterSet.pathSeparator
-                            + IStoreManagerCounters.TmpDirBytesAvailable,
-                    Bytes.gigabyte * 10/* defaultValue */);
-            
-        }
-
-    }
-
-    /**
      * Return the {@link ILoadBalancerService} if it can be discovered.
      * 
      * @return the {@link ILoadBalancerService} if it can be discovered and
@@ -1106,7 +1400,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
             return false;
             
         }
-        
+
         /*
          * At this point we know that the LBS considers this host and service to
          * be highly utilized (relative to the other hosts and services). If
@@ -1115,19 +1409,16 @@ public class AsynchronousOverflowTask implements Callable<Object> {
          * some load. Otherwise, we will SPLIT hot index partitions in order to
          * increase the potential concurrency of the workload for this service.
          * 
-         * FIXME Be careful that the unit tests for MOVE will still run when I
-         * make these changes.
-         * 
          * @todo config options for these triggers.
          * 
-         * FIXME Review the move policy with an eye towards how it selects which
+         * @todo Review the move policy with an eye towards how it selects which
          * index partition(s) to move. Note that chooseMoves() is now invoked
          * ONLY when the host is heavily utilized (on both the global and the
          * local scale). CPU is the only fungable resource since things will
          * just slow down if a host has 100% CPU while it can die if it runs out
          * of DISK or RAM (including if it begins to swap heavily).
          */
-        final ResourceScores resourceScores = new ResourceScores();
+        final ResourceScores resourceScores = resourceManager.getResourceScores();
 
         final boolean shouldMove = //
             // heavy CPU utilization.
@@ -1178,7 +1469,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 
         /*
          * The minimum #of active index partitions on a data service. We will
-         * consider moving index partitions iff this threshold is exceeeded.
+         * consider moving index partitions iff this threshold is exceeded.
          */
         final int minActiveIndexPartitions = resourceManager.minimumActiveIndexPartitions;
 
@@ -1387,15 +1678,19 @@ public class AsynchronousOverflowTask implements Callable<Object> {
             }
 
             // handler decides when and where to split an index partition.
-            final ISplitHandler splitHandler = vmd.getAdjustedSplitHandler();
+//            final ISplitHandler splitHandler = vmd.getAdjustedSplitHandler();
 
             final long rangeCount = vmd.getRangeCount();
             
-            if (splitHandler.shouldSplit(rangeCount)) {
+//            if (splitHandler.shouldSplit(rangeCount)) {
+
+            if (vmd.getPercentOfSplit() > resourceManager.maximumMovePercentOfSplit) {
 
                 /*
-                 * This avoids moving index partitions that are large and really
-                 * should be split before they are moved.
+                 * This avoids moving index partitions that are large, and hence
+                 * would be slow to move. If we elect to move an index
+                 * partition, then we will do a merge first to product a compact
+                 * view and then move that view.
                  */
 
                 if (log.isInfoEnabled())
@@ -1410,7 +1705,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
             scores.add(score);
             
             // track the maximum range count over all active indices.
-            maxRangeCount = Math.max(maxRangeCount, vmd.getRangeCount());
+            maxRangeCount = Math.max(maxRangeCount, rangeCount);
             
         }
             
@@ -1481,11 +1776,10 @@ public class AsynchronousOverflowTask implements Callable<Object> {
              * history limit such that older data will be released thereby
              * freeing space on the disk.
              * 
-             * @todo it deleted tuples are a large part of the operations on the
-             * index partition during its life on the old journal then do a
-             * compacting merge on the index before doing any other operation so
-             * that we can better tell how many tuples remain in the index
-             * partition.
+             * @todo if there are a lot of deleted tuples on the index partition
+             * during its life on the old journal then do a compacting merge on
+             * the index before doing any other operation so that we can better
+             * tell how many tuples remain in the index partition.
              * 
              * FIXME We are currently using the performance counters for all
              * AbstractTask operations, not just those which are UNISOLATED or
@@ -1682,8 +1976,9 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 
                 nmove++;
 
-              } else if (!vmd.getAdjustedSplitHandler().shouldJoin(
-                    vmd.getRangeCount())) {
+//              } else if (!vmd.getAdjustedSplitHandler().shouldJoin(
+//                    vmd.getRangeCount())) {
+            } else if (vmd.getPercentOfSplit() > .5) {
 
                 /*
                  * Split the index partition and then move the smallest of the
@@ -1878,14 +2173,14 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 //                 * resulting index partitions (the rightSibling) will have a
 //                 * significant workload.
 //                 * 
-//                 * FIXME However, there are other conditions under which hot
+//                 * However, there are other conditions under which hot
 //                 * splits do not help. For instance, if the indices are all more
 //                 * or less equally active but the workload is not high enough to
 //                 * increase the CPU utilization. [This condition occurs when we
 //                 * use a counter with some fast high bits to randomly distribute
 //                 * writes.]
 //                 * 
-//                 * FIXME Even worse, there is nothing to prevent a split from
+//                 * Even worse, there is nothing to prevent a split from
 //                 * being hot split again. That is, this acceleration term does
 //                 * not take history into account.
 //                 */
@@ -1986,7 +2281,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
      * order for them to "catch up" with buffered writes on the new journal -
      * those writes need to be incorporated into the new index partition.
      * 
-     * <h2> Compacting Merge </h2>
+     * <h2>Compacting Merge</h2>
      * 
      * A compacting merge is performed when there are buffered writes, when the
      * buffered writes were not simply copied onto the new journal during the
@@ -1995,7 +2290,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
      * index components for the index partition exceeds some threshold (~4).
      * Also, we do not do a build if the index partitions will be moved.
      * 
-     * <h2> Incremental Build </h2>
+     * <h2>Incremental Build</h2>
      * 
      * A incremental build is performed when there are buffered writes, when the
      * buffered writes were not simply copied onto the new journal during the
@@ -2010,7 +2305,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
      * including deleted tuples, so it can do more work and does not cause the
      * rangeCount() to be reduced since the deleted tuples are preserved.
      * 
-     * <h2> Split </h2>
+     * <h2>Split</h2>
      * 
      * A split is considered when an index partition appears to be overcapacity.
      * The split operation will inspect the index partition in more detail when
@@ -2020,7 +2315,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
      * a new partition identifier). An index partition which is WAY overcapacity
      * can be split into more than 2 new index partitions.
      * 
-     * <h2> Join </h2>
+     * <h2>Join</h2>
      * 
      * A join is considered when an index partition is undercapacity. Joins
      * require both an undercapacity index partition and its rightSibling. Since
@@ -2032,7 +2327,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
      * partition to the {@link IDataService} on which its rightSibling was
      * found.
      * 
-     * <h2> Move </h2>
+     * <h2>Move</h2>
      * 
      * We move index partitions around in order to make the use of CPU, RAM and
      * DISK resources more even across the federation and prevent hosts or data
@@ -2079,21 +2374,23 @@ public class AsynchronousOverflowTask implements Callable<Object> {
      * or other nodes are at very low utilization. We always prefer to move the
      * "warm" index partitions instead.
      * 
-     * <h2> DISK exhaustion </h2>
+     * <h2>DISK exhaustion</h2>
      * 
      * Running out of DISK space causes an urgent condition and can lead to
      * failure or all services on the same host. Therefore, when a host is near
      * to exhausting its DISK space it (a) MUST notify the
      * {@link ILoadBalancerService}; (b) temporary files SHOULD be purged; it
      * MAY choose to shed indices that are "hot for write" since that will slow
-     * down the rate at which the disk space is consumed; and (d) the resource
-     * manager MAY aggressively release old resources, even at the expense of
-     * forcing transactions to abort.
-     * 
-     * @todo document tailSplits.
+     * down the rate at which the disk space is consumed; (d) index partitions
+     * may be aggressively moved off of the LDS; (e) the transaction service MAY
+     * reduce the retention period; and (f) as a last resort, the transaction
+     * service MAY invalidate read locks, which implies that read or read-write
+     * transactions will be aborted.
      * 
      * FIXME implement suggestions for handling cases when we are nearing DISK
-     * exhaustion.
+     * exhaustion (aggressive release of resources, which should not depend on
+     * asynchronous overflow but rather be part of a monitoring thread or an
+     * inspection task run in each group commit).
      * 
      * FIXME read locks for read-committed operations. For example, queries to
      * the mds should use a read-historical tx so that overflow in the mds will
@@ -2105,15 +2402,9 @@ public class AsynchronousOverflowTask implements Callable<Object> {
      * FIXME make the atomic update tasks truly atomic using full transactions
      * and/or distributed locks and correcting actions.
      */
-    protected List<AbstractTask> chooseTasks() throws Exception {
+    protected List<AbstractTask> chooseTasks(final boolean forceCompactingMerges)
+            throws Exception {
 
-        /*
-         * Note whether or not a compacting merge was requested and clear the
-         * flag.
-         */
-        final boolean compactingMerge = resourceManager.compactingMerge
-                .getAndSet(false); 
-        
         // the old journal.
         final AbstractJournal oldJournal = resourceManager
                 .getJournal(lastCommitTime);
@@ -2122,14 +2413,14 @@ public class AsynchronousOverflowTask implements Callable<Object> {
         
         if (log.isInfoEnabled())
             log.info("begin: lastCommitTime=" + lastCommitTime
-                    + ", compactingMerge=" + compactingMerge
+                    + ", compactingMerge=" + forceCompactingMerges
                     + ", oldJournalSize=" + oldJournalSize);
 
         // tasks to be created (capacity of the array is estimated).
         final List<AbstractTask> tasks = new ArrayList<AbstractTask>(
                 (int) oldJournal.getName2Addr().rangeCount());
 
-        if (!compactingMerge) {
+        if (!forceCompactingMerges) {
 
             /*
              * Note: When a compacting merge is requested we do not consider
@@ -2182,7 +2473,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
          * journal).
          */
 
-        tasks.addAll(chooseSplitBuildOrMerge(compactingMerge));
+        tasks.addAll(chooseSplitBuildOrMerge(forceCompactingMerges));
 
         /*
          * Log the selected post-processing decisions at a high level.
@@ -2196,7 +2487,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                 sb.append("\n" + entry.getKey() + "\t = " + entry.getValue());
             }
             log.warn("\nlastCommitTime=" + lastCommitTime
-                    + ", compactingMerge=" + compactingMerge
+                    + ", compactingMerge=" + forceCompactingMerges
                     + ", oldJournalSize=" + oldJournalSize + sb);
         }
 
@@ -2235,13 +2526,14 @@ public class AsynchronousOverflowTask implements Callable<Object> {
      * @return The list of tasks.
      * 
      *         FIXME Should schedule builds for all remaining shards and then
-     *         prioritize merges. Merge should do split if size on disk exceeds
-     *         threshold after the merge. If running a build, then withdraw the
-     *         merge task until the build is complete and then reschedule the
-     *         merge task. Merges can run across overflow processing unless that
-     *         specific merge is already a clear candidate for a split (200M+ on
-     *         the disk), and even then we will not lock out overflow if the
-     *         journal is 2x overextended when we start the merge.
+     *         prioritize merges. Merge should do split (or scatter split) [or
+     *         cause it to be scheduled] if size on disk exceeds threshold after
+     *         the merge. If running a build, then withdraw the merge task until
+     *         the build is complete and then reschedule the merge task. Merges
+     *         can run across overflow processing unless that specific merge is
+     *         already a clear candidate for a split (200M+ on the disk), and
+     *         even then we will not lock out overflow if the journal is 2x
+     *         overextended when we start the merge.
      *         <p>
      *         Remove all support for splits from this method. Splits are
      *         decided by {@link CompactingMergeTask}. Run the split logic
@@ -2344,8 +2636,8 @@ public class AsynchronousOverflowTask implements Callable<Object> {
             
             }
             
-            // the adjusted split handler.
-            final ISplitHandler splitHandler = vmd.getAdjustedSplitHandler();
+//            // the adjusted split handler.
+//            final ISplitHandler splitHandler = vmd.getAdjustedSplitHandler();
             
             /*
              * Tail split?
@@ -2389,7 +2681,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                 continue;
                 
             }
-            
+
             /*
              * Should split?
              * 
@@ -2398,13 +2690,17 @@ public class AsynchronousOverflowTask implements Callable<Object> {
              * until the index partition move is complete since each of them
              * would cause the index partition to become invalidated.
              * 
-             * Note: [Split performs a compacting merge so it is allowed when
-             * compactingMerge is true].
+             * FIXME Split currently performs a compacting merge so it is
+             * allowed when [compactingMerge := true] can can process a view
+             * which is not compact. However, this should be changed so that
+             * split has a precondition that the view is compact.
              */
             if (    // move not in progress
                     vmd.pmd.getSourcePartitionId() == -1//
                     // looks like a split candidate.
-                    && splitHandler.shouldSplit(vmd.getRangeCount())//
+                    && vmd.getPercentOfSplit() > 1.0
+//                    && splitHandler.shouldSplit(vmd.getRangeCount())//
+////                    (vmd.sourceSegmentCount == 1 && vmd.getPercentOfSplit() > .9) //
             ) {
 
                 /*
@@ -2543,13 +2839,20 @@ public class AsynchronousOverflowTask implements Callable<Object> {
         }
 
         final long begin = System.currentTimeMillis();
+
+        /*
+         * Notice whether or not a compacting merge of each shard was requested
+         * and clear the flag.
+         */
+        final boolean forceCompactingMerges = resourceManager.compactingMerge
+                .getAndSet(false);
         
-        resourceManager.asynchronousOverflowStartMillis.set(begin);
+        resourceManager.overflowCounters.asynchronousOverflowStartMillis.set(begin);
         
         final Event e = new Event(resourceManager.getFederation(),
                 new EventResource(), EventType.AsynchronousOverflow).addDetail(
                 "asynchronousOverflowCounter",
-                resourceManager.asynchronousOverflowCounter.get()).start();
+                resourceManager.overflowCounters.asynchronousOverflowCounter.get()).start();
         
         try {
 
@@ -2557,18 +2860,53 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                 
                 // The pre-condition views.
                 log.info("\npre-condition views: overflowCounter="
-                        + resourceManager.asynchronousOverflowCounter.get()
+                        + resourceManager.overflowCounters.asynchronousOverflowCounter.get()
                         + "\n"
                         + resourceManager.listIndexPartitions(TimestampUtility
                                 .asHistoricalRead(lastCommitTime)));
                 
             }
-            
-            // choose the tasks to be run.
-            final List<AbstractTask> tasks = chooseTasks();
-            
-            runTasks(tasks);
-            
+
+            if (resourceManager.compactingMergeWithAfterAction) {
+
+                // schedule and await all tasks.
+                final List<Future<?>> futures = scheduleAndAwaitTasks(forceCompactingMerges);
+
+                /*
+                 * Log any errors.
+                 * 
+                 * Note: An error here MAY be ignored. The index partition will
+                 * remain coherent and valid but its view will continue to have
+                 * a dependency on the old journal until a post-processing task
+                 * for that index partition succeeds.
+                 */
+                for (Future<?> f : futures) {
+                    try {
+                        f.get();
+                    } catch (CancellationException ex) {
+                        log.error(ex, ex);
+                        resourceManager.overflowCounters.asynchronousOverflowTaskCancelledCounter
+                                .incrementAndGet();
+                    } catch (ExecutionException ex) {
+                        if (isNormalShutdown(ex)) {
+                            log.warn("Normal shutdown? : " + ex, ex);
+                        } else {
+                            log.error(ex, ex);
+                        }
+                        resourceManager.overflowCounters.asynchronousOverflowTaskFailedCounter
+                                .incrementAndGet();
+                    }
+                }
+                
+            } else {
+
+                // choose the tasks to be run.
+                final List<AbstractTask> tasks = chooseTasks(forceCompactingMerges);
+
+                runTasks(tasks);
+                
+            }
+
             /*
              * Note: At this point we have the history as of the lastCommitTime
              * entirely contained in index segments. Also, since we constrained
@@ -2576,7 +2914,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
              * handle the old journal, all new writes are on the live index.
              */
 
-            final long overflowCounter = resourceManager.asynchronousOverflowCounter
+            final long overflowCounter = resourceManager.overflowCounters.asynchronousOverflowCounter
                     .incrementAndGet();
 
             log.warn("done: overflowCounter=" + overflowCounter
@@ -2588,7 +2926,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
             // The post-condition views.
             if (log.isInfoEnabled())
                 log.info("\npost-condition views: overflowCounter="
-                        + resourceManager.asynchronousOverflowCounter.get()
+                        + resourceManager.overflowCounters.asynchronousOverflowCounter.get()
                         + "\n"
                         + resourceManager.listIndexPartitions(ITx.UNISOLATED));
 
@@ -2622,7 +2960,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
              * those exceptions do not indicate a problem.
              */
             
-            resourceManager.asyncOverflowFailedCounter.incrementAndGet();
+            resourceManager.overflowCounters.asynchronousOverflowFailedCounter.incrementAndGet();
             
             if(isNormalShutdown(t)) { 
                 
@@ -2648,7 +2986,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 
             }
 
-            resourceManager.asynchronousOverflowMillis
+            resourceManager.overflowCounters.asynchronousOverflowMillis
                     .addAndGet(e.getElapsed());
 
             // clear references to the views so that they may GC'd more readily.
@@ -2848,31 +3186,36 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 
         assert resourceManager.overflowTasksConcurrent >= 0;
         
-        final ExecutorService executorService;
-        final boolean shutdownAfter;
-        if (resourceManager.overflowTasksConcurrent == 0) {
-
-            // run all tasks in parallel on a shared service.
-            executorService = resourceManager.getFederation()
-                    .getExecutorService();
-            
-            shutdownAfter = false;
-
-        } else {
-
-            // run with limited parallelism on our own service.
-            executorService = Executors.newFixedThreadPool(
-                    resourceManager.overflowTasksConcurrent,
-                    new DaemonThreadFactory(getClass().getName()));
-
-            shutdownAfter = true;
-
-        }
+//        final ExecutorService executorService;
+//        final boolean shutdownAfter;
+//        if (resourceManager.overflowTasksConcurrent == 0) {
+//
+//            // run all tasks in parallel on a shared service.
+//            executorService = resourceManager.getFederation()
+//                    .getExecutorService();
+//            
+//            shutdownAfter = false;
+//
+//        } else {
+//
+//            // run with limited parallelism on our own service.
+//            executorService = Executors.newFixedThreadPool(
+//                    resourceManager.overflowTasksConcurrent,
+//                    new DaemonThreadFactory(getClass().getName()));
+//
+//            shutdownAfter = true;
+//
+//        }
 
         try {
-            
+
             /*
              * Note: On return tasks that are not completed are cancelled.
+             * 
+             * FIXME The tasks ARE NOT running with limited parallelism. the
+             * tasks must be handed off to the ConcurrencyManager to execute and
+             * that class is not a good citizen of the Executor and
+             * ExecutorService patterns.
              */
             final List<Future> futures = resourceManager
                     .getConcurrencyManager().invokeAll(tasks,
@@ -2899,16 +3242,16 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 
         } finally {
             
-            if(shutdownAfter) {
-
-                /*
-                 * Note: this test prevents us from shutting down the
-                 * federation's thread pool!
-                 */
-
-                executorService.shutdownNow();
-                
-            }
+//            if(shutdownAfter) {
+//
+//                /*
+//                 * Note: this test prevents us from shutting down the
+//                 * federation's thread pool!
+//                 */
+//
+//                executorService.shutdownNow();
+//                
+//            }
 
             //        executorService.awaitTermination(arg0, arg1)
 
@@ -2955,7 +3298,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                 log.warn("Task cancelled: elapsed=" + elapsed + ", task="
                         + task + " : " + t);
 
-                resourceManager.asyncOverflowTaskCancelledCounter
+                resourceManager.overflowCounters.asynchronousOverflowTaskCancelledCounter
                         .incrementAndGet();
 
             } else if (isNormalShutdown(t)) {
@@ -2965,7 +3308,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 
             } else {
 
-                resourceManager.asyncOverflowTaskFailedCounter
+                resourceManager.overflowCounters.asynchronousOverflowTaskFailedCounter
                         .incrementAndGet();
 
                 log.error("Child task failed: elapsed=" + elapsed + ", task="
@@ -2982,7 +3325,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
     /**
      * These are all good indicators that the data service was shutdown.
      */
-    protected boolean isNormalShutdown(final Throwable t) {
+    private boolean isNormalShutdown(final Throwable t) {
 
         return isNormalShutdown(resourceManager, t);
         

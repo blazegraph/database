@@ -374,8 +374,8 @@ public class InferenceEngine {
      * The object that generates the {@link Program}s that we use to maintain
      * the closure of the database.
      * <p>
-     * Note: This is lazily instantiated in order to avoid a cyclid
-     * initialization dependency betweeen the {@link InferenceEngine} and the
+     * Note: This is lazily instantiated in order to avoid a cyclic
+     * initialization dependency between the {@link InferenceEngine} and the
      * {@link BaseClosure} constructors.
      */
     private BaseClosure baseClosure = null;

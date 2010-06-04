@@ -714,7 +714,6 @@ public class TestEventReceiver extends TestCase2 {
         }
 
         public CounterSet getHostCounterSet() {
-            // TODO Auto-generated method stub
             return null;
         }
         

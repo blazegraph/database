@@ -1,0 +1,53 @@
+<?xml version="1.0" ?>
+<!DOCTYPE experiment PUBLIC "-//systap.com//DTD BIGDATA EXPERIMENT 0.1//EN" "Experiment.dtd">
+<!-- There are 4 conditions. -->
+<experiment class="com.bigdata.cache.StressTestGlobalLRU">
+ <defaults>
+  <property name="com.bigdata.LRUNexus.minCacheSetSize">0</property>
+  <property name="com.bigdata.LRUNexus.initialCapacity">16</property>
+  <property name="com.bigdata.LRUNexus.loadFactor">.75</property>
+  <property name="com.bigdata.LRUNexus.maxHeap">10240</property>
+  <property name="com.bigdata.LRUNexus.percentCleared">.25</property>
+  <property name="nthreads">3</property>
+  <property name="testTimeout">20</property>
+  <property name="com.bigdata.LRUNexus.concurrencyLevel">16</property>
+  <property name="nops">10000000000</property>
+ </defaults>
+ <!-- condition#1 -->
+ <condition>
+  <property name="com.bigdata.LRUNexus.class">com.bigdata.cache.BCHMGlobalLRU2</property>
+  <property name="com.bigdata.LRUNexus.threadLocalBuffers">false</property>
+  <property name="com.bigdata.LRUNexus.threadLocalBufferCapacity">128</property>
+  <property name="com.bigdata.LRUNexus.accessPolicy">LRU</property>
+ </condition>
+ <condition>
+  <property name="com.bigdata.LRUNexus.class">com.bigdata.cache.BCHMGlobalLRU2</property>
+  <property name="com.bigdata.LRUNexus.threadLocalBuffers">true</property>
+  <property name="com.bigdata.LRUNexus.threadLocalBufferCapacity">128</property>
+  <property name="com.bigdata.LRUNexus.accessPolicy">LRU</property>
+ </condition>
+ <!-- condition#2 
+ <condition>
+  <property name="com.bigdata.LRUNexus.class">com.bigdata.cache.BCHMGlobalLRU2</property>
+  <property name="com.bigdata.LRUNexus.threadLocalBuffers">false</property>
+  <property name="com.bigdata.LRUNexus.threadLocalBufferCapacity">128</property>
+  <property name="com.bigdata.LRUNexus.accessPolicy">LIRS</property>
+ </condition>
+ <condition>
+  <property name="com.bigdata.LRUNexus.class">com.bigdata.cache.BCHMGlobalLRU2</property>
+  <property name="com.bigdata.LRUNexus.threadLocalBuffers">true</property>
+  <property name="com.bigdata.LRUNexus.threadLocalBufferCapacity">128</property>
+  <property name="com.bigdata.LRUNexus.accessPolicy">LIRS</property>
+ </condition>
+ -->
+ <!-- infinispan cache implementations : these cause problems in the CI builds 
+ <condition>
+  <property name="com.bigdata.LRUNexus.class">com.bigdata.cache.BCHMGlobalLRU</property>
+  <property name="com.bigdata.LRUNexus.accessPolicy">LRU</property>
+ </condition>
+ <condition>
+  <property name="com.bigdata.LRUNexus.class">com.bigdata.cache.BCHMGlobalLRU</property>
+  <property name="com.bigdata.LRUNexus.accessPolicy">LIRS</property>
+ </condition>
+-->
+</experiment>

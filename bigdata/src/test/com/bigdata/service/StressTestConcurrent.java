@@ -51,6 +51,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.log4j.Level;
+
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
@@ -59,6 +61,7 @@ import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
+import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.journal.BasicExperimentConditions;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.DiskOnlyStrategy;
@@ -69,7 +72,8 @@ import com.bigdata.journal.ValidationError;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
-import com.bigdata.resources.DefaultSplitHandler;
+import com.bigdata.resources.OverflowCounters;
+import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.DataService.Options;
 import com.bigdata.service.ndx.ClientIndexView;
 import com.bigdata.test.ExperimentDriver;
@@ -88,11 +92,6 @@ import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
  * concurrently using unisolated operations on the data services. This test can
  * be used to observe the throughput and queue depth of arising from a variety
  * of data service and client configurations.
- * 
- * @todo I have observed better performance with the {@link BufferMode#Disk}
- *       when compared to {@link BufferMode#Direct}. I expect that this is due
- *       to resource starvation on a laptop class platform. The fully buffered
- *       mode should be faster if there are sufficent resources available.
  * 
  * @todo The primary metrics reported by the test are elapsed time and
  *       operations per second. Compute the through put in terms of bytes per
@@ -132,9 +131,7 @@ public class StressTestConcurrent extends
      */
     public Properties getProperties() {
         
-        Properties properties = new Properties(super.getProperties());
-        
-//        properties.setProperty(Options.DATA_DIR,getName());
+        final Properties properties = new Properties(super.getProperties());
 
         // Make sure this test uses disk so that it can trigger overflows.
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
@@ -142,16 +139,48 @@ public class StressTestConcurrent extends
 
         /*
          * Note: if we make the initial and maximum extent small so that we
-         * trigger overflow a lot then we introduce a lot of overhead.
+         * trigger overflow a lot then we introduce a lot of overhead. However
+         * the ratios of the number of indices, the maximum journal extent, and
+         * the nominal shard size must appropriate or most of the overflow
+         * operations will be index segment builds with few or no splits (the
+         * shards will not grow large enough to be split).
          */
-        properties.setProperty(Options.INITIAL_EXTENT, ""+1*Bytes.megabyte);
-        properties.setProperty(Options.MAXIMUM_EXTENT, ""+1*Bytes.megabyte);
+        properties.setProperty(Options.INITIAL_EXTENT, "" + 1 * Bytes.megabyte);
+        properties.setProperty(Options.MAXIMUM_EXTENT, "" + 1 * Bytes.megabyte);
 
-        // enable moves (overrides value set in the test setup for the super class)
-        properties.setProperty(Options.MAXIMUM_MOVES_PER_TARGET,Options.DEFAULT_MAXIMUM_MOVES_PER_TARGET);
+        // make sure overflow processing is enabled.
+        properties.setProperty(Options.OVERFLOW_ENABLED, "true");
 
-        // disable scatter split.
-        properties.setProperty(Options.SCATTER_SPLIT_ENABLED, "false");
+        // Note: another way to disable moves is to restrict the test to a
+        // single data service.
+        properties.setProperty(
+                com.bigdata.service.EmbeddedClient.Options.NDATA_SERVICES, "2");
+
+        // enable moves (one per target).
+        properties.setProperty(
+                ResourceManager.Options.MAXIMUM_MOVES_PER_TARGET, "1");
+
+        // disable the CPU threshold for moves.
+        properties.setProperty(
+                ResourceManager.Options.MOVE_PERCENT_CPU_TIME_THRESHOLD, ".0");
+
+        /*
+         * Note: Disables the initial round robin policy for the load balancer
+         * service so that it will use our fakes scores.
+         */
+        properties.setProperty(
+                LoadBalancerService.Options.INITIAL_ROUND_ROBIN_UPDATE_COUNT,
+                "0");
+
+        // load balancer update delay
+//      properties.setProperty(LoadBalancerService.Options.UPDATE_DELAY,"10000");
+      
+        // make sure scatter splits are enabled.
+        properties.setProperty(Options.SCATTER_SPLIT_ENABLED, "true");
+
+        // small shards.
+        properties.setProperty(Options.NOMINAL_SHARD_SIZE, "" + Bytes.kilobyte
+                * 10);
 
         /*
          * Note: Overflow frequency is being controlled by specifying a small
@@ -162,35 +191,18 @@ public class StressTestConcurrent extends
          * does not give us enough time to build up enough writes and an index
          * with very few writes gets split into too many index partitions.
          */
-        
+
         // disable split acceleration.
-      properties.setProperty(Options.ACCELERATE_SPLIT_THRESHOLD, "0");
+        properties.setProperty(Options.ACCELERATE_SPLIT_THRESHOLD, "0");
         // lots of acceleration (too much).
 //        properties.setProperty(Options.ACCELERATE_SPLIT_THRESHOLD, "50");
 
-      // disable overflow acceleration.
-      properties.setProperty(Options.ACCELERATE_OVERFLOW_THRESHOLD, "0");
+        // disable overflow acceleration.
+        properties.setProperty(Options.ACCELERATE_OVERFLOW_THRESHOLD, "0");
         // lots of acceleration (too much).
 //        properties.setProperty(Options.ACCELERATE_OVERFLOW_THRESHOLD, ""
 //                + (Bytes.gigabyte * 10));
-        
-        // performance counter sampling interval.
-//        properties.setProperty(Options.PERFORMANCE_COUNTERS_SAMPLE_INTERVAL,"5000");
-        
-        // performance counter reporting interval (should be the same as the sampling interval).
-//        properties.setProperty(IBigdataClient.Options.REPORT_DELAY,"5000");
 
-        // load balancer update delay
-        properties.setProperty(LoadBalancerService.Options.UPDATE_DELAY,"10000");
-
-        // Note: another way to disable moves is to restrict the test to a single data service.
-//        properties.setProperty(com.bigdata.service.EmbeddedBigdataFederation.Options.NDATA_SERVICES,"1");
-
-         // make sure overflow processing is enabled.
-         properties.setProperty(Options.OVERFLOW_ENABLED,"true");
-        
-//        properties.setProperty(Options.CREATE_TEMP_FILE,"true");
-        
         return properties;
         
     }
@@ -223,37 +235,24 @@ public class StressTestConcurrent extends
      *       correct since the properties need to be overridden. See
      *       {@link #doComparisonTest(Properties)}.
      * 
-     * @todo the stress test is not really triggering many of the more
-     *       interesting sequences, such as scatter split, move, join, build vs
-     *       compacting merge, etc. As such it is not stressing much of the
-     *       system and not providing much validation.
-     * 
      * @throws Exception
      */
-    public void test_stressTest1() throws Exception {
+    public void test_stressTest2() throws Exception {
 
-        int nclients = 40; // max concurrency limited by #of index partitions.
+        int nclients = 10; // max concurrency limited by #of index partitions.
         long timeout = 50; // 20 or 40 (Note: ignored for correctness testing!)
         int ntrials = 1000; // 1000 or 10000
         int keyLen = 4; // @todo not used right now.
         int nops = 100; // 100
         double insertRate = .8d;
-        int nindices = 10; // was 10
+        int nindices = 5; // was 10
         boolean testCorrectness = true;
 
         doConcurrentClientTest(client, nclients, timeout, ntrials, keyLen,
                 nops, insertRate, nindices, testCorrectness );
-
-//        log.info("dataService0\n" + dataService0.getStatistics());
-//       
-//        if (dataService1 != null) {
-//            
-//            log.info("dataService1\n" + dataService1.getStatistics());
-//            
-//        }
         
     }
-    
+
     /**
      * A stress test with a pool of concurrent clients.
      * 
@@ -290,10 +289,10 @@ public class StressTestConcurrent extends
      *            The #of different indices to which the operation will be
      *            applied. The tasks will be generated modulo <i>nindices</i>.
      *            When nindices is greater than one, there is increased
-     *            likelyhood of tasks running concurrently before the first
+     *            likelihood of tasks running concurrently before the first
      *            split. Regardless of the value of nindices, after a scale-out
-     *            index has been split the liklelyhood of concurrent writers
-     *            goes up significantly.
+     *            index has been split the likelihood of concurrent writers goes
+     *            up significantly.
      * 
      * @param testCorrectness
      *            When <code>true</code>, ground truth will be maintained and
@@ -333,16 +332,11 @@ public class StressTestConcurrent extends
      *       machines, but that also requires a distributed client otherwise the
      *       client may become the bottleneck.
      * 
-     * @todo introduce a ground truth index on a local (temp) store and verify
-     *       the state of the scale-out index. access to the ground truth index
-     *       would have to be synchronized, e.g., using a lock for mutation and
-     *       for verification.
-     * 
      * @todo parameterize for random deletes and writes and parameterize those
      *       operations so that they can be made likely to force a join or split
      *       of an index partition.
      */
-    static public Result doConcurrentClientTest(final IBigdataClient client,
+    public Result doConcurrentClientTest(final IBigdataClient<?> client,
             final int nclients, final long timeout, final int ntrials,
             final int keyLen, final int nops, final double insertRate, final int nindices,
             boolean testCorrectness) throws InterruptedException, IOException {
@@ -351,7 +345,7 @@ public class StressTestConcurrent extends
         final String basename = "testIndex";
 
         // connect to the federation.
-        final IBigdataFederation federation = client.connect();
+        final IBigdataFederation<?> federation = client.connect();
         
         /*
          * Register the scale-out index(s).
@@ -359,345 +353,483 @@ public class StressTestConcurrent extends
         assert nindices > 0;
         
         final IIndex[] index = new IIndex[nindices];
-        final IIndex[] groundTruth = new IIndex[nindices];
+        final BTree[] groundTruth = new BTree[nindices];
         final IRawStore[] groundTruthStore = new IRawStore[nindices];
         final ReentrantLock[] lock = new ReentrantLock[nindices];
 
-        for (int i = 0; i < nindices; i++) {
-
-            final String name = basename + i;
-            final UUID indexUUID = UUID.randomUUID();
-            final int entryCountPerSplit = 400;
-            final double overCapacityMultiplier = 1.5;
-            final int minimumEntryCountPerSplit = 100;
-            {
-
-                final IndexMetadata indexMetadata = new IndexMetadata(name,
-                        indexUUID);
-
-                indexMetadata.setTupleSerializer(new NOPTupleSerializer(
-                        new ASCIIKeyBuilderFactory(keyLen)));
-                
-                // The threshold below which we will try to join index
-                // partitions.
-                ((DefaultSplitHandler) indexMetadata.getSplitHandler())
-                        .setMinimumEntryCount(minimumEntryCountPerSplit);
-
-                // The target #of index entries per partition.
-                ((DefaultSplitHandler) indexMetadata.getSplitHandler())
-                        .setEntryCountPerSplit(entryCountPerSplit);
-
-                // Overcapacity multipler before an index partition will be
-                // split.
-                ((DefaultSplitHandler) indexMetadata.getSplitHandler())
-                        .setOverCapacityMultiplier(overCapacityMultiplier);
-
-                // must support delete markers
-                indexMetadata.setDeleteMarkers(true);
-
-                // register the scale-out index, creating a single index
-                // partition.
-                federation.registerIndex(indexMetadata);
-
-                if(testCorrectness) {
-                    
-                    /*
-                     * Setup a distinct backing store for the ground truth for
-                     * each index and a lock to serialize access to that index.
-                     * This allows concurrency if you start with more than one
-                     * index or after an index has been split.
-                     */
-                    
-                    groundTruthStore[i] = new TemporaryRawStore(
-                            WormAddressManager.SCALE_UP_OFFSET_BITS);
-
-                    
-                    final IndexMetadata md = indexMetadata.clone();
-
-                    // turn off delete markers for the ground truth index.
-                    md.setDeleteMarkers(false);
-
-                    groundTruth[i] = BTree.create(groundTruthStore[i], md);
-
-                    lock[i] = new ReentrantLock();
-                    
-                }
-                
-            }
-        
-            index[i] = federation.getIndex(name, ITx.UNISOLATED);
-        
-        }
-                
+        // Used to run the client tasks.
         final ThreadPoolExecutor executorService = (ThreadPoolExecutor) Executors
                 .newFixedThreadPool(nclients, DaemonThreadFactory
                         .defaultThreadFactory());
 
-        // will log the behavior of this queue.
-        {        
-        
-            ScheduledExecutorService sampleService = Executors
-                    .newSingleThreadScheduledExecutor(DaemonThreadFactory
-                            .defaultThreadFactory());
+        // Used to collect performance counters on some queues.
+        final ScheduledExecutorService sampleService = Executors
+                .newSingleThreadScheduledExecutor(DaemonThreadFactory
+                        .defaultThreadFactory());
 
-            final long initialDelay = 0; // initial delay in ms.
-            final long delay = 1000; // delay in ms.
-            final TimeUnit unit = TimeUnit.MILLISECONDS;
+        // Used to periodically spam the LBS with fake data to prompt moves.
+        final ScheduledExecutorService spamLBSService = Executors
+                .newSingleThreadScheduledExecutor(DaemonThreadFactory
+                        .defaultThreadFactory());
 
-            ThreadPoolExecutorStatisticsTask queueLengthTask = new ThreadPoolExecutorStatisticsTask(
-                    "testExecutorService", executorService);
-
-            sampleService.scheduleWithFixedDelay(queueLengthTask, initialDelay,
-                    delay, unit);
-            
-        }
-        
-        final Collection<Callable<Void>> tasks = new HashSet<Callable<Void>>();
-
-        for (int i = 0; i < ntrials; i++) {
-
-            final int k = i % nindices;
-
-            tasks.add(new Task(index[k], keyLen, nops, insertRate,
-                    groundTruth[k], lock[k]));
-
-        }
-
-        /*
-         * Run the M transactions on N clients.
-         */
-
-        final long begin = System.currentTimeMillis();
-
-        log.warn("Starting tasks on client");
-
-        /*
-         * Note: When [testCorrectness := true] we MUST wait for all tasks to
-         * complete since the ground truth data can otherwise differ from the
-         * data successfully committed on the database (if a task is cancelled
-         * during the write on groundTruth then it WILL NOT agree with the
-         * scale-out indices).
-         */
-        final List<Future<Void>> results = executorService.invokeAll(tasks,
-                testCorrectness ? Long.MAX_VALUE : timeout, TimeUnit.SECONDS);
-        
-        final long elapsed = System.currentTimeMillis() - begin;
-        
-        log.warn("Examining task results: elapsed="+elapsed);
-        
-        final Iterator<Future<Void>> itr = results.iterator();
-        
-        int nfailed = 0; // #of operations that failed
-        int ncommitted = 0; // #of operations that committed.
-        int nuncommitted = 0; // #of operations that did not complete in time.
-        int ntimeout = 0;
-        int ninterrupted = 0;
-        final LinkedList<Exception> failures = new LinkedList<Exception>();
-        
-        while(itr.hasNext()) {
-
-            final Future<Void> future = itr.next();
-
-            if (future.isCancelled()) {
-
-                nuncommitted++;
-
-                continue;
-
-            }
-
-            try {
-
-                // Don't wait
-                future.get(0L, TimeUnit.MILLISECONDS);
-
-                ncommitted++;
-
-            } catch (ExecutionException ex) {
-
-                // Validation errors are allowed and counted as aborted txs.
-
-                if (ex.getCause() instanceof ValidationError) {
-
-                    nfailed++;
-
-                } else {
-
-                    // Other kinds of exceptions are errors.
-
-                    log.error("Not expecting: " + ex.getMessage());
-
-                    failures.add(ex);
-
-                }
-
-            } catch (InterruptedException e) {
-
-                ninterrupted++;
-
-            } catch (TimeoutException e) {
-
-                ntimeout++;
-                
-            }
-            
-        }
-        
-        /*
-         * Note: This can cause exceptions to be thrown out of the write
-         * executor service since the concurrency manager will have been
-         * shutdown but asynchronous overflow processing is doubtless still
-         * running some tasks.
-         */
-        executorService.shutdownNow();
-
-        final Result ret = new Result();
-        
-        ret.put("ncommitted", "" + ncommitted);
-        ret.put("nfailed", "" + nfailed);
-        ret.put("nuncommitted", "" + nuncommitted);
-        ret.put("ntimeout", "" + ntimeout);
-        ret.put("ninterrupted", "" + ninterrupted);
-        ret.put("elapsed(ms)", "" + elapsed);
-        ret.put("operations/sec", "" + (ncommitted * 1000 / elapsed));
-        ret.put("failures", "" + (failures.size()));
-
-        System.err.println(ret.toString(true/*newline*/));
-
-        if(!failures.isEmpty()) {
-            
-            System.err.println("failures:\n"+Arrays.toString(failures.toArray()));
-            
-            fail("There were "+failures.size()+" failed tasks for unexpected causes");
-            
-        }
-
-        if(testCorrectness) {
-        
-            /*
-             * @todo config parameter.
-             * 
-             * Note: there may be differences when we have forced overflow and
-             * when we have not since forcing overflow will trigger compacting
-             * merges. So you are more likely to find a problem if you DO NOT
-             * force overflow.
-             * 
-             * Note: This DOES NOT guarentee that overflow is forced on a given
-             * data service. it is forced if the method can gain the exclusive
-             * write lock for that data service. otherwise it will timeout and
-             * overflow processing will not be triggered on that data service.
-             */
-            final boolean forceOverflow = false;
-            if (forceOverflow) {
-
-                System.err.println("Forcing overflow: " + new Date());
-
-                ((AbstractScaleOutFederation) federation)
-                        .forceOverflow(true/* truncateJournal */);
-
-                System.err.println("Forced  overflow: " + new Date());
-
-            }
-            
-            /*
-             * For each index, verify its state against the corresponding ground
-             * truth index.
-             */
+        try {
 
             for (int i = 0; i < nindices; i++) {
 
                 final String name = basename + i;
+                final UUID indexUUID = UUID.randomUUID();
+                {
 
-                final IIndex expected = groundTruth[i];
-                
-                System.err
-                        .println("Validating: " + name
-                                + " #groundTruthEntries="
-                                + groundTruth[i].rangeCount()
-                        + ", #partitions="
-                        + federation.getMetadataIndex(name, ITx.READ_COMMITTED)
-                                .rangeCount());
+                    final IndexMetadata indexMetadata = new IndexMetadata(name,
+                            indexUUID);
 
-                /*
-                 * Note: This uses an iterator based comparison so that we can
-                 * compare a local index without delete markers and a key-range
-                 * partitioned index with delete markers.
-                 * 
-                 * Note: This is using a read-only tx reading from the last
-                 * commit point on the federation. That guarentees a consistent
-                 * read.
-                 * 
-                 * Note: Tasks must run to completion!
-                 * 
-                 * If any tasks were cancelled while they were running then the
-                 * groundTruth MIGHT NOT agree with the scale-out indices. This
-                 * is true even though the task which writes on the scale-out
-                 * indices does not update the ground truth until it has
-                 * successfully written on the scale-out index. The reason is
-                 * that the BTree code itself can notice the interrupt while we
-                 * are writing on the groundTruth index and if the task is
-                 * cancelled in the middle of a BTree mutation then the state of
-                 * the groundTruth and scale-out indices WILL NOT agree.
-                 * 
-                 * FIXME I still see errors where the last byte in the key is
-                 * off by one in this test from time to time. I am not sure if
-                 * this is a test harness problem (assumptions that the test
-                 * harness is making) or a system problem.
-                 * 
-                 * expected=com.bigdata.btree.Tuple@8291269{ nvisited=2368,
-                 * flags=[KEYS,VALS], key=[-128, 0, 11, -45], val=[108, -114,
-                 * -104, -47, -70], obj=[108, -114, -104, -47, -70],
-                 * sourceIndex=0},
-                 * 
-                 * actual=com.bigdata.btree.AbstractChunkedTupleIterator$ResultSetTuple@33369876{
-                 * nvisited=197, flags=[KEYS,VALS], key=[-128, 0, 11, -46],
-                 * val=[111, 56, 17, 100, 56], obj=[111, 56, 17, 100, 56],
-                 * sourceIndex=2}
-                 */
-                
-                // read-only tx from lastCommitTime.
-                final long tx = federation.getTransactionService().newTx(
-                        ITx.READ_COMMITTED);
-                
-                try {
-                    
-                    assertSameEntryIterator(expected, federation.getIndex(name,
-                            tx));
-                    
-                } finally {
-                    
-                    federation.getTransactionService().abort(tx);
-                    
+                    indexMetadata.setTupleSerializer(new NOPTupleSerializer(
+                            new ASCIIKeyBuilderFactory(keyLen)));
+
+                    // must support delete markers
+                    indexMetadata.setDeleteMarkers(true);
+
+                    // register the scale-out index, creating a single index
+                    // partition.
+                    federation.registerIndex(indexMetadata);
+
+                    if (testCorrectness) {
+
+                        /*
+                         * Setup a distinct backing store for the ground truth
+                         * for each index and a lock to serialize access to that
+                         * index. This allows concurrency if you start with more
+                         * than one index or after an index has been split.
+                         */
+
+                        groundTruthStore[i] = new TemporaryRawStore(
+                                WormAddressManager.SCALE_UP_OFFSET_BITS);
+
+                        final IndexMetadata md = indexMetadata.clone();
+
+                        // turn off delete markers for the ground truth index.
+                        md.setDeleteMarkers(false);
+
+                        groundTruth[i] = BTree.create(groundTruthStore[i], md);
+
+                        lock[i] = new ReentrantLock();
+
+                    }
+
                 }
 
-                /*
-                 * Verify against the unisolated views (this might be Ok if all
-                 * tasks ran to completion, but if there is ongoing asynchronous
-                 * overflow activity then that could mess this up since the
-                 * UNISOLATED index views do not have read-consistent
-                 * semantics).
-                 */
-                assertSameEntryIterator(expected, federation.getIndex(name,
-                        ITx.UNISOLATED));
-
-                
-                /*
-                 * Release the ground truth index and the backing store.
-                 */
-
-                groundTruth[i] = null;
-
-                groundTruthStore[i].destroy();
+                index[i] = federation.getIndex(name, ITx.UNISOLATED);
 
             }
 
-            System.err.println("Validated " + nindices
-                    + " indices against ground truth.");
-            
+            // will log the behavior of this queue.
+            {
+
+                final long initialDelay = 0; // initial delay in ms.
+                final long delay = 1000; // delay in ms.
+                final TimeUnit unit = TimeUnit.MILLISECONDS;
+
+                final ThreadPoolExecutorStatisticsTask queueLengthTask = new ThreadPoolExecutorStatisticsTask(
+                        "testExecutorService", executorService);
+
+                sampleService.scheduleWithFixedDelay(queueLengthTask,
+                        initialDelay, delay, unit);
+
+            }
+
+            // will periodically spam the LBS to prompt moves.
+            if (fed.getDataServiceUUIDs(0/* maxCount */).length == 2) {
+
+                final long initialDelay = 3000; // initial delay in ms.
+                final long delay = initialDelay * 2; // delay in ms.
+                final TimeUnit unit = TimeUnit.MILLISECONDS;
+
+                final Runnable spamTask = new Runnable() {
+
+                    final Random r = new Random();
+                    
+                    public void run() {
+                        try {
+                            if(r.nextBoolean()) {
+                                if(r.nextBoolean()) {
+                                    StressTestConcurrent.this.setupLBSForMove(dataService0);
+                                } else {
+                                    StressTestConcurrent.this.setupLBSForMove(dataService1);
+                                }
+                            } else {
+                                // Tell the LBS that the services are equally loaded.
+                                StressTestConcurrent.this.setupLBSForMove(null);
+                            }
+                        } catch (IOException e) {
+                            log.error(e, e);
+                        }
+                    }
+
+                };
+
+                sampleService.scheduleWithFixedDelay(spamTask, initialDelay,
+                        delay, unit);
+
+            }
+
+            final Collection<Callable<Void>> tasks = new HashSet<Callable<Void>>();
+
+            for (int i = 0; i < ntrials; i++) {
+
+                final int k = i % nindices;
+
+                tasks.add(new Task(index[k], keyLen, nops, insertRate,
+                        groundTruth[k], lock[k]));
+
+            }
+
+            /*
+             * Run the M transactions on N clients.
+             */
+
+            final long begin = System.currentTimeMillis();
+
+            log.warn("Starting tasks on client");
+
+            /*
+             * Note: When [testCorrectness := true] we MUST wait for all tasks
+             * to complete since the ground truth data can otherwise differ from
+             * the data successfully committed on the database (if a task is
+             * canceled during the write on groundTruth then it WILL NOT agree
+             * with the scale-out indices).
+             */
+            final List<Future<Void>> results = executorService.invokeAll(tasks,
+                    testCorrectness ? Long.MAX_VALUE : timeout,
+                    TimeUnit.SECONDS);
+
+            final long elapsed = System.currentTimeMillis() - begin;
+
+            if (log.isInfoEnabled())
+                log.info("Examining task results: elapsed=" + elapsed);
+
+            final Iterator<Future<Void>> itr = results.iterator();
+
+            int nfailed = 0; // #of operations that failed
+            int ncommitted = 0; // #of operations that committed.
+            int nuncommitted = 0; // #of operations that did not complete in
+                                  // time.
+            int ntimeout = 0;
+            int ninterrupted = 0;
+            final LinkedList<Exception> failures = new LinkedList<Exception>();
+
+            while (itr.hasNext()) {
+
+                final Future<Void> future = itr.next();
+
+                if (future.isCancelled()) {
+
+                    nuncommitted++;
+
+                    continue;
+
+                }
+
+                try {
+
+                    // Don't wait
+                    future.get(0L, TimeUnit.MILLISECONDS);
+
+                    ncommitted++;
+
+                } catch (ExecutionException ex) {
+
+                    // Validation errors are allowed and counted as aborted txs.
+
+                    if (ex.getCause() instanceof ValidationError) {
+
+                        nfailed++;
+
+                    } else {
+
+                        // Other kinds of exceptions are errors.
+
+                        log.error("Not expecting: " + ex.getMessage());
+
+                        failures.add(ex);
+
+                    }
+
+                } catch (InterruptedException e) {
+
+                    ninterrupted++;
+
+                } catch (TimeoutException e) {
+
+                    ntimeout++;
+
+                }
+
+            }
+
+            /*
+             * Note: This can cause exceptions to be thrown out of the write
+             * executor service since the concurrency manager will have been
+             * shutdown but asynchronous overflow processing is doubtless still
+             * running some tasks.
+             */
+            executorService.shutdownNow();
+
+            /*
+             * Figure out how many of these different operations were executed
+             * by the data service(s).
+             */
+            final OverflowCounters overflowCounters = new OverflowCounters();
+            if (dataService0 != null) {
+                overflowCounters.add(((DataService) dataService0).getResourceManager()
+                        .getOverflowCounters());
+            }
+            if (dataService1 != null) {
+                overflowCounters.add(((DataService) dataService1).getResourceManager()
+                        .getOverflowCounters());
+            }
+
+            final Result ret = new Result();
+
+            ret.put("ncommitted", "" + ncommitted);
+            ret.put("nfailed", "" + nfailed);
+            ret.put("nuncommitted", "" + nuncommitted);
+            ret.put("ntimeout", "" + ntimeout);
+            ret.put("ninterrupted", "" + ninterrupted);
+            ret.put("elapsed(ms)", "" + elapsed);
+            ret.put("operations/sec", "" + (ncommitted * 1000 / elapsed));
+            ret.put("failures", "" + (failures.size()));
+            ret.put("nbuild", "" + overflowCounters.indexPartitionBuildCounter);
+            ret.put("nmerge", "" + overflowCounters.indexPartitionMoveCounter);
+            ret.put("nsplit", "" + overflowCounters.indexPartitionSplitCounter);
+            ret.put("nmove", "" + overflowCounters.indexPartitionMoveCounter);
+
+            System.err.println(ret.toString(true/* newline */));
+
+            System.err.println(overflowCounters.getCounters().toString());
+
+            if (!failures.isEmpty()) {
+
+                System.err.println("failures:\n"
+                        + Arrays.toString(failures.toArray()));
+
+                fail("There were " + failures.size()
+                        + " failed tasks for unexpected causes");
+
+            }
+
+            if (testCorrectness) {
+
+                /*
+                 * @todo config parameter.
+                 * 
+                 * Note: there may be differences when we have forced overflow
+                 * and when we have not since forcing overflow will trigger
+                 * compacting merges. So you are more likely to find a problem
+                 * if you DO NOT force overflow.
+                 * 
+                 * Note: This DOES NOT guarantee that overflow is forced on a
+                 * given data service. it is forced if the method can gain the
+                 * exclusive write lock for that data service. otherwise it will
+                 * timeout and overflow processing will not be triggered on that
+                 * data service.
+                 */
+                final boolean forceOverflow = false;
+                if (forceOverflow) {
+
+                    System.err.println("Forcing overflow: " + new Date());
+
+                    ((AbstractScaleOutFederation<?>) federation)
+                            .forceOverflow(true/* truncateJournal */);
+
+                    System.err.println("Forced  overflow: " + new Date());
+
+                }
+
+                /*
+                 * For each index, verify its state against the corresponding
+                 * ground truth index.
+                 */
+
+                for (int i = 0; i < nindices; i++) {
+
+                    final String name = basename + i;
+
+                    final IIndex expected = groundTruth[i];
+
+                    System.err.println("Validating: "
+                            + name
+                            + " #groundTruthEntries="
+                            + groundTruth[i].rangeCount()
+                            + ", #partitions="
+                            + federation.getMetadataIndex(name,
+                                    ITx.READ_COMMITTED).rangeCount());
+
+                    /*
+                     * Note: This uses an iterator based comparison so that we
+                     * can compare a local index without delete markers and a
+                     * key-range partitioned index with delete markers.
+                     * 
+                     * Note: This is using a read-only tx reading from the last
+                     * commit point on the federation. That guarantees a
+                     * consistent read.
+                     * 
+                     * Note: Tasks must run to completion!
+                     * 
+                     * If any tasks were cancelled while they were running then
+                     * the groundTruth MIGHT NOT agree with the scale-out
+                     * indices. This is true even though the task which writes
+                     * on the scale-out indices does not update the ground truth
+                     * until it has successfully written on the scale-out index.
+                     * The reason is that the BTree code itself can notice the
+                     * interrupt while we are writing on the groundTruth index
+                     * and if the task is cancelled in the middle of a BTree
+                     * mutation then the state of the groundTruth and scale-out
+                     * indices WILL NOT agree.
+                     * 
+                     * FIXME I still see errors where the last byte in the key
+                     * is off by one in this test from time to time. I am not
+                     * sure if this is a test harness problem (assumptions that
+                     * the test harness is making) or a system problem.
+                     * 
+                     * expected=com.bigdata.btree.Tuple@8291269{ nvisited=2368,
+                     * flags=[KEYS,VALS], key=[-128, 0, 11, -45], val=[108,
+                     * -114, -104, -47, -70], obj=[108, -114, -104, -47, -70],
+                     * sourceIndex=0},
+                     * 
+                     * actual=com.bigdata.btree.
+                     * AbstractChunkedTupleIterator$ResultSetTuple@33369876{
+                     * nvisited=197, flags=[KEYS,VALS], key=[-128, 0, 11, -46],
+                     * val=[111, 56, 17, 100, 56], obj=[111, 56, 17, 100, 56],
+                     * sourceIndex=2}
+                     */
+
+                    // read-only tx from lastCommitTime.
+                    final long tx = federation.getTransactionService().newTx(
+                            ITx.READ_COMMITTED);
+
+                    try {
+
+                        assertSameEntryIterator(expected, federation.getIndex(
+                                name, tx));
+
+                    } finally {
+
+                        federation.getTransactionService().abort(tx);
+
+                    }
+
+                    /*
+                     * Verify against the unisolated views (this might be Ok if
+                     * all tasks ran to completion, but if there is ongoing
+                     * asynchronous overflow activity then that could mess this
+                     * up since the UNISOLATED index views do not have
+                     * read-consistent semantics).
+                     */
+                    assertSameEntryIterator(expected, federation.getIndex(name,
+                            ITx.UNISOLATED));
+
+                    /*
+                     * Release the ground truth index and the backing store.
+                     */
+
+                    groundTruth[i].close();
+                    groundTruth[i] = null;
+
+                    groundTruthStore[i].destroy();
+
+                }
+
+                System.err.println("Validated " + nindices
+                        + " indices against ground truth.");
+
+            }
+
+            return ret;
+
+        } finally {
+
+            /*
+             * Make sure that we destroy the temporary store used for the ground
+             * truth indices.
+             */
+            for (IRawStore tmp : groundTruthStore) {
+
+                if (tmp != null && tmp.isOpen()) {
+
+                    tmp.destroy();
+
+                }
+
+            }
+
+            // make sure all services are down.
+            executorService.shutdownNow();
+            sampleService.shutdownNow();
+            spamLBSService.shutdownNow();
+
         }
-        
-        return ret;
-       
+
+    }
+
+    /**
+     * Fake out the load balancer so that it will report the one data service is
+     * "highly utilized" while the other data service is "under utilized".
+     * 
+     * @param targetService
+     *            The target data service -or- <code>null</code> if you want to
+     *            tell the LBS that the services are equally loaded.
+     * 
+     * @throws IOException
+     */
+    private void setupLBSForMove(final IDataService targetService)
+            throws IOException {
+
+        // explicitly set the log level for the load balancer.
+        LoadBalancerService.log.setLevel(Level.INFO);
+
+        final AbstractEmbeddedLoadBalancerService lbs = ((AbstractEmbeddedLoadBalancerService) ((EmbeddedFederation<?>) fed)
+                .getLoadBalancerService());
+
+        final ServiceScore[] fakeServiceScores = new ServiceScore[2];
+
+        if (targetService == null) {
+
+            System.err.println("Spamming LBS: services have equal load.");
+
+            fakeServiceScores[0] = new ServiceScore(
+                    AbstractStatisticsCollector.fullyQualifiedHostName,
+                    dataService0.getServiceUUID(), "dataService0", 0.5// rawScore
+            );
+
+            fakeServiceScores[1] = new ServiceScore(
+                    AbstractStatisticsCollector.fullyQualifiedHostName,
+                    dataService1.getServiceUUID(), "dataService1", 0.5// rawScore
+            );
+
+        } else {
+
+            System.err
+                    .println("Spamming LBS: one service will appear heavily loaded.");
+
+            fakeServiceScores[0] = new ServiceScore(
+                    AbstractStatisticsCollector.fullyQualifiedHostName,
+                    dataService0.getServiceUUID(), "dataService0",
+                    // rawScore
+                    targetService.getServiceUUID().equals(
+                            dataService0.getServiceUUID()) ? 1.0 : 0.0);
+
+            fakeServiceScores[1] = new ServiceScore(
+                    AbstractStatisticsCollector.fullyQualifiedHostName,
+                    dataService1.getServiceUUID(), "dataService1",
+                    // rawScore
+                    targetService.getServiceUUID().equals(
+                            dataService0.getServiceUUID()) ? 1.0 : 0.0);
+
+        }
+
+        // set the fake scores on the load balancer.
+        lbs.setServiceScores(fakeServiceScores);
+
     }
     
     /**
@@ -742,7 +874,7 @@ public class StressTestConcurrent extends
          * effect, or at least report the #of entries and height of the
          * index at the end of the overall run.
          */
-        final int incRange = 100;  
+        static final int incRange = 100;  
         
         int lastKey = 0;
 
@@ -980,7 +1112,7 @@ public class StressTestConcurrent extends
 
 //        properties.setProperty(Options.FORCE_ON_COMMIT, ForceEnum.No.toString());
 
-        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
+//        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
 
         // properties.setProperty(Options.BUFFER_MODE, BufferMode.Direct.toString());
 
