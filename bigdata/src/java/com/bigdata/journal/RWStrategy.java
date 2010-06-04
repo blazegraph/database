@@ -146,6 +146,10 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 			return m_rb1;
 		}
 
+		public FileMetadata getFileMetadata() {
+			return m_fileMetadata;
+		}
+
 		public File getFile() {
 			return m_fileMetadata.file;
 		}
@@ -360,23 +364,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		try {
 			m_store.checkRootBlock(rootBlock);
 			
-			final ByteBuffer data = rootBlock.asReadOnlyBuffer();
-
-			final long pos = rootBlock.isRootBlock0() ? FileMetadata.OFFSET_ROOT_BLOCK0
-					: FileMetadata.OFFSET_ROOT_BLOCK1;
-
-			FileChannel channel = m_fileMetadata.raf.getChannel();
-
-			channel.write(data, pos);
-
-			if (forceOnCommit != ForceEnum.No) {
-
-				channel.force(forceOnCommit == ForceEnum.ForceMetadata);
-
-			}
-			
-			if (log.isDebugEnabled())
-				log.debug("Writing ROOTBLOCK");
+			m_fileMetadata.writeRootBlock(rootBlock, forceOnCommit);
 
 		}
 
@@ -620,10 +608,17 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
         
     }
 
-	// FIXME setExtentForLocalStore
+	/**
+	 * Called from HAGlue.receiveAndReplicate to ensure the correct file extent
+	 * prior to any writes.
+	 * For RW this is essential as the allocaiton blocks for current committed data
+	 * could otherwise be overwritten and the store invalidated.
+	 * 
+	 * @see com.bigdata.journal.IHABufferStrategy#setExtentForLocalStore(long)
+	 */
 	public void setExtentForLocalStore(long extent) throws IOException, InterruptedException {
         
-        throw new UnsupportedOperationException();
+        m_store.establishHAExtent(extent);
         
 	}
 
