@@ -45,6 +45,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.journal.Environment;
 import com.bigdata.journal.FileMetadata;
+import com.bigdata.journal.ForceEnum;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RWStrategy.FileMetadataView;
 import com.bigdata.util.ChecksumUtility;
@@ -998,13 +999,26 @@ public class RWStore implements IStore {
 	 * It should now only be called by extend file to ensure that the metaBits
 	 * are set correctly
 	 * 
+	 * In order to ensure that the new block is the one that would be chosen, we need to
+	 * duplicate the rootBlock. This does mean that we lose the ability to roll
+	 * back the commit.  It also means that until that point there is an invalid store state.
+	 * Both rootBlocks would be valid but with different extents.  This is fine at
+	 * that moment, but subsequent writes would effectively cause the initial rootBlock
+	 * to reference invalid allocation blocks.
+	 * 
+	 * In any event we need to duplicate the rootblocks since any rootblock that references
+	 * the old allocation area will be invalid.
+	 * 
 	 * TODO: Should be replaced with specific updateExtendedMetaData that will
 	 * simply reset the metaBitsAddr
+	 * @throws IOException 
 	 */
-	protected void writeFileSpec() {
+	protected void writeFileSpec() throws IOException {
 		m_rb = m_fmv.newRootBlockView(!m_rb.isRootBlock0(), m_rb.getOffsetBits(), getNextOffset(), m_rb
 				.getFirstCommitTime(), m_rb.getLastCommitTime(), m_rb.getCommitCounter(), m_rb.getCommitRecordAddr(),
 				m_rb.getCommitRecordIndexAddr(), getMetaStartAddr(), getMetaBitsAddr(), m_rb.getLastCommitTime());
+		
+		m_fmv.getFileMetadata().writeRootBlock(m_rb, ForceEnum.Force);
 	}
 
 	float m_vers = 0.0f;
@@ -1344,7 +1358,11 @@ public class RWStore implements IStore {
 	 * by "zero'd" bits since this can indicate that memory has been cleared.
 	 */
 	private void extendFile() {
-		int adjust = 0;
+		int adjust = -1200 + (m_nextAllocation - m_metaStartAddr) + (m_fileSize - m_metaStartAddr) + (m_fileSize / 10);
+		
+		extendFile(adjust);
+	}
+	private void extendFile(int adjust) {
 		if (m_extendingFile) {
 			throw new IllegalStateException("File concurrently extended");
 		}
@@ -1354,12 +1372,6 @@ public class RWStore implements IStore {
 
 			long fromAddr = convertAddr(m_fileSize);
 			long oldMetaStart = convertAddr(m_metaStartAddr);
-
-			adjust = -1200 + (m_nextAllocation - m_metaStartAddr) + (m_fileSize - m_metaStartAddr) + (m_fileSize / 10);
-
-			if (adjust > 0) {
-				throw new Error("Extend file is NEGATIVE!!");
-			}
 
 			m_fileSize += adjust;
 			m_metaStartAddr += adjust;
@@ -1373,6 +1385,7 @@ public class RWStore implements IStore {
 			if (log.isInfoEnabled()) log.info("Extending file to: " + toAddr);
 			m_raf.setLength(toAddr);
 
+			// Read in entire allocation block area from end of file and move to new position
 			long sze = fromAddr - oldMetaStart;
 			byte buf[] = new byte[(int) sze];
 			m_raf.seek(oldMetaStart);
@@ -1390,8 +1403,10 @@ public class RWStore implements IStore {
 				}
 			}
 
-			// ensure file structure is right
-			writeFileSpec();
+			// ensure file structure is right by writing twice, once to each of ROOTBLOCK0 and ROOTBLOCK1
+			writeFileSpec(); // Ensre both
+			writeFileSpec(); // Rootblocks are valid
+			
 			if (log.isInfoEnabled()) log.warn("Extend file done");
 		} catch (Throwable t) {
 			throw new RuntimeException("Force Reopen", t);
@@ -1906,6 +1921,23 @@ public class RWStore implements IStore {
 
         }
 
-    };
+    }
+
+    /**
+     * Delegated to from setExtentForLocalStore after expected call from HAGlue.replicateAndReceive.
+     * 
+     * If the current file extent is different from the required extent then the call is made to move
+     * the allocation blocks.
+     * 
+     * @param extent
+     */
+	public void establishHAExtent(long extent) {
+		long currentExtent = convertAddr(m_fileSize);
+		
+		if (extent != currentExtent) {
+			extendFile(convertFromAddr(extent - currentExtent));
+		}
+		
+	}
 
 }
