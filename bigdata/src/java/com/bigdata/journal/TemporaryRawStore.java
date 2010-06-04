@@ -281,14 +281,11 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
                 false, // readOnly
                 ForceEnum.No, // forceWrites
                 offsetBits,//
-//                0, // readCacheCapacity
-//                0, // readCacheMaxRecordSize
                 true, // writeCacheEnabled
                 3, // writeCacheBufferCount
                 false, // validateChecksum (desperation option for restart).
                 createTime,//
                 Quorum.NO_QUORUM,// Temporary stores are not HA.
-                new ChecksumUtility(), // checker (root blocks generated but not saved).
                 false // alternateRootBlock
         );
         

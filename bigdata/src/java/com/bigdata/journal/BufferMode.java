@@ -203,5 +203,14 @@ public enum BufferMode {
         return storeType;
         
     }
+    
+    public static BufferMode getDefaultBufferMode(StoreTypeEnum storeType) {
+    	switch (storeType) {
+    	case RW:
+    		return DiskRW;
+    	default:
+    		return DiskWORM;
+    	}    	
+    }
 
 }
