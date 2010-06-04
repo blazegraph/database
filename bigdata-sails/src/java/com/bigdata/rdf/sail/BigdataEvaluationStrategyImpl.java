@@ -11,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
@@ -447,8 +448,11 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         if (INFO)
             log.info("languageCode=" + languageCode + ", label=" + label);
 
-        final Iterator<IHit> itr = database.getSearchEngine().search(label,
-                languageCode, 0d/* minCosine */, 10000/* maxRank */);
+        final Iterator<IHit> itr = database.getLexiconRelation()
+                .getSearchEngine().search(label, languageCode,
+                        false/*prefixMatch*/,
+                        0d/* minCosine */, 10000/* maxRank */,
+                        1000L/* timeout */, TimeUnit.MILLISECONDS);
 
         Set<URI> graphs = null;
         if (database.isQuads() && dataset != null) {

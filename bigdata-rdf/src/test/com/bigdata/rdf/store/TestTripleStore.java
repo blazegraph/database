@@ -55,7 +55,6 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -698,7 +697,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             assertSameIterator(new SPO[]{},
                     store.getAccessPath(NULL,NULL,NULL).iterator());
             
-            final BigdataValueFactoryImpl valueFactory = store.getValueFactory();
+            final BigdataValueFactory valueFactory = store.getValueFactory();
             final BigdataURI A = valueFactory.createURI("http://www.bigdata.com/A");
             final BigdataURI B = valueFactory.createURI("http://www.bigdata.com/B");
             final BigdataURI C = valueFactory.createURI("http://www.bigdata.com/C");

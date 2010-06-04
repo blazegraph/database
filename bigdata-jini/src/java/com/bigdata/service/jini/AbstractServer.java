@@ -2054,6 +2054,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
         /*
          * Wait until the server is terminated.
+         * 
+         * FIXME Since spurious wakeups are possible, this should be used in a loop
+         * with a condition variable.
          */
         
         synchronized (keepAlive) {

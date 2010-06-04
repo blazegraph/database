@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
 Portions of this code are:
 
-Copyright Aduna (http://www.aduna-software.com/) © 2001-2007
+Copyright Aduna (http://www.aduna-software.com/) ï¿½ 2001-2007
 
 All rights reserved.
 
@@ -115,6 +115,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.TruthMaintenance;
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValue;
@@ -345,6 +346,14 @@ public class BigdataSail extends SailBase implements Sail {
         
         public static final String DEFAULT_ISOLATABLE_INDICES = "false";
 
+        /**
+         * Experimental new star joins feature.  Not yet performant.
+         */
+        public static final String STAR_JOINS = BigdataSail.class
+                .getPackage().getName()
+                + ".starJoins";
+        
+        public static final String DEFAULT_STAR_JOINS = "false";
         
     }
 
@@ -411,6 +420,15 @@ public class BigdataSail extends SailBase implements Sail {
     }
     
     /**
+     * Return <code>true</code> iff star joins are enabled.
+     */
+    public boolean isStarJoins() {
+    	
+    	return starJoins;
+    	
+    }
+    
+    /**
      * The configured capacity for the statement buffer(s).
      * 
      * @see Options#BUFFER_CAPACITY
@@ -465,9 +483,16 @@ public class BigdataSail extends SailBase implements Sail {
     /**
      * When true, read/write transactions are allowed.
      * 
-     * @see Options#ISOLATABLE_INDICES
+     * @see {@link Options#ISOLATABLE_INDICES}
      */
     final private boolean isolatable;
+    
+    /**
+     * When true, enable star joins.
+     * 
+     * @See {@link Options#STAR_JOINS}
+     */
+    final private boolean starJoins;
     
     /**
      * <code>true</code> iff the {@link BigdataSail} has been
@@ -871,6 +896,19 @@ public class BigdataSail extends SailBase implements Sail {
             if (log.isInfoEnabled())
                 log.info(BigdataSail.Options.ISOLATABLE_INDICES + "="
                         + isolatable);
+            
+        }
+
+        // star joins
+        { 
+            
+            starJoins = Boolean.parseBoolean(properties.getProperty(
+                    BigdataSail.Options.STAR_JOINS,
+                    BigdataSail.Options.DEFAULT_STAR_JOINS));
+
+            if (log.isInfoEnabled())
+                log.info(BigdataSail.Options.STAR_JOINS + "="
+                        + starJoins);
             
         }
 
@@ -1351,7 +1389,7 @@ public class BigdataSail extends SailBase implements Sail {
          * FIXME bnodes : resolution of term identifiers to blank nodes for
          * JOINs in {@link BigdataSolutionResolverator}.
          */
-        private Map<String, BigdataBNodeImpl> bnodes;
+        private Map<String, BigdataBNode> bnodes;
 
         /**
          * A reverse mapping from the assigned term identifiers for blank nodes
@@ -1360,7 +1398,7 @@ public class BigdataSail extends SailBase implements Sail {
          * {@link SailConnection} without loosing the blank node identifier.
          * This behavior is required by the contract for {@link SailConnection}.
          */
-        private Map<Long, BigdataBNodeImpl> bnodes2;
+        private Map<Long, BigdataBNode> bnodes2;
         
         /**
          * Used to coordinate between read/write transactions and the unisolated
@@ -1543,8 +1581,8 @@ public class BigdataSail extends SailBase implements Sail {
                  * explicit synchronization during iterators, which breaks
                  * encapsulation.
                  */
-                bnodes = new ConcurrentHashMap<String, BigdataBNodeImpl>();
-                bnodes2 = new ConcurrentHashMap<Long, BigdataBNodeImpl>();
+                bnodes = new ConcurrentHashMap<String, BigdataBNode>();
+                bnodes2 = new ConcurrentHashMap<Long, BigdataBNode>();
 //                bnodes = Collections
 //                        .synchronizedMap(new HashMap<String, BigdataBNodeImpl>(
 //                                bufferCapacity));
@@ -2878,7 +2916,7 @@ public class BigdataSail extends SailBase implements Sail {
 
             final BigdataEvaluationStrategyImpl2 strategy = new BigdataEvaluationStrategyImpl2(
                     (BigdataTripleSource) tripleSource, dataset,
-                    nativeJoins);
+                    nativeJoins, starJoins);
 
             final QueryOptimizerList optimizerList = new QueryOptimizerList();
             optimizerList.add(new BindingAssigner());
@@ -2957,7 +2995,7 @@ public class BigdataSail extends SailBase implements Sail {
 
                 final BigdataEvaluationStrategyImpl2 strategy = new BigdataEvaluationStrategyImpl2(
                         (BigdataTripleSource) tripleSource, dataset,
-                        nativeJoins);
+                        nativeJoins, starJoins);
 
                 final QueryOptimizerList optimizerList = new QueryOptimizerList();
                 optimizerList.add(new BindingAssigner());

@@ -13,6 +13,7 @@ import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IStarJoin;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.Rule;
@@ -368,6 +369,15 @@ public class RuleState implements IRuleState {
                     final IVariableOrConstant t = nextPred.get(j);
                     if (t.isVar()) {
                         final IVariable v = (IVariable) t;
+                        required.add(v);
+                    }
+                }
+
+                if (nextPred instanceof IStarJoin) {
+                    final IStarJoin starJoin = (IStarJoin) nextPred;
+                    final Iterator<IVariable> it = starJoin.getConstraintVariables();
+                    while (it.hasNext()) {
+                        IVariable v = it.next();
                         required.add(v);
                     }
                 }

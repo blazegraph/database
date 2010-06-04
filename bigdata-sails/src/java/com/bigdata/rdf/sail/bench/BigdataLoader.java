@@ -1,4 +1,4 @@
-package benchmark.bigdata;
+package com.bigdata.rdf.sail.bench;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -15,12 +15,15 @@ import com.bigdata.rdf.load.RDFDataLoadMaster;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.LocalTripleStore;
 
 /**
  * Very simple loader that takes a journal file and a data file as input and
- * loads the data into the journal. If the journal file exists, it will be
- * destroyed before the load so that the load takes place on a clean journal.
+ * loads the data into the journal. 
+ * <p>
+ * If the journal file exists, you should generally delete it 
+ * before the load so that the load takes place on a clean journal.
  * <p>
  * Note: For scale-out, use the {@link RDFDataLoadMaster} instead.
  * 
@@ -135,7 +138,8 @@ public class BigdataLoader {
      * @param data
      *            path to the data (assumes ntriples)
      * 
-     * @todo this is not an efficient API for loading the data.
+     * @todo This is not an efficient API for loading the data.  use the 
+     * 		 {@link DataLoader} instead.
      */
     private static final void loadData(BigdataSailRepository repo, String data) 
             throws Exception {

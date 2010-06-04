@@ -20,9 +20,11 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -63,7 +65,7 @@ import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
-import com.bigdata.util.concurrent.LatchedExecutorService;
+import com.bigdata.util.concurrent.LatchedExecutor;
 
 /**
  * This class examines the named indices defined on the journal identified by
@@ -595,11 +597,11 @@ public class AsynchronousOverflowTask implements Callable<Object> {
         final List<Future<?>> buildFutures = new LinkedList<Future<?>>();
         try {
 
-            final ExecutorService buildService = new LatchedExecutorService(
+            final Executor buildService = new LatchedExecutor(
                     resourceManager.getFederation().getExecutorService(),
                     resourceManager.buildServiceCorePoolSize);
 
-            final ExecutorService mergeService = new LatchedExecutorService(
+            final Executor mergeService = new LatchedExecutor(
                     resourceManager.getFederation().getExecutorService(),
                     resourceManager.mergeServiceCorePoolSize);
 
@@ -613,10 +615,11 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                     if (vmd.mergePriority > 0) {
 
                         // Schedule a compacting merge.
-                        mergeFutures.add(mergeService
-                                .submit(new AtomicCallable(
-                                        OverflowActionEnum.Merge, vmd,
-                                        new CompactingMergeTask(vmd))));
+                        final FutureTask<?> ft = new FutureTask(
+                                new AtomicCallable(OverflowActionEnum.Merge,
+                                        vmd, new CompactingMergeTask(vmd)));
+                        mergeFutures.add(ft);
+                        mergeService.execute(ft);
 
                     }
 
@@ -632,16 +635,20 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                 if (forceCompactingMerges && !vmd.compactView) {
 
                     // Force a compacting merge.
-                    mergeFutures.add(mergeService.submit(new AtomicCallable(
+                    final FutureTask<?> ft = new FutureTask(new AtomicCallable(
                             OverflowActionEnum.Merge, vmd,
-                            new CompactingMergeTask(vmd))));
+                            new CompactingMergeTask(vmd)));
+                    mergeFutures.add(ft);
+                    mergeService.execute(ft);
 
                 } else {
 
                     // Schedule a build.
-                    buildFutures.add(buildService.submit(new AtomicCallable(
+                    final FutureTask<?> ft = new FutureTask(new AtomicCallable(
                             OverflowActionEnum.Build, vmd,
-                            new IncrementalBuildTask(vmd))));
+                            new IncrementalBuildTask(vmd)));
+                    buildFutures.add(ft);
+                    buildService.execute(ft);
 
                 }
 

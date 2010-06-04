@@ -56,5 +56,6 @@ import org.openrdf.model.BNode;
  * @version $Id$
  */
 public interface BigdataBNode extends BigdataResource, BNode {
-
+    public void setStatementIdentifier(boolean isStmtIdentifier);
+    public boolean isStatementIdentifier();
 }

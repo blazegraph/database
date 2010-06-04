@@ -1,7 +1,7 @@
 package com.bigdata.btree.raba.codec;
 
 import it.unimi.dsi.fastutil.bytes.ByteArrayFrontCodedList;
-import it.unimi.dsi.fastutil.bytes.CustomByteArrayFrontCodedList;
+import it.unimi.dsi.fastutil.bytes.custom.CustomByteArrayFrontCodedList;
 
 import java.io.Externalizable;
 import java.io.IOException;
