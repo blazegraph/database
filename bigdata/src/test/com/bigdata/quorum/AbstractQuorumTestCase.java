@@ -60,7 +60,7 @@ abstract public class AbstractQuorumTestCase extends TestCase2 {
 
     /** The mock shared quorum state object. */
     protected MockQuorumFixture fixture;
-
+    
     @Override
     protected void setUp() throws Exception {
 

@@ -60,7 +60,7 @@ abstract public class AbstractQuorumClient<S extends Remote> implements
     }
 
     public S getLeaderService(final long token) {
-        final Quorum q = getQuorum();
+        final Quorum<?,?> q = getQuorum();
         q.assertQuorum(token);
         final UUID leaderId = q.getLeaderId();
         if (leaderId == null) {
@@ -74,8 +74,8 @@ abstract public class AbstractQuorumClient<S extends Remote> implements
 
     public void notify(QuorumEvent e) {
         
-        if (log.isInfoEnabled())
-            log.info(e.toString());
+//        if (log.isInfoEnabled())
+//            log.info(e.toString());
 
     }
 

@@ -1,7 +1,6 @@
 package com.bigdata.quorum;
 
 import java.rmi.Remote;
-import java.util.Iterator;
 import java.util.UUID;
 
 import com.bigdata.journal.ha.AsynchronousQuorumCloseException;

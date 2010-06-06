@@ -192,6 +192,15 @@ public interface QuorumMember<S extends Remote> extends QuorumClient<S> {
      */
     void memberRemove();
 
+	/**
+	 * Invoked when a consensus has been achieved among <code>(k+1)/2</code>
+	 * services concerning a shared lastCommitTime.
+	 * 
+	 * @param lastCommitTime
+	 *            The last commit time around which a consensus was established.
+	 */
+    void consensus(final long lastCommitTime);
+    
     /**
      * Invoked when this service joins the quorum.
      */
