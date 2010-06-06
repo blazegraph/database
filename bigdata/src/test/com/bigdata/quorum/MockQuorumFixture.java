@@ -45,7 +45,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * @version $Id$
  */
 public class MockQuorumFixture<S extends Remote, C extends QuorumClient<S>, Q extends AbstractQuorum<S, C>>
-        extends AbstractQuorum<S, C> {
+		extends AbstractQuorum<S, C> {
 
     /**
      * @param k
@@ -72,7 +72,8 @@ public class MockQuorumFixture<S extends Remote, C extends QuorumClient<S>, Q ex
      * The visibility on these methods has been expanded so you can pump events
      * into the mock quorum from a unit test.
      */
-    
+
+    @Override
     public void memberAdd(final UUID serviceId) {
         super.memberAdd(serviceId);
         for(MockQuorum client : clients) {
@@ -80,13 +81,15 @@ public class MockQuorumFixture<S extends Remote, C extends QuorumClient<S>, Q ex
         }
     }
 
-    public void memberRemove(final UUID serviceId) {
+    @Override
+   public void memberRemove(final UUID serviceId) {
         super.memberRemove(serviceId);
         for(MockQuorum client : clients) {
             client.memberRemove(serviceId);
         }
     }
 
+    @Override
     public void pipelineAdd(final UUID serviceId) {
         super.pipelineAdd(serviceId);
         for(MockQuorum client : clients) {
@@ -94,6 +97,7 @@ public class MockQuorumFixture<S extends Remote, C extends QuorumClient<S>, Q ex
         }
     }
 
+    @Override
     public void pipelineRemove(final UUID serviceId) {
         super.pipelineRemove(serviceId);
         for(MockQuorum client : clients) {
@@ -101,6 +105,23 @@ public class MockQuorumFixture<S extends Remote, C extends QuorumClient<S>, Q ex
         }
     }
 
+    @Override
+	public void castVote(final UUID serviceId, final long lastCommitTime) {
+		super.castVote(serviceId, lastCommitTime);
+		for (MockQuorum client : clients) {
+			client.castVote(serviceId, lastCommitTime);
+		}
+    }
+
+    @Override
+    public void withdrawVote(final UUID serviceId) {
+        super.withdrawVote(serviceId);
+        for(MockQuorum client : clients) {
+            client.withdrawVote(serviceId);
+        }
+    }
+
+    @Override
     public void serviceJoin(final UUID serviceId) {
         super.serviceJoin(serviceId);
         for(MockQuorum client : clients) {
@@ -108,6 +129,7 @@ public class MockQuorumFixture<S extends Remote, C extends QuorumClient<S>, Q ex
         }
     }
 
+    @Override
     public void serviceLeave(final UUID serviceId) {
         super.serviceLeave(serviceId);
         for(MockQuorum client : clients) {
@@ -115,6 +137,7 @@ public class MockQuorumFixture<S extends Remote, C extends QuorumClient<S>, Q ex
         }
     }
 
+    @Override
     public void updateToken(final long newToken) {
         super.updateToken(newToken);
         for(MockQuorum client : clients) {
@@ -139,38 +162,38 @@ public class MockQuorumFixture<S extends Remote, C extends QuorumClient<S>, Q ex
             super(k);
         }
         
-        /*
-         * The visibility on these methods has been expanded so you can pump
-         * events into the mock quorum from a unit test.
-         */
-
-        public void memberAdd(final UUID serviceId) {
-            super.memberAdd(serviceId);
-        }
-
-        public void memberRemove(final UUID serviceId) {
-            super.memberRemove(serviceId);
-        }
-
-        public void pipelineAdd(final UUID serviceId) {
-            super.pipelineAdd(serviceId);
-        }
-
-        public void pipelineRemove(final UUID serviceId) {
-            super.pipelineRemove(serviceId);
-        }
-
-        public void serviceJoin(final UUID serviceId) {
-            super.serviceJoin(serviceId);
-        }
-
-        public void serviceLeave(final UUID serviceId) {
-            super.serviceLeave(serviceId);
-        }
-
-        public void updateToken(final long newToken) {
-            super.updateToken(newToken);
-        }
+//        /*
+//         * The visibility on these methods has been expanded so you can pump
+//         * events into the mock quorum from a unit test.
+//         */
+//
+//        public void memberAdd(final UUID serviceId) {
+//            super.memberAdd(serviceId);
+//        }
+//
+//        public void memberRemove(final UUID serviceId) {
+//            super.memberRemove(serviceId);
+//        }
+//
+//        public void pipelineAdd(final UUID serviceId) {
+//            super.pipelineAdd(serviceId);
+//        }
+//
+//        public void pipelineRemove(final UUID serviceId) {
+//            super.pipelineRemove(serviceId);
+//        }
+//
+//        public void serviceJoin(final UUID serviceId) {
+//            super.serviceJoin(serviceId);
+//        }
+//
+//        public void serviceLeave(final UUID serviceId) {
+//            super.serviceLeave(serviceId);
+//        }
+//
+//        public void updateToken(final long newToken) {
+//            super.updateToken(newToken);
+//        }
 
     }
     
@@ -195,17 +218,33 @@ public class MockQuorumFixture<S extends Remote, C extends QuorumClient<S>, Q ex
         
     }
 
-    /**
-     * NOP client base class used for the individual clients for each
-     * {@link MockQuorum} registered with of a shared {@link MockQuorumFixture}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     * @version $Id$
-     */
+	/**
+	 * NOP client base class used for the individual clients for each
+	 * {@link MockQuorum} registered with of a shared {@link MockQuorumFixture}.
+	 * 
+	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+	 *         Thompson</a>
+	 * @version $Id: MockQuorumFixture.java 2970 2010-06-03 22:21:22Z
+	 *          thompsonbry $
+	 * 
+	 *          FIXME Also track whether the client is a leader (true when
+	 *          leaderElecte() and until leaderLeft()), whether the client is a
+	 *          follower (true when followerElect() and until serviceLeave of
+	 *          the client or leaderLeft/quorumBroke).
+	 */
     static class MockQuorumMember<S extends Remote> extends
             AbstractQuorumMember<S> {
 
+		/**
+		 * The last lastCommitTime value around which a consensus was achieved.
+		 */
+        protected volatile long lastConsensusValue = -1L;
+        
+        /**
+         * The downstream service in the write pipeline.
+         */
+        protected volatile UUID downStreamId = null;
+        
         /**
          * @param quorum
          */
@@ -217,6 +256,30 @@ public class MockQuorumFixture<S extends Remote, C extends QuorumClient<S>, Q ex
             throw new UnsupportedOperationException();
         }
 
-    }
+		/**
+		 * {@inheritDoc}
+		 * 
+		 * Overridden to save the <i>lastCommitTime</i> on
+		 * {@link #lastConsensusValue}.
+		 */
+        @Override
+		public void consensus(long lastCommitTime) {
+			super.consensus(lastCommitTime);
+			this.lastConsensusValue = lastCommitTime;
+		}
+
+		/**
+		 * {@inheritDoc}
+		 * 
+		 * Overridden to save the current downstream service {@link UUID} on
+		 * {@link #downStreamId}
+		 */
+		public void pipelineChange(final UUID oldDownStreamId,
+				final UUID newDownStreamId) {
+			super.pipelineChange(oldDownStreamId, newDownStreamId);
+			this.downStreamId = newDownStreamId;
+		}
+
+	}
 
 }

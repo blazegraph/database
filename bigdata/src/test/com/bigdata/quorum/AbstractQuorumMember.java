@@ -55,7 +55,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
     }
 
     public S getLeaderService(final long token) {
-        final Quorum q = getQuorum();
+        final Quorum<?,?> q = getQuorum();
         q.assertQuorum(token);
         final UUID leaderId = q.getLeaderId();
         if (leaderId == null) {
@@ -180,7 +180,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
      * 
      * The default implementation logs the message but does not handle it.
      */
-    public void electedFollower(long token) {
+    public void electedFollower(final long token) {
         if (log.isDebugEnabled())
             log.debug("token=" + token);
     }
@@ -190,7 +190,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
      * 
      * The default implementation logs the message but does not handle it.
      */
-    public void electedLeader(long token) {
+    public void electedLeader(final long token) {
         if (log.isDebugEnabled())
             log.debug("token=" + token);
     }
@@ -200,7 +200,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
      * 
      * The default implementation logs the message but does not handle it.
      */
-    public void leaderLeft(UUID leaderId) {
+    public void leaderLeft(final UUID leaderId) {
         if (log.isDebugEnabled())
             log.debug("token=" + leaderId);
     }
@@ -245,16 +245,31 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
             log.debug("");
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * The default implementation logs the message but does not handle it.
-     */
-    public void pipelineChange(UUID oldDownStreamId, UUID newDownStreamId) {
-        if (log.isDebugEnabled())
-            log.debug("old=" + oldDownStreamId + ",new=" + newDownStreamId);
-    }
+	/**
+	 * {@inheritDoc}
+	 * 
+	 * The default implementation logs the message but does not handle it.
+	 */
+	public void pipelineChange(final UUID oldDownStreamId,
+			final UUID newDownStreamId) {
+		if (log.isDebugEnabled())
+			log.debug("oldDownStream=" + oldDownStreamId + ",newDownStream="
+					+ newDownStreamId);
+	}
 
+	/**
+	 * {@inheritDoc}
+	 * 
+	 * Note: The service will be joined to the quorum automatically by
+	 * {@link AbstractQuorum#consensus()} and {@link #serviceJoin()} will be
+	 * invoked when the distributed quorum state has been updated to reflect
+	 * that service join.
+	 */
+	public void consensus(final long lastCommitTime) {
+		if (log.isDebugEnabled())
+			log.debug("lastCommitTime=" + lastCommitTime);
+	}
+    
     /**
      * {@inheritDoc}
      * 

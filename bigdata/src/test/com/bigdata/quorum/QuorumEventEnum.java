@@ -52,6 +52,22 @@ public enum QuorumEventEnum {
      */
     PIPELINE_REMOVED,
     /**
+     * Vote cast by a service for some lastCommitTime.
+     */
+    VOTE_CAST,
+    /**
+     * Vote for some lastCommitTime was withdrawn by a service.
+     */
+    VOTE_WITHDRAWN,
+	/**
+	 * A consensus has been achieved with <code>(k+1)/2</code> services voting
+	 * for some lastCommitTime. This event will typically be associated with an
+	 * invalid quorum token since the quorum token is assigned when the leader
+	 * is elected and this event generally becomes visible before the
+	 * {@link #LEADER_ELECTED} event.
+	 */
+    CONSENSUS,
+    /**
      * Event generated when a service joins a quorum.
      */
     SERVICE_JOINED,
