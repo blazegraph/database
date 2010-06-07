@@ -412,6 +412,8 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	}
 
 	public void destroy() {
+		m_store.close();
+
 		if (m_fileMetadata.raf != null && m_fileMetadata.raf.getChannel().isOpen()) {
 			try {
 				m_fileMetadata.raf.close();
