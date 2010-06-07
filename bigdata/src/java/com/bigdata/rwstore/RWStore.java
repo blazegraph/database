@@ -39,6 +39,10 @@ import java.nio.channels.OverlappingFileLockException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.TreeSet;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 
@@ -203,7 +207,32 @@ public class RWStore implements IStore {
 	Environment m_environment;
 	RWWriteCacheService m_writeCache;
 
-	private void baseInit() {
+    /**
+     * This lock is used to exclude readers when the extent of the backing file
+     * is about to be changed.
+     * 
+     * At present we use synchronized (this)  for alloc/commitChanges and getData,
+     * since only alloc and commitChanges can cause a file extend, and only getData
+     * can read.
+     * 
+     * By using an explicit extensionLock we can unsure that that the taking of
+     * the lock is directly related to the functionality, plus we can support
+     * concurretn readers that are prohibited at present.
+     */
+    final private ReentrantReadWriteLock m_extensionLock = new ReentrantReadWriteLock();
+    
+    /**
+     * An explicit allocation lock allows for reads concurrent with allocation requests.
+     * It is only when an allocation triggers a file extention that the write
+     * extensionLock needs to be taken.
+     * TODO: There is scope to take advantage of the different allocator sizes
+     * and provide allocation locks on the fixed allocators.  We will still need
+     * a store-wide allocation lock when creating new allocation areas, but 
+     * significant contention may be avoided.
+     */
+    final private ReentrantLock m_allocationLock = new ReentrantLock();
+
+    private void baseInit() {
 		m_commitCallback = null;
 
 		m_metaBitsSize = cDefaultMetaBitsSize;
@@ -522,7 +551,11 @@ public class RWStore implements IStore {
 
 	// Allocators
 	public PSInputStream getData(int addr, int size) {
-		synchronized (this) {
+        final Lock readLock = m_extensionLock.readLock();
+
+        readLock.lock();
+        
+		try {
 			try {
 				m_writeCache.flush(false);
 			} catch (InterruptedException e1) {
@@ -544,6 +577,8 @@ public class RWStore implements IStore {
 			}
 
 			return instr;
+		} finally {
+			readLock.unlock();
 		}
 	}
 
@@ -571,7 +606,11 @@ public class RWStore implements IStore {
 			return;
 		}
 
-		synchronized (this) {
+        final Lock readLock = m_extensionLock.readLock();
+
+        readLock.lock();
+        
+		try {
 			if (length > (MAX_FIXED_ALLOC-4)) {
 				try {
 					int nblocks = 1 + (length/(MAX_FIXED_ALLOC-4));
@@ -644,6 +683,8 @@ public class RWStore implements IStore {
 				
 				throw new IllegalArgumentException("Unable to read data", e);
 			}
+		} finally {
+			readLock.unlock();
 		}
 	}
 
@@ -739,6 +780,12 @@ public class RWStore implements IStore {
 	 * 
 	 * TODO: Alternatively, and more generally, a BLOB mechanism would allocate
 	 * an array of blocks and store/write into a master block.
+	 * 
+	 * TODO: Remove use of synchronized and replace with lock.  The synchronized
+	 * guarded reads from file extensions caused by allocations, but the new
+	 * extensionFile lock fulfills this requirement, while a separate lock
+	 * could be used to protect multi-threaded allocations (which is separate
+	 * from file extension).
 	 */
 	boolean allocCurrent = false;
 
@@ -748,7 +795,9 @@ public class RWStore implements IStore {
 		if (size > MAX_FIXED_ALLOC) {
 			throw new IllegalArgumentException("Alloation size to big: " + size);
 		}
-		synchronized (this) {
+		
+		m_allocationLock.lock();
+		try {
 			if (allocCurrent) {
 				throw new Error("Nested allocation .. WHY!");
 			}
@@ -817,6 +866,8 @@ public class RWStore implements IStore {
 				allocCurrent = false;
 
 			}
+		} finally {
+			m_allocationLock.unlock();
 		}
 	}
 
@@ -838,43 +889,49 @@ public class RWStore implements IStore {
 	 * is used to manage the chained buffers.
 	 **/
 	public long alloc(byte buf[], int size) {
-		if (size >= MAX_FIXED_ALLOC) {
-			if (log.isDebugEnabled())
-				log.debug("BLOB ALLOC: " + size);
-			
-			PSOutputStream psout = PSOutputStream.getNew(this);
-			try {
-				int i = 0;
-				int lsize = size - 512;
-				while (i < lsize) {
-					psout.write(buf, i, 512); // add 512 bytes at a time
-					i += 512;
-				}
-				psout.write(buf, i, size - i);
+		m_allocationLock.lock();
+		
+		try {
+			if (size >= MAX_FIXED_ALLOC) {
+				if (log.isDebugEnabled())
+					log.debug("BLOB ALLOC: " + size);
 				
-				return psout.save();
-			} catch (IOException e) {
-				throw new RuntimeException("Close Store", e);
+				PSOutputStream psout = PSOutputStream.getNew(this);
+				try {
+					int i = 0;
+					int lsize = size - 512;
+					while (i < lsize) {
+						psout.write(buf, i, 512); // add 512 bytes at a time
+						i += 512;
+					}
+					psout.write(buf, i, size - i);
+					
+					return psout.save();
+				} catch (IOException e) {
+					throw new RuntimeException("Close Store", e);
+				}
+				
 			}
 			
-		}
-		
-		int newAddr = alloc(size+4); // allow size for checksum
-		
-		int chk = ChecksumUtility.getCHK().checksum(buf, size);
-
-		try {
+			int newAddr = alloc(size+4); // allow size for checksum
 			
-			m_writeCache.write(physicalAddress(newAddr), ByteBuffer.wrap(buf, 0, size), chk);
-		} catch (IllegalStateException e) {
-			reopen(m_fmv);
-			
-			throw new RuntimeException("Close Store", e);
-		} catch (InterruptedException e) {
-			throw new RuntimeException("Close Store", new ClosedByInterruptException());
+			int chk = ChecksumUtility.getCHK().checksum(buf, size);
+	
+			try {
+				
+				m_writeCache.write(physicalAddress(newAddr), ByteBuffer.wrap(buf, 0, size), chk);
+			} catch (IllegalStateException e) {
+				reopen(m_fmv);
+				
+				throw new RuntimeException("Close Store", e);
+			} catch (InterruptedException e) {
+				throw new RuntimeException("Close Store", new ClosedByInterruptException());
+			}
+	
+			return newAddr;
+		} finally {
+			m_allocationLock.unlock();
 		}
-
-		return newAddr;
 	}
 
 	/****************************************************************************
@@ -1060,9 +1117,10 @@ public class RWStore implements IStore {
 
 		checkCoreAllocations();
 
+		// take allocation lock to prevent other threads allocating during commit
+		m_allocationLock.lock();
+		
 		try {
-			// Commit Callback?
-			synchronized (this) {
 				m_committing = true;
 
 				if (m_commitCallback != null) {
@@ -1119,12 +1177,12 @@ public class RWStore implements IStore {
 				}
 
 				m_raf.getChannel().force(false); // TODO, check if required!
-			}
 		} catch (IOException e) {
 			throw new StorageTerminalError("Unable to commit transaction", e);
 		} finally {
 			m_committing = false;
 			m_recentAlloc = false;
+			m_allocationLock.unlock();
 		}
 
 		checkCoreAllocations();
@@ -1366,6 +1424,9 @@ public class RWStore implements IStore {
 		if (m_extendingFile) {
 			throw new IllegalStateException("File concurrently extended");
 		}
+		Lock writeLock = this.m_extensionLock.writeLock();
+		
+		writeLock.lock();
 		try {
 			m_extendingFile = true;
 			m_writeCache.flush(true);
@@ -1404,7 +1465,7 @@ public class RWStore implements IStore {
 			}
 
 			// ensure file structure is right by writing twice, once to each of ROOTBLOCK0 and ROOTBLOCK1
-			writeFileSpec(); // Ensre both
+			writeFileSpec(); // Ensure both
 			writeFileSpec(); // Rootblocks are valid
 			
 			if (log.isInfoEnabled()) log.warn("Extend file done");
@@ -1412,6 +1473,7 @@ public class RWStore implements IStore {
 			throw new RuntimeException("Force Reopen", t);
 		} finally {
 			m_extendingFile = false;
+			writeLock.unlock();
 		}
 	}
 
