@@ -329,12 +329,15 @@ public class FileMetadata {
 		if (bufferMode == BufferMode.Transient) {
 
 			// This mode is not a valid option in this context.
-
 			throw new IllegalArgumentException();
 
 		}
 
-		if (readOnly && create) {
+        if (file.exists() && file.length() != 0)
+            throw new IllegalArgumentException("File exists and is not empty: "
+                    + file.getAbsolutePath());
+
+        if (readOnly && create) {
 
 			throw new IllegalArgumentException("'" + Options.CREATE + "' may not be used with '" + Options.READ_ONLY
 					+ "'");
@@ -368,7 +371,7 @@ public class FileMetadata {
 
 		this.readOnly = readOnly;
 
-		this.exists = !isEmptyFile && file.exists();
+		this.exists = false;
 
 		// true for a temporary file
 		final boolean temporary = bufferMode.equals(BufferMode.Temporary);
@@ -432,367 +435,366 @@ public class FileMetadata {
 
 			}
 
-			if (exists && !temporary) {
+//			if (exists && !temporary) {
+//
+//				/*
+//				 * The file already exists (but not for temporary files).
+//				 * 
+//				 * Note: this next line will throw IOException if there is a
+//				 * file lock contention.
+//				 * 
+//				 * Note: [raf] was initialized by [opener.reopenChannel()]
+//				 * above!
+//				 */
+//				this.extent = raf.length();
+//
+//				this.userExtent = extent - headerSize0;
+//
+//				if (this.extent <= headerSize0) {
+//
+//					/*
+//					 * By throwing an exception for files that are not large
+//					 * enough to contain the MAGIC, VERSION, and both root
+//					 * blocks we avoid IO errors when trying to read those data
+//					 * and are able to reject files based on whether they have
+//					 * bad magic, version, or root blocks.
+//					 */
+//
+//					throw new RuntimeException("File too small to contain a valid journal: " + file.getAbsoluteFile());
+//
+//				}
+//
+//				// if( bufferMode != BufferMode.Disk ) {
+//				if (bufferMode.isFullyBuffered()) {
+//
+//					/*
+//					 * Verify that we can address this many bytes with this
+//					 * strategy. The strategies that rely on an in-memory buffer
+//					 * are all limited to the #of bytes that can be addressed by
+//					 * an int32.
+//					 */
+//
+//					AbstractBufferStrategy.assertNonDiskExtent(userExtent);
+//
+//				}
+//
+//				/*
+//				 * Note: The code to read the MAGIC, VERSION, and root blocks is
+//				 * shared by DumpJournal (code is copy by value) and in part by
+//				 * the rollback() method on AbstractJournal.
+//				 */
+//
+//				/*
+//				 * Read the MAGIC and VERSION.
+//				 */
+//				raf.seek(0L);
+//				try {
+//					/*
+//					 * Note: this next line will throw IOException if there is a
+//					 * file lock contention.
+//					 */
+//					magic = raf.readInt();
+//				} catch (IOException ex) {
+//					throw new RuntimeException("Can not read magic. Is file locked by another process?", ex);
+//				}
+//				if (magic != MAGIC)
+//					throw new RuntimeException("Bad journal magic: expected=" + MAGIC + ", actual=" + magic);
+//				version = raf.readInt();
+//				if (version != VERSION1)
+//					throw new RuntimeException("Bad journal version: expected=" + VERSION1 + ", actual=" + version);
+//
+//				/*
+//				 * Check root blocks (magic, timestamps), choose root block,
+//				 * read constants (slotSize, segmentId).
+//				 */
+//				{
+//
+//					final ChecksumUtility checker = validateChecksum ? ChecksumUtility.threadChk
+//							.get()
+//							: null;
+//
+//					// final FileChannel channel = raf.getChannel();
+//					final ByteBuffer tmp0 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
+//					final ByteBuffer tmp1 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
+//					FileChannelUtility.readAll(opener, tmp0, OFFSET_ROOT_BLOCK0);
+//					FileChannelUtility.readAll(opener, tmp1, OFFSET_ROOT_BLOCK1);
+//					tmp0.position(0); // resets the position.
+//					tmp1.position(0);
+//					try {
+//						rootBlock0 = new RootBlockView(true, tmp0, checker);
+//					} catch (RootBlockException ex) {
+//						log.warn("Bad root block zero: " + ex);
+//					}
+//					try {
+//						rootBlock1 = new RootBlockView(false, tmp1, checker);
+//					} catch (RootBlockException ex) {
+//						log.warn("Bad root block one: " + ex);
+//					}
+//					if (rootBlock0 == null && rootBlock1 == null) {
+//						throw new RuntimeException(
+//								"Both root blocks are bad - journal is not usable: "
+//										+ file);
+//					}
+//					if (alternateRootBlock)
+//						log.warn("Using alternate root block");
+//					/*
+//					 * Choose the root block based on the commit counter.
+//					 * 
+//					 * Note: The commit counters MAY be equal. This will happen
+//					 * if we rollback the journal and override the current root
+//					 * block with the alternate root block.
+//					 */
+//					final long cc0 = rootBlock0.getCommitCounter();
+//					final long cc1 = rootBlock1.getCommitCounter();
+//					this.rootBlock = (cc0 > cc1 ? (alternateRootBlock ? rootBlock1
+//							: rootBlock0)
+//							: (alternateRootBlock ? rootBlock0 : rootBlock1));
+//				}
+//
+//				// use the offset bits from the root block.
+//				this.offsetBits = rootBlock.getOffsetBits();
+//
+//				/*
+//				 * The offset into the user extent at which the next record will
+//				 * be written.
+//				 */
+//				this.nextOffset = rootBlock.getNextOffset();
+//
+//				this.createTime = rootBlock.getCreateTime();
+//
+//				this.closeTime = rootBlock.getCloseTime();
+//
+//				if (closeTime != 0L && !readOnly) {
+//
+//					throw new RuntimeException("Journal is closed for writes: closedTime=" + closeTime);
+//
+//				}
+//
+//				switch (bufferMode) {
+//				case Direct: {
+//					// Allocate the buffer buffer.
+//					buffer = (useDirectBuffers ? ByteBuffer.allocateDirect((int) userExtent) : ByteBuffer
+//							.allocate((int) userExtent));
+//					// Setup to read data from file into the buffer.
+//					if (nextOffset > Integer.MAX_VALUE) {
+//						throw new RuntimeException("This file is too large for a buffered mode: use " + BufferMode.Disk);
+//					}
+//					buffer.limit((int) nextOffset);
+//					buffer.position(0);
+//					if (nextOffset > 0) {
+//						// Read the file image into the direct buffer.
+//						FileChannelUtility.readAll(opener, buffer, headerSize0);
+//					}
+//					break;
+//				}
+//				case Mapped: {
+//					// Map the file.
+//					boolean loadMappedFile = false; // @todo expose as property.
+//					buffer = opener.reopenChannel().map(FileChannel.MapMode.READ_WRITE, headerSize0, extent);
+//					if (loadMappedFile) {
+//						/*
+//						 * Load the image into mapped memory. Generally, I would
+//						 * think that you are better off NOT loading the image.
+//						 * When you want the image in memory, use the Direct
+//						 * mode instead. It should be MUCH faster and has better
+//						 * control over the amount and timing of the IO.
+//						 */
+//						((MappedByteBuffer) buffer).load();
+//					}
+//					break;
+//				}
+//				case Disk:
+//					buffer = null;
+//					break;
+//				case DiskWORM:
+//					buffer = null;
+//					break;
+//				case DiskRW:
+//					buffer = null;
+//					break;
+//				default:
+//					throw new AssertionError();
+//				}
+//
+//				/*
+//				 * Note: there should be no processing required on restart since
+//				 * the intention of transactions that did not commit will not be
+//				 * visible.
+//				 */
+//
+//			} else {
 
-				/*
-				 * The file already exists (but not for temporary files).
-				 * 
-				 * Note: this next line will throw IOException if there is a
-				 * file lock contention.
-				 * 
-				 * Note: [raf] was initialized by [opener.reopenChannel()]
-				 * above!
-				 */
-				this.extent = raf.length();
+			/*
+			 * Create a new journal.
+			 */
 
-				this.userExtent = extent - headerSize0;
+			if (deleteOnExit) {
 
-				if (this.extent <= headerSize0) {
-
-					/*
-					 * By throwing an exception for files that are not large
-					 * enough to contain the MAGIC, VERSION, and both root
-					 * blocks we avoid IO errors when trying to read those data
-					 * and are able to reject files based on whether they have
-					 * bad magic, version, or root blocks.
-					 */
-
-					throw new RuntimeException("File too small to contain a valid journal: " + file.getAbsoluteFile());
-
-				}
-
-				// if( bufferMode != BufferMode.Disk ) {
-				if (bufferMode.isFullyBuffered()) {
-
-					/*
-					 * Verify that we can address this many bytes with this
-					 * strategy. The strategies that rely on an in-memory buffer
-					 * are all limited to the #of bytes that can be addressed by
-					 * an int32.
-					 */
-
-					AbstractBufferStrategy.assertNonDiskExtent(userExtent);
-
-				}
-
-				/*
-				 * Note: The code to read the MAGIC, VERSION, and root blocks is
-				 * shared by DumpJournal (code is copy by value) and in part by
-				 * the rollback() method on AbstractJournal.
-				 */
-
-				/*
-				 * Read the MAGIC and VERSION.
-				 */
-				raf.seek(0L);
+				// Mark the file for deletion on exit.
 				try {
+					file.deleteOnExit();
+				} catch (NullPointerException ex) {
 					/*
-					 * Note: this next line will throw IOException if there is a
-					 * file lock contention.
-					 */
-					magic = raf.readInt();
-				} catch (IOException ex) {
-					throw new RuntimeException("Can not read magic. Is file locked by another process?", ex);
-				}
-				if (magic != MAGIC)
-					throw new RuntimeException("Bad journal magic: expected=" + MAGIC + ", actual=" + magic);
-				version = raf.readInt();
-				if (version != VERSION1)
-					throw new RuntimeException("Bad journal version: expected=" + VERSION1 + ", actual=" + version);
-
-				/*
-				 * Check root blocks (magic, timestamps), choose root block,
-				 * read constants (slotSize, segmentId).
-				 */
-				{
-
-					final ChecksumUtility checker = validateChecksum ? ChecksumUtility.threadChk
-							.get()
-							: null;
-
-					// final FileChannel channel = raf.getChannel();
-					final ByteBuffer tmp0 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
-					final ByteBuffer tmp1 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
-					FileChannelUtility.readAll(opener, tmp0, OFFSET_ROOT_BLOCK0);
-					FileChannelUtility.readAll(opener, tmp1, OFFSET_ROOT_BLOCK1);
-					tmp0.position(0); // resets the position.
-					tmp1.position(0);
-					try {
-						rootBlock0 = new RootBlockView(true, tmp0, checker);
-					} catch (RootBlockException ex) {
-						log.warn("Bad root block zero: " + ex);
-					}
-					try {
-						rootBlock1 = new RootBlockView(false, tmp1, checker);
-					} catch (RootBlockException ex) {
-						log.warn("Bad root block one: " + ex);
-					}
-					if (rootBlock0 == null && rootBlock1 == null) {
-						throw new RuntimeException(
-								"Both root blocks are bad - journal is not usable: "
-										+ file);
-					}
-					if (alternateRootBlock)
-						log.warn("Using alternate root block");
-					/*
-					 * Choose the root block based on the commit counter.
+					 * Ignore NPE caused by a known Sun bug.
 					 * 
-					 * Note: The commit counters MAY be equal. This will happen
-					 * if we rollback the journal and override the current root
-					 * block with the alternate root block.
+					 * See http://bugs.sun.com/view_bug.do?bug_id=6526376
 					 */
-					final long cc0 = rootBlock0.getCommitCounter();
-					final long cc1 = rootBlock1.getCommitCounter();
-					this.rootBlock = (cc0 > cc1 ? (alternateRootBlock ? rootBlock1
-							: rootBlock0)
-							: (alternateRootBlock ? rootBlock0 : rootBlock1));
-				}
-
-				// use the offset bits from the root block.
-				this.offsetBits = rootBlock.getOffsetBits();
-
-				/*
-				 * The offset into the user extent at which the next record will
-				 * be written.
-				 */
-				this.nextOffset = rootBlock.getNextOffset();
-
-				this.createTime = rootBlock.getCreateTime();
-
-				this.closeTime = rootBlock.getCloseTime();
-
-				if (closeTime != 0L && !readOnly) {
-
-					throw new RuntimeException("Journal is closed for writes: closedTime=" + closeTime);
-
-				}
-
-				switch (bufferMode) {
-				case Direct: {
-					// Allocate the buffer buffer.
-					buffer = (useDirectBuffers ? ByteBuffer.allocateDirect((int) userExtent) : ByteBuffer
-							.allocate((int) userExtent));
-					// Setup to read data from file into the buffer.
-					if (nextOffset > Integer.MAX_VALUE) {
-						throw new RuntimeException("This file is too large for a buffered mode: use " + BufferMode.Disk);
-					}
-					buffer.limit((int) nextOffset);
-					buffer.position(0);
-					if (nextOffset > 0) {
-						// Read the file image into the direct buffer.
-						FileChannelUtility.readAll(opener, buffer, headerSize0);
-					}
-					break;
-				}
-				case Mapped: {
-					// Map the file.
-					boolean loadMappedFile = false; // @todo expose as property.
-					buffer = opener.reopenChannel().map(FileChannel.MapMode.READ_WRITE, headerSize0, extent);
-					if (loadMappedFile) {
-						/*
-						 * Load the image into mapped memory. Generally, I would
-						 * think that you are better off NOT loading the image.
-						 * When you want the image in memory, use the Direct
-						 * mode instead. It should be MUCH faster and has better
-						 * control over the amount and timing of the IO.
-						 */
-						((MappedByteBuffer) buffer).load();
-					}
-					break;
-				}
-				case Disk:
-					buffer = null;
-					break;
-				case DiskWORM:
-					buffer = null;
-					break;
-				case DiskRW:
-					buffer = null;
-					break;
-				default:
-					throw new AssertionError();
-				}
-
-				/*
-				 * Note: there should be no processing required on restart since
-				 * the intention of transactions that did not commit will not be
-				 * visible.
-				 */
-
-			} else {
-
-				/*
-				 * Create a new journal.
-				 */
-
-				if (deleteOnExit) {
-
-					// Mark the file for deletion on exit.
-					try {
-						file.deleteOnExit();
-					} catch (NullPointerException ex) {
-						/*
-						 * Ignore NPE caused by a known Sun bug.
-						 * 
-						 * See http://bugs.sun.com/view_bug.do?bug_id=6526376
-						 */
-					}
-
-				}
-
-				/*
-				 * Set the initial extent.
-				 * 
-				 * Note: since a mapped file CAN NOT be extended, we pre-extend
-				 * it to its maximum extent here.
-				 */
-
-				this.extent = (bufferMode == BufferMode.Mapped ? maximumExtent : initialExtent);
-
-				this.userExtent = extent - headerSize0;
-
-				// if (bufferMode != BufferMode.Disk
-				// && bufferMode != BufferMode.Temporary ) {
-				if (bufferMode.isFullyBuffered()) {
-
-					/*
-					 * Verify that we can address this many bytes with this
-					 * strategy. The strategies that rely on an in-memory buffer
-					 * are all limited to the #of bytes that can be addressed by
-					 * an int32.
-					 */
-
-					AbstractBufferStrategy.assertNonDiskExtent(userExtent);
-
-				}
-
-				/*
-				 * The offset at which the first record will be written. This is
-				 * zero(0) since the buffer offset (0) is the first byte after
-				 * the root blocks.
-				 */
-				nextOffset = 0;
-
-				magic = MAGIC;
-
-				version = VERSION1;
-
-				if (!temporary) {
-
-					/*
-					 * Extend the file. We do this eagerly in an attempt to
-					 * convince the OS to place the data into a contiguous
-					 * region on the disk.
-					 */
-					raf.setLength(extent);
-
-					/*
-					 * Write the MAGIC and version on the file.
-					 */
-					raf.seek(0);
-					raf.writeInt(MAGIC);
-					raf.writeInt(VERSION1);
-
-				}
-
-				/*
-				 * Generate the root blocks. They are for all practical purposes
-				 * identical (in fact, their timestamps will be distinct). The
-				 * root block are then written into their locations in the file.
-				 */
-				{
-
-                    final ChecksumUtility checker = ChecksumUtility.threadChk
-                            .get();
-
-					// use the caller's value for offsetBits.
-					this.offsetBits = offsetBits;
-					final long commitCounter = 0L;
-					final long firstCommitTime = 0L;
-					final long lastCommitTime = 0L;
-					final long commitRecordAddr = 0L;
-					final long commitRecordIndexAddr = 0L;
-					final UUID uuid = UUID.randomUUID(); // journal's UUID.
-					final StoreTypeEnum stenum = bufferMode.getStoreType();
-					if (createTime == 0L) {
-						throw new IllegalArgumentException(
-								"Create time may not be zero.");
-					}
-					this.createTime = createTime;
-					this.closeTime = 0L;
-					final IRootBlockView rootBlock0 = new RootBlockView(true,
-							offsetBits, nextOffset, firstCommitTime,
-							lastCommitTime, commitCounter, commitRecordAddr,
-							commitRecordIndexAddr, uuid, quorumToken,//
-							0L, 0L, stenum, createTime, closeTime, checker);
-					final IRootBlockView rootBlock1 = new RootBlockView(false,
-							offsetBits, nextOffset, firstCommitTime,
-							lastCommitTime, commitCounter, commitRecordAddr,
-							commitRecordIndexAddr, uuid, quorumToken,//
-							0L, 0L, stenum, createTime, closeTime, checker);
-
-					if (!temporary) {
-	
-						// FileChannel channel = raf.getChannel();
-	
-						FileChannelUtility.writeAll(opener, rootBlock0
-								.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK0);
-
-						FileChannelUtility.writeAll(opener, rootBlock1
-								.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK1);
-	
-						/*
-						 * Force the changes to disk. We also force the file
-						 * metadata to disk since we just changed the file size and
-						 * we do not want to loose track of that.
-						 */
-
-						opener.reopenChannel().force(true);
-	
-					}
-	
-					this.rootBlock = rootBlock0;
-
-				}
-				
-				switch (bufferMode) {
-				case Direct:
-					/*
-					 * Allocate the buffer.
-					 * 
-					 * Note that we do not read in any data since no user data
-					 * has been written and the root blocks are not cached in
-					 * the buffer to avoid possible overwrites.
-					 */
-					buffer = (useDirectBuffers ? ByteBuffer.allocateDirect((int) userExtent) : ByteBuffer
-							.allocate((int) userExtent));
-					break;
-				case Mapped:
-					/*
-					 * Map the file starting from the first byte of the user
-					 * space and continuing through the entire user extent.
-					 */
-					if (INFO)
-						log.info("Mapping file=" + file);
-					buffer = opener.reopenChannel().map(FileChannel.MapMode.READ_WRITE, headerSize0, userExtent);
-					break;
-				case DiskRW:
-					buffer = null;
-					break;
-				case Disk:
-					buffer = null;
-					break;
-				case DiskWORM:
-					buffer = null;
-					break;
-				case Temporary:
-					buffer = null;
-					break;
-				default:
-					throw new AssertionError();
 				}
 
 			}
+
+			/*
+			 * Set the initial extent.
+			 * 
+			 * Note: since a mapped file CAN NOT be extended, we pre-extend
+			 * it to its maximum extent here.
+			 */
+
+			this.extent = (bufferMode == BufferMode.Mapped ? maximumExtent : initialExtent);
+
+			this.userExtent = extent - headerSize0;
+
+			// if (bufferMode != BufferMode.Disk
+			// && bufferMode != BufferMode.Temporary ) {
+			if (bufferMode.isFullyBuffered()) {
+
+				/*
+				 * Verify that we can address this many bytes with this
+				 * strategy. The strategies that rely on an in-memory buffer
+				 * are all limited to the #of bytes that can be addressed by
+				 * an int32.
+				 */
+
+				AbstractBufferStrategy.assertNonDiskExtent(userExtent);
+
+			}
+
+			/*
+			 * The offset at which the first record will be written. This is
+			 * zero(0) since the buffer offset (0) is the first byte after
+			 * the root blocks.
+			 */
+			nextOffset = 0;
+
+			magic = MAGIC;
+
+			version = VERSION1;
+
+			if (!temporary) {
+
+				/*
+				 * Extend the file. We do this eagerly in an attempt to
+				 * convince the OS to place the data into a contiguous
+				 * region on the disk.
+				 */
+				raf.setLength(extent);
+
+				/*
+				 * Write the MAGIC and version on the file.
+				 */
+				raf.seek(0);
+				raf.writeInt(MAGIC);
+				raf.writeInt(VERSION1);
+
+			}
+
+			/*
+			 * Generate the root blocks. They are for all practical purposes
+			 * identical (in fact, their timestamps will be distinct). The
+			 * root block are then written into their locations in the file.
+			 */
+			{
+
+                final ChecksumUtility checker = ChecksumUtility.threadChk.get();
+
+				// use the caller's value for offsetBits.
+				this.offsetBits = offsetBits;
+				final long commitCounter = 0L;
+				final long firstCommitTime = 0L;
+				final long lastCommitTime = 0L;
+				final long commitRecordAddr = 0L;
+				final long commitRecordIndexAddr = 0L;
+				final UUID uuid = UUID.randomUUID(); // journal's UUID.
+				final StoreTypeEnum stenum = bufferMode.getStoreType();
+				if (createTime == 0L) {
+					throw new IllegalArgumentException(
+							"Create time may not be zero.");
+				}
+				this.createTime = createTime;
+				this.closeTime = 0L;
+				final IRootBlockView rootBlock0 = new RootBlockView(true,
+						offsetBits, nextOffset, firstCommitTime,
+						lastCommitTime, commitCounter, commitRecordAddr,
+						commitRecordIndexAddr, uuid, quorumToken,//
+						0L, 0L, stenum, createTime, closeTime, checker);
+				final IRootBlockView rootBlock1 = new RootBlockView(false,
+						offsetBits, nextOffset, firstCommitTime,
+						lastCommitTime, commitCounter, commitRecordAddr,
+						commitRecordIndexAddr, uuid, quorumToken,//
+						0L, 0L, stenum, createTime, closeTime, checker);
+
+				if (!temporary) {
+
+					// FileChannel channel = raf.getChannel();
+
+					FileChannelUtility.writeAll(opener, rootBlock0
+							.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK0);
+
+					FileChannelUtility.writeAll(opener, rootBlock1
+							.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK1);
+
+					/*
+					 * Force the changes to disk. We also force the file
+					 * metadata to disk since we just changed the file size and
+					 * we do not want to loose track of that.
+					 */
+
+					opener.reopenChannel().force(true);
+
+				}
+
+				this.rootBlock = rootBlock0;
+
+			}
+			
+			switch (bufferMode) {
+			case Direct:
+				/*
+				 * Allocate the buffer.
+				 * 
+				 * Note that we do not read in any data since no user data
+				 * has been written and the root blocks are not cached in
+				 * the buffer to avoid possible overwrites.
+				 */
+				buffer = (useDirectBuffers ? ByteBuffer.allocateDirect((int) userExtent) : ByteBuffer
+						.allocate((int) userExtent));
+				break;
+			case Mapped:
+				/*
+				 * Map the file starting from the first byte of the user
+				 * space and continuing through the entire user extent.
+				 */
+				if (INFO)
+					log.info("Mapping file=" + file);
+				buffer = opener.reopenChannel().map(FileChannel.MapMode.READ_WRITE, headerSize0, userExtent);
+				break;
+			case DiskRW:
+				buffer = null;
+				break;
+			case Disk:
+				buffer = null;
+				break;
+			case DiskWORM:
+				buffer = null;
+				break;
+			case Temporary:
+				buffer = null;
+				break;
+			default:
+				throw new AssertionError();
+			}
+
+//			}
 
 			this.useChecksums = useChecksums(rootBlock);
 

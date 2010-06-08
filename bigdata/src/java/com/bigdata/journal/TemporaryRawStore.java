@@ -317,7 +317,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
             
         } catch (Throwable t) {
             
-            t.printStackTrace(System.err);
+            log.error("Ignoring: " + t, t);
             
         }
         
