@@ -33,11 +33,13 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channel;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.OverlappingFileLockException;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
@@ -47,6 +49,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.IReopenChannel;
+import com.bigdata.io.WriteCache;
+import com.bigdata.io.WriteCache.FileChannelScatteredWriteCache;
+import com.bigdata.io.WriteCache.RecordMetadata;
 import com.bigdata.journal.Environment;
 import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.ForceEnum;
@@ -217,7 +222,7 @@ public class RWStore implements IStore {
      * 
      * By using an explicit extensionLock we can unsure that that the taking of
      * the lock is directly related to the functionality, plus we can support
-     * concurretn readers that are prohibited at present.
+     * concurrent reads.
      */
     final private ReentrantReadWriteLock m_extensionLock = new ReentrantReadWriteLock();
     
@@ -264,14 +269,53 @@ public class RWStore implements IStore {
 			 */
             m_writeCache = new RWWriteCacheService(6, m_raf.length(),
                     new ReopenFileChannel(m_fd, m_raf, "rw"), m_environment
-                            .getQuorumManager());
+                            .getQuorumManager()) {
+            	
+		                public WriteCache newWriteCache(final ByteBuffer buf,
+		                        final boolean useChecksum,
+		                        final boolean bufferHasData,
+		                        final IReopenChannel<? extends Channel> opener)
+		                        throws InterruptedException {
+		                    return new WriteCacheImpl(buf,
+		                            useChecksum, bufferHasData,
+		                            (IReopenChannel<FileChannel>) opener);
+		                }
+            	};
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {
             throw new RuntimeException(e);
 		} 
 	}
+		
+	class WriteCacheImpl extends WriteCache.FileChannelScatteredWriteCache {
+        public WriteCacheImpl(final ByteBuffer buf,
+                final boolean useChecksum,
+                final boolean bufferHasData,
+                final IReopenChannel<FileChannel> opener)
+                throws InterruptedException {
 
+            super(buf, useChecksum, m_environment
+                    .isHighlyAvailable(), bufferHasData, opener);
+
+        }
+
+        @Override
+        protected boolean writeOnChannel(final ByteBuffer data,
+                final long firstOffsetignored,
+                final Map<Long, RecordMetadata> recordMap,
+                final long nanos) throws InterruptedException, IOException {
+        	Lock readLock = m_extensionLock.readLock();
+        	readLock.lock();
+        	try {
+        		return super.writeOnChannel(data, firstOffsetignored, recordMap, nanos);
+        	} finally {
+        		readLock.unlock();
+        	}
+        	
+        }
+		
+	};
 	protected String m_filename;
 	protected LockFile m_lockFile;
 
@@ -887,51 +931,48 @@ public class RWStore implements IStore {
 	 * 
 	 * If the allocation is for greater than MAX_FIXED_ALLOC, then a PSOutputStream
 	 * is used to manage the chained buffers.
+	 * 
+	 * TODO: Instead of using PSOutputStream instead manage allocations written
+	 * to the WriteCacheService, building BlobHeader as you go.
 	 **/
 	public long alloc(byte buf[], int size) {
-		m_allocationLock.lock();
-		
-		try {
-			if (size >= MAX_FIXED_ALLOC) {
-				if (log.isDebugEnabled())
-					log.debug("BLOB ALLOC: " + size);
-				
-				PSOutputStream psout = PSOutputStream.getNew(this);
-				try {
-					int i = 0;
-					int lsize = size - 512;
-					while (i < lsize) {
-						psout.write(buf, i, 512); // add 512 bytes at a time
-						i += 512;
-					}
-					psout.write(buf, i, size - i);
-					
-					return psout.save();
-				} catch (IOException e) {
-					throw new RuntimeException("Close Store", e);
-				}
-				
-			}
-			
-			int newAddr = alloc(size+4); // allow size for checksum
-			
-			int chk = ChecksumUtility.getCHK().checksum(buf, size);
-	
+		if (size >= MAX_FIXED_ALLOC) {
+			if (log.isDebugEnabled())
+				log.debug("BLOB ALLOC: " + size);
+
+			PSOutputStream psout = PSOutputStream.getNew(this);
 			try {
-				
-				m_writeCache.write(physicalAddress(newAddr), ByteBuffer.wrap(buf, 0, size), chk);
-			} catch (IllegalStateException e) {
-				reopen(m_fmv);
-				
+				int i = 0;
+				int lsize = size - 512;
+				while (i < lsize) {
+					psout.write(buf, i, 512); // add 512 bytes at a time
+					i += 512;
+				}
+				psout.write(buf, i, size - i);
+
+				return psout.save();
+			} catch (IOException e) {
 				throw new RuntimeException("Close Store", e);
-			} catch (InterruptedException e) {
-				throw new RuntimeException("Close Store", new ClosedByInterruptException());
 			}
-	
-			return newAddr;
-		} finally {
-			m_allocationLock.unlock();
+
 		}
+
+		int newAddr = alloc(size + 4); // allow size for checksum
+
+		int chk = ChecksumUtility.getCHK().checksum(buf, size);
+
+		try {
+
+			m_writeCache.write(physicalAddress(newAddr), ByteBuffer.wrap(buf, 0, size), chk);
+		} catch (IllegalStateException e) {
+			reopen(m_fmv);
+
+			throw new RuntimeException("Close Store", e);
+		} catch (InterruptedException e) {
+			throw new RuntimeException("Close Store", new ClosedByInterruptException());
+		}
+
+		return newAddr;
 	}
 
 	/****************************************************************************
@@ -1424,12 +1465,25 @@ public class RWStore implements IStore {
 		if (m_extendingFile) {
 			throw new IllegalStateException("File concurrently extended");
 		}
+		try {
+			/*
+			 * The call to flush the cache cannot be made while holding the
+			 * extension writeLock, since the writeOnChannel takes the
+			 * extension readLock.
+			 * TODO: Confirm that this cannot be a problem... that writes could
+			 * not be added to the writeCache by another thread to the
+			 * allocation block area.
+			 */
+			m_writeCache.flush(true);
+		} catch (InterruptedException e) {
+			throw new RuntimeException("Flush interrupted in extend file");
+		}
+
 		Lock writeLock = this.m_extensionLock.writeLock();
 		
 		writeLock.lock();
 		try {
 			m_extendingFile = true;
-			m_writeCache.flush(true);
 
 			long fromAddr = convertAddr(m_fileSize);
 			long oldMetaStart = convertAddr(m_metaStartAddr);
