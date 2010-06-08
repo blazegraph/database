@@ -29,11 +29,11 @@ package com.bigdata.quorum;
 
 import java.util.UUID;
 
+import junit.framework.TestCase2;
+
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
-import com.bigdata.quorum.MockQuorumFixture.MockQuorumFixtureClient;
-
-import junit.framework.TestCase2;
+import com.bigdata.quorum.MockQuorumFixture.MockQuorum.MockQuorumActor;
 
 /**
  * Test suite for the {@link MockQuorumFixture}. This class is responsible for
@@ -61,6 +61,67 @@ public class TestMockQuorumFixture extends TestCase2 {
     }
 
     /**
+     * Tests of various illegal constructor calls.
+     */
+    public void test_ctor_correctRejection() {
+
+        try {
+            final int k = 2;
+            new MockQuorumFixture(k);
+            fail("Expected: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            if (log.isInfoEnabled())
+                log.info(ex);
+        }        
+
+        try {
+            final int k = 0;
+            new MockQuorumFixture(k);
+            fail("Expected: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            if (log.isInfoEnabled())
+                log.info(ex);
+        }        
+
+        try {
+            final int k = -1;
+            new MockQuorumFixture(k);
+            fail("Expected: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            if (log.isInfoEnabled())
+                log.info(ex);
+        }        
+
+    }
+
+    /**
+     * Simple start()/terminate() test.
+     */
+    public void test_start_terminate() {
+
+        final int k = 1;
+        
+        // Create fixture providing mock of the distributed quorum state.
+        final MockQuorumFixture fixture = new MockQuorumFixture(k);
+
+        // Start the fixture.
+        fixture.start();
+        
+        // Create a mock client for that fixture.
+        final MockQuorum clientQuorum = new MockQuorum(fixture);
+        
+        // Run the client's quorum.
+        clientQuorum.start(new MockQuorumMember(clientQuorum));
+        
+        // Terminate the client's quorum.
+        clientQuorum.terminate();
+
+        // Terminate the fixture.
+        fixture.terminate();
+        
+    }
+
+    /**
      * A simple quorum run.
      */
     public void test_run1() {
@@ -70,33 +131,49 @@ public class TestMockQuorumFixture extends TestCase2 {
         // The per-client quorum objects.
         final MockQuorum[] quorums = new MockQuorum[k];
         final MockQuorumMember[] clients = new MockQuorumMember[k];
+        final MockQuorumActor[] actors = new MockQuorumActor[k];
         // The mock shared quorum state object.
         final MockQuorumFixture fixture = new MockQuorumFixture(k);
         try {
  
-            // run the fixture with a NOP client.
-            fixture.start(new MockQuorumFixtureClient(fixture));
+            // run the fixture.
+            fixture.start();
 
             /*
              * Setup the client quorums.
              */
             for (int i = 0; i < k; i++) {
-                quorums[i] = new MockQuorum(k);
+                quorums[i] = new MockQuorum(fixture);
                 clients[i] = new MockQuorumMember(quorums[i]);
                 quorums[i].start(clients[i]);
-                fixture.addQuorumToFixture(quorums[i]);
+                actors [i] = quorums[i].getActor();
             }
             
-            final UUID serviceId = UUID.randomUUID();
-            fixture.memberAdd(serviceId);
+            // The serviceId of the 1st client.
+            final UUID serviceId = clients[0].getServiceId();
+  
+            // Verify none of the client quorums have any members.
+            assertEquals(new UUID[]{},quorums[0].getMembers());
+            assertEquals(new UUID[]{},quorums[1].getMembers());
+            assertEquals(new UUID[]{},quorums[2].getMembers());
+
+            // Verify the client is not a member of the quorum.
+            assertFalse(clients[0].isMember());
+
+            // tell the client's actor to add it as a quorum member.
+            actors[0].memberAdd();
             
+            assertEquals(new UUID[]{serviceId},quorums[0].getMembers());
+            assertEquals(new UUID[]{serviceId},quorums[1].getMembers());
+            assertEquals(new UUID[]{serviceId},quorums[2].getMembers());
+
+            // The client should now be a quorum member.
+            assertTrue(clients[0].isMember());
+
         } finally {
-            for(int i=0; i<k; i++) {
-                if(quorums[i]!=null)
+            for (int i = 0; i < k; i++) {
+                if (quorums[i] != null)
                     quorums[i].terminate();
-//                if(clients[i]!=null) {
-//                    clients[i].terminate();
-//                }
             }
             fixture.terminate();
         }

@@ -59,7 +59,7 @@ abstract public class AbstractQuorumClient<S extends Remote> implements
 
     }
 
-    public S getLeaderService(final long token) {
+    public S getLeader(final long token) {
         final Quorum<?,?> q = getQuorum();
         q.assertQuorum(token);
         final UUID leaderId = q.getLeaderId();

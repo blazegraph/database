@@ -56,4 +56,15 @@ public interface QuorumEvent {
      */
     UUID getServiceId();
 
+    /**
+     * The lastCommitTime for which a vote was cast.
+     * 
+     * @return The lastCommitTime for which the vote was cast.
+     * 
+     * @throws UnsupportedOperationException
+     *             unless {@link #getEventType()} returns
+     *             {@link QuorumEventEnum#VOTE_CAST}
+     */
+    long lastCommitTime();
+
 }
