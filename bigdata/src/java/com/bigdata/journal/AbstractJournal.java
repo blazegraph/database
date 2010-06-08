@@ -738,14 +738,21 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 				fileMetadata = null;
 
-				final boolean useDirectBuffers = Boolean.parseBoolean(getProperty(Options.USE_DIRECT_BUFFERS,
-						Options.DEFAULT_USE_DIRECT_BUFFERS));
-				final int offsetBits = getProperty(Options.OFFSET_BITS, Integer
-						.toString((this instanceof Journal ? WormAddressManager.SCALE_UP_OFFSET_BITS
-								: WormAddressManager.SCALE_OUT_OFFSET_BITS)), new IntegerRangeValidator(
-						WormAddressManager.MIN_OFFSET_BITS, WormAddressManager.MAX_OFFSET_BITS));
-				final long createTime = Long
-						.parseLong(getProperty(Options.CREATE_TIME, "" + System.currentTimeMillis()));
+				final boolean useDirectBuffers = Boolean
+						.parseBoolean(getProperty(Options.USE_DIRECT_BUFFERS,
+								Options.DEFAULT_USE_DIRECT_BUFFERS));
+
+				final int offsetBits = getProperty(
+						Options.OFFSET_BITS,
+						Integer
+								.toString((this instanceof Journal ? WormAddressManager.SCALE_UP_OFFSET_BITS
+										: WormAddressManager.SCALE_OUT_OFFSET_BITS)),
+						new IntegerRangeValidator(
+								WormAddressManager.MIN_OFFSET_BITS,
+								WormAddressManager.MAX_OFFSET_BITS));
+
+				final long createTime = Long.parseLong(getProperty(
+						Options.CREATE_TIME, "" + System.currentTimeMillis()));
 
 				_bufferStrategy = new TransientBufferStrategy(offsetBits, initialExtent, 0L/*
 																							 * soft
@@ -781,40 +788,22 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 				this._rootBlock = rootBlock1;
 
 			} else {
-				boolean create = Boolean.parseBoolean(Options.DEFAULT_CREATE);
-				boolean isEmptyFile = false;
 
-				final boolean createTempFile = Boolean.parseBoolean(getProperty(Options.CREATE_TEMP_FILE,
-						Options.DEFAULT_CREATE_TEMP_FILE));
+				final FileMetadata fileMetadata = FileMetadata.createInstance(
+						properties, !(this instanceof Journal), quorumToken);
 
-				if (createTempFile) {
-
-					create = false;
-
-					isEmptyFile = true;
-
-				}
-
-				if (readOnly) {
-
-					create = false;
-
-				}
-
-				FileMetadata fileMetadata = FileMetadata.createInstance(properties, !(this instanceof Journal),
-						quorumToken);
 				final BufferMode bufferMode = fileMetadata.bufferMode;
 
-				/*
-				 * Note: The caller SHOULD specify an explicit [createTime] when
-				 * its value is critical. The default assigned here does NOT
-				 * attempt to use a clock that is consistent with the commit
-				 * protocol or even a clock that assigns unique timestamps.
-				 */
-				final long createTime = Long
-						.parseLong(getProperty(Options.CREATE_TIME, "" + System.currentTimeMillis()));
-
-				assert createTime != 0L;
+//				/*
+//				 * Note: The caller SHOULD specify an explicit [createTime] when
+//				 * its value is critical. The default assigned here does NOT
+//				 * attempt to use a clock that is consistent with the commit
+//				 * protocol or even a clock that assigns unique timestamps.
+//				 */
+//				final long createTime = Long
+//						.parseLong(getProperty(Options.CREATE_TIME, "" + System.currentTimeMillis()));
+//
+//				assert createTime != 0L;
 
 				switch (bufferMode) {
 

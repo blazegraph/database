@@ -41,6 +41,7 @@ import com.bigdata.config.LongRangeValidator;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
+import com.bigdata.io.WriteCacheService;
 import com.bigdata.journal.ha.Quorum;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
@@ -205,22 +206,22 @@ public class FileMetadata {
 	 */
 	final boolean exists;
 
-    /**
-     * The object used by the journal to compute the checksums of its root
-     * blocks (this object is NOT thread-safe so there is one instance per
-     * journal).
-     */
-    ChecksumUtility checker = new ChecksumUtility();
+//    /**
+//     * The object used by the journal to compute the checksums of its root
+//     * blocks (this object is NOT thread-safe so there is one instance per
+//     * journal).
+//     */
+//    final private ChecksumUtility checker = new ChecksumUtility();
 
     /**
 	 * The 1st root block.
 	 */
-	IRootBlockView rootBlock0;
+	protected IRootBlockView rootBlock0;
 
 	/**
 	 * The 2nd root block.
 	 */
-	IRootBlockView rootBlock1;
+	protected IRootBlockView rootBlock1;
 
 	/**
 	 * The current root block. For a new file, this is "rootBlock0". For an
@@ -229,7 +230,9 @@ public class FileMetadata {
 	final IRootBlockView rootBlock;
 
 	/**
-	 * Prepare a journal file for use by an {@link IBufferStrategy}.
+	 * This constructor handles the case where the file does not exist or exists
+	 * but is empty (including files created by the temporary file creation
+	 * mechanism).
 	 * 
 	 * @param file
 	 *            The name of the file to be opened.
@@ -278,18 +281,18 @@ public class FileMetadata {
 	 *            When <code>true</code>, the {@link DiskOnlyStrategy} will
 	 *            allocate a direct {@link ByteBuffer} from the
 	 *            {@link DirectBufferPool} to service as a write cache.
+	 * @param writeCacheBufferCount
+	 *            The #of buffers to allocate for the {@link WriteCacheService}.
+	 * @param validateChecksum
+	 *            When <code>true</code>, the checksum stored in the root blocks
+	 *            of an existing file will be validated when the file is opened.
+	 *            See {@link Options#VALIDATE_CHECKSUM}.
 	 * @param createTime
 	 *            The create time to be assigned to the root block iff a new
 	 *            file is created.
 	 * @param quorumToken
 	 *            The current quorum token or {@link Quorum#NO_QUORUM} if the
 	 *            caller is not met with any {@link Quorum}.
-	 * @param validateChecksum
-	 *            When <code>true</code>, the checksum stored in the root blocks
-	 *            of an existing file will be validated when the file is opened.
-	 *            See {@link Options#VALIDATE_CHECKSUM}.
-	 * @param checker
-	 *            The object used to compute the checksum of the root blocks.
 	 * @param alternateRootBlock
 	 *            When <code>true</code> the prior root block will be used. This
 	 *            option may be used when a commit record is valid but the data
@@ -306,31 +309,13 @@ public class FileMetadata {
 	 *             if there is a problem preparing the file for use by the
 	 *             journal.
 	 */
-	// * @param readCacheCapacity
-	// * The capacity of an optional read cache. When ZERO(0) the read
-	// * cache will be disabled. The capacity specifies the #of records
-	// * that will be retained by an LRU style cache. Note that this
-	// * option is only supported by the {@link DiskOnlyStrategy}.
-	// * Further note that most of the other {@link IBufferStrategy}s
-	// * are already fully buffered and hence can not benefit from a
-	// * read cache. Finally, note that the higher-level data
-	// * structures use the {@link LRUNexus}, which provides a read
-	// * cache of the decompressed records. For these reasons there is
-	// * little reason to enable this lower-level read cache.
-	// * @param readCacheMaxRecordSize
-	// * The maximum size of a record that will be allowed into the
-	// * optional read cache.
-//	return new FileMetadata(file, bufferMode, useDirectBuffers, 
-//			initialExtent, maximumExtent, create, isEmptyFile, deleteOnExit,
-//			readOnly, forceWrites, writeCacheEnabled, writeCacheBufferCount,
-//			createTime, quorumToken, validateChecksum, alternateRootBlock);
-	FileMetadata(final File file, final BufferMode bufferMode, final boolean useDirectBuffers,
-			final long initialExtent, final long maximumExtent, final boolean create, final boolean isEmptyFile,
-			boolean deleteOnExit,
-			final boolean readOnly,
-			final ForceEnum forceWrites,
-			final int offsetBits,
-			final boolean writeCacheEnabled, final int writeCacheBufferCount, final boolean validateChecksum,
+	FileMetadata(final File file, final BufferMode bufferMode,
+			final boolean useDirectBuffers, final long initialExtent,
+			final long maximumExtent, final boolean create,
+			final boolean isEmptyFile, boolean deleteOnExit,
+			final boolean readOnly, final ForceEnum forceWrites,
+			final int offsetBits, final boolean writeCacheEnabled,
+			final int writeCacheBufferCount, final boolean validateChecksum,
 			final long createTime, final long quorumToken,
 			final boolean alternateRootBlock) throws RuntimeException {
 
@@ -518,40 +503,49 @@ public class FileMetadata {
 				 * Check root blocks (magic, timestamps), choose root block,
 				 * read constants (slotSize, segmentId).
 				 */
+				{
 
-				// final FileChannel channel = raf.getChannel();
-				final ByteBuffer tmp0 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
-				final ByteBuffer tmp1 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
-				FileChannelUtility.readAll(opener, tmp0, OFFSET_ROOT_BLOCK0);
-				FileChannelUtility.readAll(opener, tmp1, OFFSET_ROOT_BLOCK1);
-				tmp0.position(0); // resets the position.
-				tmp1.position(0);
-				try {
-					rootBlock0 = new RootBlockView(true, tmp0, validateChecksum ? checker : null);
-				} catch (RootBlockException ex) {
-					log.warn("Bad root block zero: " + ex);
+					final ChecksumUtility checker = validateChecksum ? ChecksumUtility.threadChk
+							.get()
+							: null;
+
+					// final FileChannel channel = raf.getChannel();
+					final ByteBuffer tmp0 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
+					final ByteBuffer tmp1 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
+					FileChannelUtility.readAll(opener, tmp0, OFFSET_ROOT_BLOCK0);
+					FileChannelUtility.readAll(opener, tmp1, OFFSET_ROOT_BLOCK1);
+					tmp0.position(0); // resets the position.
+					tmp1.position(0);
+					try {
+						rootBlock0 = new RootBlockView(true, tmp0, checker);
+					} catch (RootBlockException ex) {
+						log.warn("Bad root block zero: " + ex);
+					}
+					try {
+						rootBlock1 = new RootBlockView(false, tmp1, checker);
+					} catch (RootBlockException ex) {
+						log.warn("Bad root block one: " + ex);
+					}
+					if (rootBlock0 == null && rootBlock1 == null) {
+						throw new RuntimeException(
+								"Both root blocks are bad - journal is not usable: "
+										+ file);
+					}
+					if (alternateRootBlock)
+						log.warn("Using alternate root block");
+					/*
+					 * Choose the root block based on the commit counter.
+					 * 
+					 * Note: The commit counters MAY be equal. This will happen
+					 * if we rollback the journal and override the current root
+					 * block with the alternate root block.
+					 */
+					final long cc0 = rootBlock0.getCommitCounter();
+					final long cc1 = rootBlock1.getCommitCounter();
+					this.rootBlock = (cc0 > cc1 ? (alternateRootBlock ? rootBlock1
+							: rootBlock0)
+							: (alternateRootBlock ? rootBlock0 : rootBlock1));
 				}
-				try {
-					rootBlock1 = new RootBlockView(false, tmp1, validateChecksum ? checker : null);
-				} catch (RootBlockException ex) {
-					log.warn("Bad root block one: " + ex);
-				}
-				if (rootBlock0 == null && rootBlock1 == null) {
-					throw new RuntimeException("Both root blocks are bad - journal is not usable: " + file);
-				}
-				if (alternateRootBlock)
-					log.warn("Using alternate root block");
-				/*
-				 * Choose the root block based on the commit counter.
-				 * 
-				 * Note: The commit counters MAY be equal. This will happen if
-				 * we rollback the journal and override the current root block
-				 * with the alternate root block.
-				 */
-				long cc0 = rootBlock0.getCommitCounter();
-				long cc1 = rootBlock1.getCommitCounter();
-				this.rootBlock = (cc0 > cc1 ? (alternateRootBlock ? rootBlock1 : rootBlock0)
-						: (alternateRootBlock ? rootBlock0 : rootBlock1));
 
 				// use the offset bits from the root block.
 				this.offsetBits = rootBlock.getOffsetBits();
@@ -705,46 +699,62 @@ public class FileMetadata {
 				 * identical (in fact, their timestamps will be distinct). The
 				 * root block are then written into their locations in the file.
 				 */
-				// use the caller's value for offsetBits.
-				this.offsetBits = offsetBits;
-				final long commitCounter = 0L;
-				final long firstCommitTime = 0L;
-				final long lastCommitTime = 0L;
-				final long commitRecordAddr = 0L;
-				final long commitRecordIndexAddr = 0L;
-				final UUID uuid = UUID.randomUUID(); // journal's UUID.
-				final StoreTypeEnum stenum = bufferMode.getStoreType();
-				if (createTime == 0L) {
-					throw new IllegalArgumentException("Create time may not be zero.");
+				{
+
+					final ChecksumUtility checker = validateChecksum ? ChecksumUtility.threadChk
+							.get()
+							: null;
+
+					// use the caller's value for offsetBits.
+					this.offsetBits = offsetBits;
+					final long commitCounter = 0L;
+					final long firstCommitTime = 0L;
+					final long lastCommitTime = 0L;
+					final long commitRecordAddr = 0L;
+					final long commitRecordIndexAddr = 0L;
+					final UUID uuid = UUID.randomUUID(); // journal's UUID.
+					final StoreTypeEnum stenum = bufferMode.getStoreType();
+					if (createTime == 0L) {
+						throw new IllegalArgumentException(
+								"Create time may not be zero.");
+					}
+					this.createTime = createTime;
+					this.closeTime = 0L;
+					final IRootBlockView rootBlock0 = new RootBlockView(true,
+							offsetBits, nextOffset, firstCommitTime,
+							lastCommitTime, commitCounter, commitRecordAddr,
+							commitRecordIndexAddr, uuid, quorumToken,//
+							0L, 0L, stenum, createTime, closeTime, checker);
+					final IRootBlockView rootBlock1 = new RootBlockView(false,
+							offsetBits, nextOffset, firstCommitTime,
+							lastCommitTime, commitCounter, commitRecordAddr,
+							commitRecordIndexAddr, uuid, quorumToken,//
+							0L, 0L, stenum, createTime, closeTime, checker);
+
+					if (!temporary) {
+	
+						// FileChannel channel = raf.getChannel();
+	
+						FileChannelUtility.writeAll(opener, rootBlock0
+								.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK0);
+
+						FileChannelUtility.writeAll(opener, rootBlock1
+								.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK1);
+	
+						/*
+						 * Force the changes to disk. We also force the file
+						 * metadata to disk since we just changed the file size and
+						 * we do not want to loose track of that.
+						 */
+
+						opener.reopenChannel().force(true);
+	
+					}
+	
+					this.rootBlock = rootBlock0;
+
 				}
-				this.createTime = createTime;
-				this.closeTime = 0L;
-				final IRootBlockView rootBlock0 = new RootBlockView(true, offsetBits, nextOffset, firstCommitTime,
-						lastCommitTime, commitCounter, commitRecordAddr, commitRecordIndexAddr, uuid, quorumToken,//
-						0L, 0L, stenum, createTime, closeTime, checker);
-				final IRootBlockView rootBlock1 = new RootBlockView(false, offsetBits, nextOffset, firstCommitTime,
-						lastCommitTime, commitCounter, commitRecordAddr, commitRecordIndexAddr, uuid, quorumToken,//
-						0L, 0L, stenum, createTime, closeTime, checker);
-
-				if (!temporary) {
-
-					// FileChannel channel = raf.getChannel();
-
-					FileChannelUtility.writeAll(opener, rootBlock0.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK0);
-
-					FileChannelUtility.writeAll(opener, rootBlock1.asReadOnlyBuffer(), OFFSET_ROOT_BLOCK1);
-
-					/*
-					 * Force the changes to disk. We also force the file
-					 * metadata to disk since we just changed the file size and
-					 * we do not want to loose track of that.
-					 */
-					opener.reopenChannel().force(true);
-
-				}
-
-				this.rootBlock = rootBlock0;
-
+				
 				switch (bufferMode) {
 				case Direct:
 					/*
@@ -794,19 +804,62 @@ public class FileMetadata {
 
 	}
 
-	/*
-	 * If the file exists then this alternative constructor can be used.
+	/**
+	 * This constructor handles cases where the file exists and is non-empty.
+	 * 
+	 * @param file
+	 *            The name of the file to be opened.
+	 * @param useDirectBuffers
+	 *            true if a buffer should be allocated using
+	 *            {@link ByteBuffer#allocateDirect(int)} rather than
+	 *            {@link ByteBuffer#allocate(int)}. This has no effect for the
+	 *            {@link BufferMode#Disk} and {@link BufferMode#Mapped} modes.
+	 * @param readOnly
+	 *            When true, the file is opened in a read-only mode and it is an
+	 *            error if the file does not exist.
+	 * @param forceWrites
+	 *            When true, the file is opened in "rwd" mode and individual IOs
+	 *            are forced to disk. This option SHOULD be false since we only
+	 *            need to write through to disk on commit, not on each IO.
+	 * @param writeCacheEnabled
+	 *            When <code>true</code>, the {@link DiskOnlyStrategy} will
+	 *            allocate a direct {@link ByteBuffer} from the
+	 *            {@link DirectBufferPool} to service as a write cache.
+	 * @param writeCacheBufferCount
+	 *            The #of buffers to allocate for the {@link WriteCacheService}.
+	 * @param validateChecksum
+	 *            When <code>true</code>, the checksum stored in the root blocks
+	 *            of an existing file will be validated when the file is opened.
+	 *            See {@link Options#VALIDATE_CHECKSUM}.
+	 * @param alternateRootBlock
+	 *            When <code>true</code> the prior root block will be used. This
+	 *            option may be used when a commit record is valid but the data
+	 *            associated with the commit point is invalid. There are two
+	 *            root blocks. Normally the one which has been most recently
+	 *            written will be loaded on restart. When this option is
+	 *            specified, the older of the two root blocks will be loaded
+	 *            instead. <strong>If you use this option and then do a commit
+	 *            then the more recent of the root blocks will be lost and any
+	 *            data associated with that commit point will be lost as
+	 *            well!</strong>
+	 * 
+	 * @throws RuntimeException
+	 *             if there is a problem preparing the file for use by the
+	 *             journal.
 	 */
-	FileMetadata(final File file, final boolean useDirectBuffers, final boolean readOnly, final ForceEnum forceWrites,
-			final boolean writeCacheEnabled, final int writeCacheBufferCount, final boolean validateChecksum,
-			final boolean alternateRootBlock)
+	FileMetadata(final File file, final boolean useDirectBuffers,
+			final boolean readOnly, final ForceEnum forceWrites,
+			final boolean writeCacheEnabled, final int writeCacheBufferCount,
+			final boolean validateChecksum, final boolean alternateRootBlock)
 			throws RuntimeException {
 
 		if (file == null)
 			throw new IllegalArgumentException();
 
 		if (!file.exists() || file.length() == 0)
-			throw new IllegalArgumentException("File must exist and have content for this constructor");
+			throw new IllegalArgumentException(
+					"File does not exist or is empty: "
+							+ file.getAbsolutePath());
 
 		if (readOnly && forceWrites != ForceEnum.No) {
 
@@ -820,10 +873,7 @@ public class FileMetadata {
 		this.writeCacheBufferCount = writeCacheBufferCount;
 
 		this.fileMode = (readOnly ? "r" : forceWrites.asFileMode());
-		
-	    this.checker = validateChecksum ? new ChecksumUtility() : null;
-
-		
+				
 		this.readOnly = readOnly;
 
 		this.exists = file.exists();
@@ -860,7 +910,9 @@ public class FileMetadata {
 				 * or root blocks.
 				 */
 
-				throw new RuntimeException("File too small to contain a valid journal: " + file.getAbsoluteFile());
+				throw new RuntimeException(
+						"File too small to contain a valid journal: "
+								+ file.getAbsoluteFile());
 
 			}
 
@@ -893,40 +945,50 @@ public class FileMetadata {
 			 * Check root blocks (magic, timestamps), choose root block, read
 			 * constants (slotSize, segmentId).
 			 */
+			{
+				
+				final ChecksumUtility checker = validateChecksum ? ChecksumUtility.threadChk
+						.get()
+						: null;
 
-			// final FileChannel channel = raf.getChannel();
-			final ByteBuffer tmp0 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
-			final ByteBuffer tmp1 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
-			FileChannelUtility.readAll(opener, tmp0, OFFSET_ROOT_BLOCK0);
-			FileChannelUtility.readAll(opener, tmp1, OFFSET_ROOT_BLOCK1);
-			tmp0.position(0); // resets the position.
-			tmp1.position(0);
-			try {
-				rootBlock0 = new RootBlockView(true, tmp0, validateChecksum ? checker : null);
-			} catch (RootBlockException ex) {
-				log.warn("Bad root block zero: " + ex);
+				// final FileChannel channel = raf.getChannel();
+				final ByteBuffer tmp0 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
+				final ByteBuffer tmp1 = ByteBuffer.allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
+				FileChannelUtility.readAll(opener, tmp0, OFFSET_ROOT_BLOCK0);
+				FileChannelUtility.readAll(opener, tmp1, OFFSET_ROOT_BLOCK1);
+				tmp0.position(0); // resets the position.
+				tmp1.position(0);
+				try {
+					rootBlock0 = new RootBlockView(true, tmp0, checker);
+				} catch (RootBlockException ex) {
+					log.warn("Bad root block zero: " + ex);
+				}
+				try {
+					rootBlock1 = new RootBlockView(false, tmp1, checker);
+				} catch (RootBlockException ex) {
+					log.warn("Bad root block one: " + ex);
+				}
+				if (rootBlock0 == null && rootBlock1 == null) {
+					throw new RuntimeException(
+							"Both root blocks are bad - journal is not usable: "
+									+ file);
+				}
+				if (alternateRootBlock)
+					log.warn("Using alternate root block");
+				/*
+				 * Choose the root block based on the commit counter.
+				 * 
+				 * Note: The commit counters MAY be equal. This will happen if
+				 * we rollback the journal and override the current root block
+				 * with the alternate root block.
+				 */
+				final long cc0 = rootBlock0.getCommitCounter();
+				final long cc1 = rootBlock1.getCommitCounter();
+				this.rootBlock = (cc0 > cc1 ? (alternateRootBlock ? rootBlock1
+						: rootBlock0) : (alternateRootBlock ? rootBlock0
+						: rootBlock1));
+
 			}
-			try {
-				rootBlock1 = new RootBlockView(false, tmp1, validateChecksum ? checker : null);
-			} catch (RootBlockException ex) {
-				log.warn("Bad root block one: " + ex);
-			}
-			if (rootBlock0 == null && rootBlock1 == null) {
-				throw new RuntimeException("Both root blocks are bad - journal is not usable: " + file);
-			}
-			if (alternateRootBlock)
-				log.warn("Using alternate root block");
-			/*
-			 * Choose the root block based on the commit counter.
-			 * 
-			 * Note: The commit counters MAY be equal. This will happen if we
-			 * rollback the journal and override the current root block with the
-			 * alternate root block.
-			 */
-			long cc0 = rootBlock0.getCommitCounter();
-			long cc1 = rootBlock1.getCommitCounter();
-			this.rootBlock = (cc0 > cc1 ? (alternateRootBlock ? rootBlock1 : rootBlock0)
-					: (alternateRootBlock ? rootBlock0 : rootBlock1));
 
 			this.bufferMode = BufferMode.getDefaultBufferMode(rootBlock.getStoreType());
 
@@ -1132,14 +1194,15 @@ public class FileMetadata {
 	 * 
 	 * @return Whether or not record level checksums are enabled.
 	 */
-	static private boolean useChecksums(IRootBlockView rootBlock) {
+	static private boolean useChecksums(final IRootBlockView rootBlock) {
 
 		return rootBlock.getVersion() >= RootBlockView.VERSION2
 				|| (rootBlock.getVersion() == 1 && rootBlock.getStoreType() == StoreTypeEnum.RW);
 
 	}
 
-	public void writeRootBlock(IRootBlockView rootBlock, ForceEnum forceOnCommit) throws IOException {
+	public void writeRootBlock(final IRootBlockView rootBlock,
+			final ForceEnum forceOnCommit) throws IOException {
 
 		if (rootBlock == null)
 			throw new IllegalArgumentException();
@@ -1148,7 +1211,7 @@ public class FileMetadata {
 
 		final long pos = rootBlock.isRootBlock0() ? OFFSET_ROOT_BLOCK0 : OFFSET_ROOT_BLOCK1;
 
-		FileChannel channel = raf.getChannel();
+		final FileChannel channel = raf.getChannel();
 
 		channel.write(data, pos);
 
@@ -1162,145 +1225,161 @@ public class FileMetadata {
 			log.debug("Writing ROOTBLOCK");
 
 	}
-	
-	/*
-	 * Refactoring of the FileMetadata creation to simplify Journal initialization, the principle
-	 * objective to support determination of Journal type from an existing file.
+
+	/**
+	 * Prepare a journal file for use by an {@link IBufferStrategy}. The file
+	 * will be created if necessary as permitted and instructed by the specified
+	 * {@link Options}. The root blocks will be created or read from the file
+	 * and verified. A variety of interesting properties are set on the returned
+	 * {@link FileMetadata} object.
 	 */
-	static public FileMetadata createInstance(Properties properties, boolean isScaleout, long quorumToken) {
-        final BufferMode bufferMode = BufferMode.valueOf(getProperty(properties,
-                Options.BUFFER_MODE, Options.DEFAULT_BUFFER_MODE));
+	static public FileMetadata createInstance(final Properties properties,
+			final boolean isScaleout, final long quorumToken) {
+
+		final BufferMode bufferMode = BufferMode.valueOf(getProperty(
+				properties, Options.BUFFER_MODE, Options.DEFAULT_BUFFER_MODE));
 		
         boolean create = Boolean.parseBoolean(Options.DEFAULT_CREATE);
+        
         boolean isEmptyFile = false;
 
-        final boolean createTempFile = Boolean.parseBoolean(getProperty(properties,
-                Options.CREATE_TEMP_FILE, Options.DEFAULT_CREATE_TEMP_FILE));
-        File tmpDir = null;
+		final boolean createTempFile = Boolean.parseBoolean(getProperty(
+				properties, Options.CREATE_TEMP_FILE,
+				Options.DEFAULT_CREATE_TEMP_FILE));
+
+		final File tmpDir = new File(getProperty(properties, Options.TMP_DIR,
+				System.getProperty("java.io.tmpdir")));
 
         if (createTempFile) {
 
-            create = false;
+			create = false;
 
-            isEmptyFile = true;
+			isEmptyFile = true;
 
-            {
+			if (!tmpDir.exists()) {
 
-                tmpDir = new File(getProperty(properties, Options.TMP_DIR, System
-                        .getProperty("java.io.tmpdir")));
+				if (!tmpDir.mkdirs()) {
 
-                if (!tmpDir.exists()) {
+					throw new RuntimeException("Could not create directory: "
+							+ tmpDir.getAbsolutePath());
 
-                    if (!tmpDir.mkdirs()) {
+				}
 
-                        throw new RuntimeException("Could not create directory: "
-                                + tmpDir.getAbsolutePath());
+			}
 
-                    }
+			if (!tmpDir.isDirectory()) {
 
-                }
+				throw new RuntimeException("Not a directory: "
+						+ tmpDir.getAbsolutePath());
 
-                if (!tmpDir.isDirectory()) {
+			}
 
-                    throw new RuntimeException("Not a directory: "
-                            + tmpDir.getAbsolutePath());
-
-                }
-                
-            }
-         }
+		}
         
-        String fname = getProperty(properties, Options.FILE, null);
+        // The backing file.
+        final File file;
+        {
 
-        if (createTempFile) {
+			// The name of the backing file iff explicitly specified.
+			String fname = getProperty(properties, Options.FILE, null);
 
-            if (fname != null) {
+			if (createTempFile) {
 
-                throw new RuntimeException("Can not use option '"
-                        + Options.CREATE_TEMP_FILE + "' with option '"
-                        + Options.FILE + "'");
+				if (fname != null) {
 
-            }
+					throw new RuntimeException("Can not use option '"
+							+ Options.CREATE_TEMP_FILE + "' with option '"
+							+ Options.FILE + "'");
 
-            try {
+				}
 
-                fname = File.createTempFile("bigdata-" + bufferMode + "-",
-                        Options.JNL, tmpDir).toString();
-                
-            } catch(IOException ex) {
-                
-                throw new RuntimeException(ex);
-                
-            }
-            
-        } else if (fname == null) {
-	
-	            throw new RuntimeException("Required property: '"
-	                    + Options.FILE + "'");
-	
+				try {
+
+					fname = File.createTempFile("bigdata-" + bufferMode + "-",
+							Options.JNL, tmpDir).toString();
+
+				} catch (IOException ex) {
+
+					throw new RuntimeException(ex);
+
+				}
+
+			} else if (fname == null) {
+
+				throw new RuntimeException("Required property: '"
+						+ Options.FILE + "'");
+
+			}
+
+			file = new File(fname);
+		
         }
 
-        final File file = new File(fname);
+		if (file.exists() && file.length() == 0) {
 
-        if (file.exists() && file.length() == 0) {
+			/*
+			 * The file exists but is empty. This is what happens if you use
+			 * File.createTempFile(...) to generate the name of the file to be
+			 * opened. As a special exception, the journal will be initialized
+			 * on the empty file.
+			 * 
+			 * Note: this will also be the case if a new file is opened but
+			 * never written to.
+			 */
 
-            /*
-             * The file exists but is empty. This is what happens if you use
-             * File.createTempFile(...) to generate the name of the file to
-             * be opened. As a special exception, the journal will be
-             * initialized on the empty file.
-             * 
-             * Note: this will also be the case if a new file is opened but
-             * never written to.
-             */
-            
-            isEmptyFile = true;
-            
-        } else {
-            
-            /*
-             * Make sure that the parent directory (if any) exists.
-             */
-            
-            final File parent = file.getParentFile();
-            
-            if(parent != null && !parent.exists()) {
-               
-                // create the parent directory.
-                
-                if (!parent.mkdirs()) {
-                    
-                    throw new RuntimeException(
-                            "Could not create parent directory: " + parent);
-                    
-                }
-                
+			isEmptyFile = true;
+
+		} else {
+
+			/*
+			 * Make sure that the parent directory (if any) exists.
+			 */
+
+			final File parent = file.getParentFile();
+
+			if (parent != null && !parent.exists()) {
+
+				// create the parent directory.
+
+				if (!parent.mkdirs()) {
+
+					throw new RuntimeException(
+							"Could not create parent directory: " + parent);
+
+				}
+
             }
             
         }
-        final boolean useDirectBuffers = Boolean.parseBoolean(getProperty(properties, Options.USE_DIRECT_BUFFERS,
-        				Options.DEFAULT_USE_DIRECT_BUFFERS));
-        final boolean readOnly = Boolean.parseBoolean(getProperty(properties, Options.READ_ONLY,
-                Options.DEFAULT_READ_ONLY));
-        final ForceEnum forceWrites = ForceEnum.parse(getProperty(properties, 
-                Options.FORCE_WRITES, Options.DEFAULT_FORCE_WRITES));
-
-        final boolean deleteOnExit = Boolean.parseBoolean(getProperty(properties, 
-                Options.DELETE_ON_EXIT, Options.DEFAULT_DELETE_ON_EXIT));
-
-        final boolean writeCacheEnabled = Boolean.parseBoolean(getProperty(properties, 
-                Options.WRITE_CACHE_ENABLED, Options.DEFAULT_WRITE_CACHE_ENABLED));
         
-        final int writeCacheBufferCount = Integer.parseInt(getProperty(properties, 
-                Options.WRITE_CACHE_BUFFER_COUNT,
-                Options.DEFAULT_WRITE_CACHE_BUFFER_COUNT));
+		final boolean useDirectBuffers = Boolean.parseBoolean(getProperty(
+				properties, Options.USE_DIRECT_BUFFERS,
+				Options.DEFAULT_USE_DIRECT_BUFFERS));
 
-        final boolean validateChecksum = Boolean.parseBoolean(getProperty(properties,
-                Options.VALIDATE_CHECKSUM, Options.DEFAULT_VALIDATE_CHECKSUM));
+		final boolean readOnly = Boolean.parseBoolean(getProperty(properties,
+				Options.READ_ONLY, Options.DEFAULT_READ_ONLY));
 
-        final boolean alternateRootBlock = Boolean
-                .parseBoolean(getProperty(properties, Options.ALTERNATE_ROOT_BLOCK,
-                        "false"));
+		final ForceEnum forceWrites = ForceEnum.parse(getProperty(properties,
+				Options.FORCE_WRITES, Options.DEFAULT_FORCE_WRITES));
+
+		final boolean deleteOnExit = Boolean.parseBoolean(getProperty(
+				properties, Options.DELETE_ON_EXIT,
+				Options.DEFAULT_DELETE_ON_EXIT));
+
+		final boolean writeCacheEnabled = Boolean.parseBoolean(getProperty(
+				properties, Options.WRITE_CACHE_ENABLED,
+				Options.DEFAULT_WRITE_CACHE_ENABLED));
+
+		final int writeCacheBufferCount = Integer.parseInt(getProperty(
+				properties, Options.WRITE_CACHE_BUFFER_COUNT,
+				Options.DEFAULT_WRITE_CACHE_BUFFER_COUNT));
+
+		final boolean validateChecksum = Boolean.parseBoolean(getProperty(
+				properties, Options.VALIDATE_CHECKSUM,
+				Options.DEFAULT_VALIDATE_CHECKSUM));
+
+		final boolean alternateRootBlock = Boolean.parseBoolean(getProperty(
+				properties, Options.ALTERNATE_ROOT_BLOCK, "false"));
 
         if (alternateRootBlock && !readOnly) {
 
@@ -1309,50 +1388,79 @@ public class FileMetadata {
 
         }
         
-        if (!isEmptyFile) {
-        	return new FileMetadata(file, useDirectBuffers, readOnly, forceWrites, writeCacheEnabled, writeCacheBufferCount,
-        			validateChecksum, alternateRootBlock);
-        } else {
-            long initialExtent = getProperty(properties, Options.INITIAL_EXTENT,
-                    Options.DEFAULT_INITIAL_EXTENT, new LongRangeValidator(
-                            Options.minimumInitialExtent, Long.MAX_VALUE));
+		if (file.exists() && !isEmptyFile) {
 
-            long maximumExtent = getProperty(properties, Options.MAXIMUM_EXTENT,
-                    Options.DEFAULT_MAXIMUM_EXTENT, new LongRangeValidator(
-                            initialExtent, Long.MAX_VALUE));
+			/*
+			 * Code path when the file exists and is non-empty.
+			 */
+			
+			return new FileMetadata(file, useDirectBuffers, readOnly,
+					forceWrites, writeCacheEnabled, writeCacheBufferCount,
+					validateChecksum, alternateRootBlock);
 
-            final long createTime = Long.parseLong(getProperty(properties, Options.CREATE_TIME,
-                    "" + System.currentTimeMillis()));
-            
-            final int offsetBits = getProperty(properties, 
-                    Options.OFFSET_BITS,
-                    Integer
-                            .toString((!isScaleout ? WormAddressManager.SCALE_UP_OFFSET_BITS
-                                    : WormAddressManager.SCALE_OUT_OFFSET_BITS)),
-                    new IntegerRangeValidator(
-                            WormAddressManager.MIN_OFFSET_BITS,
-                            WormAddressManager.MAX_OFFSET_BITS));
+		} else {
 
-            return new FileMetadata(file, bufferMode, useDirectBuffers, 
-        			initialExtent, maximumExtent, create, isEmptyFile, deleteOnExit,
-        			readOnly, forceWrites, offsetBits, writeCacheEnabled, writeCacheBufferCount,
-        			validateChecksum, createTime, quorumToken, alternateRootBlock);
-        }
+			/*
+			 * Code path with the file does not exist or exists but is empty.
+			 * 
+			 * Note: Among other things, this code path covers the create of an
+			 * AbstractJournal when the caller has supplied a filename obtained
+			 * from the temporary file creation mechanisms.
+			 */
+
+			final long initialExtent = getProperty(properties,
+					Options.INITIAL_EXTENT, Options.DEFAULT_INITIAL_EXTENT,
+					new LongRangeValidator(Options.minimumInitialExtent,
+							Long.MAX_VALUE));
+
+			final long maximumExtent = getProperty(properties,
+					Options.MAXIMUM_EXTENT, Options.DEFAULT_MAXIMUM_EXTENT,
+					new LongRangeValidator(initialExtent, Long.MAX_VALUE));
+
+			/*
+			 * Note: The caller SHOULD specify an explicit [createTime] when
+			 * its value is critical. The default assigned here does NOT
+			 * attempt to use a clock that is consistent with the commit
+			 * protocol or even a clock that assigns unique timestamps.
+			 */
+			final long createTime = Long.parseLong(getProperty(properties,
+					Options.CREATE_TIME, "" + System.currentTimeMillis()));
+
+			final int offsetBits = getProperty(
+					properties,
+					Options.OFFSET_BITS,
+					Integer
+							.toString((!isScaleout ? WormAddressManager.SCALE_UP_OFFSET_BITS
+									: WormAddressManager.SCALE_OUT_OFFSET_BITS)),
+					new IntegerRangeValidator(
+							WormAddressManager.MIN_OFFSET_BITS,
+							WormAddressManager.MAX_OFFSET_BITS));
+
+			return new FileMetadata(file, bufferMode, useDirectBuffers,
+					initialExtent, maximumExtent, create, isEmptyFile,
+					deleteOnExit, readOnly, forceWrites, offsetBits,
+					writeCacheEnabled, writeCacheBufferCount, validateChecksum,
+					createTime, quorumToken, alternateRootBlock);
+		
+		}
+
 	}
 
-    static protected String getProperty(final Properties properties,
-            final String name, final String defaultValue) {
+	static protected String getProperty(final Properties properties,
+			final String name, final String defaultValue) {
 
-        return Configuration.getProperty(null/* indexManager */, properties,
-                ""/* no namespace */, name, defaultValue);
+		return Configuration.getProperty(null/* indexManager */, properties,
+				""/* no namespace */, name, defaultValue);
 
-    }
+	}
 
-    static protected <E> E getProperty(final Properties properties, final String name, final String defaultValue,
-            IValidator<E> validator) {
+	static protected <E> E getProperty(final Properties properties,
+			final String name, final String defaultValue,
+			IValidator<E> validator) {
 
-        return Configuration.getProperty(null, properties,
-                ""/* no namespace */, name, defaultValue, validator);
+		return Configuration.getProperty(null, properties, ""/* no namespace */,
+				name, defaultValue, validator);
 
-    }
+	}
+
 }
