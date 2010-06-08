@@ -2037,6 +2037,16 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                 // invoke doTask() on AbstractTask with locks.
                 final T ret = delegate.doTask();
 
+                /*
+                 * FIXME If there is an error in the task execution, then for
+                 * RWStore we need to explicitly undo the allocations for the
+                 * B+Tree(s) on which this task wrote. If we do not take this
+                 * step, then the records already written onto the store up to
+                 * that point will never be released if the groupCommit
+                 * succeeds. This is essentially a persistent memory leak on the
+                 * store.
+                 */
+                
                 // checkpoint while holding locks.
                 delegate.checkpointNanoTime = delegate.checkpointTask();
 
