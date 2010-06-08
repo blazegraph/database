@@ -686,11 +686,6 @@ public class NanoSparqlServer extends AbstractHTTPD {
 			 */
 			break;
 		case DESCRIBE:
-			/*
-			 * FIXME handle DESCRIBE, translating into a reasonable execution
-			 * plan (Sesame translates this poorly).
-			 */
-			break;
 		case CONSTRUCT:
 			return new GraphQueryTask(queryStr, os);
 		case SELECT:
