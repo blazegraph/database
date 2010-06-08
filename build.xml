@@ -1792,6 +1792,7 @@ ${postInstallMessage}</echo>
 
       <junit printsummary="on" haltonfailure="no" fork="no" dir="${classes.dir}" timeout="60000">
         <formatter type="xml"/>
+        <formatter type="brief"/>
 
         <sysproperty key="java.security.policy" value="${java.security.policy}"/>
         <sysproperty key="java.net.preferIPv4Stack" value="{java.net.preferIPv4Stack}"/>
