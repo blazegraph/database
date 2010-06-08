@@ -122,7 +122,6 @@ public class BigdataSailGraphQuery extends SailGraphQuery
             }
             node = new MultiProjection(node, projElemLists);
             node = new Reduced(node);
-            System.err.println(node);
             parsedQuery.setTupleExpr(node);
         } catch (Exception ex) {
             throw new RuntimeException(ex);
