@@ -30,15 +30,15 @@ import java.rmi.Remote;
 import java.util.UUID;
 
 /**
- * An interface that effects various changes in the distributed quorum state
+ * An interface that causes various changes in the distributed quorum state
  * required to execute the intention of a {@link QuorumMember} service and its
- * cognizant {@link AbstractQuorum}.
+ * cognizant {@link AbstractQuorum}. 
  * 
  * @author thompsonbry@users.sourceforge.net
  * @see QuorumWatcher
  */
 public interface QuorumActor<S extends Remote, C extends QuorumClient<S>> {
-
+    
 	/**
 	 * The {@link Quorum}.
 	 */
@@ -46,8 +46,6 @@ public interface QuorumActor<S extends Remote, C extends QuorumClient<S>> {
 
 	/**
 	 * The service on whose behalf this class is acting.
-	 * 
-	 * @return
 	 */
 	public C getQuorumMember();
 
@@ -56,11 +54,63 @@ public interface QuorumActor<S extends Remote, C extends QuorumClient<S>> {
 	 */
 	public UUID getServiceId();
 
-	/**
-	 * Join the service method with the quorum (for example, by adding the
-	 * ephemeral znode for the service to the "joined" services znode for this
-	 * quorum).
-	 */
-	public void joinService(final long lastCommitTime);
+    /**
+     * Add the associated service to the set of quorum members.
+     */
+    void memberAdd();
+
+    /**
+     * Remove the associated service from the set of quorum members.
+     */
+    void memberRemove();
+    
+    /**
+     * Add the associated service to the write pipeline.
+     */
+    void pipelineAdd();
+
+    /**
+     * Remove the associated service from write pipeline.
+     */
+    void pipelineRemove();
+
+    /**
+     * Cast a vote on the behalf of the associated service. If the service has
+     * already voted for some other lastCommitTime, then that vote is withdrawn
+     * before the new vote is cast.
+     * 
+     * @param lastCommitTime
+     *            The lastCommitTime timestamp for which the service casts its
+     *            vote.
+     * 
+     * @throws IllegalArgumentException
+     *             if the lastCommitTime is negative.
+     */
+    void castVote(long lastCommitTime);
+
+    /**
+     * Withdraw the vote cast by the service (a service has only one vote).
+     */
+    void withdrawVote();
+
+    /**
+     * Add the associated service to the set of joined services for the quorum.
+     */
+    void serviceJoin();
+
+    /**
+     * Remove the associated service from the set of joined services for the
+     * quorum.
+     */
+    void serviceLeave();
+
+    /**
+     * First set the lastValidToken on the quorum equal to the given token and
+     * then set the current token to the given token. When the leader is
+     * elected, it should invoke this method to update the quorum token, passing
+     * in <code>newToken := lastValidToken+1</code>. This method may only be
+     * invoked by the leader.
+     */
+    void setToken(final long newToken);
 
 }

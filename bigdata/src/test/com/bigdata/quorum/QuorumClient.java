@@ -76,6 +76,6 @@ public interface QuorumClient<S extends Remote> extends QuorumListener {
      * @throws QuorumException
      *             if the quorum token is no longer valid.
      */
-    S getLeaderService(long token);
+    S getLeader(long token);
 
 }

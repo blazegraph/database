@@ -56,4 +56,14 @@ import java.rmi.Remote;
 */
 public interface QuorumWatcher<S extends Remote, C extends QuorumClient<S>> {
 
+//    /**
+//     * Start asynchronous processing.
+//     */
+//    public void start();
+//    
+//    /**
+//     * Terminate asynchronous processing.
+//     */
+//    public void terminate();
+    
 }

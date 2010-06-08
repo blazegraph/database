@@ -31,7 +31,7 @@ import junit.framework.TestCase2;
 
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
-import com.bigdata.quorum.MockQuorumFixture.MockQuorumFixtureClient;
+import com.bigdata.quorum.MockQuorumFixture.MockQuorum.MockQuorumActor;
 
 /**
  * Abstract base class for testing using a {@link MockQuorumFixture}.
@@ -58,6 +58,12 @@ abstract public class AbstractQuorumTestCase extends TestCase2 {
     /** The clients. */
     protected MockQuorumMember[] clients;
 
+    /**
+     * The per-client quorum actor objects. The unit tests send events on the
+     * behalf of the clients using these actor objects.
+     */
+    protected MockQuorumActor[] actors = new MockQuorumActor[k];
+
     /** The mock shared quorum state object. */
     protected MockQuorumFixture fixture;
     
@@ -72,20 +78,21 @@ abstract public class AbstractQuorumTestCase extends TestCase2 {
         quorums = new MockQuorum[k];
         
         clients = new MockQuorumMember[k];
-        
+
+        actors  = new MockQuorumActor[k];
+
         fixture = new MockQuorumFixture(k);
 
-        // run the fixture with a NOP client.
-        fixture.start(new MockQuorumFixtureClient(fixture));
+        fixture.start(); 
 
         /*
          * Setup the client quorums.
          */
         for (int i = 0; i < k; i++) {
-            quorums[i] = new MockQuorum(k);
+            quorums[i] = new MockQuorum(fixture);
             clients[i] = new MockQuorumMember(quorums[i]);
             quorums[i].start(clients[i]);
-            fixture.addQuorumToFixture(quorums[i]);
+            actors [i] = quorums[i].getActor();
         }
     
     }
@@ -104,6 +111,7 @@ abstract public class AbstractQuorumTestCase extends TestCase2 {
         }
         quorums = null;
         clients = null;
+        actors  = null;
         fixture = null;
     }
 

@@ -451,7 +451,7 @@ abstract public class AbstractHAService<S extends HAGlue, L extends AbstractJour
              * Run the operation on the leader using local method call in the
              * caller's thread to avoid deadlock.
              */
-            final RunnableFuture<Void> f = getLeaderService(token).abort2Phase(
+            final RunnableFuture<Void> f = getLeader(token).abort2Phase(
                     token);
             // Note: This runs synchronously (ignores timeout).
             f.run();
@@ -561,7 +561,7 @@ abstract public class AbstractHAService<S extends HAGlue, L extends AbstractJour
      *       invoked in a context where it is holding a lock on the local
      *       low-level store!
      */
-    public ByteBuffer readFromQuorum(final UUID storeId, final long addr)
+    public byte[] readFromQuorum(final UUID storeId, final long addr)
             throws InterruptedException, IOException {
 
         if (storeId == null)
@@ -593,7 +593,7 @@ abstract public class AbstractHAService<S extends HAGlue, L extends AbstractJour
          */
         try {
 
-            final RunnableFuture<ByteBuffer> rf = otherService.readFromDisk(
+            final RunnableFuture<byte[]> rf = otherService.readFromDisk(
                     storeId, addr);
 
             rf.run();

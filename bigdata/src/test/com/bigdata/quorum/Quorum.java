@@ -1,6 +1,8 @@
 package com.bigdata.quorum;
 
 import java.rmi.Remote;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import com.bigdata.journal.ha.AsynchronousQuorumCloseException;
@@ -148,6 +150,34 @@ public interface Quorum<S extends Remote, C extends QuorumClient<S>> {
     boolean isQuorumMet();
 
     /**
+     * Add a listener
+     * 
+     * @param listener
+     *            The listener.
+     * 
+     * @throws IllegalArgumentException
+     *             if the listener is null.
+     * @throws IllegalArgumentException
+     *             if the listener is the quorum's client (the quorum's client
+     *             is always a listener).
+     */
+    void addListener(QuorumListener listener);
+
+    /**
+     * Remove a listener (the quorum's client is always a listener).
+     * 
+     * @param listener
+     *            The listener.
+     * 
+     * @throws IllegalArgumentException
+     *             if the listener is null.
+     * @throws IllegalArgumentException
+     *             if the listener is the quorum's client (the quorum's client
+     *             is always a listener).
+     */
+    void removeListener(QuorumListener listener);
+    
+    /**
      * Return the identifiers for the member services (all known physical
      * services for the logical service).
      * 
@@ -155,6 +185,11 @@ public interface Quorum<S extends Remote, C extends QuorumClient<S>> {
      */
     UUID[] getMembers();
 
+    /**
+     * Return an immutable snapshot of the votes cast by the quorum members.
+     */
+    Map<Long,Set<UUID>> getVotes();
+    
     /**
      * Return the identifiers for the member services joined with this quorum.
      * If the quorum was met at the moment the request was processed, then the

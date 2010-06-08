@@ -87,8 +87,8 @@ public interface HAService<S extends HAGlue> extends QuorumMember<S> {
      * 
      * @see HAGlue#readFromDisk(UUID, long)
      */
-    ByteBuffer readFromQuorum(UUID storeId, long addr)
-            throws InterruptedException, IOException;
+    byte[] readFromQuorum(UUID storeId, long addr) throws InterruptedException,
+            IOException;
 
     /*
      * quorum commit.

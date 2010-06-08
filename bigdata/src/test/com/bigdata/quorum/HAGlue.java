@@ -2,7 +2,6 @@ package com.bigdata.quorum;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
 import java.rmi.Remote;
 import java.util.UUID;
 import java.util.concurrent.Future;
@@ -66,9 +65,9 @@ public interface HAGlue extends Remote {
      * 
      * @see HAService#readFromQuorum(UUID, long)
      */
-    public RunnableFuture<ByteBuffer> readFromDisk(UUID storeId, long addr)
+    public RunnableFuture<byte[]> readFromDisk(UUID storeId, long addr)
             throws IOException;
-    
+
     /*
      * quorum commit protocol.
      */
@@ -142,6 +141,15 @@ public interface HAGlue extends Remote {
      * quorum by replicating the root blocks of the quorum leader.
      * 
      * @return The current root block.
+     * 
+     * @todo For the data service, we need a means to access the root blocks for
+     *       the historical journals as well as the current live journal. The
+     *       store UUID could be passed along for that purpose. When null, it
+     *       could always be the root block of the current store in order to
+     *       avoid a bootstrapping problem where we do not know the UUID of the
+     *       current store and the currently store could have changed (via
+     *       synchronous overflow) by the time we receive the response to that
+     *       request.
      */
     IRootBlockView getRootBlock() throws IOException;
 

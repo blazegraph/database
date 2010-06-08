@@ -66,9 +66,6 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("quorum");
 
-        // Simple unit tests of a singleton quorum.
-        suite.addTestSuite(TestMockQuorum.class);
-
         /*
          * Test the fixture used to test the quorums (the fixture builds on the
          * same base class).

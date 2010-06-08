@@ -54,7 +54,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
 
     }
 
-    public S getLeaderService(final long token) {
+    public S getLeader(final long token) {
         final Quorum<?,?> q = getQuorum();
         q.assertQuorum(token);
         final UUID leaderId = q.getLeaderId();
@@ -102,7 +102,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
     }
 
     public boolean isLeader(final long token) {
-        if (getServiceId().equals(getQuorum().getLeaderId())) {
+        if (!getServiceId().equals(getQuorum().getLeaderId())) {
             // Not the leader.
             return false;
         }

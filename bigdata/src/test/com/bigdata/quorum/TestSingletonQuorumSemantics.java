@@ -29,17 +29,16 @@ package com.bigdata.quorum;
 
 import java.util.UUID;
 
-import com.bigdata.journal.ha.QuorumException;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
 
 /**
- * FIXME Test the quorum semantics for a singleton quorum. This test suite
- * allows us to verify that each quorum state change is translated into the
- * appropriate methods against the public API of the quorum client or quorum
- * member.
+ * Test the quorum semantics for a singleton quorum. This test suite allows us
+ * to verify that each quorum state change is translated into the appropriate
+ * methods against the public API of the quorum client or quorum member.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TestSingletonQuorumSemantics.java 2984 2010-06-06 22:10:32Z
+ *          thompsonbry $
  */
 public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
 
@@ -63,78 +62,73 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
     }
 
     /**
-     * Unit test verifies that the {@link QuorumMember} receives synchronous
-     * state change messages when it is added to and removed from a
-     * {@link Quorum}.
+     * Unit test for quorum member add/remove.
      */
     public void test_memberAddRemove() {
         
-        assertFalse(clients[0].isMember());
+        final Quorum<?, ?> quorum = quorums[0];
+        final QuorumMember<?> client = clients[0];
+        final QuorumActor<?,?> actor = actors[0];
+        final UUID serviceId = client.getServiceId();
         
-        fixture.memberAdd(clients[0].getServiceId());
+        // client is not a member.
+        assertFalse(client.isMember());
+        assertEquals(new UUID[] {}, quorum.getMembers());
         
-        assertTrue(clients[0].isMember());
+        // instruct actor to add client as a member.
+        actor.memberAdd();
         
-        fixture.memberRemove(clients[0].getServiceId());
-        
-        assertFalse(clients[0].isMember());
+        // client is a member.
+        assertTrue(client.isMember());
+        assertEquals(new UUID[] {serviceId}, quorum.getMembers());
 
+        // instruct actor to remove client as a member.
+        actor.memberRemove();
+        
+        // client is not a member.
+        assertFalse(client.isMember());
+        assertEquals(new UUID[] {}, quorum.getMembers());
+        
     }
 
 	/**
-	 * Unit test verifies that the {@link QuorumMember} receives synchronous
-	 * state change messages when it is added to and removed from a
-	 * {@link Quorum}'s write pipeline.
-	 * 
-	 * @todo Tnis test also verifies that we need to be a member of the quorum
-	 *       in order to be added to the write pipeline. If that changes, then
-	 *       update this unit test.
-	 * 
-	 *       FIXME This should verify the pipeline change events (synchronous
-	 *       messages informing the client of a change in its downstream service
-	 *       in the write pipeline)!
+	 * Unit test for write pipeline add/remove.
 	 */
     public void test_pipelineAddRemove() {
 
-		final MockQuorumMember<?> client = clients[0];
+        final Quorum<?, ?> quorum = quorums[0];
+        final MockQuorumMember<?> client = clients[0];
+        final QuorumActor<?,?> actor = actors[0];
+        final UUID serviceId = client.getServiceId();
 
-//		final UUID serviceId = client.getServiceId();
-
-		assertNull(client.downStreamId);
+        assertFalse(client.isMember());
+        assertNull(client.downStreamId);
         assertFalse(client.isPipelineMember());
+        assertEquals(new UUID[]{},quorum.getPipeline());
 
-        try {
-            fixture.pipelineAdd(client.getServiceId());
-            fail("Expected " + QuorumException.class);
-        } catch (QuorumException ex) {
-            if (log.isInfoEnabled())
-                log.info("Ignoring expected exception: " + ex);
-        }
-
-        fixture.memberAdd(client.getServiceId());
+        actor.memberAdd();
 
 		/*
 		 * add to the pipeline. since this is a singleton quorum, the downstream
-		 * service will remainin null.
+		 * service will remain null.
 		 */
 		assertNull(client.downStreamId);
-        fixture.pipelineAdd(client.getServiceId());
+        actor.pipelineAdd();
 		assertNull(client.downStreamId);
-
         assertTrue(client.isPipelineMember());
+        assertEquals(new UUID[]{serviceId},quorum.getPipeline());
 
 		/*
 		 * remove from the pipeline. since this is a singleton quorum, the
-		 * downstream service will remainin null.
+		 * downstream service will remain null.
 		 */
 		assertNull(client.downStreamId);
-        fixture.pipelineRemove(client.getServiceId());
+        actor.pipelineRemove();
 		assertNull(client.downStreamId);
-        
         assertFalse(client.isPipelineMember());
+        assertEquals(new UUID[]{},quorum.getPipeline());
 
-        fixture.memberRemove(client.getServiceId());
-
+        actor.memberRemove();
         assertFalse(client.isMember());
 
     }
@@ -144,104 +138,132 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
 	 */
 	public void test_voting() {
 
-    	final long lastCommitTime1 = 0L;
+        final Quorum<?, ?> quorum = quorums[0];
+        final MockQuorumMember<?> client = clients[0];
+        final QuorumActor<?,?> actor = actors[0];
+        final UUID serviceId = client.getServiceId();
+
+        final long lastCommitTime1 = 0L;
 
 		final long lastCommitTime2 = 2L;
 
 		// Verify that no consensus has been achieved yet.
 		assertEquals(-1L, clients[0].lastConsensusValue);
 
-		// service may not vote until it is added as a member.
-		try {
-			fixture.castVote(clients[0].getServiceId(), lastCommitTime1);
-			fail("Expected " + QuorumException.class);
-		} catch (QuorumException ex) {
-			if (log.isInfoEnabled())
-				log.info("Ignoring expected exception: " + ex);
-		}
-
-        fixture.memberAdd(clients[0].getServiceId());
-        
+		// add as member service.
+        actor.memberAdd();
         assertTrue(clients[0].isMember());
 
+        // join the pipeline.
+        actor.pipelineAdd();
+        
         // Verify that timestamps must be non-negative.
 		try {
-			fixture.castVote(clients[0].getServiceId(), -1L);
+			actor.castVote(-1L);
 			fail("Expected " + IllegalArgumentException.class);
 		} catch (IllegalArgumentException ex) {
 			if (log.isInfoEnabled())
 				log.info("Ignoring expected exception: " + ex);
 		}
 
+		// Should not be any votes.
+        assertEquals(0,quorum.getVotes().size());
+        
 		// Cast a vote.
-		fixture.castVote(clients[0].getServiceId(), lastCommitTime1);
+		actor.castVote(lastCommitTime1);
+		
+		// Should be just one vote.
+		assertEquals(1,quorum.getVotes().size());
 
 		// Verify the consensus was updated
-		assertEquals(lastCommitTime1, clients[0].lastConsensusValue);
+		assertEquals(lastCommitTime1, client.lastConsensusValue);
 
 		// Cast another vote.
-		fixture.castVote(clients[0].getServiceId(), lastCommitTime2);
+		actor.castVote(lastCommitTime2);
+
+        // Should be just one vote since a service can only vote for one
+        // lastCommitTime at a time.
+        assertEquals(1,quorum.getVotes().size());
 
 		// Verify the consensus was updated again.
-		assertEquals(lastCommitTime2, clients[0].lastConsensusValue);
+		assertEquals(lastCommitTime2, client.lastConsensusValue);
 
-        fixture.memberRemove(clients[0].getServiceId());
-        
+		// Remove as a member.
+        actor.memberRemove();
         assertFalse(clients[0].isMember());
+        // The service vote was also removed.
+        assertEquals(0,quorum.getVotes().size());
         
     }
 
-	/**
-	 * Unit test for the protocol up to a service join, which triggers a leader
-	 * election. Since the singleton quorum has only one member our client will
-	 * be elected the leader.
-	 * 
-	 * @todo Work through when the service joins the pipeline. Normally, this is
-	 *       when the service joins the quorum, right? Or if the quorum is
-	 *       already met, then the service joins the pipeline as part of the
-	 *       synchronization protocol before it can join the quorum.
-	 */
-	public void test_serviceJoin() {
+    /**
+     * Unit test for the protocol up to a service join, which triggers a leader
+     * election. Since the singleton quorum has only one member our client will
+     * be elected the leader.
+     */
+    public void test_serviceJoin() {
 
-		final MockQuorumMember<?> client = clients[0];
-		final UUID serviceId = client.getServiceId();
-		
-		final long lastCommitTime = 0L;
-		
-		// declare the service as a quorum member.
-		fixture.memberAdd(serviceId);
-		
-		// cast a vote for a lastCommitTime.
-		fixture.castVote(serviceId, lastCommitTime);
+        final Quorum<?, ?> quorum = quorums[0];
+        final MockQuorumMember<?> client = clients[0];
+        final QuorumActor<?,?> actor = actors[0];
+        final UUID serviceId = client.getServiceId();
 
-		// verify the consensus was updated again.
-		assertEquals(lastCommitTime, client.lastConsensusValue);
+        final long lastCommitTime = 0L;
 
-		// validate the token is not yet assigned.
-		assertFalse(fixture.isQuorumMet());
-		assertEquals(Quorum.NO_QUORUM,fixture.token());
-		assertFalse(client.isJoinedMember(fixture.token()));
-		
-		// join the pipeline.
-		fixture.pipelineAdd(serviceId);
-		
-		// join the quorum.
-		fixture.serviceJoin(serviceId);
+        // declare the service as a quorum member.
+        actor.memberAdd();
 
-		/*
-		 * FIXME use the QuorumActor pattern to have updateToken() when it is
-		 * invoked on the client propagate that change through the fixture,
-		 * which corresponds to the distributed quorum state. Verify that this
-		 * is fixed by verifying the fixture state agrees with the client's
-		 * quorum state.
-		 */
-		// validate the token was assigned by the leader.
-		assertTrue(client.getQuorum().isQuorumMet());
-		assertEquals(Quorum.NO_QUORUM + 1, client.getQuorum().token());
-		assertTrue(client.isJoinedMember(client.getQuorum().token()));
-		assertTrue(client.isLeader(client.getQuorum().token()));
-		assertFalse(client.isFollower(client.getQuorum().token()));
+        // join the pipeline.
+        actor.pipelineAdd();
 
-	}
+        // cast a vote for a lastCommitTime.
+        actor.castVote(lastCommitTime);
+
+        // verify the consensus was updated again.
+        assertEquals(lastCommitTime, client.lastConsensusValue);
+
+        // validate the token is not yet assigned.
+        assertFalse(quorum.isQuorumMet());
+        assertEquals(Quorum.NO_QUORUM, quorum.token());
+        assertFalse(client.isJoinedMember(quorum.token()));
+
+        // verify no joined services.
+        assertEquals(new UUID[]{},quorum.getJoinedMembers());
+        
+        /*
+         * Do service join, quorum should meet. 
+         */
+
+        // join the quorum.
+        actor.serviceJoin();
+
+        // verify the joined services. 
+        assertEquals(new UUID[] { serviceId }, quorum.getJoinedMembers());
+
+        // validate the token was assigned by the leader.
+        final long token1 = quorum.token();
+        assertTrue(quorum.isQuorumMet());
+        assertEquals(Quorum.NO_QUORUM + 1, token1);
+        assertEquals(Quorum.NO_QUORUM + 1, quorum.lastValidToken());
+        assertTrue(client.isJoinedMember(token1));
+        assertTrue(client.isLeader(token1));
+        assertFalse(client.isFollower(token1));
+
+        /*
+         * Do service leave, quorum should break. 
+         */
+        
+        // service leave.
+        actor.serviceLeave();
+
+        // verify no joined services.
+        assertEquals(new UUID[]{},quorum.getJoinedMembers());
+
+        // verify the quorum broken.
+        assertFalse(quorum.isQuorumMet());
+        assertEquals(Quorum.NO_QUORUM, quorum.token());
+        assertEquals(token1, quorum.lastValidToken());
+        
+    }
 
 }
