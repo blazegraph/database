@@ -702,9 +702,8 @@ public class FileMetadata {
 				 */
 				{
 
-					final ChecksumUtility checker = validateChecksum ? ChecksumUtility.threadChk
-							.get()
-							: null;
+                    final ChecksumUtility checker = ChecksumUtility.threadChk
+                            .get();
 
 					// use the caller's value for offsetBits.
 					this.offsetBits = offsetBits;
