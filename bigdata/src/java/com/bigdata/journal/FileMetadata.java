@@ -34,6 +34,7 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.Banner;
 import com.bigdata.config.Configuration;
 import com.bigdata.config.IValidator;
 import com.bigdata.config.IntegerRangeValidator;
@@ -1236,6 +1237,8 @@ public class FileMetadata {
 	static public FileMetadata createInstance(final Properties properties,
 			final boolean isScaleout, final long quorumToken) {
 
+		Banner.banner();
+		
 		final BufferMode bufferMode = BufferMode.valueOf(getProperty(
 				properties, Options.BUFFER_MODE, Options.DEFAULT_BUFFER_MODE));
 		
