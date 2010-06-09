@@ -94,13 +94,22 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
         for(UUID t : a) {
             if(serviceId.equals(t)) {
                 // verify the token is still valid.
-                assertQuorum(token);
-                return true;
+                return getQuorum().token() == token;
             }
         }
         return false;
     }
 
+    /**
+     * @todo This method is a bit odd as it is open to two different semantics
+     *       based on whether or not it will return false or throw a
+     *       {@link QuorumException} if the condition is not true. What makes it
+     *       odd is having the token passed in, but without the token we can not
+     *       know that the test is valid as of the same met quorum.
+     *       <p>
+     *       Right now this is only used by unit tests. Maybe the method should
+     *       go away?
+     */
     public boolean isLeader(final long token) {
         if (!getServiceId().equals(getQuorum().getLeaderId())) {
             // Not the leader.
@@ -112,6 +121,16 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
         return true;
     }
 
+    /**
+     * @todo This method is a bit odd as it is open to two different semantics
+     *       based on whether or not it will return false or throw a
+     *       {@link QuorumException} if the condition is not true. What makes it
+     *       odd is having the token passed in, but without the token we can not
+     *       know that the test is valid as of the same met quorum.
+     *       <p>
+     *       Right now this is only used by unit tests. Maybe the method should
+     *       go away?
+     */
     public boolean isFollower(final long token) {
         final UUID serviceId = getServiceId();
         final UUID[] joined = getQuorum().getJoinedMembers();
@@ -131,6 +150,16 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
         return false;
     }
 
+    /**
+     * @todo This method is a bit odd as it is open to two different semantics
+     *       based on whether or not it will return false or throw a
+     *       {@link QuorumException} if the condition is not true. What makes it
+     *       odd is having the token passed in, but without the token we can not
+     *       know that the test is valid as of the same met quorum.
+     *       <p>
+     *       Right now this is only used by unit tests. Maybe the method should
+     *       go away?
+     */
     public boolean isLastInChain(final long token) {
         final UUID serviceId = getServiceId();
         final UUID[] pipeline = getQuorum().getPipeline();
@@ -166,13 +195,30 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
     }
 
     protected void assertLeader(final long token) {
-        if (!isLeader(token))
+        if (!getServiceId().equals(getQuorum().getLeaderId())) {
+            // Not the leader.
             throw new QuorumException();
+        }
+        // We are the leader, now verify quorum is still valid.
+        getQuorum().assertQuorum(token);
     }
 
     protected void assertFollower(final long token) {
-        if (!isFollower(token))
-            throw new QuorumException();
+        final UUID serviceId = getServiceId();
+        final UUID[] joined = getQuorum().getJoinedMembers();
+        for (int i = 0; i < joined.length; i++) {
+            final boolean eq = serviceId.equals(joined[i]);
+            if (!eq)
+                continue;
+            if (i == 0) {
+                // We are the leader (not a follower).
+                throw new QuorumException();
+            }
+            // We are a follower.  Now verify quorum is still valid.
+            getQuorum().assertQuorum(token);
+        }
+        // We are not a joined service.
+        throw new QuorumException();
     }
 
     /**
@@ -190,9 +236,9 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
      * 
      * The default implementation logs the message but does not handle it.
      */
-    public void electedLeader(final long token) {
+    public void electedLeader(final long token, final UUID leaderId) {
         if (log.isDebugEnabled())
-            log.debug("token=" + token);
+            log.debug("token=" + token + ", leaderId=" + leaderId);
     }
 
     /**
@@ -257,18 +303,15 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
 					+ newDownStreamId);
 	}
 
-	/**
-	 * {@inheritDoc}
-	 * 
-	 * Note: The service will be joined to the quorum automatically by
-	 * {@link AbstractQuorum#consensus()} and {@link #serviceJoin()} will be
-	 * invoked when the distributed quorum state has been updated to reflect
-	 * that service join.
-	 */
 	public void consensus(final long lastCommitTime) {
 		if (log.isDebugEnabled())
 			log.debug("lastCommitTime=" + lastCommitTime);
 	}
+    
+    public void lostConsensus() {
+        if (log.isDebugEnabled())
+            log.debug("");
+    }
     
     /**
      * {@inheritDoc}

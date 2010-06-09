@@ -77,7 +77,13 @@ public interface QuorumActor<S extends Remote, C extends QuorumClient<S>> {
     /**
      * Cast a vote on the behalf of the associated service. If the service has
      * already voted for some other lastCommitTime, then that vote is withdrawn
-     * before the new vote is cast.
+     * before the new vote is cast. Services do not withdraw their cast votes
+     * until a quorum breaks and a new consensus needs to be established. When a
+     * service needs to synchronize, it will have initially votes its current
+     * lastCommitTime. Once the service is receiving writes from the write
+     * pipeline and has synchronized any historical delta, it will update its
+     * vote and join the quorum at the next commit point (or immediately if
+     * there are no outstanding writes against the quorum).
      * 
      * @param lastCommitTime
      *            The lastCommitTime timestamp for which the service casts its

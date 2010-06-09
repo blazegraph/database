@@ -78,6 +78,9 @@ public interface QuorumMember<S extends Remote> extends QuorumClient<S> {
 
     /**
      * Return <code>true</code> if the service is joined with the quorum.
+     * <p>
+     * Note: This method DOES NOT throw an exception if the quorum is not met,
+     * but it will not return <code>true</code> unless the quorum is met.
      * 
      * @param token
      *            The quorum token for which the request was made.
@@ -159,15 +162,19 @@ public interface QuorumMember<S extends Remote> extends QuorumClient<S> {
      *            iff this service <em>is</em> the last service in the pipeline.
      */
     void pipelineChange(UUID oldDownStreamId,UUID newDownStreamId);
-    
+
     /**
-     * Invoked when <em>this</em> quorum member is elected as the quorum leader.
-     * This event only occurs when the quorum meets.
+     * Invoked when a quorum member is elected as the quorum leader. All quorum
+     * members will see this event.
      * 
      * @param token
      *            The newly assigned quorum token.
+     * @param leaderId
+     *            The {@link UUID} of the service which was elected to be the
+     *            quorum leader. This information is only valid for the scope of
+     *            the accompanying quorum token.
      */
-    void electedLeader(long token);
+    void electedLeader(long token,UUID leaderId);
 
     /**
      * Invoked when <em>this</em> quorum member is elected as a quorum follower.
@@ -176,9 +183,6 @@ public interface QuorumMember<S extends Remote> extends QuorumClient<S> {
      * 
      * @param token
      *            The newly assigned quorum token.
-     * 
-     *            FIXME Verify that we get this event both on meet and on join
-     *            after meet.
      */
     void electedFollower(long token);
 
@@ -192,14 +196,35 @@ public interface QuorumMember<S extends Remote> extends QuorumClient<S> {
      */
     void memberRemove();
 
-	/**
-	 * Invoked when a consensus has been achieved among <code>(k+1)/2</code>
-	 * services concerning a shared lastCommitTime.
-	 * 
-	 * @param lastCommitTime
-	 *            The last commit time around which a consensus was established.
-	 */
+    /**
+     * Invoked when a consensus has been achieved among <code>(k+1)/2</code>
+     * services concerning a shared lastCommitTime (really, this is not a
+     * consensus but a simple majority). This message is sent to each member
+     * service regardless of whether or not they participated in the consensus.
+     * <p>
+     * Once a consensus has been reached, each {@link QuorumMember} which agrees
+     * on that <i>lastCommitTime</i> MUST do a {@link #serviceJoin()} before the
+     * quorum will meet. The first quorum member to do a service join will be
+     * elected the leader. The remaining services to do a service join will be
+     * elected followers.
+     * 
+     * @param lastCommitTime
+     *            The last commit time around which a consensus was established.
+     *
+     * @see #serviceJoin()
+     * @see #electedLeader(long)
+     * @see #electedFollower(long)
+     * @see #lostConsensus()
+     */
     void consensus(final long lastCommitTime);
+
+    /**
+     * Invoked when the consensus is lost. Services do not withdraw their cast
+     * votes until a quorum breaks and a new consensus needs to be established.
+     * 
+     * @see #consensus(long)
+     */
+    void lostConsensus();
     
     /**
      * Invoked when this service joins the quorum.
