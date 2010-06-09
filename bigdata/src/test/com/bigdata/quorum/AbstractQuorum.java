@@ -2,7 +2,6 @@ package com.bigdata.quorum;
 
 import java.rmi.Remote;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -164,19 +163,19 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
 //     */
 //    private final Condition quorumBreak = lock.newCondition();
 
-    /**
-     * Condition signaled when the ordered set of services comprising the write
-     * pipeline is changed. Services must notice this event, locate themselves
-     * within the pipeline, and inspect their downstream service in the pipeline
-     * (if any). If the downstream, service has changed, then the service must
-     * reconfigure itself appropriately to relay writes to the downstream
-     * service (if any).
-     * <p>
-     * The condition variable in this case depends on the interpreter. For a
-     * service in the write pipeline, the condition variable is its downstream
-     * service. If that has changed, then the condition is satisfied.
-     */
-    private final Condition pipelineChange = lock.newCondition();
+//    /**
+//     * Condition signaled when the ordered set of services comprising the write
+//     * pipeline is changed. Services must notice this event, locate themselves
+//     * within the pipeline, and inspect their downstream service in the pipeline
+//     * (if any). If the downstream, service has changed, then the service must
+//     * reconfigure itself appropriately to relay writes to the downstream
+//     * service (if any).
+//     * <p>
+//     * The condition variable in this case depends on the interpreter. For a
+//     * service in the write pipeline, the condition variable is its downstream
+//     * service. If that has changed, then the condition is satisfied.
+//     */
+//    private final Condition pipelineChange = lock.newCondition();
 
     /**
      * The last valid token assigned to this quorum. This is updated by the
@@ -192,28 +191,32 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
      *       service or can there by physical services which are not quorum
      *       members, e.g., because they have been replaced by a hot spare?
      */
-    private final Set<UUID> members;
+    private final LinkedHashSet<UUID> members;
 
     /**
      * Each service votes for its lastCommitTime when it starts and after the
      * quorum breaks.
      */
-    private final TreeMap<Long/*lastCommitTime*/,Set<UUID>> votes;
+    private final TreeMap<Long/*lastCommitTime*/,LinkedHashSet<UUID>> votes;
     
     /**
-     * The services joined with the quorum in the order in which they join.
+     * The services joined with the quorum in the order in which they join. This
+     * MUST be a {@link LinkedHashSet} to preserve the join order.
      */
     private final LinkedHashSet<UUID> joined;
 
     /**
-     * The ordered set of services in the write pipeline. The first service in
-     * this order MUST be the leader. The remaining services appear in the order
-     * in which they enter the write pipeline. When a service leaves the write
-     * pipeline, the upstream service consults the pipeline state to identify
-     * its new downstream service (if any) and then queries that service for its
-     * {@link PipelineState} so it may begin to transmit write cache blocks to
-     * the downstream service. When a service joins the write pipeline, it
-     * always joins as the last service in this ordered set.
+     * The ordered set of services in the write pipeline. The
+     * {@link LinkedHashSet} is responsible for preserving the pipeline order.
+     * <p>
+     * The first service in this order MUST be the leader. The remaining
+     * services appear in the order in which they enter the write pipeline. When
+     * a service leaves the write pipeline, the upstream service consults the
+     * pipeline state to identify its new downstream service (if any) and then
+     * queries that service for its {@link PipelineState} so it may begin to
+     * transmit write cache blocks to the downstream service. When a service
+     * joins the write pipeline, it always joins as the last service in this
+     * ordered set.
      */
     private final LinkedHashSet<UUID> pipeline;
 
@@ -273,9 +276,19 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
         
         this.token = this.lastValidToken = NO_QUORUM;
 
-        members = new HashSet<UUID>(k);
+        /*
+         * Note: A linked hash set is used to make it easier on the unit tests
+         * since the order in which the services are added to the quorum will be
+         * maintained by the linked hash set. Otherwise we need to compare
+         * sorted arrays.
+         */
+        members = new LinkedHashSet<UUID>(k);
 
-        votes = new TreeMap<Long,Set<UUID>>();
+        /*
+         * Note: The TreeMap maintains data in order by ascending timestamp
+         * which makes it easier to interpret.
+         */
+        votes = new TreeMap<Long,LinkedHashSet<UUID>>();
 
         joined = new LinkedHashSet<UUID>(k);
 
@@ -561,10 +574,10 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
              * faster than a TreeMap.
              */
             final Map<Long, Set<UUID>> tmp = new LinkedHashMap<Long, Set<UUID>>();
-            final Iterator<Map.Entry<Long, Set<UUID>>> itr = votes.entrySet()
+            final Iterator<Map.Entry<Long, LinkedHashSet<UUID>>> itr = votes.entrySet()
                     .iterator();
             while (itr.hasNext()) {
-                final Map.Entry<Long, Set<UUID>> entry = itr.next();
+                final Map.Entry<Long, LinkedHashSet<UUID>> entry = itr.next();
                 tmp.put(entry.getKey(), entry.getValue());
             }
             return tmp;
@@ -623,6 +636,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                     final UUID nextId = itr.hasNext() ? itr.next() : null;
                     return new UUID[] { priorId, nextId };
                 }
+                priorId = current;
             }
             // The caller's service was not in the pipeline.
             return null;
@@ -637,6 +651,10 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             if(!isQuorumMet()) {
                 return null;
             }
+            /*
+             * FIXME Track the leader explicitly? Add a method to report the
+             * followers? The followers are peers - they have no inherent order.
+             */
             // Should always exist if the quorum is met.
             return joined.iterator().next();
         } finally {
@@ -806,7 +824,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                 // Notice the last service in the pipeline _before_ we add this one.
                 final UUID lastId = getLastInPipeline();
     			if (pipeline.add(serviceId)) {
-    				pipelineChange.signalAll();
+//    				pipelineChange.signalAll();
     				if (log.isDebugEnabled()) {
     					// The serviceId will be at the end of the pipeline.
     					final UUID[] a = getPipeline();
@@ -859,8 +877,15 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                 throw new IllegalArgumentException();
             lock.lock();
             try {
+                /*
+                 * Look for the service before/after the one being removed
+                 * from the pipeline. If the service *before* the one being
+                 * removed is our client, then we will notify it that its
+                 * downstream service has changed.
+                 */
+                final UUID[] priorNext = getPipelinePriorAndNext(serviceId);
                 if (pipeline.remove(serviceId)) {
-                    pipelineChange.signalAll();
+//                    pipelineChange.signalAll();
                     final QuorumMember<S> client = getClientAsMember();
                     if (client != null) {
                         final UUID clientId = client.getServiceId();
@@ -873,14 +898,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                              */
                             client.pipelineRemove();
                         }
-                        /*
-                         * Look for the service before/after the one being removed
-                         * from the pipeline. If the service *before* the one being
-                         * removed is our client, then we will notify it that its
-                         * downstream service has changed.
-                         */
-                        final UUID[] priorNext = getPipelinePriorAndNext(serviceId);
-                        if (priorNext != null && priorNext[0].equals(clientId)) {
+                        if (priorNext != null && clientId.equals(priorNext[0])) {
                             /*
                              * Notify the client that its downstream service was
                              * removed from the write pipeline. The client needs to
@@ -936,7 +954,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                 // Withdraw any existing vote for that service.
                 withdrawVote(serviceId);
                 // Look for a set of votes for that lastCommitTime.
-    			Set<UUID> tmp = votes.get(lastCommitTime);
+    			LinkedHashSet<UUID> tmp = votes.get(lastCommitTime);
                 if (tmp == null) {
                     // None found, so create an empty set now.
                     tmp = new LinkedHashSet<UUID>();
@@ -1005,14 +1023,21 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             try {
 //    			if (!members.contains(serviceId))
 //    				throw new QuorumException(ERR_NOT_MEMBER + serviceId);
-    			final Iterator<Map.Entry<Long, Set<UUID>>> itr = votes.entrySet()
-    					.iterator();
+                final Iterator<Map.Entry<Long, LinkedHashSet<UUID>>> itr = votes
+                        .entrySet().iterator();
     			while (itr.hasNext()) {
-    				final Map.Entry<Long, Set<UUID>> entry = itr.next();
+    				final Map.Entry<Long, LinkedHashSet<UUID>> entry = itr.next();
     				final Set<UUID> votes = entry.getValue();
-    				if (votes.remove(serviceId)) {
-    					// found where the service had cast its vote.
-    					if (log.isInfoEnabled())
+                    if (votes.remove(serviceId)) {
+                        if (votes.size() + 1 == (k + 1) / 2) {
+                            final QuorumMember<S> client = getClientAsMember();
+                            if (client != null) {
+                                // Tell the client that the consensus was lost.
+                                client.lostConsensus();
+                            }
+                        }
+                        // found where the service had cast its vote.
+                        if (log.isInfoEnabled())
     						log.info("serviceId=" + serviceId + ", lastCommitTime="
     								+ entry.getKey());
     					if (votes.isEmpty()) {
@@ -1035,6 +1060,14 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
          * 
          * @param serviceId
          *            The service {@link UUID}.
+         * 
+         *            FIXME A service clearly needs to be part of the pipeline
+         *            before it can do a serviceJoin(). However, we still have
+         *            to separate out these use cases: (1) The quorum is broken
+         *            so there is nothing flowing over the write pipeline; and
+         *            (2) The quorum is met, so there may be data flowing over
+         *            the write pipeline and services attempting to join must do
+         *            so at an atomic commit of the quorum.
          */
         protected void serviceJoin(final UUID serviceId) {
             if (serviceId == null)
@@ -1079,54 +1112,39 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                      */
                     // the serviceId of the leader.
                     final UUID leaderId = joined.iterator().next();
-                    // the serviceId of our client.
-                    final UUID clientId = client.getServiceId();
-                    // true iff our client is the leader.
-                    final boolean isLeader = leaderId.equals(clientId);
+                    // true iff the newly joined service is the leader.
+                    final boolean isLeader = leaderId.equals(serviceId);
                     if (isLeader) {
                         /*
-                         * Our client will become the leader.
+                         * This service is the first to join and will become the
+                         * leader.
                          * 
-                         * @todo Can we get away with simply assigning a new token
-                         * and marking the client as read-write? The followers
-                         * should already be in the right state (post-abort() and
-                         * connected with the write pipeline) so once we have a
-                         * token, all should be golden.
+                         * @todo Can we get away with simply assigning a new
+                         * token and marking the client as read-write? The
+                         * followers should already be in the right state
+                         * (post-abort() and connected with the write pipeline)
+                         * so once we have a token, all should be golden.
                          */
                         setToken(lastValidToken + 1);
-                        client.electedLeader(token);
+                        client.electedLeader(token, serviceId);
                         sendEvent(new E(QuorumEventEnum.LEADER_ELECTED, token,
                                 serviceId));
                         if (log.isInfoEnabled())
                             log.info("leader=" + leaderId + ", token=" + token);
                     } else {
-                        /*
-                         * Our client will become a follower.
-                         * 
-                         * Note: We need to await the leader publishing the new
-                         * token here. I am not quite sure how to handle an
-                         * interrupt if one does occur while we are waiting.
-                         * Presumably, we should simply ignore the interrupt and
-                         * continue waiting unless the quorum is asynchronously
-                         * closed by terminate(), which is what this code does.
-                         */
-                        long token = NO_QUORUM;
-                        while (true) {
-                            try {
-                                token = awaitQuorum();
-                                break;
-                            } catch (AsynchronousQuorumCloseException e) {
-                                throw e;
-                            } catch (InterruptedException e) {
-                                // Ignore and retry.
-                                continue;
-                            }
+                        // the serviceId of our client.
+                        final UUID clientId = client.getServiceId();
+                        if (serviceId.equals(clientId)) {
+                            // Our client is being elected as a follower.
+                            client.electedFollower(token);
+                            sendEvent(new E(QuorumEventEnum.FOLLOWER_ELECTED,
+                                    token, serviceId));
+                            if (log.isInfoEnabled())
+                                log.info("follower=" + serviceId + ", token="
+                                        + token);
+                        } else {
+                            // Some other client was elected as a follower.
                         }
-                        client.electedFollower(token);
-                        sendEvent(new E(QuorumEventEnum.FOLLOWER_ELECTED, token,
-                                serviceId));
-                        if (log.isInfoEnabled())
-                            log.info("leader=" + leaderId + ", token=" + token);
                     }
                 }
             } finally {

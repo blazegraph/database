@@ -559,6 +559,12 @@ public class MockQuorumFixture {
 			this.lastConsensusValue = lastCommitTime;
 		}
 
+        @Override
+        public void lostConsensus() {
+            super.lostConsensus();
+            this.lastConsensusValue = Quorum.NO_QUORUM;
+        }
+        
 		/**
 		 * {@inheritDoc}
 		 * 
@@ -571,6 +577,16 @@ public class MockQuorumFixture {
 			this.downStreamId = newDownStreamId;
 		}
 
+        /**
+         * {@inheritDoc}
+         * 
+         * Overridden to clear the {@link #downStreamId}.
+         */
+		public void pipelineRemove() {
+		    super.pipelineRemove();
+		    this.downStreamId = null;
+		}
+		
 	}
 
 }
