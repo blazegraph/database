@@ -52,11 +52,18 @@ import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
  * 
  *          FIXME We must also test with k:=5 in order to see some situations
  *          which do not appear with k:=3.
- *          
+ * 
  *          FIXME THere will need to be unit tests for synchronization when a
  *          service wants to join a met quorum.
- *          
- *          FIXME There will need to be unit tests for hot spare recruitment.
+ * 
+ *          FIXME There will need to be unit tests for hot spares.
+ * 
+ *          FIXME Write unit tests when services fail during a join and verify
+ *          that the retraction of the service vote leads to either a failure of
+ *          the quorum to meet or a met quorum once another vote is cast (that
+ *          is, verify that the conformance of the vote order and the join order
+ *          are preserved if the vote order is perturbed while services are
+ *          joining).
  */
 public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
 
@@ -467,9 +474,18 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
 
         /*
          * Have each service cast a vote for a lastCommitTime.
+         * 
+         * FIXME Ok. The problem is that the events are propagating depth first.
+         * This means that the quorum for the actor we use and the fixture both
+         * have 2 votes and do the 1st service join before the other client
+         * quorums receive the 2nd vote. Instead, we need each event to be
+         * distributed to each client before the next event goes out. This is
+         * what zookeeper would be doing.
          */
         actor0.castVote(lastCommitTime);
         actor1.castVote(lastCommitTime);
+//        fixture.castVote(serviceId0, lastCommitTime);
+//        fixture.castVote(serviceId1, lastCommitTime);
         // verify the consensus was updated again.
         assertEquals(lastCommitTime, client0.lastConsensusValue);
         assertEquals(lastCommitTime, client1.lastConsensusValue);

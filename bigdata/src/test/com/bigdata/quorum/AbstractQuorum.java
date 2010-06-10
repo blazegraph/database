@@ -365,15 +365,16 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
          */
         final QuorumClient<S> c = this.client;
         return super.toString() + //
-        "{k="+k+//
-        ",lastValidToken="+lastValidToken+//
-        ",token=" + token +//
-        ",members="+Collections.unmodifiableCollection(members)+//
-        ",pipeline="+Collections.unmodifiableCollection(pipeline)+//
-        ",votes="+Collections.unmodifiableMap(votes)+//
-        ",joined="+Collections.unmodifiableCollection(joined)+//
-        ",client=" + (c == null ? "N/A" : c.getClass().getName()) + //
-        ",listeners="+listeners+
+        "{ k="+k+//
+        ", lastValidToken="+lastValidToken+//
+        ", token=" + token +//
+        ", members="+Collections.unmodifiableCollection(members)+//
+        ", pipeline="+Collections.unmodifiableCollection(pipeline)+//
+        ", votes="+Collections.unmodifiableMap(votes)+//
+        ", joined="+Collections.unmodifiableCollection(joined)+//
+        ", client=" + (c == null ? "N/A" : c.getClass().getName()) + //
+        ", serviceId="+(c instanceof QuorumMember<?>?((QuorumMember<?>)c).getServiceId():"N/A")+//
+        ", listeners="+listeners+
         "}";
     }
     
@@ -527,6 +528,72 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
         } finally {
             lock.unlock();
         }
+    }
+
+    /*
+     * Helper methods.
+     */
+
+    /**
+     * Search for the vote for the service.
+     * 
+     * @param serviceId
+     *            The service identifier.
+     * 
+     * @return The lastCommitTime for which the service has cast its vote -or-
+     *         <code>null</code> if the service is not participating in a
+     *         consensus of at least <code>(k+1)/2</code> services.
+     */
+    private Long getLastCommitTimeConsensus(final UUID serviceId) {
+        final Iterator<Map.Entry<Long, LinkedHashSet<UUID>>> itr = votes
+                .entrySet().iterator();
+        while (itr.hasNext()) {
+            final Map.Entry<Long, LinkedHashSet<UUID>> entry = itr.next();
+            final Set<UUID> votes = entry.getValue();
+            if (votes.contains(serviceId)) {
+                return entry.getKey().longValue();
+            }
+        }
+        // Service is not part of a consensus.
+        return null;
+    }
+
+//    /**
+//     * Search for the vote for the service.
+//     * 
+//     * @param serviceId
+//     *            The service identifier.
+//     * 
+//     * @return The lastCommitTime for which the service has cast its vote.
+//     * 
+//     * @throws QuorumException
+//     *             unless the service has cast its vote for the consensus.
+//     */
+//    private long assertVotedForConsensus(final UUID serviceId) {
+//        final Long lastCommitTime = getLastCommitTimeConsensus(serviceId);
+//        if (lastCommitTime == null) {
+//            throw new QuorumException(ERR_NOT_IN_CONSENSUS + serviceId);
+//        }
+//        return lastCommitTime.longValue();
+//    }
+
+    /**
+     * Return the index of the service in the vote order.
+     * 
+     * @param voteOrder
+     *            An ordered set of votes.
+     * @return The index of the service in that vote order.
+     * @throws AssertionError
+     *             if the service in not found in the vote order.
+     */
+    private int getIndexInVoteOrder(final UUID serviceId, final UUID[] voteOrder) {
+        for (int i = 0; i < voteOrder.length; i++) {
+            if (voteOrder[i].equals(serviceId)) {
+                return i;
+            }
+        }
+        // This indicates a bug in the caller's logic.
+        throw new AssertionError();
     }
 
     public UUID[] getJoinedMembers() {
@@ -829,26 +896,6 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             }
         }
         
-        /**
-         * Method is invoked by the {@link QuorumWatcher} when the leader
-         * publishes out a new quorum token.
-         * 
-         * @param newToken
-         *            The new token.
-         */
-        protected void setToken(final long newToken) {
-            lock.lock();
-            try {
-                // signal everyone that the quorum has met.
-                quorumMeet.signalAll();
-                if (log.isInfoEnabled())
-                    log.info("newToken=" + newToken + ",lastValidToken="
-                            + lastValidToken);
-            } finally {
-                lock.unlock();
-            }
-        }
-        
         final public void setToken() {
             lock.lock();
             try {
@@ -860,19 +907,22 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
 
         final public void clearToken() {
             /*
-             * Immediately clear our local copy of the quorum token. This will
-             * cause any asserts which the service may execute currently using
-             * the old token to immediately fail.
+             * I have changed this to only clear the token while holding the
+             * lock in order to make the leader election decidable. Otherwise it
+             * is possible to have the token cleared during a service join which
+             * would not have otherwise triggered an election and the election
+             * would be triggered immediately.
              */
-            token = NO_QUORUM;
+//            /*
+//             * Immediately clear our local copy of the quorum token. This will
+//             * cause any asserts which the service may execute currently using
+//             * the old token to immediately fail.
+//             */
+//            token = NO_QUORUM;
             lock.lock();
             try {
                 // Clear the token in the distributed quorum state.
                 doClearToken();
-                // Notify the client that the quorum broke.
-                client.quorumBreak();
-                sendEvent(new E(QuorumEventEnum.QUORUM_BROKE, lastValidToken,
-                        token, serviceId));
             } finally {
                 lock.unlock();
             }
@@ -924,50 +974,6 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             } finally {
                 lock.unlock();
             }
-        }
-
-        /*
-         * Helper methods.
-         */
-        
-        /**
-         * Search for the vote for the service.
-         * 
-         * @return The lastCommitTime for which the service has cast its vote.
-         * 
-         * @throws QuorumException
-         *             unless the service has cast its vote for the consensus.
-         */
-        private long assertVotedForConsensus() {
-            final Iterator<Map.Entry<Long, LinkedHashSet<UUID>>> itr = votes
-                    .entrySet().iterator();
-            while (itr.hasNext()) {
-                final Map.Entry<Long, LinkedHashSet<UUID>> entry = itr.next();
-                final Set<UUID> votes = entry.getValue();
-                if (votes.contains(serviceId)) {
-                    return entry.getKey().longValue();
-                }
-            }
-            throw new QuorumException(ERR_NOT_IN_CONSENSUS + serviceId);
-        }
-
-        /**
-         * Return the index of the service in the vote order.
-         * 
-         * @param voteOrder
-         *            An ordered set of votes.
-         * @return The index of the service in that vote order.
-         * @throws AssertionError
-         *             if the service in not found in the vote order.
-         */
-        private int getIndexInVoteOrder(final UUID[] voteOrder) {
-            for (int i = 0; i < voteOrder.length; i++) {
-                if (voteOrder[i].equals(serviceId)) {
-                    return i;
-                }
-            }
-            // This indicates a bug in the caller's logic.
-            throw new AssertionError();
         }
         
         /*
@@ -1052,17 +1058,22 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
 
         private void conditionalServiceJoin() {
             /*
-             * Discover the lastCommitTime of the consensus (throws an
-             * exception if the service did not vote for the consensus or if
-             * there is no consensus).
+             * Discover the lastCommitTime of the consensus.
              */
-            final long lastCommitTime = assertVotedForConsensus();
+            final Long lastCommitTime = getLastCommitTimeConsensus(serviceId);
+            if (lastCommitTime == null) {
+                /*
+                 * Either the service did not vote for the consensus or there is
+                 * no consensus.
+                 */
+                throw new QuorumException(ERR_NOT_IN_CONSENSUS + serviceId);
+            }
             {
                 // Get the vote order for the consensus.
                 final UUID[] voteOrder = votes.get(lastCommitTime).toArray(
                         new UUID[0]);
                 // Get the index of this service in the vote order.
-                final int index = getIndexInVoteOrder(voteOrder);
+                final int index = getIndexInVoteOrder(serviceId, voteOrder);
                 // Get the join order.
                 final UUID[] joined = getJoinedMembers();
                 /*
@@ -1441,6 +1452,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                                  * once their predecessor in the vote order
                                  * joins.
                                  */
+                                log.warn("First service will join");
                                 actor.serviceJoin();
                             }
                         }
@@ -1530,16 +1542,24 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
         protected void setToken() {
             lock.lock();
             try {
-                // This must be updated before the token is set.
-                assert lastValidToken != NO_QUORUM;
+                {
+                    /*
+                     * Verify preconditions
+                     */
+                    // This must be updated before the token is set.
+                    assert lastValidToken != NO_QUORUM;
+                    // 
+                    assert joined.size() >= (k + 1) / 2 : "Not enough joined services: njoined="
+                            + joined.size() + " : " + AbstractQuorum.this;
+                }
                 // Set the token from the lastValidToken.
                 final long token = AbstractQuorum.this.token = lastValidToken;
                 // signal everyone that the quorum has met.
                 quorumMeet.signalAll();
-                // Note: MUST NOT call this before we set the token!
                 final UUID leaderId = getLeaderId();
-                // The leader MUST be defined.
-                assert leaderId != null : AbstractQuorum.this.toString();
+                // must exist when quorum meets.
+                assert leaderId != null : "Leader is null : "
+                        + AbstractQuorum.this.toString();
                 final QuorumMember<S> client = getClientAsMember();
                 if (client != null) {
                     /*
@@ -1578,19 +1598,28 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
          * quorum token is invalidated.
          */
         protected void clearToken() {
-            /*
-             * Immediately invalidate the token without obtaining a lock. This
-             * ensures that asynchronous client activities conditioned on a
-             * specific token will fail immediately.
-             */
-            token = NO_QUORUM;
-            log.warn("Quorum broken");
-//            lock.lock();
-//            try {
-//                log.warn("Quorum broken");
-//            } finally {
-//                lock.unlock();
-//            }
+//            /*
+//             * Immediately invalidate the token without obtaining a lock. This
+//             * ensures that asynchronous client activities conditioned on a
+//             * specific token will fail immediately.
+//             */
+            lock.lock();
+            try {
+                final boolean willBreak = token != NO_QUORUM;
+                token = NO_QUORUM;
+                if (willBreak) {
+                    log.warn("Quorum break");
+                    final QuorumMember<S> client = getClientAsMember();
+                    if (client != null) {
+                        // Notify the client that the quorum broke.
+                        client.quorumBreak();
+                    }
+                    sendEvent(new E(QuorumEventEnum.QUORUM_BROKE,
+                            lastValidToken, token, null/* serviceId */));
+                }
+            } finally {
+                lock.unlock();
+            }
         }
 
         /**
@@ -1610,51 +1639,93 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                     // Already joined.
                     return;
                 }
+                if (log.isInfoEnabled())
+                    log.info("serviceId=" + serviceId.toString());
                 // queue client event.
                 sendEvent(new E(QuorumEventEnum.SERVICE_JOINED, lastValidToken,
                         token, serviceId));
-                if (log.isInfoEnabled())
-                    log.info("serviceId=" + serviceId.toString());
-                final int njoined = joined.size();
-                final int k = replicationFactor();
-                final boolean willMeet = njoined == (k + 1) / 2;
-                if (willMeet) {
-                    /*
-                     * The quorum will meet.
-                     * 
-                     * Note: The quorum is not met until the leader election has
-                     * occurred and the followers are all lined up. This state
-                     * only indicates that a meet will occur once those things
-                     * happen.
-                     */
-                    if (log.isInfoEnabled())
-                        log.info("Quorum will meet: k=" + k + ", njoined="
-                                + njoined);
-                }
+//                final int njoined = joined.size();
+//                final int k = replicationFactor();
+//                final boolean willMeet = njoined == (k + 1) / 2;
+//                if (willMeet) {
+//                    /*
+//                     * The quorum will meet.
+//                     * 
+//                     * Note: The quorum is not met until the leader election has
+//                     * occurred and the followers are all lined up. This state
+//                     * only indicates that a meet will occur once those things
+//                     * happen.
+//                     */
+//                    if (log.isInfoEnabled())
+//                        log.info("Quorum will meet: k=" + k + ", njoined="
+//                                + njoined);
+//                }
                 final QuorumMember<S> client = getClientAsMember();
                 if (client != null) {
                     /*
                      * Since our client is a quorum member, figure out whether
                      * or not it is the leader, in which case it will do the
-                     * leader election.
+                     * leader election, or a follower, in which case we need do
+                     * a service join if it is next in the vote order.
                      */
                     final UUID clientId = client.getServiceId();
-                    // the serviceId of the leader.
-                    final UUID leaderId = joined.iterator().next();
-                    // true iff our client is the leader.
-                    final boolean isLeader = leaderId.equals(clientId);
-                    if (isLeader) {
+                    // The current consensus -or- null if our client is not in a
+                    // consensus.
+                    final Long lastCommitTime = getLastCommitTimeConsensus(clientId);
+                    if (lastCommitTime != null) {
                         /*
-                         * This service was the first to join and will become
-                         * the leader.
-                         * 
-                         * Note: The followers will get their electedFollower()
-                         * message when they notice the token was set.
+                         * Our client is in the consensus.
                          */
-                        actor.reorganizePipeline();
-                        actor.setLastValidToken(lastValidToken + 1);
-                        actor.setToken();
-                        client.electedLeader();
+                        // Get the vote order. This is also the target join
+                        // order.
+                        final UUID[] voteOrder = votes.get(lastCommitTime)
+                                .toArray(new UUID[0]);
+                        // the serviceId of the leader.
+                        final UUID leaderId = voteOrder[0];// joined.iterator().next();
+                        // true iff our client is the leader (else it is a
+                        // follower since it is in the consensus).
+                        final boolean isLeader = leaderId.equals(clientId);
+                        if (isLeader) {
+                            final int njoined = joined.size();
+                            if (njoined == ((k + 1) / 2)) {
+                                /*
+                                 * Elect the leader.
+                                 * 
+                                 * Note: We are guaranteed that the #of joined
+                                 * services just rose to (k+1)/2 (rather than
+                                 * falling) because this is part of a
+                                 * serviceJoin event which modified the joined
+                                 * services set.
+                                 * 
+                                 * Note: The followers will get their
+                                 * electedFollower() message when they notice
+                                 * the token was set.
+                                 */
+                                log.warn("Electing leader: "
+                                        + AbstractQuorum.this.toString());
+                                actor.reorganizePipeline();
+                                actor.setLastValidToken(lastValidToken + 1);
+                                actor.setToken();
+                                client.electedLeader();
+                            }
+                        } else {
+                            // The index of our client in the vote order.
+                            final int index = getIndexInVoteOrder(clientId,
+                                    voteOrder);
+                            /*
+                             * If the service which joined immediately proceeds
+                             * our client in the vote order, then do a service
+                             * join for our client now.
+                             */
+                            if (serviceId.equals(voteOrder[index - 1])) {
+                                /*
+                                 * Elect a follower.
+                                 */
+                                log.warn("Electing follower: "
+                                        + AbstractQuorum.this.toString());
+                                actor.serviceJoin();
+                            }
+                        }
                     }
                 }
             } finally {
@@ -1803,6 +1874,11 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
      *            The event.
      */
     private void sendEventNow(final QuorumEvent e) {
+        if (e.getEventType() == QuorumEventEnum.VOTE_CAST
+                && listeners.size() == 3) {
+            // FIXME Remove this debugging block.
+            System.err.println("Casting votes: " + e+" : quorum="+this);
+        }
         // The client is always a listener.
         sendOneEvent(e, AbstractQuorum.this.client);
         // Send to any registered listeners as well.
