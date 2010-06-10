@@ -323,9 +323,9 @@ public class RWStore implements IStore {
 
 	private IRootBlockView m_rb;
 
-	private long m_commitCounter;
+	volatile private long m_commitCounter;
 
-	private long m_metaBitsAddr;
+	volatile private long m_metaBitsAddr;
 
 	// Constructor
 
@@ -479,8 +479,10 @@ public class RWStore implements IStore {
 
 		// RWStore now restore metabits
 		byte[] buf = new byte[m_metaBitsSize * 4];
-		m_raf.seek(rawmbaddr);
-		m_raf.read(buf);
+		//m_raf.seek(rawmbaddr);
+		//m_raf.read(buf);
+		m_raf.getChannel().read(ByteBuffer.wrap(buf), rawmbaddr);
+
 		DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
 		for (int i = 0; i < m_metaBitsSize; i++) {
 			m_metaBits[i] = strBuf.readInt();
@@ -522,8 +524,9 @@ public class RWStore implements IStore {
 			if (tstBit(m_metaBits, i++)) {
 				byte buf[] = new byte[ALLOC_BLOCK_SIZE];
 
-				m_raf.seek(addr);
-				m_raf.readFully(buf);
+//				m_raf.seek(addr);
+//				m_raf.readFully(buf);
+				m_raf.getChannel().read(ByteBuffer.wrap(buf), addr);
 				
 				DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
 
@@ -614,8 +617,9 @@ public class RWStore implements IStore {
 			PSInputStream instr = PSInputStream.getNew(this, size);
 
 			try {
-				m_raf.seek(physicalAddress(addr));
-				m_raf.readFully(instr.getBuffer(), 0, size);
+//				m_raf.seek(physicalAddress(addr));
+//				m_raf.readFully(instr.getBuffer(), 0, size);
+				m_raf.getChannel().read(ByteBuffer.wrap(instr.getBuffer(), 0, size), physicalAddress(addr));
 			} catch (IOException e) {
 				throw new StorageTerminalError("Unable to read data", e);
 			}
@@ -626,11 +630,11 @@ public class RWStore implements IStore {
 		}
 	}
 
-	private int m_cacheReads = 0;
-	private int m_diskReads = 0;
-	private int m_allocations = 0;
-	private int m_frees = 0;
-	private long m_nativeAllocBytes = 0;
+	volatile private long m_cacheReads = 0;
+	volatile private long m_diskReads = 0;
+	volatile private int m_allocations = 0;
+	volatile private int m_frees = 0;
+	volatile private long m_nativeAllocBytes = 0;
 
 	/**
 	 * If the buf[] size is greater than the maximum fixed allocation, then the direct read
@@ -713,10 +717,17 @@ public class RWStore implements IStore {
 					}
 					m_cacheReads++;
 				} else {
-					m_raf.seek(paddr);
-					m_raf.readFully(buf, offset, length);
-					int chk = m_raf.readInt(); // read checksum
+//						k
+//						m_raf.readFully(buf, offset, length);
+					m_raf.getChannel().read(ByteBuffer.wrap(buf, offset, length), paddr);
+					ByteBuffer chkbuf = ByteBuffer.allocate(4);
+					m_raf.getChannel().read(chkbuf, paddr+length);
+					chkbuf.position(0);
+					int chk = chkbuf.getInt(); // read checksum
 					if (chk != ChecksumUtility.getCHK().checksum(buf, offset, length)) {
+						log.warn("Invalid data checksum for addr: " + paddr + ", chk: " + chk + ", length: " + length
+								+ ", first byte: " + buf[0] + ", successful reads: " + m_diskReads
+								+ ", at last extend: " + m_readsAtExtend + ", cacheReads: " + m_cacheReads);
 						throw new IllegalStateException("Invalid data checksum");
 					}
 					
@@ -732,24 +743,33 @@ public class RWStore implements IStore {
 		}
 	}
 
+	/**
+	 * FIXME: This method is not currently used with BigData, if needed then
+	 * the address mangling needs re-working
+	 */
 	public int getDataSize(long addr, byte buf[]) {
-		synchronized (this) {
-			m_writes.flush();
-
-			if (addr == 0) {
-				return 0;
-			}
-
-			try {
-				int size = addr2Size((int) addr);
-				m_raf.seek(physicalAddress((int) addr));
-				m_raf.readFully(buf, 0, size);
-
-				return size;
-			} catch (IOException e) {
-				throw new StorageTerminalError("Unable to read data", e);
-			}
-		}
+		throw new UnsupportedOperationException();
+		
+//		synchronized (this) {
+//			m_writes.flush();
+//
+//			if (addr == 0) {
+//				return 0;
+//			}
+//
+//			try {
+//				int size = addr2Size((int) addr);
+//				synchronized (m_raf) {
+////					m_raf.seek(physicalAddress((int) addr));
+////					m_raf.readFully(buf, 0, size);
+//					m_raf.getChannel().read(ByteBuffer.wrap(buf, 0, size), physicalAddress((int) addr));
+//					}
+//
+//				return size;
+//			} catch (IOException e) {
+//				throw new StorageTerminalError("Unable to read data", e);
+//			}
+//		}
 	}
 
 	/***************************************************************************************
@@ -781,8 +801,9 @@ public class RWStore implements IStore {
 		case -2:
 			return;
 		}
-
-		synchronized (this) {
+		
+		m_allocationLock.lock();
+		try {
 			while (addr != 0) {
 				Allocator alloc = getBlockByAddress(addr);
 				long pa = alloc.getPhysicalAddress(getOffset(addr));
@@ -796,6 +817,8 @@ public class RWStore implements IStore {
 	
 				addr = 0;
 			}
+		} finally {
+			m_allocationLock.unlock();
 		}
 	}
 
@@ -831,10 +854,9 @@ public class RWStore implements IStore {
 	 * could be used to protect multi-threaded allocations (which is separate
 	 * from file extension).
 	 */
-	boolean allocCurrent = false;
 
-	long m_maxAllocation = 0;
-	long m_spareAllocation = 0;
+	volatile long m_maxAllocation = 0;
+	volatile long m_spareAllocation = 0;
 	public int alloc(int size) {
 		if (size > MAX_FIXED_ALLOC) {
 			throw new IllegalArgumentException("Alloation size to big: " + size);
@@ -842,15 +864,10 @@ public class RWStore implements IStore {
 		
 		m_allocationLock.lock();
 		try {
-			if (allocCurrent) {
-				throw new Error("Nested allocation .. WHY!");
-			}
-
 			try {
 				if (size > m_maxAllocation) {
 					m_maxAllocation = size;
 				}
-				allocCurrent = true;
 
 				ArrayList list;
 				Allocator allocator = null;
@@ -881,6 +898,9 @@ public class RWStore implements IStore {
 				} else {
 					allocator = (Allocator) list.get(0);
 					addr = allocator.alloc(this, size);
+					if (addr == 0) {
+						throw new IllegalStateException("Allocator " + allocator + " from FreeList allocating null address");
+					}
 				}
 
 				if (!m_commitList.contains(allocator)) {
@@ -895,7 +915,7 @@ public class RWStore implements IStore {
 
 				long pa = physicalAddress(addr);
 				if (pa == 0L) {
-					throw new IllegalStateException();
+					throw new IllegalStateException("No physical address found for " + addr);
 				}
 
 				m_allocations++;
@@ -906,9 +926,6 @@ public class RWStore implements IStore {
 				t.printStackTrace();
 
 				throw new RuntimeException(t);
-			} finally {
-				allocCurrent = false;
-
 			}
 		} finally {
 			m_allocationLock.unlock();
@@ -1244,12 +1261,12 @@ public class RWStore implements IStore {
 	}
 
 	// Header Data
-	private long m_curHdrAddr = 0;
-	private int m_rootAddr;
+	volatile private long m_curHdrAddr = 0;
+	volatile private int m_rootAddr;
 
-	private int m_fileSize;
-	private int m_nextAllocation;
-	private int m_maxFileSize;
+	volatile private int m_fileSize;
+	volatile private int m_nextAllocation;
+	volatile private int m_maxFileSize;
 
 	private int m_headerSize = 2048;
 
@@ -1257,11 +1274,11 @@ public class RWStore implements IStore {
 	private static int cDefaultMetaBitsSize = 64; // DEBUG FIX ME
 	// private static int cDefaultMetaBitsSize = 128;
 	private int m_metaBits[];
-	private int m_metaBitsSize = cDefaultMetaBitsSize;
+	volatile private int m_metaBitsSize = cDefaultMetaBitsSize;
 	private int m_metaTransientBits[];
-	private int m_metaStartAddr;
+	volatile private int m_metaStartAddr;
 
-	private boolean m_recentAlloc = false;
+	volatile private boolean m_recentAlloc = false;
 
 	protected int allocBlock(int size) {
 		// minimum 1
@@ -1437,7 +1454,7 @@ public class RWStore implements IStore {
 	public int convertFromAddr(long addr) {
 		return (int) -(addr >> ALLOCATION_SCALEUP); 
 	}
-	boolean m_extendingFile = false;
+	volatile boolean m_extendingFile = false;
 	/**
 	 * extendFile will extend by 10% and round up to be a multiple of 16k
 	 * 
@@ -1455,12 +1472,35 @@ public class RWStore implements IStore {
 	 * There are two approaches to this problem. The first is only to copy the
 	 * known committed (written) allocation blocks - but this cannot be implied
 	 * by "zero'd" bits since this can indicate that memory has been cleared.
+	 * 
+	 * Synchronization
+	 * 
+	 * The writecache may contain allocation block writes that must be flushed 
+	 * before the file can be extended.  The extend file explicitly moves the 
+	 * written allocation blocks to there new location at the new end of the 
+	 * file and then updates the rootblocks to ensure they point to the new 
+	 * allocation areas.
+	 * 
+	 * Extend file is only triggered by either alloc or metaAlloc which are s
+	 * ynchronized by the allocation lock. So extend file ends up being 
+	 * synchronized by the same lock.
+	 *
+	 * If we knew that the write cache had no writes to the allocation areas, 
+	 * we would not need to flush, but calling flush prior to the extend is 
+	 * suffucient to guarantee, in conjunction with holding the allocation lock,
+	 * that no new writes to the allocation areas will be made.
+	 * 
+	 * Once the flush is complete we take the extension writeLock to prevent 
+	 * further reads or writes, extend the file, moving the allocation areas on
+	 * the disk, then force the new rootblocks to disk.
 	 */
 	private void extendFile() {
 		int adjust = -1200 + (m_nextAllocation - m_metaStartAddr) + (m_fileSize - m_metaStartAddr) + (m_fileSize / 10);
 		
 		extendFile(adjust);
 	}
+	volatile long m_readsAtExtend = 0;
+	
 	private void extendFile(int adjust) {
 		if (m_extendingFile) {
 			throw new IllegalStateException("File concurrently extended");
@@ -1527,6 +1567,7 @@ public class RWStore implements IStore {
 			throw new RuntimeException("Force Reopen", t);
 		} finally {
 			m_extendingFile = false;
+			m_readsAtExtend = this.m_diskReads;
 			writeLock.unlock();
 		}
 	}
@@ -1944,7 +1985,7 @@ public class RWStore implements IStore {
 		if (ba == null) {
 			Allocator lalloc = (Allocator) m_allocs.get(m_allocs.size()-1);
 			int psa = lalloc.getRawStartAddr(); // previous block start address
-			assert (psa-1) < m_nextAllocation;
+			assert (psa-1) > m_nextAllocation;
 			ba = new BlobAllocator(this, psa-1);
 			ba.setFreeList(m_freeBlobs); // will add itself to the free list
 			ba.setIndex(m_allocs.size());
