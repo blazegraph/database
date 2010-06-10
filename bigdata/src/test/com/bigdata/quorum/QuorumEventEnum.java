@@ -84,12 +84,21 @@ public enum QuorumEventEnum {
      * Event generated when a service joins a quorum as a follower.
      */
     FOLLOWER_ELECTED,
+//    /**
+//     * Event generated when the leader leaves a quorum.
+//     */
+//    LEADER_LEFT,
     /**
-     * Event generated when the leader leaves a quorum.
+     * Event generated when the last valid token is set.
      */
-    LEADER_LEFT,
+    SET_LAST_VALID_TOKEN,
     /**
-     * Event generated when a quorum breaks.
+     * Event generated when a quorum meets.
+     */
+    QUORUM_MEET,
+    /**
+     * Event generated when a quorum breaks due to a leader leave or a service
+     * leave which brings the #of joined services to <code>((k+1)/2)-1</code>.
      */
     QUORUM_BROKE;
 

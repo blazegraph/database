@@ -79,4 +79,24 @@ abstract public class AbstractQuorumClient<S extends Remote> implements
 
     }
 
+    /**
+     * {@inheritDoc}
+     * 
+     * The default implementation logs the message but does not handle it.
+     */
+    public void quorumBreak() {
+        if (log.isInfoEnabled())
+            log.info("");
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * The default implementation logs the message but does not handle it.
+     */
+    public void quorumMeet(final long token, final UUID leaderId) {
+        if (log.isInfoEnabled())
+            log.info("token=" + token + ",leaderId=" + leaderId);
+    }
+
 }

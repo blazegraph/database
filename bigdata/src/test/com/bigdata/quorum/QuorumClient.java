@@ -36,6 +36,10 @@ import com.bigdata.journal.ha.QuorumException;
  * A non-remote interface for a client which monitors the state of a quorum.
  * This interface adds the ability to receive notice of quorum state changes and
  * resolve the {@link Remote} interface for the member services of the quorum.
+ * Clients can register as a {@link QuorumListener} in order to be notified of
+ * interesting events.
+ * 
+ * @see Quorum#addListener(QuorumListener)
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

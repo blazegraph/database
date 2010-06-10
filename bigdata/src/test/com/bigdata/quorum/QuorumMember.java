@@ -38,6 +38,8 @@ import com.bigdata.journal.ha.QuorumException;
  * quorum). The methods on this interface are aware of the service {@link UUID}
  * of the member service and can report on its role and relationships in the
  * {@link Quorum}.
+ * <p>
+ * {@link QuorumMember}s receive a 
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -164,33 +166,22 @@ public interface QuorumMember<S extends Remote> extends QuorumClient<S> {
     void pipelineChange(UUID oldDownStreamId,UUID newDownStreamId);
 
     /**
-     * Invoked when a quorum member is elected as the quorum leader. All quorum
-     * members will see this event.
-     * 
-     * @param token
-     *            The newly assigned quorum token.
-     * @param leaderId
-     *            The {@link UUID} of the service which was elected to be the
-     *            quorum leader. This information is only valid for the scope of
-     *            the accompanying quorum token.
+     * Invoked when <em>this</em> quorum member is elected as the quorum leader.
      */
-    void electedLeader(long token,UUID leaderId);
+    void electedLeader();
 
     /**
      * Invoked when <em>this</em> quorum member is elected as a quorum follower.
      * This event occurs both when the quorum meets and when a quorum member is
      * becomes synchronized with and then joins an already met quorum.
-     * 
-     * @param token
-     *            The newly assigned quorum token.
      */
-    void electedFollower(long token);
+    void electedFollower();
 
     /**
      * Invoked when this service is added as a quorum member.
      */
     void memberAdd();
-    
+
     /**
      * Invoked when this service is removed as a quorum member.
      */
@@ -230,24 +221,50 @@ public interface QuorumMember<S extends Remote> extends QuorumClient<S> {
      * Invoked when this service joins the quorum.
      */
     void serviceJoin();
-    
+
     /**
-     * Invoked when this service was joined with the quorum and it leaves the
-     * quorum.
+     * Invoked when this service leaves the quorum.
      */
     void serviceLeave();
 
     /**
-     * Invoked for all quorum members when the leader leaves the quorum.
-     * 
-     * @param leaderId
-     *            The {@link UUID} of the leader which left the quorum.
+     * Invoked for all quorum members when the leader leaves the quorum. A
+     * leader leave is also a quorum break, so services can generally just
+     * monitor {@link #quorumBreak()} instead of this method. Also, services
+     * will generally notice a quorum break because {@link Quorum#token()} will
+     * have been cleared and will in any case not be the same token under which
+     * the service was operating.
      */
-    void leaderLeft(UUID leaderId);
+    void leaderLeft();
 
     /**
-     * Invoked for all quorum member when the quorum breaks.
+     * Invoked when a quorum meets. The service should be prepared to accept
+     * reads. If the service was elected as the quorum leader, then it should be
+     * prepared to accept writes. All joined services should be arranged in a
+     * write pipeline, with the leader at the head of that pipeline. Cache
+     * blocks be send down the pipeline by the leader and relayed from service
+     * to service in order to keep the followers synchronized with the leader.
+     * The leader uses a 2-phase commit protocol to ensure that the quorum
+     * enters each commit point atomically and that followers can read
+     * historical commit points, including on the prior commit point.
+     * 
+     * @param token
+     *            The newly assigned quorum token.
+     * @param leaderId
+     *            The {@link UUID} of the service which was elected to be the
+     *            quorum leader. This information is only valid for the scope of
+     *            the accompanying quorum token.
      */
-    void quorumBroke();
+    void quorumMeet(long token, UUID leaderId);
+
+    /**
+     * Invoked when a quorum breaks. The service MUST handle handle this event
+     * by (a) doing an abort() which will any buffered writes and reload their
+     * current root block; and (b) casting a vote for their current commit time.
+     * Once a consensus is reached on the current commit time, services will be
+     * joined in the vote order, a new leader will be elected, and the quorum
+     * will meet again.
+     */
+    void quorumBreak();
 
 }

@@ -57,53 +57,6 @@ public class MockQuorumFixture {
      */
     private final AbstractQuorum quorumImpl;
     
-//    /**
-//     * The lock used by the {@link MockQuorumActor} to make atomic state changes
-//     * in this class. All fields on this class are protected by this lock.
-//     */
-//    private final ReentrantLock lock = new ReentrantLock();
-//    
-//    private final Condition memberChange = lock.newCondition();
-//
-//    private final Condition pipelineChange = lock.newCondition();
-//
-//    private final Condition votesChange = lock.newCondition();
-//
-//    private final Condition joinedChange = lock.newCondition();
-//
-//    /**
-//     * The current quorum token.
-//     */
-//    private long token = Quorum.NO_QUORUM;
-//
-//    /**
-//     * The last valid token assigned to this quorum. This is updated by the
-//     * leader when the quorum meets.
-//     */
-//    private long lastValidToken = Quorum.NO_QUORUM;
-//
-//    /**
-//     * The service {@link UUID} of each service registered as a member of this
-//     * quorum.
-//     */
-//    private final Set<UUID> members = new LinkedHashSet<UUID>();
-//
-//    /**
-//     * Each service votes for its lastCommitTime when it starts and after the
-//     * quorum breaks.
-//     */
-//    private final TreeMap<Long/*lastCommitTime*/,Set<UUID>> votes = new TreeMap<Long, Set<UUID>>();
-//    
-//    /**
-//     * The services joined with the quorum in the order in which they join.
-//     */
-//    private final LinkedHashSet<UUID> joined = new LinkedHashSet<UUID>();
-//
-//    /**
-//     * The ordered set of services in the write pipeline.
-//     */
-//    private final LinkedHashSet<UUID> pipeline = new LinkedHashSet<UUID>();
-
     /**
      * @param k
      */
@@ -119,15 +72,81 @@ public class MockQuorumFixture {
 
         this.quorumImpl = new AbstractQuorum(k) {
             
+            /**
+             * A do nothing actor used for the {@link MockQuorumFixture}'s inner quorum
+             * object.
+             */
+            class NOPQuorumFixtureActor extends QuorumActorBase {
+
+                public NOPQuorumFixtureActor(final UUID serviceId) {
+                    super(serviceId);
+                }
+
+                @Override
+                protected void doCastVote(long lastCommitTime) {
+                }
+
+                @Override
+                protected void doMemberAdd() {
+                    
+                }
+
+                @Override
+                protected void doMemberRemove() {
+                }
+
+                @Override
+                protected void doPipelineAdd() {
+                }
+
+                @Override
+                protected void doPipelineRemove() {
+                }
+
+                @Override
+                protected void doServiceJoin() {
+                }
+
+                @Override
+                protected void doServiceLeave() {
+                }
+
+                @Override
+                protected void doSetLastValidToken(long newToken) {
+                }
+
+                @Override
+                protected void doSetToken() {
+                }
+
+                @Override
+                protected void doClearToken() {
+                }
+
+                @Override
+                protected void doWithdrawVote() {
+                }
+
+                @Override
+                protected void reorganizePipeline() {
+                }
+                                
+            };
+            
             /** NOP Actor. */
             @Override
-            protected QuorumActor newActor(final UUID serviceId) {
-                return new NOPQuorumFixtureActor();
+            protected QuorumActorBase newActor(final UUID serviceId) {
+                return new NOPQuorumFixtureActor(serviceId);
             }
 
             @Override
             protected QuorumWatcherBase newWatcher() {
                 return new QuorumWatcherBase() {
+
+                    /** NOP. */
+                    @Override
+                    protected void setupDiscovery() {
+                    }
                 };
             }
         };
@@ -142,51 +161,6 @@ public class MockQuorumFixture {
 
     }
 
-    /**
-     * A do nothing actor used for the {@link MockQuorumFixture}'s inner quorum
-     * object.
-     */
-    private class NOPQuorumFixtureActor implements QuorumActor {
-        public void castVote(long lastCommitTime) {
-        }
-
-        public QuorumClient getQuorumMember() {
-            return null;
-        }
-
-        public Quorum getQuourm() {
-            return null;
-        }
-
-        public UUID getServiceId() {
-            return null;
-        }
-
-        public void memberAdd() {
-        }
-
-        public void memberRemove() {
-        }
-
-        public void pipelineAdd() {
-        }
-
-        public void pipelineRemove() {
-        }
-
-        public void serviceJoin() {
-        }
-
-        public void serviceLeave() {
-        }
-
-        public void setToken(long newToken) {
-        }
-
-        public void withdrawVote() {
-        }
-        
-    }
     
     /**
      * A NOP {@link QuorumClient} for the fixture's inner quorum object.
@@ -256,8 +230,16 @@ public class MockQuorumFixture {
         ((QuorumWatcherBase) quorumImpl.getWatcher()).serviceLeave(serviceId);
     }
 
-    private void setToken(final long newToken) {
-        ((QuorumWatcherBase) quorumImpl.getWatcher()).setToken(newToken);
+    private void setLastValidToken(final long newToken) {
+        ((QuorumWatcherBase) quorumImpl.getWatcher()).setLastValidToken(newToken);
+    }
+    
+    private void setToken() {
+        ((QuorumWatcherBase) quorumImpl.getWatcher()).setToken();
+    }
+    
+    private void clearToken() {
+        ((QuorumWatcherBase) quorumImpl.getWatcher()).clearToken();
     }
     
     /**
@@ -284,7 +266,7 @@ public class MockQuorumFixture {
         }
 
         @Override
-        protected QuorumActor newActor(final UUID serviceId) {
+        protected QuorumActorBase newActor(final UUID serviceId) {
             return new MockQuorumActor(serviceId);
         }
 
@@ -324,67 +306,80 @@ public class MockQuorumFixture {
 
         /**
          * Actor updates the state of the {@link MockQuorumFixture}.
-         * <p>
-         * Note: This relies on the {@link QuorumEvent} mechanism. If there are
-         * errors, they will be logged rather than propagated. This actually
-         * mimics what happens if a client spams zookeeper with some bad data.
-         * The errors will be observed in the QuorumWatcher of the clients
-         * monitoring that quourm.
          */
-        protected class MockQuorumActor implements QuorumActor {
+        protected class MockQuorumActor extends QuorumActorBase {
 
             private final UUID serviceId;
             
             public MockQuorumActor(final UUID serviceId) {
+                super(serviceId);
                 this.serviceId = serviceId;
             }
-            
-            public QuorumMember getQuorumMember() {
-                return (QuorumMember) MockQuorum.this.getClient();
-            }
-
-            public Quorum getQuourm() {
-                return MockQuorum.this;
-            }
-
-            public UUID getServiceId() {
-                return serviceId;
-            }
-
-            public void memberAdd() {
+           
+            public void doMemberAdd() {
                 fixture.memberAdd(serviceId);
             }
 
-            public void memberRemove() {
+            public void doMemberRemove() {
                 fixture.memberRemove(serviceId);
             }
 
-            public void castVote(long lastCommitTime) {
+            public void doCastVote(long lastCommitTime) {
                 fixture.castVote(serviceId,lastCommitTime);
             }
 
-            public void withdrawVote() {
+            public void doWithdrawVote() {
                 fixture.withdrawVote(serviceId);
             }
 
-            public void pipelineAdd() {
+            public void doPipelineAdd() {
                 fixture.pipelineAdd(serviceId);
             }
 
-            public void pipelineRemove() {
+            public void doPipelineRemove() {
                 fixture.pipelineRemove(serviceId);
             }
 
-            public void serviceJoin() {
+            public void doServiceJoin() {
                 fixture.serviceJoin(serviceId);
             }
 
-            public void serviceLeave() {
+            public void doServiceLeave() {
                 fixture.serviceLeave(serviceId);
             }
 
-            public void setToken(final long newToken) {
-                fixture.setToken(newToken);
+            public void doSetLastValidToken(final long newToken) {
+                fixture.setLastValidToken(newToken);
+            }
+
+            public void doSetToken() {
+                fixture.setToken();
+            }
+
+            public void doClearToken() {
+                fixture.clearToken();
+            }
+
+            /**
+             * {@inheritDoc}
+             * <p>
+             * This implementation tunnels through to the fixture and makes the
+             * necessary changes directly. Those changes will be noticed by the
+             * {@link QuorumWatcher} implementations for the other clients in
+             * the unit test.
+             */
+            @Override
+            protected void reorganizePipeline() {
+                final UUID[] pipeline = getPipeline();
+                for (int i = 0; i < pipeline.length; i++) {
+                    final UUID t = pipeline[i]; 
+                    if (serviceId.equals(t)) {
+                        // Done.
+                        return;
+                    }
+                    fixture.pipelineRemove(t);
+                    fixture.pipelineAdd(t);
+                }
             }
 
         }
@@ -392,6 +387,12 @@ public class MockQuorumFixture {
         /**
          * Watcher propagates state changes observed in the
          * {@link MockQuorumFixture} to the {@link MockQuorum}.
+         * <p>
+         * Note: This relies on the {@link QuorumEvent} mechanism. If there are
+         * errors, they will be logged rather than propagated. This actually
+         * mimics what happens if a client spams zookeeper with some bad data.
+         * The errors will be observed in the QuorumWatcher of the clients
+         * monitoring that quorum.
          */
         protected class MockQuorumWatcher extends QuorumWatcherBase implements
                 QuorumListener {
@@ -462,6 +463,25 @@ public class MockQuorumFixture {
                     serviceLeave(e.getServiceId());
                     break;
                 }
+                case SET_LAST_VALID_TOKEN: {
+                    setLastValidToken(e.lastValidToken());
+                    break;
+                }
+                    /**
+                     * Event generated when a quorum meets (used here to set the
+                     * current token).
+                     */
+                case QUORUM_MEET: {
+                    setToken();
+                    break;
+                }
+              /**
+              * Event generated when a quorum breaks (used here to clear the current token).
+              */
+              case QUORUM_BROKE: {
+                  clearToken();
+                  break;
+              }
 //                    /**
 //                     * Event generated when a new leader is elected, including
 //                     * when a quorum meets.
@@ -477,10 +497,6 @@ public class MockQuorumFixture {
 //                     */
 //                case LEADER_LEFT:
 //                    /**
-//                     * Event generated when a quorum breaks.
-//                     */
-//                case QUORUM_BROKE:
-//                    /**
 //                     * A consensus has been achieved with <code>(k+1)/2</code>
 //                     * services voting for some lastCommitTime. This event will
 //                     * typically be associated with an invalid quorum token
@@ -490,9 +506,24 @@ public class MockQuorumFixture {
 //                     */
 //                case CONSENSUS:
                 default:
-                    log.info("Ignoring : " + e);
+                    if(log.isInfoEnabled())
+                        log.info("Ignoring : " + e);
                 }
 
+            }
+
+            /**
+             * FIXME We really should scan the fixture's quorumImpl state using
+             * getMembers(), getVotes(), getPipelineMembers(), getJoined(), and
+             * token() and setup the client's quorum to mirror the state of the
+             * fixture. This code could not be reused directly for zookeeper
+             * because the watchers need to be setup atomically as we read the
+             * distributed quorum state.
+             */
+            @Override
+            protected void setupDiscovery() {
+                if (log.isInfoEnabled())
+                    log.info("");
             }
 
         }
@@ -507,18 +538,15 @@ public class MockQuorumFixture {
 	 *         Thompson</a>
 	 * @version $Id: MockQuorumFixture.java 2970 2010-06-03 22:21:22Z
 	 *          thompsonbry $
-	 * 
-	 *          FIXME Also track whether the client is a leader (true when
-	 *          leaderElecte() and until leaderLeft()), whether the client is a
-	 *          follower (true when followerElect() and until serviceLeave of
-	 *          the client or leaderLeft/quorumBroke).
 	 */
     static class MockQuorumMember<S extends Remote> extends
             AbstractQuorumMember<S> {
 
-		/**
-		 * The last lastCommitTime value around which a consensus was achieved.
-		 */
+        /**
+         * The last lastCommitTime value around which a consensus was achieved
+         * and initially -1L, but this is cleared to -1L each time the consensus
+         * is lost.
+         */
         protected volatile long lastConsensusValue = -1L;
         
         /**
@@ -562,7 +590,7 @@ public class MockQuorumFixture {
         @Override
         public void lostConsensus() {
             super.lostConsensus();
-            this.lastConsensusValue = Quorum.NO_QUORUM;
+            this.lastConsensusValue = -1L;
         }
         
 		/**
