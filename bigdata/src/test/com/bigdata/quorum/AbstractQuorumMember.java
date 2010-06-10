@@ -226,9 +226,9 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
      * 
      * The default implementation logs the message but does not handle it.
      */
-    public void electedFollower(final long token) {
+    public void electedFollower() {
         if (log.isDebugEnabled())
-            log.debug("token=" + token);
+            log.debug("");
     }
 
     /**
@@ -236,9 +236,9 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
      * 
      * The default implementation logs the message but does not handle it.
      */
-    public void electedLeader(final long token, final UUID leaderId) {
+    public void electedLeader() {
         if (log.isDebugEnabled())
-            log.debug("token=" + token + ", leaderId=" + leaderId);
+            log.debug("");
     }
 
     /**
@@ -246,9 +246,9 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
      * 
      * The default implementation logs the message but does not handle it.
      */
-    public void leaderLeft(final UUID leaderId) {
+    public void leaderLeft() {
         if (log.isDebugEnabled())
-            log.debug("token=" + leaderId);
+            log.debug("");
     }
 
     /**
@@ -318,7 +318,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
      * 
      * The default implementation logs the message but does not handle it.
      */
-    public void quorumBroke() {
+    public void quorumBreak() {
         if (log.isDebugEnabled())
             log.debug("");
     }

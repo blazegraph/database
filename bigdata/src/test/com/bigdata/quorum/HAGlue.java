@@ -44,6 +44,20 @@ public interface HAGlue extends Remote {
     InetSocketAddress getWritePipelineAddr();
 
     /*
+     * Administrative
+     */
+
+    /**
+     * This method may be issued to force the service to close and then reopen
+     * its zookeeper connection. This is a drastic action which will cause all
+     * <i>ephemeral</i> tokens for that service to be retracted from zookeeper.
+     * When the service reconnects, it will reestablish those connections.
+     * 
+     * @todo Good idea? Bad idea?
+     */
+    public Future<Void> bounceZookeeperConnection();
+    
+    /*
      * bad reads
      */
 
@@ -115,6 +129,27 @@ public interface HAGlue extends Remote {
      * Write replication pipeline.
      */
 
+    /**
+     * Instruct the service to move to the end of the write pipeline. The leader
+     * MUST be the first service in the write pipeline since it is the service
+     * to which the application directs all write requests. This message is used
+     * when a leader will be elected and it needs to force other services before
+     * it in the write pipeline to add/leave such that the leader will become
+     * the first service in the write pipeline.
+     * 
+     * @todo It is possible for the leader to issue these messages in an
+     *       sequence which is designed to arrange the write pipeline such that
+     *       it has a good network topology. The leader must first analyze the
+     *       network topology for the services in the pipeline, decide on a good
+     *       order, and then issue the requests to the services in that order.
+     *       Each service will move to the end of the pipeline in turn. Once all
+     *       services have been moved to the end of the pipeline, the pipeline
+     *       will reflect the desired total order. However, note that transient
+     *       network partitioning, zookeeper session timeouts, etc. can all
+     *       cause this order to be perturbed.
+     */
+    Future<Void> moveToEndOfPipeline() throws IOException;
+    
     /**
      * Accept metadata describing an NIO buffer transfer along the write
      * pipeline. This method is never invoked on the master. It is only invoked

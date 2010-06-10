@@ -45,6 +45,11 @@ public interface QuorumEvent {
     QuorumEventEnum getEventType();
 
     /**
+     * The lastValid token at the time of the event.
+     */
+    long lastValidToken();
+
+    /**
      * The current quorum token at the time the event was generated.
      */
     long token();
@@ -66,5 +71,5 @@ public interface QuorumEvent {
      *             {@link QuorumEventEnum#VOTE_CAST}
      */
     long lastCommitTime();
-
+    
 }

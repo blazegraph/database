@@ -32,7 +32,56 @@ import java.util.UUID;
 /**
  * An interface that causes various changes in the distributed quorum state
  * required to execute the intention of a {@link QuorumMember} service and its
- * cognizant {@link AbstractQuorum}. 
+ * cognizant {@link AbstractQuorum}. The {@link QuorumActor} is responsible for
+ * making coherent changes in the distributed quorum state. However, when a
+ * service terminates abnormally, is partitioned from the distributed quorum,
+ * etc., then the distributed quorum state MAY temporary be inconsistent. For
+ * example, when a service loses its zookeeper connection, zookeeper will remove
+ * all <i>ephemeral</i> znodes for that service, but the order in which those
+ * tokens are removed is not specified.
+ * <p>
+ * The {@link QuorumActor} will reject operations whose preconditions are not
+ * met (on member add, pipeline add, vote cast, service join, set token, etc.)
+ * and for take additional operations as necessary to ensure that postconditions
+ * are satisfied (on remove). This asymmetry in the API is intended to make it
+ * easier for a service to "remove" itself from the various collections
+ * maintained in the distributed quorum state.
+ * <p>
+ * The preconditions for add are:
+ * <dl>
+ * <dt>{@link #memberAdd()}</dt>
+ * <dd>none.</dd>
+ * <dt>{@link #pipelineAdd()}</dt>
+ * <dd>member.</dd>
+ * <dt>{@link #castVote(long)}</dt>
+ * <dd>member, pipeline.</dd>
+ * <dt>{@link #serviceJoin()}</dt>
+ * <dd>member, pipeline, consensus around cast vote, predecessor in the vote
+ * order is joined</dd>
+ * <dt>{@link #setLastValidToken(long)}</dt>
+ * <dd>member, pipeline, consensus around cast vote, first in the vote order,
+ * new value is GT the lastValidToken.</dd>
+ * <dt>{@link #setToken(long)}</dt>
+ * <dd>member, pipeline, consensus around cast vote, first in the vote order,
+ * new value is EQ to the lastValidToken.</dd>
+ * </dl>
+ * <p>
+ * The post-conditions for remove are:
+ * <dl>
+ * <dt>{@link #memberRemove()}</dt>
+ * <dd>not joined, no vote cast, not in pipeline, not member.</dd>
+ * <dt>{@link #pipelineRemove()}</dt>
+ * <dd>not in pipeline, vote withdrawn, service not joined.</dd>
+ * <dt>{@link #withdrawVote()}</dt>
+ * <dd>vote withdrawn, service not joined.</dd>
+ * <dt>{@link #serviceLeave()}</dt>
+ * <dd>vote withdrawn, not in pipeline, service not joined.</dd>
+ * <dt>{@link #clearToken()}</dt>
+ * <dd>This operation does not have any pre- or post-conditions. However,
+ * services will quickly recognize that the quorum token is no longer valid and
+ * will initiate local state changes required to prepare themselves to form a
+ * new quorum.</dd>
+ * </dl>
  * 
  * @author thompsonbry@users.sourceforge.net
  * @see QuorumWatcher
@@ -47,7 +96,7 @@ public interface QuorumActor<S extends Remote, C extends QuorumClient<S>> {
 	/**
 	 * The service on whose behalf this class is acting.
 	 */
-	public C getQuorumMember();
+	public QuorumMember<S> getQuorumMember();
 
 	/**
 	 * The {@link UUID} of the service on whose behalf this class is acting.
@@ -55,22 +104,22 @@ public interface QuorumActor<S extends Remote, C extends QuorumClient<S>> {
 	public UUID getServiceId();
 
     /**
-     * Add the associated service to the set of quorum members.
+     * Add the service to the set of quorum members.
      */
     void memberAdd();
 
     /**
-     * Remove the associated service from the set of quorum members.
+     * Remove the service from the set of quorum members.
      */
     void memberRemove();
     
     /**
-     * Add the associated service to the write pipeline.
+     * Add the service to the write pipeline.
      */
     void pipelineAdd();
 
     /**
-     * Remove the associated service from write pipeline.
+     * Remove the service from the write pipeline.
      */
     void pipelineRemove();
 
@@ -111,12 +160,25 @@ public interface QuorumActor<S extends Remote, C extends QuorumClient<S>> {
     void serviceLeave();
 
     /**
-     * First set the lastValidToken on the quorum equal to the given token and
-     * then set the current token to the given token. When the leader is
-     * elected, it should invoke this method to update the quorum token, passing
-     * in <code>newToken := lastValidToken+1</code>. This method may only be
-     * invoked by the leader.
+     * Set the lastValidToken on the quorum equal to the given token. When a new
+     * leader will be elected, this method will be invoked to update the quorum
+     * token, passing in <code>newToken := lastValidToken+1</code>.
      */
-    void setToken(final long newToken);
+    void setLastValidToken(final long newToken);
+
+    /**
+     * Set the current token on the quorum equal to the given token. When a new
+     * leader will be elected, this method will be invoked to update the quorum
+     * token, passing in <code>newToken := lastValidToken</code>. Note that
+     * {@link #setLastValidToken(long)} will have been invoked as a precondition
+     * so this has the effect of updating the current token to the recently
+     * assigned newToken.
+     */
+    void setToken();
+
+    /**
+     * Clear the quorum token.
+     */
+    void clearToken();
 
 }

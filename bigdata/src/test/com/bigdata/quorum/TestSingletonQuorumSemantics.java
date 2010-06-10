@@ -183,7 +183,10 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
 
         // Should be just one vote since a service can only vote for one
         // lastCommitTime at a time.
-        assertEquals(1,quorum.getVotes().size());
+        if (quorum.getVotes().size() != 1) {
+            assertEquals(quorum.getVotes().toString(), 1, quorum.getVotes()
+                    .size());
+        }
 
 		// Verify the consensus was updated again.
 		assertEquals(lastCommitTime2, client.lastConsensusValue);
@@ -209,60 +212,106 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
         final UUID serviceId = client.getServiceId();
 
         final long lastCommitTime = 0L;
+        final long lastCommitTime2 = 2L;
 
         // declare the service as a quorum member.
         actor.memberAdd();
-
-        // join the pipeline.
+        assertTrue(client.isMember());
+        assertEquals(new UUID[]{serviceId},quorum.getMembers());
+        
+        // add to the pipeline.
         actor.pipelineAdd();
+        assertTrue(client.isPipelineMember());
+        assertEquals(new UUID[]{serviceId},quorum.getPipeline());
 
         // cast a vote for a lastCommitTime.
         actor.castVote(lastCommitTime);
+        assertEquals(1,quorum.getVotes().size());
+        assertEquals(new UUID[] { serviceId }, quorum.getVotes().get(
+                lastCommitTime).toArray(new UUID[0]));
 
-        // verify the consensus was updated again.
+        // verify the consensus was updated.
         assertEquals(lastCommitTime, client.lastConsensusValue);
 
-        // validate the token is not yet assigned.
-        assertFalse(quorum.isQuorumMet());
-        assertEquals(Quorum.NO_QUORUM, quorum.token());
-        assertFalse(client.isJoinedMember(quorum.token()));
+        // verify service was joined.
+        assertTrue(client.isJoinedMember(quorum.token()));
+        assertEquals(new UUID[] { serviceId }, quorum.getJoinedMembers());
 
-        // verify no joined services.
-        assertEquals(new UUID[]{},quorum.getJoinedMembers());
+        // validate the token was assigned.
+        assertEquals(Quorum.NO_QUORUM + 1, quorum.lastValidToken());
+        assertEquals(Quorum.NO_QUORUM + 1, quorum.token());
+        assertTrue(quorum.isQuorumMet());
+        final long token1 = quorum.token();
         
         /*
-         * Do service join, quorum should meet. 
+         * Do service leave, quorum should break. 
          */
 
-        // join the quorum.
-        actor.serviceJoin();
+        actor.serviceLeave();
+
+        // vote was withdrawn.
+        assertEquals(0,quorum.getVotes().size());
+        assertEquals(null,quorum.getVotes().get(lastCommitTime));
+
+        // verify the consensus was updated.
+        assertEquals(-1L, client.lastConsensusValue);
+        
+        assertFalse(quorum.isQuorumMet());
+        assertEquals(Quorum.NO_QUORUM, quorum.token());
+        assertEquals(token1, quorum.lastValidToken());
+        assertFalse(client.isJoinedMember(quorum.token()));
+        assertEquals(new UUID[]{},quorum.getJoinedMembers());
+        assertFalse(client.isPipelineMember());
+        assertEquals(new UUID[]{},quorum.getPipeline());
+
+        /*
+         * Cast another vote, the quorum should meet again.
+         */
+
+        actor.pipelineAdd();
+        actor.castVote(lastCommitTime2);
+        
+        assertEquals(1,quorum.getVotes().size());
+        assertEquals(null,quorum.getVotes().get(lastCommitTime));
+        assertEquals(new UUID[] { serviceId }, quorum.getVotes().get(
+                lastCommitTime2).toArray(new UUID[0]));
+
+        // verify the consensus was updated.
+        assertEquals(lastCommitTime2, client.lastConsensusValue);
 
         // verify the joined services. 
         assertEquals(new UUID[] { serviceId }, quorum.getJoinedMembers());
 
         // validate the token was assigned by the leader.
-        final long token1 = quorum.token();
+        final long token2 = quorum.token();
         assertTrue(quorum.isQuorumMet());
-        assertEquals(Quorum.NO_QUORUM + 1, token1);
-        assertEquals(Quorum.NO_QUORUM + 1, quorum.lastValidToken());
-        assertTrue(client.isJoinedMember(token1));
-        assertTrue(client.isLeader(token1));
-        assertFalse(client.isFollower(token1));
+        assertEquals(token1 + 1, token2);
+        assertEquals(token1 + 1, quorum.lastValidToken());
+        assertTrue(client.isJoinedMember(token2));
+        assertTrue(client.isLeader(token2));
+        assertFalse(client.isFollower(token2));
 
         /*
-         * Do service leave, quorum should break. 
+         * Do service leave, quorum should break again. 
          */
         
-        // service leave.
         actor.serviceLeave();
 
-        // verify no joined services.
-        assertEquals(new UUID[]{},quorum.getJoinedMembers());
+        // vote was withdrawn.
+        assertEquals(0,quorum.getVotes().size());
+        assertEquals(null,quorum.getVotes().get(lastCommitTime));
+        assertEquals(null,quorum.getVotes().get(lastCommitTime2));
 
-        // verify the quorum broken.
+        // verify the consensus was updated.
+        assertEquals(-1L, client.lastConsensusValue);
+        
         assertFalse(quorum.isQuorumMet());
         assertEquals(Quorum.NO_QUORUM, quorum.token());
-        assertEquals(token1, quorum.lastValidToken());
+        assertEquals(token2, quorum.lastValidToken());
+        assertFalse(client.isJoinedMember(quorum.token()));
+        assertEquals(new UUID[]{},quorum.getJoinedMembers());
+        assertFalse(client.isPipelineMember());
+        assertEquals(new UUID[]{},quorum.getPipeline());
         
     }
 

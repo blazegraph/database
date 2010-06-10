@@ -424,9 +424,95 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
     }
 
     /**
+     * Unit test for service join/leave where services vote and join in the
+     * pipeline order.
+     */
+    public void test_serviceJoin3_simple() {
+
+        final Quorum<?, ?> quorum0 = quorums[0];
+        final MockQuorumMember<?> client0 = clients[0];
+        final QuorumActor<?,?> actor0 = actors[0];
+        final UUID serviceId0 = client0.getServiceId();
+        
+        final Quorum<?, ?> quorum1 = quorums[1];
+        final MockQuorumMember<?> client1 = clients[1];
+        final QuorumActor<?,?> actor1 = actors[1];
+        final UUID serviceId1 = client1.getServiceId();
+
+        final Quorum<?, ?> quorum2 = quorums[2];
+        final MockQuorumMember<?> client2 = clients[2];
+        final QuorumActor<?,?> actor2 = actors[2];
+        final UUID serviceId2 = client2.getServiceId();
+        
+//            final long lastCommitTime1 = 0L;
+//
+//            final long lastCommitTime2 = 2L;
+
+        final long lastCommitTime = 0L;
+
+        // declare the services as a quorum members.
+        actor0.memberAdd();
+        actor1.memberAdd();
+        actor2.memberAdd();
+
+        /*
+         * Have the services join the pipeline.
+         */
+        actor0.pipelineAdd();
+        actor1.pipelineAdd();
+        actor2.pipelineAdd();
+        assertEquals(new UUID[]{serviceId0,serviceId1,serviceId2},quorum0.getPipeline());
+        assertEquals(new UUID[]{serviceId0,serviceId1,serviceId2},quorum1.getPipeline());
+        assertEquals(new UUID[]{serviceId0,serviceId1,serviceId2},quorum2.getPipeline());
+
+        /*
+         * Have each service cast a vote for a lastCommitTime.
+         */
+        actor0.castVote(lastCommitTime);
+        actor1.castVote(lastCommitTime);
+        // verify the consensus was updated again.
+        assertEquals(lastCommitTime, client0.lastConsensusValue);
+        assertEquals(lastCommitTime, client1.lastConsensusValue);
+        assertEquals(lastCommitTime, client2.lastConsensusValue);
+
+        /*
+         * Service join in the same order in which they cast their votes.
+         */
+        assertEquals(new UUID[]{serviceId0,serviceId1},quorum0.getJoinedMembers());
+        assertEquals(new UUID[]{serviceId0,serviceId1},quorum1.getJoinedMembers());
+        assertEquals(new UUID[]{serviceId0,serviceId1},quorum2.getJoinedMembers());
+
+        // validate the token was assigned.
+        assertEquals(Quorum.NO_QUORUM + 1, quorum0.lastValidToken());
+        assertEquals(Quorum.NO_QUORUM + 1, quorum0.token());
+        assertTrue(quorum0.isQuorumMet());
+        final long token1 = quorum0.token();
+        assertEquals(token1,quorum1.lastValidToken());
+        assertEquals(token1,quorum2.lastValidToken());
+        assertEquals(token1,quorum1.token());
+        assertEquals(token1,quorum2.token());        
+        
+        // The pipeline order is the same as the vote order : @todo test cases were the pipeline was rearranged to make this true.
+        assertEquals(new UUID[]{serviceId0,serviceId1,serviceId2},quorum0.getPipeline());
+        assertEquals(new UUID[]{serviceId0,serviceId1,serviceId2},quorum1.getPipeline());
+        assertEquals(new UUID[]{serviceId0,serviceId1,serviceId2},quorum2.getPipeline());
+
+        /*
+         * Cast the last vote.
+         * 
+         * @todo The last service should join immediately since it does not have
+         * to do any validation when it joins. FIXME Provide for a callback to
+         * acknowledge or reject a join so we can verify the leader's root
+         * blocks in detail?
+         */
+        actor2.castVote(lastCommitTime);
+
+    }
+    
+    /**
      * Unit test for service join/leave, including quorum meet and break.
      */
-    public void test_serviceJoin3() {
+    public void test_serviceJoin3_messy() {
 
         final Quorum<?, ?> quorum0 = quorums[0];
         final MockQuorumMember<?> client0 = clients[0];
@@ -527,6 +613,27 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
          * electedFollower() event. However, this event is not really critical.
          * The electedLeader() event is sufficient as long as the client knows
          * that it is joined with the quorum.
+         * 
+         * FIXME Ah. The way to handle this is with notification as each
+         * upstream service is elected into the quorum (this is like zookeeper,
+         * where everyone watches the previous znode in the queue). When a
+         * service joins the quorum, it should fail any services ordered before
+         * itself in the pipeline which are not yet joined. Since services only
+         * enter the pipeline at the end, the first joined service will always
+         * remain at the head of the pipeline - which is where we need it to be
+         * when it is elected the leader.
+         * 
+         * When #of joined services rises to (k+1)/2 and the quorum will meet,
+         * the first joined service is elected the leader. When the Quorum for
+         * the next service in the joined service order see the leader election
+         * event, it will issue a electedFollower() event to its client. When
+         * that follower
+         * 
+         * FIXME Quorum#getLeaderId() is based on the join[] order. This means
+         * that a leader who leaves the pipeline must also leave the joined
+         * services. In fact, it is probably true that a pipeline leave must be
+         * proceeded by a service leave for any join service, not just the
+         * leader. Update the unit tests and AbstractQuorum for that.
          * 
          * FIXME Verify that we get followerElected() events both on meet and on
          * join after meet.

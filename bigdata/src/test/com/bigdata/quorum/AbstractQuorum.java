@@ -2,6 +2,7 @@ package com.bigdata.quorum;
 
 import java.rmi.Remote;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -45,7 +46,8 @@ import com.bigdata.zookeeper.ZooKeeperAccessor;
 abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
         implements Quorum<S, C> {
 
-    static protected final transient Logger log = Logger.getLogger(AbstractQuorum.class);
+    static protected final transient Logger log = Logger
+            .getLogger(AbstractQuorum.class);
 
     /**
      * Text when an operation is not permitted because the service is not a
@@ -59,6 +61,24 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
      */
     static protected final transient String ERR_NOT_PIPELINE = "Not a pipeline member : ";
 
+    /**
+     * Text when an operation is not permitted because the service has not cast
+     * its vote for a lastCommitTime around which there is a consensus of
+     * (k+1)/2 quorum members.
+     */
+    static protected final transient String ERR_NOT_IN_CONSENSUS = "Not in a quorum consensus : ";
+
+    /**
+     * Text when an operation is not permitted because the new value for the
+     * lastValidToken is not strictly greater than the current value.
+     */
+    static protected final transient String ERR_BAD_TOKEN = "Bad token : ";
+
+    /**
+     * Text when an operation is not permitted while the quorum is met.
+     */
+    static protected final transient String ERR_QUORUM_MET = "Quorum is met : ";
+    
     /**
      * The replication factor.
      * 
@@ -89,93 +109,21 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
      */
     private final ReentrantLock lock = new ReentrantLock();
 
-//    /**
-//     * Condition signaled when a service member is added to the quorum.
-//     * 
-//     * @todo The condition variable is?
-//     */
-//    private final Condition memberAdd = lock.newCondition();
-//
-//    /**
-//     * Condition signaled when a service member is removed from the quorum.
-//     * 
-//     * @todo The condition variable is?
-//     */
-//    private final Condition memberRemove = lock.newCondition();
-//
-//    /**
-//     * Condition signaled when a service joins the quorum.
-//     * 
-//     * @todo The condition variable is?
-//     */
-//    private final Condition serviceJoin = lock.newCondition();
-//
-//    /**
-//     * Condition signaled when joined services leaves the quorum.
-//     * 
-//     * @todo The condition variable is?
-//     */
-//    private final Condition serviceLeave = lock.newCondition();
-
-//    /**
-//     * Condition signaled when the leader is elected. The leader will notice
-//     * this event and initiate the protocol for the quorum meet.
-//     * <p>
-//     * @todo The condition variable is??? leader!=null && lastLeader != leader
-//     */
-//    private final Condition leaderElect = lock.newCondition();
-//
-//    /**
-//     * Condition signaled when the first joined service leaves. If the leader
-//     * had been elected, then that is the leader. Whether the service is
-//     * currently the leader depends on whether or not the quorum is met.
-//     * 
-//     * @todo The condition variable is??? leader==null && lastLeader!=null.
-//     */
-//    private final Condition leaderLeave = lock.newCondition();
-
     /**
      * Condition signaled when a quorum is fully met. The preconditions for this
      * event are:
      * <ul>
      * <li>At least (k+1)/2 services agree on the same lastCommitTime.</li>
-     * <li>At least (k+1)/2 services have joined the quorum.</li>
-     * <li>The first service to join the quorum is the leader and it has
-     * assigned itself a new quorum token.</li>
-     * <li>The remaining services which join are the followers are they have
-     * copied the quorum token from the leader, which signals that they are
-     * prepared to follow.</li>
-     * <li>The leader has marked itself as read-only.</li>
-     * <li>The leader has published the new quorum token.</li>
+     * <li>At least (k+1)/2 services have joined the quorum in their vote order.
+     * </li>
+     * <li>The first service to join the quorum is the leader and it has updated
+     * the lastValidToken and the current token.</li>
      * </ul>
      * The condition variable is <code> token != NO_QUORUM </code>. Since the
      * {@link #token()} is cleared as soon as the leader fails or the quorum
      * breaks, this is sufficient to detect a quorum meet.
      */
     private final Condition quorumMeet = lock.newCondition();
-
-//    /**
-//     * Condition signaled when the number of joined services falls beneath
-//     * (k+1)/2. The quorum token will have been cleared to
-//     * {@link Quorum#NO_QUORUM} before the lock is released. The condition
-//     * variable is
-//     * <code>lastValidToken != NO_QUORUM && token != lastValidToken</code>.
-//     */
-//    private final Condition quorumBreak = lock.newCondition();
-
-//    /**
-//     * Condition signaled when the ordered set of services comprising the write
-//     * pipeline is changed. Services must notice this event, locate themselves
-//     * within the pipeline, and inspect their downstream service in the pipeline
-//     * (if any). If the downstream, service has changed, then the service must
-//     * reconfigure itself appropriately to relay writes to the downstream
-//     * service (if any).
-//     * <p>
-//     * The condition variable in this case depends on the interpreter. For a
-//     * service in the write pipeline, the condition variable is its downstream
-//     * service. If that has changed, then the condition is satisfied.
-//     */
-//    private final Condition pipelineChange = lock.newCondition();
 
     /**
      * The last valid token assigned to this quorum. This is updated by the
@@ -194,11 +142,12 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
     private final LinkedHashSet<UUID> members;
 
     /**
-     * Each service votes for its lastCommitTime when it starts and after the
-     * quorum breaks.
+     * A map from collection of the distinct <i>lastCommitTimes</i> for which at
+     * least one service has cast its vote to the set of services which have
+     * cast their vote for that <i>lastCommitTime</i>, <em>in vote order</em>.
      */
-    private final TreeMap<Long/*lastCommitTime*/,LinkedHashSet<UUID>> votes;
-    
+    private final TreeMap<Long/* lastCommitTime */, LinkedHashSet<UUID>> votes;
+
     /**
      * The services joined with the quorum in the order in which they join. This
      * MUST be a {@link LinkedHashSet} to preserve the join order.
@@ -226,20 +175,20 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
      * @see #start(QuorumClient)
      */
     private C client;
-    
+
     /**
      * An object which watches the distributed state of the quorum and informs
      * this quorum about distributed quorum state changes.
      */
-    private QuorumWatcher<S, C> watcher;
+    private QuorumWatcherBase watcher;
 
     /**
      * An object which causes changes in the distributed state of the quorum
      * (defined iff the client is a {@link QuorumMember} since non-members can
      * not affect the distributed quorum state).
      */
-    private QuorumActor<S, C> actor;
-    
+    private QuorumActorBase actor;
+
     /**
      * A single threaded service used to pump events to clients outside of the
      * thread in which those events arise.
@@ -259,13 +208,13 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
      *       that the internal state changes are made.
      */
     private final boolean sendSynchronous = true;
-    
+
     /**
      * Constructor, which MUST be followed by {@link #start()} to begin
      * operations.
      */
     protected AbstractQuorum(final int k) {
-        
+
         if (k < 1)
             throw new IllegalArgumentException();
 
@@ -273,7 +222,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             throw new IllegalArgumentException("k must be odd: " + k);
 
         this.k = k;
-        
+
         this.token = this.lastValidToken = NO_QUORUM;
 
         /*
@@ -288,7 +237,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
          * Note: The TreeMap maintains data in order by ascending timestamp
          * which makes it easier to interpret.
          */
-        votes = new TreeMap<Long,LinkedHashSet<UUID>>();
+        votes = new TreeMap<Long, LinkedHashSet<UUID>>();
 
         joined = new LinkedHashSet<UUID>(k);
 
@@ -309,17 +258,17 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
      * Begin asynchronous processing.
      */
     public void start(final C client) {
-        if(client == null)
+        if (client == null)
             throw new IllegalArgumentException();
         lock.lock();
         try {
-            if(this.client != null)
+            if (this.client != null)
                 throw new IllegalStateException();
             // Clear -- must be discovered!
             this.token = this.lastValidToken = NO_QUORUM;
             // Note: Client is automatically a listener.
             this.client = client;
-//            addListener(client);
+            // addListener(client);
             if (client instanceof QuorumMember<?>) {
                 this.actor = newActor(((QuorumMember<?>) client).getServiceId());
             }
@@ -334,7 +283,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
              * discover the current quorum state, setup their listeners (e.g.,
              * zookeeper watchers), and pump deltas into the quorum.
              */
-            setupDiscovery();
+            watcher.setupDiscovery();
         } finally {
             lock.unlock();
         }
@@ -344,12 +293,20 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
         boolean interrupted = false;
         lock.lock();
         try {
-            if(client == null) {
+            if (client == null) {
                 // No client is attached.
                 return;
             }
             if (log.isDebugEnabled())
                 log.debug("client=" + client);
+            if (client instanceof QuorumMember<?>) {
+                /*
+                 * Update the distributed quorum state by removing our client
+                 * from the set of member services. This will also cause a
+                 * service leave, pipeline leave, and any vote to be withdrawn.
+                 */
+                actor.memberRemove();
+            }
             if (!sendSynchronous) {
                 eventService.shutdown();
                 try {
@@ -363,41 +320,13 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                     eventService = null;
                 }
             }
-            if (client instanceof QuorumMember<?>) {
-                /*
-                 * @todo Issue events to the client telling it to leave the
-                 * quorum and remove itself as a member service of the quorum?
-                 * (I think not because these actions should be generated in
-                 * response to observed changes in the shared quorum state. If a
-                 * client simply terminates quorum processing, then it will no
-                 * longer be informed of quorum state changes, which makes it a
-                 * bad citizen unless it also shuts down, e.g., by terminating
-                 * its zookeeper connection).
-                 */
-//                final UUID clientId = ((QuorumMember<S>) client).getServiceId();
-//                if (joined.contains(clientId)) {
-//                    log.error("Client is joined: " + clientId);
-//                    // force service leave.
-//                    serviceLeave(clientId);
-//                }
-//                if (pipeline.contains(clientId)) {
-//                    log.error("Client in pipeline: " + clientId);
-//                    // force pipeline remove.
-//                    pipelineRemove(clientId);
-//                }
-//                if (members.contains(clientId)) {
-//                    log.error("Client is member: " + clientId);
-//                    // force member remove.
-//                    memberRemove(clientId);
-//                }
-            }
             this.client = null;
             // discard listeners.
             listeners.clear();
         } finally {
             lock.unlock();
         }
-        if(interrupted) {
+        if (interrupted) {
             // Propagate the interrupt.
             Thread.currentThread().interrupt();
         }
@@ -414,14 +343,13 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
      * @return The {@link QuorumActor} which will effect changes in the
      *         distributed state of the quorum.
      */
-    abstract protected QuorumActor<S, C> newActor(UUID serviceId);
+    abstract protected QuorumActorBase newActor(UUID serviceId);
 
     /**
      * Factory method invoked by {@link #start(QuorumClient)}.
      * <p>
      * Note: Additional information can be passed to the watcher factor by
      * derived classes. For example, the {@link UUID} of the logical service to
-     * be watched and its zpath.
      * 
      * @return The {@link QuorumWatcher} which will inform this
      *         {@link AbstactQuorum} of changes occurring in the distributed
@@ -429,6 +357,26 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
      */
     abstract protected QuorumWatcherBase newWatcher();
 
+    public String toString() {
+        /*
+         * Note: This must run w/o the lock to avoid deadlocks so there may be
+         * visibility problems when accessing non-volatile member fields and the
+         * data can be inconsistent if someone else is modifying it.
+         */
+        final QuorumClient<S> c = this.client;
+        return super.toString() + //
+        "{k="+k+//
+        ",lastValidToken="+lastValidToken+//
+        ",token=" + token +//
+        ",members="+Collections.unmodifiableCollection(members)+//
+        ",pipeline="+Collections.unmodifiableCollection(pipeline)+//
+        ",votes="+Collections.unmodifiableMap(votes)+//
+        ",joined="+Collections.unmodifiableCollection(joined)+//
+        ",client=" + (c == null ? "N/A" : c.getClass().getName()) + //
+        ",listeners="+listeners+
+        "}";
+    }
+    
     /**
      * Return the {@link QuorumClient} iff the quorum is running.
      * 
@@ -469,9 +417,9 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
         }
 
         return null;
-        
+
     }
-    
+
     /**
      * Factory method invoked by {@link #start(QuorumClient)} iff the
      * {@link QuorumClient} is a {@link QuorumMember}.
@@ -483,6 +431,9 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
      * 
      * @throws IllegalStateException
      *             if the quorum is not running.
+     * 
+     * @todo It would be safer if we did not expose the actor except to the
+     *       client.  Ditto for the watcher.
      */
     protected QuorumActor<S, C> getActor() {
         lock.lock();
@@ -529,14 +480,6 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
         listeners.remove(listener);
     }
 
-    /**
-     * @todo Setup discovery (watchers) and read the initial state of the
-     *       distributed quorum, setting various internal fields appropriately.
-     */
-    protected void setupDiscovery() {
-        
-    }
-    
     public int replicationFactor() {
         // Note: [k] is final.
         return k;
@@ -574,8 +517,8 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
              * faster than a TreeMap.
              */
             final Map<Long, Set<UUID>> tmp = new LinkedHashMap<Long, Set<UUID>>();
-            final Iterator<Map.Entry<Long, LinkedHashSet<UUID>>> itr = votes.entrySet()
-                    .iterator();
+            final Iterator<Map.Entry<Long, LinkedHashSet<UUID>>> itr = votes
+                    .entrySet().iterator();
             while (itr.hasNext()) {
                 final Map.Entry<Long, LinkedHashSet<UUID>> entry = itr.next();
                 tmp.put(entry.getKey(), entry.getValue());
@@ -585,7 +528,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             lock.unlock();
         }
     }
-    
+
     public UUID[] getJoinedMembers() {
         lock.lock();
         try {
@@ -644,17 +587,13 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             lock.unlock();
         }
     }
-    
+
     public UUID getLeaderId() {
         lock.lock();
         try {
-            if(!isQuorumMet()) {
+            if (!isQuorumMet()) {
                 return null;
             }
-            /*
-             * FIXME Track the leader explicitly? Add a method to report the
-             * followers? The followers are peers - they have no inherent order.
-             */
             // Should always exist if the quorum is met.
             return joined.iterator().next();
         } finally {
@@ -692,7 +631,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             while (!isQuorumMet() && client != null) {
                 quorumMeet.await();
             }
-            if(client == null)
+            if (client == null)
                 throw new AsynchronousQuorumCloseException();
             return token;
         } finally {
@@ -700,20 +639,541 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
         }
     }
 
-    /*
-     * QuorumWatcher API.
+    /**
+     * Base class for {@link QuorumActor} implementations. The methods on this
+     * base class are designed maintain certain invariants in the distributed,
+     * both for this service and (in the case of forcing a pipeline leave on
+     * another service) for other services.
+     * <p>
+     * This class does NOT cause changes in the local {@link AbstractQuorum}
+     * state directly. Instead, it makes changes to the distributed quorum state
+     * which are perceived by the {@link QuorumWatcherBase}, which makes the
+     * corresponding adjustments to the {@link AbstractQuorum}'s internal state.
+     * <p>
+     * Note: It is not possible in a distributed system to guarantee that state
+     * changes made by other processes will not conflict with those which are
+     * made by this actor on the behalf of its service. However, outside of rare
+     * cases such as forcing another service to withdraw from the pipeline, all
+     * services act solely on their own facet of the distributed quorum state
+     * and all state changes are those which can be made atomic using a suitable
+     * distributed state system, such as zookeeper.
      * 
+     * <h3>Public API Implementation Notes</h3>
+     * 
+     * This base class implements the public API and delegates each public
+     * method to a protected abstract method which must be implemented by the
+     * concrete class. The public methods are final and encapsulate the logic to
+     * maintain the invariants for the distributed quorum state. The abstract
+     * protected methods must embody the logic required to effect those
+     * distributed state changes. All such state changes MUST be atomic. Since
+     * we will be invoking the public APIs for other operations, the public API
+     * methods should only log messages if the actor will <em>do</em> something.
+     * <p>
+     * Everything is done while holding the {@link AbstractQuorum#lock}. Since
+     * each service only acts on itself, the distributed state should remain
+     * consistent. The {@link AbstractQuorum} and the {@link QuorumActorBase}
+     * both <em>rely</em> on the {@link AbstractQuorum}s internal image of the
+     * distributed quorum state, which is maintained by the
+     * {@link QuorumWatcherBase}.
+     * <p>
+     * Note: For the zookeeper integration, a bad local image of the distributed
+     * state can be corrected by closing the zookeeper connection. A new
+     * connection will be automatically obtained and the local state image will
+     * be reinitialized from the distributed quorum state as the
+     * {@link QuorumWatcher} reestablishes its watchers.
+     * 
+     * <h4>Public API "Add" methods</h4>
+     * 
+     * The "add" methods are those operations which add something to the
+     * distributed quorum state, such as adding a member service, adding a
+     * service to the pipeline, casting a vote, or a service join.
+     * <p>
+     * The public API "add" methods follow a pattern which rejects operations if
+     * the preconditions for the action are not met while holding the
+     * {@link AbstractQuorum#lock}. For example, a service can not "join" unless
+     * it is a member, has cast a vote, there is a consensus for that vote, and
+     * the service is part of the pipeline. The detailed preconditions are
+     * documented on the {@link QuorumActor}.
+     * 
+     * <h4>Public API "Remove" methods</h4>
+     * 
+     * The "remove" methods are those operations which retract something from
+     * the distributed quorum state, such as a service leave, a pipeline leave,
+     * withdrawing a vote cast by a member service, and removing a member
+     * service from the quorum.
+     * <p>
+     * The public API "remove" methods follow a pattern which retracts any other
+     * information which must be retracted as a precondition before the
+     * specified retraction may be applied. These preconditions are evaluated
+     * while holding the {@link AbstractQuorum#lock}. Likewise, the actions are
+     * taken while holding that lock. Since the {@link QuorumWatcherBase} must
+     * obtain the lock in order to update the {@link AbstractQuorum}'s internal
+     * state, the internal state of the {@link AbstractQuorum} will not (in
+     * general) update until after the public API method releases the lock (this
+     * might not be true for the within JVM mock objects since the watcher can
+     * run in the same thread as the actor).
+     * <p>
+     * For example, the public API member remove operation is implemented as
+     * follows. If, while holding the lock, the service is a member, then the
+     * operation delegates to each of the other public API methods to remove it
+     * from the joined services, the pipeline, and withdraw its votes. Finally,
+     * the public {@link #memberRemove()} method invokes the protected method
+     * {@link #doMemberRemove()} method to actually remove the service from the
+     * set of member services in the distributed quorum state.
+     * <p>
+     * The public API methods all use conditional logic to cut down on remote
+     * operations if the {@link AbstractQuorum}'s internal state shows that the
+     * service is not a member, not in the pipeline, has not cast a vote, etc.
      */
+    abstract protected class QuorumActorBase implements QuorumActor<S, C> {
+
+        private final UUID serviceId;
+
+        private final QuorumMember<S> client;
+
+        protected QuorumActorBase(final UUID serviceId) {
+
+            this.serviceId = serviceId;
+
+            this.client = getClientAsMember();
+
+        }
+
+        final public QuorumMember<S> getQuorumMember() {
+            return client;
+        }
+
+        final public Quorum<S, C> getQuourm() {
+            return AbstractQuorum.this;
+        }
+
+        final public UUID getServiceId() {
+            return serviceId;
+        }
+
+        /*
+         * Public API methods.
+         * 
+         * For "add", the implementation pattern checks to see whether the
+         * preconditions are satisfied (for "add") and then delegates to the
+         * corresponding protected method to execute the distributed state
+         * change.
+         * 
+         * For "remove", the implementation pattern checks to see whether each
+         * post-condition is satisfied. If a given post-condition is not
+         * Satisfied, then the implementation delegates to the protected method
+         * to execute the necessary distributed state change.
+         * 
+         * Note: Each public API implementation must perform the necessary
+         * pre-/post-condition tests itself in order to avoid problems with
+         * mutual recursion among the public API methods.
+         */
+        
+        final public void memberAdd() {
+            lock.lock();
+            try {
+                conditionalMemberAddImpl();
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        final public void castVote(final long lastCommitTime) {
+            lock.lock();
+            try {
+                if (!members.contains(serviceId))
+                    throw new QuorumException(ERR_NOT_MEMBER + serviceId);
+                if (!pipeline.contains(serviceId))
+                    throw new QuorumException(ERR_NOT_PIPELINE + serviceId);
+                conditionalCastVoteImpl(lastCommitTime);
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        final public void pipelineAdd() {
+            lock.lock();
+            try {
+                if (!members.contains(serviceId))
+                    throw new QuorumException(ERR_NOT_MEMBER + serviceId);
+                conditionalPipelineAddImpl();
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        final public void serviceJoin() {
+            lock.lock();
+            try {
+                if (!members.contains(serviceId))
+                    throw new QuorumException(ERR_NOT_MEMBER + serviceId);
+                if (!pipeline.contains(serviceId))
+                    throw new QuorumException(ERR_NOT_PIPELINE + serviceId);
+                conditionalServiceJoin();
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        final public void setLastValidToken(final long newToken) {
+            lock.lock();
+            try {
+                if (newToken <= lastValidToken)
+                    throw new QuorumException(ERR_BAD_TOKEN+"lastValidToken="
+                            + lastValidToken + ", but newToken=" + newToken);
+                if (token != NO_QUORUM)
+                    throw new QuorumException(ERR_QUORUM_MET);
+                doSetLastValidToken(newToken);
+            } finally {
+                lock.unlock();
+            }
+        }
+        
+        /**
+         * Method is invoked by the {@link QuorumWatcher} when the leader
+         * publishes out a new quorum token.
+         * 
+         * @param newToken
+         *            The new token.
+         */
+        protected void setToken(final long newToken) {
+            lock.lock();
+            try {
+                // signal everyone that the quorum has met.
+                quorumMeet.signalAll();
+                if (log.isInfoEnabled())
+                    log.info("newToken=" + newToken + ",lastValidToken="
+                            + lastValidToken);
+            } finally {
+                lock.unlock();
+            }
+        }
+        
+        final public void setToken() {
+            lock.lock();
+            try {
+                doSetToken();
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        final public void clearToken() {
+            /*
+             * Immediately clear our local copy of the quorum token. This will
+             * cause any asserts which the service may execute currently using
+             * the old token to immediately fail.
+             */
+            token = NO_QUORUM;
+            lock.lock();
+            try {
+                // Clear the token in the distributed quorum state.
+                doClearToken();
+                // Notify the client that the quorum broke.
+                client.quorumBreak();
+                sendEvent(new E(QuorumEventEnum.QUORUM_BROKE, lastValidToken,
+                        token, serviceId));
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        //
+        // Public API "remove" methods.
+        // 
+        
+        final public void memberRemove() {
+            lock.lock();
+            try {
+                conditionalServiceLeaveImpl();
+                conditionalPipelineRemoveImpl();
+                conditionalWithdrawVoteImpl();
+                conditionalMemberRemoveImpl();
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        final public void withdrawVote() {
+            lock.lock();
+            try {
+                conditionalServiceLeaveImpl();
+                conditionalPipelineRemoveImpl();
+                conditionalWithdrawVoteImpl();
+            } finally {
+                lock.unlock();
+            }
+        }
+        
+        final public void pipelineRemove() {
+            lock.lock();
+            try {
+                conditionalServiceLeaveImpl();
+                conditionalPipelineRemoveImpl();
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        final public void serviceLeave() {
+            lock.lock();
+            try {
+                conditionalWithdrawVoteImpl();
+                conditionalPipelineRemoveImpl();
+                conditionalServiceLeaveImpl();
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        /*
+         * Helper methods.
+         */
+        
+        /**
+         * Search for the vote for the service.
+         * 
+         * @return The lastCommitTime for which the service has cast its vote.
+         * 
+         * @throws QuorumException
+         *             unless the service has cast its vote for the consensus.
+         */
+        private long assertVotedForConsensus() {
+            final Iterator<Map.Entry<Long, LinkedHashSet<UUID>>> itr = votes
+                    .entrySet().iterator();
+            while (itr.hasNext()) {
+                final Map.Entry<Long, LinkedHashSet<UUID>> entry = itr.next();
+                final Set<UUID> votes = entry.getValue();
+                if (votes.contains(serviceId)) {
+                    return entry.getKey().longValue();
+                }
+            }
+            throw new QuorumException(ERR_NOT_IN_CONSENSUS + serviceId);
+        }
+
+        /**
+         * Return the index of the service in the vote order.
+         * 
+         * @param voteOrder
+         *            An ordered set of votes.
+         * @return The index of the service in that vote order.
+         * @throws AssertionError
+         *             if the service in not found in the vote order.
+         */
+        private int getIndexInVoteOrder(final UUID[] voteOrder) {
+            for (int i = 0; i < voteOrder.length; i++) {
+                if (voteOrder[i].equals(serviceId)) {
+                    return i;
+                }
+            }
+            // This indicates a bug in the caller's logic.
+            throw new AssertionError();
+        }
+        
+        /*
+         * Private methods implement the conditional tests on the local state an
+         * invoke the protected methods which actually carry out the action to
+         * effect that change in the distributed quorum state.
+         * 
+         * Note: In order to avoid problems with recursion, these methods DO NOT
+         * invoke methods on the QuorumActor public API.
+         * 
+         * Note: The caller MUST hold the lock when invoking these methods.
+         */
+
+        private void conditionalMemberAddImpl() {
+            if (!members.contains(serviceId)) {
+                if (log.isDebugEnabled())
+                    log.debug("serviceId=" + serviceId);
+                doMemberAdd();
+            }
+        }
+        
+        private void conditionalMemberRemoveImpl() {
+            if (members.contains(serviceId)) {
+                if (log.isDebugEnabled())
+                    log.debug("serviceId=" + serviceId);
+                doMemberRemove();
+            }
+        }
+
+        private void conditionalCastVoteImpl(final long lastCommitTime) {
+            final Set<UUID> tmp = votes.get(lastCommitTime);
+            if (tmp != null && tmp.contains(serviceId)) {
+                // The service has already cast this vote.
+                return;
+            }
+            if (log.isDebugEnabled())
+                log.debug("serviceId=" + serviceId + ",lastCommitTime="
+                        + lastCommitTime);
+            // Withdraw any existing vote by this service.
+            conditionalWithdrawVoteImpl();
+            // Cast a vote.
+            doCastVote(lastCommitTime);
+        }
+
+        private void conditionalWithdrawVoteImpl() {
+            // Search for and withdraw cast vote.
+            final Iterator<Map.Entry<Long, LinkedHashSet<UUID>>> itr = votes
+                    .entrySet().iterator();
+            while (itr.hasNext()) {
+                final Map.Entry<Long, LinkedHashSet<UUID>> entry = itr.next();
+                final long lastCommitTime = entry.getKey();
+                final Set<UUID> votes = entry.getValue();
+                if (votes.contains(serviceId)) {
+                    // Withdraw existing vote.
+                    if (log.isDebugEnabled())
+                        log.debug("serviceId=" + serviceId + ",lastCommitTime="
+                                + lastCommitTime);
+                    doWithdrawVote();
+                    break;
+                }
+            }
+        }
+
+        private void conditionalPipelineAddImpl() {
+            if (!pipeline.contains(serviceId)) {
+                if (log.isDebugEnabled())
+                    log.debug("serviceId=" + serviceId);
+                doPipelineAdd();
+            }
+        }
+
+        private void conditionalPipelineRemoveImpl() {
+            if (pipeline.contains(serviceId)) {
+                if (log.isDebugEnabled())
+                    log.debug("serviceId=" + serviceId);
+                /*
+                 * Remove the service from the pipeline.
+                 */
+                doPipelineRemove();
+            }
+        }
+
+        private void conditionalServiceJoin() {
+            /*
+             * Discover the lastCommitTime of the consensus (throws an
+             * exception if the service did not vote for the consensus or if
+             * there is no consensus).
+             */
+            final long lastCommitTime = assertVotedForConsensus();
+            {
+                // Get the vote order for the consensus.
+                final UUID[] voteOrder = votes.get(lastCommitTime).toArray(
+                        new UUID[0]);
+                // Get the index of this service in the vote order.
+                final int index = getIndexInVoteOrder(voteOrder);
+                // Get the join order.
+                final UUID[] joined = getJoinedMembers();
+                /*
+                 * No services may join out of the vote order. Verify that the
+                 * predecessor(s) of this service in the vote order are joined
+                 * in the vote order.
+                 */
+                for (int i = 0; i < index; i++) {
+                    if (!joined[i].equals(voteOrder[i])) {
+                        throw new QuorumException(
+                                "Error in vote order: lastCommitTime="
+                                        + lastCommitTime + ",serviceId="
+                                        + serviceId + ",voteOrder="
+                                        + Arrays.toString(voteOrder)
+                                        + ",joined=" + Arrays.toString(joined)
+                                        + ",errorAtIndex=" + i);
+                    }
+                }
+                if (joined.length > index) {
+                    if (joined[index].equals(serviceId)) {
+                        /*
+                         * Service is already joined and the joined order up to
+                         * that service is the same as the vote order.
+                         */
+                        return;
+                    }
+                }
+            }
+            /*
+             * The service is not yet joined and the vote order and the join
+             * order are consistent.
+             */
+            doServiceJoin();
+        }
+
+        private void conditionalServiceLeaveImpl() {
+            if(joined.contains(serviceId)) {
+                doServiceLeave();
+            }
+        }
+
+        /*
+         * Abstract protected methods implement the atomic state change for just
+         * the specific operation without any precondition maintenance.
+         */
+
+        abstract protected void doMemberAdd();
+
+        abstract protected void doMemberRemove();
+
+        abstract protected void doCastVote(long lastCommitTime);
+
+        abstract protected void doWithdrawVote();
+
+        abstract protected void doPipelineAdd();
+
+        abstract protected void doPipelineRemove();
+
+        /**
+         * Invoked when our client will become the leader to (a) reorganize the
+         * write pipeline such that our client is the first service in the write
+         * pipeline (the leader MUST be the first service in the write
+         * pipeline); and (b) to optionally <em>optimize</em> the write pipeline
+         * for the network topology.
+         * 
+         * @see HAGlue#moveToEndOfPipeline()
+         */
+        abstract protected void reorganizePipeline();
+        
+        abstract protected void doServiceJoin();
+
+        abstract protected void doServiceLeave();
+
+        abstract protected void doSetLastValidToken(long newToken);
+
+        abstract protected void doSetToken();
+        
+        abstract protected void doClearToken();
+
+    }
 
     /**
-     * Base class for {@link QuorumWatcher} implementations. The methods on this
-     * base class are designed to be invoked by the QuorumWatcher when it
-     * observes a change in the distributed quorum state. Those methods know how
-     * to update the internal state of the {@link AbstractQuorum} based on state
-     * changes observed by a concrete {@link QuorumWatcher} implementations.
+     * Base class for {@link QuorumWatcher} implementations.
+     * <p>
+     * The protected methods on this base class are designed to be invoked by
+     * the {@link QuorumWatcher} when it observes a change in the distributed
+     * quorum state. Those methods know how to update the internal state of the
+     * {@link AbstractQuorum} based on state changes observed by a concrete
+     * {@link QuorumWatcher} implementations and will generate the appropriate
+     * messages for the {@link QuorumClient} or {@link QuorumMember} and also
+     * generate the appropriate {@link QuorumEvent}s.
+     * <p>
+     * When a state change triggers certain events on the behalf of the
+     * associated {@link QuorumMember} the {@link QuorumWatcher} will issue the
+     * necessary requests to the {@link QuorumActor}. For example, when the #of
+     * joined services rises to <code>(k+1)/2</code>, the {@link QuorumWatcher}
+     * for the first service in the vote order will issue the requests to the
+     * {@link QuorumActor} which are necessary to execute the leader election
+     * protocol.
      */
     abstract protected class QuorumWatcherBase implements QuorumWatcher<S, C> {
 
+        /**
+         * Method is invoked by {@link AbstractQuorum#start(QuorumClient)} and
+         * provides the {@link QuorumWatcher} with an opportunity to setup setup
+         * discovery (such as zookeeper watchers) and read the initial state of
+         * the distributed quorum, causing it to be reflected on the
+         * {@link AbstractQuorum} internal state.
+         */
+        abstract protected void setupDiscovery();
+        
         /**
          * Method is invoked by the {@link QuorumWatcher} when a member service
          * is added to the quorum and updates the internal state of the quorum
@@ -729,21 +1189,21 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             try {
                 if (members.add(serviceId)) {
                     // service was added as quorum member.
-    //                memberAdd.signalAll();
                     final QuorumMember<S> client = getClientAsMember();
                     if (client != null) {
                         final UUID clientId = client.getServiceId();
-                        if(serviceId.equals(clientId)) {
+                        if (serviceId.equals(clientId)) {
                             /*
-                             * The service which was added is our client, so we send
-                             * it a synchronous message so it can handle that add
-                             * event.
+                             * The service which was added is our client, so we
+                             * send it a synchronous message so it can handle
+                             * that add event.
                              */
                             client.memberAdd();
                         }
                     }
                     // queue client event.
-                    sendEvent(new E(QuorumEventEnum.MEMBER_ADDED, token(), serviceId));
+                    sendEvent(new E(QuorumEventEnum.MEMBER_ADDED,
+                            lastValidToken, token, serviceId));
                     if (log.isInfoEnabled())
                         log.info("serviceId=" + serviceId.toString());
                 }
@@ -751,7 +1211,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                 lock.unlock();
             }
         }
-    
+
         /**
          * Method is invoked by the {@link QuorumWatcher} when a member service
          * is removed from the quorum and updates the internal state of the
@@ -767,27 +1227,21 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             try {
                 if (members.remove(serviceId)) {
                     // service is no longer a member.
-    //                memberRemove.signalAll();
                     final QuorumMember<S> client = getClientAsMember();
                     if (client != null) {
                         final UUID clientId = client.getServiceId();
-                        if(serviceId.equals(clientId)) {
+                        if (serviceId.equals(clientId)) {
                             /*
-                             * The service which was removed is our client, so we
-                             * send it a synchronous message so it can handle that
-                             * add event.
+                             * The service which was removed is our client, so
+                             * we send it a synchronous message so it can handle
+                             * that add event.
                              */
                             client.memberRemove();
                         }
                     }
-                    // withdraw any vote cast by the service.
-                    withdrawVote(serviceId);
-                    // remove from the pipeline @todo can non-member services exist in the pipeline?
-                    pipelineRemove(serviceId);
-                    // service leave iff joined.
-                    serviceLeave(serviceId);
                     // queue client event.
-                    sendEvent(new E(QuorumEventEnum.MEMBER_REMOVED, token(), serviceId));
+                    sendEvent(new E(QuorumEventEnum.MEMBER_REMOVED,
+                            lastValidToken, token, serviceId));
                     if (log.isInfoEnabled())
                         log.info("serviceId=" + serviceId.toString());
                 }
@@ -809,61 +1263,52 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                 throw new IllegalArgumentException();
             lock.lock();
             try {
-                if (!members.contains(serviceId))
-                    throw new QuorumException(ERR_NOT_MEMBER + serviceId);
-    //            if(!members.contains(serviceId)) {
-    //                /*
-    //                 * Ensure that the service is a member.
-    //                 * 
-    //                 * Note: We do this as a general policy since the various events
-    //                 * in the distributed quorum state might occur out of order and
-    //                 * a pipeline add always implies a member add.
-    //                 */
-    //                memberAdd(serviceId);
-    //            }
-                // Notice the last service in the pipeline _before_ we add this one.
+                // Notice the last service in the pipeline _before_ we add this
+                // one.
                 final UUID lastId = getLastInPipeline();
-    			if (pipeline.add(serviceId)) {
-//    				pipelineChange.signalAll();
-    				if (log.isDebugEnabled()) {
-    					// The serviceId will be at the end of the pipeline.
-    					final UUID[] a = getPipeline();
-    					log.debug("pipeline: size=" + a.length + ", services="
-    							+ Arrays.toString(a));
-    				}
+                if (pipeline.add(serviceId)) {
+                    // pipelineChange.signalAll();
+                    if (log.isDebugEnabled()) {
+                        // The serviceId will be at the end of the pipeline.
+                        final UUID[] a = getPipeline();
+                        log.debug("pipeline: size=" + a.length + ", services="
+                                + Arrays.toString(a));
+                    }
                     final QuorumMember<S> client = getClientAsMember();
                     if (client != null) {
                         final UUID clientId = client.getServiceId();
-                        if(serviceId.equals(clientId)) {
+                        if (serviceId.equals(clientId)) {
                             /*
-                             * The service which was added to the write pipeline is
-                             * our client, so we send it a synchronous message so it
-                             * can handle that add event, e.g., by setting itself up
-                             * to receive data.
+                             * The service which was added to the write pipeline
+                             * is our client, so we send it a synchronous
+                             * message so it can handle that add event, e.g., by
+                             * setting itself up to receive data.
                              */
                             client.pipelineAdd();
                         }
                         if (lastId != null && clientId.equals(lastId)) {
-    						/*
-    						 * If our client was the last service in the write
-    						 * pipeline, then the new service is now its downstream
-    						 * service. The client needs to handle this event by
-    						 * configuring itself to send data to that service.
-    						 */
+                            /*
+                             * If our client was the last service in the write
+                             * pipeline, then the new service is now its
+                             * downstream service. The client needs to handle
+                             * this event by configuring itself to send data to
+                             * that service.
+                             */
                             client.pipelineChange(null/* oldDownStream */,
                                     serviceId/* newDownStream */);
                         }
                     }
                     // queue client event.
-                    sendEvent(new E(QuorumEventEnum.PIPELINE_ADDED, token(), serviceId));
+                    sendEvent(new E(QuorumEventEnum.PIPELINE_ADDED,
+                            lastValidToken, token, serviceId));
                     if (log.isInfoEnabled())
                         log.info("serviceId=" + serviceId.toString());
-    			}
-    		} finally {
-    			lock.unlock();
-    		}
+                }
+            } finally {
+                lock.unlock();
+            }
         }
-    
+
         /**
          * Method is invoked by the {@link QuorumWatcher} when a service is
          * removed from the write pipeline and updates the internal state of the
@@ -878,39 +1323,41 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             lock.lock();
             try {
                 /*
-                 * Look for the service before/after the one being removed
-                 * from the pipeline. If the service *before* the one being
-                 * removed is our client, then we will notify it that its
-                 * downstream service has changed.
+                 * Look for the service before/after the one being removed from
+                 * the pipeline. If the service *before* the one being removed
+                 * is our client, then we will notify it that its downstream
+                 * service has changed.
                  */
                 final UUID[] priorNext = getPipelinePriorAndNext(serviceId);
                 if (pipeline.remove(serviceId)) {
-//                    pipelineChange.signalAll();
+                    // pipelineChange.signalAll();
                     final QuorumMember<S> client = getClientAsMember();
                     if (client != null) {
                         final UUID clientId = client.getServiceId();
-                        if(serviceId.equals(clientId)) {
+                        if (serviceId.equals(clientId)) {
                             /*
-                             * The service which was removed from the write pipeline is
-                             * our client, so we send it a synchronous message so it
-                             * can handle that add event, e.g., by tearing down its
-                             * service which is receiving writes from the pipeline.
+                             * The service which was removed from the write
+                             * pipeline is our client, so we send it a
+                             * synchronous message so it can handle that add
+                             * event, e.g., by tearing down its service which is
+                             * receiving writes from the pipeline.
                              */
                             client.pipelineRemove();
                         }
                         if (priorNext != null && clientId.equals(priorNext[0])) {
                             /*
                              * Notify the client that its downstream service was
-                             * removed from the write pipeline. The client needs to
-                             * handle this event by configuring itself to send data
-                             * to that service.
+                             * removed from the write pipeline. The client needs
+                             * to handle this event by configuring itself to
+                             * send data to that service.
                              */
                             client.pipelineChange(serviceId/* oldDownStream */,
                                     priorNext[1]/* newDownStream */);
                         }
                     }
                     // queue client event.
-                    sendEvent(new E(QuorumEventEnum.PIPELINE_REMOVED, token(), serviceId));
+                    sendEvent(new E(QuorumEventEnum.PIPELINE_REMOVED,
+                            lastValidToken, token, serviceId));
                     if (log.isInfoEnabled())
                         log.info("serviceId=" + serviceId.toString());
                 }
@@ -942,35 +1389,31 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
          * @throws IllegalArgumentException
          *             if the lastCommitTime is negative.
          */
-        protected void castVote(final UUID serviceId,final long lastCommitTime) {
+        protected void castVote(final UUID serviceId, final long lastCommitTime) {
             if (serviceId == null)
                 throw new IllegalArgumentException();
-    		if (lastCommitTime < 0)
+            if (lastCommitTime < 0)
                 throw new IllegalArgumentException();
             lock.lock();
             try {
-                if (!members.contains(serviceId))
-                    throw new QuorumException(ERR_NOT_MEMBER + serviceId);
-                // Withdraw any existing vote for that service.
-                withdrawVote(serviceId);
                 // Look for a set of votes for that lastCommitTime.
-    			LinkedHashSet<UUID> tmp = votes.get(lastCommitTime);
+                LinkedHashSet<UUID> tmp = votes.get(lastCommitTime);
                 if (tmp == null) {
                     // None found, so create an empty set now.
                     tmp = new LinkedHashSet<UUID>();
                     // And add it to the map.
                     votes.put(lastCommitTime, tmp);
                 }
-    			if (tmp.add(serviceId)) {
-    				// The service cast its vote.
-    				final int nvotes = tmp.size();
-    				if (log.isInfoEnabled())
-    					log.info("serviceId=" + serviceId.toString()
-    							+ ", lastCommitTime=" + lastCommitTime
-    							+ ", nvotes=" + nvotes);
-    				// queue event.
-                    sendEvent(new E(QuorumEventEnum.VOTE_CAST, token(),
-                            serviceId, lastCommitTime));
+                if (tmp.add(serviceId)) {
+                    // The service cast its vote.
+                    final int nvotes = tmp.size();
+                    if (log.isInfoEnabled())
+                        log.info("serviceId=" + serviceId.toString()
+                                + ", lastCommitTime=" + lastCommitTime
+                                + ", nvotes=" + nvotes);
+                    // queue event.
+                    sendEvent(new E(QuorumEventEnum.VOTE_CAST, lastValidToken,
+                            token, serviceId, lastCommitTime));
                     if (nvotes == (k + 1) / 2) {
                         final QuorumMember<S> client = getClientAsMember();
                         if (client != null) {
@@ -979,26 +1422,30 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                              * on this last commit time.
                              */
                             client.consensus(lastCommitTime);
-                            /*
-                             * @todo Consider whether this action is taken
-                             * automatically by the Quorum or whether the client
-                             * needs to trap the consensus() message and then
-                             * join the quorum. This is currently left to the
-                             * client, which makes sense for unit tests as it
-                             * decouples the vote which achieves the consensus
-                             * and the service join.
-                             */
-//                            /*
-//                             * Instruct the client's actor to add it to the set
-//                             * of joined services for the quorum.
-//                             */
-//                            getActor().serviceJoin();
-    					}
-    					// queue event.
-    					sendEvent(new E(QuorumEventEnum.CONSENSUS, token(),
-    							serviceId, Long.valueOf(lastCommitTime)));
-    				}
-    			}
+                        }
+                        // queue event.
+                        sendEvent(new E(QuorumEventEnum.CONSENSUS,
+                                lastValidToken, token, serviceId, Long
+                                        .valueOf(lastCommitTime)));
+                        if (client != null) {
+                            final UUID clientId = client.getServiceId();
+                            final UUID[] voteOrder = tmp.toArray(new UUID[0]);
+                            if (clientId.equals(voteOrder[0])) {
+                                /*
+                                 * The client is the first service in the vote
+                                 * order, so it will be the first service to
+                                 * join and will become the leader when the
+                                 * other services join. For now, we tell the
+                                 * client's actor to join it now. The other
+                                 * clients will notice the service join and join
+                                 * once their predecessor in the vote order
+                                 * joins.
+                                 */
+                                actor.serviceJoin();
+                            }
+                        }
+                    }
+                }
             } finally {
                 lock.unlock();
             }
@@ -1021,14 +1468,15 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                 throw new IllegalArgumentException();
             lock.lock();
             try {
-//    			if (!members.contains(serviceId))
-//    				throw new QuorumException(ERR_NOT_MEMBER + serviceId);
                 final Iterator<Map.Entry<Long, LinkedHashSet<UUID>>> itr = votes
                         .entrySet().iterator();
-    			while (itr.hasNext()) {
-    				final Map.Entry<Long, LinkedHashSet<UUID>> entry = itr.next();
-    				final Set<UUID> votes = entry.getValue();
+                while (itr.hasNext()) {
+                    final Map.Entry<Long, LinkedHashSet<UUID>> entry = itr
+                            .next();
+                    final Set<UUID> votes = entry.getValue();
                     if (votes.remove(serviceId)) {
+                        sendEvent(new E(QuorumEventEnum.VOTE_WITHDRAWN,
+                                lastValidToken, token, serviceId));
                         if (votes.size() + 1 == (k + 1) / 2) {
                             final QuorumMember<S> client = getClientAsMember();
                             if (client != null) {
@@ -1038,19 +1486,111 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                         }
                         // found where the service had cast its vote.
                         if (log.isInfoEnabled())
-    						log.info("serviceId=" + serviceId + ", lastCommitTime="
-    								+ entry.getKey());
-    					if (votes.isEmpty()) {
-    						// remove map entries for which there are no votes cast.
-    						itr.remove();
-    					}
-    					break;
-                	}
+                            log.info("serviceId=" + serviceId
+                                    + ", lastCommitTime=" + entry.getKey());
+                        if (votes.isEmpty()) {
+                            // remove map entry with no votes cast.
+                            itr.remove();
+                        }
+                        break;
+                    }
                 }
             } finally {
-            	lock.unlock();
+                lock.unlock();
             }
-            
+        }
+
+        /**
+         * Method is invoked by the {@link QuorumWatcher} when the leader
+         * updates the lastValidToken. Note that the lastValidToken is updated
+         * first and then the current token is set from the lastValidToken.
+         * Since the quorum does not meet until the token has been updated, this
+         * allows us to create an atomic protocol from piecewise atomic updates.
+         * 
+         * @param newToken
+         *            The new token.
+         */
+        protected void setLastValidToken(final long newToken) {
+            lock.lock();
+            try {
+                if (log.isInfoEnabled())
+                    log.info("newToken=" + newToken);
+                lastValidToken = newToken;
+                sendEvent(new E(QuorumEventEnum.SET_LAST_VALID_TOKEN, newToken,
+                        token, null/* serviceId */));
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        /**
+         * Method is invoked by the {@link QuorumWatcher} when the leader
+         * publishes out a new quorum token.
+         */
+        protected void setToken() {
+            lock.lock();
+            try {
+                // This must be updated before the token is set.
+                assert lastValidToken != NO_QUORUM;
+                // Set the token from the lastValidToken.
+                final long token = AbstractQuorum.this.token = lastValidToken;
+                // signal everyone that the quorum has met.
+                quorumMeet.signalAll();
+                // Note: MUST NOT call this before we set the token!
+                final UUID leaderId = getLeaderId();
+                // The leader MUST be defined.
+                assert leaderId != null : AbstractQuorum.this.toString();
+                final QuorumMember<S> client = getClientAsMember();
+                if (client != null) {
+                    /*
+                     * Since our client is a quorum member, figure out whether
+                     * or not it is a follower, in which case we will send it
+                     * the electedFollower() message.
+                     */
+                    final UUID clientId = client.getServiceId();
+                    if (joined.contains(clientId) && !clientId.equals(leaderId)) {
+                        // Our client was elected as a follower.
+                        client.electedFollower();
+                        sendEvent(new E(QuorumEventEnum.FOLLOWER_ELECTED,
+                                lastValidToken, token, clientId));
+                        if (log.isInfoEnabled())
+                            log.info("follower=" + clientId + ", token="
+                                    + token + ", leader=" + leaderId);
+                    }
+                }
+                /*
+                 * The quorum has met.
+                 */
+                if (client != null) {
+                    client.quorumMeet(token, leaderId);
+                }
+                sendEvent(new E(QuorumEventEnum.QUORUM_MEET, lastValidToken,
+                        token, leaderId));
+                if (log.isInfoEnabled())
+                    log.info("leader=" + leaderId + ", newToken=" + token);
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        /**
+         * Method is invoked by the {@link QuorumWatcher} when the current
+         * quorum token is invalidated.
+         */
+        protected void clearToken() {
+            /*
+             * Immediately invalidate the token without obtaining a lock. This
+             * ensures that asynchronous client activities conditioned on a
+             * specific token will fail immediately.
+             */
+            token = NO_QUORUM;
+            log.warn("Quorum broken");
+//            lock.lock();
+//            try {
+//                log.warn("Quorum broken");
+//            } finally {
+//                lock.unlock();
+//            }
         }
 
         /**
@@ -1060,32 +1600,19 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
          * 
          * @param serviceId
          *            The service {@link UUID}.
-         * 
-         *            FIXME A service clearly needs to be part of the pipeline
-         *            before it can do a serviceJoin(). However, we still have
-         *            to separate out these use cases: (1) The quorum is broken
-         *            so there is nothing flowing over the write pipeline; and
-         *            (2) The quorum is met, so there may be data flowing over
-         *            the write pipeline and services attempting to join must do
-         *            so at an atomic commit of the quorum.
          */
         protected void serviceJoin(final UUID serviceId) {
             if (serviceId == null)
                 throw new IllegalArgumentException();
             lock.lock();
             try {
-                if (!members.contains(serviceId))
-                    throw new QuorumException(ERR_NOT_MEMBER + serviceId);
-                if (!pipeline.contains(serviceId))
-                    throw new QuorumException(ERR_NOT_PIPELINE + serviceId);
                 if (!joined.add(serviceId)) {
                     // Already joined.
                     return;
                 }
-                // another service has joined the quorum.
-    //            serviceJoin.signalAll();
                 // queue client event.
-                sendEvent(new E(QuorumEventEnum.SERVICE_JOINED, token(), serviceId));
+                sendEvent(new E(QuorumEventEnum.SERVICE_JOINED, lastValidToken,
+                        token, serviceId));
                 if (log.isInfoEnabled())
                     log.info("serviceId=" + serviceId.toString());
                 final int njoined = joined.size();
@@ -1096,8 +1623,9 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                      * The quorum will meet.
                      * 
                      * Note: The quorum is not met until the leader election has
-                     * occurred and the followers are all lined up. This state only
-                     * indicates that a meet will occur once those things happen.
+                     * occurred and the followers are all lined up. This state
+                     * only indicates that a meet will occur once those things
+                     * happen.
                      */
                     if (log.isInfoEnabled())
                         log.info("Quorum will meet: k=" + k + ", njoined="
@@ -1106,45 +1634,27 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                 final QuorumMember<S> client = getClientAsMember();
                 if (client != null) {
                     /*
-                     * Since our client is a quorum member, figure out whether or
-                     * not it is the leader, in which case it will do the leader
-                     * election.
+                     * Since our client is a quorum member, figure out whether
+                     * or not it is the leader, in which case it will do the
+                     * leader election.
                      */
+                    final UUID clientId = client.getServiceId();
                     // the serviceId of the leader.
                     final UUID leaderId = joined.iterator().next();
-                    // true iff the newly joined service is the leader.
-                    final boolean isLeader = leaderId.equals(serviceId);
+                    // true iff our client is the leader.
+                    final boolean isLeader = leaderId.equals(clientId);
                     if (isLeader) {
                         /*
-                         * This service is the first to join and will become the
-                         * leader.
+                         * This service was the first to join and will become
+                         * the leader.
                          * 
-                         * @todo Can we get away with simply assigning a new
-                         * token and marking the client as read-write? The
-                         * followers should already be in the right state
-                         * (post-abort() and connected with the write pipeline)
-                         * so once we have a token, all should be golden.
+                         * Note: The followers will get their electedFollower()
+                         * message when they notice the token was set.
                          */
-                        setToken(lastValidToken + 1);
-                        client.electedLeader(token, serviceId);
-                        sendEvent(new E(QuorumEventEnum.LEADER_ELECTED, token,
-                                serviceId));
-                        if (log.isInfoEnabled())
-                            log.info("leader=" + leaderId + ", token=" + token);
-                    } else {
-                        // the serviceId of our client.
-                        final UUID clientId = client.getServiceId();
-                        if (serviceId.equals(clientId)) {
-                            // Our client is being elected as a follower.
-                            client.electedFollower(token);
-                            sendEvent(new E(QuorumEventEnum.FOLLOWER_ELECTED,
-                                    token, serviceId));
-                            if (log.isInfoEnabled())
-                                log.info("follower=" + serviceId + ", token="
-                                        + token);
-                        } else {
-                            // Some other client was elected as a follower.
-                        }
+                        actor.reorganizePipeline();
+                        actor.setLastValidToken(lastValidToken + 1);
+                        actor.setToken();
+                        client.electedLeader();
                     }
                 }
             } finally {
@@ -1159,14 +1669,6 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
          * 
          * @param serviceId
          *            The service {@link UUID}.
-         * 
-         * @todo This is currently written to recognize a difference between a
-         *       leader leave and a quorum break. The token is cleared in both
-         *       cases. However, a quorum break occurs only when the #of
-         *       services joined with the quorum falls below (k+1)/2. When the
-         *       situation is only a leader leave and not also a quorum break,
-         *       then a new leader should be elected very quickly from one of
-         *       the other services joined with the quorum.
          */
         protected void serviceLeave(final UUID serviceId) {
             if (serviceId == null)
@@ -1183,111 +1685,69 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                     leaderId = itr.hasNext() ? itr.next() : null;
                 }
                 if (!joined.remove(serviceId)) {
-                    // This servic was not joined.
+                    // This service was not joined.
                     return;
                 }
-                // another service has left the quorum.
-    //            serviceLeave.signalAll();
-                // queue client event.
-                sendEvent(new E(QuorumEventEnum.SERVICE_LEFT, token(), serviceId));
-                if (log.isInfoEnabled())
-                    log.info("serviceId=" + serviceId.toString());
                 final int k = replicationFactor();
                 // iff the quorum was joined.
                 final boolean wasJoined = njoined == ((k + 1) / 2);
-                // iff the quorum will break.
-                final boolean willBreak = njoined == ((k + 1) / 2) - 1;
                 // iff the leader just left the quorum.
-                final boolean leaderLeft;
-                if (wasJoined) {
-                    // true iff the service which left was the leader.
-                    leaderLeft = serviceId.equals(leaderId);
-                    if(leaderLeft) {
-                        /*
-                         * While the quorum is may still be satisfied, the quorum
-                         * token will be invalidated since it is associated with an
-                         * elected leader and we just lost the leader.
-                         * 
-                         * Note: If there are still (k+1)/2 services joined with the
-                         * quorum, then one of them will be elected and that event
-                         * will be noticed by awaitQuorum(), which watches the
-                         * current token. However, the initiative for that election
-                         * lies _outside_ of this class. E.g., in the behavior of
-                         * the service as a zookeeper client.
-                         */
-                        token = NO_QUORUM;
-                    }
-                } else {
-                    leaderLeft = false;
-                }
+                final boolean leaderLeft = wasJoined
+                        && serviceId.equals(leaderId);
+                // iff the quorum will break.
+                final boolean willBreak = leaderLeft
+                        || (njoined == ((k + 1) / 2) - 1);
+                if (log.isInfoEnabled())
+                    log.info("serviceId=" + serviceId + ", k=" + k
+                            + ", njoined=" + njoined + ", wasJoined="
+                            + wasJoined + ", leaderLeft=" + leaderLeft
+                            + ", willBreak=" + willBreak);
                 final QuorumMember<S> client = getClientAsMember();
+                if (client != null && willBreak) {
+                    /*
+                     * Invalidate the current quorum token.
+                     * 
+                     * Note: Only clients can take actions on the distributed
+                     * quorum state. Non-clients monitoring the quorum will have
+                     * to wait until their watcher notices that the quorum token
+                     * in the distributed quorum state has been cleared.
+                     * 
+                     * Note: Services which are members of the quorum will see
+                     * the quorumBreak() message. They MUST handle that message
+                     * by (a) doing an abort() which will any buffered writes
+                     * and reload their current root block; and (b) cast a vote
+                     * for their current commit time. Once a consensus is
+                     * reached on the current commit time, the services will
+                     * join in the vote order, a new leader will be elected, and
+                     * the quorum will meet again.
+                     */
+                    actor.clearToken();
+                }
                 if (client != null) {
+                    // Notify all quorum members that a service left.
                     client.serviceLeave();
-                    if (wasJoined) {
-                        if (leaderLeft) {
-                            /*
-                             * Notify all quorum members that the leader left.
-                             */
-                            client.leaderLeft(leaderId);
-                        }
-                        /*
-                         * Since our client is a quorum member, we need to tell it
-                         * that it is no longer in the quorum.
-                         */
-                        if (willBreak) {
-                            client.quorumBroke();
-                            if (log.isInfoEnabled())
-                                log.info("leader=" + leaderId + ", token=" + token);
-                        }
-                    }
                 }
-                if (leaderLeft) {
-                    sendEvent(new E(QuorumEventEnum.LEADER_LEFT, token(), serviceId));
+                sendEvent(new E(QuorumEventEnum.SERVICE_LEFT, lastValidToken,
+                        token, serviceId));
+                if (client != null && leaderLeft) {
+                    // Notify all quorum members that the leader left.
+                    client.leaderLeft();
                 }
-                if (willBreak) {
-                    // The quorum will break.
-                    sendEvent(new E(QuorumEventEnum.QUORUM_BROKE, token(),
-                            serviceId));
-                    if (log.isInfoEnabled())
-                        log.info("Quorum will break: k=" + k + ", njoined="
-                                + njoined);
-                }
+//                if (leaderLeft) {
+//                    sendEvent(new E(QuorumEventEnum.LEADER_LEFT, token(),
+//                            serviceId));
+//                }
             } finally {
                 lock.unlock();
             }
         }
 
-        /**
-         * Method is invoked by the {@link QuorumWatcher} when the leader
-         * publishes out a new quorum token.
-         * 
-         * @param newToken
-         *            The new token.
-         */
-        protected void setToken(final long newToken) {
-            lock.lock();
-            try {
-                if (newToken <= lastValidToken)
-                    throw new RuntimeException("lastValidToken=" + lastValidToken
-                            + ", but newToken=" + newToken);
-                // save the new value.
-                lastValidToken = token = newToken;
-                // signal everyone that the quorum has met.
-    			quorumMeet.signalAll();
-    			if (log.isInfoEnabled())
-    				log.info("newToken=" + newToken + ",lastValidToken="
-    						+ lastValidToken);
-            } finally {
-                lock.unlock();
-            }
-        }
-        
     } // QuorumWatcherBase
 
     /*
      * 
      */
-    
+
     /**
      * Send the listener an informative event outside of the thread in which we
      * actually process these events. Quorum events are relatively infrequent
@@ -1300,14 +1760,14 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
      * @param e
      *            The event.
      */
-	private void sendEvent(final QuorumEvent e) {
-		if (log.isTraceEnabled())
-			log.trace("" + e);
-		if(sendSynchronous) {
-		    sendEventNow(e);
-		    return;
-		}
-		final Executor executor = eventService;
+    private void sendEvent(final QuorumEvent e) {
+        if (log.isTraceEnabled())
+            log.trace("" + e);
+        if (sendSynchronous) {
+            sendEventNow(e);
+            return;
+        }
+        final Executor executor = eventService;
         if (executor != null) {
             try {
                 // Submit task to send the event.
@@ -1378,33 +1838,39 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
 
         private final QuorumEventEnum type;
 
-		private final long token;
+        private final long lastValidToken;
 
-		private final UUID serviceId;
+        private final long token;
 
-		private final Long lastCommitTime;
+        private final UUID serviceId;
 
-		/**
-		 * Constructor used for most event types.
-		 * @param type
-		 * @param token
-		 * @param serviceId
-		 */
-		public E(final QuorumEventEnum type, final long token,
-				final UUID serviceId) {
-			this(type, token, serviceId, -1L/* lastCommitTime */);
-		}
-		
-		/**
-		 * Constructor used for vote events.
-		 * @param type
-		 * @param token
-		 * @param serviceId
-		 * @param lastCommitTime
-		 */
-		public E(final QuorumEventEnum type, final long token,
-                final UUID serviceId, final long lastCommitTime) {
+        private final Long lastCommitTime;
+
+        /**
+         * Constructor used for most event types.
+         * 
+         * @param type
+         * @param token
+         * @param serviceId
+         */
+        public E(final QuorumEventEnum type, final long lastValidToken,
+                final long token, final UUID serviceId) {
+            this(type, lastValidToken, token, serviceId, -1L/* lastCommitTime */);
+        }
+
+        /**
+         * Constructor used for vote events.
+         * 
+         * @param type
+         * @param token
+         * @param serviceId
+         * @param lastCommitTime
+         */
+        public E(final QuorumEventEnum type, final long lastValidToken,
+                final long token, final UUID serviceId,
+                final long lastCommitTime) {
             this.type = type;
+            this.lastValidToken = lastValidToken;
             this.token = token;
             this.serviceId = serviceId;
             this.lastCommitTime = lastCommitTime;
@@ -1418,6 +1884,10 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             return serviceId;
         }
 
+        public long lastValidToken() {
+            return lastValidToken;
+        }
+        
         public long token() {
             return token;
         }
@@ -1426,20 +1896,22 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             if (type != QuorumEventEnum.VOTE_CAST)
                 throw new UnsupportedOperationException();
             return lastCommitTime.longValue();
-		}
+        }
 
-		public String toString() {
-			return "QuorumEvent"
-					+ "{type="
-					+ type
-					+ ",token="
-					+ token
-					+ ",serviceId="
-					+ serviceId
-					+ (type == QuorumEventEnum.VOTE_CAST ? ",lastCommitTime="
-							+ lastCommitTime : "") + "}";
-		}
+        public String toString() {
+            return "QuorumEvent"
+                    + "{type="
+                    + type
+                    + ",lastValidToken="
+                    + lastValidToken
+                    + ",token="
+                    + token
+                    + ",serviceId="
+                    + serviceId
+                    + (type == QuorumEventEnum.VOTE_CAST ? ",lastCommitTime="
+                            + lastCommitTime : "") + "}";
+        }
 
-	}
+    }
 
 }
