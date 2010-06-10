@@ -205,7 +205,7 @@ public class MockQuorumFixture {
         ((QuorumWatcherBase) quorumImpl.getWatcher()).memberRemove(serviceId);
     }
 
-    private void castVote(final UUID serviceId, long lastCommitTime) {
+    private void castVote(final UUID serviceId, final long lastCommitTime) {
         ((QuorumWatcherBase) quorumImpl.getWatcher()).castVote(serviceId,
                 lastCommitTime);
     }
@@ -324,8 +324,8 @@ public class MockQuorumFixture {
                 fixture.memberRemove(serviceId);
             }
 
-            public void doCastVote(long lastCommitTime) {
-                fixture.castVote(serviceId,lastCommitTime);
+            public void doCastVote(final long lastCommitTime) {
+                fixture.castVote(serviceId, lastCommitTime);
             }
 
             public void doWithdrawVote() {
