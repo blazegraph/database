@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.cache;
 
+import com.bigdata.LRUNexus.AccessPolicyEnum;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -55,6 +56,8 @@ public class TestBCHMGlobalLRU2WithThreadLocalBuffers extends
         super(name);
     }
 
+    private final AccessPolicyEnum accessPolicy = AccessPolicyEnum.LRU;
+
     private final static long maximumBytesInMemory = 10 * Bytes.kilobyte;
 
     // clear at least 25% of the memory.
@@ -76,10 +79,10 @@ public class TestBCHMGlobalLRU2WithThreadLocalBuffers extends
 
         super.setUp();
 
-        lru = new BCHMGlobalLRU2<Long, Object>(maximumBytesInMemory,
-                minCleared, minimumCacheSetCapacity, initialCacheCapacity,
-                loadFactor, concurrencyLevel, threadLocalBuffers,
-                threadLocalBufferCapacity);
+        lru = new BCHMGlobalLRU2<Long, Object>(accessPolicy,
+                maximumBytesInMemory, minCleared, minimumCacheSetCapacity,
+                initialCacheCapacity, loadFactor, concurrencyLevel,
+                threadLocalBuffers, threadLocalBufferCapacity);
 
     }
 
@@ -91,9 +94,10 @@ public class TestBCHMGlobalLRU2WithThreadLocalBuffers extends
      */
     public void test_counters() {
 
-        lru = new BCHMGlobalLRU2<Long, Object>(maximumBytesInMemory,
-                minCleared, minimumCacheSetCapacity, initialCacheCapacity,
-                loadFactor, concurrencyLevel, threadLocalBuffers, 1/* threadLocalBufferCapacity */);
+        lru = new BCHMGlobalLRU2<Long, Object>(accessPolicy,
+                maximumBytesInMemory, minCleared, minimumCacheSetCapacity,
+                initialCacheCapacity, loadFactor, concurrencyLevel,
+                threadLocalBuffers, 1/* threadLocalBufferCapacity */);
 
         super.test_counters();
         
@@ -107,12 +111,13 @@ public class TestBCHMGlobalLRU2WithThreadLocalBuffers extends
      */
     public void test_clearCache() {
 
-        lru = new BCHMGlobalLRU2<Long, Object>(maximumBytesInMemory,
-                minCleared, minimumCacheSetCapacity, initialCacheCapacity,
-                loadFactor, concurrencyLevel, threadLocalBuffers, 1/* threadLocalBufferCapacity */);
+        lru = new BCHMGlobalLRU2<Long, Object>(accessPolicy,
+                maximumBytesInMemory, minCleared, minimumCacheSetCapacity,
+                initialCacheCapacity, loadFactor, concurrencyLevel,
+                threadLocalBuffers, 1/* threadLocalBufferCapacity */);
 
         super.test_counters();
-        
+
     }
 
 }

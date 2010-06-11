@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.raba.codec;
 
-import it.unimi.dsi.fastutil.bytes.CustomByteArrayFrontCodedList;
+import it.unimi.dsi.fastutil.bytes.custom.CustomByteArrayFrontCodedList;
 
 import java.io.UnsupportedEncodingException;
 import java.util.Arrays;

@@ -791,6 +791,8 @@ public class NanoHTTPD implements IServiceShutdown
 			{
 				// Couldn't write? No can do.
 				try { mySocket.close(); } catch( Throwable t ) {}
+				// Close input stream - producer should notice and abort.
+				try {data.close();} catch(Throwable t) {};
 			}
 		}
 	};

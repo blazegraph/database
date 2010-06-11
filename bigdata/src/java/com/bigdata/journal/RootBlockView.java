@@ -331,7 +331,9 @@ public class RootBlockView implements IRootBlockView {
         
         if (firstCommitTime != 0 && lastCommitTime < firstCommitTime) {
         
-            throw new IllegalArgumentException(
+// Note: modified to permit replay of historical transactions.
+//            throw new IllegalArgumentException(
+			  log.warn(
                     "last transaction identifier is less than first transaction identifier: lastCommitTime="
                             + lastCommitTime
                             + ", firstCommitTime="

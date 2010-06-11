@@ -1,7 +1,11 @@
 package com.bigdata.util.concurrent;
 
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
@@ -16,6 +20,15 @@ import org.apache.log4j.Logger;
  * start iff the latch is non-zero. The maximum parallelism is the minimum of
  * the value specified to the constructor and the potential parallelism of the
  * delegate service.
+ * <p>
+ * Note: The pattern for running tasks on this service is generally to
+ * {@link #execute(Runnable)} a {@link Runnable} and to make that
+ * {@link Runnable} a {@link FutureTask} if you want to await the {@link Future}
+ * of a {@link Runnable} or {@link Callable} or otherwise manage its execution.
+ * <p>
+ * Note: This class can NOT be trivially wrapped as an {@link ExecutorService}
+ * since the resulting delegation pattern for submit() winds up invoking
+ * execute() on the delegate {@link ExecutorService} rather than on this class.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -43,6 +56,17 @@ public class LatchedExecutor implements Executor {
      */
     private final BlockingQueue<Runnable> queue = new LinkedBlockingDeque<Runnable>();
 
+    private final int nparallel;
+    
+    /**
+     * Return the maximum parallelism allowed by this {@link Executor}.
+     */
+    public int getNParallel() {
+    	
+    	return nparallel;
+    	
+    }
+    
     public LatchedExecutor(final Executor executor, final int nparallel) {
 
         if (executor == null)
@@ -53,6 +77,8 @@ public class LatchedExecutor implements Executor {
 
         this.executor = executor;
 
+        this.nparallel = nparallel;
+        
         this.semaphore = new Semaphore(nparallel);
 
     }

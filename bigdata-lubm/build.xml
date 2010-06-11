@@ -1,0 +1,155 @@
+<!-- $Id: build.xml 2266 2009-10-26 18:21:50Z mrpersonick $ -->
+<!--                                                        -->
+<!-- do "ant bundle-jar" in the parent directory first.     -->
+<!--                                                        -->
+<project name="lubm" default="compile" basedir=".">
+
+	<property file="build.properties" />
+
+	<!-- build-time classpath. -->
+	<path id="build.classpath">
+		<fileset dir="${lubm.dir}/lib">
+			<include name="**/*.jar" />
+		</fileset>
+		<!-- The bigdata dependencies (for the nano-server and the Sesame jars). -->
+		<fileset dir="${bigdata.build.dir}/lib">
+			<include name="**/*.jar" />
+		</fileset>
+	</path>
+
+	<!-- runtime classpath w/o install. -->
+	<path id="runtime.classpath">
+		<!-- The compiled LUBM classes. -->
+		<pathelement location="${build.dir}/classes" />
+		<!-- The LUBM dependencies. -->
+		<fileset dir="${lubm.dir}/lib">
+			<include name="**/*.jar" />
+		</fileset>
+		<!-- The bigdata dependencies (for the nano-server and the Sesame jars). -->
+		<fileset dir="${bigdata.build.dir}/lib">
+			<include name="**/*.jar" />
+		</fileset>
+		<path refid="build.classpath" />
+	</path>
+
+	<target name="clean" description="cleans everything in [build.dir]">
+		<delete dir="${build.dir}" />
+	</target>
+
+	<target name="prepare">
+		<!-- create directories. -->
+		<mkdir dir="${build.dir}" />
+		<mkdir dir="${build.dir}/classes" />
+		<mkdir dir="${build.dir}/bin" />
+	</target>
+
+	<target name="compile" depends="prepare" description="Compile the benchmark.">
+		<javac destdir="${build.dir}/classes" classpathref="build.classpath" debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}" encoding="${javac.encoding}">
+			<src path="${lubm.dir}/src/java" />
+			<compilerarg value="-version" />
+		</javac>
+		<!-- copy resources. -->
+		<copy toDir="${build.dir}/classes">
+			<fileset dir="${lubm.dir}/src/java">
+				<exclude name="**/*.java" />
+				<exclude name="**/package.html" />
+			</fileset>
+			<!-- copy log4j configuration file. -->
+			<fileset dir="${lubm.dir}/src/resources/logging" />
+		</copy>
+		<copy toDir="${build.dir}/bin">
+			<!-- copy benchmark data and queries. -->
+			<fileset dir="${lubm.dir}/src/resources/config" />
+			<!-- copy the journal configuration file. -->
+			<fileset file="${lubm.dir}/*.properties" />
+		</copy>
+	</target>
+
+	<target name="run-generator" depends="compile">
+		<mkdir dir="${lubm.baseDir}" />
+		<mkdir dir="${lubm.dataDir}" />
+		<java classname="edu.lehigh.swat.bench.uba.Generator" fork="true" failonerror="true" dir="${lubm.dataDir}">
+			<arg value="-subdirs" />
+			<arg value="-univ" />
+			<arg value="${lubm.univ}" />
+			<arg value="-onto" />
+			<arg value="http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl" />
+			<arg value="-compress" />
+			<arg value="${lubm.compressType}" />
+			<jvmarg value="-Xmx400m" />
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+
+	<target name="start-nano-server" depends="compile" description="Start a small http server fronting for a bigdata database instance.">
+		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true" dir="${build.dir}/bin">
+			<arg line="${lubm.nanoServerPort} ${lubm.namespace} ${lubm.journalPropertyFile}" />
+			<!-- specify/override the journal file name. -->
+			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${lubm.journalFile}" />
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+
+	<target name="stop-nano-server" depends="compile" description="Stop the small http server running at the configured port (either qualification or normal trials).">
+		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true" dir="${build.dir}/bin">
+			<arg line="${lubm.nanoServerPort} -stop" />
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+
+	<!-- Note: split data files and use RDFDataLoadMaster for scale-out. -->
+	<target name="run-load" depends="compile">
+		<!-- delete file if it exists so we load into a new journal. -->
+		<delete verbose="true" file="${lubm.journalFile}" />
+		<java classname="com.bigdata.rdf.store.DataLoader" fork="true" failonerror="true">
+			<arg line="-closure -namespace ${lubm.namespace} ${lubm.journalPropertyFile} ${lubm.ontologyFile} ${lubm.dataDir}" />
+			<!-- specify/override the journal file name. -->
+			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${lubm.journalFile}" />
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+
+	<target name="run-query" depends="compile" description="Runs the benchmark queries against the loaded data.">
+		<java classname="edu.lehigh.swat.bench.ubt.Test" fork="true" failonerror="true">
+			<jvmarg value="-Dlubm.warmUp=false" />
+			<jvmarg value="-Dlubm.queryTime=10" />
+			<jvmarg value="-Dlubm.queryParallel=1" />
+			<arg value="query" />
+			<arg value="${lubm.configFile}" />
+			<arg value="${lubm.queryFile}" />
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+
+	<target name="set-properties" depends="compile" description="Set or change properties for a kb instance. The new values are read from stdin.">
+		<java classname="com.bigdata.rdf.sail.BigdataSailHelper" fork="true" failonerror="true">
+			<!--
+Note: You can't change the writeRetentionQueue capacity here.  It is propagated to the IndexMetadata records
+for the BTree instances and needs to be updated in place for each index.
+
+inputstring="com.bigdata.btree.writeRetentionQueue.capacity=8000"
+
+inputstring="com.bigdata.rdf.sail.starJoins=false"
+
+inputstring="com.bigdata.rdf.sail.starJoins=true\ncom.bigdata.relation.rule.eval.ProgramTask.maxParallelSubqueries=10"
+-->
+			<!-- dir="${build.dir}/bin" -->
+			<arg line="${lubm.journalFile} LTS kb" />
+			<jvmarg value="-Dlog4j.configuration=log4j.properties" />
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+
+</project>

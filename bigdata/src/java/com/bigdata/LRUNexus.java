@@ -240,8 +240,8 @@ public class LRUNexus {
          * ideal for both scale-out and scale-up once it has been tested more
          * throughly. Even better would be a LIRS access policy for that class.
          */
-//        String DEFAULT_CLASS = HardReferenceGlobalLRURecycler.class.getName();
-        String DEFAULT_CLASS = BCHMGlobalLRU2.class.getName();
+        String DEFAULT_CLASS = HardReferenceGlobalLRURecycler.class.getName();
+//        String DEFAULT_CLASS = BCHMGlobalLRU2.class.getName();
 
         /**
          * The load factor for the cache instances.

@@ -1334,19 +1334,34 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                      */
                     log.warn(this, new RuntimeException("Cancelling future: "
                             + future));
-                } else {
-                    
-                    /*
-                     * Otherwise log @ WARN w/o a stack trace.
-                     */
-                    log.warn("Cancelling future: " + future);
+
+					/*
+					 * Note: I have taken out this warning message since it is a
+					 * common enough event and nothing to be concerned about. It
+					 * is just the relative timing and source of the buffer
+					 * close event. If the Iterator (consumer) is closed first,
+					 * then this code path is not taken. It is common that the
+					 * iterator is closed first, but a common counter example is
+					 * when a join breaks in a manner which throus an exception
+					 * which we are willing to mask and we interrupt the
+					 * downstream join tasks. If the BlockingBuffer (producer)
+					 * is closed first, then this code path is token. Since this
+					 * is not a difference which makes a difference there is no
+					 * point issuing a warning for it.
+					 */
+//                } else {
+//                    
+//                    /*
+//                     * Otherwise log @ WARN w/o a stack trace.
+//                     */
+//                    log.warn("Cancelling future: " + future);
                     
                 }
 
                 /*
                  * Note: Cancelling the Future may cause a
                  * ClosedByInterruptException to be thrown. That will be noticed
-                 * by checkFuture(), which logs this as a warning.
+                 * by checkFuture(), which logs this @ INFO..
                  */
                 future.cancel(true/* mayInterruptIfRunning */);
 
@@ -1419,18 +1434,24 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                 } catch (ExecutionException e) {
 
-                    if (InnerCause.isInnerCause(e,
-                            ClosedByInterruptException.class)) {
+					if (InnerCause.isInnerCause(e,
+							ClosedByInterruptException.class)||
+						InnerCause.isInnerCause(e,
+									InterruptedException.class)) {
 
-                        /*
-                         * Note: ClosedByInterruptException indicates that the
-                         * producer was interrupted. This occurs any time the
-                         * iterator is closed prematurely. For example, if there
-                         * is a LIMIT on a query then the join will be broken
-                         * when the limit is satisfied. That causes the
-                         * producer's Future to be cancelled, which means that
-                         * it gets interrupted. This is not an error.
-                         */
+						/*
+						 * Note: ClosedByInterruptException indicates that the
+						 * producer was interrupted. This occurs any time the
+						 * iterator is closed prematurely. For example, if there
+						 * is a LIMIT on a query then the join will be broken
+						 * when the limit is satisfied. That causes the
+						 * producer's Future to be cancelled, which means that
+						 * it gets interrupted. This is not an error.
+						 * 
+						 * Note: a wrapped InterruptedException is handled the
+						 * same as an plain InterruptedException (above) or the
+						 * ClosedByInterruptException (here).
+						 */
 
                         if (log.isInfoEnabled())
                             log.info(e.getMessage());

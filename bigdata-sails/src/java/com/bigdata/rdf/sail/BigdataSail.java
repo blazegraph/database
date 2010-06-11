@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
 Portions of this code are:
 
-Copyright Aduna (http://www.aduna-software.com/) © 2001-2007
+Copyright Aduna (http://www.aduna-software.com/) ï¿½ 2001-2007
 
 All rights reserved.
 
@@ -115,6 +115,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.TruthMaintenance;
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValue;
@@ -167,12 +168,19 @@ import cutthecrap.utils.striterators.Striterator;
  * Concurrent readers are possible, and can be very efficient. However, readers
  * MUST use a database commit point corresponding to a desired state of the
  * store, e.g., after loading some data set and (optionally) after computing the
- * closure of that data set. Use {@link #getDatabase()} .
- * {@link AbstractTripleStore#getIndexManager()} .
- * {@link IIndexStore#getLastCommitTime()} to obtain the commit time and then
- * {@link #getReadHistoricalView(long)} to obtain a read-only view as of that
- * commit time. In you are loading data incrementally, then you can use
- * {@link #asReadCommittedView()} instead.
+ * closure of that data set. Use {@link #getReadOnlyConnection()} to obtain
+ * a read-only view of the database as of the last commit time, or 
+ * {@link #getReadOnlyConnection(long)} to obtain a read-only view of the
+ * database as of some other historical point.  These connections are safe to
+ * use concurrently with the unisolated connection from {@link #getConnection()}.
+ * </p>
+ * <p>
+ * Read/write transaction are also implemented in the bigdata SAIL.  To turn
+ * on read/write transactions, use the option {@link Options#ISOLATABLE_INDICES}.
+ * If this option is set to true, then {@link #getConnection} will return an
+ * isolated read/write view of the database.  Multiple read/write transactions
+ * are allowed, and the database can resolve add/add conflicts between
+ * transactions.
  * </p>
  * <p>
  * The {@link BigdataSail} may be configured as as to provide a triple store
@@ -338,6 +346,14 @@ public class BigdataSail extends SailBase implements Sail {
         
         public static final String DEFAULT_ISOLATABLE_INDICES = "false";
 
+        /**
+         * Experimental new star joins feature.  Not yet performant.
+         */
+        public static final String STAR_JOINS = BigdataSail.class
+                .getPackage().getName()
+                + ".starJoins";
+        
+        public static final String DEFAULT_STAR_JOINS = "false";
         
     }
 
@@ -404,6 +420,15 @@ public class BigdataSail extends SailBase implements Sail {
     }
     
     /**
+     * Return <code>true</code> iff star joins are enabled.
+     */
+    public boolean isStarJoins() {
+    	
+    	return starJoins;
+    	
+    }
+    
+    /**
      * The configured capacity for the statement buffer(s).
      * 
      * @see Options#BUFFER_CAPACITY
@@ -458,9 +483,16 @@ public class BigdataSail extends SailBase implements Sail {
     /**
      * When true, read/write transactions are allowed.
      * 
-     * @see Options#ISOLATABLE_INDICES
+     * @see {@link Options#ISOLATABLE_INDICES}
      */
     final private boolean isolatable;
+    
+    /**
+     * When true, enable star joins.
+     * 
+     * @See {@link Options#STAR_JOINS}
+     */
+    final private boolean starJoins;
     
     /**
      * <code>true</code> iff the {@link BigdataSail} has been
@@ -663,6 +695,10 @@ public class BigdataSail extends SailBase implements Sail {
                 BigdataSail.Options.TRUTH_MAINTENANCE,
                 BigdataSail.Options.DEFAULT_TRUTH_MAINTENANCE));
         
+        final boolean justify = Boolean.parseBoolean(properties.getProperty(
+                BigdataSail.Options.JUSTIFY,
+                BigdataSail.Options.DEFAULT_JUSTIFY));
+        
         final boolean noAxioms = properties.getProperty(
                 BigdataSail.Options.AXIOMS_CLASS,
                 BigdataSail.Options.DEFAULT_AXIOMS_CLASS).equals(
@@ -700,6 +736,15 @@ public class BigdataSail extends SailBase implements Sail {
                         "Cannot use transactions with a vocabulary class. " +
                         "Set option " + Options.VOCABULARY_CLASS + 
                         " = " + NoVocabulary.class.getName());
+                
+            }
+
+            if (justify) {
+                
+                throw new UnsupportedOperationException(
+                        "Cannot use transactions with justification chains. " +
+                        "Set option " + Options.JUSTIFY + 
+                        " = " + Boolean.FALSE);
                 
             }
 
@@ -851,6 +896,19 @@ public class BigdataSail extends SailBase implements Sail {
             if (log.isInfoEnabled())
                 log.info(BigdataSail.Options.ISOLATABLE_INDICES + "="
                         + isolatable);
+            
+        }
+
+        // star joins
+        { 
+            
+            starJoins = Boolean.parseBoolean(properties.getProperty(
+                    BigdataSail.Options.STAR_JOINS,
+                    BigdataSail.Options.DEFAULT_STAR_JOINS));
+
+            if (log.isInfoEnabled())
+                log.info(BigdataSail.Options.STAR_JOINS + "="
+                        + starJoins);
             
         }
 
@@ -1331,7 +1389,7 @@ public class BigdataSail extends SailBase implements Sail {
          * FIXME bnodes : resolution of term identifiers to blank nodes for
          * JOINs in {@link BigdataSolutionResolverator}.
          */
-        private Map<String, BigdataBNodeImpl> bnodes;
+        private Map<String, BigdataBNode> bnodes;
 
         /**
          * A reverse mapping from the assigned term identifiers for blank nodes
@@ -1340,7 +1398,7 @@ public class BigdataSail extends SailBase implements Sail {
          * {@link SailConnection} without loosing the blank node identifier.
          * This behavior is required by the contract for {@link SailConnection}.
          */
-        private Map<Long, BigdataBNodeImpl> bnodes2;
+        private Map<Long, BigdataBNode> bnodes2;
         
         /**
          * Used to coordinate between read/write transactions and the unisolated
@@ -1523,8 +1581,8 @@ public class BigdataSail extends SailBase implements Sail {
                  * explicit synchronization during iterators, which breaks
                  * encapsulation.
                  */
-                bnodes = new ConcurrentHashMap<String, BigdataBNodeImpl>();
-                bnodes2 = new ConcurrentHashMap<Long, BigdataBNodeImpl>();
+                bnodes = new ConcurrentHashMap<String, BigdataBNode>();
+                bnodes2 = new ConcurrentHashMap<Long, BigdataBNode>();
 //                bnodes = Collections
 //                        .synchronizedMap(new HashMap<String, BigdataBNodeImpl>(
 //                                bufferCapacity));
@@ -2822,7 +2880,67 @@ public class BigdataSail extends SailBase implements Sail {
             return evaluate(tupleExpr, dataset, bindings, includeInferred, new Properties());
         }
         
-        
+        /**
+         * Return the optimized operator tree.  Useful for debugging.
+         */
+        public synchronized TupleExpr optimize(
+                TupleExpr tupleExpr, Dataset dataset,
+                final BindingSet bindings, final boolean includeInferred,
+                final Properties queryHints) 
+                throws SailException {
+
+            if (log.isInfoEnabled())
+                log.info("Optimizing query: " + tupleExpr + ", dataSet="
+                        + dataset + ", includeInferred=" + includeInferred);
+
+            flushStatementBuffers(true/* assertions */, true/* retractions */);
+
+            // Clone the tuple expression to allow for more aggressive optimizations
+            tupleExpr = tupleExpr.clone();
+
+            if (!(tupleExpr instanceof QueryRoot)) {
+                // Add a dummy root node to the tuple expressions to allow the
+                // optimizers to modify the actual root node
+                tupleExpr = new QueryRoot(tupleExpr);
+            }
+
+            /*
+             * Convert the terms in the query with BigdataValues. Both the
+             * native joins and the BigdataEvaluationStatistics rely on
+             * this.
+             */
+                dataset = replaceValues(dataset, tupleExpr);
+
+            final TripleSource tripleSource = new BigdataTripleSource(this,
+                    includeInferred);
+
+            final BigdataEvaluationStrategyImpl2 strategy = new BigdataEvaluationStrategyImpl2(
+                    (BigdataTripleSource) tripleSource, dataset,
+                    nativeJoins, starJoins);
+
+            final QueryOptimizerList optimizerList = new QueryOptimizerList();
+            optimizerList.add(new BindingAssigner());
+            optimizerList.add(new ConstantOptimizer(strategy));
+            optimizerList.add(new CompareOptimizer());
+            optimizerList.add(new ConjunctiveConstraintSplitter());
+            optimizerList.add(new SameTermFilterOptimizer());
+            // only need to optimize the join order this way if we are not
+            // using native joins
+            if (nativeJoins == false) {
+                optimizerList.add(new QueryJoinOptimizer(
+                        new BigdataEvaluationStatistics(this)));
+            }
+            optimizerList.add(new FilterOptimizer());
+
+            optimizerList.optimize(tupleExpr, dataset, bindings);
+
+            if (log.isInfoEnabled())
+                log.info("Optimized query: " + tupleExpr);
+
+            return tupleExpr;
+
+        }
+
         /**
          * Note: The <i>includeInferred</i> argument is applied in two ways.
          * First, inferences are stripped out of the {@link SPOAccessPath}.
@@ -2877,7 +2995,7 @@ public class BigdataSail extends SailBase implements Sail {
 
                 final BigdataEvaluationStrategyImpl2 strategy = new BigdataEvaluationStrategyImpl2(
                         (BigdataTripleSource) tripleSource, dataset,
-                        nativeJoins);
+                        nativeJoins, starJoins);
 
                 final QueryOptimizerList optimizerList = new QueryOptimizerList();
                 optimizerList.add(new BindingAssigner());

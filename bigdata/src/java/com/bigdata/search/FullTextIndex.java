@@ -49,7 +49,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.LowerCaseFilter;
-import org.apache.lucene.analysis.Token;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.br.BrazilianAnalyzer;
 import org.apache.lucene.analysis.cjk.CJKAnalyzer;
@@ -67,7 +66,7 @@ import org.apache.lucene.util.Version;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ISplitHandler;
+import com.bigdata.btree.ISimpleSplitHandler;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
@@ -400,7 +399,7 @@ public class FullTextIndex extends AbstractRelation {
      * 
      * @see Options
      * 
-     * @todo Customize a {@link ISplitHandler} such that we never split a
+     * @todo Customize a {@link ISimpleSplitHandler} such that we never split a
      *       {term,doc} tuple?
      * 
      * @todo Make sure that the defaults for the split points (in terms of the

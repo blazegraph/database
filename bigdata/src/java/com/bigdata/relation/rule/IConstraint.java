@@ -44,4 +44,6 @@ public interface IConstraint extends Serializable {
     
     public boolean accept(IBindingSet bindingSet);
     
+    public IVariable[] getVariables();
+    
 }

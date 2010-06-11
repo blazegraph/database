@@ -42,7 +42,6 @@ import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
  * (De-)serializes {@link SPO}s for statement indices.
@@ -70,7 +69,7 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
 
     private static final long serialVersionUID = 2893830958762265104L;
     
-    private static final transient long NULL = IRawTripleStore.NULL;
+//    private static final transient long NULL = IRawTripleStore.NULL;
     
     /**
      * The natural order for the index.
@@ -121,8 +120,8 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         super(new ASCIIKeyBuilderFactory(keyOrder.getKeyArity()
                 * Bytes.SIZEOF_LONG), leafKeySer, leafValSer);
         
-        if (keyOrder == null)
-            throw new IllegalArgumentException();
+//        if (keyOrder == null)
+//            throw new IllegalArgumentException();
         
         this.keyOrder = keyOrder;
         
@@ -315,6 +314,7 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
 
     }
 
+    // FIXME VERSION: Not explicitly versioned.
     public void writeExternal(ObjectOutput out) throws IOException {
 
         super.writeExternal(out);

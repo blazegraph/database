@@ -1,7 +1,5 @@
 package benchmark.testdriver;
 
-import benchmark.bigdata.BigdataConnection;
-
 public class ClientManager {
 	private int activeThreadsInWarmup;
 	private int activeThreadsInRun;
@@ -36,10 +34,7 @@ public class ClientManager {
 			if(parent.doSQL)
 				sConn = new SQLConnection(parent.sparqlEndpoint, parent.timeout, parent.driverClassName);
 			else
-                /**
-                 * MRP 1/19/10
-                 */
-				sConn = new BigdataConnection(parent.repo, parent.defaultGraph, parent.timeout);
+				sConn = new SPARQLConnection(parent.sparqlEndpoint, parent.defaultGraph, parent.timeout);
 				
 			clients[i] = new ClientThread(pool, sConn, ignoreQueries.length, this, i+1);
 		}

@@ -25,22 +25,17 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.ObjectOutputStream;
 
-import java.util.Iterator;
 import java.util.Locale;
 import java.util.ArrayList;
 import java.util.LinkedList;
-import java.util.Random;
 
 import org.apache.log4j.xml.DOMConfigurator;
 import org.apache.log4j.Logger;
 import org.apache.log4j.Level;
-import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSailRepository;
 
 import java.io.*;
 import java.util.StringTokenizer;
 
-import benchmark.bigdata.BigdataConnection;
 import benchmark.qualification.QueryResult;
 
 public class TestDriver {
@@ -75,15 +70,8 @@ public class TestDriver {
 	protected int nrOfPeriods = TestDriverDefaultValues.nrOfPeriods;//The last nrOfPeriods periods are compared
 	protected boolean rampup = false;
 	
-    /**
-     * Modified by MRP 1/19/10.
-     */
-    protected BigdataSailRepository repo;
 	
-    /**
-     * Modified by MRP 1/19/10.
-     */
-	public TestDriver(String[] args, BigdataSailRepository repo) {
+	public TestDriver(String[] args) {
 		processProgramParameters(args);
 		System.out.print("Reading Test Driver data...");
 		System.out.flush();
@@ -92,18 +80,14 @@ public class TestDriver {
 		else
 			parameterPool = new LocalSPARQLParameterPool(new File(resourceDir),seed);
 		System.out.println("done");
-
-        this.repo = repo;
-        
+	
 		if(sparqlEndpoint!=null && !multithreading){
 			if(doSQL)
 				server = new SQLConnection(sparqlEndpoint, timeout, driverClassName);
 			else
-				server = new BigdataConnection(repo, defaultGraph, timeout);
+				server = new SPARQLConnection(sparqlEndpoint, defaultGraph, timeout);
 		} else if(multithreading) {
 			//do nothing
-		} else if(rampup) { // BBT 2/28/2010
-		    server = new BigdataConnection(repo, defaultGraph, timeout);
 		}
 		else {
 			printUsageInfos();
@@ -353,24 +337,6 @@ public class TestDriver {
 						if(queryResult!=null)
 							objectOutput.writeObject(queryResult);
 						queryMix.setCurrent(0, -1.0);
-/*
-                        { // hacked by mikep to get more info on problem queries
-                            final int queryNumber = next.getNr();
-                            final int runNumber = (nrRun + 1);
-                            if (queryNumber == 4 && (runNumber == 5 || runNumber == 13)) {
-                                String queryString = next.getQueryString();
-                                Iterator<String> results = queryResult.getResults();
-                                StringBuilder sb = new StringBuilder();
-                                sb.append("\nQuery 4, run ").append(runNumber);
-                                sb.append("\nquery:\n").append(queryString);
-                                sb.append("\nresults:");
-                                while (results.hasNext()) {
-                                    sb.append("\n").append(results.next());                                
-                                }
-                                System.out.println(sb.toString());
-                            }
-                        }
-*/                        
 					}
 					System.out.print(".");
 				}
@@ -523,15 +489,9 @@ public class TestDriver {
 					multithreading = true;
 					nrThreads = Integer.parseInt(args[i++ + 1]);
 				}
-                else if(args[i].equals("-seed")) {
-                    final String s = args[i++ + 1];
-                    if(s.equals("random")) {
-                        seed = System.currentTimeMillis();
-                        System.out.println("random seed: "+seed);
-                    } else {
-                        seed = Long.parseLong(s);
-                    }
-                }
+				else if(args[i].equals("-seed")) {
+					seed = Long.parseLong(args[i++ + 1]);
+				}
 				else if(args[i].equals("-t")) {
 					timeout = Integer.parseInt(args[i++ + 1]);
 				}
@@ -745,7 +705,7 @@ public class TestDriver {
 						"\t-mt <Number of clients>\n" +
 						"\t\tRun multiple clients concurrently.\n" +
 						"\t\tdefault: not set\n" +
-						"\t-seed (<Long Integer>|random)\n" +
+						"\t-seed <Long Integer>\n" +
 						"\t\tInit the Test Driver with another seed than the default.\n" +
 						"\t\tdefault: " + TestDriverDefaultValues.seed + "\n" +
 						"\t-t <timeout in ms>\n" +
@@ -779,12 +739,9 @@ public class TestDriver {
 		}
 	}
 	
-    /**
-     * Modified by MRP 1/19/10.
-     */
-	public static void main(String argv[], BigdataSailRepository repo) {
+	public static void main(String argv[]) {
 		DOMConfigurator.configureAndWatch( "log4j.xml", 60*1000 );
-		TestDriver testDriver = new TestDriver(argv, repo);
+		TestDriver testDriver = new TestDriver(argv);
 		testDriver.init();
 		System.out.println("\nStarting test...\n");
 		if(testDriver.multithreading) {

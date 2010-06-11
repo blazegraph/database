@@ -180,7 +180,11 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
         
         if (LRUNexus.INSTANCE != null) {
             // flush everything before/after a unit test.
-            LRUNexus.INSTANCE.discardAllCaches();
+            try {
+                LRUNexus.INSTANCE.discardAllCaches();
+            } catch (Throwable t) {
+                log.error(t, t);
+            }
         }
 
         super.tearDown();
