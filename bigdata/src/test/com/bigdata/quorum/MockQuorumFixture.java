@@ -28,15 +28,41 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.quorum;
 
 import java.rmi.Remote;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.quorum.AbstractQuorum.QuorumWatcherBase;
+import com.bigdata.quorum.MockQuorumFixture.MockQuorum.MockQuorumWatcher;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * A mock object providing the shared quorum state for a set of
  * {@link QuorumClient}s running in the same JVM.
+ * <p>
+ * This fixture dumps the events into queues drained by a per-watcher thread.
+ * This approximates the zookeeper behavior and ensures that each watcher sees
+ * the events in a total order. Zookeeper promises that all watchers proceed at
+ * the same rate. We enforce that with a {@link #globalSynchronousLock}. Once
+ * all watchers have drained the event, the next event is made available to the
+ * watchers.
+ * <p>
+ * The fixture only generates events for actual state changes. This also mimics
+ * the behavior of zookeeper.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -45,206 +71,436 @@ public class MockQuorumFixture {
 
     protected static final transient Logger log = Logger
             .getLogger(MockQuorumFixture.class);
+
+    /**
+     * Single threaded executor used to dispatch events to the {@link MockQuorumWatcher}s.
+     */
+    private ExecutorService dispatchService = null;
+
+    /**
+     * The set of registered listeners. Each listener will get each event. For
+     * each event, the next listener will not get the event until it has been
+     * handled by the previous listener. The {@link MockQuorumWatcher}s
+     * collaborate to create this behavior.
+     */
+    private final CopyOnWriteArraySet<MockQuorumWatcher> listeners = new CopyOnWriteArraySet<MockQuorumWatcher>();
     
     /**
-     * The service replication factor.
+     * Lock used to force global synchronous event handling semantics.
      */
-    private final int k;
+    private final Lock globalSynchronousLock = new ReentrantLock();
 
     /**
-     * The delegate which handles maintenance of the state and generation of
-     * events.
+     * Condition used to await the watcher completing the handling of an event.
      */
-    private final AbstractQuorum quorumImpl;
+    private final Condition eventDone = globalSynchronousLock.newCondition();
+
+    /**
+     * Deque of events from actors awaiting dispatch to
+     * {@link MockQuorumWatcher}. The fixture and each {@link MockQuorumWatcher}
+     * run a thread. The fixture's thread pumps each event into a local queue
+     * for each {@link MockQuorumWatcher}. The watcher's thread takes an event
+     * from the queue and interprets that event, creating a corresponding local
+     * state change.
+     */
+    private final LinkedBlockingDeque<QuorumEvent> deque = new LinkedBlockingDeque<QuorumEvent>();
     
     /**
-     * @param k
+     * The lock protecting state changes in the remaining fields and used to
+     * provide {@link Condition}s used to await various states.
      */
-    protected MockQuorumFixture(final int k) {
-        
-        if (k < 1)
-            throw new IllegalArgumentException();
+    private final ReentrantLock lock = new ReentrantLock();
 
-        if ((k % 2) == 0)
-            throw new IllegalArgumentException("k must be odd: " + k);
+    /**
+     * Condition used to await an empty {@link #deque}.
+     */
+    private final Condition dequeEmpty = lock.newCondition();
+    /**
+     * Condition used to await a non-empty {@link #deque}.
+     */
+    private final Condition dequeNotEmpty = lock.newCondition();
+    
+    /**
+     * The last valid quorum token.
+     */
+    private long lastValidToken = Quorum.NO_QUORUM;
 
-        this.k = k;
+    /**
+     * The current quorum token.
+     */
+    private long token = Quorum.NO_QUORUM;
 
-        this.quorumImpl = new AbstractQuorum(k) {
-            
-            /**
-             * A do nothing actor used for the {@link MockQuorumFixture}'s inner quorum
-             * object.
-             */
-            class NOPQuorumFixtureActor extends QuorumActorBase {
+    /**
+     * The service {@link UUID} of each service registered as a member of this
+     * quorum.
+     */
+    private final LinkedHashSet<UUID> members = new LinkedHashSet<UUID>();
 
-                public NOPQuorumFixtureActor(final UUID serviceId) {
-                    super(serviceId);
-                }
+    /**
+     * A map from collection of the distinct <i>lastCommitTimes</i> for which at
+     * least one service has cast its vote to the set of services which have
+     * cast their vote for that <i>lastCommitTime</i>, <em>in vote order</em>.
+     */
+    private final TreeMap<Long/* lastCommitTime */, LinkedHashSet<UUID>> votes = new TreeMap<Long, LinkedHashSet<UUID>>();
 
-                @Override
-                protected void doCastVote(long lastCommitTime) {
-                }
+    /**
+     * The services joined with the quorum in the order in which they join. This
+     * MUST be a {@link LinkedHashSet} to preserve the join order.
+     */
+    private final LinkedHashSet<UUID> joined = new LinkedHashSet<UUID>();
 
-                @Override
-                protected void doMemberAdd() {
-                    
-                }
+    /**
+     * The ordered set of services in the write pipeline. The
+     * {@link LinkedHashSet} is responsible for preserving the pipeline order.
+     * <p>
+     * The first service in this order MUST be the leader. The remaining
+     * services appear in the order in which they enter the write pipeline. When
+     * a service leaves the write pipeline, the upstream service consults the
+     * pipeline state to identify its new downstream service (if any) and then
+     * queries that service for its {@link PipelineState} so it may begin to
+     * transmit write cache blocks to the downstream service. When a service
+     * joins the write pipeline, it always joins as the last service in this
+     * ordered set.
+     */
+    private final LinkedHashSet<UUID> pipeline = new LinkedHashSet<UUID>();
 
-                @Override
-                protected void doMemberRemove() {
-                }
+    public MockQuorumFixture() {
+    }
 
-                @Override
-                protected void doPipelineAdd() {
-                }
-
-                @Override
-                protected void doPipelineRemove() {
-                }
-
-                @Override
-                protected void doServiceJoin() {
-                }
-
-                @Override
-                protected void doServiceLeave() {
-                }
-
-                @Override
-                protected void doSetLastValidToken(long newToken) {
-                }
-
-                @Override
-                protected void doSetToken() {
-                }
-
-                @Override
-                protected void doClearToken() {
-                }
-
-                @Override
-                protected void doWithdrawVote() {
-                }
-
-                @Override
-                protected void reorganizePipeline() {
-                }
-                                
-            };
-            
-            /** NOP Actor. */
-            @Override
-            protected QuorumActorBase newActor(final UUID serviceId) {
-                return new NOPQuorumFixtureActor(serviceId);
-            }
-
-            @Override
-            protected QuorumWatcherBase newWatcher() {
-                return new QuorumWatcherBase() {
-
-                    /** NOP. */
-                    @Override
-                    protected void setupDiscovery() {
-                    }
-                };
-            }
-        };
-        
-    } // constructor.
-
-    /** Start fixture (mostly a hook). */
+    /** Start fixture. */
     void start() {
 
-        // Start the quorum w/ a NOP client.
-        quorumImpl.start(new NOPFixtureClient(quorumImpl));
-
-    }
-
-    
-    /**
-     * A NOP {@link QuorumClient} for the fixture's inner quorum object.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private class NOPFixtureClient extends AbstractQuorumClient {
-
-        public NOPFixtureClient(Quorum quorum) {
-            super(quorum);
-        }
+        token = lastValidToken = Quorum.NO_QUORUM;
         
-        @Override
-        public Remote getService(UUID serviceId) {
-            throw new UnsupportedOperationException();
-        }
+        dispatchService = Executors
+                .newSingleThreadScheduledExecutor(new DaemonThreadFactory(
+                        "dispatchService"));
 
+        dispatchService.execute(new DispatcherTask());
+        
     }
     
-    /** Terminate fixture (mostly a hook). */
+    /** Terminate fixture. */
     void terminate() {
         
-        quorumImpl.terminate();
+        dispatchService.shutdownNow();
         
+    }
+
+    /**
+     * Dispatches each event to each watcher in turn.  The event is not
+     * dispatched to the next watcher until the current watcher is finished
+     * with the event.
+     */
+    private class DispatcherTask implements Runnable {
+        
+        public void run() {
+            while (true) {
+                try {
+                    runOnce();
+                } catch (InterruptedException t) {
+                    log.warn("Dispatcher exiting : " + t);
+                } catch (Throwable t) {
+                    log.error(t, t);
+                }
+            }
+        }
+
+        private void runOnce() throws Throwable {
+
+            final QuorumEvent e;
+            lock.lock();
+            try {
+                while(deque.isEmpty()) {
+                    dequeNotEmpty.await();
+                }
+                /*
+                 * Note: only peek for now so deque remains non-empty until we
+                 * are done with this event.
+                 */
+                if ((e = deque.peek()) == null)
+                    throw new AssertionError();
+                log.warn("Next event: " + e);
+            } finally {
+                lock.unlock();
+            }
+
+            int i = 0;
+            for (MockQuorumWatcher watcher : listeners) {
+                globalSynchronousLock.lock();
+                try {
+                    log.warn("Queuing event: " + e + " on listener#" + i);
+                    // queue a single event.
+                    watcher.queue.put(e);
+                    // signal that an event is ready.
+                    watcher.eventReady.signalAll();
+                    // wait until the event has been drained.
+                    while (!watcher.queue.isEmpty()) {
+                        // yield until the watcher is done.
+                        eventDone.await();
+                    }
+                } finally {
+                    globalSynchronousLock.unlock();
+                }
+                i++;
+            }
+
+            lock.lock();
+            try {
+                // now take the event.
+                if (e != deque.take())
+                    throw new AssertionError();
+                if (deque.isEmpty()) {
+                    /*
+                     * Signal if the deque is empty _and_ the event has been
+                     * dispatched.
+                     */
+                    dequeEmpty.signalAll();
+                }
+            } finally {
+                lock.unlock();
+            }
+
+        }
+
+    }
+    
+    /**
+     * Block until the event deque has been drained (that is, until all watchers
+     * have handled all events which have already been generated).
+     * 
+     * @throws InterruptedException
+     */
+    void awaitDeque() throws InterruptedException {
+        lock.lock();
+        try {
+            while (!deque.isEmpty()) {
+                dequeEmpty.await();
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Accept an event. Events are generated by the methods below which update
+     * our internal state. Events are ONLY generated if the internal state is
+     * changed by the request, and that state change is made atomically while
+     * holding the {@link #lock}. This guarantees that we will not see duplicate
+     * events arising from duplicate requests.
+     * 
+     * @param e
+     *            The event.
+     */
+    private void accept(final QuorumEvent e) {
+        lock.lock();
+        try {
+            if (false) {
+                // stack trace so we can see who generated this event.
+                log.warn("event=" + e, new RuntimeException("stack trace"));
+            }
+            deque.add(e);
+            dequeNotEmpty.signalAll();
+        } finally {
+            lock.unlock();
+        }
     }
     
     /*
-     * State change methods are delegated to the QuorumWatcher of the inner
-     * quorum object. That watcher will impose the state change on the private
-     * quorum object, which will in turn send QuorumEvents to each registered
-     * listener. Each MockQuorum has an inner QuorumWatch which listens for
-     * those events. This simulates the distributed state change actor/watcher
-     * pattern.
+     * Private methods implement the conditional tests on the local state an
+     * invoke the protected methods which actually carry out the action to
+     * effect that change in the distributed quorum state.
+     * 
+     * Note: These methods have pure semantics. The make the specified change,
+     * and only that change, iff the current state is different and they pump
+     * one event into the dispatcher if the change was made. These methods DO
+     * NOT do things like withdraw a vote before casting a vote. That behavior
+     * is the responsibility of the QuorumActor, which is part of what we are
+     * testing here.
      */
 
     private void memberAdd(final UUID serviceId) {
-        ((QuorumWatcherBase) quorumImpl.getWatcher()).memberAdd(serviceId);
+        lock.lock();
+        try {
+            if (members.add(serviceId)) {
+                if (log.isDebugEnabled())
+                    log.debug("serviceId=" + serviceId);
+                accept(new AbstractQuorum.E(QuorumEventEnum.MEMBER_ADDED,
+                        lastValidToken, token, serviceId));
+            }
+        } finally {
+            lock.unlock();
+        }
     }
-
+    
     private void memberRemove(final UUID serviceId) {
-        ((QuorumWatcherBase) quorumImpl.getWatcher()).memberRemove(serviceId);
+        lock.lock();
+        try {
+            if (members.remove(serviceId)) {
+                if (log.isDebugEnabled())
+                    log.debug("serviceId=" + serviceId);
+                accept(new AbstractQuorum.E(QuorumEventEnum.MEMBER_REMOVED,
+                        lastValidToken, token, serviceId));
+            }
+        } finally {
+            lock.unlock();
+        }
     }
 
     private void castVote(final UUID serviceId, final long lastCommitTime) {
-        ((QuorumWatcherBase) quorumImpl.getWatcher()).castVote(serviceId,
-                lastCommitTime);
+        lock.lock();
+        try {
+            LinkedHashSet<UUID> tmp = votes.get(lastCommitTime);
+            if (tmp == null) {
+                tmp = new LinkedHashSet<UUID>();
+                votes.put(lastCommitTime, tmp);
+            }
+            if (tmp.add(serviceId)) {
+                if (log.isDebugEnabled())
+                    log.debug("serviceId=" + serviceId + ",lastCommitTime="
+                            + lastCommitTime);
+                // Cast vote.
+                accept(new AbstractQuorum.E(QuorumEventEnum.VOTE_CAST,
+                        lastValidToken, token, serviceId, lastCommitTime));
+            }
+        } finally {
+            lock.unlock();
+        }
     }
 
     private void withdrawVote(final UUID serviceId) {
-        ((QuorumWatcherBase) quorumImpl.getWatcher()).withdrawVote(serviceId);
+        lock.lock();
+        try {
+            // Search for and withdraw cast vote.
+            final Iterator<Map.Entry<Long, LinkedHashSet<UUID>>> itr = votes
+                    .entrySet().iterator();
+            while (itr.hasNext()) {
+                final Map.Entry<Long, LinkedHashSet<UUID>> entry = itr.next();
+                final long lastCommitTime = entry.getKey();
+                final Set<UUID> votes = entry.getValue();
+                if (votes.remove(serviceId)) {
+                    // Withdraw existing vote.
+                    if (log.isDebugEnabled())
+                        log.debug("serviceId=" + serviceId + ",lastCommitTime="
+                                + lastCommitTime);
+                    accept(new AbstractQuorum.E(QuorumEventEnum.VOTE_WITHDRAWN,
+                            lastValidToken, token, serviceId));
+                    break;
+                }
+            }
+        } finally {
+            lock.unlock();
+        }
     }
 
     private void pipelineAdd(final UUID serviceId) {
-        ((QuorumWatcherBase) quorumImpl.getWatcher()).pipelineAdd(serviceId);
+        lock.lock();
+        try {
+            if (pipeline.add(serviceId)) {
+                if (log.isDebugEnabled())
+                    log.debug("serviceId=" + serviceId);
+                accept(new AbstractQuorum.E(QuorumEventEnum.PIPELINE_ADDED,
+                        lastValidToken, token, serviceId));
+            }
+        } finally {
+            lock.unlock();
+        }
     }
 
     private void pipelineRemove(final UUID serviceId) {
-        ((QuorumWatcherBase) quorumImpl.getWatcher()).pipelineRemove(serviceId);
+        lock.lock();
+        try {
+            if (pipeline.remove(serviceId)) {
+                if (log.isDebugEnabled())
+                    log.debug("serviceId=" + serviceId);
+                /*
+                 * Remove the service from the pipeline.
+                 */
+                accept(new AbstractQuorum.E(QuorumEventEnum.PIPELINE_REMOVED,
+                        lastValidToken, token, serviceId));
+            }
+        } finally {
+            lock.unlock();
+        }
     }
 
     private void serviceJoin(final UUID serviceId) {
-        ((QuorumWatcherBase) quorumImpl.getWatcher()).serviceJoin(serviceId);
+        lock.lock();
+        try {
+            if (joined.add(serviceId)) {
+                if (log.isDebugEnabled())
+                    log.debug("serviceId=" + serviceId);
+                accept(new AbstractQuorum.E(QuorumEventEnum.SERVICE_JOINED,
+                        lastValidToken, token, serviceId));
+            }
+        } finally {
+            lock.unlock();
+        }
     }
 
     private void serviceLeave(final UUID serviceId) {
-        ((QuorumWatcherBase) quorumImpl.getWatcher()).serviceLeave(serviceId);
+        lock.lock();
+        try {
+            if (joined.remove(serviceId)) {
+                if (log.isDebugEnabled())
+                    log.debug("serviceId=" + serviceId);
+                accept(new AbstractQuorum.E(QuorumEventEnum.SERVICE_LEFT,
+                        lastValidToken, token, serviceId));
+            }
+        } finally {
+            lock.unlock();
+        }
     }
 
     private void setLastValidToken(final long newToken) {
-        ((QuorumWatcherBase) quorumImpl.getWatcher()).setLastValidToken(newToken);
+        lock.lock();
+        try {
+            if (lastValidToken != newToken) {
+                lastValidToken = newToken;
+                if (log.isDebugEnabled())
+                    log.debug("newToken=" + newToken);
+                accept(new AbstractQuorum.E(
+                        QuorumEventEnum.SET_LAST_VALID_TOKEN, lastValidToken,
+                        token, null/* serviceId */));
+            }
+        } finally {
+            lock.unlock();
+        }
     }
-    
+
     private void setToken() {
-        ((QuorumWatcherBase) quorumImpl.getWatcher()).setToken();
+        lock.lock();
+        try {
+            if (token != lastValidToken) {
+                token = lastValidToken;
+                if (log.isDebugEnabled())
+                    log.debug("newToken=" + token);
+                accept(new AbstractQuorum.E(QuorumEventEnum.QUORUM_MEET,
+                        lastValidToken, token, null/* serviceId */));
+            }
+        } finally {
+            lock.unlock();
+        }
     }
-    
+
     private void clearToken() {
-        ((QuorumWatcherBase) quorumImpl.getWatcher()).clearToken();
+        lock.lock();
+        try {
+            if (token != Quorum.NO_QUORUM) {
+                token = Quorum.NO_QUORUM;
+                if (log.isDebugEnabled())
+                    log.debug("");
+                accept(new AbstractQuorum.E(QuorumEventEnum.QUORUM_BROKE,
+                        lastValidToken, token, null/* serviceId */));
+            }
+        } finally {
+            lock.unlock();
+        }
     }
-    
+
     /**
      * Mock {@link Quorum} implementation with increased visibility of some
-     * methods so we can pump state changes into the {@link MockQuorumFixture}.
+     * methods so we can pump state changes into the {@link MockQuorumFixture2}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
@@ -257,9 +513,22 @@ public class MockQuorumFixture {
 
         private volatile UUID _serviceId;
 
-        protected MockQuorum(final MockQuorumFixture fixture) {
+        /**
+         * A single threaded executor which drains the {@link #queue} and
+         * submits each event to the {@link MockQuorumWatcher} to be
+         * interpreted.
+         * <p>
+         * The task actually <em>peeks</em> at the {@link #queue} to get the
+         * event and leaves the event on the {@link #queue} until it has been
+         * executed, finally removing the event from the {@link #queue}. This
+         * makes each of the watchers run in a strictly sequence, which mirrors
+         * the zookeeper state change notification semantics.
+         */
+        private ExecutorService watcherService = null;
 
-            super(fixture.k);
+        protected MockQuorum(final int k,final MockQuorumFixture fixture) {
+
+            super(k);
             
             this.fixture = fixture;
             
@@ -279,7 +548,7 @@ public class MockQuorumFixture {
 
         /**
          * Exposed to the unit tests which use the returned {@link QuorumActor}
-         * to send state change requests to the {@link MockQuorumFixture}. From
+         * to send state change requests to the {@link MockQuorumFixture2}. From
          * there, they are noticed by the {@link MockQuorumWatcher} and become
          * visible to the client's {@link MockQuorum}.
          */
@@ -287,12 +556,19 @@ public class MockQuorumFixture {
             return (MockQuorumActor)super.getActor();
         }
         
-        public void start(QuorumMember client) {
+        public void start(final QuorumMember client) {
             super.start(client);
             // cache the service UUID.
             _serviceId = client.getServiceId();
+            watcherService = Executors
+                    .newSingleThreadScheduledExecutor(new DaemonThreadFactory(
+                            "watcherService"));
+            // The watcher.
+            final MockQuorumWatcher watcher = (MockQuorumWatcher) getWatcher();
+            // start the watcher task.
+            watcherService.execute(new WatcherTask(watcher));
             // add our watcher as a listener to the fixture's inner quorum.
-            fixture.quorumImpl.addListener((MockQuorumWatcher)getWatcher());
+            fixture.listeners.add(watcher);
         }
 
         public void terminate() {
@@ -300,12 +576,65 @@ public class MockQuorumFixture {
             super.terminate();
             // clear the serviceId cache.
             _serviceId = null;
+            watcherService.shutdownNow();
             // remove our watcher as a listener for the fixture's inner quorum.
-            fixture.quorumImpl.removeListener(watcher);
+            fixture.listeners.remove(watcher);
         }
 
         /**
-         * Actor updates the state of the {@link MockQuorumFixture}.
+         * Accepts one event at a time and notifies the {@link DispatcherTask}
+         * when we are done with it.
+         */
+        private class WatcherTask implements Runnable {
+            
+            final private MockQuorumWatcher watcher;
+            
+            public WatcherTask(final MockQuorumWatcher watcher) {
+                
+                this.watcher = watcher;
+                
+            }
+            
+            public void run() {
+                while (true) {
+                    try {
+                        runOnce();
+                    } catch (InterruptedException e) {
+                        log.warn("Shutdown : " + e);
+                    }
+                }
+            }
+
+            private void runOnce() throws InterruptedException {
+                // wait for the lock.
+                fixture.globalSynchronousLock.lock();
+                try {
+                    // Wait for an event.
+                    while(watcher.queue.isEmpty()) {
+                        watcher.eventReady.await();
+                    }
+                    // blocking take.
+                    final QuorumEvent e = watcher.queue.take();
+                    log.warn("Accepted event : " + e);
+                    try {
+                        // delegate the event.
+                        watcher.notify(e);
+                    } catch (Throwable t) {
+                        // log an errors.
+                        log.error(t, t);
+                    }
+                } finally {
+                    // signal dispatcher that we are done.
+                    fixture.eventDone.signalAll();
+                    // release the lock.
+                    fixture.globalSynchronousLock.unlock();
+                }
+            }
+            
+        } // class WatcherTask.
+        
+        /**
+         * Actor updates the state of the {@link MockQuorumFixture2}.
          */
         protected class MockQuorumActor extends QuorumActorBase {
 
@@ -316,47 +645,47 @@ public class MockQuorumFixture {
                 this.serviceId = serviceId;
             }
            
-            public void doMemberAdd() {
+            protected void doMemberAdd() {
                 fixture.memberAdd(serviceId);
             }
 
-            public void doMemberRemove() {
+            protected void doMemberRemove() {
                 fixture.memberRemove(serviceId);
             }
 
-            public void doCastVote(final long lastCommitTime) {
+            protected void doCastVote(final long lastCommitTime) {
                 fixture.castVote(serviceId, lastCommitTime);
             }
 
-            public void doWithdrawVote() {
+            protected void doWithdrawVote() {
                 fixture.withdrawVote(serviceId);
             }
 
-            public void doPipelineAdd() {
+            protected void doPipelineAdd() {
                 fixture.pipelineAdd(serviceId);
             }
 
-            public void doPipelineRemove() {
+            protected void doPipelineRemove() {
                 fixture.pipelineRemove(serviceId);
             }
 
-            public void doServiceJoin() {
+            protected void doServiceJoin() {
                 fixture.serviceJoin(serviceId);
             }
 
-            public void doServiceLeave() {
+            protected void doServiceLeave() {
                 fixture.serviceLeave(serviceId);
             }
 
-            public void doSetLastValidToken(final long newToken) {
+            protected void doSetLastValidToken(final long newToken) {
                 fixture.setLastValidToken(newToken);
             }
 
-            public void doSetToken() {
+            protected void doSetToken() {
                 fixture.setToken();
             }
 
-            public void doClearToken() {
+            protected void doClearToken() {
                 fixture.clearToken();
             }
 
@@ -367,12 +696,15 @@ public class MockQuorumFixture {
              * necessary changes directly. Those changes will be noticed by the
              * {@link QuorumWatcher} implementations for the other clients in
              * the unit test.
+             * <p>
+             * Note: This operations IS NOT atomic. Each pipeline remove/add is
+             * a separate atomic operation.
              */
             @Override
             protected void reorganizePipeline() {
                 final UUID[] pipeline = getPipeline();
                 for (int i = 0; i < pipeline.length; i++) {
-                    final UUID t = pipeline[i]; 
+                    final UUID t = pipeline[i];
                     if (serviceId.equals(t)) {
                         // Done.
                         return;
@@ -381,12 +713,12 @@ public class MockQuorumFixture {
                     fixture.pipelineAdd(t);
                 }
             }
-
+            
         }
 
         /**
          * Watcher propagates state changes observed in the
-         * {@link MockQuorumFixture} to the {@link MockQuorum}.
+         * {@link MockQuorumFixture2} to the {@link MockQuorum}.
          * <p>
          * Note: This relies on the {@link QuorumEvent} mechanism. If there are
          * errors, they will be logged rather than propagated. This actually
@@ -397,6 +729,18 @@ public class MockQuorumFixture {
         protected class MockQuorumWatcher extends QuorumWatcherBase implements
                 QuorumListener {
 
+            /**
+             * The queue into which the fixture pumps events. This only needs a
+             * capacity of ONE (1) because the fixture hands off the events
+             * synchronously to each of the {@link MockQuorumWatcher}s.
+             */
+            private final BlockingQueue<QuorumEvent> queue = new LinkedBlockingQueue<QuorumEvent>();
+
+            /**
+             * Condition signaled when an event is ready for this watcher.
+             */
+            private final Condition eventReady = fixture.globalSynchronousLock.newCondition();
+            
             /** Propagate state change to our quorum. */
             public void notify(final QuorumEvent e) {
 
@@ -482,6 +826,10 @@ public class MockQuorumFixture {
                   clearToken();
                   break;
               }
+                    /*
+                     * These events do not carry any state change so we do not
+                     * do anything with them here.
+                     */
 //                    /**
 //                     * Event generated when a new leader is elected, including
 //                     * when a quorum meets.
@@ -532,7 +880,7 @@ public class MockQuorumFixture {
     
 	/**
 	 * NOP client base class used for the individual clients for each
-	 * {@link MockQuorum} registered with of a shared {@link MockQuorumFixture}.
+	 * {@link MockQuorum} registered with of a shared {@link MockQuorumFixture2}.
 	 * 
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 	 *         Thompson</a>
@@ -617,4 +965,22 @@ public class MockQuorumFixture {
 		
 	}
 
+    public String toString() {
+        /*
+         * Note: This must run w/o the lock to avoid deadlocks so there may be
+         * visibility problems when accessing non-volatile member fields and the
+         * data can be inconsistent if someone else is modifying it.
+         */
+        return super.toString() + //
+        "{ lastValidToken="+lastValidToken+//
+        ", token=" + token +//
+        ", members="+Collections.unmodifiableCollection(members)+//
+        ", pipeline="+Collections.unmodifiableCollection(pipeline)+//
+        ", votes="+Collections.unmodifiableMap(votes)+//
+        ", joined="+Collections.unmodifiableCollection(joined)+//
+        ", listeners="+listeners+//
+        ", deque="+deque+//
+        "}";
+    }
+    
 }
