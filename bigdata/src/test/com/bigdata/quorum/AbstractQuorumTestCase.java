@@ -81,7 +81,7 @@ abstract public class AbstractQuorumTestCase extends TestCase2 {
 
         actors  = new MockQuorumActor[k];
 
-        fixture = new MockQuorumFixture(k);
+        fixture = new MockQuorumFixture();
 
         fixture.start(); 
 
@@ -89,7 +89,7 @@ abstract public class AbstractQuorumTestCase extends TestCase2 {
          * Setup the client quorums.
          */
         for (int i = 0; i < k; i++) {
-            quorums[i] = new MockQuorum(fixture);
+            quorums[i] = new MockQuorum(k,fixture);
             clients[i] = new MockQuorumMember(quorums[i]);
             quorums[i].start(clients[i]);
             actors [i] = quorums[i].getActor();

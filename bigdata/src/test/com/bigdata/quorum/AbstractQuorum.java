@@ -374,7 +374,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
         ", joined="+Collections.unmodifiableCollection(joined)+//
         ", client=" + (c == null ? "N/A" : c.getClass().getName()) + //
         ", serviceId="+(c instanceof QuorumMember<?>?((QuorumMember<?>)c).getServiceId():"N/A")+//
-        ", listeners="+listeners+
+        ", listeners="+listeners+//
         "}";
     }
     
@@ -846,6 +846,8 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
         }
 
         final public void castVote(final long lastCommitTime) {
+            if (lastCommitTime < 0)
+                throw new IllegalArgumentException();
             lock.lock();
             try {
                 if (!members.contains(serviceId))
@@ -1874,11 +1876,11 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
      *            The event.
      */
     private void sendEventNow(final QuorumEvent e) {
-        if (e.getEventType() == QuorumEventEnum.VOTE_CAST
-                && listeners.size() == 3) {
-            // FIXME Remove this debugging block.
-            System.err.println("Casting votes: " + e+" : quorum="+this);
-        }
+//        if (e.getEventType() == QuorumEventEnum.VOTE_CAST
+//                && listeners.size() == 3) {
+//            // FIXME Remove this debugging block.
+//            System.err.println("Casting votes: " + e+" : quorum="+this);
+//        }
         // The client is always a listener.
         sendOneEvent(e, AbstractQuorum.this.client);
         // Send to any registered listeners as well.
@@ -1910,7 +1912,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
     /**
      * Simple event impl.
      */
-    private static class E implements QuorumEvent {
+    protected static class E implements QuorumEvent {
 
         private final QuorumEventEnum type;
 

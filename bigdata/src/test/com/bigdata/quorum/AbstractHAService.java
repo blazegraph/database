@@ -83,7 +83,7 @@ abstract public class AbstractHAService<S extends HAGlue, L extends AbstractJour
      * @param localService
      *            The local service implementation.
      * 
-     *            FIXME generics on the quorum argument.
+     *            @todo generics on the quorum argument.
      */ 
     protected AbstractHAService(final Quorum quorum, final S service,
             final L localService) {

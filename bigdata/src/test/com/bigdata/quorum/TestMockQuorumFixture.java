@@ -67,7 +67,8 @@ public class TestMockQuorumFixture extends TestCase2 {
 
         try {
             final int k = 2;
-            new MockQuorumFixture(k);
+            final MockQuorumFixture fixture = new MockQuorumFixture();
+            new MockQuorum(k, fixture);
             fail("Expected: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             if (log.isInfoEnabled())
@@ -76,7 +77,8 @@ public class TestMockQuorumFixture extends TestCase2 {
 
         try {
             final int k = 0;
-            new MockQuorumFixture(k);
+            final MockQuorumFixture fixture = new MockQuorumFixture();
+            new MockQuorum(k, fixture);
             fail("Expected: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             if (log.isInfoEnabled())
@@ -85,7 +87,8 @@ public class TestMockQuorumFixture extends TestCase2 {
 
         try {
             final int k = -1;
-            new MockQuorumFixture(k);
+            final MockQuorumFixture fixture = new MockQuorumFixture();
+            new MockQuorum(k, fixture);
             fail("Expected: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             if (log.isInfoEnabled())
@@ -102,13 +105,13 @@ public class TestMockQuorumFixture extends TestCase2 {
         final int k = 1;
         
         // Create fixture providing mock of the distributed quorum state.
-        final MockQuorumFixture fixture = new MockQuorumFixture(k);
+        final MockQuorumFixture fixture = new MockQuorumFixture();
 
         // Start the fixture.
         fixture.start();
         
         // Create a mock client for that fixture.
-        final MockQuorum clientQuorum = new MockQuorum(fixture);
+        final MockQuorum clientQuorum = new MockQuorum(k,fixture);
         
         // Run the client's quorum.
         clientQuorum.start(new MockQuorumMember(clientQuorum));
@@ -123,8 +126,10 @@ public class TestMockQuorumFixture extends TestCase2 {
 
     /**
      * A simple quorum run.
+     * 
+     * @throws InterruptedException
      */
-    public void test_run1() {
+    public void test_run1() throws InterruptedException {
 
         // The service replication factor.
         final int k = 3;
@@ -133,7 +138,7 @@ public class TestMockQuorumFixture extends TestCase2 {
         final MockQuorumMember[] clients = new MockQuorumMember[k];
         final MockQuorumActor[] actors = new MockQuorumActor[k];
         // The mock shared quorum state object.
-        final MockQuorumFixture fixture = new MockQuorumFixture(k);
+        final MockQuorumFixture fixture = new MockQuorumFixture();
         try {
  
             // run the fixture.
@@ -143,7 +148,7 @@ public class TestMockQuorumFixture extends TestCase2 {
              * Setup the client quorums.
              */
             for (int i = 0; i < k; i++) {
-                quorums[i] = new MockQuorum(fixture);
+                quorums[i] = new MockQuorum(k,fixture);
                 clients[i] = new MockQuorumMember(quorums[i]);
                 quorums[i].start(clients[i]);
                 actors [i] = quorums[i].getActor();
@@ -162,6 +167,7 @@ public class TestMockQuorumFixture extends TestCase2 {
 
             // tell the client's actor to add it as a quorum member.
             actors[0].memberAdd();
+            fixture.awaitDeque();
             
             assertEquals(new UUID[]{serviceId},quorums[0].getMembers());
             assertEquals(new UUID[]{serviceId},quorums[1].getMembers());
