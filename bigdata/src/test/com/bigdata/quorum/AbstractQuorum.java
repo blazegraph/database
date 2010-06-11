@@ -1633,11 +1633,6 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
          * quorum token is invalidated.
          */
         protected void clearToken() {
-//            /*
-//             * Immediately invalidate the token without obtaining a lock. This
-//             * ensures that asynchronous client activities conditioned on a
-//             * specific token will fail immediately.
-//             */
             lock.lock();
             try {
                 final boolean willBreak = token != NO_QUORUM;
@@ -1651,6 +1646,13 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                     }
                     sendEvent(new E(QuorumEventEnum.QUORUM_BROKE,
                             lastValidToken, token, null/* serviceId */));
+                    if (client != null) {
+                        final UUID clientId = client.getServiceId();
+                        if(joined.contains(clientId)) {
+                            // If our client is joined, then force serviceLeave.
+                            actor.serviceLeave();
+                        }
+                    }
                 }
             } finally {
                 lock.unlock();
@@ -1787,7 +1789,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             lock.lock();
             try {
                 // #of joined services _before_ the service leaves.
-                final int njoined = joined.size();
+                final int njoinedBefore = joined.size();
                 // The serviceId of the 1st joined service (and the leader iff
                 // the quorum is met).
                 final UUID leaderId;
@@ -1801,16 +1803,16 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                 }
                 final int k = replicationFactor();
                 // iff the quorum was joined.
-                final boolean wasJoined = njoined == ((k + 1) / 2);
+                final boolean wasJoined = njoinedBefore >= ((k + 1) / 2);
                 // iff the leader just left the quorum.
                 final boolean leaderLeft = wasJoined
                         && serviceId.equals(leaderId);
                 // iff the quorum will break.
                 final boolean willBreak = leaderLeft
-                        || (njoined == ((k + 1) / 2) - 1);
+                        || (njoinedBefore == ((k + 1) / 2));
                 if (log.isInfoEnabled())
                     log.info("serviceId=" + serviceId + ", k=" + k
-                            + ", njoined=" + njoined + ", wasJoined="
+                            + ", njoined(before)=" + njoinedBefore + ", wasJoined="
                             + wasJoined + ", leaderLeft=" + leaderLeft
                             + ", willBreak=" + willBreak);
                 final QuorumMember<S> client = getClientAsMember();
