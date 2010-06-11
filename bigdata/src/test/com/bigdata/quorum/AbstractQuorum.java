@@ -81,6 +81,11 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
     static protected final transient String ERR_QUORUM_MET = "Quorum is met : ";
     
     /**
+     * Text when an operation is not permitted because the quorum can not meet.
+     */
+    static protected final transient String ERR_CAN_NOT_MEET = "Quorum can not meet : ";
+    
+    /**
      * The replication factor.
      * 
      * @todo In order to allow changes in the target replication factor, this
@@ -887,8 +892,12 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
         final public void setLastValidToken(final long newToken) {
             lock.lock();
             try {
+                if (joined.size() < ((k + 1) / 2))
+                    throw new QuorumException(ERR_CAN_NOT_MEET
+                            + " too few services are joined: #joined="
+                            + joined.size() + ", k=" + k);
                 if (newToken <= lastValidToken)
-                    throw new QuorumException(ERR_BAD_TOKEN+"lastValidToken="
+                    throw new QuorumException(ERR_BAD_TOKEN + "lastValidToken="
                             + lastValidToken + ", but newToken=" + newToken);
                 if (token != NO_QUORUM)
                     throw new QuorumException(ERR_QUORUM_MET);

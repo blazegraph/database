@@ -50,9 +50,6 @@ import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
  * @version $Id: TestHA3QuorumSemantics.java 2965 2010-06-02 20:19:51Z
  *          thompsonbry $
  * 
- *          FIXME We should be verifying the downstreamState on the
- *          {@link MockQuorumMember}.
- * 
  *          FIXME We must also test with k:=5 in order to see some situations
  *          which do not appear with k:=3 (not sure which ones off hand, but I
  *          remember noting that there are some).
@@ -169,7 +166,9 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
     }
 
     /**
-     * Unit test for write pipeline add/remove.
+     * Unit test for write pipeline add/remove, including the
+     * {@link PipelineState} of the downstream service as maintained by the
+     * {@link MockQuorumMember}.
      * 
      * @throws InterruptedException
      */
@@ -925,19 +924,118 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
     }
 
     /**
-     * FIXME Write unit tests for pipeline reorganization when the leader is
-     * elected. These tests need to have a pipeline order where the service
-     * which will become the leader is not at the head of the pipeline. When the
-     * leader is elected, the leader must cause the pipeline to be reorganized
-     * such that the leader is at the head of the pipeline. In general, we can
-     * not control the pipeline order imposed by the leader when it reorganizes
-     * the pipeline and the leader that was aware of the network topology could
-     * chose to reorganize the pipeline in order to optimize it even though the
-     * leader was already at the head of the pipeline.
+     * Unit tests for pipeline reorganization when the leader is elected. This
+     * tests the automatic reorganization of the pipeline order where the
+     * service which will become the leader is not at the head of the pipeline.
+     * When the leader is elected, the leader must cause the pipeline to be
+     * reorganized such that the leader is at the head of the pipeline. In
+     * general, we can not control the pipeline order imposed by the leader when
+     * it reorganizes the pipeline and the leader that was aware of the network
+     * topology could chose to reorganize the pipeline in order to optimize it
+     * even though the leader was already at the head of the pipeline.
+     * 
+     * @throws InterruptedException
      */
-    public void test_pipelineReorganization() {
+    public void test_pipelineReorganization() throws InterruptedException {
         
-        fail("write test");
+        final Quorum<?, ?> quorum0 = quorums[0];
+        final MockQuorumMember<?> client0 = clients[0];
+        final QuorumActor<?, ?> actor0 = actors[0];
+        final UUID serviceId0 = client0.getServiceId();
+
+        final Quorum<?, ?> quorum1 = quorums[1];
+        final MockQuorumMember<?> client1 = clients[1];
+        final QuorumActor<?, ?> actor1 = actors[1];
+        final UUID serviceId1 = client1.getServiceId();
+
+        final Quorum<?, ?> quorum2 = quorums[2];
+        final MockQuorumMember<?> client2 = clients[2];
+        final QuorumActor<?,?> actor2 = actors[2];
+        final UUID serviceId2 = client2.getServiceId();
+
+        final long lastCommitTime = 0L;
+
+        // declare the services as a quorum members.
+        actor0.memberAdd();
+        actor1.memberAdd();
+        actor2.memberAdd();
+        fixture.awaitDeque();
+
+        /*
+         * Have the services join the pipeline a different order from the order
+         * in which they will cast their votes.
+         * 
+         * Note: Only two of the members are added to the pipeline so the
+         * behavior when the leader reorganizes the pipeline will be
+         * deterministic.
+         */
+        // actor2.pipelineAdd();
+        actor1.pipelineAdd();
+        actor0.pipelineAdd();
+        fixture.awaitDeque();
+
+        /*
+         * The service which we will cause to vote first (and hence will become
+         * the leader) is NOT at the head of the pipeline.
+         */
+        assertEquals(new UUID[] { serviceId1, serviceId0 }, quorum0
+                .getPipeline());
+        assertEquals(new UUID[] { serviceId1, serviceId0 }, quorum1
+                .getPipeline());
+        assertEquals(new UUID[] { serviceId1, serviceId0 }, quorum2
+                .getPipeline());
+
+        /*
+         * Have two services cast a vote for a lastCommitTime. This will cause
+         * the quorum to meet.
+         */
+        final long token1;
+        {
+        
+            actor0.castVote(lastCommitTime);
+            actor1.castVote(lastCommitTime);
+            fixture.awaitDeque();
+
+            // services have voted for a single lastCommitTime.
+            assertEquals(1, quorum0.getVotes().size());
+
+            // verify the vote order.
+            assertEquals(new UUID[] { serviceId0, serviceId1 }, quorum0
+                    .getVotes().get(lastCommitTime).toArray(new UUID[0]));
+
+            // verify the consensus was updated.
+            assertEquals(lastCommitTime, client0.lastConsensusValue);
+            assertEquals(lastCommitTime, client1.lastConsensusValue);
+            assertEquals(lastCommitTime, client2.lastConsensusValue);
+
+            /*
+             * Service join in the same order in which they cast their votes.
+             */
+            assertEquals(new UUID[] { serviceId0, serviceId1 }, quorum0
+                    .getJoinedMembers());
+            assertEquals(new UUID[] { serviceId0, serviceId1 }, quorum1
+                    .getJoinedMembers());
+            assertEquals(new UUID[] { serviceId0, serviceId1 }, quorum2
+                    .getJoinedMembers());
+
+            // validate the token was assigned.
+            assertEquals(Quorum.NO_QUORUM + 1, quorum0.lastValidToken());
+            assertEquals(Quorum.NO_QUORUM + 1, quorum0.token());
+            assertTrue(quorum0.isQuorumMet());
+            token1 = quorum0.token();
+            assertEquals(token1, quorum1.lastValidToken());
+            assertEquals(token1, quorum2.lastValidToken());
+            assertEquals(token1, quorum1.token());
+            assertEquals(token1, quorum2.token());
+
+            // The leader is now at the front of the pipeline.
+            assertEquals(new UUID[] { serviceId0, serviceId1 }, quorum0
+                    .getPipeline());
+            assertEquals(new UUID[] { serviceId0, serviceId1 }, quorum1
+                    .getPipeline());
+            assertEquals(new UUID[] { serviceId0, serviceId1 }, quorum2
+                    .getPipeline());
+        }
         
     }
     
