@@ -68,7 +68,7 @@ public interface QuorumEvent {
      * 
      * @throws UnsupportedOperationException
      *             unless {@link #getEventType()} returns
-     *             {@link QuorumEventEnum#VOTE_CAST}
+     *             {@link QuorumEventEnum#CAST_VOTE}
      */
     long lastCommitTime();
     

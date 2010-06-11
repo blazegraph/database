@@ -72,6 +72,9 @@ abstract public class AbstractQuorumTestCase extends TestCase2 {
 
         super.setUp();
         
+        if(log.isInfoEnabled())
+            log.info(": " + getName());
+
         if (k == 0)
             throw new AssertionError("k is not set");
         
@@ -98,6 +101,8 @@ abstract public class AbstractQuorumTestCase extends TestCase2 {
     }
 
     protected void tearDown() throws Exception {
+        if(log.isInfoEnabled())
+            log.info(": " + getName());
         if (quorums != null) {
             for (int i = 0; i < k; i++) {
                 if (quorums[i] != null) {

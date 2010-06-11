@@ -41,12 +41,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.journal.ha.QuorumException;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum.MockQuorumWatcher;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -229,7 +231,8 @@ public class MockQuorumFixture {
             for (MockQuorumWatcher watcher : listeners) {
                 globalSynchronousLock.lock();
                 try {
-                    log.warn("Queuing event: " + e + " on listener#" + i);
+                    if(log.isInfoEnabled())
+                        log.info("Queuing event: " + e + " on listener#" + i);
                     // queue a single event.
                     watcher.queue.put(e);
                     // signal that an event is ready.
@@ -264,12 +267,37 @@ public class MockQuorumFixture {
         }
 
     }
-    
+
     /**
      * Block until the event deque has been drained (that is, until all watchers
-     * have handled all events which have already been generated).
+     * have handled all events which have already been generated). For example:
+     * 
+     * <pre>
+     * actor.memberAdd();
+     * actor.pipelineAdd();
+     * </pre>
+     * 
+     * can throw an {@link QuorumException} since the actor's local quorum state
+     * in all likelihood will not have been updated before we attempt to add the
+     * actor to the pipeline in the distributed quorum state.
+     * <p>
+     * However, the following sequence will succeed.
+     * 
+     * <pre>
+     * actor.memberAdd();
+     * fixture.awaitDeque();
+     * actor.pipelineAdd();
+     * </pre>
      * 
      * @throws InterruptedException
+     * 
+     *             FIXME Consider using a {@link SynchronousQueue} instead of an
+     *             unbounded blocking queue. However, experiments with a bounded
+     *             blocking queue result in deadlock, which I have not analyzed
+     *             yet. Since I have not looked into this, I am not sure if the
+     *             problem is the fixture design or the {@link AbstractQuorum}
+     *             and I do not know whether the {@link AbstractQuorum} would
+     *             result in deadlocks with zookeeper (I rather doubt it).
      */
     void awaitDeque() throws InterruptedException {
         lock.lock();
@@ -299,8 +327,10 @@ public class MockQuorumFixture {
                 // stack trace so we can see who generated this event.
                 log.warn("event=" + e, new RuntimeException("stack trace"));
             }
-            deque.add(e);
+            deque.put(e);
             dequeNotEmpty.signalAll();
+        } catch (InterruptedException ex) {
+            throw new RuntimeException(ex.getMessage(), ex);
         } finally {
             lock.unlock();
         }
@@ -325,7 +355,7 @@ public class MockQuorumFixture {
             if (members.add(serviceId)) {
                 if (log.isDebugEnabled())
                     log.debug("serviceId=" + serviceId);
-                accept(new AbstractQuorum.E(QuorumEventEnum.MEMBER_ADDED,
+                accept(new AbstractQuorum.E(QuorumEventEnum.MEMBER_ADD,
                         lastValidToken, token, serviceId));
             }
         } finally {
@@ -339,7 +369,7 @@ public class MockQuorumFixture {
             if (members.remove(serviceId)) {
                 if (log.isDebugEnabled())
                     log.debug("serviceId=" + serviceId);
-                accept(new AbstractQuorum.E(QuorumEventEnum.MEMBER_REMOVED,
+                accept(new AbstractQuorum.E(QuorumEventEnum.MEMBER_REMOVE,
                         lastValidToken, token, serviceId));
             }
         } finally {
@@ -360,7 +390,7 @@ public class MockQuorumFixture {
                     log.debug("serviceId=" + serviceId + ",lastCommitTime="
                             + lastCommitTime);
                 // Cast vote.
-                accept(new AbstractQuorum.E(QuorumEventEnum.VOTE_CAST,
+                accept(new AbstractQuorum.E(QuorumEventEnum.CAST_VOTE,
                         lastValidToken, token, serviceId, lastCommitTime));
             }
         } finally {
@@ -383,7 +413,7 @@ public class MockQuorumFixture {
                     if (log.isDebugEnabled())
                         log.debug("serviceId=" + serviceId + ",lastCommitTime="
                                 + lastCommitTime);
-                    accept(new AbstractQuorum.E(QuorumEventEnum.VOTE_WITHDRAWN,
+                    accept(new AbstractQuorum.E(QuorumEventEnum.WITHDRAW_VOTE,
                             lastValidToken, token, serviceId));
                     break;
                 }
@@ -399,7 +429,7 @@ public class MockQuorumFixture {
             if (pipeline.add(serviceId)) {
                 if (log.isDebugEnabled())
                     log.debug("serviceId=" + serviceId);
-                accept(new AbstractQuorum.E(QuorumEventEnum.PIPELINE_ADDED,
+                accept(new AbstractQuorum.E(QuorumEventEnum.PIPELINE_ADD,
                         lastValidToken, token, serviceId));
             }
         } finally {
@@ -416,7 +446,7 @@ public class MockQuorumFixture {
                 /*
                  * Remove the service from the pipeline.
                  */
-                accept(new AbstractQuorum.E(QuorumEventEnum.PIPELINE_REMOVED,
+                accept(new AbstractQuorum.E(QuorumEventEnum.PIPELINE_REMOVE,
                         lastValidToken, token, serviceId));
             }
         } finally {
@@ -430,7 +460,7 @@ public class MockQuorumFixture {
             if (joined.add(serviceId)) {
                 if (log.isDebugEnabled())
                     log.debug("serviceId=" + serviceId);
-                accept(new AbstractQuorum.E(QuorumEventEnum.SERVICE_JOINED,
+                accept(new AbstractQuorum.E(QuorumEventEnum.SERVICE_JOIN,
                         lastValidToken, token, serviceId));
             }
         } finally {
@@ -444,7 +474,7 @@ public class MockQuorumFixture {
             if (joined.remove(serviceId)) {
                 if (log.isDebugEnabled())
                     log.debug("serviceId=" + serviceId);
-                accept(new AbstractQuorum.E(QuorumEventEnum.SERVICE_LEFT,
+                accept(new AbstractQuorum.E(QuorumEventEnum.SERVICE_LEAVE,
                         lastValidToken, token, serviceId));
             }
         } finally {
@@ -615,7 +645,8 @@ public class MockQuorumFixture {
                     }
                     // blocking take.
                     final QuorumEvent e = watcher.queue.take();
-                    log.warn("Accepted event : " + e);
+                    if (log.isInfoEnabled())
+                        log.info("Accepted event : " + e);
                     try {
                         // delegate the event.
                         watcher.notify(e);
@@ -751,7 +782,7 @@ public class MockQuorumFixture {
                 /**
                  * Event generated when a member service is added to a quorum.
                  */
-                case MEMBER_ADDED: {
+                case MEMBER_ADD: {
                     memberAdd(e.getServiceId());
                     break;
                 }
@@ -759,7 +790,7 @@ public class MockQuorumFixture {
                      * Event generated when a member service is removed form a
                      * quorum.
                      */
-                case MEMBER_REMOVED: {
+                case MEMBER_REMOVE: {
                     memberRemove(e.getServiceId());
                     break;
                 }
@@ -767,7 +798,7 @@ public class MockQuorumFixture {
                      * Event generated when a service is added to the write
                      * pipeline.
                      */
-                case PIPELINE_ADDED: {
+                case PIPELINE_ADD: {
                     pipelineAdd(e.getServiceId());
                     break;
                 }
@@ -775,35 +806,35 @@ public class MockQuorumFixture {
                      * Event generated when a member service is removed from the
                      * write pipeline.
                      */
-                case PIPELINE_REMOVED: {
+                case PIPELINE_REMOVE: {
                     pipelineRemove(e.getServiceId());
                     break;
                 }
                     /**
                      * Vote cast by a service for some lastCommitTime.
                      */
-                case VOTE_CAST: {
+                case CAST_VOTE: {
                     castVote(e.getServiceId(), e.lastCommitTime());
                     break;
                 }
                     /**
                      * Vote for some lastCommitTime was withdrawn by a service.
                      */
-                case VOTE_WITHDRAWN: {
+                case WITHDRAW_VOTE: {
                     withdrawVote(e.getServiceId());
                     break;
                 }
                     /**
                      * Event generated when a service joins a quorum.
                      */
-                case SERVICE_JOINED: {
+                case SERVICE_JOIN: {
                     serviceJoin(e.getServiceId());
                     break;
                 }
                     /**
                      * Event generated when a service leaves a quorum.
                      */
-                case SERVICE_LEFT: {
+                case SERVICE_LEAVE: {
                     serviceLeave(e.getServiceId());
                     break;
                 }

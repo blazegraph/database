@@ -22,6 +22,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.concurrent.TimeoutException;
+import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.journal.ha.AsynchronousQuorumCloseException;
 import com.bigdata.journal.ha.QuorumException;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -582,9 +583,9 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
      * 
      * @param voteOrder
      *            An ordered set of votes.
-     * @return The index of the service in that vote order.
-     * @throws AssertionError
-     *             if the service in not found in the vote order.
+     * 
+     * @return The index of the service in that vote order -or- <code>-1</code>
+     *         if the service does not appear in the vote order.
      */
     private int getIndexInVoteOrder(final UUID serviceId, final UUID[] voteOrder) {
         for (int i = 0; i < voteOrder.length; i++) {
@@ -592,8 +593,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                 return i;
             }
         }
-        // This indicates a bug in the caller's logic.
-        throw new AssertionError();
+        return -1;
     }
 
     public UUID[] getJoinedMembers() {
@@ -1076,6 +1076,9 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                         new UUID[0]);
                 // Get the index of this service in the vote order.
                 final int index = getIndexInVoteOrder(serviceId, voteOrder);
+                if (index == -1) {
+                    throw new AssertionError(AbstractQuorum.this.toString());
+                }
                 // Get the join order.
                 final UUID[] joined = getJoinedMembers();
                 /*
@@ -1215,7 +1218,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                         }
                     }
                     // queue client event.
-                    sendEvent(new E(QuorumEventEnum.MEMBER_ADDED,
+                    sendEvent(new E(QuorumEventEnum.MEMBER_ADD,
                             lastValidToken, token, serviceId));
                     if (log.isInfoEnabled())
                         log.info("serviceId=" + serviceId.toString());
@@ -1253,7 +1256,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                         }
                     }
                     // queue client event.
-                    sendEvent(new E(QuorumEventEnum.MEMBER_REMOVED,
+                    sendEvent(new E(QuorumEventEnum.MEMBER_REMOVE,
                             lastValidToken, token, serviceId));
                     if (log.isInfoEnabled())
                         log.info("serviceId=" + serviceId.toString());
@@ -1312,7 +1315,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                         }
                     }
                     // queue client event.
-                    sendEvent(new E(QuorumEventEnum.PIPELINE_ADDED,
+                    sendEvent(new E(QuorumEventEnum.PIPELINE_ADD,
                             lastValidToken, token, serviceId));
                     if (log.isInfoEnabled())
                         log.info("serviceId=" + serviceId.toString());
@@ -1369,7 +1372,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                         }
                     }
                     // queue client event.
-                    sendEvent(new E(QuorumEventEnum.PIPELINE_REMOVED,
+                    sendEvent(new E(QuorumEventEnum.PIPELINE_REMOVE,
                             lastValidToken, token, serviceId));
                     if (log.isInfoEnabled())
                         log.info("serviceId=" + serviceId.toString());
@@ -1425,25 +1428,28 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                                 + ", lastCommitTime=" + lastCommitTime
                                 + ", nvotes=" + nvotes);
                     // queue event.
-                    sendEvent(new E(QuorumEventEnum.VOTE_CAST, lastValidToken,
+                    sendEvent(new E(QuorumEventEnum.CAST_VOTE, lastValidToken,
                             token, serviceId, lastCommitTime));
-                    if (nvotes == (k + 1) / 2) {
+                    if (nvotes >= (k + 1) / 2) {
                         final QuorumMember<S> client = getClientAsMember();
-                        if (client != null) {
-                            /*
-                             * Tell the client that consensus has been reached
-                             * on this last commit time.
-                             */
-                            client.consensus(lastCommitTime);
+                        if (nvotes == (k + 1) / 2) {
+                            if (client != null) {
+                                /*
+                                 * Tell the client that consensus has been
+                                 * reached on this last commit time.
+                                 */
+                                client.consensus(lastCommitTime);
+                            }
+                            // queue event.
+                            sendEvent(new E(QuorumEventEnum.CONSENSUS,
+                                    lastValidToken, token, serviceId, Long
+                                            .valueOf(lastCommitTime)));
                         }
-                        // queue event.
-                        sendEvent(new E(QuorumEventEnum.CONSENSUS,
-                                lastValidToken, token, serviceId, Long
-                                        .valueOf(lastCommitTime)));
                         if (client != null) {
                             final UUID clientId = client.getServiceId();
                             final UUID[] voteOrder = tmp.toArray(new UUID[0]);
-                            if (clientId.equals(voteOrder[0])) {
+                            if (nvotes == (k + 1) / 2
+                                    && clientId.equals(voteOrder[0])) {
                                 /*
                                  * The client is the first service in the vote
                                  * order, so it will be the first service to
@@ -1455,7 +1461,34 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                                  * joins.
                                  */
                                 log.warn("First service will join");
+                                assert joined.isEmpty() : "Services already joined: "
+                                        + AbstractQuorum.this;
                                 actor.serviceJoin();
+                            } else if (clientId.equals(serviceId)) {
+                                /*
+                                 * The service which just joined is our client.
+                                 * If the service before our client in the vote
+                                 * order is joined, then it is time for our
+                                 * client to join.
+                                 */
+                                final int index = getIndexInVoteOrder(clientId,
+                                        voteOrder);
+                                final UUID waitsFor = voteOrder[index - 1];
+                                if (joined.contains(waitsFor)) {
+                                    log
+                                            .warn("Service will join already met quorum : njoined="
+                                                    + joined.size()
+                                                    + ", serviceId=" + clientId);
+                                    if (joined.size() != voteOrder.length - 1)
+                                        throw new AssertionError(
+                                                "Expecting "
+                                                        + (voteOrder.length - 1)
+                                                        + " joined services, but there are "
+                                                        + joined.size()
+                                                        + " joined services : "
+                                                        + AbstractQuorum.this);
+                                    actor.serviceJoin();
+                               }
                             }
                         }
                     }
@@ -1489,7 +1522,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                             .next();
                     final Set<UUID> votes = entry.getValue();
                     if (votes.remove(serviceId)) {
-                        sendEvent(new E(QuorumEventEnum.VOTE_WITHDRAWN,
+                        sendEvent(new E(QuorumEventEnum.WITHDRAW_VOTE,
                                 lastValidToken, token, serviceId));
                         if (votes.size() + 1 == (k + 1) / 2) {
                             final QuorumMember<S> client = getClientAsMember();
@@ -1573,7 +1606,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                     if (joined.contains(clientId) && !clientId.equals(leaderId)) {
                         // Our client was elected as a follower.
                         client.electedFollower();
-                        sendEvent(new E(QuorumEventEnum.FOLLOWER_ELECTED,
+                        sendEvent(new E(QuorumEventEnum.ELECTED_FOLLOWER,
                                 lastValidToken, token, clientId));
                         if (log.isInfoEnabled())
                             log.info("follower=" + clientId + ", token="
@@ -1644,7 +1677,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                 if (log.isInfoEnabled())
                     log.info("serviceId=" + serviceId.toString());
                 // queue client event.
-                sendEvent(new E(QuorumEventEnum.SERVICE_JOINED, lastValidToken,
+                sendEvent(new E(QuorumEventEnum.SERVICE_JOIN, lastValidToken,
                         token, serviceId));
 //                final int njoined = joined.size();
 //                final int k = replicationFactor();
@@ -1714,6 +1747,11 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                             // The index of our client in the vote order.
                             final int index = getIndexInVoteOrder(clientId,
                                     voteOrder);
+                            if (index == -1) {
+                                throw new AssertionError(AbstractQuorum.this
+                                        .toString());
+                            }
+
                             /*
                              * If the service which joined immediately proceeds
                              * our client in the vote order, then do a service
@@ -1800,7 +1838,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                     // Notify all quorum members that a service left.
                     client.serviceLeave();
                 }
-                sendEvent(new E(QuorumEventEnum.SERVICE_LEFT, lastValidToken,
+                sendEvent(new E(QuorumEventEnum.SERVICE_LEAVE, lastValidToken,
                         token, serviceId));
                 if (client != null && leaderLeft) {
                     // Notify all quorum members that the leader left.
@@ -1971,7 +2009,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
         }
 
         public long lastCommitTime() {
-            if (type != QuorumEventEnum.VOTE_CAST)
+            if (type != QuorumEventEnum.CAST_VOTE)
                 throw new UnsupportedOperationException();
             return lastCommitTime.longValue();
         }
@@ -1986,7 +2024,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                     + token
                     + ",serviceId="
                     + serviceId
-                    + (type == QuorumEventEnum.VOTE_CAST ? ",lastCommitTime="
+                    + (type == QuorumEventEnum.CAST_VOTE ? ",lastCommitTime="
                             + lastCommitTime : "") + "}";
         }
 
