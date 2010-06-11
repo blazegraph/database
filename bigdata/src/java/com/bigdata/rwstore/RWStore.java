@@ -48,6 +48,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.WriteCache;
 import com.bigdata.io.WriteCache.FileChannelScatteredWriteCache;
@@ -236,6 +237,7 @@ public class RWStore implements IStore {
      * significant contention may be avoided.
      */
     final private ReentrantLock m_allocationLock = new ReentrantLock();
+    ReopenFileChannel m_reopener = null;
 
     private void baseInit() {
 		m_commitCallback = null;
@@ -262,13 +264,19 @@ public class RWStore implements IStore {
 
 		m_transactionCount = 0;
 		m_committing = false;
+		
+		try {
+			m_reopener = new ReopenFileChannel(m_fd, m_raf, "rw");
+		} catch (IOException e1) {
+			throw new RuntimeException(e1);
+		}
 
 		try {
 			/**
 			 * TODO: Configure number of WriteCache buffers for WriteCacheService
 			 */
             m_writeCache = new RWWriteCacheService(6, m_raf.length(),
-                    new ReopenFileChannel(m_fd, m_raf, "rw"), m_environment
+                    m_reopener, m_environment
                             .getQuorumManager()) {
             	
 		                public WriteCache newWriteCache(final ByteBuffer buf,
@@ -481,7 +489,8 @@ public class RWStore implements IStore {
 		byte[] buf = new byte[m_metaBitsSize * 4];
 		//m_raf.seek(rawmbaddr);
 		//m_raf.read(buf);
-		m_raf.getChannel().read(ByteBuffer.wrap(buf), rawmbaddr);
+		// m_raf.getChannel().read(ByteBuffer.wrap(buf), rawmbaddr);
+		FileChannelUtility.readAll(m_reopener, ByteBuffer.wrap(buf), rawmbaddr);
 
 		DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
 		for (int i = 0; i < m_metaBitsSize; i++) {
@@ -526,7 +535,8 @@ public class RWStore implements IStore {
 
 //				m_raf.seek(addr);
 //				m_raf.readFully(buf);
-				m_raf.getChannel().read(ByteBuffer.wrap(buf), addr);
+//				m_raf.getChannel().read(ByteBuffer.wrap(buf), addr);
+				FileChannelUtility.readAll(m_reopener, ByteBuffer.wrap(buf), addr);
 				
 				DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
 
@@ -619,7 +629,9 @@ public class RWStore implements IStore {
 			try {
 //				m_raf.seek(physicalAddress(addr));
 //				m_raf.readFully(instr.getBuffer(), 0, size);
-				m_raf.getChannel().read(ByteBuffer.wrap(instr.getBuffer(), 0, size), physicalAddress(addr));
+//				m_raf.getChannel().read(ByteBuffer.wrap(instr.getBuffer(), 0, size), physicalAddress(addr));
+				FileChannelUtility.readAll(m_reopener, ByteBuffer.wrap(instr.getBuffer(), 0, size),
+						physicalAddress(addr));
 			} catch (IOException e) {
 				throw new StorageTerminalError("Unable to read data", e);
 			}
@@ -719,9 +731,11 @@ public class RWStore implements IStore {
 				} else {
 //						k
 //						m_raf.readFully(buf, offset, length);
-					m_raf.getChannel().read(ByteBuffer.wrap(buf, offset, length), paddr);
+//					m_raf.getChannel().read(ByteBuffer.wrap(buf, offset, length), paddr);
+					FileChannelUtility.readAll(m_reopener, ByteBuffer.wrap(buf, offset, length), paddr);
 					ByteBuffer chkbuf = ByteBuffer.allocate(4);
-					m_raf.getChannel().read(chkbuf, paddr+length);
+//					m_raf.getChannel().read(chkbuf, paddr+length);
+					FileChannelUtility.readAll(m_reopener, chkbuf, paddr+length);
 					chkbuf.position(0);
 					int chk = chkbuf.getInt(); // read checksum
 					if (chk != ChecksumUtility.getCHK().checksum(buf, offset, length)) {
