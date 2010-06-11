@@ -38,27 +38,27 @@ public enum QuorumEventEnum {
     /**
      * Event generated when a member service is added to a quorum.
      */
-    MEMBER_ADDED,
+    MEMBER_ADD,
     /**
      * Event generated when a member service is removed form a quorum.
      */
-    MEMBER_REMOVED,
+    MEMBER_REMOVE,
     /**
      * Event generated when a service is added to the write pipeline.
      */
-    PIPELINE_ADDED,
+    PIPELINE_ADD,
     /**
      * Event generated when a member service is removed from the write pipeline.
      */
-    PIPELINE_REMOVED,
+    PIPELINE_REMOVE,
     /**
      * Vote cast by a service for some lastCommitTime.
      */
-    VOTE_CAST,
+    CAST_VOTE,
     /**
      * Vote for some lastCommitTime was withdrawn by a service.
      */
-    VOTE_WITHDRAWN,
+    WITHDRAW_VOTE,
 	/**
 	 * A consensus has been achieved with <code>(k+1)/2</code> services voting
 	 * for some lastCommitTime. This event will typically be associated with an
@@ -70,35 +70,30 @@ public enum QuorumEventEnum {
     /**
      * Event generated when a service joins a quorum.
      */
-    SERVICE_JOINED,
+    SERVICE_JOIN,
     /**
      * Event generated when a service leaves a quorum.
      */
-    SERVICE_LEFT,
+    SERVICE_LEAVE,
+    /**
+     * Event generated when a service joins a quorum as a follower.
+     */
+    ELECTED_FOLLOWER,
     /**
      * Event generated when a new leader is elected, including when a quorum
      * meets.
      */
-    LEADER_ELECTED,
-    /**
-     * Event generated when a service joins a quorum as a follower.
-     */
-    FOLLOWER_ELECTED,
-//    /**
-//     * Event generated when the leader leaves a quorum.
-//     */
-//    LEADER_LEFT,
+    ELECTED_LEADER,
     /**
      * Event generated when the last valid token is set.
      */
     SET_LAST_VALID_TOKEN,
     /**
-     * Event generated when a quorum meets.
+     * Event generated when a quorum meets (aka when the token is set).
      */
     QUORUM_MEET,
     /**
-     * Event generated when a quorum breaks due to a leader leave or a service
-     * leave which brings the #of joined services to <code>((k+1)/2)-1</code>.
+     * Event generated when a quorum breaks (aka when the token is cleared).
      */
     QUORUM_BROKE;
 

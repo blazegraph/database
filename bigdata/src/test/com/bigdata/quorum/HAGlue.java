@@ -9,6 +9,7 @@ import java.util.concurrent.RunnableFuture;
 
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IRootBlockView;
+import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.rawstore.IRawStore;
 
@@ -134,8 +135,9 @@ public interface HAGlue extends Remote {
      * MUST be the first service in the write pipeline since it is the service
      * to which the application directs all write requests. This message is used
      * when a leader will be elected and it needs to force other services before
-     * it in the write pipeline to add/leave such that the leader will become
-     * the first service in the write pipeline.
+     * it in the write pipeline to leave/add themselves from/to the write
+     * pipeline such that the leader becomes the first service in the write
+     * pipeline.
      * 
      * @todo It is possible for the leader to issue these messages in an
      *       sequence which is designed to arrange the write pipeline such that
@@ -147,6 +149,35 @@ public interface HAGlue extends Remote {
      *       will reflect the desired total order. However, note that transient
      *       network partitioning, zookeeper session timeouts, etc. can all
      *       cause this order to be perturbed.
+     * 
+     * @todo A pipeline leave currently causes a service leave. Reconsider this
+     *       because it would mean that reorganizing the pipeline would actually
+     *       cause service leaves, which would temporarily break the quorum and
+     *       certainly distribute the leader election. If we can do a pipeline
+     *       leave without a service leave, if services which are joined always
+     *       rejoin the write pipeline when the observe a pipeline leave, and if
+     *       we can force a service leave (by instructing the service to
+     *       {@link #bounceZookeeperConnection()}) if the service fails to
+     *       rejoin the pipeline, then it would be easier to reorganize the
+     *       pipeline. [This would still make it possible for services to add
+     *       themselves to the pipeline without being joined with the quorum but
+     *       the quorum watcher would now automatically add the service to the
+     *       quorum before a join and add it back if it is removed from the
+     *       pipeline while it was joined _if_ the quorum is not yet met (once
+     *       the quorum is met we can not rejoin the pipeline if writes have
+     *       propagated along the pipeline, and the pipeline is not clean at
+     *       each commit - only when we have an exclusive lock on the
+     *       {@link WriteExecutorService}).]
+     * 
+     * @todo The leader could also invoke this at any commit point where a
+     *       service joins the quorum since we need to obtain an exclusive lock
+     *       on the {@link WriteExecutorService} at that point (use as we do
+     *       when we do a synchronous overflow).
+     *       <p>
+     *       Periodic re-optimizations should take into account that services
+     *       which are bouncing should stay at the end of the pipeline even
+     *       though they have higher network costs because loosing the service
+     *       at the end of the pipeline causes minimal retransmission.
      */
     Future<Void> moveToEndOfPipeline() throws IOException;
     
