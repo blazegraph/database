@@ -82,7 +82,6 @@ import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IPredicate;
-import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.Var;
@@ -711,18 +710,26 @@ public class SPORelation extends AbstractRelation<ISPO> {
             /*
              * Note: this value coder does not know about statement identifiers.
              * Therefore it is turned off if statement identifiers are enabled.
-             * 
-             * @todo Examine some options for value compression for the
-             * statement indices when statement identifiers are enabled. Of
-             * course, the CanonicalHuffmanRabaCoder can always be used.
              */
 
             leafValSer = new FastRDFValueCoder2();
 //            leafValSer = SimpleRabaCoder.INSTANCE;
 
         } else {
-            
+
+            /*
+             * The default is canonical huffman coding, which is relatively slow
+             * and does not achieve very good compression on term identifiers.
+             */
             leafValSer = DefaultTupleSerializer.getDefaultValuesCoder();
+
+            /*
+             * @todo This is much faster than huffman coding, but less space
+             * efficient. However, it appears that there are some cases where
+             * SIDs are enabled but only the flag bits are persisted. What
+             * gives?
+             */
+//            leafValSer = new FixedLengthValueRabaCoder(1 + 8);
             
         }
         
@@ -1405,7 +1412,117 @@ public class SPORelation extends AbstractRelation<ISPO> {
         return new ChunkedWrappedIterator<Long>(itr);
                 
     }
-    
+	/**
+     * Efficient scan of the distinct term identifiers that appear in the first
+     * position of the keys for the statement index corresponding to the
+     * specified {@link IKeyOrder}. For example, using {@link SPOKeyOrder#POS}
+     * will give you the term identifiers for the distinct predicates actually
+     * in use within statements in the {@link SPORelation}.
+     * 
+     * @param keyOrder
+     *            The selected index order.
+     * 
+     * @return An iterator visiting the distinct term identifiers.
+     */
+    public IChunkedIterator<Long> distinctMultiTermScan(final IKeyOrder<ISPO> keyOrder,long[] knownTerms) {
+
+        return distinctMultiTermScan(keyOrder,knownTerms,/* termIdFilter */null);
+
+    }
+
+    /**
+     * Efficient scan of the distinct term identifiers that appear in the first
+     * position of the keys for the statement index corresponding to the
+     * specified {@link IKeyOrder}. For example, using {@link SPOKeyOrder#POS}
+     * will give you the term identifiers for the distinct predicates actually
+     * in use within statements in the {@link SPORelation}.
+     * 
+     * @param keyOrder
+     *            The selected index order.
+     * @param knownTerms
+     *            An array of term identifiers to be interpreted as bindings
+     *            using the <i>keyOrder</i>.
+     * @param termIdFilter
+     *            An optional filter.
+     * 
+     * @return An iterator visiting the distinct term identifiers.
+     * 
+     * @todo add the ability to specify {@link IRangeQuery#PARALLEL} here for
+     *       fast scans across multiple shards when chunk-wise order is Ok.
+     */
+    public IChunkedIterator<Long> distinctMultiTermScan(
+            final IKeyOrder<ISPO> keyOrder, final long[] knownTerms,
+            final ITermIdFilter termIdFilter) {
+
+        final FilterConstructor<SPO> filter = new FilterConstructor<SPO>();
+        final int nterms = knownTerms.length;
+
+        final KeyBuilder fromKey = new KeyBuilder(getKeyArity() * 8);
+        for (long l : knownTerms) {
+            fromKey.append(l);
+        }
+
+        final KeyBuilder toKey = new KeyBuilder(getKeyArity() * 8);
+        for (int i = 0; i < nterms; i++) {
+            if (i == nterms - 1) {
+                toKey.append(knownTerms[i] + 1);
+            } else {
+                toKey.append(knownTerms[i]);
+            }
+        }
+        
+        /*
+         * Layer in the logic to advance to the tuple that will have the next
+         * distinct term identifier in the first position of the key.
+         */
+        filter.addFilter(new DistinctMultiTermAdvancer(getKeyArity(), nterms));
+
+        if (termIdFilter != null) {
+
+            /*
+             * Layer in a filter for only the desired term types.
+             */
+
+            filter.addFilter(new TupleFilter<SPO>() {
+
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                protected boolean isValid(final ITuple<SPO> tuple) {
+
+                    final long id = KeyBuilder.decodeLong(tuple
+                            .getKeyBuffer().array(), 0);
+
+                    return termIdFilter.isValid(id);
+
+                }
+
+            });
+
+        }
+
+        @SuppressWarnings("unchecked")
+        final Iterator<Long> itr = new Striterator(getIndex(keyOrder)
+                .rangeIterator(fromKey.getKey(), toKey.getKey(),
+                        0/* capacity */, IRangeQuery.KEYS | IRangeQuery.CURSOR,
+                        filter)).addFilter(new Resolver() {
+
+            private static final long serialVersionUID = 1L;
+
+            /**
+             * Resolve SPO key to Long.
+             */
+            @Override
+            protected Long resolve(Object obj) {
+                return KeyBuilder.decodeLong(((ITuple) obj).getKeyBuffer()
+                        .array(), (nterms - 1) * 8);
+            }
+        });
+
+        return new ChunkedWrappedIterator<Long>(itr);
+
+    }
+
     public SPO newElement(final IPredicate<ISPO> predicate,
             final IBindingSet bindingSet) {
 
@@ -1739,17 +1856,20 @@ public class SPORelation extends AbstractRelation<ISPO> {
         if (keyArity == 3) {
 
             tasks.add(new SPOIndexWriter(this, a, numStmts, false/* clone */,
-                    SPOKeyOrder.SPO, filter, sortTime, insertTime, mutationCount,
+                    SPOKeyOrder.SPO, SPOKeyOrder.SPO.isPrimaryIndex(),
+                    filter, sortTime, insertTime, mutationCount,
                     reportMutation));
     
             if (!oneAccessPath) {
     
                 tasks.add(new SPOIndexWriter(this, a, numStmts, true/* clone */,
-                        SPOKeyOrder.POS, filter, sortTime, insertTime, mutationCount,
+                        SPOKeyOrder.POS, SPOKeyOrder.POS.isPrimaryIndex(),
+                        filter, sortTime, insertTime, mutationCount,
                         false/*reportMutation*/));
     
                 tasks.add(new SPOIndexWriter(this, a, numStmts, true/* clone */,
-                        SPOKeyOrder.OSP, filter, sortTime, insertTime, mutationCount,
+                        SPOKeyOrder.OSP, SPOKeyOrder.OSP.isPrimaryIndex(),
+                        filter, sortTime, insertTime, mutationCount,
                         false/*reportMutation*/));
     
             }
@@ -1757,29 +1877,40 @@ public class SPORelation extends AbstractRelation<ISPO> {
         } else {
 
             tasks.add(new SPOIndexWriter(this, a, numStmts, false/* clone */,
-                    SPOKeyOrder.SPOC, filter, sortTime, insertTime,
+                    SPOKeyOrder.SPOC, SPOKeyOrder.SPOC.isPrimaryIndex(),
+                    filter, sortTime, insertTime,
                     mutationCount, reportMutation));
 
             if (!oneAccessPath) {
 
                 tasks.add(new SPOIndexWriter(this, a, numStmts,
-                        true/* clone */, SPOKeyOrder.POCS, filter, sortTime,
+                        true/* clone */, SPOKeyOrder.POCS,
+                        SPOKeyOrder.POCS.isPrimaryIndex(),
+                        filter, sortTime,
                         insertTime, mutationCount, false/* reportMutation */));
 
                 tasks.add(new SPOIndexWriter(this, a, numStmts,
-                        true/* clone */, SPOKeyOrder.OCSP, filter, sortTime,
+                        true/* clone */, SPOKeyOrder.OCSP, 
+                        SPOKeyOrder.OCSP.isPrimaryIndex(),
+                        filter, sortTime,
                         insertTime, mutationCount, false/* reportMutation */));
 
                 tasks.add(new SPOIndexWriter(this, a, numStmts,
-                        true/* clone */, SPOKeyOrder.CSPO, filter, sortTime,
+                        true/* clone */, SPOKeyOrder.CSPO,
+                        SPOKeyOrder.CSPO.isPrimaryIndex(),
+                        filter, sortTime,
                         insertTime, mutationCount, false/* reportMutation */));
 
                 tasks.add(new SPOIndexWriter(this, a, numStmts,
-                        true/* clone */, SPOKeyOrder.PCSO, filter, sortTime,
+                        true/* clone */, SPOKeyOrder.PCSO, 
+                        SPOKeyOrder.PCSO.isPrimaryIndex(),
+                        filter, sortTime,
                         insertTime, mutationCount, false/* reportMutation */));
 
                 tasks.add(new SPOIndexWriter(this, a, numStmts,
-                        true/* clone */, SPOKeyOrder.SOPC, filter, sortTime,
+                        true/* clone */, SPOKeyOrder.SOPC,
+                        SPOKeyOrder.SOPC.isPrimaryIndex(),
+                        filter, sortTime,
                         insertTime, mutationCount, false/* reportMutation */));
 
             }
@@ -1894,18 +2025,21 @@ public class SPORelation extends AbstractRelation<ISPO> {
         if (keyArity == 3) {
 
             tasks.add(new SPOIndexRemover(this, stmts, numStmts,
-                    SPOKeyOrder.SPO, false/* clone */, sortTime, writeTime,
+                    SPOKeyOrder.SPO, SPOKeyOrder.SPO.isPrimaryIndex(), 
+                    false/* clone */, sortTime, writeTime,
                     mutationCount, reportMutation));
 
             if (!oneAccessPath) {
 
                 tasks.add(new SPOIndexRemover(this, stmts, numStmts,
-                        SPOKeyOrder.POS, true/* clone */, sortTime, writeTime,
+                        SPOKeyOrder.POS, SPOKeyOrder.POS.isPrimaryIndex(),
+                        true/* clone */, sortTime, writeTime,
                         mutationCount,
                         false/* reportMutation */));
 
                 tasks.add(new SPOIndexRemover(this, stmts, numStmts,
-                        SPOKeyOrder.OSP, true/* clone */, sortTime, writeTime,
+                        SPOKeyOrder.OSP, SPOKeyOrder.OSP.isPrimaryIndex(),
+                        true/* clone */, sortTime, writeTime,
                         mutationCount, false/* reportMutation */));
 
             }
@@ -1913,29 +2047,35 @@ public class SPORelation extends AbstractRelation<ISPO> {
         } else {
 
             tasks.add(new SPOIndexRemover(this, stmts, numStmts,
-                    SPOKeyOrder.SPOC, false/* clone */, sortTime, writeTime,
+                    SPOKeyOrder.SPOC, SPOKeyOrder.SPOC.isPrimaryIndex(),
+                    false/* clone */, sortTime, writeTime,
                     mutationCount, reportMutation));
 
             if (!oneAccessPath) {
 
                 tasks.add(new SPOIndexRemover(this, stmts, numStmts,
-                        SPOKeyOrder.POCS, true/* clone */, sortTime, writeTime,
+                        SPOKeyOrder.POCS,SPOKeyOrder.POCS.isPrimaryIndex(), 
+                        true/* clone */, sortTime, writeTime,
                         mutationCount, false/* reportMutation */));
 
                 tasks.add(new SPOIndexRemover(this, stmts, numStmts,
-                        SPOKeyOrder.OCSP, true/* clone */, sortTime, writeTime,
+                        SPOKeyOrder.OCSP, SPOKeyOrder.OCSP.isPrimaryIndex(),
+                        true/* clone */, sortTime, writeTime,
                         mutationCount, false/* reportMutation */));
 
                 tasks.add(new SPOIndexRemover(this, stmts, numStmts,
-                        SPOKeyOrder.CSPO, true/* clone */, sortTime, writeTime,
+                        SPOKeyOrder.CSPO, SPOKeyOrder.CSPO.isPrimaryIndex(),
+                        true/* clone */, sortTime, writeTime,
                         mutationCount, false/* reportMutation */));
 
                 tasks.add(new SPOIndexRemover(this, stmts, numStmts,
-                        SPOKeyOrder.PCSO, true/* clone */, sortTime, writeTime,
+                        SPOKeyOrder.PCSO, SPOKeyOrder.PCSO.isPrimaryIndex(),
+                        true/* clone */, sortTime, writeTime,
                         mutationCount, false/* reportMutation */));
 
                 tasks.add(new SPOIndexRemover(this, stmts, numStmts,
-                        SPOKeyOrder.SOPC, true/* clone */, sortTime, writeTime,
+                        SPOKeyOrder.SOPC, SPOKeyOrder.SOPC.isPrimaryIndex(),
+                        true/* clone */, sortTime, writeTime,
                         mutationCount, false/* reportMutation */));
 
             }

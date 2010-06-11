@@ -8,6 +8,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -38,7 +39,7 @@ public class BigdataStatementIteratorImpl
      * resolve term identifiers to the corresponding blank node objects across a
      * "connection" context.
      */
-    private final Map<Long, BigdataBNodeImpl> bnodes;
+    private final Map<Long, BigdataBNode> bnodes;
 
     /**
      * 
@@ -69,7 +70,7 @@ public class BigdataStatementIteratorImpl
      *            closed).
      */
     public BigdataStatementIteratorImpl(final AbstractTripleStore db,
-            final Map<Long, BigdataBNodeImpl> bnodes,
+            final Map<Long, BigdataBNode> bnodes,
                 final IChunkedOrderedIterator<ISPO> src) {
         
         super(db, src, new BlockingBuffer<BigdataStatement[]>(
@@ -85,6 +86,7 @@ public class BigdataStatementIteratorImpl
     /**
      * Strengthens the return type.
      */
+    @Override
     public BigdataStatementIteratorImpl start(final ExecutorService service) {
 
         return (BigdataStatementIteratorImpl) super.start(service);
@@ -92,9 +94,9 @@ public class BigdataStatementIteratorImpl
     }
 
     /**
-     * Resolve a chunk of {@link ISPO}s into a chunk of
-     * {@link BigdataStatement}s.
+     * Resolve a chunk of {@link ISPO}s into a chunk of {@link BigdataStatement}s.
      */
+    @Override
     protected BigdataStatement[] resolveChunk(final ISPO[] chunk) {
 
         if (DEBUG)

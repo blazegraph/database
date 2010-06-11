@@ -163,8 +163,14 @@ public class StressTestGlobalLRU extends TestCase implements IComparisonTest {
         result.put("opCount", "" + opCount);
         result.put("elapsed", "" + runCounters.elapsed);
         result.put("class", lru.getClass().getName());
+        result.put("cache.recordCount", ""+lru.getRecordCount());
+        result.put("cache.cacheSetSize", ""+lru.getCacheSetSize());
+        result.put("cache.bytesInMemory", ""+lru.getBytesInMemory());
+        result.put("cache.bytesOnDisk", ""+lru.getBytesOnDisk());
+        result.put("cache.evictionCount", ""+lru.getEvictionCount());
         result.put("concurrencyLevel", "" + cacheSettings.concurrencyLevel);
         result.put("accessPolicy", "" + cacheSettings.accessPolicy);
+        result.put("threadLocalBuffers", "" + cacheSettings.threadLocalBuffers);
         result.put("threadLocalBufferCapacity", ""
                 + cacheSettings.threadLocalBufferCapacity);
 
@@ -854,7 +860,6 @@ public class StressTestGlobalLRU extends TestCase implements IComparisonTest {
                     new NV(TestOptions.ACCESS_POLICY,AccessPolicyEnum.LRU.toString()),//
                 }));
            
-            // Note: concurrencyLevel := 0 means true thread-local buffers.
             conditions.add(getCondition(defaultProperties, new NV[] {//
                 new NV(TestOptions.CLASS,BCHMGlobalLRU2.class.getName()),//
                 new NV(TestOptions.THREAD_LOCAL_BUFFERS,"true"),//
@@ -862,19 +867,38 @@ public class StressTestGlobalLRU extends TestCase implements IComparisonTest {
                 new NV(TestOptions.ACCESS_POLICY,AccessPolicyEnum.LRU.toString()),//
             }));
             
+            conditions.add(getCondition(defaultProperties, new NV[] {//
+                    new NV(TestOptions.CLASS,BCHMGlobalLRU2.class.getName()),//
+                    new NV(TestOptions.THREAD_LOCAL_BUFFERS,"false"),//
+                    new NV(TestOptions.THREAD_LOCAL_BUFFER_CAPACITY,"128"),//
+                    new NV(TestOptions.ACCESS_POLICY,AccessPolicyEnum.LIRS.toString()),//
+                }));
+           
+            conditions.add(getCondition(defaultProperties, new NV[] {//
+                new NV(TestOptions.CLASS,BCHMGlobalLRU2.class.getName()),//
+                new NV(TestOptions.THREAD_LOCAL_BUFFERS,"true"),//
+                new NV(TestOptions.THREAD_LOCAL_BUFFER_CAPACITY,"128"),//
+                new NV(TestOptions.ACCESS_POLICY,AccessPolicyEnum.LIRS.toString()),//
+            }));
+            
             //
             // Based on the infinispan BCHM.
             //
+            /*
+             * Note: These cache conditions have been commented out since they
+             * cause problems with the CI builds, have somewhat aberrant
+             * behavior, and are being replaced by our own non-blocking cache.
+             */
             
-            conditions.add(getCondition(defaultProperties, new NV[] {//
-                    new NV(TestOptions.CLASS,BCHMGlobalLRU.class.getName()),//
-                    new NV(TestOptions.ACCESS_POLICY,AccessPolicyEnum.LRU.toString()),//
-                }));
-
-            conditions.add(getCondition(defaultProperties, new NV[] {//
-                    new NV(TestOptions.CLASS,BCHMGlobalLRU.class.getName()),//
-                    new NV(TestOptions.ACCESS_POLICY,AccessPolicyEnum.LIRS.toString()),//
-                }));
+//            conditions.add(getCondition(defaultProperties, new NV[] {//
+//                    new NV(TestOptions.CLASS,BCHMGlobalLRU.class.getName()),//
+//                    new NV(TestOptions.ACCESS_POLICY,AccessPolicyEnum.LRU.toString()),//
+//                }));
+//
+//            conditions.add(getCondition(defaultProperties, new NV[] {//
+//                    new NV(TestOptions.CLASS,BCHMGlobalLRU.class.getName()),//
+//                    new NV(TestOptions.ACCESS_POLICY,AccessPolicyEnum.LIRS.toString()),//
+//                }));
 
             final Experiment exp = new Experiment(className, defaultProperties,
                     conditions);

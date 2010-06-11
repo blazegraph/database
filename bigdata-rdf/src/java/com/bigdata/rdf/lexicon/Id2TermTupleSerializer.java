@@ -1,45 +1,25 @@
 /**
 
-The Notice below must appear in each file of the Source Code of any
-copy you distribute of the Licensed Product.  Contributors to any
-Modifications may add their own copyright notices to identify their
-own contributions.
+Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
 
-License:
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
 
-The contents of this file are subject to the CognitiveWeb Open Source
-License Version 1.1 (the License).  You may not copy or use this file,
-in either source code or executable form, except in compliance with
-the License.  You may obtain a copy of the License from
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
 
-  http://www.CognitiveWeb.org/legal/license/
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
-Software distributed under the License is distributed on an AS IS
-basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
-the License for the specific language governing rights and limitations
-under the License.
-
-Copyrights:
-
-Portions created by or assigned to CognitiveWeb are Copyright
-(c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
-information for CognitiveWeb is available at
-
-  http://www.CognitiveWeb.org
-
-Portions Copyright (c) 2002-2003 Bryan Thompson.
-
-Acknowledgements:
-
-Special thanks to the developers of the Jabber Open Source License 1.0
-(JOSL), from which this License was derived.  This License contains
-terms that differ from JOSL.
-
-Special thanks to the CognitiveWeb Open Source Contributors for their
-suggestions and support of the Cognitive Web.
-
-Modifications:
-
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
  * Created on Jul 7, 2008
@@ -50,6 +30,8 @@ package com.bigdata.rdf.lexicon;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 import org.openrdf.model.Value;
 
@@ -61,9 +43,10 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
-import com.bigdata.rdf.model.BigdataValueImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Encapsulates key and value formation for the reverse lexicon index.
@@ -87,7 +70,7 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<Long, Bigdata
      * A (de-)serialized backed by a {@link BigdataValueFactoryImpl} for the
      * {@link #namespace} of the owning {@link LexiconRelation}.
      */
-    transient private BigdataValueSerializer<BigdataValueImpl> valueSer;
+    transient private BigdataValueSerializer<BigdataValue> valueSer;
     
     /**
      * Used to serialize RDF {@link Value}s.
@@ -96,6 +79,8 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<Long, Bigdata
      * restricted to a single writer so it does not have to be thread-safe.
      */
     final transient private DataOutputBuffer buf = new DataOutputBuffer(Bytes.SIZEOF_LONG);
+
+    transient private BigdataValueFactory valueFactory;
 
     /**
      * De-serialization ctor.
@@ -112,7 +97,7 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<Long, Bigdata
      *            A factory that does not support unicode and has an
      *            initialCapacity of {@value Bytes#SIZEOF_LONG}.
      */
-    public Id2TermTupleSerializer(final String namespace) {
+    public Id2TermTupleSerializer(final String namespace,final BigdataValueFactory valueFactory) {
         
         super(//
                 new ASCIIKeyBuilderFactory(Bytes.SIZEOF_LONG),//
@@ -131,9 +116,8 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<Long, Bigdata
             throw new IllegalArgumentException();
         
         this.namespace = namespace;
-
-        this.valueSer = BigdataValueFactoryImpl.getInstance(namespace)
-                .getValueSerializer();
+        this.valueFactory=valueFactory;
+        this.valueSer = this.valueFactory.getValueSerializer();
 
     }
     
@@ -199,7 +183,7 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<Long, Bigdata
         
         buf.reset();
         
-        return valueSer.serialize((BigdataValueImpl)obj, buf);
+        return valueSer.serialize(obj, buf);
 
     }
 
@@ -220,22 +204,95 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<Long, Bigdata
 
     }
 
-    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        
-        super.readExternal(in);
-        
-        namespace = in.readUTF();
+    /**
+     * Included only the UTF serialization of the namespace field without
+     * explicit version support.
+     * 
+     * <pre>
+     * namespace:UTF
+     * </pre>
+     */
+    static final transient short VERSION0 = 0;
 
-        valueSer = BigdataValueFactoryImpl.getInstance(namespace).getValueSerializer();
-        
+    /**
+     * Added the UTF serialization of the class name of the value factory
+     * and an explicit version number in the serialization format. This
+     * version is detected by a read of an empty string from the original
+     * UTF field.
+     * 
+     * <pre>
+     * "":UTF
+     * valueFactoryClass:UTF
+     * namespace:UTF
+     * </pre>
+     * 
+     * Note: THere are unit tests for this backward compatible serialization
+     * change in TestId2TermTupleSerializer.
+     */
+    static final transient short VERSION1 = 1;
+
+    private static final transient short VERSION = VERSION1;
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        short version = VERSION0;
+        String s1 = in.readUTF();
+        String s2 = BigdataValueFactoryImpl.class.getName();
+        if (s1.length() == 0) {
+            version = in.readShort();
+            s1 = in.readUTF();
+            s2 = in.readUTF();
+        }
+        switch (version) {
+        case VERSION0:
+        case VERSION1:
+            break;
+        default:
+            throw new IOException("unknown version=" + version);
+        }
+        final String namespace = s1;
+        final String valueFactoryClass = s2;
+        // set the namespace field.
+        this.namespace = namespace;
+        // resolve the valueSerializer from the value factory class.
+        try {
+            final Class<?> vfc = Class.forName(valueFactoryClass);
+            if (!BigdataValueFactory.class.isAssignableFrom(vfc)) {
+                throw new RuntimeException(
+                        AbstractTripleStore.Options.VALUE_FACTORY_CLASS
+                                + ": Must extend: "
+                                + BigdataValueFactory.class.getName());
+            }
+            final Method gi = vfc.getMethod("getInstance", String.class);
+            this.valueFactory = (BigdataValueFactory) gi
+                    .invoke(null, namespace);
+        } catch (NoSuchMethodException e) {
+            throw new IOException(e);
+        } catch (InvocationTargetException e) {
+            throw new IOException(e);
+        } catch (IllegalAccessException e) {
+            throw new IOException(e);
+        }
+        valueSer = this.valueFactory.getValueSerializer();
     }
     
     public void writeExternal(ObjectOutput out) throws IOException {
-
         super.writeExternal(out);
-        
-        out.writeUTF(namespace);
-        
+        final short version = VERSION;
+        final String valueFactoryClass = valueFactory.getClass().getName();
+        switch (version) {
+        case VERSION0:
+            out.writeUTF(namespace);
+            break;
+        case VERSION1:
+            out.writeUTF("");
+            out.writeShort(version);
+            out.writeUTF(namespace);
+            out.writeUTF(valueFactoryClass);
+            break;
+        default:
+            throw new AssertionError();
+        }
     }
-    
+
 }

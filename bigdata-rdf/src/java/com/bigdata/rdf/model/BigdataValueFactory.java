@@ -47,7 +47,10 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * @version $Id$
  */
 public interface BigdataValueFactory extends ValueFactory {
-
+	/**
+	 * Remove instance of valueFactory from static cache
+	 */
+	void remove(final String namespace);
     /**
      * Returns a factory that will assign its blank node IDs within a globally
      * unique namespace. This factory should be used when processing a document
@@ -72,45 +75,45 @@ public interface BigdataValueFactory extends ValueFactory {
 //     */
 //    BigdataBNodeImpl createSID(String id);
 
-    BigdataBNodeImpl createBNode();
+    BigdataBNode createBNode();
 
-    BigdataBNodeImpl createBNode(String id);
+    BigdataBNode createBNode(String id);
 
-    BigdataLiteralImpl createLiteral(String label);
+    BigdataLiteral createLiteral(String label);
 
-    BigdataLiteralImpl createLiteral(boolean arg0);
+    BigdataLiteral createLiteral(boolean arg0);
 
-    BigdataLiteralImpl createLiteral(byte arg0);
+    BigdataLiteral createLiteral(byte arg0);
 
-    BigdataLiteralImpl createLiteral(short arg0);
+    BigdataLiteral createLiteral(short arg0);
 
-    BigdataLiteralImpl createLiteral(int arg0);
+    BigdataLiteral createLiteral(int arg0);
 
-    BigdataLiteralImpl createLiteral(long arg0);
+    BigdataLiteral createLiteral(long arg0);
 
-    BigdataLiteralImpl createLiteral(float arg0);
+    BigdataLiteral createLiteral(float arg0);
 
-    BigdataLiteralImpl createLiteral(double arg0);
+    BigdataLiteral createLiteral(double arg0);
 
-    BigdataLiteralImpl createLiteral(XMLGregorianCalendar arg0);
+    BigdataLiteral createLiteral(XMLGregorianCalendar arg0);
 
-    BigdataLiteralImpl createLiteral(String label, String language);
+    BigdataLiteral createLiteral(String label, String language);
 
-    BigdataLiteralImpl createLiteral(String label, URI datatype);
+    BigdataLiteral createLiteral(String label, URI datatype);
 
-    BigdataURIImpl createURI(String uriString);
+    BigdataURI createURI(String uriString);
 
-    BigdataURIImpl createURI(String namespace, String localName);
-
-    /**
-     * Create a statement whose {@link StatementEnum} is NOT specified.
-     */
-    BigdataStatementImpl createStatement(Resource s, URI p, Value o);
+    BigdataURI createURI(String namespace, String localName);
 
     /**
      * Create a statement whose {@link StatementEnum} is NOT specified.
      */
-    BigdataStatementImpl createStatement(Resource s, URI p, Value o, Resource c);
+    BigdataStatement createStatement(Resource s, URI p, Value o);
+
+    /**
+     * Create a statement whose {@link StatementEnum} is NOT specified.
+     */
+    BigdataStatement createStatement(Resource s, URI p, Value o, Resource c);
 
     /**
      * Create a statement (core impl). The s,p,o, and the optional c arguments
@@ -130,7 +133,7 @@ public interface BigdataValueFactory extends ValueFactory {
      * @param type
      *            The statement type (optional).
      */
-    BigdataStatementImpl createStatement(Resource s, URI p, Value o,
+    BigdataStatement createStatement(Resource s, URI p, Value o,
             Resource c, StatementEnum type);
     
     /**
@@ -187,6 +190,6 @@ public interface BigdataValueFactory extends ValueFactory {
      * 
      * @return
      */
-    BigdataValueSerializer<BigdataValueImpl> getValueSerializer();
+    BigdataValueSerializer<BigdataValue> getValueSerializer();
 
 }

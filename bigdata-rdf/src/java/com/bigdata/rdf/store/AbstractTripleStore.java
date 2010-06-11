@@ -28,6 +28,7 @@
 package com.bigdata.rdf.store;
 
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
@@ -38,13 +39,13 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
@@ -57,6 +58,7 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.rio.rdfxml.RDFXMLParser;
+
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
@@ -78,7 +80,9 @@ import com.bigdata.rdf.axioms.OwlAxioms;
 import com.bigdata.rdf.inf.IJustificationIterator;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.JustificationIterator;
+import com.bigdata.rdf.lexicon.BigdataRDFFullTextIndex;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
+import com.bigdata.rdf.lexicon.ITextIndexer;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -139,7 +143,6 @@ import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.IRuleTaskFactory;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.search.FullTextIndex;
-import com.bigdata.search.IHit;
 import com.bigdata.service.AbstractEmbeddedDataService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
@@ -358,7 +361,7 @@ abstract public class AbstractTripleStore extends
      * 
      * @todo allow a {@link TempTripleStore} to specify another db's lexicon?
      */
-    final public BigdataValueFactoryImpl getValueFactory() {
+    final public BigdataValueFactory getValueFactory() {
 
         if (valueFactory == null) {
 
@@ -383,7 +386,7 @@ abstract public class AbstractTripleStore extends
         return valueFactory;
         
     }
-    private volatile BigdataValueFactoryImpl valueFactory;
+    private volatile BigdataValueFactory valueFactory;
     
     /*
      * IDatabase, ILocatableResource
@@ -801,10 +804,45 @@ abstract public class AbstractTripleStore extends
          */
         String QUADS_MODE = AbstractTripleStore.class.getName()
                 + ".quadsMode";
-        
+
         String DEFAULT_QUADS_MODE = "false";
 
-        
+        /**
+         * The name of the {@link BigdataValueFactory} class. The implementation
+         * MUST declare a method with the following signature which will be used
+         * as a canonicalizing factory for the instances of that class.
+         * 
+         * <pre>
+         * public static BigdataValueFactory getInstance(final String namespace)
+         * </pre>
+         * 
+         * @see #DEFAULT_VALUE_FACTORY_CLASS
+         */
+        String VALUE_FACTORY_CLASS = AbstractTripleStore.class.getName()
+                + ".valueFactoryClass";
+
+        String DEFAULT_VALUE_FACTORY_CLASS = BigdataValueFactoryImpl.class
+                .getName();
+
+        /**
+         * The name of the {@link ITextIndexer} class. The implementation MUST
+         * declare a method with the following signature which will be used to
+         * locate instances of that class.
+         * 
+         * <pre>
+         * static public ITextIndexer getInstance(final IIndexManager indexManager,
+         *             final String namespace, final Long timestamp,
+         *             final Properties properties)
+         * </pre>
+         * 
+         * @see #DEFAULT_TEXT_INDEXER_CLASS
+         */
+        String TEXT_INDEXER_CLASS = AbstractTripleStore.class.getName()
+                + ".textIndexerClass";
+
+        String DEFAULT_TEXT_INDEXER_CLASS = BigdataRDFFullTextIndex.class
+                .getName();
+
     }
 
     protected Class determineAxiomClass() {
@@ -1468,26 +1506,26 @@ abstract public class AbstractTripleStore extends
     }
     private LexiconRelation lexiconRelation;
 
-    /**
-     * Full text information retrieval for RDF essentially treats the RDF
-     * Literals as "documents." The literals are broken down into "token"s to
-     * obtain a "token frequency distribution" for that literal/document. The
-     * full text index contains the indexed token data.
-     * 
-     * @return The object managing the text search indices or <code>null</code>
-     *         iff text search is not enabled.
-     * 
-     * @see Options#TEXT_INDEX
-     * @see Options#TEXT_INDEX_DATATYPE_LITERALS
-     */
-    final public FullTextIndex getSearchEngine() {
-
-        if (!lexicon)
-            return null;
-
-        return getLexiconRelation().getSearchEngine();
-        
-    }
+// Note: Use LexiconRelation#getSearchEngine().
+//    /**
+//     * Full text information retrieval for RDF essentially treats the RDF
+//     * Literals as "documents." The literals are broken down into "token"s to
+//     * obtain a "token frequency distribution" for that literal/document. The
+//     * full text index contains the indexed token data.
+//     * 
+//     * @return The object managing the text search indices or <code>null</code>
+//     *         iff text search is not enabled.
+//     * 
+//     * @see Options#TEXT_INDEX
+//     * @see Options#TEXT_INDEX_DATATYPE_LITERALS
+//     */
+//    final public ITextIndexer getSearchEngine() {
+//
+//        if (!lexicon)
+//            return null;
+//
+//        return getLexiconRelation().getSearchEngine();
+//    }
     
     final public long getNamedGraphCount() {
 
@@ -3571,46 +3609,47 @@ abstract public class AbstractTripleStore extends
         } while (statementCount0 < statementCount1);
 
     }
-    
-    /**
-     * <p>
-     * Performs a full text search against literals returning an {@link IHit}
-     * list visiting the term identifiers for literals containing tokens parsed
-     * from the query. Those term identifiers may be used to join against the
-     * statement indices in order to bring back appropriate results.
-     * </p>
-     * <p>
-     * Note: If you want to discover a data typed value, then form the
-     * appropriate data typed {@link Literal} and use
-     * {@link IRawTripleStore#getTermId(Value)}. Likewise, that method is also
-     * more appropriate when you want to lookup a specific {@link URI}.
-     * </p>
-     * 
-     * @param languageCode
-     *            The language code that should be used when tokenizing the
-     *            query (an empty string will be interpreted as the default
-     *            {@link Locale}).
-     * @param text
-     *            The query (it will be parsed into tokens).
-     * 
-     * @return An iterator that visits each term in the lexicon in which one or
-     *         more of the extracted tokens has been found. The value returned
-     *         by {@link IHit#getDocId()} is in fact the <i>termId</i> and you
-     *         can resolve it to the term using {@link #getTerm(long)}.
-     * 
-     * @throws InterruptedException
-     *             if the search operation is interrupted.
-     * 
-     * @todo Abstract the search api so that it queries the terms index directly
-     *       when a data typed literal or a URI is used (typed query).
-     */
-    @SuppressWarnings("unchecked")
-    public Iterator<IHit> textSearch(final String languageCode,
-            final String text) throws InterruptedException {
 
-        return getSearchEngine().search(text, languageCode);
-
-    }
+// Use getLexiconRelation().getSearchEngine().search(...)
+//    /**
+//     * <p>
+//     * Performs a full text search against literals returning an {@link IHit}
+//     * list visiting the term identifiers for literals containing tokens parsed
+//     * from the query. Those term identifiers may be used to join against the
+//     * statement indices in order to bring back appropriate results.
+//     * </p>
+//     * <p>
+//     * Note: If you want to discover a data typed value, then form the
+//     * appropriate data typed {@link Literal} and use
+//     * {@link IRawTripleStore#getTermId(Value)}. Likewise, that method is also
+//     * more appropriate when you want to lookup a specific {@link URI}.
+//     * </p>
+//     * 
+//     * @param languageCode
+//     *            The language code that should be used when tokenizing the
+//     *            query (an empty string will be interpreted as the default
+//     *            {@link Locale}).
+//     * @param text
+//     *            The query (it will be parsed into tokens).
+//     * 
+//     * @return An iterator that visits each term in the lexicon in which one or
+//     *         more of the extracted tokens has been found. The value returned
+//     *         by {@link IHit#getDocId()} is in fact the <i>termId</i> and you
+//     *         can resolve it to the term using {@link #getTerm(long)}.
+//     * 
+//     * @throws InterruptedException
+//     *             if the search operation is interrupted.
+//     * 
+//     * @todo Abstract the search api so that it queries the terms index directly
+//     *       when a data typed literal or a URI is used (typed query).
+//     */
+//    @SuppressWarnings("unchecked")
+//    public Iterator<IHit> textSearch(final String languageCode,
+//            final String text) throws InterruptedException {
+//
+//        return getSearchEngine().search(text, languageCode);
+//
+//    }
 
     /**
      * 

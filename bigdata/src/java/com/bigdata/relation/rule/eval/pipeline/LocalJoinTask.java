@@ -186,14 +186,40 @@ public class LocalJoinTask extends JoinTask {
      */
     protected final BlockingBuffer<IBindingSet[]> syncBuffer;
 
-    /**
-     * The {@link Future} for the sink for this {@link LocalJoinTask} and
-     * <code>null</code> iff this is {@link JoinTask#lastJoin}. This
-     * field is set by the {@link LocalJoinMasterTask} so it can be
-     * <code>null</code> if things error out before it gets set or 
-     * perhaps if they complete too quickly.
-     */
-    protected Future<? extends Object> sinkFuture;
+	/**
+	 * The {@link Future} for the sink for this {@link LocalJoinTask} and
+	 * <code>null</code> iff this is {@link JoinTask#lastJoin}. This field is
+	 * set by the {@link LocalJoinMasterTask} so it can be <code>null</code> if
+	 * things error out before it gets set or perhaps if they complete too
+	 * quickly.
+	 */
+	private volatile Future<? extends Object> sinkFuture;
+
+	/**
+	 * Set the future for the downstream join dimension on this join task. This
+	 * MUST be done before you begin to execute the downstream join. The sink
+	 * future is relied on by {@link #flushAndCloseBuffersAndAwaitSinks()} and
+	 * {@link #cancelSinks()}, both of which are executed from {@link #call()}.
+	 * 
+	 * @param f
+	 *            The future for the downstream join dimension.
+	 * 
+	 * @throws IllegalStateException
+	 *             if the future was already set.
+	 * @throws IllegalArgumentException
+	 *             if the argument is <code>null</code>.
+	 */
+	final protected void setSinkFuture(final Future<? extends Object> f) {
+
+		if (f == null)
+			throw new IllegalArgumentException();
+
+		if (sinkFuture != null)
+			throw new IllegalStateException();
+
+		this.sinkFuture = f;
+		
+	}
     
     @Override
     protected void flushAndCloseBuffersAndAwaitSinks()
@@ -257,29 +283,19 @@ public class LocalJoinTask extends JoinTask {
             assert !syncBuffer.isOpen();
 
             if (halt)
-                throw new RuntimeException(firstCause.get());
+				throw new RuntimeException(firstCause.get());
 
-            if (sinkFuture == null) {
+			try {
 
-                // @todo should we wait for the Future to be assigned?
-                log.warn("sinkFuture not assigned yet: orderIndex="
-                        + orderIndex);
-                
-            } else {
-                
-                try {
+				sinkFuture.get();
 
-                    sinkFuture.get();
+			} catch (Throwable t) {
 
-                } catch (Throwable t) {
+				halt(t);
 
-                    halt(t);
+			}
 
-                }
-            
-            }
-            
-        }
+		}
         
     }
 
@@ -294,11 +310,7 @@ public class LocalJoinTask extends JoinTask {
 
             syncBuffer.reset();
 
-            if (sinkFuture != null) {
-
-                sinkFuture.cancel(true/* mayInterruptIfRunning */);
-
-            }
+            sinkFuture.cancel(true/* mayInterruptIfRunning */);
 
         }
 

@@ -30,6 +30,7 @@ package com.bigdata.relation.rule.eval;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
@@ -790,14 +791,15 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
                 this.ruleState.getRequiredVars()[tailIndex];
             
             // clone binding set.
-            // final IBindingSet bset = bindingSet.clone();
-            final IBindingSet bset = bindingSet.copy(variablesToKeep);
+            IBindingSet bset = bindingSet.clone();
             
             // bind element to propagate bindings.
             if (joinNexus.bind(rule, tailIndex, e, bset)) {
 
                 ruleStats.subqueryCount[tailIndex]++;
 
+                bset = bset.copy(variablesToKeep);
+                
                 // run the subquery.
                 apply(orderIndex + 1, bset, buffer);
 
@@ -1036,7 +1038,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
                     // add the solution to the buffer.
                     buffer.add(solution);
-                    
+
                 }
 
             }

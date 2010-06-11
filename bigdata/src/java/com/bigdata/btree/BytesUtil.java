@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
-import it.unimi.dsi.fastutil.bytes.CustomByteArrayFrontCodedList;
+import it.unimi.dsi.fastutil.bytes.custom.CustomByteArrayFrontCodedList;
 import it.unimi.dsi.io.InputBitStream;
 import it.unimi.dsi.io.OutputBitStream;
 

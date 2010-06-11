@@ -58,10 +58,10 @@ public class BigdataStatementImpl implements BigdataStatement {
      */
     private static final long serialVersionUID = 6739949195958368365L;
 
-    private final BigdataResource s;
-    private final BigdataURI p;
-    private final BigdataValue o;
-    private final BigdataResource c;
+    protected final BigdataResource s;
+    protected final BigdataURI p;
+    protected final BigdataValue o;
+    protected final BigdataResource c;
     private StatementEnum type;
     private transient boolean override = false;
     private transient boolean modified = false;
@@ -69,7 +69,7 @@ public class BigdataStatementImpl implements BigdataStatement {
     /**
      * Used by {@link BigdataValueFactory}
      */
-    protected BigdataStatementImpl(final BigdataResource subject,
+    public BigdataStatementImpl(final BigdataResource subject,
             final BigdataURI predicate, final BigdataValue object,
             final BigdataResource context, final StatementEnum type) {
 
@@ -180,7 +180,7 @@ public class BigdataStatementImpl implements BigdataStatement {
      * Note: implementation per {@link Statement} interface, which specifies
      * that only the (s,p,o) positions are to be considered.
      */
-    final public boolean equals(final Statement stmt) {
+    public boolean equals(final Statement stmt) {
 
         return s.equals(stmt.getSubject()) && //
                p.equals(stmt.getPredicate()) && //

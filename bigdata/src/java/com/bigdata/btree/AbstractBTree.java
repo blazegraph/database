@@ -36,6 +36,9 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Level;
@@ -77,6 +80,7 @@ import com.bigdata.journal.CompactTask;
 import com.bigdata.journal.IAtomicStore;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.Journal;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
@@ -243,17 +247,6 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      */
     protected final ILRUCache<Long, Object> storeCache;
 
-//    /**
-//     * Global LRU on which we touch {@link INodeData} and {@link ILeafData}
-//     * instances. This replaces the historical readRetentionQueue, but touch is
-//     * for {@link INodeData} and {@link ILeafData} rather than {@link Node} or
-//     * {@link Leaf}.
-//     * 
-//     * @deprecated I think that this can be safely hidden. Also hide
-//     *             {@link LRUNexus#getGlobalLRU()}
-//     */
-//    final IHardReferenceQueue<Object> globalLRU;
-
     /**
      * The branching factor for the btree.
      */
@@ -263,7 +256,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * Helper class models a request to load a child node.
      * <p>
      * Note: This class must implement equals() and hashCode() since it is used
-     * within the Memoizer pattern.
+     * within the {@link Memoizer} pattern.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
@@ -377,13 +370,15 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 //            return cache.size();
 //            
 //        }
-        
+
         /**
          * Called by the thread which atomically sets the
          * {@link AbstractNode#childRefs} element to the computed
-         * {@link AbstractNode}.
+         * {@link AbstractNode}. At that point a reference exists to the child
+         * on the parent.
          * 
-         * @param addr
+         * @param req
+         *            The requst.
          */
         void removeFromCache(final LoadChildRequest req) {
 
@@ -435,21 +430,65 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      */
     AbstractNode<?> loadChild(final Node parent, final int index) {
 
-        try {
-
-            return memo.compute(new LoadChildRequest(parent, index));
-
-        } catch (InterruptedException e) {
+        if (false && store instanceof Journal
+                && ((Journal) store).getReadExecutor() != null) {
 
             /*
-             * Note: This exception will be thrown iff interrupted while
-             * awaiting the FutureTask inside of the Memoizer.
+             * This code path materializes the child node using the read
+             * service. This has the effect of bounding the #of concurrent IO
+             * requests against the local disk based on the allowed parallelism
+             * for that read service.
              */
 
-            throw new RuntimeException(e);
+            final Executor s = ((Journal) store).getReadExecutor();
+
+            final FutureTask<AbstractNode<?>> ft = new FutureTask<AbstractNode<?>>(
+                    new Callable<AbstractNode<?>>() {
+
+                        public AbstractNode<?> call() throws Exception {
+
+                            return memo.compute(new LoadChildRequest(parent,
+                                    index));
+
+                        }
+
+                    });
+            
+            s.execute(ft);
+
+            try {
+
+                return ft.get();
+
+            } catch (InterruptedException e) {
+
+                throw new RuntimeException(e);
+
+            } catch (ExecutionException e) {
+
+                throw new RuntimeException(e);
+
+            }
+
+        } else {
+
+            try {
+
+                return memo.compute(new LoadChildRequest(parent, index));
+
+            } catch (InterruptedException e) {
+
+                /*
+                 * Note: This exception will be thrown iff interrupted while
+                 * awaiting the FutureTask inside of the Memoizer.
+                 */
+
+                throw new RuntimeException(e);
+
+            }
 
         }
-        
+
     }
 
     /**
