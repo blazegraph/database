@@ -22,9 +22,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.concurrent.TimeoutException;
-import com.bigdata.journal.WriteExecutorService;
-import com.bigdata.journal.ha.AsynchronousQuorumCloseException;
-import com.bigdata.journal.ha.QuorumException;
+import com.bigdata.ha.HAGlue;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.zookeeper.ZooKeeperAccessor;
 
@@ -44,7 +42,7 @@ import com.bigdata.zookeeper.ZooKeeperAccessor;
  *       at the next commit point or (if there are no pending writes) as soon as
  *       the node is caught up.
  */
-abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
+public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
         implements Quorum<S, C> {
 
     static protected final transient Logger log = Logger
@@ -261,7 +259,10 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
     }
 
     /**
-     * Begin asynchronous processing.
+     * Begin asynchronous processing. The state of the quorum is reset, the
+     * client is registered as a {@link QuorumListener}, the {@link QuorumActor}
+     * and {@link QuorumWatcher} are created, and asynchronous discovery is
+     * initialized for the {@link QuorumWatcher}.
      */
     public void start(final C client) {
         if (client == null)
@@ -276,6 +277,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
             this.client = client;
             // addListener(client);
             if (client instanceof QuorumMember<?>) {
+                // create actor for that service.
                 this.actor = newActor(((QuorumMember<?>) client).getServiceId());
             }
             this.watcher = newWatcher();
@@ -284,6 +286,15 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                             "QuorumEventService")));
             if (log.isDebugEnabled())
                 log.debug("client=" + client);
+            /*
+             * Let the service know that it is running w/ the quorum.
+             * 
+             * Note: We can not do this until everything is in place, but we
+             * also must do this before the watcher setups up for discovery
+             * since that could will sending messages to the client as it
+             * discovers the distributed quorum state.
+             */
+            client.start(this);
             /*
              * Invoke hook for watchers. This gives them a chance to actually
              * discover the current quorum state, setup their listeners (e.g.,
@@ -313,6 +324,11 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                  */
                 actor.memberRemove();
             }
+            /*
+             * Let the service know that it is no longer running w/ the
+             * quorum.
+             */
+            client.terminate();
             if (!sendSynchronous) {
                 eventService.shutdown();
                 try {
@@ -384,18 +400,10 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
         "}";
     }
     
-    /**
-     * Return the {@link QuorumClient} iff the quorum is running.
-     * 
-     * @return The {@link QuorumClient}.
-     * 
-     * @throws IllegalStateException
-     *             if the quorum is not running.
-     */
-    protected QuorumClient<S> getClient() {
+    public C getClient() {
         lock.lock();
         try {
-            if (this.client != null)
+            if (this.client == null)
                 throw new IllegalStateException();
             return client;
         } finally {
@@ -403,6 +411,20 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
         }
     }
 
+    public QuorumMember<S> getMember() {
+        lock.lock();
+        try {
+            if (this.client == null)
+                throw new IllegalStateException();
+            if (client instanceof QuorumMember<?>) {
+                return (QuorumMember<S>) client;
+            }
+            throw new UnsupportedOperationException();
+        } finally {
+            lock.unlock();
+        }
+    }
+    
     /**
      * Return the client cast to a {@link QuorumMember}.
      * <p>
@@ -428,8 +450,8 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
     }
 
     /**
-     * Factory method invoked by {@link #start(QuorumClient)} iff the
-     * {@link QuorumClient} is a {@link QuorumMember}.
+     * The object used to effect changes in distributed quorum state on the
+     * behalf of the {@link QuorumMember}.
      * 
      * @return The {@link QuorumActor} which will effect changes in the
      *         distributed state of the quorum -or- <code>null</code> if the
@@ -438,11 +460,8 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
      * 
      * @throws IllegalStateException
      *             if the quorum is not running.
-     * 
-     * @todo It would be safer if we did not expose the actor except to the
-     *       client.  Ditto for the watcher.
      */
-    protected QuorumActor<S, C> getActor() {
+    public QuorumActor<S, C> getActor() {
         lock.lock();
         try {
             if (this.client == null)
@@ -673,7 +692,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
         }
     }
 
-    public long token() {
+    final public long token() {
         // Note: volatile read.
         return token;
     }
@@ -686,7 +705,26 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                 + this.token);
     }
 
-    public boolean isQuorumMet() {
+    final public void assertLeader(final long token) {
+        if (this.token == NO_QUORUM) {
+            // The quorum is not met.
+            throw new QuorumException();
+        }
+        final UUID leaderId = getLeaderId();
+        final QuorumMember<S> client = getClientAsMember();
+        if (client == null) {
+            // Our client is not a QuorumMember (so can not join the quorum).
+            throw new QuorumException();
+        }
+        if (!leaderId.equals(client.getServiceId())) {
+            // Our client is not the leader.
+            throw new QuorumException();
+        }
+        // Our client is the leader, now verify quorum is still valid.
+        assertQuorum(token);
+    }
+
+    final public boolean isQuorumMet() {
         return token != NO_QUORUM;
     }
 
@@ -1292,12 +1330,9 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                 // one.
                 final UUID lastId = getLastInPipeline();
                 if (pipeline.add(serviceId)) {
-                    // pipelineChange.signalAll();
                     if (log.isDebugEnabled()) {
                         // The serviceId will be at the end of the pipeline.
-                        final UUID[] a = getPipeline();
-                        log.debug("pipeline: size=" + a.length + ", services="
-                                + Arrays.toString(a));
+                        log.debug("pipeline=" + Arrays.toString(getPipeline()));
                     }
                     final QuorumMember<S> client = getClientAsMember();
                     if (client != null) {
@@ -1378,6 +1413,18 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                              */
                             client.pipelineChange(serviceId/* oldDownStream */,
                                     priorNext[1]/* newDownStream */);
+                        }
+                        if (priorNext != null && priorNext[0] == null
+                                && clientId.equals(priorNext[1])) {
+                            /*
+                             * Notify the client that its upstream service was
+                             * removed from the write pipeline such that it is
+                             * now the first service in the write pipeline. The
+                             * client will need to handle this event by
+                             * configuring itself with an HASendService rather
+                             * than an HAReceiveService.
+                             */
+                            client.pipelineElectedLeader();
                         }
                     }
                     // queue client event.
@@ -1470,8 +1517,17 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                                  * joins.
                                  */
                                 log.warn("First service will join");
-                                assert joined.isEmpty() : "Services already joined: "
-                                        + AbstractQuorum.this;
+                                if (!joined.isEmpty()) {
+                                    /*
+                                     * FIXME Why is this being tripped? It
+                                     * should be a unique circumstance and it is
+                                     * not a problem so long as the services
+                                     * join in the right order regardless. You
+                                     * can see in it the quorum test suite.
+                                     */
+                                    log.error("Services already joined: "
+                                            + AbstractQuorum.this);
+                                }
                                 actor.serviceJoin();
                             } else if (clientId.equals(serviceId)) {
                                 /*
@@ -1605,33 +1661,43 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                 assert leaderId != null : "Leader is null : "
                         + AbstractQuorum.this.toString();
                 final QuorumMember<S> client = getClientAsMember();
-                if (client != null) {
-                    /*
-                     * Since our client is a quorum member, figure out whether
-                     * or not it is a follower, in which case we will send it
-                     * the electedFollower() message.
-                     */
-                    final UUID clientId = client.getServiceId();
-                    if (joined.contains(clientId) && !clientId.equals(leaderId)) {
-                        // Our client was elected as a follower.
-                        client.electedFollower();
-                        sendEvent(new E(QuorumEventEnum.ELECTED_FOLLOWER,
-                                lastValidToken, token, clientId));
-                        if (log.isInfoEnabled())
-                            log.info("follower=" + clientId + ", token="
-                                    + token + ", leader=" + leaderId);
-                    }
-                }
+//                if (client != null) {
+//                    /*
+//                     * Since our client is a quorum member, figure out whether
+//                     * or not it is a follower, in which case we will send it
+//                     * the electedFollower() message.
+//                     */
+//                    final UUID clientId = client.getServiceId();
+//                    // Our client was elected the leader?
+//                    if (joined.contains(clientId) && clientId.equals(leaderId)) {
+//                        client.electedLeader();
+//                        sendEvent(new E(QuorumEventEnum.ELECTED_LEADER,
+//                                lastValidToken, token, clientId));
+//                        if (log.isInfoEnabled())
+//                            log.info("leader=" + clientId + ", token="
+//                                    + token + ", leader=" + leaderId);
+//                    }
+//                    // Our client was elected a follower?
+//                    if (joined.contains(clientId) && !clientId.equals(leaderId)) {
+//                        client.electedFollower();
+//                        sendEvent(new E(QuorumEventEnum.ELECTED_FOLLOWER,
+//                                lastValidToken, token, clientId));
+//                        if (log.isInfoEnabled())
+//                            log.info("follower=" + clientId + ", token="
+//                                    + token + ", leader=" + leaderId);
+//                    }
+//                }
                 /*
                  * The quorum has met.
                  */
+                log.warn("leader=" + leaderId + ", newToken=" + token
+//                        + " : " + AbstractQuorum.this
+                        );
                 if (client != null) {
                     client.quorumMeet(token, leaderId);
                 }
                 sendEvent(new E(QuorumEventEnum.QUORUM_MEET, lastValidToken,
                         token, leaderId));
-                if (log.isInfoEnabled())
-                    log.info("leader=" + leaderId + ", newToken=" + token);
             } finally {
                 lock.unlock();
             }
@@ -1687,9 +1753,6 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                 }
                 if (log.isInfoEnabled())
                     log.info("serviceId=" + serviceId.toString());
-                // queue client event.
-                sendEvent(new E(QuorumEventEnum.SERVICE_JOIN, lastValidToken,
-                        token, serviceId));
 //                final int njoined = joined.size();
 //                final int k = replicationFactor();
 //                final boolean willMeet = njoined == (k + 1) / 2;
@@ -1714,6 +1777,15 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                      * leader election, or a follower, in which case we need do
                      * a service join if it is next in the vote order.
                      */
+                    final UUID clientId = client.getServiceId();
+                    if(serviceId.equals(clientId)) {
+                        client.serviceJoin();
+                    }
+                }
+                // queue event.
+                sendEvent(new E(QuorumEventEnum.SERVICE_JOIN, lastValidToken,
+                        token, serviceId));
+                if(client!=null) {
                     final UUID clientId = client.getServiceId();
                     // The current consensus -or- null if our client is not in a
                     // consensus.
@@ -1752,7 +1824,7 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                                 actor.reorganizePipeline();
                                 actor.setLastValidToken(lastValidToken + 1);
                                 actor.setToken();
-                                client.electedLeader();
+//                                client.electedLeader(); // moved to watcher.
                             }
                         } else {
                             // The index of our client in the vote order.
@@ -1851,10 +1923,10 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
                 }
                 sendEvent(new E(QuorumEventEnum.SERVICE_LEAVE, lastValidToken,
                         token, serviceId));
-                if (client != null && leaderLeft) {
-                    // Notify all quorum members that the leader left.
-                    client.leaderLeft();
-                }
+//                if (client != null && leaderLeft) {
+//                    // Notify all quorum members that the leader left.
+//                    client.leaderLeft();
+//                }
 //                if (leaderLeft) {
 //                    sendEvent(new E(QuorumEventEnum.LEADER_LEFT, token(),
 //                            serviceId));
@@ -2042,3 +2114,4 @@ abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>>
     }
 
 }
+

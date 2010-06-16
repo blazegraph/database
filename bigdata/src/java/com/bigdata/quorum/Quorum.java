@@ -5,8 +5,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import com.bigdata.journal.ha.AsynchronousQuorumCloseException;
-import com.bigdata.journal.ha.QuorumException;
 
 /**
  * A quorum is a collection of services instances comprising the same logical
@@ -250,14 +248,6 @@ public interface Quorum<S extends Remote, C extends QuorumClient<S>> {
             AsynchronousQuorumCloseException;
 
     /**
-     * The {@link UUID} of the leader {@link Quorum} leader (non-blocking).
-     * 
-     * @return The {@link UUID} of the leader {@link Quorum} leader -or-
-     *         <code>null</code> if the quorum is not met.
-     */
-    UUID getLeaderId();
-
-    /**
      * Assert that the quorum associated with the token is still valid. The
      * pattern for using this method is to save the {@link #token()} somewhere.
      * This method may then be invoked to verify that the saved token is still
@@ -268,9 +258,34 @@ public interface Quorum<S extends Remote, C extends QuorumClient<S>> {
      * 
      * @throws QuorumException
      *             if the quorum is invalid.
+     * @throws QuorumException
+     *             if the <i>token</i> is {@link #NO_QUORUM}.
      */
     void assertQuorum(long token);
- 
+
+    /**
+     * Assert that the token is still valid and that the {@link #getClient()} is
+     * the quorum leader.
+     * 
+     * @param token
+     *            A quorum token.
+     * @throws QuorumException
+     *             if the quorum is invalid.
+     * @throws QuorumException
+     *             if the <i>token</i> is {@link #NO_QUORUM}.
+     * @throws QuorumException
+     *             if our client is not the quorum leader.
+     */
+    void assertLeader(long token);
+    
+    /**
+     * The {@link UUID} of the leader {@link Quorum} leader (non-blocking).
+     * 
+     * @return The {@link UUID} of the leader {@link Quorum} leader -or-
+     *         <code>null</code> if the quorum is not met.
+     */
+    UUID getLeaderId();
+    
     /**
      * Start any asynchronous processing associated with maintaining the
      * {@link Quorum} state.
@@ -283,4 +298,40 @@ public interface Quorum<S extends Remote, C extends QuorumClient<S>> {
      */
     void terminate();
     
+    /**
+     * Return the {@link QuorumClient} iff the quorum is running.
+     * 
+     * @return The {@link QuorumClient}.
+     * 
+     * @throws IllegalStateException
+     *             if the quorum is not running.
+     */
+    C getClient();
+
+    /**
+     * Return the {@link QuorumMember} iff the quorum is running.
+     * 
+     * @return The {@link QuorumMember}.
+     * 
+     * @throws IllegalStateException
+     *             if the quorum is not running.
+     * @throws UnsupportedOperationException
+     *             if the client does not implement {@link QuorumMember}.
+     */
+    QuorumMember<S> getMember();
+
+    /**
+     * The object used to effect changes in distributed quorum state on the
+     * behalf of the {@link QuorumMember}.
+     * 
+     * @return The {@link QuorumActor} which will effect changes in the
+     *         distributed state of the quorum.
+     * 
+     * @throws IllegalStateException
+     *             if the quorum is not running.
+     * @throws IllegalStateException
+     *             if the client is not a {@link QuorumMember}.
+     */
+    QuorumActor<S, C> getActor();
+
 }

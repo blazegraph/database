@@ -33,7 +33,7 @@ import java.rmi.Remote;
  * implementation of this interface is generally an inner class of the concrete
  * {@link AbstractQuorum} and is responsible for updating the internal state of
  * the {@link AbstractQuorum} as it the distributed quorum state. The quorum
- * internal state always <em>reflects</em> the distributed quorum state.  
+ * internal state always <em>reflects</em> the distributed quorum state.
  * <p>
  * For example, the zookeeper implementation will watch the zpath whose children
  * are the member services. If a new child appears, it will invoke
@@ -45,14 +45,20 @@ import java.rmi.Remote;
  * which manage its life cycle (start/terminate). All of the interesting methods
  * are on the {@link AbstractQuorum} class.
  * <p>
+ * The {@link QuorumWatcher} is responsible for generating these events during
+ * its discovery phase when it starts running. The {@link QuorumWatcher} MUST
+ * report the discovered state in a manner consistent with the preconditions and
+ * postconditions defined for the {@link QuorumActor} the {@link QuorumWatcher}.
+ * <p>
  * The {@link QuorumActor} provides the complementary functionality of
  * <i>causing</i> changes in the distributed state of the quorum.
  * 
  * @param <S>
  * @param <C>
  * 
- * @author thompsonbry@users.sourceforge.net
  * @see QuorumActor
+ * 
+ * @author thompsonbry@users.sourceforge.net
  */
 public interface QuorumWatcher<S extends Remote, C extends QuorumClient<S>> {
 

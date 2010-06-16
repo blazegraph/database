@@ -29,8 +29,8 @@ package com.bigdata.quorum;
 
 import java.rmi.Remote;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArraySet;
 
-import com.bigdata.journal.ha.QuorumException;
 
 /**
  * Abstract base class for a {@link QuorumMember}.
@@ -43,9 +43,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
 
     private final UUID serviceId;
 
-    protected AbstractQuorumMember(final Quorum quorum, final UUID serviceId) {
-
-        super(quorum);
+    protected AbstractQuorumMember(final UUID serviceId) {
 
         if (serviceId == null)
             throw new IllegalArgumentException();
@@ -69,6 +67,16 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
 
     public UUID getServiceId() {
         return serviceId;
+    }
+
+    /**
+     * Return the actor for this {@link QuorumMember} (it is allocated by
+     * {@link AbstractQuorum#start(QuorumClient)}).
+     */
+    public QuorumActor<S, QuorumMember<S>> getActor() {
+
+        return (QuorumActor<S, QuorumMember<S>>) getQuorum().getActor();
+
     }
 
     public boolean isMember() {
@@ -172,7 +180,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
         return false;
     }
 
-    public UUID getDownstreamService(final long token) {
+    public UUID getDownstreamServiceId() {
         final UUID serviceId = getServiceId();
         final UUID[] pipeline = getQuorum().getPipeline();
         for (int i = 0; i < pipeline.length - 1; i++) {
@@ -180,9 +188,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
             if (!eq)
                 continue;
             // The next service in the pipeline after this service.
-            final UUID nextId = pipeline[i+1]; 
-            // Verify quorum is still valid.
-            getQuorum().assertQuorum(token);
+            final UUID nextId = pipeline[i + 1];
             // Ok, we are at the end of the pipeline.
             return nextId;
         }
@@ -194,13 +200,8 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
         getQuorum().assertQuorum(token);
     }
 
-    protected void assertLeader(final long token) {
-        if (!getServiceId().equals(getQuorum().getLeaderId())) {
-            // Not the leader.
-            throw new QuorumException();
-        }
-        // We are the leader, now verify quorum is still valid.
-        getQuorum().assertQuorum(token);
+    public void assertLeader(final long token) {
+        getQuorum().assertLeader(token);
     }
 
     protected void assertFollower(final long token) {
@@ -221,126 +222,115 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
         throw new QuorumException();
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * The default implementation logs the message but does not handle it.
+    /*
+     * QuorumStateChangeListener
      */
-    public void electedFollower() {
-        if (log.isDebugEnabled())
-            log.debug("");
-    }
+    
+    /**
+     * This is used to dispatch the {@link QuorumStateChangeListener} events.
+     */
+    private final CopyOnWriteArraySet<QuorumStateChangeListener> listeners = new CopyOnWriteArraySet<QuorumStateChangeListener>();
 
     /**
-     * {@inheritDoc}
+     * Add a delegate listener.
      * 
-     * The default implementation logs the message but does not handle it.
+     * @param listener
+     *            The listener.
      */
-    public void electedLeader() {
-        if (log.isDebugEnabled())
-            log.debug("");
-    }
+    protected void addListener(final QuorumStateChangeListener listener) {
 
-    /**
-     * {@inheritDoc}
-     * 
-     * The default implementation logs the message but does not handle it.
-     */
-    public void leaderLeft() {
-        if (log.isDebugEnabled())
-            log.debug("");
+        if (listener == null)
+            throw new IllegalArgumentException();
+        
+        this.listeners.add(listener);
+        
     }
-
+    
     /**
-     * {@inheritDoc}
+     * Remove a delegate listener.
      * 
-     * The default implementation logs the message but does not handle it.
+     * @param listener
+     *            The listener.
      */
+    protected void removeListener(final QuorumStateChangeListener listener) {
+
+        if (listener == null)
+            throw new IllegalArgumentException();
+        
+        this.listeners.remove(listener);
+        
+    }
+    
     public void memberAdd() {
-        if (log.isDebugEnabled())
-            log.debug("");
+        for (QuorumStateChangeListener l : listeners) {
+            l.memberAdd();
+        }
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * The default implementation logs the message but does not handle it.
-     */
     public void memberRemove() {
-        if (log.isDebugEnabled())
-            log.debug("");
+        for (QuorumStateChangeListener l : listeners) {
+            l.memberRemove();
+        }
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * The default implementation logs the message but does not handle it.
-     */
     public void pipelineAdd() {
-        if (log.isDebugEnabled())
-            log.debug("");
+        for (QuorumStateChangeListener l : listeners) {
+            l.pipelineAdd();
+        }
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * The default implementation logs the message but does not handle it.
-     */
     public void pipelineRemove() {
-        if (log.isDebugEnabled())
-            log.debug("");
+        for (QuorumStateChangeListener l : listeners) {
+            l.pipelineRemove();
+        }
     }
 
-	/**
-	 * {@inheritDoc}
-	 * 
-	 * The default implementation logs the message but does not handle it.
-	 */
-	public void pipelineChange(final UUID oldDownStreamId,
-			final UUID newDownStreamId) {
-		if (log.isDebugEnabled())
-			log.debug("oldDownStream=" + oldDownStreamId + ",newDownStream="
-					+ newDownStreamId);
+    public void pipelineElectedLeader() {
+        for (QuorumStateChangeListener l : listeners) {
+            l.pipelineElectedLeader();
+        }
+    }
+
+	public void pipelineChange(final UUID oldDownStreamId, final UUID newDownStreamId) {
+        for (QuorumStateChangeListener l : listeners) {
+            l.pipelineChange(oldDownStreamId, newDownStreamId);
+        }
 	}
 
-	public void consensus(final long lastCommitTime) {
-		if (log.isDebugEnabled())
-			log.debug("lastCommitTime=" + lastCommitTime);
-	}
-    
+    public void consensus(final long lastCommitTime) {
+        for (QuorumStateChangeListener l : listeners) {
+            l.consensus(lastCommitTime);
+        }
+    }
+
     public void lostConsensus() {
-        if (log.isDebugEnabled())
-            log.debug("");
-    }
-    
-    /**
-     * {@inheritDoc}
-     * 
-     * The default implementation logs the message but does not handle it.
-     */
-    public void quorumBreak() {
-        if (log.isDebugEnabled())
-            log.debug("");
+        for (QuorumStateChangeListener l : listeners) {
+            l.lostConsensus();
+        }
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * The default implementation logs the message but does not handle it.
-     */
     public void serviceJoin() {
-        if (log.isDebugEnabled())
-            log.debug("");
+        for (QuorumStateChangeListener l : listeners) {
+            l.serviceJoin();
+        }
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * The default implementation logs the message but does not handle it.
-     */
     public void serviceLeave() {
-        if (log.isDebugEnabled())
-            log.debug("");
+        for (QuorumStateChangeListener l : listeners) {
+            l.serviceLeave();
+        }
+    }
+
+    public void quorumBreak() {
+        for (QuorumStateChangeListener l : listeners) {
+            l.quorumBreak();
+        }
+    }
+
+    public void quorumMeet(final long token, final UUID leaderId) {
+        for (QuorumStateChangeListener l : listeners) {
+            l.quorumMeet(token, leaderId);
+        }
     }
 
 }
