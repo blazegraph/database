@@ -29,12 +29,19 @@ package com.bigdata.journal.ha;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.UUID;
 
-import com.bigdata.io.WriteCacheService;
+import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.QuorumService;
 import com.bigdata.journal.CommitRecordIndex;
+import com.bigdata.journal.ForceEnum;
+import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.ProxyTestCase;
+import com.bigdata.journal.RootBlockView;
+import com.bigdata.quorum.Quorum;
+import com.bigdata.util.ChecksumUtility;
 
 /**
  * Unit tests bootstrap 3 journals in a specified failover chain and demonstrate
@@ -70,14 +77,16 @@ public class TestHAWritePipeline extends ProxyTestCase<Journal> {
         final Journal store = getStore(getProperties());
 
         try {
-            
-            final QuorumManager qm = store.getQuorumManager();
 
-            final Quorum q = qm.getQuorum();
+            /*
+             * @todo we probably have to return the service which joined as the
+             * leader from getStore().
+             */
+            final Quorum<HAGlue,QuorumService<HAGlue>> q = store.getQuorum();
 
             final long token = q.token();
 
-            qm.assertQuorumLeader(token);
+            q.getClient().assertLeader(token);
 
             // @todo verify binary state of all stores.
             
@@ -94,17 +103,15 @@ public class TestHAWritePipeline extends ProxyTestCase<Journal> {
         final Journal store = getStore(getProperties());
         try {
 
-            final QuorumManager qm = store.getQuorumManager();
-
-            final Quorum q = qm.getQuorum();
+            final Quorum<HAGlue,QuorumService<HAGlue>> q = store.getQuorum();
 
             final long token = q.token();
 
-            qm.assertQuorumLeader(token);
+            q.assertLeader(token);
 
             store.abort();
 
-            qm.assertQuorumLeader(token);
+            q.assertLeader(token);
 
         } finally {
 
@@ -119,21 +126,19 @@ public class TestHAWritePipeline extends ProxyTestCase<Journal> {
         final Journal store = getStore(getProperties());
         try {
 
-            final QuorumManager qm = store.getQuorumManager();
-            
-            final Quorum q = qm.getQuorum();
+            final Quorum<HAGlue,QuorumService<HAGlue>> q = store.getQuorum();
 
             final long token = q.token();
 
-            qm.assertQuorumLeader(token);
+            q.assertLeader(token);
             
             store.write(getRandomData());
             
-            qm.assertQuorumLeader(token);
+            q.assertLeader(token);
             
             store.abort();
 
-            qm.assertQuorumLeader(token);
+            q.assertLeader(token);
 
         } finally {
 
@@ -156,17 +161,15 @@ public class TestHAWritePipeline extends ProxyTestCase<Journal> {
         final Journal store = getStore(getProperties());
         try {
 
-            final QuorumManager qm = store.getQuorumManager();
-
-            final Quorum q = qm.getQuorum();
+            final Quorum<HAGlue,QuorumService<HAGlue>> q = store.getQuorum();
 
             final long token = q.token();
 
-            qm.assertQuorumLeader(token);
+            q.assertLeader(token);
 
             store.commit();
 
-            qm.assertQuorumLeader(token);
+            q.assertLeader(token);
 
        } finally {
 
@@ -184,34 +187,32 @@ public class TestHAWritePipeline extends ProxyTestCase<Journal> {
         final Journal store = getStore(getProperties());
         try {
 
-            final QuorumManager qm = store.getQuorumManager();
-            
-            final Quorum q = qm.getQuorum();
+            final Quorum<HAGlue,QuorumService<HAGlue>> q = store.getQuorum();
 
             final long token = q.token();
 
-            qm.assertQuorumLeader(token);
+            q.assertLeader(token);
 
             // The 1st after a create is never empty. 
             store.commit();
 
-            qm.assertQuorumLeader(token);
+            q.assertLeader(token);
 
             // This is an empty commit : @todo verify no change to root blocks.
             store.commit();
 
-            qm.assertQuorumLeader(token);
+            q.assertLeader(token);
 
             /*
              * write a single record and then commit.
              */
             store.write(getRandomData());
             
-            qm.assertQuorumLeader(token);
+            q.assertLeader(token);
             
             store.commit();
 
-            qm.assertQuorumLeader(token);
+            q.assertLeader(token);
  
         } finally {
 
@@ -232,9 +233,7 @@ public class TestHAWritePipeline extends ProxyTestCase<Journal> {
         final Journal store = getStore(getProperties());
         try {
 
-            final QuorumManager qm = store.getQuorumManager();
-            
-            final Quorum q = qm.getQuorum();
+            final Quorum<HAGlue,QuorumService<HAGlue>> q = store.getQuorum();
 
             final long token = q.token();
             
@@ -242,20 +241,37 @@ public class TestHAWritePipeline extends ProxyTestCase<Journal> {
 
             final long addr = store.write(expected);
 
-            qm.assertQuorumLeader(token);
+            q.assertLeader(token);
             
             store.commit();
 
-            qm.assertQuorumLeader(token);
-            
-            for (int i = 0; i < q.replicationFactor(); i++) {
+            /*
+             * The joined member services for the met quorum. The leader is in
+             * the first position in this array. We verify (below) that the
+             * joinOrder is for the [token] we obtained above, which is what
+             * gives us the guarantee that this service is still the leader and
+             * that the UUID in position zero is this service.
+             */
+            final UUID[] joinOrder = q.getJoinedMembers();
 
-                assertEquals(expected, q.getHAGlue(i).readFromDisk(q.token(),
-                        addr));
+            /*
+             * Verify the quorum is valid before we proceed with our assumptions
+             * concerning the joinOrder.
+             */
+            q.assertQuorum(token);
+
+            for (int i = 1; i < joinOrder.length; i++) {
+
+                final UUID serviceId = joinOrder[i];
+                
+                final HAGlue remoteService = q.getClient().getService(serviceId);
+                
+                assertEquals(expected, remoteService.readFromDisk(q.token(),
+                        store.getUUID(), addr));
 
             }
 
-            qm.assertQuorumLeader(token);
+            q.assertQuorum(token);
             
         } finally {
 
@@ -264,5 +280,89 @@ public class TestHAWritePipeline extends ProxyTestCase<Journal> {
         }
 
     }
+
+//    public void test_getRootBlocksFromLeader() {
+//        
+//    }
+//    
+//    /**
+//     * Replace our root blocks with those of the quorum leader (HA only).
+//     * 
+//     * FIXME This just grabs the root blocks of the quorum leader if there was
+//     * no backing file.
+//     * <p>
+//     * In fact, we need to handle synchronization when the backing file exists
+//     * and when it does not exist, however we will not be "in" the quorum on
+//     * restart if we are not synchronized.
+//     * <p>
+//     * If we are not the leader of a quorum then we need to synchronize with the
+//     * quorum leader.
+//     * <p>
+//     * Note: The delta can be obtained by comparing out current root block with
+//     * the root block of the leader.
+//     */
+//    public void takeRootBlocksFromLeader(final Quorum<?,?> quorum) {
+//
+//        if (!quorum.isHighlyAvailable())
+//            throw new UnsupportedOperationException();
+//
+//        if (quorum.getClient().isLeader(quorumToken)) {
+//            // The leader can not issue this request to itself.
+//            throw new UnsupportedOperationException();
+//        }
+//
+//        if (_rootBlock.getLastCommitTime() != 0L) {
+//            /*
+//             * Journal already has committed state.
+//             */
+//            throw new UnsupportedOperationException();
+//        }
+//
+//        try {
+//
+//            if (quorum.isHighlyAvailable())
+//                System.err.println("HA JOURNAL INIT");
+//
+//            System.err.println("Requesting root block from leader.");
+//            final UUID leaderId = quorum.getLeaderId();
+//            quorum.assertQuorum(quorumToken);
+//            // get the root blocks from the leader.
+//            final byte[] tmp = quorum.getClient().getService(leaderId)
+//                    .getRootBlock(getUUID());
+//            // construct view from the root block.
+//            final IRootBlockView rootBlock0 = new RootBlockView(//
+//                    true, // isRootBlock0
+//                    ByteBuffer.wrap(tmp), //
+//                    new ChecksumUtility()//
+//                    );
+//            // construct view from the root block.
+//            final IRootBlockView rootBlock1 = new RootBlockView(//
+//                    true, // isRootBlock0
+//                    ByteBuffer.wrap(tmp), //
+//                    new ChecksumUtility()//
+//                    );
+//            System.err.println("Got root block from leader: " + rootBlock0);
+//            if (rootBlock0.getCommitCounter() != 0L) {
+//                throw new RuntimeException("Leader already has data: "
+//                        + rootBlock0);
+//            }
+//
+//            // overwrite our root blocks with the leader's.
+//            _bufferStrategy.writeRootBlock(rootBlock0, ForceEnum.No);
+//            _bufferStrategy.writeRootBlock(rootBlock1, ForceEnum.Force);
+//
+//            /*
+//             * Do a low-level abort to discard the current write set and reload
+//             * various things from the new root blocks.
+//             */
+//            _abort();
+//
+//        } catch (IOException ex) {
+//
+//            throw new RuntimeException(ex);
+//
+//        }
+//
+//    }
 
 }
