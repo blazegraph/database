@@ -75,15 +75,15 @@ public enum QuorumEventEnum {
      * Event generated when a service leaves a quorum.
      */
     SERVICE_LEAVE,
-    /**
-     * Event generated when a service joins a quorum as a follower.
-     */
-    ELECTED_FOLLOWER,
-    /**
-     * Event generated when a new leader is elected, including when a quorum
-     * meets.
-     */
-    ELECTED_LEADER,
+//    /**
+//     * Event generated when a service joins a quorum as a follower.
+//     */
+//    ELECTED_FOLLOWER,
+//    /**
+//     * Event generated when a new leader is elected, including when a quorum
+//     * meets.
+//     */
+//    ELECTED_LEADER,
     /**
      * Event generated when the last valid token is set.
      */

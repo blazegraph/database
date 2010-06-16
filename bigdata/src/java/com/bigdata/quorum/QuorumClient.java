@@ -30,16 +30,13 @@ package com.bigdata.quorum;
 import java.rmi.Remote;
 import java.util.UUID;
 
-import com.bigdata.journal.ha.QuorumException;
 
 /**
  * A non-remote interface for a client which monitors the state of a quorum.
  * This interface adds the ability to receive notice of quorum state changes and
  * resolve the {@link Remote} interface for the member services of the quorum.
- * Clients can register as a {@link QuorumListener} in order to be notified of
- * interesting events.
  * 
- * @see Quorum#addListener(QuorumListener)
+ * @see AbstractQuorum#start(QuorumClient)
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -47,9 +44,34 @@ import com.bigdata.journal.ha.QuorumException;
 public interface QuorumClient<S extends Remote> extends QuorumListener {
 
     /**
-     * The quorum that is being monitored.
+     * Life cycle message sent when the client will begin to receive messages
+     * from the {@link Quorum}. At a minimum, the client should save a reference
+     * to the {@link Quorum}.
+     * 
+     * @param quorum
+     *            The quorum.
+     * 
+     * @see AbstractQuorum#start(QuorumClient)
      */
-    Quorum getQuorum();
+    void start(Quorum<?,?> quorum);
+    
+    /**
+     * Life cycle message send when the client will no longer receive messages
+     * from the {@link Quorum}.
+     * 
+     * @see AbstractQuorum#terminate()
+     */
+    void terminate();
+
+    /**
+     * The quorum that is being monitored.
+     * 
+     * @throws QuorumException
+     *             if the client is not running with the quorum.
+     * 
+     * @see #start(Quorum)
+     */
+    Quorum<?,?> getQuorum();
 
     /**
      * Return the remote interface used to perform HA operations on a member of

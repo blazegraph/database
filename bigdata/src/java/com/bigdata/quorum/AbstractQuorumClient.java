@@ -29,36 +29,58 @@ package com.bigdata.quorum;
 
 import java.rmi.Remote;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 
 /**
+ * Base class for {@link QuorumClient}s.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 abstract public class AbstractQuorumClient<S extends Remote> implements
         QuorumClient<S> {
 
-    static protected final Logger log = Logger
+    static protected final transient Logger log = Logger
             .getLogger(AbstractQuorumClient.class);
-    
-    private final Quorum quorum;
 
-    protected AbstractQuorumClient(final Quorum quorum) {
+    private final AtomicReference<Quorum<?, ?>> quorum = new AtomicReference<Quorum<?, ?>>();
+
+    protected AbstractQuorumClient() {
+
+    }
+
+    public Quorum<?,?> getQuorum() {
+
+        final Quorum<?,?> tmp = quorum.get();
+
+        if (tmp == null)
+            throw new IllegalStateException();
+
+        return tmp;
+
+    }
+
+    public void start(final Quorum<?,?> quorum) {
 
         if (quorum == null)
             throw new IllegalArgumentException();
 
-        this.quorum = quorum;
+        if (!this.quorum.compareAndSet(null/* expect */, quorum/* update */)) {
 
+            throw new IllegalStateException();
+
+        }
+    
     }
 
-    public Quorum getQuorum() {
-
-        return quorum;
-
+    public void terminate() {
+        
+        this.quorum.set(null);
+        
     }
-
+    
     public S getLeader(final long token) {
         final Quorum<?,?> q = getQuorum();
         q.assertQuorum(token);
@@ -73,30 +95,6 @@ abstract public class AbstractQuorumClient<S extends Remote> implements
     abstract public S getService(UUID serviceId);
 
     public void notify(QuorumEvent e) {
-        
-//        if (log.isInfoEnabled())
-//            log.info(e.toString());
-
-    }
-
-    /**
-     * {@inheritDoc}
-     * 
-     * The default implementation logs the message but does not handle it.
-     */
-    public void quorumBreak() {
-        if (log.isInfoEnabled())
-            log.info("");
-    }
-
-    /**
-     * {@inheritDoc}
-     * 
-     * The default implementation logs the message but does not handle it.
-     */
-    public void quorumMeet(final long token, final UUID leaderId) {
-        if (log.isInfoEnabled())
-            log.info("token=" + token + ",leaderId=" + leaderId);
     }
 
 }

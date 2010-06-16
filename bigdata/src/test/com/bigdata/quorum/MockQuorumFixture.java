@@ -36,19 +36,20 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.journal.ha.QuorumException;
+import com.bigdata.quorum.MockQuorumFixture.MockQuorum.MockQuorumActor;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum.MockQuorumWatcher;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -166,14 +167,80 @@ public class MockQuorumFixture {
      */
     private final LinkedHashSet<UUID> pipeline = new LinkedHashSet<UUID>();
 
+    /**
+     * An {@link Executor} which can be used by the unit tests.
+     */
+    private ExecutorService executorService;
+
+    /**
+     * A map from the serviceId to each {@link QuorumMember}.
+     */
+    private final ConcurrentHashMap<UUID, QuorumMember<?>> known = new ConcurrentHashMap<UUID, QuorumMember<?>>();
+    
+    /**
+     * An {@link Executor} which can be used by the unit tests.
+     * 
+     * @see QuorumMember#getExecutor()
+     */
+    public Executor getExecutor() {
+        return executorService;
+    }
+
+    /**
+     * Resolve a known {@link QuorumMember} for the fixture.
+     * 
+     * @param serviceId
+     *            The {@link UUID}for the {@link QuorumMember}'s service.
+     * 
+     * @return The {@link QuorumMember} -or- <code>null</code> if there is none
+     *         known for that serviceId.
+     */
+    public QuorumMember<?> getMember(final UUID serviceId) {
+
+        if (serviceId == null)
+            throw new IllegalArgumentException();
+
+        final QuorumMember<?> member = known.get(serviceId);
+
+        return member;
+
+    }
+
+    /**
+     * Resolve the service by its {@link UUID} for any service running against
+     * this fixture.
+     * 
+     * @param serviceId
+     *            The {@link UUID} for the service.
+     * 
+     * @return The service.
+     * 
+     * @throws IllegalArgumentException
+     *             if there is no known {@link QuorumMember} for that serviceId.
+     */
+    public Object getService(final UUID serviceId) {
+
+        final QuorumMember<?> member = getMember(serviceId);
+
+        if (member == null)
+            throw new IllegalArgumentException("Unknown: " + serviceId);
+
+        return member.getService();
+
+    }
+    
     public MockQuorumFixture() {
     }
 
     /** Start fixture. */
-    void start() {
+    synchronized
+    public void start() {
 
         token = lastValidToken = Quorum.NO_QUORUM;
-        
+
+        executorService = Executors
+                .newCachedThreadPool(new DaemonThreadFactory("executorService"));
+
         dispatchService = Executors
                 .newSingleThreadScheduledExecutor(new DaemonThreadFactory(
                         "dispatchService"));
@@ -183,12 +250,28 @@ public class MockQuorumFixture {
     }
     
     /** Terminate fixture. */
-    void terminate() {
+    synchronized 
+    public void terminate() {
         
-        dispatchService.shutdownNow();
+        if (executorService != null) {
+            executorService.shutdownNow();
+            executorService = null;
+        }
+        
+        if (dispatchService != null) {
+            dispatchService.shutdownNow();
+            dispatchService = null;
+        }
         
     }
 
+    private void assertRunning() {
+
+        if (dispatchService == null)
+            throw new IllegalStateException();
+        
+    }
+    
     /**
      * Dispatches each event to each watcher in turn.  The event is not
      * dispatched to the next watcher until the current watcher is finished
@@ -291,17 +374,34 @@ public class MockQuorumFixture {
      * 
      * @throws InterruptedException
      * 
-     *             FIXME Consider using a {@link SynchronousQueue} instead of an
-     *             unbounded blocking queue. However, experiments with a bounded
-     *             blocking queue result in deadlock, which I have not analyzed
-     *             yet. Since I have not looked into this, I am not sure if the
-     *             problem is the fixture design or the {@link AbstractQuorum}
-     *             and I do not know whether the {@link AbstractQuorum} would
-     *             result in deadlocks with zookeeper (I rather doubt it).
+     *             FIXME Make this method private and invoke it from the
+     *             {@link MockQuorumActor} for each request which it issues such
+     *             that the client never gets ahead of the observations of its
+     *             own actions (or those of any other client).
+     *             <p>
+     *             The {@link #deque} must be unbounded since each action can
+     *             trigger additional actions.
+     *             <p>
+     *             The logic in {@link MockQuorumWatcher#notify(QuorumEvent)}
+     *             currently holds the {@link #globalSynchronousLock} while
+     *             processing the event. In order for us to make this change it
+     *             will have to locally queue the event and then process it
+     *             later (or simply notify that a specific watched event has
+     *             occurred and then inspect the quorum state to decide what the
+     *             event was and how to handle it). If these changes are made
+     *             then we can make {@link #lock} and alias for
+     *             {@link #globalSynchronousLock}, make this method a NOP, and
+     *             add a private variant which is invoked by the
+     *             {@link MockQuorumActor} for each action which it takes. All
+     *             of this would make the {@link MockQuorumFixture} more
+     *             "zookeeper" like in its guarantee of global synchronous
+     *             notification and the actions which clients must take to
+     *             handle those notifications.
      */
-    void awaitDeque() throws InterruptedException {
+    public void awaitDeque() throws InterruptedException {
         lock.lock();
         try {
+            assertRunning();
             while (!deque.isEmpty()) {
                 dequeEmpty.await();
             }
@@ -323,6 +423,7 @@ public class MockQuorumFixture {
     private void accept(final QuorumEvent e) {
         lock.lock();
         try {
+            assertRunning();
             if (false) {
                 // stack trace so we can see who generated this event.
                 log.warn("event=" + e, new RuntimeException("stack trace"));
@@ -537,11 +638,10 @@ public class MockQuorumFixture {
      * @version $Id: MockQuorumFixture.java 2984 2010-06-06 22:10:32Z
      *          thompsonbry $
      */
-    static class MockQuorum extends AbstractQuorum {
+    static public class MockQuorum<S extends Remote, C extends QuorumMember<S>>
+            extends AbstractQuorum<S, C> {
 
         private final MockQuorumFixture fixture;
-
-        private volatile UUID _serviceId;
 
         /**
          * A single threaded executor which drains the {@link #queue} and
@@ -556,14 +656,14 @@ public class MockQuorumFixture {
          */
         private ExecutorService watcherService = null;
 
-        protected MockQuorum(final int k,final MockQuorumFixture fixture) {
+        public MockQuorum(final int k, final MockQuorumFixture fixture) {
 
             super(k);
             
             this.fixture = fixture;
             
         }
-
+        
         @Override
         protected QuorumActorBase newActor(final UUID serviceId) {
             return new MockQuorumActor(serviceId);
@@ -586,10 +686,9 @@ public class MockQuorumFixture {
             return (MockQuorumActor)super.getActor();
         }
         
-        public void start(final QuorumMember client) {
-            super.start(client);
-            // cache the service UUID.
-            _serviceId = client.getServiceId();
+        public void start(final C client) {
+            super.start((C) client);
+            // Start the service accepting events for the watcher.
             watcherService = Executors
                     .newSingleThreadScheduledExecutor(new DaemonThreadFactory(
                             "watcherService"));
@@ -599,13 +698,14 @@ public class MockQuorumFixture {
             watcherService.execute(new WatcherTask(watcher));
             // add our watcher as a listener to the fixture's inner quorum.
             fixture.listeners.add(watcher);
+            // Save UUID -> QuorumMember mapping on the fixture.
+            fixture.known.put(client.getServiceId(), client);
         }
 
         public void terminate() {
             final MockQuorumWatcher watcher = (MockQuorumWatcher) getWatcher();
             super.terminate();
-            // clear the serviceId cache.
-            _serviceId = null;
+            // Stop the service accepting events for the watcher.
             watcherService.shutdownNow();
             // remove our watcher as a listener for the fixture's inner quorum.
             fixture.listeners.remove(watcher);
@@ -858,8 +958,10 @@ public class MockQuorumFixture {
                   break;
               }
                     /*
-                     * These events do not carry any state change so we do not
-                     * do anything with them here.
+                     * Note: These events do not carry any state change so we do
+                     * not do anything with them here. These events will be
+                     * generated by the watchers for each quorum as it accepts
+                     * the state change events from the fixture.
                      */
 //                    /**
 //                     * Event generated when a new leader is elected, including
@@ -908,16 +1010,19 @@ public class MockQuorumFixture {
         }
 
     }
-    
-	/**
-	 * NOP client base class used for the individual clients for each
-	 * {@link MockQuorum} registered with of a shared {@link MockQuorumFixture2}.
-	 * 
-	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-	 *         Thompson</a>
-	 * @version $Id: MockQuorumFixture.java 2970 2010-06-03 22:21:22Z
-	 *          thompsonbry $
-	 */
+
+    /**
+     * NOP client base class used for the individual clients for each
+     * {@link MockQuorum} registered with of a shared {@link MockQuorumFixture}
+     * - you can actually use any {@link QuorumMember} implementation you like
+     * with the {@link MockQuorumFixture}, not just this one. The implementation
+     * you use DOES NOT have to be derived from this class. .
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id: MockQuorumFixture.java 2970 2010-06-03 22:21:22Z
+     *          thompsonbry $
+     */
     static class MockQuorumMember<S extends Remote> extends
             AbstractQuorumMember<S> {
 
@@ -936,19 +1041,24 @@ public class MockQuorumFixture {
         /**
          * @param quorum
          */
-        protected MockQuorumMember(MockQuorum quorum) {
-            super(quorum, UUID.randomUUID());
+        protected MockQuorumMember() {
+            
+            super(UUID.randomUUID());
+            
         }
 
-        /**
-         * Strengthened return type
-         */
-        public MockQuorum getQuourm() {
-            return (MockQuorum)super.getQuorum();
-        }
+//        /**
+//         * Strengthened return type
+//         */
+//        public MockQuorum<S, QuorumMember<S>> getQuourm() {
+//         
+//            return (MockQuorum<S, QuorumMember<S>>) super.getQuorum();
+//            
+//        }
         
         /**
-         * Can not resolve services.
+         * Can not resolve services (this functionality is not required for the
+         * unit tests in the <code>com.bigdata.quorum</code> package.
          */
         public S getService(UUID serviceId) {
             throw new UnsupportedOperationException();
@@ -993,6 +1103,14 @@ public class MockQuorumFixture {
 		    super.pipelineRemove();
 		    this.downStreamId = null;
 		}
+
+        public Executor getExecutor() {
+            throw new UnsupportedOperationException();
+        }
+
+        public S getService() {
+            throw new UnsupportedOperationException();
+        }
 		
 	}
 
