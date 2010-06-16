@@ -49,6 +49,9 @@ import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.config.IntegerValidator;
 import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.QuorumService;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.relation.locator.ILocatableResource;
@@ -162,8 +165,15 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      */
     public Journal(final Properties properties) {
         
-        super(properties);
-     
+        this(properties, null/* quorum */);
+    
+    }
+
+    public Journal(final Properties properties,
+            final Quorum<HAGlue, QuorumService<HAGlue>> quorum) {
+
+        super(properties, quorum);
+
         tempStoreFactory = new TemporaryStoreFactory(properties);
         
         executorService = Executors.newCachedThreadPool(new DaemonThreadFactory

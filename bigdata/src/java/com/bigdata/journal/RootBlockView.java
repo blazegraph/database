@@ -35,7 +35,7 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.journal.ha.Quorum;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.WormAddressManager;

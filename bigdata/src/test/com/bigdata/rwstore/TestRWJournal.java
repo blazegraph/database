@@ -298,12 +298,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
         public void test_reallocate() {
             final Journal store = (Journal) getStore();
 
-            byte[] buf = new byte[1024]; // 2Mb buffer of random data
-            r.nextBytes(buf);
-            
-            ByteBuffer bb = ByteBuffer.wrap(buf);
-
             try {
+
+                byte[] buf = new byte[1024]; // 2Mb buffer of random data
+                r.nextBytes(buf);
+                
+                ByteBuffer bb = ByteBuffer.wrap(buf);
 
                 RWStrategy bs = (RWStrategy) store
                         .getBufferStrategy();
@@ -327,12 +327,10 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 assertEquals(bb, inbb1);
                 assertEquals(bb, inbb2);
                 
-            } catch (Exception e) {
-            	e.printStackTrace();
-            	fail();
+            } finally {
+                store.destroy();
             }
-                
-                
+   
         }
         
         /**
@@ -532,12 +530,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
             
             final Journal store = (Journal) getStore();
 
-            byte[] buf = new byte[1024 * 2048]; // 2Mb buffer of random data
-            r.nextBytes(buf);
-            
-            ByteBuffer bb = ByteBuffer.wrap(buf);
-
             try {
+
+                byte[] buf = new byte[1024 * 2048]; // 2Mb buffer of random data
+                r.nextBytes(buf);
+                
+                ByteBuffer bb = ByteBuffer.wrap(buf);
 
                 RWStrategy bs = (RWStrategy) store
                         .getBufferStrategy();
@@ -577,12 +575,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
             
             final Journal store = (Journal) getStore();
 
-            byte[] buf = new byte[1024 * 2048]; // 2Mb buffer of random data
-            r.nextBytes(buf);
-            
-            ByteBuffer bb = ByteBuffer.wrap(buf);
-
             try {
+
+                byte[] buf = new byte[1024 * 2048]; // 2Mb buffer of random data
+                r.nextBytes(buf);
+                
+                ByteBuffer bb = ByteBuffer.wrap(buf);
 
                 RWStrategy bs = (RWStrategy) store
                         .getBufferStrategy();

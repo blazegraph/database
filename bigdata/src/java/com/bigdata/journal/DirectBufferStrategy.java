@@ -30,7 +30,6 @@ import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.ExecutorService;
 
 import com.bigdata.io.FileChannelUtility;
-import com.bigdata.io.messages.IHAClient;
 
 /**
  * Direct buffer strategy uses a direct {@link ByteBuffer} as a write through

@@ -32,10 +32,10 @@ import java.nio.channels.FileChannel;
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.IReopenChannel;
-import com.bigdata.io.WriteCache;
-import com.bigdata.io.WriteCacheService;
-import com.bigdata.io.WriteCache.FileChannelScatteredWriteCache;
-import com.bigdata.journal.ha.QuorumManager;
+import com.bigdata.io.writecache.WriteCache;
+import com.bigdata.io.writecache.WriteCacheService;
+import com.bigdata.io.writecache.WriteCache.FileChannelScatteredWriteCache;
+import com.bigdata.quorum.Quorum;
 
 /**
  * Defines the WriteCacheService to be used by the RWStore.
@@ -48,11 +48,11 @@ public class RWWriteCacheService extends WriteCacheService {
     
     public RWWriteCacheService(final int nbuffers, final long fileExtent,
             final IReopenChannel<? extends Channel> opener,
-            final QuorumManager quorumManager) throws InterruptedException,
+            final Quorum quorum) throws InterruptedException,
             IOException {
 
         super(nbuffers, true/* useChecksum */, fileExtent, opener,
-                quorumManager);
+                quorum);
         
     }
 
@@ -66,8 +66,11 @@ public class RWWriteCacheService extends WriteCacheService {
             final IReopenChannel<? extends Channel> opener)
             throws InterruptedException {
 
+        final boolean highlyAvailable = getQuorum() != null
+                && getQuorum().isHighlyAvailable();
+
         return new FileChannelScatteredWriteCache(buf, true/* useChecksum */,
-        		getQuorumManager().isHighlyAvailable(),
+        		highlyAvailable,
         		bufferHasData,
                 (IReopenChannel<FileChannel>) opener);
 

@@ -30,18 +30,21 @@ package com.bigdata.journal;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.net.BindException;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
+import java.rmi.Remote;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
@@ -52,6 +55,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.BigdataStatics;
 import com.bigdata.LRUNexus;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
@@ -67,19 +71,18 @@ import com.bigdata.config.LongRangeValidator;
 import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.QuorumService;
+import com.bigdata.ha.QuorumServiceBase;
 import com.bigdata.io.IDataRecord;
 import com.bigdata.io.IDataRecordAccess;
 import com.bigdata.journal.Name2Addr.Entry;
-import com.bigdata.journal.ha.HADelegate;
-import com.bigdata.journal.ha.HADelegator;
-import com.bigdata.journal.ha.HAGlue;
-import com.bigdata.journal.ha.HAReceiveService;
-import com.bigdata.journal.ha.HASendService;
 import com.bigdata.journal.ha.HAWriteMessage;
-import com.bigdata.journal.ha.Quorum;
-import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
+import com.bigdata.quorum.Quorum;
+import com.bigdata.quorum.QuorumActor;
+import com.bigdata.quorum.QuorumMember;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rawstore.WormAddressManager;
@@ -501,7 +504,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	}
 
 	/**
-	 * True iff the journal was opened in a read-only mode
+	 * True iff the journal was opened in a read-only mode.
 	 */
 	private final boolean readOnly;
 
@@ -532,8 +535,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	private final long maximumExtent;
 	private final long initialExtent;
 	private final long minimumExtension;
-
-	private final Environment environment;
 
 	/**
 	 * The maximum extent before a {@link #commit()} will {@link #overflow()}.
@@ -590,33 +591,49 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
-	/**
-	 * Create or re-open a journal.
-	 * <p>
-	 * Note: Creating a new journal registers some internal indices but does NOT
-	 * perform a commit. Those indices will become restart safe with the first
-	 * commit.
-	 * <p>
-	 * If re-opening a journal, then the type of the journal should be
-	 * determined from the rootBlock, with the properties used only to provide
-	 * default values for a new journal.
-	 * 
-	 * @param properties
-	 *            The properties as defined by {@link Options}.
-	 * 
-	 * @throws RuntimeException
-	 *             If there is a problem when creating, opening, or reading from
-	 *             the journal file.
-	 * 
-	 * @see Options
-	 */
-	protected AbstractJournal(Properties properties) {
+    /**
+     * Create or re-open a journal.
+     * 
+     * @param properties
+     *            The properties as defined by {@link Options}.
+     * 
+     * @throws RuntimeException
+     *             If there is a problem when creating, opening, or reading from
+     *             the journal file.
+     * 
+     * @see Options
+     */
+    protected AbstractJournal(final Properties properties) {
 
-		if (properties == null)
-			throw new IllegalArgumentException();
+        this(properties, null/* quorum */);
 
-		this.properties = properties = (Properties) properties.clone();
+    }
 
+    /**
+     * Create or re-open a journal as part of a highly available {@link Quorum}.
+     * 
+     * @param properties
+     *            The properties as defined by {@link Options}.
+     * @param quorum
+     *            The quorum with which the journal will join (HA mode only).
+     * 
+     * @throws RuntimeException
+     *             If there is a problem when creating, opening, or reading from
+     *             the journal file.
+     * 
+     * @see Options
+     */
+    protected AbstractJournal(Properties properties,
+            final Quorum<HAGlue, QuorumService<HAGlue>> quorum) {
+
+        if (properties == null)
+            throw new IllegalArgumentException();
+
+        this.properties = properties = (Properties) properties.clone();
+
+        // null unless in HA mode.
+		this.quorum = quorum;
+		
 		/*
 		 * Set various 'final' properties.
 		 */
@@ -651,7 +668,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		minimumExtension = getProperty(Options.MINIMUM_EXTENSION, Options.DEFAULT_MINIMUM_EXTENSION,
 				new LongRangeValidator(Options.minimumMinimumExtension, Long.MAX_VALUE));
 
-		readOnly = Boolean.parseBoolean(getProperty(Options.READ_ONLY, Options.DEFAULT_READ_ONLY));
+        readOnly = (Boolean.parseBoolean(getProperty(Options.READ_ONLY, Options.DEFAULT_READ_ONLY)));
 
 		forceOnCommit = ForceEnum.parse(getProperty(Options.FORCE_ON_COMMIT, Options.DEFAULT_FORCE_ON_COMMIT));
 
@@ -679,30 +696,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 				throw new RuntimeException("Not a directory: " + tmpDir.getAbsolutePath());
 
 			}
-
-		}
-
-		/*
-		 * Initialize the HA components.
-		 */
-
-		this.quorumManager = newQuorumManager();
-
-		this.environment = new HAEnvironment();
-
-		this.haDelegate = newHADelegate(environment);
-
-		this.haGlue = new HADelegator(haDelegate);
-
-		if (quorumManager.isHighlyAvailable()) {
-
-			// Invalid quorum token until a quorum is met.
-			quorumToken = Quorum.NO_QUORUM;
-
-		} else {
-
-			// The token is a constant since we are not HA.
-			quorumToken = quorumManager.getQuorum().token();
 
 		}
 
@@ -874,10 +867,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 					 * Setup the buffer strategy.
 					 */
 
-					_bufferStrategy = new WORMStrategy(0L/*
-														 * soft limit for
-														 * maximumExtent
-														 */, minimumExtension, fileMetadata, environment);
+					_bufferStrategy = new WORMStrategy(
+					        0L,// soft limit for maximumExtent
+					        minimumExtension,//
+                            fileMetadata, //
+                            quorum//
+                            );
 
 					this._rootBlock = fileMetadata.rootBlock;
 
@@ -891,7 +886,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 					 * Setup the buffer strategy.
 					 */
 
-					_bufferStrategy = new RWStrategy(fileMetadata, environment);
+					_bufferStrategy = new RWStrategy(fileMetadata, quorum);
 
 					this._rootBlock = fileMetadata.rootBlock;
 
@@ -929,6 +924,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 				}
 			}
 
+            /*
+             * Note: Creating a new journal registers some internal indices but
+             * does NOT perform a commit. Those indices will become restart safe
+             * with the first commit.
+             */
+			
 			// Save resource description (sets value returned by getUUID()).
 			this.journalMetadata = new JournalMetadata(this);
 
@@ -1206,8 +1207,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		_bufferStrategy.close();
 
-		// Stop watching for quorum related events.
-		getQuorumManager().terminate();
+        // Stop watching for quorum related events.
+        if (quorum != null)
+            quorum.terminate();
 
 		// report event.
 		ResourceManager.closeJournal(getFile() == null ? null : getFile().toString());
@@ -1645,36 +1647,58 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
-	/**
-	 * Return <code>true</code> if the journal was opened in a read-only mode
-	 */
-	// * or if {@link #closeForWrites(long)} was used to seal the journal
-	// against
-	// * further writes.
+    /**
+     * Return <code>true</code> if the journal was opened in a read-only mode or
+     * if {@link #closeForWrites(long)} was used to seal the journal against
+     * further writes.
+     */
 	public boolean isReadOnly() {
 
-		// return readOnly || getRootBlockView().getCloseTime() != 0L;
+        return readOnly || getRootBlockView().getCloseTime() != 0L;
 
-		assertOpen();
+    }
 
-		/*
-		 * In HA mode, the followers are read-only.
-		 */
-		if (quorumManager.isHighlyAvailable()) {
+    /**
+     * Assert that the journal is readable.
+     * 
+     * @throws IllegalStateException
+     *             if the journal is not writable at this time.
+     */
+    protected void assertCanRead() {
 
-			final Quorum q = quorumManager.getQuorum();
+        if (_bufferStrategy == null) {
+            // only possible during the constructor call.
+            throw new IllegalStateException();
+        }
 
-			if (q != null && !q.isLeader()) {
+        if (!_bufferStrategy.isOpen()) {
+            throw new IllegalStateException();
+        }
 
-				return false;
+    }
 
-			}
+    /**
+     * Assert that the journal is writable.
+     * 
+     * @throws IllegalStateException
+     *             if the journal is not writable at this time.
+     */
+    protected void assertCanWrite() {
 
-		}
+        if (_bufferStrategy == null) {
+            // only possible during the constructor call.
+            throw new IllegalStateException();
+        }
 
-		return _bufferStrategy.isReadOnly();
+        if (!_bufferStrategy.isOpen()) {
+            throw new IllegalStateException();
+        }
 
-	}
+        if (_bufferStrategy.isReadOnly()) {
+            throw new IllegalStateException();
+        }
+
+    }
 
 	public boolean isStable() {
 
@@ -1711,12 +1735,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * availability. High availability exists (in principle) when the
 	 * {@link QuorumManager#replicationFactor()} <em>k</em> is greater than one.
 	 * 
-	 * @see #getQuorumManager()
+	 * @see #getQuorum()
 	 * @see QuorumManager#isHighlyAvailable()
 	 */
 	public boolean isHighlyAvailable() {
 
-		return getQuorumManager().isHighlyAvailable();
+		return getQuorum().isHighlyAvailable();
 
 	}
 
@@ -1834,9 +1858,17 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		try {
 
-			final Quorum q = getQuorumManager().getQuorum();
-			getQuorumManager().assertQuorum(quorumToken);
-			q.abort2Phase();
+            if (quorum != null) {
+
+                // HA mode
+                quorum.getClient().abort2Phase(quorumToken);
+
+            } else {
+
+                // Non-HA mode.
+                _abort();
+                
+            }
 
 		} catch (Throwable e) {
 
@@ -2058,8 +2090,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	public long commit() {
 
-		quorumManager.assertQuorumLeader(quorumToken);
-
 		final ILocalTransactionManager transactionManager = getLocalTransactionManager();
 
 		/*
@@ -2210,11 +2240,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			// next offset at which user data would be written.
 			final long nextOffset = _bufferStrategy.getNextOffset();
 
-			/*
-			 * Verify that the last negotiated quorum is still in effect.
-			 */
-			final Quorum q = quorumManager.getQuorum();
-			quorumManager.assertQuorumLeader(quorumToken);
+            if (quorum != null) {
+                /*
+                 * Verify that the last negotiated quorum is still in valid.
+                 */
+                quorum.assertLeader(quorumToken);
+            }
 
 			/*
 			 * Call commit on buffer strategy prior to retrieving root block,
@@ -2261,47 +2292,103 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 				final long metaBitsAddr = _bufferStrategy.getMetaBitsAddr();
 
 				// Create the new root block.
-				newRootBlock = new RootBlockView(!old.isRootBlock0(), old.getOffsetBits(), nextOffset, firstCommitTime,
-						lastCommitTime, newCommitCounter, commitRecordAddr, commitRecordIndexAddr, old.getUUID(),
-						quorumToken, metaStartAddr, metaBitsAddr, old.getStoreType(), old.getCreateTime(), old
-								.getCloseTime(), checker);
+                newRootBlock = new RootBlockView(!old.isRootBlock0(), old
+                        .getOffsetBits(), nextOffset, firstCommitTime,
+                        lastCommitTime, newCommitCounter, commitRecordAddr,
+                        commitRecordIndexAddr, old.getUUID(), quorumToken,
+                        metaStartAddr, metaBitsAddr, old.getStoreType(),
+                        old.getCreateTime(), old.getCloseTime(), checker);
 
 			}
 
-			try {
+            if (quorum == null) {
+                
+                /*
+                 * Non-HA mode.
+                 */
 
-				final int minYes = (q.replicationFactor() + 1) >> 1;
+                /*
+                 * Force application data to stable storage _before_
+                 * we update the root blocks. This option guarantees
+                 * that the application data is stable on the disk
+                 * before the atomic commit. Some operating systems
+                 * and/or file systems may otherwise choose an
+                 * ordered write with the consequence that the root
+                 * blocks are laid down on the disk before the
+                 * application data and a hard failure could result
+                 * in the loss of application data addressed by the
+                 * new root blocks (data loss on restart).
+                 * 
+                 * Note: We do not force the file metadata to disk.
+                 * If that is done, it will be done by a force()
+                 * after we write the root block on the disk.
+                 */
+                if (doubleSync) {
 
-				// @todo config prepare timeout (Watch out for long GC pauses!)
-				final int nyes = q.prepare2Phase(newRootBlock, 1000/* timeout */, TimeUnit.MILLISECONDS);
+                    _bufferStrategy.force(false/* metadata */);
 
-				if (nyes >= minYes) {
+                }
 
-					q.commit2Phase(commitTime);
+                // write the root block on to the backing store.
+                _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
 
-				} else {
+                // set the new root block.
+                _rootBlock = newRootBlock;
 
-					q.abort2Phase();
+                // reload the commit record from the new root block.
+                _commitRecord = _getCommitRecord();
 
-				}
+            } else {
+                
+                /*
+                 * HA mode.
+                 */
+                
+                final QuorumService<HAGlue> quorumService = quorum.getClient();
 
-			} catch (Throwable e) {
-				/*
-				 * FIXME At this point the quorum is probably inconsistent in
-				 * terms of their root blocks. Rather than attempting to send an
-				 * abort() message to the quorum, we probably should force the
-				 * master to yield its role at which point the quorum will
-				 * attempt to elect a new master and resynchronize.
-				 */
-				if (q != null) {
-					try {
-						q.abort2Phase();
-					} catch (Throwable t) {
-						log.warn(t, t);
-					}
-				}
-				throw new RuntimeException(e);
-			}
+                try {
+
+                    final int minYes = (quorum.replicationFactor() + 1) >> 1;
+
+                    // @todo config prepare timeout (Watch out for long GC
+                    // pauses!)
+                    final int nyes = quorumService.prepare2Phase(//
+                            !old.isRootBlock0(),//
+                            newRootBlock,//
+                            1000, // timeout
+                            TimeUnit.MILLISECONDS//
+                            );
+
+                    if (nyes >= minYes) {
+
+                        quorumService.commit2Phase(quorumToken, commitTime);
+
+                    } else {
+
+                        quorumService.abort2Phase(quorumToken);
+
+                    }
+
+                } catch (Throwable e) {
+                    /*
+                     * FIXME At this point the quorum is probably inconsistent
+                     * in terms of their root blocks. Rather than attempting to
+                     * send an abort() message to the quorum, we probably should
+                     * force the master to yield its role at which point the
+                     * quorum will attempt to elect a new master and
+                     * resynchronize.
+                     */
+                    if (quorumService != null) {
+                        try {
+                            quorumService.abort2Phase(quorumToken);
+                        } catch (Throwable t) {
+                            log.warn(t, t);
+                        }
+                    }
+                    throw new RuntimeException(e);
+                }
+
+            }
 
 			final long elapsedNanos = System.nanoTime() - beginNanos;
 
@@ -2391,65 +2478,40 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
-	public ByteBuffer read(final long addr) {
+    public ByteBuffer read(final long addr) {
+            assertOpen();
 
-		assertOpen();
-
-		quorumManager.assertQuorum(quorumToken);
-
-		return _bufferStrategy.read(addr);
-
+        assertCanRead();
+            
+        return _bufferStrategy.read(addr);
+            
 	}
+    
+    public long write(final ByteBuffer data) {
 
-	public long write(final ByteBuffer data) {
+        assertCanRead();
 
-		assertOpen();
+        return _bufferStrategy.write(data);
+	
+    }
 
-		if (isReadOnly()) {
+    // Note: RW store method.
+    public long write(final ByteBuffer data, final long oldAddr) {
 
-			throw new UnsupportedOperationException();
+        assertCanWrite();
 
-		}
+        return _bufferStrategy.write(data, oldAddr);
+        
+    }
 
-		quorumManager.assertQuorumLeader(quorumToken);
+    // Note: NOP for WORM. Used by RW for eventual recycle protocol.
+    public void delete(final long addr) {
 
-		return _bufferStrategy.write(data);
+        assertCanWrite();
 
-	}
+        _bufferStrategy.delete(addr);
 
-	// Note: RW store method.
-	public long write(final ByteBuffer data, final long oldAddr) {
-
-		assertOpen();
-
-		if (isReadOnly()) {
-
-			throw new UnsupportedOperationException();
-
-		}
-
-		quorumManager.assertQuorumLeader(quorumToken);
-
-		return _bufferStrategy.write(data, oldAddr);
-
-	}
-
-	// Note: NOP for WORM. Used by RW for eventual recycle protocol.
-	public void delete(final long addr) {
-
-		assertOpen();
-
-		if (isReadOnly()) {
-
-			throw new UnsupportedOperationException();
-
-		}
-
-		quorumManager.assertQuorumLeader(quorumToken);
-
-		_bufferStrategy.delete(addr);
-
-	}
+    }
 
 	final public long getRootAddr(final int index) {
 
@@ -3293,418 +3355,200 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * High Availability
 	 */
 
-	/**
-	 * The current quorum token or {@value Quorum#NO_QUORUM} if the node is not
-	 * part of a {@link Quorum}.
-	 * <p>
-	 * The state of the field changes when a new quorum is negotiated or when an
-	 * existing quorum is broken. However, state changes in this field MUST be
-	 * coordinated with the journal in order to cover transitions into the
-	 * quorum (blocked read/write requests must be released) and transitions
-	 * when the quorum breaks (the current write set must be discarded by the
-	 * master). In addition, when there is no quorum, the resynchronization
-	 * protocol may affect both the persistent state of the journal and any
-	 * state which the journal keeps buffered in memory (record cache, address
-	 * translation cache, etc).
-	 * <p>
-	 * Access to this field is protected by the {@link #_fieldReadWriteLock} but
-	 * MUST also be coordinated as described above.
-	 * 
-	 * FIXME Many methods need to be modified to (a) await a quorum if there is
-	 * none; and (b) handle a change in the quorum token. When a quorum breaks,
-	 * these operations can block until a new quorum meets. As long as the
-	 * master has not changed, the master's state remains valid and the other
-	 * nodes can be brought into synchronization (they are synchronized if they
-	 * are at the same message count for the write pipeline). If the master
-	 * fails, then the new master will not have the same buffered write set and
-	 * the outstanding operations (both unisolated and read/write tx) must about
-	 * so we can resume from a known good commit point (this is true even if the
-	 * secondaries remain active since (a) we do not have a strong guarantee
-	 * that the new master is at the same message count on the write pipeline as
-	 * the old master; and (b) transaction write sets are buffered within the
-	 * JVM and/or disk on the master and are not available to the secondaries on
-	 * failover.
-	 * 
-	 * @see #read(long)
-	 * @see #write(ByteBuffer)
-	 * @see #write(ByteBuffer, long)
-	 * @see #delete(long)
-	 * @see #closeForWrites(long) However, some methods probably should be
-	 *      allowed to proceed without a quorum (or a node must be permitted to
-	 *      disconnect permanently from a quorum). E.g.:
-	 * 
-	 * @see #close()
-	 * @see #destroy() Another interesting question is whether we have to be in
-	 *      a quorum to create a new journal. I would say, "yes" for a data
-	 *      service. The atomic cutover to a new journal should only be taken by
-	 *      a quorum.
-	 *      <p>
-	 *      Probably you need to be in a quorum to create an HA journal (outside
-	 *      of a data service) as well. That would appear to be necessary in
-	 *      order to create the same initial root blocks on each node. In that
-	 *      case we have a bootstrapping problem for new HA journals. Either
-	 *      they must have a quorum before hand and go through a coordinated
-	 *      "commit" protocol for the journal create or they should be created
-	 *      first, then negotiate the quorum membership and who is the master
-	 *      and then resynchronize before the journal comes on line.
-	 */
+    /**
+     * The current quorum token or {@value Quorum#NO_QUORUM} if the node is not
+     * part of a {@link Quorum}.
+     * <p>
+     * The state of the field changes when a new quorum is negotiated or when an
+     * existing quorum is broken. However, state changes in this field MUST be
+     * coordinated with the journal in order to cover transitions into the
+     * quorum (blocked read/write requests must be released) and transitions
+     * when the quorum breaks (the current write set must be discarded by the
+     * master). In addition, when there is no quorum, the resynchronization
+     * protocol may affect both the persistent state of the journal and any
+     * state which the journal keeps buffered in memory (record cache, address
+     * translation cache, etc).
+     * <p>
+     * Access to this field is protected by the {@link #_fieldReadWriteLock} but
+     * MUST also be coordinated as described above.
+     * 
+     * FIXME Many methods need to be modified to (a) await a quorum if there is
+     * none; and (b) handle a change in the quorum token. When a quorum breaks,
+     * these operations can block until a new quorum meets. As long as the
+     * master has not changed, the master's state remains valid and the other
+     * nodes can be brought into synchronization (they are synchronized if they
+     * are at the same message count for the write pipeline). If the master
+     * fails, then the new master will not have the same buffered write set and
+     * the outstanding operations (both unisolated and read/write tx) must about
+     * so we can resume from a known good commit point (this is true even if the
+     * secondaries remain active since (a) we do not have a strong guarantee
+     * that the new master is at the same message count on the write pipeline as
+     * the old master; and (b) transaction write sets are buffered within the
+     * JVM and/or disk on the master and are not available to the secondaries on
+     * failover.
+     * 
+     * @see #read(long)
+     * @see #write(ByteBuffer)
+     * @see #write(ByteBuffer, long)
+     * @see #delete(long)
+     * @see #closeForWrites(long) However, some methods probably should be
+     *      allowed to proceed without a quorum (or a node must be permitted to
+     *      disconnect permanently from a quorum). E.g.:
+     * 
+     * @see #close()
+     * @see #destroy() Another interesting question is whether we have to be in
+     *      a quorum to create a new journal. I would say, "yes" for a data
+     *      service. The atomic cutover to a new journal should only be taken by
+     *      a quorum.
+     *      <p>
+     *      Probably you need to be in a quorum to create an HA journal (outside
+     *      of a data service) as well. That would appear to be necessary in
+     *      order to create the same initial root blocks on each node. In that
+     *      case we have a bootstrapping problem for new HA journals. Either
+     *      they must have a quorum before hand and go through a coordinated
+     *      "commit" protocol for the journal create or they should be created
+     *      first, then negotiate the quorum membership and who is the master
+     *      and then resynchronize before the journal comes on line.
+     * 
+     * @todo maintain readOnly flag based on whether or not the QuorumService
+     *       was the leader the last time the quorum met and whether the token
+     *       is still valid. use a lightweight test for a valid token to avoid
+     *       lock contention.
+     * 
+     * @todo readers should not block and await a quorum unless we are willing
+     *       to handle the case where this QuorumService is not joined with the
+     *       met quorum either by reading on the quorum or by throwing an
+     *       exception back to the application.
+     * 
+     * @todo In HA mode, the followers are read-only. However, that is a
+     *       high-level constraint on application writes. For synchronization,
+     *       we need to be able to write on the journal even when it is not
+     *       joined with the quorum. The WriteCacheService will refuse to relay
+     *       writes if the service is not the leader of a met quorum.
+     *       <p>
+     *       For example, it would be appropriate to impose the constraint on
+     *       which nodes can be read or written at a load balancer at the SAIL
+     *       layer.
+     * 
+     *       if (quorum.isHighlyAvailable() && quorum.isQuorumMet() &&
+     *       quorum.getClient().isFollower(quorumToken)) { return true; }
+     */
 	private volatile long quorumToken;
 
-	/**
-	 * The {@link QuorumManager} is initialized when the journal is initialized
-	 * and remains in effect until the journal has been shutdown.
-	 */
-	private final QuorumManager quorumManager;
+    /**
+     * The current {@link Quorum} (if any).
+     */
+	private final Quorum<HAGlue,QuorumService<HAGlue>> quorum;
 
-	/**
-	 * The {@link QuorumManager} for this service.
-	 */
-	public QuorumManager getQuorumManager() {
+    /**
+     * The {@link Quorum} for this service -or- <code>null</code> if the service
+     * is not running with a quorum.
+     */
+	public Quorum<HAGlue,QuorumService<HAGlue>> getQuorum() {
 
-		return quorumManager;
+		return quorum;
+
+	}
+	
+    /**
+     * Factory for the {@link HADelegate} object for this
+     * {@link AbstractJournal}. This may be overridden to publish additional
+     * methods for the low-level HA API. The object returned by this factor is
+     * available using {@link QuorumMember#getService()}.
+     */
+    protected HAGlue newHAGlue(final UUID serviceId) {
+
+        // FIXME This is defaulting to a random port on the loopback address.
+        final InetSocketAddress writePipelineAddr;
+        try {
+            writePipelineAddr =  new InetSocketAddress(getPort(0));
+        } catch (UnknownHostException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        return new BasicHA(serviceId, writePipelineAddr);
 
 	}
 
-	/**
-	 * {@link QuorumManager} factory. The default behavior returns a fixed
-	 * quorum formed from a single service - this journal. This method may be
-	 * overridden to create a highly available journal or to create highly
-	 * available services which embed a journal, such as the data service.
-	 */
-	protected QuorumManager newQuorumManager() {
+    /**
+     * Implementation hooks into the various low-level operations required to
+     * support HA for the journal.
+     * 
+     * @todo Default to the loopback interface and a random open port?
+     * 
+     * @todo refactor into one implementation class per HA interface and then
+     *       use delegation to route the operations to the implementation
+     *       classes.
+     */
+	protected class BasicHA implements HAGlue  {
 
-		return new SingletonQuorumManager();
+	    private final UUID serviceId;
+	    private final InetSocketAddress writePipelineAddr;
 
-	}
+        protected BasicHA(final UUID serviceId,
+                final InetSocketAddress writePipelineAddr) {
 
-	private final HAGlue haGlue;
-	private final HADelegate haDelegate;
+            if (serviceId == null)
+                throw new IllegalArgumentException();
+            if (writePipelineAddr == null)
+                throw new IllegalArgumentException();
 
-	/**
-	 * The object which is used to coordinate various low-level operations among
-	 * the members of a {@link Quorum}.
-	 */
-	public HAGlue getHAGlue() {
+            this.serviceId = serviceId;
+            this.writePipelineAddr = writePipelineAddr;
 
-		return haGlue;
+        }
 
-	}
+        /**
+         * The most recent prepare request.
+         */
+        private final AtomicReference<IRootBlockView> prepareRequest = new AtomicReference<IRootBlockView>();
 
-	/**
-	 * Factory for the {@link HADelegate} object for this
-	 * {@link AbstractJournal}. This may be overridden to publish additional
-	 * methods for the low-level HA API.
-	 */
-	protected HADelegate newHADelegate(final Environment environment) {
+        public UUID getServiceId() {
 
-		return new BasicHA(environment);
-
-	}
-
-	public HADelegate getHADelegate() {
-
-		return haDelegate;
-
-	}
-
-	/**
-	 * A manager for a quorum consisting of just this journal.
-	 * 
-	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-	 *         Thompson</a>
-	 * @version $Id: AbstractJournal.java 2930 2010-05-28 12:30:41Z
-	 *          martyncutcher $
-	 */
-	private class SingletonQuorumManager implements QuorumManager {
-
-		private final Quorum quorum = new SingletonQuorum();
-
-		public boolean isHighlyAvailable() {
-			return false;
+            return serviceId;
+            
 		}
 
-		public int replicationFactor() {
-			return 1;
-		}
+        public InetSocketAddress getWritePipelineAddr() {
+            
+            return writePipelineAddr;
+            
+        }
 
-		public Quorum getQuorum() {
-			return quorum;
-		}
+        /*
+         * @todo if the leader is synchronized with the followers then they
+         * should all agree on whether they should be writing rootBlock0 or
+         * rootBlock1.
+         */
+        public Future<Boolean> prepare2Phase(final boolean isRootBlock0,
+                final byte[] tmp, final long timeout, final TimeUnit unit) {
 
-		public Quorum awaitQuorum() throws InterruptedException {
-			return quorum;
-		}
+            if (tmp == null)
+                throw new IllegalStateException();
 
-		public void assertQuorum(long token) {
-			// NOP - the quorum is static and always valid.
-		}
-
-		public void assertQuorumLeader(long token) {
-			/*
-			 * NOP - the quorum is static and always valid. There is only one
-			 * node and it is always the leader.
-			 */
-		}
-
-		public void terminate() {
-			// NOP - the quorum is static and does no asynchronous processing.
-		}
-
-	}
-
-	/**
-	 * An immutable quorum consisting of just this journal. The quorum is always
-	 * met.
-	 * <p>
-	 * This implementation directly tunnels requests to the {@link HAGlue}
-	 * instance for the {@link AbstractJournal} and assumes that there is only
-	 * one member in the quorum. An HA implementation needs to perform these
-	 * operations on each member of the quorum.
-	 * 
-	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-	 *         Thompson</a>
-	 * @version $Id: AbstractJournal.java 2930 2010-05-28 12:30:41Z
-	 *          martyncutcher $
-	 */
-	final private class SingletonQuorum implements Quorum {
-
-		public int replicationFactor() {
-			return 1;
-		}
-
-		public boolean isLeader() {
-			return true;
-		}
-
-		public boolean isFollower() {
-			return false;
-		}
-
-		public boolean isLastInChain() {
-			return false;
-		}
-
-		public boolean isQuorumMet() {
-			return true;
-		}
-
-		public int size() {
-			return 1;
-		}
-
-		/**
-		 * Always return 0 since we never have to negotiate an agreement with
-		 * anyone else.
-		 */
-		public long token() {
-			return 0;
-		}
-
-		public int getIndex() {
-			return 0;
-		}
-
-		public HAGlue getHAGlue(int index) {
-
-			if (index != 0)
-				throw new IndexOutOfBoundsException();
-
-			return AbstractJournal.this.getHAGlue();
-
-		}
-
-		public ExecutorService getExecutorService() {
-
-			return AbstractJournal.this.getExecutorService();
-
-		}
-
-		/**
-		 * NOP.
-		 */
-		public void invalidate() {
-			// NOP
-		}
-
-		/**
-		 * There are no other members in the quorum so failover reads are not
-		 * supported.
-		 * 
-		 * @throws IllegalStateException
-		 *             always since the quorum is not highly available.
-		 */
-		public ByteBuffer readFromQuorum(long addr) {
-			throw new IllegalStateException();
-		}
-
-		public int prepare2Phase(final IRootBlockView rootBlock, final long timeout, final TimeUnit unit)
-				throws InterruptedException, TimeoutException, IOException {
-			try {
-				final RunnableFuture<Boolean> f = haGlue.prepare2Phase(rootBlock);
-				/*
-				 * Note: In order to avoid a deadlock, this must run() on the
-				 * master in the caller's thread and use a local method call.
-				 * For the other services in the quorum it should submit the
-				 * RunnableFutures to an Executor and then await their outcomes.
-				 * To minimize latency, first submit the futures for the other
-				 * services and then do f.run() on the master. This will allow
-				 * the other services to prepare concurrently with the master's
-				 * IO.
-				 */
-				f.run();
-				return f.get(timeout, unit) ? 1 : 0;
-			} catch (Throwable e) {
-				throw new RuntimeException(e);
-			}
-		}
-
-		public void commit2Phase(final long commitTime) throws IOException {
-			try {
-				final RunnableFuture<Void> f = haGlue.commit2Phase(commitTime);
-				/*
-				 * Note: In order to avoid a deadlock, this must run() on the
-				 * master in the caller's thread and use a local method call.
-				 * For the other services in the quorum it should submit the
-				 * RunnableFutures to an Executor and then await their outcomes.
-				 * To minimize latency, first submit the futures for the other
-				 * services and then do f.run() on the master. This will allow
-				 * the other services to prepare concurrently with the master's
-				 * IO.
-				 */
-				f.run();
-				f.get();
-			} catch (Throwable e) {
-				throw new RuntimeException(e);
-			}
-		}
-
-		public void abort2Phase() throws IOException {
-			try {
-				final RunnableFuture<Void> f = haGlue.abort2Phase(token());
-				/*
-				 * Note: In order to avoid a deadlock, this must run() on the
-				 * master in the caller's thread and use a local method call.
-				 * For the other services in the quorum it should submit the
-				 * RunnableFutures to an Executor and then await their outcomes.
-				 * To minimize latency, first submit the futures for the other
-				 * services and then do f.run() on the master. This will allow
-				 * the other services to prepare concurrently with the master's
-				 * IO.
-				 */
-				f.run();
-				f.get();
-			} catch (Throwable e) {
-				throw new RuntimeException(e);
-			}
-		}
-
-		/**
-		 * Not supported for a standalone journal.
-		 * 
-		 * @throws UnsupportedOperationException
-		 *             always.
-		 */
-		public HASendService getHASendService() {
-			throw new UnsupportedOperationException();
-		}
-
-		/**
-		 * Not supported for a standalone journal.
-		 * 
-		 * @throws UnsupportedOperationException
-		 *             always.
-		 */
-		public HAReceiveService<HAWriteMessage> getHAReceiveService() {
-			throw new UnsupportedOperationException();
-		}
-
-		/**
-		 * Not supported for a standalone journal.
-		 * 
-		 * @throws UnsupportedOperationException
-		 *             always.
-		 */
-		public Future<Void> replicate(HAWriteMessage msg, ByteBuffer b) throws IOException {
-			throw new UnsupportedOperationException();
-		}
-
-		/**
-		 * Not supported for a standalone journal.
-		 * 
-		 * @throws UnsupportedOperationException
-		 *             always.
-		 */
-		public Future<Void> receiveAndReplicate(HAWriteMessage msg) throws IOException {
-			throw new UnsupportedOperationException();
-		}
-
-	}
-
-	/**
-	 * Implementation hooks into the various low-level operations required to
-	 * support HA for the journal.
-	 */
-	protected class BasicHA extends HADelegate {
-
-		/** Defaults to the loopback interface and a random open port. */
-		protected BasicHA(Environment environment) {
-			super(environment);
-
-		}
-
-		/**
-		 * The most recent prepare request.
-		 */
-		private final AtomicReference<IRootBlockView> prepareRequest = new AtomicReference<IRootBlockView>();
-
-		/**
-		 * FIXME When exposed for RMI as a smart proxy, we need to send the
-		 * rootBlock as a byte[] and possible also send the rootBlock0 flag
-		 * (which is not part of the persistent state of the root block).
-		 * 
-		 * Whether or not we send the rootBlock0 flag depends on whether or not
-		 * resynchronization guarantees that the root blocks (both of them) are
-		 * the same for all services in the quorum.
-		 */
-		// // Copy the root block into a byte[].
-		// final byte[] data;
-		// {
-		// final ByteBuffer rb = rootBlock.asReadOnlyBuffer();
-		// data = new byte[rb.limit()];
-		// rb.get(data);
-		// }
-		// * Alternatate the root block based on the state of the local store
-		// NOT
-		// * the master.
-		// *
-		// * This assumes that it is possible that resynchronization will cause
-		// * the root blocks assigned to the rootBlock0 and rootBlock1 slots to
-		// * differ from service to service in the quorum. That is Ok as long as
-		// * resynchronization does not explicitly align the root blocks across
-		// * the quorum. If it does, then we need to pass along the master's
-		// value
-		// * for the [rootBlock0] flag rather than base its value on the local
-		// * store's state.
-		// *
-		// * final boolean rootBlock0 = _rootBlock.isRootBlock0() ? false :
-		// true;
-		// *
-		// * // validate the root block, obtaining a view. final IRootBlockView
-		// * view = new RootBlockView(rootBlock0, ByteBuffer.wrap(rootBlock),
-		// * ChecksumUtility.threadChk.get());
-		public RunnableFuture<Boolean> prepare2Phase(final IRootBlockView rootBlock) {
-
-			if (rootBlock == null)
-				throw new IllegalStateException();
+            // construct view from the root block.
+            final IRootBlockView rootBlock = new RootBlockView(//
+                    isRootBlock0,//
+                    ByteBuffer.wrap(tmp), //
+                    new ChecksumUtility()//
+            );
 
 			if (rootBlock.getLastCommitTime() <= getLastCommitTime())
 				throw new IllegalStateException();
 
-			getQuorumManager().assertQuorum(rootBlock.getQuorumToken());
+			getQuorum().assertQuorum(rootBlock.getQuorumToken());
 
 			prepareRequest.set(rootBlock);
 
-			return new FutureTask<Boolean>(new Runnable() {
+			// the quorum token from the leader is in the root block.
+			final long prepareToken = rootBlock.getQuorumToken();
+			
+			// true the token is valid and this service is the quorum leader
+			final boolean isLeader = quorum.getMember().isLeader(prepareToken);
+			
+			final FutureTask<Boolean> ft = new FutureTask<Boolean>(new Runnable() {
 
 				public void run() {
 
@@ -3713,7 +3557,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 					if (rootBlock == null)
 						throw new IllegalStateException();
 
-					getQuorumManager().assertQuorum(rootBlock.getQuorumToken());
+					getQuorum().assertQuorum(prepareToken);
 
 					/*
 					 * Call to ensure strategy does everything required for
@@ -3747,16 +3591,43 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 				}
 			}, true/* vote=yes */);
 
+			if(isLeader) {
+
+	            /*
+	             * Run in the caller's thread.
+	             * 
+	             * Note: In order to avoid deadlock, when the leader calls back to
+	             * itself it MUST do so in the same thread in which it is already
+	             * holding the writeLock. [Actually, we do not obtain the writeLock
+	             * in prepare2Phase, but all the other quorum commit methods do.]
+	             */
+
+			    ft.run();
+			    
+			} else {
+
+                /*
+                 * We can't really handle the timeout in the leader's thread
+                 * (and it would be very odd if the leader wound up waiting on
+                 * itself!) but the followers can obey the timeout semantics for
+                 * prepare() by execute()ing the FutureTask and then returning
+                 * it immediately. The leader can wait on the Future up to the
+                 * timeout and then cancel the Future.
+                 */
+                
+			    // submit.
+			    getExecutorService().execute(ft);
+			    
+			}
+			
+			return ft;
+			
 		}
 
-		/**
-		 * Note: Deadlocks will occur if the writeLock is held by the master
-		 * across commitNow() and a different thread runs commit2Phase() for the
-		 * master since commit2Phase() must acquire the writeLock.
-		 */
-		public RunnableFuture<Void> commit2Phase(final long commitTime) {
+		public Future<Void> commit2Phase(final long commitTime) {
 
-			return new FutureTask<Void>(new Runnable() {
+			final FutureTask<Void> ft = new FutureTask<Void>(new Runnable() {
+			    
 				public void run() {
 
 					final IRootBlockView rootBlock = prepareRequest.get();
@@ -3772,7 +3643,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 							throw new IllegalStateException();
 
 						// verify that the qourum has not changed.
-						getQuorumManager().assertQuorum(rootBlock.getQuorumToken());
+						getQuorum().assertQuorum(rootBlock.getQuorumToken());
 
 						// write the root block on to the backing store.
 						_bufferStrategy.writeRootBlock(rootBlock, forceOnCommit);
@@ -3794,56 +3665,67 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 				}
 			}, null/* Void */);
 
-		}
-
-		/**
-		 * Note: Deadlocks will occur if the writeLock is held by the master
-		 * across commitNow() and a different thread runs abort2Phase() for the
-		 * master since abort() will attempt to acquire the writeLock as well.
-		 */
-		public RunnableFuture<Void> abort2Phase(final long token) {
-
-			return new FutureTask<Void>(new Runnable() {
-				public void run() {
-
-					getQuorumManager().assertQuorum(token);
-
-					prepareRequest.set(null/* discard */);
-
-					_abort();
-
-				}
-			}, null/* Void */);
+            /*
+             * Run in the caller's thread.
+             * 
+             * Note: In order to avoid deadlock, when the leader calls back to
+             * itself it MUST do so in the same thread in which it is already
+             * holding the writeLock.
+             */
+            ft.run();
+            
+            return ft;
 
 		}
 
-		/**
-		 * {@inheritDoc}
-		 * 
-		 * FIXME We should test the LRUNexus for failover reads and install
-		 * records into the cache if there is a cache miss. Unfortunately the
-		 * cache holds objects, some of which declare how to access the
-		 * underlying {@link IDataRecord} using the {@link IDataRecordAccess}
-		 * interface.
-		 * 
-		 * FIXME ByteBuffer is not Serializable. Use byte[] instead? Since these
-		 * are rare events it may not be worthwhile to setup a separate
-		 * low-level socket service to send/receive the data.
-		 * 
-		 * FIXME Pass in the UUID of the store. Could be the live journal,
-		 * historical journal, or an index segment. The {@link HADelegate}
-		 * really needs to be elevated to the {@link IResourceManager} or the
-		 * {@link QuorumManager} to support this.
-		 */
-		public RunnableFuture<ByteBuffer> readFromDisk(final long token, final long addr) {
+        public Future<Void> abort2Phase(final long token) {
 
-			return new FutureTask<ByteBuffer>(new Callable<ByteBuffer>() {
-				public ByteBuffer call() throws Exception {
+            final FutureTask<Void> ft = new FutureTask<Void>(new Runnable() {
+                public void run() {
 
-					getQuorumManager().assertQuorum(token);
+                    getQuorum().assertQuorum(token);
 
-					final AbstractJournal store = getLiveJournal();
+                    prepareRequest.set(null/* discard */);
 
+                    _abort();
+
+                }
+            }, null/* Void */);
+
+            /*
+             * Run in the caller's thread.
+             * 
+             * Note: In order to avoid deadlock, when the leader calls back to
+             * itself it MUST do so in the same thread in which it is already
+             * holding the writeLock.
+             */
+            ft.run();
+
+            return ft;
+
+		}
+
+        /**
+         * {@inheritDoc}
+         * 
+         * @todo We should test the LRUNexus for failover reads and install
+         *       records into the cache if there is a cache miss. Unfortunately
+         *       the cache holds objects, some of which declare how to access
+         *       the underlying {@link IDataRecord} using the
+         *       {@link IDataRecordAccess} interface.
+         * 
+         * @todo Since these are rare events it may not be worthwhile to setup a
+         *       separate low-level socket service to send/receive the data.
+         */
+        public Future<byte[]> readFromDisk(final long token,
+                final UUID storeId, final long addr) {
+
+			final FutureTask<byte[]> ft = new FutureTask<byte[]>(new Callable<byte[]>() {
+				
+			    public byte[] call() throws Exception {
+
+				    quorum.assertQuorum(token);
+				    
 					// final ILRUCache<Long, Object> cache = (LRUNexus.INSTANCE
 					// == null) ? null
 					// : LRUNexus.getCache(jnl);
@@ -3856,152 +3738,110 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 					//                        
 					// }
 
-					// read from the local store.
-					final ByteBuffer b = ((IHABufferStrategy) store.getBufferStrategy()).readFromLocalStore(addr);
+                    // read from the local store.
+                    final ByteBuffer b = ((IHABufferStrategy) getBufferStrategy())
+                            .readFromLocalStore(addr);
 
+                    final byte[] a = BytesUtil.toArray(b);
+                    
 					// cache.putIfAbsent(addr, b);
 
-					return b;
+					return a;
 
 				}
 			});
-
-		}
-
-		public Future<Void> receiveAndReplicate(final HAWriteMessage msg) throws IOException {
-			try {
-				((IHABufferStrategy) AbstractJournal.this._bufferStrategy).setExtentForLocalStore(msg.getFileExtent());
-			} catch (InterruptedException e) {
-				throw new RuntimeException(e);
-			}
 			
-			return getQuorumManager().getQuorum().receiveAndReplicate(msg);
+			ft.run();
+			
+			return ft;
 
 		}
 
-		@Override
-		public IRootBlockView getRootBlock() {
+        public Future<Void> receiveAndReplicate(final HAWriteMessage msg)
+                throws IOException {
 
-			return AbstractJournal.this.getRootBlockView();
+            /*
+             * Adjust the size on the disk of the local store to that given in
+             * the message. For the RW store, this can cause the allocation
+             * blocks to be moved if the store is extended.
+             * 
+             * @todo Trap truncation vs extend?
+             */
+            try {
+                ((IHABufferStrategy) AbstractJournal.this._bufferStrategy)
+                        .setExtentForLocalStore(msg.getFileExtent());
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
+            return getQuorum().getClient().receiveAndReplicate(msg);
 
 		}
+
+        public byte[] getRootBlock(final UUID storeId) {
+
+            if (storeId == null)
+                throw new IllegalArgumentException();
+
+            if (getUUID().equals(storeId)) {
+                // A request for a different journal's root block.
+                throw new UnsupportedOperationException();
+            }
+
+            return BytesUtil.toArray(AbstractJournal.this.getRootBlockView()
+                    .asReadOnlyBuffer());
+
+        }
+
+		/** NOP. */
+        public Future<Void> bounceZookeeperConnection() {
+            final FutureTask<Void> ft = new FutureTask<Void>(new Runnable() {
+                public void run() {
+                }
+            }, null);
+            ft.run();
+            return ft;
+        }
+
+        /**
+         * Does pipeline remove/add.
+         */
+        public Future<Void> moveToEndOfPipeline() {
+            final FutureTask<Void> ft = new FutureTask<Void>(new Runnable() {
+                public void run() {
+                    final QuorumActor<?, ?> actor = quorum.getActor();
+                    actor.pipelineRemove();
+                    actor.pipelineAdd();
+                }
+            }, null/* result */);
+            getExecutorService().execute(ft);
+            return ft;
+        }
 
 	};
 
-	/**
-	 * Local class providing Environment hooks used by all objects supporting
-	 * HA.
-	 */
-	class HAEnvironment implements Environment {
-
-		HAEnvironment() {
-		}
-
-		public AbstractJournal getJournal() {
-			return AbstractJournal.this;
-		}
-
-		public QuorumManager getQuorumManager() {
-			return quorumManager;
-		}
-
-		public boolean isHighlyAvailable() {
-			return quorumManager.isHighlyAvailable();
-		}
-
-		public HADelegate getHADelegate() {
-			return haDelegate;
-		}
-	}
-
-	/**
-	 * Await a quorum (HA only).
-	 * 
-	 * @throws InterruptedException
-	 */
-	public void awaitQuorum() throws InterruptedException {
-
-		if (!quorumManager.isHighlyAvailable()) {
-			throw new UnsupportedOperationException();
-		}
-
-		final Quorum q;
-
-		System.err.println("HA : AWAITING QUORUM : k=" + quorumManager.replicationFactor());
-
-		// Block until we have a quorum.
-		q = quorumManager.awaitQuorum();
-
-		this.quorumToken = q.token();
-
-		System.err.println("HA : ACHIEVED QUORUM : k=" + quorumManager.replicationFactor() + ", size=" + q.size()
-				+ ", token=" + quorumToken);
-
-	}
-
-	/**
-	 * Replace out root blocks with those of the quorum leader (HA only).
-	 * 
-	 * FIXME This just grabs the root blocks of the quorum leader if there was
-	 * no backing file.
-	 * <p>
-	 * In fact, we need to handle synchronization when the backing file exists
-	 * and when it does not exist, however we will not be "in" the quorum on
-	 * restart if we are not synchronized.
-	 * <p>
-	 * If we are not the leader of a quorum then we need to synchronize with the
-	 * quorum leader.
-	 * <p>
-	 * Note: The delta can be obtained by comparing out current root block with
-	 * the root block of the leader.
-	 */
-	public void takeRootBlocksFromLeader() {
-
-		final Quorum q = quorumManager.getQuorum();
-		quorumManager.assertQuorum(quorumToken);
-
-		if (!quorumManager.isHighlyAvailable())
-			throw new UnsupportedOperationException();
-
-		if (q.isLeader())
-			throw new UnsupportedOperationException();
-
-		if (_rootBlock.getLastCommitTime() != 0L) {
-			/*
-			 * Journal already has committed state.
-			 */
-			throw new UnsupportedOperationException();
-		}
-
-		try {
-
-			if (quorumManager.isHighlyAvailable())
-				System.err.println("HA JOURNAL INIT");
-
-			System.err.println("Requesting root block from leader.");
-			// get the root blocks from the leader.
-			final IRootBlockView rootBlock = q.getHAGlue(0/* leader */).getRootBlock();
-			System.err.println("Got root block from leader: " + rootBlock);
-			if (rootBlock.getCommitCounter() != 0L) {
-				throw new RuntimeException("Leader already has data: " + rootBlock);
-			}
-
-			// overwrite our root blocks with the leader's.
-			_bufferStrategy.writeRootBlock(rootBlock, ForceEnum.No);
-			_bufferStrategy.writeRootBlock(rootBlock, ForceEnum.No);
-
-			/*
-			 * Do a low-level abort to discard the current write set and reload
-			 * various things from the new root blocks.
-			 */
-			_abort();
-
-		} catch (IOException ex) {
-
-			throw new RuntimeException(ex);
-
-		}
-
-	}
+    /**
+     * Return an unused port.
+     * 
+     * @param suggestedPort
+     *            The suggested port.
+     *            
+     * @return The suggested port, unless it is zero or already in use, in which
+     *         case an unused port is returned.
+     * 
+     * @throws IOException
+     */
+    static protected int getPort(int suggestedPort) throws IOException {
+        ServerSocket openSocket;
+        try {
+            openSocket = new ServerSocket(suggestedPort);
+        } catch (BindException ex) {
+            // the port is busy, so look for a random open port
+            openSocket = new ServerSocket(0);
+        }
+        final int port = openSocket.getLocalPort();
+        openSocket.close();
+        return port;
+    }
 
 }

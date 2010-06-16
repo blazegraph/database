@@ -41,7 +41,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeSet;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -50,14 +49,12 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
-import com.bigdata.io.WriteCache;
-import com.bigdata.io.WriteCache.FileChannelScatteredWriteCache;
-import com.bigdata.io.WriteCache.RecordMetadata;
-import com.bigdata.journal.Environment;
+import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.ForceEnum;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RWStrategy.FileMetadataView;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -210,7 +207,7 @@ public class RWStore implements IStore {
 	ArrayList m_commitList;
 
 	WriteBlock m_writes;
-	Environment m_environment;
+	final Quorum<?,?> m_quorum;
 	RWWriteCacheService m_writeCache;
 
     /**
@@ -276,8 +273,7 @@ public class RWStore implements IStore {
 			 * TODO: Configure number of WriteCache buffers for WriteCacheService
 			 */
             m_writeCache = new RWWriteCacheService(6, m_raf.length(),
-                    m_reopener, m_environment
-                            .getQuorumManager()) {
+                    m_reopener, m_quorum) {
             	
 		                public WriteCache newWriteCache(final ByteBuffer buf,
 		                        final boolean useChecksum,
@@ -303,7 +299,7 @@ public class RWStore implements IStore {
                 final IReopenChannel<FileChannel> opener)
                 throws InterruptedException {
 
-            super(buf, useChecksum, m_environment
+            super(buf, useChecksum, m_quorum!=null&&m_quorum
                     .isHighlyAvailable(), bufferHasData, opener);
 
         }
@@ -337,8 +333,8 @@ public class RWStore implements IStore {
 
 	// Constructor
 
-	public RWStore(FileMetadataView fileMetadataView, boolean readOnly,
-	        Environment environment) {
+	public RWStore(final FileMetadataView fileMetadataView, final boolean readOnly,
+	        final Quorum<?,?> quorum) {
 
 	    if (false && Config.isLockFileNeeded() && !readOnly) {
 			m_lockFile = LockFile.create(m_filename + ".lock");
@@ -348,7 +344,7 @@ public class RWStore implements IStore {
 			}
 		}
 
-        m_environment = environment;
+        m_quorum = quorum;
 	    
 		reopen(fileMetadataView);
 	}

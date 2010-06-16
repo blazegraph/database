@@ -28,7 +28,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 
 import com.bigdata.counters.CounterSet;
-import com.bigdata.io.WriteCacheService;
+import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IMRMW;
 import com.bigdata.rawstore.IRawStore;
