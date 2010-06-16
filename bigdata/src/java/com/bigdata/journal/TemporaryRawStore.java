@@ -38,14 +38,13 @@ import org.apache.log4j.Logger;
 import com.bigdata.LRUNexus;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.journal.ha.Quorum;
 import com.bigdata.mdi.AbstractResourceMetadata;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.IMRMW;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.relation.locator.ILocatableResource;
-import com.bigdata.util.ChecksumUtility;
 
 /**
  * A non-restart-safe store for temporary data that buffers data in memory until

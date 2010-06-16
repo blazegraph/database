@@ -30,6 +30,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
@@ -41,12 +42,13 @@ import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.striped.StripedCounters;
+import com.bigdata.ha.QuorumRead;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
-import com.bigdata.io.WriteCache;
-import com.bigdata.io.WriteCacheService;
+import com.bigdata.io.writecache.WriteCache;
+import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.journal.ha.HAWriteMessage;
-import com.bigdata.journal.ha.Quorum;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
@@ -168,7 +170,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
     private final long minimumExtension;
 
-	private Environment environment;
+    private final Quorum<?,?> quorum;
+//    private final AtomicReference<Quorum<?,?>> quorumRef;
 
     /**
      * This lock is used to exclude readers when the extent of the backing file
@@ -197,6 +200,20 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      */
     private final boolean useChecksums;
 
+    /**
+     * <code>true</code> if the backing store will be used in an HA
+     * {@link Quorum} (this is passed through to the {@link WriteCache} objects
+     * which use this flag to conditionally track the checksum of the entire
+     * write cache buffer).
+     */
+    private final boolean isHighlyAvailable;
+    
+    /**
+     * The {@link UUID} which identifies the journal (this is the same for each
+     * replicated journal is a quorum, so it is really a logical store UUID).
+     */
+    private final UUID storeUUID;
+    
     @Override
     public boolean useChecksums() {
         return useChecksums;
@@ -802,7 +819,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * @param fileMetadata
      */
     WORMStrategy(final long maximumExtent, final long minimumExtension,
-            final FileMetadata fileMetadata, final Environment environment) {
+            final FileMetadata fileMetadata,
+            final Quorum<?, ?> quorum) {
 
         super(fileMetadata.extent, maximumExtent, fileMetadata.offsetBits,
                 fileMetadata.nextOffset, fileMetadata.bufferMode,
@@ -833,9 +851,11 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         this.minimumExtension = minimumExtension;
 
-        this.environment = environment;
+        this.quorum = quorum;
 
         this.useChecksums = fileMetadata.useChecksums;
+
+        this.storeUUID = fileMetadata.rootBlock.getUUID();
         
         // initialize striped performance counters for this store.
         this.storeCounters.set(new StoreCounters(10/* batchSize */));
@@ -857,10 +877,13 @@ public class WORMStrategy extends AbstractBufferStrategy implements
          * Note: HA MUST use a write cache service (the write cache service
          * handles the write pipeline to the downstream quorum members).
          */
+//        final Quorum<?,?> quorum = quorumRef.get();
         
-            final boolean useWriteCacheService = fileMetadata.writeCacheEnabled
-                    && !fileMetadata.readOnly && fileMetadata.closeTime == 0L
-                    || (environment.isHighlyAvailable());
+        isHighlyAvailable = quorum != null && quorum.isHighlyAvailable();
+
+        final boolean useWriteCacheService = fileMetadata.writeCacheEnabled
+                && !fileMetadata.readOnly && fileMetadata.closeTime == 0L
+                || isHighlyAvailable;
         
         if (useWriteCacheService) {
             /*
@@ -869,7 +892,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             try {
                 this.writeCacheService = new WriteCacheService(
                         fileMetadata.writeCacheBufferCount, useChecksums,
-                        extent, opener, environment.getQuorumManager()) {
+                        extent, opener, quorum) {
                     @Override
                     public WriteCache newWriteCache(final ByteBuffer buf,
                             final boolean useChecksum,
@@ -914,8 +937,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 final IReopenChannel<FileChannel> opener)
                 throws InterruptedException {
 
-            super(baseOffset, buf, useChecksum, environment
-                    .isHighlyAvailable(), bufferHasData, opener);
+            super(baseOffset, buf, useChecksum, isHighlyAvailable,
+                    bufferHasData, opener);
 
         }
 
@@ -1182,12 +1205,14 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             } finally {
                 c.release();
             }
-            if (environment.isHighlyAvailable()) {
-                final Quorum q = environment.getQuorumManager().getQuorum();
-                if (q.isQuorumMet()) {
+//            final Quorum<?, ?> quorum = quorumRef.get();
+            if (quorum != null && quorum.isHighlyAvailable()) {
+                if (quorum.isQuorumMet()) {
                     try {
                         // Read on another node in the quorum.
-                        return q.readFromQuorum(addr);
+                        final byte[] a = ((QuorumRead<?>) quorum.getMember())
+                                .readFromQuorum(storeUUID, addr);
+                        return ByteBuffer.wrap(a);
                     } catch (Throwable t) {
                         throw new RuntimeException("While handling: " + e, t);
                     }
@@ -2208,10 +2233,11 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     /**
      * Extend file if required for HAWriteMessage - just call through to truncate
      */
-	public void setExtentForLocalStore(long extent) throws IOException, InterruptedException {
-        
+    public void setExtentForLocalStore(final long extent) throws IOException,
+            InterruptedException {
+
         truncate(extent);
-        
-	}
+
+    }
 
 }

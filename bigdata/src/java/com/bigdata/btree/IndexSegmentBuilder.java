@@ -59,7 +59,7 @@ import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.NOPReopener;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.io.WriteCache;
+import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.TemporaryRawStore;

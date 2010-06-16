@@ -30,7 +30,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
@@ -38,6 +37,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rwstore.RWStore;
@@ -54,19 +54,24 @@ import com.bigdata.util.ChecksumUtility;
 public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHABufferStrategy {
     protected static final Logger log = Logger.getLogger(RWStrategy.class);
 
-	FileMetadata m_fileMetadata = null;
+	final private FileMetadata m_fileMetadata;
 	
-	Environment m_environment = null;
+	final private Quorum<?,?> m_environment;
 
-	RWStore m_store = null;
+    /**
+     * The backing store impl.
+     * 
+     * @see #reopen().
+     */
+	private volatile RWStore m_store = null;
 	
-	FileMetadataView m_fmv = new FileMetadataView();
+	final private FileMetadataView m_fmv = new FileMetadataView();
 	
-	IRootBlockView m_rb;
-	IRootBlockView m_rb0;
-	IRootBlockView m_rb1;
+	private volatile IRootBlockView m_rb;
+	private volatile IRootBlockView m_rb0;
+	private volatile IRootBlockView m_rb1;
 	
-	CounterSet m_counters = new CounterSet();
+//	CounterSet m_counters = new CounterSet();
 
 	/**
 	 * It is important to ensure that the RWStrategy keeps a check on the physical root blocks and uses
@@ -74,15 +79,15 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	 * 
 	 * @param fileMetadata
 	 */
-	RWStrategy(final FileMetadata fileMetadata, final Environment environment) {
+	RWStrategy(final FileMetadata fileMetadata, final Quorum<?,?> quorum) {
 
 		m_fileMetadata = fileMetadata;
 		
-		m_environment = environment;
+		m_environment = quorum;
 		
 		m_rb = fileMetadata.rootBlock;
 		
-		m_store = new RWStore(m_fmv, false, environment); // not read-only for now
+		m_store = new RWStore(m_fmv, false, quorum); // not read-only for now
 		
 		m_rb0 = copyRootBlock(true);
 		m_rb1 = copyRootBlock(false);
@@ -290,15 +295,20 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
 	public void closeForWrites() {
 		// TODO Auto-generated method stub
-
+	    throw new UnsupportedOperationException();
 	}
 
 	public BufferMode getBufferMode() {
 		return BufferMode.DiskRW;
 	}
 
+    /**
+     * FIXME Define and implement support for counters. The pattern for this
+     * method is to always return a new object so it may be attached to various
+     * points in hierarchies belonging to the caller.
+     */
 	public CounterSet getCounters() {
-		return m_counters;
+		return new CounterSet();
 	}
 
 	public long getExtent() {

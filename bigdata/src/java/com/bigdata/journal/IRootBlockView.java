@@ -30,7 +30,7 @@ package com.bigdata.journal;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
-import com.bigdata.journal.ha.Quorum;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.WormAddressManager;
 
 /**

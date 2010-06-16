@@ -33,7 +33,7 @@ import java.util.UUID;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.journal.ha.Quorum;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.TestWormAddressManager;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.util.ChecksumUtility;

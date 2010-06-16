@@ -31,7 +31,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import com.bigdata.journal.ha.HAWriteMessage;
-import com.bigdata.journal.ha.Quorum;
+import com.bigdata.quorum.Quorum;
 
 /**
  * A highly available {@link IBufferStrategy}.
