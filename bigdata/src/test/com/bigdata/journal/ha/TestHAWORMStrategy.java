@@ -35,7 +35,7 @@ import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.io.WriteCacheService;
+import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.journal.AbstractInterruptsTestCase;
 import com.bigdata.journal.AbstractMRMWTestCase;
 import com.bigdata.journal.AbstractMROWTestCase;

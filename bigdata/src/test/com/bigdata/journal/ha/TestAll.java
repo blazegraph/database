@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal.ha;
 
+import com.bigdata.ha.pipeline.TestHASendAndReceive;
+import com.bigdata.ha.pipeline.TestHASendAndReceive3Nodes;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -60,12 +63,6 @@ public class TestAll extends TestCase {
     {
 
         final TestSuite suite = new TestSuite("journal/HA");
-
-        // Test of HASendService and HAReceiveService (2 nodes).
-        suite.addTestSuite(TestHASendAndReceive.class);
-
-        // Test of HASendService and HAReceiveService (3 nodes).
-        suite.addTestSuite(TestHASendAndReceive3Nodes.class);
 
         // HA test suite for the WORM strategy.
         suite.addTest(TestHAWORMStrategy.suite());

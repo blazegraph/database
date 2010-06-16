@@ -28,15 +28,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.ha;
 
 import java.io.File;
+import java.nio.ByteBuffer;
+import java.rmi.Remote;
 import java.util.Properties;
+import java.util.UUID;
 
 import junit.framework.TestCase;
 
 import com.bigdata.LRUNexus;
+import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.QuorumService;
+import com.bigdata.ha.QuorumServiceBase;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractJournalTestCase;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
 import com.bigdata.journal.ProxyTestCase;
+import com.bigdata.quorum.MockQuorumFixture;
+import com.bigdata.quorum.Quorum;
+import com.bigdata.quorum.QuorumActor;
 
 /**
  * <p>
@@ -68,7 +78,27 @@ abstract public class AbstractHAJournalTestCase
     //************************************************************
     //************************************************************
     //************************************************************
-    
+
+    /**
+     * The replication factor for the quorum. This is initialized in
+     * {@link #setUp(ProxyTestCase)} so you can override it. The default is
+     * <code>3</code>, which is a highly available quorum.
+     */
+    protected int k;
+
+    /**
+     * The replication count (#of journals) for the quorum. This is initialized
+     * in {@link #setUp(ProxyTestCase)} so you can override it. The default is
+     * <code>3</code>, which is the same as the default replication factor
+     * {@link #k}.
+     */
+    protected int replicationCount;
+    /**
+     * The fixture provides a mock of the distributed quorum state machine.
+     */
+    protected MockQuorumFixture fixture = null;
+    private Journal[] stores = null;
+
     /**
      * Invoked from {@link TestCase#setUp()} for each test in the suite.
      */
@@ -80,6 +110,13 @@ abstract public class AbstractHAJournalTestCase
 //        log.info("\n\n================:BEGIN:" + testCase.getName()
 //                + ":BEGIN:====================");
 
+        fixture = new MockQuorumFixture();
+        fixture.start();
+
+        k = 3;
+        
+        replicationCount = 3;
+        
     }
 
     /**
@@ -95,12 +132,14 @@ abstract public class AbstractHAJournalTestCase
             }
         }
 
+        if(fixture!=null) {
+            fixture.terminate();
+            fixture = null;
+        }
+        
         super.tearDown(testCase);
 
     }
-
-    private MockQuorumStateChange fixture = null;
-    private Journal[] stores = null;
 
     /**
      * Note: Due to the manner in which the {@link MockQuorumManager} is
@@ -112,47 +151,17 @@ abstract public class AbstractHAJournalTestCase
     @Override
     protected Journal getStore(final Properties properties) {
 
-        final int k = 3; // @todo config by Properties?
+        stores = new Journal[replicationCount];
 
-        fixture = new MockQuorumStateChange(k);
-        
-        stores = new Journal[k];
+        for (int i = 0; i < replicationCount; i++) {
 
-        /*
-         * FIXME [The create order SHOULD NOT matter. Modify to defer the write
-         * pipeline setup until the quorum "meets".]
-         * 
-         * Note: This was hacked into the reverse setup order so the
-         * WriteServiceCache can initialize using getHAGlue(index+1). However,
-         * that makes it impossible to setup the journals since the followers
-         * need to obtain their root blocks from the leader. The only way to
-         * handle this is to "await" the quorum before the followers obtain the
-         * leader's current root block and before the nodes setup the HA
-         * send/receive pipeline. We also need to run the "new Journal()"
-         * constructor in a Thread (or Runnable) in order to have these
-         * initialize concurrently, which is how life is in a distributed
-         * system.
-         * 
-         * FIXME Invoking init() from within the AbstractJournal constructor is
-         * a REALLY BAD idea. When you extend the AbstractJournal, the subclass
-         * will have its init() invoked before its constructor runs. For
-         * example, Journal#init() runs during super(properties) for the Journal
-         * constructor!
-         */
-        for (int i = k - 1; i >= 0; i--) {
-//        for (int i = 0; i < k; i++) {
-            
-            // stores[i] = newJournal(i, properties);
-            newJournal(i, properties); // journal initialization sets store index
+            stores[i] = newJournal(properties);
 
         }
 
         /*
          * Initialize the master first. The followers will get their root blocks
          * from the master.
-         * 
-         * @todo The master should set the quorum token before it does anything
-         * else.
          */
 //        fixture.join(stores[0]);
 //        fixture.join(stores[1]);
@@ -166,33 +175,147 @@ abstract public class AbstractHAJournalTestCase
 
     }
 
-    protected Journal newJournal(final int index, final Properties properties) {
+    protected Journal newJournal(final Properties properties) {
 
-        return new Journal(properties) {
-        
-            protected QuorumManager newQuorumManager() {
-            	
-                stores[index] = this;
-                
-                final MockQuorumManager quorumManager = AbstractHAJournalTestCase.this
-                        .newQuorumManager(index, stores);
+        /*
+         * Initialize the HA components.
+         */
 
-                fixture.add(index, quorumManager);
-                
-                return quorumManager;
-                
-            };
+        final Quorum<HAGlue, QuorumService<HAGlue>> quorum = newQuorum();
+
+        final HAJournal jnl = new HAJournal(properties, quorum);
+
+        final UUID serviceId = UUID.randomUUID();
+
+        /*
+         * Set the client on the quorum.
+         * 
+         * FIXME The client needs to manage the quorumToken and various other
+         * things.
+         */
+        quorum.start(newQuorumService(serviceId, jnl.newHAGlue(serviceId),jnl));
+
+//      // discard the current write set.
+//      abort();
+//      
+//      // set the quorum object.
+//      this.quorum.set(quorum);
+//
+//      // save off the current token (typically NO_QUORUM unless standalone).
+//      quorumToken = quorum.token();
+
+        /*
+         * Tell the actor to try and join the quorum. It will join iff our
+         * current root block can form a simple majority with the other services
+         * in the quorum.
+         */
+        final QuorumActor<?, ?> actor = quorum.getActor();
+        try {
             
-        };
+            actor.memberAdd();
+            fixture.awaitDeque();
+            
+            actor.pipelineAdd();
+            fixture.awaitDeque();
+            
+            actor.castVote(jnl.getLastCommitTime());
+            fixture.awaitDeque();
+
+        } catch (InterruptedException ex) {
+        
+            throw new RuntimeException(ex);
+            
+        }
+        
+        return jnl;
+        
+//        return new Journal(properties) {
+//
+//            protected Quorum<HAGlue, QuorumService<HAGlue>> newQuorum() {
+//
+//                return AbstractHAJournalTestCase.this.newQuorum();
+//
+//            };
+//
+//        };
 
     }
 
-    protected MockQuorumManager newQuorumManager(final int index,
-            final Journal[] stores) {
+    private static class HAJournal extends Journal {
 
-        return new MockQuorumManager(index, stores);
+        /**
+         * @param properties
+         */
+        public HAJournal(Properties properties,
+                Quorum<HAGlue, QuorumService<HAGlue>> quorum) {
+            super(properties, quorum);
+        }
+        
+        public HAGlue newHAGlue(final UUID serviceId) {
+         
+            return super.newHAGlue(serviceId);
+            
+        }
+        
+    }
+    
+    protected Quorum<HAGlue, QuorumService<HAGlue>> newQuorum() {
+
+        return new MockQuorumFixture.MockQuorum<HAGlue, QuorumService<HAGlue>>(
+                k, fixture);
 
     };
+
+    /**
+     * Factory for the {@link QuorumService} implementation.
+     * 
+     * @param remoteServiceImpl
+     *            The object that implements the {@link Remote} interfaces
+     *            supporting HA operations.
+     */
+    protected QuorumServiceBase<HAGlue, AbstractJournal> newQuorumService(
+            final UUID serviceId, final HAGlue remoteServiceImpl,
+            final AbstractJournal store) {
+
+        return new QuorumServiceBase<HAGlue, AbstractJournal>(serviceId,
+                remoteServiceImpl, store) {
+
+            /**
+             * Only the local service implementation object can be resolved.
+             */
+            @Override
+            public HAGlue getService(final UUID serviceId) {
+                
+                return (HAGlue) fixture.getService(serviceId);
+                
+            }
+
+            /**
+             * FIXME handle replicated writes. Probably just dump it on the
+             * jnl's WriteCacheService. Or maybe wrap it back up using a
+             * WriteCache and let that lay it down onto the disk.
+             */
+            @Override
+            protected void handleReplicatedWrite(HAWriteMessage msg,
+                    ByteBuffer data) throws Exception {
+
+                
+//                new WriteCache() {
+//                    
+//                    @Override
+//                    protected boolean writeOnChannel(ByteBuffer buf, long firstOffset,
+//                            Map<Long, RecordMetadata> recordMap, long nanos)
+//                            throws InterruptedException, TimeoutException, IOException {
+//                        // TODO Auto-generated method stub
+//                        return false;
+//                    }
+//                };
+                
+                throw new UnsupportedOperationException();
+            }
+        };
+
+    }
 
     /**
      * Re-open the same backing store.
@@ -250,7 +373,7 @@ abstract public class AbstractHAJournalTestCase
             // Set the file property explicitly.
             properties.setProperty(Options.FILE, file.toString());
 
-            stores[i] = newJournal(i, properties);
+            stores[i] = newJournal(properties);
 
         }
 
@@ -258,4 +381,57 @@ abstract public class AbstractHAJournalTestCase
         
     }
 
+//    /**
+//     * Begin to run as part of a highly available {@link Quorum}.
+//     * 
+//     * @param newQuorum
+//     *            The {@link Quorum}.
+//     */
+//    public void joinQuorum(final Quorum<HAGlue, QuorumService<HAGlue>> quorum) {
+//
+//        if (quorum == null)
+//            throw new IllegalArgumentException();
+//
+//        final WriteLock lock = _fieldReadWriteLock.writeLock();
+//
+//        lock.lock();
+//
+//        try {
+//
+//            if (this.quorum.get() != null) {
+//                // Already running with some quorum.
+//                throw new IllegalStateException();
+//            }
+//
+//            // discard the current write set.
+//            abort();
+//            
+//            // set the quorum object.
+//            this.quorum.set(quorum);
+//
+//            // save off the current token (typically NO_QUORUM unless standalone).
+//            quorumToken = quorum.token();
+//
+//            /*
+//             * Tell the actor to try and join the quorum. It will join iff our
+//             * current root block can form a simple majority with the other
+//             * services in the quorum.
+//             */
+//            final QuorumActor<?,?> actor = quorum.getActor();
+//            actor.memberAdd();
+//            actor.pipelineAdd();
+//            actor.castVote(getRootBlockView().getLastCommitTime());
+//            
+//        } catch (Throwable e) {
+//
+//            throw new RuntimeException(e);
+//
+//        } finally {
+//
+//            lock.unlock();
+//
+//        }
+//
+//    }
+    
 }
