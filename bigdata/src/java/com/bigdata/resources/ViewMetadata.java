@@ -242,15 +242,22 @@ class ViewMetadata extends BTreeMetadata implements Params {
 
             final int accelerateSplitThreshold = resourceManager.accelerateSplitThreshold;
 
-            if (accelerateSplitThreshold == 0) {
+            if (accelerateSplitThreshold == 0
+                    || partitionCount > accelerateSplitThreshold) {
 
                 this.adjustedNominalShardSize = resourceManager.nominalShardSize;
 
             } else {
 
-                // discount: given T=100, will be 1 when N=100; 10 when N=10,
-                // and
-                // 100 when N=1.
+                /*
+                 * discount: given T=100:
+                 * 
+                 * d = .01 when N=1
+                 * 
+                 * d = .1 when N=10
+                 * 
+                 * d = 1 when N=100
+                 */
                 final double d = (double) partitionCount
                         / accelerateSplitThreshold;
 
