@@ -75,7 +75,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
      */
     public QuorumActor<S, QuorumMember<S>> getActor() {
 
-        return (QuorumActor<S, QuorumMember<S>>) getQuorum().getActor();
+        return (QuorumActor<S, QuorumMember<S>>) (QuorumActor<?,?>)getQuorum().getActor();
 
     }
 
