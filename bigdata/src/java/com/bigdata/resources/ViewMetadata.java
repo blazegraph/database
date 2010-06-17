@@ -87,8 +87,7 @@ class ViewMetadata extends BTreeMetadata implements Params {
      * BTree but the full view). The view is cached. If the reference has been
      * cleared then the view is re-opened. This also initializes values
      * requiring additional effort which are not available until this method is
-     * invoked including {@link #getRangeCount()} ,
-     * {@link #getAdjustedSplitHandler()}, etc.
+     * invoked including {@link #getRangeCount()}, etc.
      */
     public ILocalBTreeView getView() {
 
