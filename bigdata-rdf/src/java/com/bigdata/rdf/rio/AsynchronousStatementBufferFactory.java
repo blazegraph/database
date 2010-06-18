@@ -72,6 +72,7 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFParser;
 
 import com.bigdata.btree.AsynchronousIndexWriteConfiguration;
 import com.bigdata.btree.IndexMetadata;
@@ -356,24 +357,15 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
     private final RDFFormat defaultFormat;
     
     /**
-     * Validate the RDF interchange syntax when <code>true</code>.
+     * Options for the {@link RDFParser}.
      */
-    private final boolean verifyData;
+    private final RDFParserOptions parserOptions;
 
     /**
      * Delete files after they have been successfully loaded when
      * <code>true</code>.
      */
     private final boolean deleteAfter;
-
-    /**
-     * Validate the RDF interchange syntax when <code>true</code>.
-     */
-    protected boolean isVerifyData() {
-        
-        return verifyData;
-        
-    }
 
     /**
      * Delete files after they have been successfully loaded when
@@ -1421,7 +1413,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                     try {
                         // run the parser.
                         new PresortRioLoader(buffer).loadRdf(reader, baseURL,
-                                rdfFormat, verifyData);
+                                rdfFormat, parserOptions);
                     } finally {
                         reader.close();
                     }
@@ -1487,8 +1479,13 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      *            The initial capacity of the map of the distinct RDF
      *            {@link BNode}s parsed from a single document.
      * @param defaultFormat
-     * @param verifyData
+     *            The default {@link RDFFormat} which will be assumed.
+     * @param parserOptions
+     *            Options for the {@link RDFParser}.
      * @param deleteAfter
+     *            <code>true</code> if the resource should be deleted once the
+     *            statements from that resource are restart safe on the target
+     *            database.
      * @param parserPoolSize
      *            The #of worker threads in the thread pool for parsing RDF
      *            documents.
@@ -1507,10 +1504,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      * @param pauseParsedPoolStatementThreshold
      *            The maximum #of statements which can be parsed but not yet
      *            buffered before requests for new parser tasks are paused [0:
-     *            {@link Long#MAX_VALUE}]. This allows you to place a
-     *            constraint on the RAM of the parsers. The RAM demand of the
-     *            asynchronous index write buffers is controlled by their master
-     *            and sink queue capacity and chunk size.
+     *            {@link Long#MAX_VALUE}]. This allows you to place a constraint
+     *            on the RAM of the parsers. The RAM demand of the asynchronous
+     *            index write buffers is controlled by their master and sink
+     *            queue capacity and chunk size.
      * 
      * @todo CDL still used for validation by some unit tests. Do a variant of
      *       this that does read-only TERM2ID requests and then validates the
@@ -1522,7 +1519,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             final int valuesInitialCapacity,//
             final int bnodesInitialCapacity, //
             final RDFFormat defaultFormat,//
-            final boolean verifyData,//
+            final RDFParserOptions parserOptions,//
             final boolean deleteAfter,//
             final int parserPoolSize,//
             final int parserQueueCapacity,//
@@ -1533,6 +1530,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             ) {
 
         if (tripleStore == null)
+            throw new IllegalArgumentException();
+        if (parserOptions== null)
             throw new IllegalArgumentException();
         if (producerChunkSize <= 0)
             throw new IllegalArgumentException();
@@ -1557,7 +1556,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         
         this.defaultFormat  = defaultFormat;
         
-        this.verifyData = verifyData;
+        this.parserOptions = parserOptions;
         
         this.deleteAfter = deleteAfter;
 

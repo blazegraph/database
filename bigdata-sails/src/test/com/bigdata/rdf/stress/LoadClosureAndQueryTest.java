@@ -81,6 +81,7 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.load.ConcurrentDataLoader;
 import com.bigdata.rdf.load.FileSystemLoader;
 import com.bigdata.rdf.load.RDFLoadTaskFactory;
+import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.sail.BigdataSail;
@@ -851,7 +852,8 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
          * 
          * @todo configure via Properties.
          */
-        final boolean verifyRDFSourceData = false;
+        final RDFParserOptions parserOptions = new RDFParserOptions();
+        parserOptions.setVerifyData(false);
 
         /*
          * Properties that are used iff we use the ConcurrentDataLoader.
@@ -925,7 +927,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
                     didTruthMaintenance = false;
             
                     loadConcurrent(nthreads, nclients, clientNum,
-                            bufferCapacity, dataDir, verifyRDFSourceData);
+                            bufferCapacity, dataDir, parserOptions);
 
                 } else {
 
@@ -1116,7 +1118,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
      *             if interrupted.
      */
     protected void loadConcurrent(int nthreads, int nclients, int clientNum,
-            int bufferCapacity, File dataDir, boolean verifyRDFSourceData)
+            int bufferCapacity, File dataDir, RDFParserOptions parserOptions)
             throws InterruptedException {
 
         System.out.println("Will load files: dataDir=" + dataDir);
@@ -1129,7 +1131,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
         final AbstractTripleStore db = sail.getDatabase();
 
         final RDFLoadTaskFactory loadTaskFactory = //
-        new RDFLoadTaskFactory(db, bufferCapacity, verifyRDFSourceData,
+        new RDFLoadTaskFactory(db, bufferCapacity, parserOptions,
                 false/* deleteAfter */, fallback);
 
         final ConcurrentDataLoader service = new ConcurrentDataLoader(fed,

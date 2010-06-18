@@ -151,7 +151,7 @@ implements Serializable {
                     jobState.valuesInitialCapacity,//
                     jobState.bnodesInitialCapacity,//
                     jobState.getFallbackRDFFormat(), // 
-                    jobState.parserValidates,//
+                    jobState.parserOptions,//
                     false, // deleteAfter is handled by the master!
                     jobState.parserPoolSize, //  
                     jobState.parserQueueCapacity, // 
