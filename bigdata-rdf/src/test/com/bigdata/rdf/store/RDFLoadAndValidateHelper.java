@@ -58,6 +58,7 @@ import com.bigdata.rdf.load.ConcurrentDataLoader;
 import com.bigdata.rdf.load.FileSystemLoader;
 import com.bigdata.rdf.load.RDFLoadTaskFactory;
 import com.bigdata.rdf.load.RDFVerifyTaskFactory;
+import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.service.IBigdataFederation;
 
 /**
@@ -80,7 +81,7 @@ public class RDFLoadAndValidateHelper {
     
     final FilenameFilter filter;
 
-    final boolean verifyData = false;
+    final RDFParserOptions parserOptions;
 
     final RDFFormat fallback = RDFFormat.RDFXML;
     
@@ -115,13 +116,17 @@ public class RDFLoadAndValidateHelper {
         
         this.clientNum = clientNum;
 
+        this.parserOptions = new RDFParserOptions();
+        
+        parserOptions.setVerifyData(false);
+        
     }
     
     public void load(final AbstractTripleStore db) throws InterruptedException {
 
         // Note: no write buffer for 'verify' since it is not doing any writes!
         final RDFLoadTaskFactory loadTaskFactory = new RDFLoadTaskFactory(db,
-                bufferCapacity, verifyData, false/* deleteAfter */, fallback);
+                bufferCapacity, parserOptions, false/* deleteAfter */, fallback);
 
         final FileSystemLoader scanner = new FileSystemLoader(service,
                 nclients, clientNum);
@@ -171,7 +176,7 @@ public class RDFLoadAndValidateHelper {
     public void validate(AbstractTripleStore db) throws InterruptedException {
 
         final RDFVerifyTaskFactory verifyTaskFactory = new RDFVerifyTaskFactory(
-                db, bufferCapacity, verifyData, false/*deleteAfter*/, fallback);
+                db, bufferCapacity, parserOptions, false/*deleteAfter*/, fallback);
 
         final FileSystemLoader scanner = new FileSystemLoader(service,
                 nclients, clientNum);

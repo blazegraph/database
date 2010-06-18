@@ -8,6 +8,7 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -104,9 +105,9 @@ public class AbstractRDFTaskFactory<S extends Statement,T extends Runnable> impl
     final public RDFFormat fallback;
 
     /**
-     * Validation of RDF by the RIO parser is disabled unless this is true.
+     * RDFParser options.
      */
-    final public boolean verifyData;
+    final public RDFParserOptions parserOptions;
 
     /**
      * Delete files after successful processing when <code>true</code>.
@@ -149,12 +150,12 @@ public class AbstractRDFTaskFactory<S extends Statement,T extends Runnable> impl
     }
 
     protected AbstractRDFTaskFactory(AbstractTripleStore db,
-            final boolean verifyData, final boolean deleteAfter,
+            final RDFParserOptions parserOptions, final boolean deleteAfter,
             RDFFormat fallback, IStatementBufferFactory bufferFactory) {
-
+        
         this.db = db;
         
-        this.verifyData = verifyData;
+        this.parserOptions = parserOptions;
 
         this.deleteAfter = deleteAfter;
         
@@ -191,7 +192,7 @@ public class AbstractRDFTaskFactory<S extends Statement,T extends Runnable> impl
 
         }
         
-        return (T) new SingleResourceReaderTask(resource, baseURL, rdfFormat, verifyData,
+        return (T) new SingleResourceReaderTask(resource, baseURL, rdfFormat, parserOptions,
                 deleteAfter, bufferFactory, toldTriples);
         
     }
