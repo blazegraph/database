@@ -209,7 +209,7 @@ public class QueryTask extends AbstractStepTask {
 
             while (itr.hasNext()) {
 
-                // @todo handle sub-programs.
+                // FIXME RULE_REFACTOR handle sub-programs.
                 final IRule rule = (IRule) itr.next();
 
                 final Callable<RuleStats> task = joinNexus.getRuleTaskFactory(

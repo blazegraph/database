@@ -51,6 +51,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.IRequiredHostCounters;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IResourceManager;
@@ -965,6 +966,10 @@ abstract public class OverflowManager extends IndexManager {
          * Index partitions are split once they reach or exceed this size. The
          * space on the journal is not considered when making this decision
          * since it can not readily be attributed to any given index partition.
+         * <p>
+         * Note: If you modify this, you may also need to modify the size of the
+         * buffers in the {@link DirectBufferPool} used to fully buffer the
+         * nodes region of the index segment file.
          */
         String NOMINAL_SHARD_SIZE = OverflowManager.class.getName()
                 + ".nominalShardSize";

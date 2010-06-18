@@ -378,9 +378,11 @@ abstract public class AbstractRIOTestCase extends AbstractTripleStoreTestCase {
                     final RDFFormat rdfFormat = RDFFormat.forFileName(resource,
                             RDFFormat.RDFXML);
                     
-                    // verify RDF/XML syntax.
-                    final boolean verifyData = true;
+                    final RDFParserOptions options = new RDFParserOptions();
                     
+                    // verify RDF/XML syntax.
+                    options.setVerifyData(true);
+
                     // Setup the loader.
                     final PresortRioLoader loader = new PresortRioLoader(factory
                             .newStatementBuffer());
@@ -399,7 +401,7 @@ abstract public class AbstractRIOTestCase extends AbstractTripleStoreTestCase {
 
                     });
 
-                    loader.loadRdf((Reader) reader, baseURI, rdfFormat, verifyData);
+                    loader.loadRdf((Reader) reader, baseURI, rdfFormat, options);
 
                     if (log.isInfoEnabled())
                         log.info("Done: " + resource);
@@ -673,9 +675,13 @@ abstract public class AbstractRIOTestCase extends AbstractTripleStoreTestCase {
                 final RDFFormat rdfFormat = RDFFormat.forFileName(resource,
                         RDFFormat.RDFXML);
 
+                final RDFParserOptions options = new RDFParserOptions();
+                
+                options.setVerifyData(false);
+
                 loader.loadRdf(new BufferedReader(new InputStreamReader(
                         new FileInputStream(resource))), baseURI, rdfFormat,
-                        false/* verify */);
+                        options);
 
                 log.info("End of reparse: nerrors=" + nerrs + ", file="
                         + resource);

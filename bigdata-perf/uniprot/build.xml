@@ -1,0 +1,57 @@
+<!-- $Id$ -->
+<!--                                                        -->
+<!-- Do "ant bundle-jar" in the top-level directory first!  -->
+<!--                                                        -->
+<project name="uniprot" default="run-load" basedir=".">
+
+	<property file="build.properties" />
+
+	<!-- runtime classpath w/o install. -->
+	<path id="runtime.classpath">
+		<!-- The bigdata dependencies. -->
+		<fileset dir="${bigdata.build.dir}/lib">
+			<include name="**/*.jar" />
+		</fileset>
+	</path>
+
+	<target name="clean" description="deletes the generated database.">
+		<!-- delete file if it exists so we load into a new journal. -->
+		<delete file="${journalFile}" verbose="true" />
+	</target>
+
+	<target name="prepare">
+	</target>
+	
+	<!-- Note: For scale-out, split the data files and use MappedRDFDataLoadMaster. -->
+	<target name="run-load" depends="clean, prepare">
+		<java classname="com.bigdata.rdf.store.DataLoader" fork="true" failonerror="true">
+			<arg line="-namespace ${namespace} ${journalPropertyFile} ${dataFiles}" />
+			<!-- specify/override the journal file name. -->
+			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${journalFile}" />
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+
+	<target name="start-nano-server" depends="prepare" description="Start a small http server fronting for a bigdata database instance.">
+		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true">
+			<arg line="${nanoServerPort} ${namespace} ${journalPropertyFile}" />
+			<!-- specify/override the journal file name. -->
+			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${journalFile}" />
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+
+	<target name="stop-nano-server" depends="prepare" description="Stop the small http server running at the configured port.">
+		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true">
+			<arg line="${nanoServerPort} -stop" />
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+
+</project>

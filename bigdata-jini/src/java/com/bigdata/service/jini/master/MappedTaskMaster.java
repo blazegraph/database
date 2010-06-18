@@ -42,7 +42,6 @@ import com.bigdata.btree.AsynchronousIndexWriteConfiguration;
 import com.bigdata.btree.BigdataMap;
 import com.bigdata.btree.BigdataSet;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.rdf.load.RDFDataLoadMaster;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.jini.JiniFederation;
@@ -81,7 +80,7 @@ V extends Serializable//
         extends TaskMaster<S, T, U> {
 
     /**
-     * {@link Configuration} options for the {@link RDFDataLoadMaster}.
+     * {@link Configuration} options for the {@link MappedTaskMaster}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -145,7 +144,7 @@ V extends Serializable//
     }
     
     /**
-     * The job description for an {@link RDFDataLoadMaster}.
+     * The job description for an {@link MappedTaskMaster}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
