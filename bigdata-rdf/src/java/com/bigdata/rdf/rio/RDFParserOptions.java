@@ -84,7 +84,7 @@ public class RDFParserOptions implements Serializable {
         String STOP_AT_FIRST_ERROR = RDFParserOptions.class.getName()
                 + ".stopAtFirstError";
 
-        String DEFAULT_STOP_AT_FIRST_ERROR = "false";
+        String DEFAULT_STOP_AT_FIRST_ERROR = "true";
 
         /**
          * Optional boolean property may be used to set
