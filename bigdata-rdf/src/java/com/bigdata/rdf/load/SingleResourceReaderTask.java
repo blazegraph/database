@@ -15,6 +15,7 @@ import org.openrdf.rio.RDFFormat;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.rio.PresortRioLoader;
+import com.bigdata.rdf.rio.RDFParserOptions;
 
 /**
  * Tasks either loads a RDF resource or verifies that the told triples found
@@ -46,7 +47,7 @@ public class SingleResourceReaderTask implements Runnable {
     /**
      * Validate the RDF interchange syntax when <code>true</code>.
      */
-    final boolean verifyData;
+    final RDFParserOptions parserOptions;
     
     /**
      * Delete files after they have been successfully loaded when
@@ -88,7 +89,7 @@ public class SingleResourceReaderTask implements Runnable {
      * @param toldTriples
      */
     public SingleResourceReaderTask(String resource, String baseURL, RDFFormat rdfFormat,
-            final boolean verifyData, final boolean deleteAfter,
+            final RDFParserOptions parserOptions, final boolean deleteAfter,
             IStatementBufferFactory bufferFactory, AtomicLong toldTriples) {
 
         if (resource == null)
@@ -98,6 +99,9 @@ public class SingleResourceReaderTask implements Runnable {
             throw new IllegalArgumentException();
 
         if (rdfFormat == null)
+            throw new IllegalArgumentException();
+
+        if (parserOptions == null)
             throw new IllegalArgumentException();
         
         if (bufferFactory == null)
@@ -112,7 +116,7 @@ public class SingleResourceReaderTask implements Runnable {
 
         this.rdfFormat = rdfFormat;
 
-        this.verifyData = verifyData;
+        this.parserOptions = parserOptions;
 
         this.deleteAfter = deleteAfter;
         
@@ -182,7 +186,7 @@ public class SingleResourceReaderTask implements Runnable {
 
             // run the parser.
             // @todo reuse the same underlying parser instance?
-            loader.loadRdf(reader, baseURL, rdfFormat, verifyData);
+            loader.loadRdf(reader, baseURL, rdfFormat, parserOptions);
 
             success = true;
             

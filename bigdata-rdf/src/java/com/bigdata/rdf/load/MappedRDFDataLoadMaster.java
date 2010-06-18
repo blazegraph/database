@@ -38,11 +38,13 @@ import org.apache.log4j.Logger;
 import org.apache.zookeeper.KeeperException;
 import org.openrdf.model.Value;
 import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFParser;
 
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.ClosureStats;
+import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
@@ -233,13 +235,21 @@ V extends Serializable//
          */
         String FORCE_OVERFLOW_BEFORE_CLOSURE = "forceOverflowBeforeClosure";
         
-        /**
-         * When <code>true</code> a validating parsed will be used.
-         */
-        String PARSER_VALIDATES = "parserValidates";
-        
-        boolean DEFAULT_PARSER_VALIDATES = false;
+//        /**
+//         * When <code>true</code> a validating parsed will be used.
+//         */
+//        String PARSER_VALIDATES = "parserValidates";
+//        
+//        boolean DEFAULT_PARSER_VALIDATES = false;
 
+        /**
+         * Optional job property may be used to set the options on the
+         * {@link RDFParser}.
+         * 
+         * @see RDFParserOptions
+         */
+        String PARSER_OPTIONS = "parserOptions";
+        
 //        /**
 //         * When the {@link RDFFormat} of a resource is not evident, assume that
 //         * it is the format specified by this value (default
@@ -368,11 +378,11 @@ V extends Serializable//
         final boolean forceOverflowBeforeClosure;
         
         /**
-         * When <code>true</code> a validating parsed will be used.
+         * The options for the {@link RDFParser} instances.
          * 
-         * @see ConfigurationOptions#PARSER_VALIDATES
+         * @see ConfigurationOptions#PARSER_OPTIONS
          */
-        final public boolean parserValidates;
+        final public RDFParserOptions parserOptions;
         
 //        /**
 //         * The {@link RDFFormat} that will be used when the format can not be
@@ -439,8 +449,8 @@ V extends Serializable//
             sb.append(", " + ConfigurationOptions.COMPUTE_CLOSURE + "="
                     + computeClosure);
             
-            sb.append(", " + ConfigurationOptions.PARSER_VALIDATES + "="
-                    + parserValidates);
+            sb.append(", " + ConfigurationOptions.PARSER_OPTIONS + "="
+                    + parserOptions);
             
 //            sb.append(", " + ConfigurationOptions.FALLBACK_RDF_FORMAT + "="
 //                    + fallbackRDFFormat);
@@ -524,10 +534,9 @@ V extends Serializable//
                     ConfigurationOptions.FORCE_OVERFLOW_BEFORE_CLOSURE,
                     Boolean.TYPE);
 
-            parserValidates = (Boolean) config.getEntry(
-                    component,
-                    ConfigurationOptions.FORCE_OVERFLOW, Boolean.TYPE,
-                    ConfigurationOptions.DEFAULT_PARSER_VALIDATES);
+            parserOptions = (RDFParserOptions) config.getEntry(component,
+                    ConfigurationOptions.PARSER_OPTIONS,
+                    RDFParserOptions.class, new RDFParserOptions());
 
             // @todo enable once RDFFormat is Serializable. 
 //            fallbackRDFFormat = ((RDFFormat) config.getEntry(component,

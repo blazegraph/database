@@ -973,7 +973,7 @@ abstract public class AbstractTestCase
 
             return new RDFHandlerBase() {
 
-                public void handleStatement(Statement stmt) {
+                public void handleStatement(final Statement stmt) {
                     
                     buffer.add(stmt);
                     
@@ -983,7 +983,7 @@ abstract public class AbstractTestCase
 
         }
 
-        private void verifyStatements(int n, Statement[] a) {
+        private void verifyStatements(final int n, final Statement[] a) {
 
             final HashMap<Value, BigdataValue> termSet = new HashMap<Value, BigdataValue>(
                     n);
