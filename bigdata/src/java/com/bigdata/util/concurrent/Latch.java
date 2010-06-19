@@ -135,6 +135,9 @@ public class Latch {
 
             final long c = this.counter.incrementAndGet();
 
+            if (c <= 0)
+                throw new IllegalStateException(toString());
+
             if (log.isDebugEnabled())
                 log.debug(toString());
 
@@ -158,9 +161,9 @@ public class Latch {
         lock.lock();
         try {
 
-            if (this.counter.get() + delta <= 0) {
+            if (this.counter.get() + delta < 0) {
                 
-                throw new IllegalStateException();
+                throw new IllegalStateException(toString());
                 
             }
 
@@ -210,7 +213,7 @@ public class Latch {
 
             if (this.counter.get() <= 0) {
                 
-                throw new IllegalStateException();
+                throw new IllegalStateException(toString());
                 
             }
             
@@ -337,37 +340,45 @@ public class Latch {
             throws InterruptedException {
 
         long nanos = unit.toNanos(timeout);
-        long lastTime = System.nanoTime();
+        final long start = System.nanoTime();
         
         if (lock.tryLock(nanos, TimeUnit.NANOSECONDS)) {
 
             try {
 
                 // subtract out the lock waiting time.
-                final long now = System.nanoTime();
-                
-                nanos -= now - lastTime;
-                
-//                lastTime = now;
+                nanos -= (System.nanoTime() - start);
 
-                if (counter.get() == 0) {
-
-                    if (log.isInfoEnabled())
-                        log.info("Done waiting (true).");
-
-                    // don't wait.
-                    return true;
-
+                long c;
+                while ((c = counter.get()) != 0) {
+                    if (c < 0)
+                        throw new IllegalStateException(toString());
+                    if (nanos > 0)
+                        nanos = cond.awaitNanos(nanos);
+                    else
+                        return false;
                 }
-
-                if (cond.await(nanos, TimeUnit.NANOSECONDS)) {
-
-                    if (log.isInfoEnabled())
-                        log.info("Done waiting (true)");
-
-                    return true;
-
-                }
+                
+                return true;
+                
+//                if (counter.get() == 0) {
+//
+//                    if (log.isInfoEnabled())
+//                        log.info("Done waiting (true).");
+//
+//                    // don't wait.
+//                    return true;
+//
+//                }
+//
+//                if (cond.await(nanos, TimeUnit.NANOSECONDS)) {
+//
+//                    if (log.isInfoEnabled())
+//                        log.info("Done waiting (true)");
+//
+//                    return true;
+//
+//                }
 
             } finally {
 
@@ -376,8 +387,8 @@ public class Latch {
             }
         }
 
-        if (log.isInfoEnabled())
-            log.info("Timeout (false) : counter" + counter);
+//        if (log.isInfoEnabled())
+//            log.info("Timeout (false) : counter" + counter);
 
         // Timeout.
         return false;
