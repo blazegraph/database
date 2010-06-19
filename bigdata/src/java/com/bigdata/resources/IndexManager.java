@@ -1881,7 +1881,7 @@ abstract public class IndexManager extends StoreManager {
                     e.addDetail("actualRangeCount", builder.getCheckpoint().nentries);
                     e.addDetail("commitTime", commitTime);
                     e.addDetail("elapsed", +builder.elapsed);
-                    e.addDetail("MB", fpf
+                    e.addDetail("MB(out)", fpf
                             .format(((double) nbytes / Bytes.megabyte32)));
                     e.addDetail("MB/s", fpf.format(mbPerSec));
             
