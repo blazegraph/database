@@ -30,13 +30,13 @@ http://localhost:8080/?regex=/([^/]*)/.*/(.*)/pause/(pausedThreadCount)&depth=8&
 http://localhost:8080/?regex=/([^/]*)/.*/(.*)/pause/(poolPausedCount)&depth=8&correlated=true&file=service/cs/pause/poolPausedCount
 
 # services (parser, term2Id writers, other index writers, file deletes)
-http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/parserService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/parserServiceQueueLength
-http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/parserService%2FAverage+Active+Count&depth=8&correlated=true&file=service/cs/parserServiceAverageActiveCount
-http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/term2IdWriterService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/term2IdWriterServiceQueueLength
-http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/term2IdWriterService%2FAverage+Active+Count&depth=8&correlated=true&file=service/cs/term2IdWriterServiceAverageActiveCount
-http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/otherWriterService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/otherWriterServiceQueueLength
-http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/otherWriterService%2FAverage+Active+Count&depth=8&correlated=true&file=service/cs/otherWriterServiceAverageActiveCount
-http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/deleteService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/deleteServiceAverageQueueLength
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/parserService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/service/parserServiceQueueLength
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/parserService%2FAverage+Active+Count&depth=8&correlated=true&file=service/cs/service/parserServiceAverageActiveCount
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/term2IdWriterService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/service/term2IdWriterServiceQueueLength
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/term2IdWriterService%2FAverage+Active+Count&depth=8&correlated=true&file=service/cs/service/term2IdWriterServiceAverageActiveCount
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/otherWriterService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/service/otherWriterServiceQueueLength
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/otherWriterService%2FAverage+Active+Count&depth=8&correlated=true&file=service/cs/service/otherWriterServiceAverageActiveCount
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/deleteService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/service/deleteServiceAverageQueueLength
 
 # The workflow latch counters (indicate #of documents in a given workflow state).
 # The 'document' latch is the #of documents that are in process in any of the 

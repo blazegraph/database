@@ -36,6 +36,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.util.InnerCause;
+
 /**
  * A synchronization aid that allows one or more threads to await a counter
  * becoming zero. Once the counter reaches zero, all waiting threads are
@@ -253,10 +255,11 @@ public class Latch {
 //    * 
 //    * @throws InterruptedException
     private final void _signal() { //throws InterruptedException {
-
-        lock.lock();
-//        lock.lockInterruptibly();
-        try {
+        if(!lock.isHeldByCurrentThread())
+            throw new IllegalMonitorStateException();
+//        lock.lock();
+////        lock.lockInterruptibly();
+//        try {
 
             if (log.isInfoEnabled())
                 log.info("signalAll()");
@@ -264,21 +267,28 @@ public class Latch {
             // release anyone awaiting our signal.
             cond.signalAll();
 
-        } finally {
-
-            lock.unlock();
-
-        }
+//        } finally {
+//
+//            lock.unlock();
+//
+//        }
 
         try {
-            // allow extensions, but not while holding the lock.
+            // allow extensions.
             signal();
+        } catch (InterruptedException t) {
+          // propagate to the caller.
+          Thread.currentThread().interrupt();
 //        } catch (InterruptedException t) {
 //            // propagate to the caller.
 //            throw t;
         } catch (Throwable t) {
             // log anything else thrown out.
             log.error(toString(), t);
+            if(InnerCause.isInnerCause(t, InterruptedException.class)) {
+                // propagate the interrupt.
+                Thread.currentThread().interrupt();
+            }
         }
         
     }
