@@ -142,4 +142,76 @@ public class TestLatch extends TestCase2 {
 
     }
 
+    /**
+     * Verify that dec() does not allow the counter to become negative.
+     */
+    public void test3() {
+
+        final Latch latch = new Latch();
+
+        try {
+
+            latch.dec();
+            
+            fail("Counter is negative");
+
+        } catch (IllegalStateException ex) {
+
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+            
+        }
+    
+        assertEquals(0, latch.get());
+
+        assertEquals(1, latch.inc());
+        
+        assertEquals(0,latch.dec());
+        
+        try {
+
+            latch.dec();
+            
+            fail("Counter is negative: "+latch.get());
+
+        } catch (IllegalStateException ex) {
+
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+            
+        }
+    
+    }
+
+    /**
+     * Verify that addAndGet() allows the counter to return to zero but does not
+     * allow the counter to become negative.
+     */
+    public void test4() {
+
+        final Latch latch = new Latch();
+
+        assertEquals(1, latch.inc());
+
+        assertEquals(0, latch.addAndGet(-1));
+
+        assertEquals(1, latch.inc());
+
+        try {
+
+            latch.addAndGet(-2);
+            
+            fail("Counter is negative: "+latch.get());
+
+        } catch (IllegalStateException ex) {
+
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+            
+        }
+
+        assertEquals(0, latch.addAndGet(-1));
+        
+    }
+    
 }
