@@ -1,5 +1,7 @@
 package com.bigdata.rdf.load;
 
+import info.aduna.concurrent.locks.Lock;
+
 import java.io.Serializable;
 import java.rmi.RemoteException;
 import java.util.concurrent.ExecutionException;
@@ -52,10 +54,16 @@ implements Serializable {
     final protected transient static Logger log = Logger
             .getLogger(MappedRDFFileLoadTask.class);
 
+//    /**
+//     * The original version.
+//     */
+//    private static final long serialVersionUID = 6787939197771556658L;
+
     /**
-     * 
+     * This version added {@link #isDone} and made the {@link Lock},
+     * {@link #allDone} and {@link #ready} part of the serialized state.
      */
-    private static final long serialVersionUID = 6787939197771556658L;
+    private static final long serialVersionUID = 2L;
 
     protected final S jobState;
 
@@ -63,36 +71,46 @@ implements Serializable {
     
     /**
      * Instantiated by {@link #call()} on the {@link IRemoteExecutor} service.
+     * This is volatile because it is used by some methods which do not obtain
+     * the {@link #lock}.
      */
-    private transient AsynchronousStatementBufferFactory<BigdataStatement,V> statementBufferFactory;
+    private volatile transient AsynchronousStatementBufferFactory<BigdataStatement,V> statementBufferFactory;
 
     /**
-     * Note: transient field set by {@link #call()}. 
+     * Lock used to protect the condition variables {@link #isReady} and
+     * {@link #isDone}.
+     * <p>
+     * Note: The {@link ReentrantLock} class and its {@link Condition}s are all
+     * {@link Serializable} but all of their fields are transient. When
+     * deserialized they will have no waiters, which is just what we want.
      */
-    private transient ReentrantLock lock;
+    private final ReentrantLock lock = new ReentrantLock();
 
     /**
-     * Condition signaled when done.
+     * Condition signaled when {@link #isDone}.
      * <p>
-     * Note: transient field set by {@link #call()}.
+     * Note: Javadoc for {@link ReentrantLock} indicates it and its
+     * {@link Condition}s are {@link Serializable}.
      */
-    private transient Condition allDone;
-    
+    private final Condition allDone = lock.newCondition();
+
     /**
-     * Condition signaled when ready.
+     * Condition signaled when {@link #isReady}.
      * <p>
-     * Note: transient field set by {@link #call()}.
+     * Note: Javadoc for {@link ReentrantLock} indicates it and its
+     * {@link Condition}s are {@link Serializable}.
      */
-    private transient Condition ready;
+    private final Condition ready = lock.newCondition();
     
     /**
      * Flag set once {@link #call()} has initialized our transient state.
-     * <p>
-     * Note: this flag is serialized so it is <code>false</code> before the
-     * methods on this class can be invoked using RMI, especially
-     * {@link #accept(Serializable[])}.
      */
-    private volatile boolean isReady = false;
+    private boolean isReady = false;
+    
+    /**
+     * Condition variable set when the task is done.
+     */
+    private boolean isDone = false;
     
     public String toString() {
 
@@ -111,7 +129,7 @@ implements Serializable {
         this.jobState = jobState;
 
         this.locator = locator;
-
+        
     }
 
     /**
@@ -127,9 +145,9 @@ implements Serializable {
     protected void setUp() throws InterruptedException {
 
         // set transient fields.
-        lock = new ReentrantLock();
-        allDone = lock.newCondition();
-        ready = lock.newCondition();
+//        lock = new ReentrantLock();
+//        allDone = lock.newCondition();
+//        ready = lock.newCondition();
 
         lock.lockInterruptibly();
         try {
@@ -247,11 +265,13 @@ implements Serializable {
              */
             lock.lockInterruptibly();
             try {
-                try {
-                    allDone.await();
-                } catch (InterruptedException ex) {
-                    if (log.isInfoEnabled())
-                        log.info("Client will terminate.");
+                while (!isDone) {
+                    try {
+                        allDone.await();
+                    } catch (InterruptedException ex) {
+                        if (log.isInfoEnabled())
+                            log.info("Client will terminate.");
+                    }
                 }
             } finally {
                 lock.unlock();
@@ -319,7 +339,7 @@ implements Serializable {
              * running on the remote executor service has been fully initialized
              * before we allow access to its methods other than call().
              */
-            if (!isReady) {
+            while(!isReady) {
 
                 // wait until ready.
                 ready.await();
@@ -375,24 +395,31 @@ implements Serializable {
     public void close() throws RemoteException, InterruptedException {
 
         awaitReady();
-        
-        lock.lockInterruptibly();
+
         try {
 
             statementBufferFactory.awaitAll();
+            
+        } catch (ExecutionException ex) {
 
-            if (log.isInfoEnabled())
-                log.info("Done.");
+            throw new RuntimeException(ex);
+
+        }
+        
+        if (log.isInfoEnabled())
+            log.info("Done.");
+
+        lock.lockInterruptibly();
+        try {
 
             /*
              * Signal in case master did not interrupt the main thread in
              * call().
              */
-            allDone.signal();
-            
-        } catch (ExecutionException ex) {
 
-            throw new RuntimeException(ex);
+            isDone = true;
+            
+            allDone.signal();
             
         } finally {
 
