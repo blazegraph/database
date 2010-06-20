@@ -318,6 +318,8 @@ V extends Serializable//
             final Future<Long> scannerFuture = fed.getExecutorService().submit(
                     scanner);
 
+            System.out.println("Master running : " + scanner);
+
             // await scanner future.
             final Long acceptCount = scannerFuture.get();
 
