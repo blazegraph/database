@@ -405,6 +405,10 @@ implements Serializable {
 
         awaitReady();
 
+        if (log.isDebugEnabled())
+            log.debug("accepting: " + chunk.length + " resources : "
+                    + toString());
+
         for (V resource : chunk) {
 
             if (isDone)
@@ -416,8 +420,8 @@ implements Serializable {
                  * Try to submit the resource for processing.
                  */
 
-                if (log.isDebugEnabled())
-                    log.debug("locator=" + locator + ", resource=" + resource);
+                if (log.isTraceEnabled())
+                    log.trace("locator=" + locator + ", resource=" + resource);
 
                 statementBufferFactory.submitOne(resource,
                         jobState.rejectedExecutionDelay);
