@@ -27,8 +27,7 @@
 		<java classname="com.bigdata.rdf.store.DataLoader" fork="true" failonerror="true">
 			<arg line="-namespace ${namespace} ${journalPropertyFile} ${dataFiles}" />
 			<!-- specify/override the journal file name. -->
-			<!-- uniprot has datatype validation errors so we set stopAtFirstError=false -->
-			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${journalFile} -Dcom.bigdata.rdf.rio.RDFParserOptions.stopAtFirstError=false" />
+			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${journalFile}" />
 			<classpath>
 				<path refid="runtime.classpath" />
 			</classpath>
