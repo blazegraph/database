@@ -270,11 +270,14 @@ implements Serializable {
                 // Create path to counter set.
                 final CounterSet tmp = serviceRoot.makePath(relPath);
 
-                /*final CounterSet*/ counters = statementBufferFactory
+                final CounterSet counters = statementBufferFactory
                         .getCounters();
-             
-                // Attach counters.
+
+                // Attach counters [the counters are MOVEd to tmp].
                 tmp.attach(counters, true/* replace */);
+
+                // Note reference to the current counters for log messages.
+                this.counters = tmp;
                 
             }
 
