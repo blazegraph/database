@@ -133,6 +133,7 @@ http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/disk/writeSecs&depth=18&
 http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/disk/bytesReadPerSec&depth=18&correlated=true&period=Minutes&file=service/ds/LiveJournal/bytesReadPerSec
 http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/disk/bytesWrittenPerSec&depth=18&correlated=true&period=Minutes&file=service/ds/LiveJournal/bytesWrittenPerSec
 http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/extent&depth=18&correlated=true&period=Minutes&file=service/ds/LiveJournal/extent
+http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/nextOffset&depth=18&correlated=true&period=Minutes&file=service/ds/LiveJournal/nextOffset
 
 # OverflowManager
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Overflow%20Manager/Synchronous Overflow Count&depth=12&period=Minutes&correlated=true&file=service/ds/OverflowManager/SynchronousOverflowCount

@@ -47,6 +47,16 @@ public class FileSystemScanner extends AbstractResourceScanner<File> {
 
     protected final FilenameFilter filter;
 
+    public String toString() {
+
+        return getClass() + //
+                "{acceptCount=" + super.getAcceptCount() + //
+                ",fileOrDir=" + fileOrDir + //
+                ",filter=" + (filter == null ? "N/A" : filter) + //
+                "}";
+        
+    }
+    
     /**
      * @param buffer
      *            Chunks of files to be loaded are added to this buffer.
