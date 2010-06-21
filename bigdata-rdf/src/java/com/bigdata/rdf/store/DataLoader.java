@@ -1262,16 +1262,44 @@ public class DataLoader {
                     is.close();
                 }
             }
-			if (System.getProperty(com.bigdata.journal.Options.FILE) != null) {
-				// Override/set from the environment.
-				final String file = System
-						.getProperty(com.bigdata.journal.Options.FILE);
-				System.out.println("Using: " + com.bigdata.journal.Options.FILE
-						+ "=" + file);
-                properties.setProperty(com.bigdata.journal.Options.FILE, file);
-            }
+//			if (System.getProperty(com.bigdata.journal.Options.FILE) != null) {
+//				// Override/set from the environment.
+//				final String file = System
+//						.getProperty(com.bigdata.journal.Options.FILE);
+//				System.out.println("Using: " + com.bigdata.journal.Options.FILE
+//						+ "=" + file);
+//                properties.setProperty(com.bigdata.journal.Options.FILE, file);
+//            }
         }
 
+        /*
+         * Allow override of select options.
+         */
+        {
+            final String[] overrides = new String[] {
+                    // Journal options.
+                    com.bigdata.journal.Options.FILE,
+                    // RDFParserOptions.
+                    RDFParserOptions.Options.DATATYPE_HANDLING,
+                    RDFParserOptions.Options.PRESERVE_BNODE_IDS,
+                    RDFParserOptions.Options.STOP_AT_FIRST_ERROR,
+                    RDFParserOptions.Options.VERIFY_DATA,
+                    // DataLoader options.
+                    DataLoader.Options.BUFFER_CAPACITY,
+                    DataLoader.Options.CLOSURE,
+                    DataLoader.Options.COMMIT,
+                    DataLoader.Options.FLUSH,
+            };
+            for (String s : overrides) {
+                if (System.getProperty(s) != null) {
+                    // Override/set from the environment.
+                    final String v = System.getProperty(s);
+                    System.out.println("Using: " + s + "=" + v);
+                    properties.setProperty(s, v);
+                }
+            }
+        }
+        
         final List<File> files = new LinkedList<File>();
         while(i<args.length) {
             
