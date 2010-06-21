@@ -236,7 +236,7 @@ V extends Serializable//
              * is assigned to a client in advance of observing the rate at which
              * the client is consuming its workload.
              */
-            final int masterChunkSize = 10000;
+            final int masterChunkSize = 100; // was 10000 (BBT 6/21/2010).
             final int sinkChunkSize = 1000;
             conf = (AsynchronousIndexWriteConfiguration) config.getEntry(component,
                     ConfigurationOptions.RESOURCE_BUFFER_CONFIG, AsynchronousIndexWriteConfiguration.class,
