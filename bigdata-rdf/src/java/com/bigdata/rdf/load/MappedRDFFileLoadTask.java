@@ -252,6 +252,33 @@ implements Serializable {
             };
 
             /*
+             * Add the counters to be reported to the client's counter set. The
+             * added counters will be reported when the client reports its own
+             * counters.
+             * 
+             * Note: This needs to be done before we signal [ready] since the
+             * job master may have already sent a chunk of resources our
+             * accept(chunk[]) method.
+             */
+            {
+
+                final CounterSet serviceRoot = getFederation()
+                        .getServiceCounterSet();
+
+                final String relPath = jobState.jobName;
+
+                // Create path to counter set.
+                final CounterSet tmp = serviceRoot.makePath(relPath);
+
+                /*final CounterSet*/ counters = statementBufferFactory
+                        .getCounters();
+             
+                // Attach counters.
+                tmp.attach(counters, true/* replace */);
+                
+            }
+
+            /*
              * Update the flag and notify all blocked threads since they can now
              * execute.
              */
@@ -275,29 +302,6 @@ implements Serializable {
         setUp();
         
         try {
-
-            /*
-             * Add the counters to be reported to the client's counter set. The
-             * added counters will be reported when the client reports its own
-             * counters.
-             */
-            {
-
-                final CounterSet serviceRoot = getFederation()
-                        .getServiceCounterSet();
-
-                final String relPath = jobState.jobName;
-
-                // Create path to counter set.
-                final CounterSet tmp = serviceRoot.makePath(relPath);
-
-                /*final CounterSet*/ counters = statementBufferFactory
-                        .getCounters();
-             
-                // Attach counters.
-                tmp.attach(counters, true/* replace */);
-                
-            }
 
             /*
              * Wait until either (a) interrupted by the master using
