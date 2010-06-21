@@ -2,6 +2,8 @@ package com.bigdata.rdf.load;
 
 import info.aduna.concurrent.locks.Lock;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.rmi.RemoteException;
 import java.util.concurrent.ExecutionException;
@@ -74,35 +76,32 @@ implements Serializable {
      * This is volatile because it is used by some methods which do not obtain
      * the {@link #lock}.
      */
-    private volatile transient AsynchronousStatementBufferFactory<BigdataStatement,V> statementBufferFactory;
+    private transient volatile AsynchronousStatementBufferFactory<BigdataStatement,V> statementBufferFactory;
 
     /**
      * Lock used to protect the condition variables {@link #isReady} and
      * {@link #isDone}.
      * <p>
-     * Note: The {@link ReentrantLock} class and its {@link Condition}s are all
-     * {@link Serializable} but all of their fields are transient. When
-     * deserialized they will have no waiters, which is just what we want.
+     * Note: This field is set by {@link #readObject(ObjectInputStream)} on
+     * deserialization. It is volatile to ensure visibility of the field value.
      */
-    private final ReentrantLock lock = new ReentrantLock();
+    private transient volatile ReentrantLock lock;
 
     /**
      * Condition signaled when {@link #isDone}.
      * <p>
-     * Note: While findbugs reports an error here, the javadoc for
-     * {@link ReentrantLock} indicates it and its {@link Condition}s are
-     * {@link Serializable}.
+     * Note: This field is set by {@link #readObject(ObjectInputStream)} on
+     * deserialization. It is volatile to ensure visibility of the field value.
      */
-    private final Condition allDone = lock.newCondition();
+    private transient volatile Condition allDone;
 
     /**
      * Condition signaled when {@link #isReady}.
      * <p>
-     * Note: While findbugs reports an error here, the javadoc for
-     * {@link ReentrantLock} indicates it and its {@link Condition}s are
-     * {@link Serializable}.
+     * Note: This field is set by {@link #readObject(ObjectInputStream)} on
+     * deserialization. It is volatile to ensure visibility of the field value.
      */
-    private final Condition ready = lock.newCondition();
+    private transient volatile Condition ready;
     
     /**
      * Flag set once {@link #call()} has initialized our transient state.
@@ -114,6 +113,14 @@ implements Serializable {
      */
     private boolean isDone = false;
     
+    private void readObject(final ObjectInputStream in) throws IOException,
+            ClassNotFoundException {
+        in.defaultReadObject();
+        lock = new ReentrantLock();
+        allDone = lock.newCondition();
+        ready = lock.newCondition();
+    }
+
     public String toString() {
 
         return getClass().getName() + "{clientNum=" + locator + "}";

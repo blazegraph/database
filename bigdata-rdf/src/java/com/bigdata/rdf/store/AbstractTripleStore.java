@@ -1781,6 +1781,8 @@ abstract public class AbstractTripleStore extends
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
      * Note: Will always return zero (0) if {@value Options#STORE_BLANK_NODES}
      * is <code>false</code>.
      */

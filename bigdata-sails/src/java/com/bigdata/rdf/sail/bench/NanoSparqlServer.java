@@ -251,7 +251,16 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
 			sb.append("literalCount\t = " + tripleStore.getLiteralCount() + "\n");
 
-			sb.append("bnodeCount\t = " + tripleStore.getBNodeCount() + "\n");
+            /*
+             * Note: The blank node count is only available when using the told
+             * bnodes mode.
+             */
+            sb
+                    .append("bnodeCount\t = "
+                            + (tripleStore.getLexiconRelation()
+                                    .isStoreBlankNodes() ? ""
+                                    + tripleStore.getBNodeCount() : "N/A")
+                            + "\n");
 
 			sb.append(IndexMetadata.Options.BTREE_BRANCHING_FACTOR
 					+ "="

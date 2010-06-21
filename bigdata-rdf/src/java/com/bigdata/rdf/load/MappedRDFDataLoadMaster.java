@@ -769,7 +769,15 @@ V extends Serializable//
 
             sb.append("literalCount\t" + tripleStore.getLiteralCount() + "\n");
 
-            sb.append("bnodeCount\t" + tripleStore.getBNodeCount() + "\n");
+            /*
+             * Note: blank node counts are not available unless the store uses
+             * the told bnodes mode.
+             */
+            sb.append("bnodeCount\t"
+                            + (tripleStore.getLexiconRelation()
+                                    .isStoreBlankNodes() ? ""
+                                    + tripleStore.getBNodeCount() : "N/A")
+                            + "\n");
 
             // sb.append(tripleStore.predicateUsage());
 
