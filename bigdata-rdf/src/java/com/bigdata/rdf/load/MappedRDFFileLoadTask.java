@@ -99,19 +99,31 @@ implements Serializable {
      * Condition signaled when {@link #isReady}.
      * <p>
      * Note: This field is set by {@link #readObject(ObjectInputStream)} on
-     * deserialization. It is volatile to ensure visibility of the field value.
+     * deserialization. It is volatile to ensure visibility of the value set by
+     * {@link #readObject(ObjectInputStream)}.
      */
     private transient volatile Condition ready;
-    
+
     /**
      * Flag set once {@link #call()} has initialized our transient state.
+     * <p>
+     * Note: This field is set by {@link #readObject(ObjectInputStream)} on
+     * deserialization. It is volatile to ensure visibility of the value set by
+     * {@link #readObject(ObjectInputStream)}.
      */
-    private boolean isReady = false;
+    private transient volatile boolean isReady;
     
     /**
      * Condition variable set when the task is done.
      */
-    private boolean isDone = false;
+    private transient volatile boolean isDone;
+
+    /**
+     * @todo This is here for debugging purposes (I am trying to track down a
+     *       problem where the client stops self-reporting performance counters
+     *       to the load balancer).
+     */
+    private transient volatile CounterSet counters;
     
     private void readObject(final ObjectInputStream in) throws IOException,
             ClassNotFoundException {
@@ -119,11 +131,19 @@ implements Serializable {
         lock = new ReentrantLock();
         allDone = lock.newCondition();
         ready = lock.newCondition();
+        isReady = false;
+        isDone = false;
     }
 
     public String toString() {
 
-        return getClass().getName() + "{clientNum=" + locator + "}";
+        return getClass().getName() + //
+                "{clientNum=" + locator + //
+                ",jobState=" + jobState + //
+                ",ready=" + isReady + //
+                ",done=" + isDone + //
+                ",counters=" + counters + //
+                "}";
 
     }
 
@@ -164,6 +184,9 @@ implements Serializable {
         lock.lockInterruptibly();
         try {
 
+            if (log.isInfoEnabled())
+                log.info(toString());
+            
             final AbstractTripleStore tripleStore = (AbstractTripleStore) getFederation()
                     .getResourceLocator().locate(jobState.namespace,
                             ITx.UNISOLATED);
@@ -236,6 +259,9 @@ implements Serializable {
 
             ready.signalAll();
 
+            if (log.isInfoEnabled())
+                log.info("ready: "+toString());
+            
         } finally {
 
             lock.unlock();
@@ -265,9 +291,12 @@ implements Serializable {
                 // Create path to counter set.
                 final CounterSet tmp = serviceRoot.makePath(relPath);
 
+                final CounterSet counters = statementBufferFactory
+                        .getCounters();
+             
                 // Attach counters.
-                tmp
-                        .attach(statementBufferFactory.getCounters(), true/* replace */);
+                tmp.attach(counters, true/* replace */);
+                
             }
 
             /*
@@ -279,15 +308,14 @@ implements Serializable {
             try {
                 while (!isDone) {
                     allDone.await();
+                    if (log.isInfoEnabled())
+                        log.info("done: " + toString());
                 }
             } finally {
+                // set flag in case interrupted.
+                isDone = true;
                 lock.unlock();
             }
-
-        } catch (InterruptedException ex) {
-
-            if (log.isInfoEnabled())
-                log.info("Client will terminate.");
 
         } finally {
 
@@ -297,6 +325,9 @@ implements Serializable {
             } catch (Throwable t2) {
                 log.warn(this, t2);
             }
+
+            if (log.isInfoEnabled())
+                log.info("Client terminated: " + toString());
 
         }
 
@@ -351,10 +382,13 @@ implements Serializable {
              * running on the remote executor service has been fully initialized
              * before we allow access to its methods other than call().
              */
-            while(!isReady) {
+            while (!isReady) {
 
                 // wait until ready.
                 ready.await();
+
+                if (log.isInfoEnabled())
+                    log.info("ready: " + toString());
 
             }
 
@@ -373,19 +407,25 @@ implements Serializable {
 
         for (V resource : chunk) {
 
+            if (isDone)
+                throw new IllegalStateException("task done: " + toString());
+            
             try {
-                
+
                 /*
                  * Try to submit the resource for processing.
                  */
-                
+
+                if (log.isDebugEnabled())
+                    log.debug("locator=" + locator + ", resource=" + resource);
+
                 statementBufferFactory.submitOne(resource,
                         jobState.rejectedExecutionDelay);
                 
             } catch (InterruptedException ex) {
                 
                 /*
-                 * The client was interrupted.
+                 * The client was interrupted by the master (job cancellation).
                  */
                 
                 throw ex;
@@ -411,6 +451,9 @@ implements Serializable {
         lock.lockInterruptibly();
         try {
 
+            if (log.isInfoEnabled())
+                log.info("awaiting StatementBufferFactory: " + toString());
+
             /*
              * @todo Why is this done while holding the lock? It seems like this
              * should be invoked without holding the lock unless the intention
@@ -419,16 +462,7 @@ implements Serializable {
             statementBufferFactory.awaitAll();
 
             if (log.isInfoEnabled())
-                log.info("Done.");
-
-            /*
-             * Signal in case master did not interrupt the main thread in
-             * call().
-             */
-
-            isDone = true;
-
-            allDone.signalAll();
+                log.info("StatementBufferFactory complete: " + toString());
 
         } catch (ExecutionException ex) {
 
@@ -436,7 +470,23 @@ implements Serializable {
 
         } finally {
 
-            lock.unlock();
+            try {
+                /*
+                 * Set the condition variable and signal [allDone] in case
+                 * master did not interrupt the main thread in call().
+                 */
+                isDone = true;
+
+                allDone.signalAll();
+
+                if (log.isInfoEnabled())
+                    log.info("done: " + toString());
+
+            } finally {
+            
+                lock.unlock();
+                
+            }
 
         }
 
