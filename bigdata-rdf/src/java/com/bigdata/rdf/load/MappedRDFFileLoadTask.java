@@ -291,7 +291,7 @@ implements Serializable {
                 // Create path to counter set.
                 final CounterSet tmp = serviceRoot.makePath(relPath);
 
-                final CounterSet counters = statementBufferFactory
+                /*final CounterSet*/ counters = statementBufferFactory
                         .getCounters();
              
                 // Attach counters.
