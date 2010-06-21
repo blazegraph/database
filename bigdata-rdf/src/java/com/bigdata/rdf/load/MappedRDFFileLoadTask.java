@@ -273,12 +273,24 @@ implements Serializable {
                 final CounterSet counters = statementBufferFactory
                         .getCounters();
 
+                if (log.isDebugEnabled())
+                    log.debug("Attaching counters: locator=" + locator + " : "
+                            + counters);
+
                 // Attach counters [the counters are MOVEd to tmp].
                 tmp.attach(counters, true/* replace */);
 
                 // Note reference to the current counters for log messages.
                 this.counters = tmp;
-                
+
+                if (log.isDebugEnabled())
+                    log.debug("Attached counters: locator=" + locator + " :  "
+                            + tmp);
+
+                if (log.isDebugEnabled())
+                    log.debug("Service counters : locator=" + locator + " : "
+                            + serviceRoot.getPath(relPath));
+
             }
 
             /*
