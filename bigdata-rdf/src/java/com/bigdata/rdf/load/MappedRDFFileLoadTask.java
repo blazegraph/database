@@ -89,16 +89,18 @@ implements Serializable {
     /**
      * Condition signaled when {@link #isDone}.
      * <p>
-     * Note: Javadoc for {@link ReentrantLock} indicates it and its
-     * {@link Condition}s are {@link Serializable}.
+     * Note: While findbugs reports an error here, the javadoc for
+     * {@link ReentrantLock} indicates it and its {@link Condition}s are
+     * {@link Serializable}.
      */
     private final Condition allDone = lock.newCondition();
 
     /**
      * Condition signaled when {@link #isReady}.
      * <p>
-     * Note: Javadoc for {@link ReentrantLock} indicates it and its
-     * {@link Condition}s are {@link Serializable}.
+     * Note: While findbugs reports an error here, the javadoc for
+     * {@link ReentrantLock} indicates it and its {@link Condition}s are
+     * {@link Serializable}.
      */
     private final Condition ready = lock.newCondition();
     
@@ -122,6 +124,9 @@ implements Serializable {
             final INotifyOutcome<V, L> notifyProxy, final L locator) {
 
         super(notifyProxy);
+
+        if (jobState == null)
+            throw new IllegalArgumentException();
 
         if (locator == null)
             throw new IllegalArgumentException();
@@ -257,7 +262,7 @@ implements Serializable {
                 tmp
                         .attach(statementBufferFactory.getCounters(), true/* replace */);
             }
-            
+
             /*
              * Wait until either (a) interrupted by the master using
              * Future#cancel(); or (b) the master invokes close(), indicating
@@ -266,16 +271,16 @@ implements Serializable {
             lock.lockInterruptibly();
             try {
                 while (!isDone) {
-                    try {
-                        allDone.await();
-                    } catch (InterruptedException ex) {
-                        if (log.isInfoEnabled())
-                            log.info("Client will terminate.");
-                    }
+                    allDone.await();
                 }
             } finally {
                 lock.unlock();
             }
+
+        } catch (InterruptedException ex) {
+
+            if (log.isInfoEnabled())
+                log.info("Client will terminate.");
 
         } finally {
 
@@ -396,21 +401,18 @@ implements Serializable {
 
         awaitReady();
 
-        try {
-
-            statementBufferFactory.awaitAll();
-            
-        } catch (ExecutionException ex) {
-
-            throw new RuntimeException(ex);
-
-        }
-        
-        if (log.isInfoEnabled())
-            log.info("Done.");
-
         lock.lockInterruptibly();
         try {
+
+            /*
+             * @todo Why is this done while holding the lock? It seems like this
+             * should be invoked without holding the lock unless the intention
+             * is to prevent concurrent calls to accept(chunk).
+             */
+            statementBufferFactory.awaitAll();
+
+            if (log.isInfoEnabled())
+                log.info("Done.");
 
             /*
              * Signal in case master did not interrupt the main thread in
@@ -418,13 +420,17 @@ implements Serializable {
              */
 
             isDone = true;
-            
-            allDone.signal();
-            
+
+            allDone.signalAll();
+
+        } catch (ExecutionException ex) {
+
+            throw new RuntimeException(ex);
+
         } finally {
 
             lock.unlock();
-            
+
         }
 
     }
