@@ -4104,9 +4104,9 @@ abstract public class StoreManager extends ResourceEvents implements
              * Note: This logs the file as reported by [resourceFiles] as well
              * as the file in IResourceMetadata in case any discrepency arises.
              */
-//            if (log.isInfoEnabled())
-//                log.info
-                log.warn("DELETE: " + resourceMetadata + " : " + file);
+            if (log.isInfoEnabled())
+                log.info("DELETE: " + resourceMetadata + " : " + file);
+//                log.warn("DELETE: " + resourceMetadata + " : " + file);
             
             if (file == null) {
 
