@@ -548,7 +548,7 @@ public class NanoSparqlClient {
 
 			if (opts.queryStr == null) {
 
-			    readFromStdin();
+			    opts.queryStr = readFromStdin();
 			    
 			}
 
