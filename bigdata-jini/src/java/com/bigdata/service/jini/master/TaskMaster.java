@@ -709,7 +709,8 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
         /*
          * Install a shutdown hook so that the master will cancel any running
-         * clients if it is interrupted (normal kill will trigger this hook).
+         * clients if it is interrupted (normal kill will trigger this hook, but
+         * it is also triggered for a normal exit from main()).
          */
         Runtime.getRuntime().addShutdownHook(new Thread() {
 
@@ -717,7 +718,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
                 future.cancel(true/* mayInterruptIfRunning */);
 
-                System.err.println("Caught signal, shutting down: " + new Date());
+                System.err.println("Shutting down: " + new Date());
 
             }
 
