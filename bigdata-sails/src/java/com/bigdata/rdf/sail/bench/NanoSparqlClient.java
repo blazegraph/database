@@ -422,7 +422,8 @@ public class NanoSparqlClient {
 		/** The connection timeout (ms). */
 		public int timeout = DEFAULT_TIMEOUT;
 		public boolean showQuery = false;
-		public boolean quiet = false;
+        public boolean verbose = false;
+        public boolean quiet = false;
 
 	}
 
@@ -458,14 +459,16 @@ public class NanoSparqlClient {
 	 *            {@value #DEFAULT_TIMEOUT}).</dd>
      *            <dt>-show</dt>
      *            <dd>Show the parser query (operator tree).</dd>
+     *            <dt>-verbose</dt>
+     *            <dd>Be verbose.</dd>
      *            <dt>-quiet</dt>
-     *            <dd>Run quietly.</dd>
+     *            <dd>Be quiet.</dd>
      *            <dt>-f</dt>
      *            <dd>A file containing the query.</dd>
-     *            <dt>-q</dt>
+     *            <dt>-query</dt>
      *            <dd>The query follows immediately on the command line (be sure to quote the query).</dd>
      *            <dt>-t</dt>
-     *            <dd>The http connection timeout in milliseconds.</dd>
+     *            <dd>The http connection timeout in milliseconds -or- ZERO (0) for an infinite timeout.</dd>
 	 *            <dt>-defaultGraph</dt>
 	 *            <dd>The URI of the default graph to use for the query.</dd>
 	 *            </dl>
@@ -501,13 +504,24 @@ public class NanoSparqlClient {
 
                 } else if (arg.equals("-f")) {
 
-                    opts.queryStr = readFromFile(new File(args[++i]));
+                    final String file = args[++i];
+                    
+                    if (opts.verbose)
+                        System.err.println("reading from file: " + file);
+
+                    opts.queryStr = readFromFile(new File(file));
+
+                } else if (arg.equals("-verbose")) {
+                    
+                    opts.verbose = true;
+                    opts.quiet = false;
 
                 } else if (arg.equals("-quiet")) {
                     
+                    opts.verbose = false;
                     opts.quiet = true;
                     
-                } else if (arg.equals("-q")) {
+                } else if (arg.equals("-query")) {
 
                     opts.queryStr = args[++i];
 
@@ -515,13 +529,24 @@ public class NanoSparqlClient {
 
 					opts.defaultGraphUri = args[++i];
 
+                    if (opts.verbose)
+                        System.err.println("defaultGraph: "
+                                + opts.defaultGraphUri);
+
 				} else if (arg.equals("-show")) {
 
 					opts.showQuery = true;
 					
 				} else if (arg.equals("-t")) {
 
-					opts.timeout = Integer.valueOf(args[++i]);
+                    if ((opts.timeout = Integer.valueOf(args[++i])) < 0) {
+
+                        throw new IllegalArgumentException("Bad timeout.");
+                        
+				    }
+
+                    if (opts.verbose)
+                        System.err.println("timeout: " + opts.timeout + "ms");
 
 				} else if (arg.equals("-help") || arg.equals("--?")) {
 
@@ -541,6 +566,8 @@ public class NanoSparqlClient {
 			// The next argument is the serviceURL, which is required.
 			if (i < args.length) {
 				opts.serviceURL = args[i++];
+                if (opts.verbose)
+                    System.err.println("serviceURL: " + opts.serviceURL);
 			} else {
 				usage();
 				System.exit(1);
@@ -548,6 +575,10 @@ public class NanoSparqlClient {
 
 			if (opts.queryStr == null) {
 
+                if (opts.verbose) {
+                    System.err.println("Reading from stdin...");
+                }
+			    
 			    opts.queryStr = readFromStdin();
 			    
 			}
