@@ -201,9 +201,6 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		// since the kb exists, wrap it as a sail.
 		sail = new BigdataSail(tripleStore);
 
-		// Log some information about the kb (#of statements, etc).
-		System.out.println(getKBInfo(sail)); // @todo log @ info?
-
 		repo = new BigdataSailRepository(sail);
 		repo.initialize();
 
@@ -228,8 +225,12 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
     /**
      * Return various interesting metadata about the KB state.
+     * 
+     * @todo The range counts can take some time if the cluster is heavily
+     *       loaded since they must query each shard for the primary statement
+     *       index and the TERM2ID index.
      */
-	protected StringBuilder getKBInfo(final BigdataSail sail) {
+	protected StringBuilder getKBInfo() {
 
 		final StringBuilder sb = new StringBuilder();
 
@@ -481,16 +482,22 @@ public class NanoSparqlServer extends AbstractHTTPD {
 			final Properties header,
 			final LinkedHashMap<String, Vector<String>> params) throws Exception {
 
-		final boolean showQueries = params.get("showQueries") != null;
+        final boolean showQueries = params.get("showQueries") != null;
 
-		final StringBuilder sb = new StringBuilder();
+        final boolean showKBInfo = params.get("showKBInfo") != null;
 
-		sb.append("Accepted query count=" + queryIdFactory.get()+"\n");
-		
-		sb.append("Running query count=" + queries.size()+"\n");
+        final StringBuilder sb = new StringBuilder();
 
-		// General information on the connected kb.
-        sb.append(getKBInfo(sail));
+        sb.append("Accepted query count=" + queryIdFactory.get() + "\n");
+
+        sb.append("Running query count=" + queries.size() + "\n");
+
+        if (showKBInfo) {
+
+            // General information on the connected kb.
+            sb.append(getKBInfo());
+
+        }
 		
 		if (repo.getDatabase().getIndexManager() instanceof IJournal) {
 
@@ -1066,6 +1073,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
 			}
 
+			// start the server.
 			server = new NanoSparqlServer(config, indexManager);
 
             /*
@@ -1089,6 +1097,16 @@ public class NanoSparqlServer extends AbstractHTTPD {
                     }
 
                 });
+
+            }
+
+            System.out.println("Service is running.");
+
+            if (true) { // @todo if(!quiet) or if(verbose)
+                /*
+                 * Log some information about the kb (#of statements, etc).
+                 */
+                System.out.println(server.getKBInfo());
             }
 
 			/*
