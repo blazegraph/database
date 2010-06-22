@@ -40,6 +40,7 @@ import java.io.PipedOutputStream;
 import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Properties;
@@ -59,7 +60,6 @@ import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
-import org.openrdf.query.parser.ParsedQuery;
 import org.openrdf.query.parser.QueryParser;
 import org.openrdf.query.parser.sparql.SPARQLParserFactory;
 import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLWriter;
@@ -317,7 +317,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
     }
     
     synchronized public void shutdown() {
-        System.err.println("shutdown");
+        System.err.println("Normal shutdown.");
         queryService.shutdown();
         try {
             System.err.println("Awaiting termination of running queries.");
@@ -333,15 +333,30 @@ public class NanoSparqlServer extends AbstractHTTPD {
     }
 
     synchronized public void shutdownNow() {
-        System.err.println("shutdownNow");
+        System.err.println("Immediate shutdown");
+        // interrupt all running queries.
     	queryService.shutdownNow();
+        /*
+         * Wait a moment for any running queries to close their query
+         * connections.
+         */
+        try {
+            Thread.sleep(1000/* ms */);
+        } catch (InterruptedException ex) {
+            // ignore 
+        }
     	super.shutdown();
 		synchronized (alive) {
 			alive.set(false);
 			alive.notifyAll();
 		}
     }
-    
+
+    /**
+     * Note: This uses an atomic boolean in order to give us a synchronization
+     * object whose state also serves as a condition variable. findbugs objects,
+     * but this is a deliberate usage.
+     */
     private final AtomicBoolean alive = new AtomicBoolean(true);
 
 //    @Override
@@ -701,7 +716,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		 * position of having to parse the query here and then again when it is
 		 * executed.
 		 */
-		final ParsedQuery q = engine.parseQuery(queryStr, null/*baseURI*/);
+		/*final ParsedQuery q =*/ engine.parseQuery(queryStr, null/*baseURI*/);
 
 		final NanoSparqlClient.QueryType queryType = NanoSparqlClient.QueryType
 				.fromQuery(queryStr);
@@ -735,9 +750,13 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
     }
 
-	/**
-	 * Executes a tuple query.
-	 */
+    /**
+     * Executes a tuple query.
+     * 
+     * @todo Extract a base class which handles the timing, pipe, reporting,
+     *       obtains the connection, and provides the finally {} semantics for
+     *       each type of query task.
+     */
 	private class TupleQueryTask implements Callable<Void> {
 
 		private final String queryStr;
@@ -1049,6 +1068,29 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
 			server = new NanoSparqlServer(config, indexManager);
 
+            /*
+             * Install a shutdown hook so that the master will cancel any
+             * running clients if it is interrupted (normal kill will trigger
+             * this hook).
+             */
+            {
+                
+                final NanoSparqlServer tmp = server;
+                
+                Runtime.getRuntime().addShutdownHook(new Thread() {
+
+                    public void run() {
+
+                        tmp.shutdownNow();
+
+                        System.err.println("Caught signal, shutting down: "
+                                + new Date());
+
+                    }
+
+                });
+            }
+
 			/*
 			 * Wait until the server is terminated.
 			 */
@@ -1064,7 +1106,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
 			}
 
-		} catch (Exception ex) {
+		} catch (Throwable ex) {
 			ex.printStackTrace();
 		} finally {
 			if (server != null)
