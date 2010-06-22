@@ -2470,7 +2470,7 @@ abstract public class StoreManager extends ResourceEvents implements
                     + "{file="
                     + getFile()
                     + ", open="
-                    + isOpen()
+                    + ManagedJournal.this.isOpen()
                     + (rootBlock != null ? ", uuid="
                             + getRootBlockView().getUUID() : "") + "}";
             
