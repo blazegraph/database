@@ -534,7 +534,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 			
 		}
 		
-		return new Response(HTTP_NOTFOUND, MIME_TEXT_PLAIN, sb.toString());
+		return new Response(HTTP_OK, MIME_TEXT_PLAIN, sb.toString());
 
 	}
 	
