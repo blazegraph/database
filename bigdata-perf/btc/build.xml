@@ -25,7 +25,12 @@
 	<!-- Note: For scale-out, split the data files and use MappedRDFDataLoadMaster. -->
 	<target name="run-load" depends="clean, prepare">
 		<java classname="com.bigdata.rdf.store.DataLoader" fork="true" failonerror="true">
-			<arg line="-namespace ${namespace} ${journalPropertyFile} ${dataFiles}" />
+			<arg line="
+				-namespace ${namespace}
+				-format nquads
+				${journalPropertyFile}
+				${dataFiles}
+			" />
 			<!-- specify/override the journal file name. -->
 			<!-- uniprot has datatype validation errors so we set stopAtFirstError=false -->
 			<jvmarg line="${queryJvmArgs}
