@@ -168,6 +168,9 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
      * @todo Support {@link DatatypeHandling} values.
      * 
      * @todo {@link NxParser} tracks line numbers, so propagate those to RIO.
+     * 
+     * @todo Verify that this does/does not respect the RIO preseveBlankNodes
+     *       option.
      */
     public void parse(Reader r, String baseUriIsIgnored) throws IOException,
             RDFParseException, RDFHandlerException {
