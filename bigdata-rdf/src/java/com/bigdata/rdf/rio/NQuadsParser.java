@@ -166,6 +166,8 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
      *       {@link Reader}. It has been modified to support this.
      * 
      * @todo Support {@link DatatypeHandling} values.
+     * 
+     * @todo {@link NxParser} tracks line numbers, so propagate those to RIO.
      */
     public void parse(Reader r, String baseUriIsIgnored) throws IOException,
             RDFParseException, RDFHandlerException {
