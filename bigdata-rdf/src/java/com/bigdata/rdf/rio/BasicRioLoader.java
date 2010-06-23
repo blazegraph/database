@@ -53,6 +53,20 @@ public class BasicRioLoader implements IRioLoader {
     protected static final transient Logger log = Logger
             .getLogger(IRioLoader.class);
 
+    /**
+     * Force the load of the NxParser integration class.
+     */
+    static {
+
+        // Force the load of the NXParser integration.
+        try {
+            Class.forName(NQuadsParser.class.getName());
+        } catch (ClassNotFoundException e) {
+            log.error(e);
+        }
+        
+    }
+    
     long stmtsAdded;
     
     long insertTime;
@@ -132,8 +146,6 @@ public class BasicRioLoader implements IRioLoader {
      * constructor.
      * 
      * @return The parser.
-     * 
-     * @todo reuse parser instances for the same {@link RDFFormat}?
      */
     final protected RDFParser getParser(final RDFFormat rdfFormat) {
 
