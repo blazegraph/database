@@ -28,7 +28,11 @@
 			<arg line="-namespace ${namespace} ${journalPropertyFile} ${dataFiles}" />
 			<!-- specify/override the journal file name. -->
 			<!-- uniprot has datatype validation errors so we set stopAtFirstError=false -->
-			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${journalFile} -Dcom.bigdata.rdf.rio.RDFParserOptions.stopAtFirstError=false" />
+			<jvmarg line="${queryJvmArgs}
+				-Dcom.bigdata.journal.AbstractJournal.file=${journalFile}
+				-Dcom.bigdata.rdf.rio.RDFParserOptions.stopAtFirstError=false
+				-Dcom.bigdata.rdf.store.DataLoader.bufferCapacity=1000000
+			" />
 			<classpath>
 				<path refid="runtime.classpath" />
 			</classpath>
@@ -39,7 +43,9 @@
 		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true">
 			<arg line="${nanoServerPort} ${namespace} ${journalPropertyFile}" />
 			<!-- specify/override the journal file name. -->
-			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${journalFile}" />
+			<jvmarg line="${queryJvmArgs}
+				-Dcom.bigdata.journal.AbstractJournal.file=${journalFile}
+			" />
 			<classpath>
 				<path refid="runtime.classpath" />
 			</classpath>
