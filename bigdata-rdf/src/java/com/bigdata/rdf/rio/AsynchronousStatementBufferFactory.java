@@ -485,7 +485,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         buffer_id2t = ((IScaleOutClientIndex) lexiconRelation.getId2TermIndex())
                 .newWriteBuffer(
                         null/* resultHandler */,
-                        new DefaultDuplicateRemover<BigdataValue>(true/* testRefs */),
+                        null, // FIXME restore duplicate remover new DefaultDuplicateRemover<BigdataValue>(true/* testRefs */),
                         Id2TermWriteProcConstructor.INSTANCE);
 
         if (buffer_text != null) {
@@ -540,7 +540,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                     .newWriteBuffer(
                             keyOrder.isPrimaryIndex() ? statementResultHandler
                                     : null,
-                            new DefaultDuplicateRemover<ISPO>(true/* testRefs */),
+                            null,// FIXME restore duplicate remover. new DefaultDuplicateRemover<ISPO>(true/* testRefs */),
                             SPOIndexWriteProc.IndexWriteProcConstructor.INSTANCE);
             
             e.setValue(buffer);
@@ -3719,19 +3719,23 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                 protected void signal() throws InterruptedException {
 
                     super.signal();
-
-                    lock.lock();
-                    try {
+                    /*
+                     * Note: There is no requirement for an atomic state
+                     * transition for these two counters so there is no reason
+                     * to take the lock here.
+                     */
+//                    lock.lock();
+//                    try {
 
                         documentTIDsWaitingCount.decrementAndGet();
 
                         documentTIDsReadyCount.incrementAndGet();
 
-                    } finally {
-                    
-                        lock.unlock();
-                        
-                    }
+//                    } finally {
+//                    
+//                        lock.unlock();
+//                        
+//                    }
 
                     // Note: otherWriterService MUST have unbounded queue.
                     otherWriterService.submit(new BufferOtherWritesTask(

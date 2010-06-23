@@ -798,6 +798,9 @@ V extends Serializable//
 
         super.beginJob(jobState);
 
+        System.out.println("namespace=" + jobState.namespace + ", jobName="
+                + jobState.jobName + ", nclients=" + jobState.nclients);
+
         // create/re-open the kb.
         openTripleStore();
         
