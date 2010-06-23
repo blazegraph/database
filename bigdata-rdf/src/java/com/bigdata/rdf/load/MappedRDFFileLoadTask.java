@@ -17,6 +17,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.rdf.load.MappedRDFDataLoadMaster.JobState;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.rio.AsynchronousStatementBufferFactory;
+import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.IRemoteExecutor;
@@ -198,13 +199,31 @@ implements Serializable {
 
             }
 
+            final RDFParserOptions parserOptions = jobState.parserOptions;
+            
+            if (tripleStore.getLexiconRelation().isStoreBlankNodes()
+                    && !parserOptions.getPreserveBNodeIDs()) {
+
+                /*
+                 * Override and enable preservation of blank nodes by the RDF
+                 * parser since we will be storing the node IDs in the database.
+                 */
+
+                parserOptions.setPreserveBNodeIDs(true);
+
+                log
+                        .warn("Overriding parser configuration to set preserveBNodeIDs true since the target stores blank node IDs: namespace="
+                                + tripleStore.getNamespace());
+
+            }
+
             statementBufferFactory = new AsynchronousStatementBufferFactory<BigdataStatement, V>(
                     (ScaleOutTripleStore) tripleStore,//
                     jobState.producerChunkSize,//
                     jobState.valuesInitialCapacity,//
                     jobState.bnodesInitialCapacity,//
                     jobState.getFallbackRDFFormat(), // 
-                    jobState.parserOptions,//
+                    parserOptions,//
                     false, // deleteAfter is handled by the master!
                     jobState.parserPoolSize, //  
                     jobState.parserQueueCapacity, // 

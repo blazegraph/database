@@ -162,12 +162,29 @@ public class RDFParserOptions implements Serializable {
 
     }
     
+    public RDFParserOptions(//
+            final boolean verifyData,
+            final boolean preserveBlankNodeIDs, //
+            final boolean stopAtFirstError,//
+            final DatatypeHandling datatypeHandling//
+            ) {
+
+        if (datatypeHandling == null)
+            throw new IllegalArgumentException();
+        
+        this.verifyData = verifyData;
+        this.preserveBNodeIDs = preserveBlankNodeIDs;
+        this.stopAtFirstError = stopAtFirstError;
+        this.datatypeHandling = datatypeHandling;
+        
+    }
+    
     public synchronized String toString() {
         return super.toString() + //
-                "{datatypeHandling=" + datatypeHandling + //
+                "{verifyData=" + verifyData + //
                 ",preserveBNodeIDS=" + preserveBNodeIDs + //
                 ",stopAtFirstError=" + stopAtFirstError + //
-                ",verifyData=" + verifyData + //
+                ",datatypeHandling=" + datatypeHandling + //
                 "}";
     }
 
