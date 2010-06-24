@@ -34,6 +34,7 @@ import java.io.Reader;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -51,6 +52,8 @@ import org.openrdf.rio.helpers.RDFParserBase;
 import org.semanticweb.yars.nx.Node;
 import org.semanticweb.yars.nx.parser.NxParser;
 
+import com.bigdata.rawstore.Bytes;
+
 /**
  * A wrapper for an {@link NxParser} which implements the {@link RDFParser}
  * interface. Instances of this class are not thread safe.
@@ -61,6 +64,9 @@ import org.semanticweb.yars.nx.parser.NxParser;
  * FIXME Write some unit tests for this integration.
  */
 public class NQuadsParser extends RDFParserBase implements RDFParser  {
+
+    final protected transient static Logger log = Logger
+            .getLogger(NQuadsParser.class);
 
     /**
      * The nquads RDF format.
@@ -171,6 +177,10 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
      * 
      * @todo Verify that this does/does not respect the RIO preseveBlankNodes
      *       option.
+     * 
+     *       FIXME LEXICON_REFACTOR This is automatically dropping long literals
+     *       and logs an error when it does so. We should provide an option to
+     *       allow/disallow them and store them appropriately.
      */
     public void parse(Reader r, String baseUriIsIgnored) throws IOException,
             RDFParseException, RDFHandlerException {
@@ -237,10 +247,24 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
             } else if (nodes[2] instanceof org.semanticweb.yars.nx.BNode) {
                 o = f.createBNode(nodes[2].toString());
             } else if (nodes[2] instanceof org.semanticweb.yars.nx.Literal) {
+                final org.semanticweb.yars.nx.Literal tmp = (org.semanticweb.yars.nx.Literal) nodes[2];
+                final int len = tmp.getData().length();
+                if (len > (Bytes.kilobyte32 * 64)) {
+                    log
+                            .error("Dropping statement with long literal: length="
+                                    + len
+                                    + (tmp.getDatatype() != null ? ",datatype="
+                                            + tmp.getDatatype() : "")
+                                    + ", begins=["
+                                    + tmp
+                                            .getData()
+                                            .substring(0/* beginIndex */, 100/* endIndex */));
+                    continue;
+                }
                 o = f.createLiteral(nodes[2].toString());
             } else
                 throw new RuntimeException();
-
+            
             // c
             if (nodes.length > 3) {
                 if (nodes[3] instanceof org.semanticweb.yars.nx.Resource) {
