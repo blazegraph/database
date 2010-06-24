@@ -2050,6 +2050,9 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      */
     final protected void documentDone(final R resource) {
 
+        if (!lock.isHeldByCurrentThread())
+            throw new IllegalMonitorStateException();
+        
         try {
             
             final Runnable task = newSuccessTask(resource);
@@ -2057,7 +2060,12 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             if (task != null) {
 
                 // increment before we submit the task.
-                guardLatch_notify.inc();
+//                lock.lock();
+//                try {
+                    guardLatch_notify.inc();
+//                } finally {
+//                    lock.unlock();
+//                }
                 try {
 
                     // queue up success notice.
@@ -2079,12 +2087,12 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                 } catch (RejectedExecutionException ex) {
                     // decrement latch since tasks did not run.
-                    lock.lock();
-                    try {
+//                    lock.lock();
+//                    try {
                         guardLatch_notify.dec();
-                    } finally {
-                        lock.unlock();
-                    }
+//                    } finally {
+//                        lock.unlock();
+//                    }
                     // rethrow exception (will be logged below).
                     throw ex;
                 }
@@ -2093,7 +2101,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             
         } catch (Throwable t) {
 
-            log.error(t,t);
+            // Log @ ERROR and ignore.
+            log.error(t, t);
             
         }
 
@@ -3865,12 +3874,13 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                                 .addAndGet(toldTriplesThisDocument);
                         outstandingStatementCount
                                 .addAndGet(-toldTriplesThisDocument);
-                    } finally {
-
-                        lock.unlock();
 
                         // notify that the document is done.
                         documentDone(getDocumentIdentifier());
+                        
+                    } finally {
+
+                        lock.unlock();
 
                     }
 
