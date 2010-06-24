@@ -512,7 +512,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             /*
              * Subclass's options.
              */
-            toString(new StringBuilder());
+            toString(sb);
 
             sb.append("}");
 
