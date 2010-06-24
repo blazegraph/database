@@ -425,6 +425,10 @@ V extends Serializable//
             in.defaultReadObject();
             final String tmp = (String) in.readObject();
             rdfFormat = tmp == null ? null : RDFFormat.valueOf(tmp);
+
+            // FIXME remove this line.
+            log.error("rdfFormat=" + rdfFormat);
+
         }
 
         @Override
@@ -570,7 +574,12 @@ V extends Serializable//
 
                 if (tmp != null) {
 
+                    NQuadsParser.forceLoad();
+
                     rdfFormat = RDFFormat.valueOf(tmp);
+
+                    // FIXME remove this line.
+                    log.error("rdfFormat=" + rdfFormat);
 
                 }
 
