@@ -69,6 +69,14 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
             .getLogger(NQuadsParser.class);
 
     /**
+     * This hook may be used to force the load of this class so it can register
+     * the {@link #nquads} {@link RDFFormat} and the parser.
+     */
+    static public void forceLoad() {
+
+    }
+    
+    /**
      * The nquads RDF format.
      * <p>
      * The file extension <code>.nq</code> is recommended for N-Quads documents.
@@ -79,26 +87,28 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
      * 
      * @see http://sw.deri.org/2008/07/n-quads/
      */
-    static public final RDFFormat nquads = new RDFFormat(
-            // format name.
-            "nquads",
-            // registered mime types.
-            Arrays.asList(new String[] {"text/x-nquads"}), //
-            Charset.forName("US-ASCII"), // charset
-            // file extensions
-            Arrays.asList(new String[]{".nq"}),
-            true, // supportsNamespaces,
-            true // supportsContexts
-    );
+    static public final RDFFormat nquads;
 
     /**
      * Register an {@link RDFFormat} for the {@link NxParser} to handle nquads.
      * 
      * @todo These things should be registered automatically using META-INF per
-     *       the openrdf javadoc.
+     *       the openrdf javadoc.  For now, use {@link #forceLoad()}.
      */
     static {
 
+        nquads = new RDFFormat(
+                // format name.
+                "nquads",
+                // registered mime types.
+                Arrays.asList(new String[] {"text/x-nquads"}), //
+                Charset.forName("US-ASCII"), // charset
+                // file extensions
+                Arrays.asList(new String[]{".nq"}),
+                true, // supportsNamespaces,
+                true // supportsContexts
+        );
+        
         // register the nquads format.
         RDFFormat.register(nquads);
 

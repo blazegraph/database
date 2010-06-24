@@ -61,11 +61,7 @@ public class BasicRioLoader implements IRioLoader {
     static {
 
         // Force the load of the NXParser integration.
-        try {
-            Class.forName(NQuadsParser.class.getName());
-        } catch (ClassNotFoundException e) {
-            log.error(e);
-        }
+        NQuadsParser.forceLoad();
         
     }
     

@@ -256,11 +256,14 @@ V extends Serializable//
         /**
          * When the {@link RDFFormat} of a resource is not evident, assume that
          * it is the format specified by this value (default
-         * {@value #DEFAULT_RDF_FORMAT}).
+         * {@value #DEFAULT_RDF_FORMAT}). The value is one of the {@link String}
+         * values of the known {@link RDFFormat}s, including
+         * {@link NQuadsParser#nquads}. It may be null, in which case there is
+         * no default.
          */
         String RDF_FORMAT = "rdfFormat";
 
-        RDFFormat DEFAULT_RDF_FORMAT = RDFFormat.RDFXML;
+        String DEFAULT_RDF_FORMAT = RDFFormat.RDFXML.toString();
 
 //        /**
 //         * The maximum #of times an attempt will be made to load any given file.
@@ -407,12 +410,8 @@ V extends Serializable//
         static {
 
             // Force the load of the NXParser integration.
-            try {
-                Class.forName(NQuadsParser.class.getName());
-            } catch (ClassNotFoundException e) {
-                log.error(e);
-            }
-            
+            NQuadsParser.forceLoad();
+
         }
 
         private void writeObject(final ObjectOutputStream out)
@@ -563,9 +562,19 @@ V extends Serializable//
                     ConfigurationOptions.PARSER_OPTIONS,
                     RDFParserOptions.class, new RDFParserOptions());
 
-            rdfFormat = (RDFFormat) config.getEntry(component,
-                    ConfigurationOptions.RDF_FORMAT, RDFFormat.class,
-                    ConfigurationOptions.DEFAULT_RDF_FORMAT);
+            {
+
+                final String tmp = (String) config.getEntry(component,
+                        ConfigurationOptions.RDF_FORMAT, String.class,
+                        ConfigurationOptions.DEFAULT_RDF_FORMAT.toString());
+
+                if (tmp != null) {
+
+                    rdfFormat = RDFFormat.valueOf(tmp);
+
+                }
+
+            }
 
             rejectedExecutionDelay = (Long) config.getEntry(
                     component,
