@@ -189,7 +189,7 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
      *       option.
      * 
      *       FIXME LEXICON_REFACTOR This is automatically dropping long literals
-     *       and logs an error when it does so. We should provide an option to
+     *       and logs an warning when it does so. We should provide an option to
      *       allow/disallow them and store them appropriately.
      */
     public void parse(Reader r, String baseUriIsIgnored) throws IOException,
@@ -261,11 +261,11 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
                 final int len = tmp.getData().length();
                 if (len > (Bytes.kilobyte32 * 64)) {
                     log
-                            .error("Dropping statement with long literal: length="
+                            .warn("Dropping statement with long literal: length="
                                     + len
                                     + (tmp.getDatatype() != null ? ",datatype="
                                             + tmp.getDatatype() : "")
-                                    + ", begins=["
+                                    + ", begins="
                                     + tmp
                                             .getData()
                                             .substring(0/* beginIndex */, 100/* endIndex */));
