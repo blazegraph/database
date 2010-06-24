@@ -485,7 +485,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         buffer_id2t = ((IScaleOutClientIndex) lexiconRelation.getId2TermIndex())
                 .newWriteBuffer(
                         null/* resultHandler */,
-                        null, // FIXME restore duplicate remover new DefaultDuplicateRemover<BigdataValue>(true/* testRefs */),
+                        new DefaultDuplicateRemover<BigdataValue>(true/* testRefs */),
                         Id2TermWriteProcConstructor.INSTANCE);
 
         if (buffer_text != null) {
@@ -540,7 +540,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                     .newWriteBuffer(
                             keyOrder.isPrimaryIndex() ? statementResultHandler
                                     : null,
-                            null,// FIXME restore duplicate remover. new DefaultDuplicateRemover<ISPO>(true/* testRefs */),
+                            new DefaultDuplicateRemover<ISPO>(true/* testRefs */),
                             SPOIndexWriteProc.IndexWriteProcConstructor.INSTANCE);
             
             e.setValue(buffer);
