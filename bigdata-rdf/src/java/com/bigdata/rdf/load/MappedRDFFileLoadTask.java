@@ -222,7 +222,7 @@ implements Serializable {
                     jobState.producerChunkSize,//
                     jobState.valuesInitialCapacity,//
                     jobState.bnodesInitialCapacity,//
-                    jobState.getFallbackRDFFormat(), // 
+                    jobState.getRDFFormat(), // 
                     parserOptions,//
                     false, // deleteAfter is handled by the master!
                     jobState.parserPoolSize, //  

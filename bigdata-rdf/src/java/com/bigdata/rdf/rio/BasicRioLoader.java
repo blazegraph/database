@@ -55,6 +55,8 @@ public class BasicRioLoader implements IRioLoader {
 
     /**
      * Force the load of the NxParser integration class.
+     * 
+     * @todo Should be done via META-INFO.
      */
     static {
 
