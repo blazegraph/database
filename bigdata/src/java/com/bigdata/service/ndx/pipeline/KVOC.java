@@ -53,10 +53,18 @@ public class KVOC<O> extends KVOList<O> {
      * original value has been successfully written onto an index partition.
      */
     @Override
+    /*
+     * @todo This is now synchronized on the same monitor as the super class
+     * (KVOList) which wants mutex semantics for add(o) and done(). I am not
+     * sure if this is necessary. It is being done in an attempt to track
+     * down a client stall related to a hang waiting on the inner Lock for
+     * the tidsLatch in AsynchronousStatementBufferFactory.
+     */
+    synchronized//
     public void done() {
 
         super.done();
-        
+
         latch.dec();
 
     }
