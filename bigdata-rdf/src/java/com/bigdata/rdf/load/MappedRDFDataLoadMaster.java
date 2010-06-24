@@ -416,18 +416,31 @@ V extends Serializable//
 
         private void writeObject(final ObjectOutputStream out)
                 throws IOException {
+            
             out.defaultWriteObject();
-            out.writeObject(rdfFormat == null ? null : rdfFormat.toString());
+            
+            out.writeObject(rdfFormat == null ? null : rdfFormat.getName());
+            
         }
 
         private void readObject(final ObjectInputStream in) throws IOException,
                 ClassNotFoundException {
-            in.defaultReadObject();
-            final String tmp = (String) in.readObject();
-            rdfFormat = tmp == null ? null : RDFFormat.valueOf(tmp);
 
-            // FIXME remove this line.
-            log.error("rdfFormat=" + rdfFormat);
+            in.defaultReadObject();
+
+            final String tmp = (String) in.readObject();
+
+            if (tmp != null) {
+
+                rdfFormat = RDFFormat.valueOf(tmp);
+
+                if (rdfFormat == null) {
+                    
+                    log.error("Could not resolve RDFFormat: name=" + tmp);
+                    
+                }
+                
+            }
 
         }
 
@@ -578,8 +591,11 @@ V extends Serializable//
 
                     rdfFormat = RDFFormat.valueOf(tmp);
 
-                    // FIXME remove this line.
-                    log.error("rdfFormat=" + rdfFormat);
+                    if (rdfFormat == null) {
+
+                        log.error("Could not resolve RDFFormat: name=" + tmp);
+                        
+                    }
 
                 }
 
