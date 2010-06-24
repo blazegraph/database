@@ -1327,10 +1327,13 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         );
         
         if (rdfFormat == null) {
+            
+            final String msg = "Could not determine interchange syntax - skipping : file="
+                    + resource;
 
-            throw new RuntimeException(
-                    "Could not determine interchange syntax - skipping : file="
-                            + resource);
+            log.error(msg);
+            
+            throw new RuntimeException(msg);
 
         }
 
