@@ -477,7 +477,10 @@ implements Serializable {
                 /*
                  * The client was not able to process this resource.
                  */
-                
+                // @todo additional logging since (per below) getNotifyProxy() log error not found.
+                log.error(ex.getMessage() + ", locator=" + locator
+                        + ", resource=" + resource);
+                // @todo I am not finding getNotifyProxy() errors in the log. Why?
                 getNotifyProxy().error(resource, locator, ex);
                 
             }
