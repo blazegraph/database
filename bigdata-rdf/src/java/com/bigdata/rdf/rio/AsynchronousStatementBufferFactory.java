@@ -657,6 +657,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         
         otherWriterService.shutdownNow();
 
+        notifyService.shutdownNow();
+
         if (serviceStatisticsTask != null) {
             
             serviceStatisticsTask.cancel();
@@ -2074,7 +2076,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                             try {
                                 task.run();
                             } finally {
-                                lock.lock();
+                                lock.lock(); // acquire latch w/in task.
                                 try {
                                     // decrement after the task is done.
                                     guardLatch_notify.dec();
@@ -2120,7 +2122,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      */
     final protected void documentError(final R resource, final Throwable t) {
 
-        assert lock.isHeldByCurrentThread();
+        if (!lock.isHeldByCurrentThread()) throw new IllegalMonitorStateException();
 
         documentErrorCount.incrementAndGet();
 
@@ -2152,7 +2154,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                             try {
                                 task.run();
                             } finally {
-                                lock.lock();
+                                lock.lock(); // acquire latch w/in task.
                                 try {
                                     // decrement after the task is done.
                                     guardLatch_notify.dec();
@@ -2165,12 +2167,12 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                 } catch (RejectedExecutionException ex) {
                     // decrement latch since tasks did not run.
-                    lock.lock();
-                    try {
+//                    lock.lock();
+//                    try {
                         guardLatch_notify.dec();
-                    } finally {
-                        lock.unlock();
-                    }
+//                    } finally {
+//                        lock.unlock();
+//                    }
                     // rethrow exception (will be logged below).
                     throw ex;
                 }

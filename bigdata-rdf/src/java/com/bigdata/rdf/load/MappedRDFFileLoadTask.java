@@ -71,7 +71,7 @@ implements Serializable {
     protected final S jobState;
 
     protected final L locator;
-    
+
     /**
      * Instantiated by {@link #call()} on the {@link IRemoteExecutor} service.
      * This is volatile because it is used by some methods which do not obtain
@@ -244,6 +244,14 @@ implements Serializable {
                 protected Runnable newSuccessTask(final V resource) {
                     return new Runnable() {
                         public void run() {
+                            if(isDone) {
+                                /*
+                                 * Rather than attempting RMI back to the
+                                 * master, this is a NOP if the master was
+                                 * cancelled.
+                                 */
+                                return;
+                            }
                             try {
                                 getNotifyProxy().success(resource, locator);
                             } catch (Throwable ex) {
@@ -258,6 +266,14 @@ implements Serializable {
                         final Throwable cause) {
                     return new Runnable() {
                         public void run() {
+                            if(isDone) {
+                                /*
+                                 * Rather than attempting RMI back to the
+                                 * master, this is a NOP if the master was
+                                 * cancelled.
+                                 */
+                                return;
+                            }
                             try {
                                 getNotifyProxy()
                                         .error(resource, locator, cause);
@@ -321,7 +337,7 @@ implements Serializable {
             ready.signalAll();
 
             if (log.isInfoEnabled())
-                log.info("ready: "+toString());
+                log.info("ready: " + toString());
             
         } finally {
 
@@ -333,10 +349,10 @@ implements Serializable {
     
     public Void call() throws Exception {
 
-        setUp();
-        
         try {
 
+            setUp();
+            
             /*
              * Wait until either (a) interrupted by the master using
              * Future#cancel(); or (b) the master invokes close(), indicating
@@ -349,6 +365,8 @@ implements Serializable {
                     if (log.isInfoEnabled())
                         log.info("done: " + toString());
                 }
+            } catch (InterruptedException ex) {
+                log.warn("Cancelled: " + toString());
             } finally {
                 // set flag in case interrupted.
                 isDone = true;
@@ -357,11 +375,13 @@ implements Serializable {
 
         } finally {
 
-            try {
-                statementBufferFactory
-                        .cancelAll(true/* mayInterruptIfRunning */);
-            } catch (Throwable t2) {
-                log.warn(this, t2);
+            if (statementBufferFactory != null) {
+                try {
+                    statementBufferFactory
+                            .cancelAll(true/* mayInterruptIfRunning */);
+                } catch (Throwable t2) {
+                    log.warn(this, t2);
+                }
             }
 
             if (log.isInfoEnabled())
@@ -477,9 +497,11 @@ implements Serializable {
                 /*
                  * The client was not able to process this resource.
                  */
+
                 // @todo additional logging since (per below) getNotifyProxy() log error not found.
                 log.error(ex.getMessage() + ", locator=" + locator
                         + ", resource=" + resource);
+                
                 // @todo I am not finding getNotifyProxy() errors in the log. Why?
                 getNotifyProxy().error(resource, locator, ex);
                 
