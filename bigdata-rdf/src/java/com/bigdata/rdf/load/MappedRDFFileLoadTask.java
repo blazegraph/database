@@ -366,7 +366,8 @@ implements Serializable {
                         log.info("done: " + toString());
                 }
             } catch (InterruptedException ex) {
-                log.warn("Cancelled: " + toString());
+                // @todo change to WARN.
+                log.error("Client cancelled by interrupt: " + toString());
             } finally {
                 // set flag in case interrupted.
                 isDone = true;
