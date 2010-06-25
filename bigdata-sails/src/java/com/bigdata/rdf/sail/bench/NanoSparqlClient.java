@@ -547,8 +547,8 @@ public class NanoSparqlClient {
 
                     if (opts.verbose)
                         System.err.println("timeout: "
-                                + (opts.timeout == 0 ? "infinite" : ""
-                                        + opts.timeout) + "ms");
+                                + (opts.timeout == 0 ? "infinite" : (""
+                                        + opts.timeout + "ms")));
 
 				} else if (arg.equals("-help") || arg.equals("--?")) {
 
