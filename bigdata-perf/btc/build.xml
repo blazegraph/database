@@ -27,7 +27,7 @@
 			<arg line="
 				Splitter.config
 			" />
-			<jvmarg line="-server -xMx1g" />
+			<jvmarg line="-server -Xmx1g" />
 			<classpath>
 				<path refid="runtime.classpath" />
 			</classpath>
