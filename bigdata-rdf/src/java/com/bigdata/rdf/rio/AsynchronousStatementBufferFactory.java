@@ -1321,8 +1321,9 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             log.info("resource=" + resourceStr);
         
         final RDFFormat defaultFormat = getDefaultRDFFormat();
-
-        // @todo when resource is URL use reported MimeTYPE also.
+        /* @todo This might be ignorant of .gz and .zip extensions.
+         * @todo when resource is URL use reported MimeTYPE also.
+         */
         final RDFFormat rdfFormat = (defaultFormat == null //
                 ? RDFFormat.forFileName(resourceStr) //
                 : RDFFormat.forFileName(resourceStr, defaultFormat)//

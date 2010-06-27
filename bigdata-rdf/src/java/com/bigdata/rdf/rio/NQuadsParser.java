@@ -104,7 +104,7 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
                 Arrays.asList(new String[] {"text/x-nquads"}), //
                 Charset.forName("US-ASCII"), // charset
                 // file extensions
-                Arrays.asList(new String[]{".nq"}),
+                Arrays.asList(new String[]{"nq"}),
                 true, // supportsNamespaces,
                 true // supportsContexts
         );
