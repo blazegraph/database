@@ -21,7 +21,19 @@
 
 	<target name="prepare">
 	</target>
-	
+
+	<target name="run-split" depends="" description="Splits RDF files.">
+		<java classname="com.bigdata.rdf.util.Splitter" fork="true" failonerror="true">
+			<arg line="
+				Splitter.config
+			" />
+			<jvmarg line="-server -xMx1g" />
+			<classpath>
+				<path refid="runtime.classpath" />
+			</classpath>
+		</java>
+	</target>
+
 	<!-- Note: For scale-out, split the data files and use MappedRDFDataLoadMaster. -->
 	<target name="run-load" depends="clean, prepare">
 		<java classname="com.bigdata.rdf.store.DataLoader" fork="true" failonerror="true">
