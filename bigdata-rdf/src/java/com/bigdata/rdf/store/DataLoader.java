@@ -51,9 +51,12 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.inf.TruthMaintenance;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.load.IStatementBufferFactory;
 import com.bigdata.rdf.rio.LoadStats;
+import com.bigdata.rdf.rio.NQuadsParser;
 import com.bigdata.rdf.rio.PresortRioLoader;
+import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.rio.RioLoaderEvent;
 import com.bigdata.rdf.rio.RioLoaderListener;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -67,21 +70,15 @@ import com.bigdata.rdf.spo.SPO;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo It should be easier to configure the underlying parsers in order to
- *       enable or disable various features which they support, e.g., preserving
- *       BNode IDs, validation, etc.
  */
 public class DataLoader {
 
     /**
      * Logger.
      */
-    protected static final Logger log = Logger.getLogger(DataLoader.class);
+    protected static final transient Logger log = Logger.getLogger(DataLoader.class);
 
-//    protected static final boolean INFO = log.isInfoEnabled();
-
-    private final boolean verifyData;
+    private final RDFParserOptions parserOptions;
 
     /**
      * The {@link StatementBuffer} capacity.
@@ -127,7 +124,7 @@ public class DataLoader {
      * 
      * @see #getAssertionBuffer()
      */
-    private StatementBuffer buffer;
+    private StatementBuffer<?> buffer;
     
     /**
      * Return the assertion buffer.
@@ -156,7 +153,7 @@ public class DataLoader {
      *       where the appropriate factory is required for TM vs non-TM
      *       scenarios (or where the factory is parameterize for tm vs non-TM).
      */
-    synchronized protected StatementBuffer getAssertionBuffer() {
+    synchronized protected StatementBuffer<?> getAssertionBuffer() {
 
         if (buffer == null) {
 
@@ -328,47 +325,45 @@ public class DataLoader {
         None;
         
     }
-    
+
     /**
      * Options for the {@link DataLoader}.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * Note: The default for {@link RDFParserOptions.Options#PRESERVE_BNODE_IDS}
+     * is conditionally overridden when
+     * {@link LexiconRelation#isStoreBlankNodes()} is <code>true</code>.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
      * @version $Id$
      */
-    public static interface Options {
-        
-        /**
-         * Optional boolean property may be used to turn on data verification in
-         * the RIO parser (default is <code>false</code>).
-         */
-        public static final String VERIFY_DATA = DataLoader.class.getName()+".verifyData";
-        
-        public static final String DEFAULT_VERIFY_DATA = "false";
-        
+    public static interface Options extends RDFParserOptions.Options {
+
         /**
          * Optional property specifying whether and when the {@link DataLoader}
          * will {@link ITripleStore#commit()} the database (default
-         * {@link CommitEnum#Batch}).
+         * {@value CommitEnum#Batch}).
          * <p>
          * Note: commit semantics vary depending on the specific backing store.
          * See {@link ITripleStore#commit()}.
          */
-        public static final String COMMIT = DataLoader.class.getName()+".commit";
+        String COMMIT = DataLoader.class.getName()+".commit";
         
-        public static final String DEFAULT_COMMIT = CommitEnum.Batch.toString();
+        String DEFAULT_COMMIT = CommitEnum.Batch.toString();
 
         /**
          * Optional property specifying the capacity of the
-         * {@link StatementBuffer} (default is 100k statements).
+         * {@link StatementBuffer} (default is {@value #DEFAULT_BUFFER_CAPACITY}
+         * statements).
          */
-        public static final String BUFFER_CAPACITY = DataLoader.class.getName()+".bufferCapacity";
+        String BUFFER_CAPACITY = DataLoader.class.getName()+".bufferCapacity";
         
-        public static final String DEFAULT_BUFFER_CAPACITY = "100000";
+        String DEFAULT_BUFFER_CAPACITY = "100000";
 
         /**
          * Optional property controls whether and when the RDFS(+) closure is
          * maintained on the database as documents are loaded (default
-         * {@link ClosureEnum#Batch).
+         * {@value ClosureEnum#Batch}).
          * <p>
          * Note: The {@link InferenceEngine} supports a variety of options. When
          * closure is enabled, the caller's {@link Properties} will be used to
@@ -385,19 +380,18 @@ public class DataLoader {
          * @see InferenceEngine
          * @see InferenceEngine.Options
          */
-        public static final String CLOSURE = DataLoader.class.getName()+".closure";
+        String CLOSURE = DataLoader.class.getName()+".closure";
         
-        public static final String DEFAULT_CLOSURE = ClosureEnum.Batch.toString();
-        
+        String DEFAULT_CLOSURE = ClosureEnum.Batch.toString();
+
         /**
          * 
-         * When <code>true</code> (the default) the {@link StatementBuffer} is
-         * flushed by each
+         * When <code>true</code> the {@link StatementBuffer} is flushed by each
          * {@link DataLoader#loadData(String, String, RDFFormat)} or
          * {@link DataLoader#loadData(String[], String[], RDFFormat[])}
          * operation and when {@link DataLoader#doClosure()} is requested. When
          * <code>false</code> the caller is responsible for flushing the
-         * {@link #buffer}.
+         * {@link #buffer}. The default is {@value #DEFAULT_FLUSH}.
          * <p>
          * This behavior MAY be disabled if you want to chain load a bunch of
          * small documents without flushing to the backing store after each
@@ -414,15 +408,15 @@ public class DataLoader {
          * <strong>This feature is most useful when blank nodes are not in use,
          * but it causes memory to grow when blank nodes are in use and forces
          * statements using blank nodes to be deferred until the application
-         * flushes the {@link DataLoader} when statement identifiers are enabled.
-         * </strong>
+         * flushes the {@link DataLoader} when statement identifiers are
+         * enabled. </strong>
          */
-        public static final String FLUSH = DataLoader.class.getName()+".flush";
+        String FLUSH = DataLoader.class.getName()+".flush";
         
         /**
          * The default value (<code>true</code>) for {@link #FLUSH}.
          */
-        public static final String DEFAULT_FLUSH = "true";
+        String DEFAULT_FLUSH = "true";
         
     }
 
@@ -457,12 +451,27 @@ public class DataLoader {
         if (database == null)
             throw new IllegalArgumentException();
 
-        verifyData = Boolean.parseBoolean(properties.getProperty(
-                Options.VERIFY_DATA, Options.DEFAULT_VERIFY_DATA));
+        // setup the parser options.
+        {
+            
+            this.parserOptions = new RDFParserOptions(properties);
 
-        if (log.isInfoEnabled())
-            log.info(Options.VERIFY_DATA + "=" + verifyData);
+            if ((properties.getProperty(Options.PRESERVE_BNODE_IDS) == null)
+                    && database.getLexiconRelation().isStoreBlankNodes()) {
 
+                /*
+                 * Note: preserveBNodeIDs is overridden based on whether or not
+                 * the target is storing the blank node identifiers (unless the
+                 * property was explicitly set - this amounts to a conditional
+                 * default).
+                 */
+
+                parserOptions.setPreserveBNodeIDs(true);
+
+            }
+
+        }
+        
         commitEnum = CommitEnum.valueOf(properties.getProperty(Options.COMMIT,
                 Options.DEFAULT_COMMIT));
 
@@ -997,12 +1006,12 @@ public class DataLoader {
             
             if(source instanceof Reader) {
                 
-                loader.loadRdf((Reader) source, baseURL, rdfFormat, verifyData);
+                loader.loadRdf((Reader) source, baseURL, rdfFormat, parserOptions);
 
             } else if (source instanceof InputStream) {
 
                 loader.loadRdf((InputStream) source, baseURL, rdfFormat,
-                        verifyData);
+                        parserOptions);
 
             } else
                 throw new AssertionError();
@@ -1190,27 +1199,37 @@ public class DataLoader {
         // default namespace.
         String namespace = "kb";
         boolean doClosure = false;
+        RDFFormat rdfFormat = null;
+        String baseURI = null;
         
         int i = 0;
 
         while (i < args.length) {
             
             final String arg = args[i];
-            
-            if(arg.startsWith("-")) {
-                
-                if(arg.equals("-namespace")) {
-                    
+
+            if (arg.startsWith("-")) {
+
+                if (arg.equals("-namespace")) {
+
                     namespace = args[++i];
-                
-                } else if(arg.equals("-closure")) {
-                        
-                	doClosure = true;
-                    
+
+                } else if (arg.equals("-format")) {
+
+                    rdfFormat = RDFFormat.valueOf(args[++i]);
+
+                } else if (arg.equals("-baseURI")) {
+
+                    baseURI = args[++i];
+
+                } else if (arg.equals("-closure")) {
+
+                    doClosure = true;
+
                 } else {
-                    
+
                     System.err.println("Unknown argument: " + arg);
-                    
+
                     usage();
                     
                 }
@@ -1254,16 +1273,44 @@ public class DataLoader {
                     is.close();
                 }
             }
-			if (System.getProperty(com.bigdata.journal.Options.FILE) != null) {
-				// Override/set from the environment.
-				final String file = System
-						.getProperty(com.bigdata.journal.Options.FILE);
-				System.out.println("Using: " + com.bigdata.journal.Options.FILE
-						+ "=" + file);
-                properties.setProperty(com.bigdata.journal.Options.FILE, file);
-            }
+//			if (System.getProperty(com.bigdata.journal.Options.FILE) != null) {
+//				// Override/set from the environment.
+//				final String file = System
+//						.getProperty(com.bigdata.journal.Options.FILE);
+//				System.out.println("Using: " + com.bigdata.journal.Options.FILE
+//						+ "=" + file);
+//                properties.setProperty(com.bigdata.journal.Options.FILE, file);
+//            }
         }
 
+        /*
+         * Allow override of select options.
+         */
+        {
+            final String[] overrides = new String[] {
+                    // Journal options.
+                    com.bigdata.journal.Options.FILE,
+                    // RDFParserOptions.
+                    RDFParserOptions.Options.DATATYPE_HANDLING,
+                    RDFParserOptions.Options.PRESERVE_BNODE_IDS,
+                    RDFParserOptions.Options.STOP_AT_FIRST_ERROR,
+                    RDFParserOptions.Options.VERIFY_DATA,
+                    // DataLoader options.
+                    DataLoader.Options.BUFFER_CAPACITY,
+                    DataLoader.Options.CLOSURE,
+                    DataLoader.Options.COMMIT,
+                    DataLoader.Options.FLUSH,
+            };
+            for (String s : overrides) {
+                if (System.getProperty(s) != null) {
+                    // Override/set from the environment.
+                    final String v = System.getProperty(s);
+                    System.out.println("Using: " + s + "=" + v);
+                    properties.setProperty(s, v);
+                }
+            }
+        }
+        
         final List<File> files = new LinkedList<File>();
         while(i<args.length) {
             
@@ -1310,11 +1357,11 @@ public class DataLoader {
             for (File fileOrDir : files) {
 
 //                dataLoader.loadFiles(fileOrDir, null/* baseURI */,
-//                        null/* rdfFormat */, filter);
+//                        rdfFormat, filter);
 
-				dataLoader.loadFiles(totals, 0/* depth */, fileOrDir,
-						null/* baseURI */, null/* rdfFormat */, filter, true/* endOfBatch */
-				);
+                dataLoader.loadFiles(totals, 0/* depth */, fileOrDir, baseURI,
+                        rdfFormat, filter, true/* endOfBatch */
+                );
 
             }
             
@@ -1409,4 +1456,14 @@ public class DataLoader {
 
     };
 
+    /**
+     * Force the load of the NxParser integration class.
+     */
+    static {
+
+        // Force the load of the NXParser integration.
+        NQuadsParser.forceLoad();
+        
+    }
+    
 }

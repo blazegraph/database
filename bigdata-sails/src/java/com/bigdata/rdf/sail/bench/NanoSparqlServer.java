@@ -40,21 +40,26 @@ import java.io.PipedOutputStream;
 import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Date;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Properties;
+import java.util.TreeMap;
 import java.util.Vector;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
-import org.openrdf.query.parser.ParsedQuery;
 import org.openrdf.query.parser.QueryParser;
 import org.openrdf.query.parser.sparql.SPARQLParserFactory;
 import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLWriter;
@@ -63,6 +68,7 @@ import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.LRUNexus;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
@@ -70,7 +76,6 @@ import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
 import com.bigdata.rdf.sail.BigdataSailRepository;
@@ -91,10 +96,17 @@ import com.bigdata.util.httpd.NanoHTTPD;
  *       parameters, in the property file, as request headers, or as query hints
  *       using the PREFIX mechanism.
  * 
+ * @todo Make each namespace available at <code>/namespace?query=...</code>?
+ * 
  * @todo Allow timestamp for server reads as protocol parameter (URL query
  *       parameter or header).
  * 
- * @todo Add an "EXPLAIN" query type and show the execution plan and costs.
+ * @todo Add an "?explain" URL query parameter and show the execution plan and
+ *       costs (or make this a navigable option from the set of running queries
+ *       to drill into their running costs and offer an opportunity to kill them
+ *       as well).
+ * 
+ * @todo Add command to kill a running query.
  * 
  * @todo Add command to drop the LRUNexus cache.
  */
@@ -121,10 +133,15 @@ public class NanoSparqlServer extends AbstractHTTPD {
 	 */
     static private final String charset = "UTF-8";
     
-	/**
+    /**
+     * The target Sail.
+     */
+    private final BigdataSail sail;
+
+    /**
 	 * The target repository.
 	 */
-	final BigdataSailRepository repo;
+	private final BigdataSailRepository repo;
 
 	/**
 	 * @todo use to decide ASK, DESCRIBE, CONSTRUCT, SELECT, EXPLAIN, etc.
@@ -136,27 +153,53 @@ public class NanoSparqlServer extends AbstractHTTPD {
      */
     private final ExecutorService queryService;
 
-	public NanoSparqlServer(final int port, final String namespace,
+    /**
+     * Metadata about running queries.
+     */
+    private static class RunningQuery {
+    	/** The unique identifier for this query. */
+    	final long queryId;
+    	/** The query. */
+    	final String query;
+    	/** The timestamp when the query was accepted (ns). */
+    	final long begin;
+    	public RunningQuery(long queryId,String query,long begin) {
+    		this.queryId = queryId;
+    		this.query = query;
+    		this.begin = begin;
+    	}
+    }
+
+    /**
+     * The currently executing queries (does not include queries where a client
+     * has established a connection but the query is not running because the
+     * {@link #queryService} is blocking).
+     */
+    private final ConcurrentHashMap<Long,RunningQuery> queries = new ConcurrentHashMap<Long,RunningQuery>();
+
+    /**
+     * Factory for the query identifiers.
+     */
+    private final AtomicLong queryIdFactory = new AtomicLong(); 
+    
+	public NanoSparqlServer(final Config config,
 			final IIndexManager indexManager) throws IOException,
 			SailException, RepositoryException {
 
-		super(port);
+		super(config.port);
 
 		// resolve the kb instance of interest.
 		final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
-				.getResourceLocator().locate(namespace, ITx.UNISOLATED);
+				.getResourceLocator().locate(config.namespace, ITx.UNISOLATED);
 
 		if (tripleStore == null) {
 
-			throw new RuntimeException("No such kb: " + namespace);
+			throw new RuntimeException("No such kb: " + config.namespace);
 
 		}
 		
 		// since the kb exists, wrap it as a sail.
-		final BigdataSail sail = new BigdataSail(tripleStore);
-
-		// Log some information about the kb (#of statements, etc).
-		System.out.println(getKBInfo(sail)); // @todo log @ info?
+		sail = new BigdataSail(tripleStore);
 
 		repo = new BigdataSailRepository(sail);
 		repo.initialize();
@@ -164,10 +207,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		// used to parse qeries.
         engine = new SPARQLParserFactory().getParser();
 
-        // @todo parameter and configuration of same.
-        final int requestServicePoolSize = 0;
-
-        if (requestServicePoolSize == 0) {
+        if (config.queryThreadPoolSize == 0) {
 
             queryService = (ThreadPoolExecutor) Executors
                     .newCachedThreadPool(new DaemonThreadFactory
@@ -176,7 +216,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
         } else {
 
             queryService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-                    requestServicePoolSize, new DaemonThreadFactory
+                    config.queryThreadPoolSize, new DaemonThreadFactory
                     (getClass().getName()+".queryService"));
 
         }
@@ -185,8 +225,12 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
     /**
      * Return various interesting metadata about the KB state.
+     * 
+     * @todo The range counts can take some time if the cluster is heavily
+     *       loaded since they must query each shard for the primary statement
+     *       index and the TERM2ID index.
      */
-	protected StringBuilder getKBInfo(final BigdataSail sail) {
+	protected StringBuilder getKBInfo() {
 
 		final StringBuilder sb = new StringBuilder();
 
@@ -216,7 +260,16 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
 			sb.append("literalCount\t = " + tripleStore.getLiteralCount() + "\n");
 
-			sb.append("bnodeCount\t = " + tripleStore.getBNodeCount() + "\n");
+            /*
+             * Note: The blank node count is only available when using the told
+             * bnodes mode.
+             */
+            sb
+                    .append("bnodeCount\t = "
+                            + (tripleStore.getLexiconRelation()
+                                    .isStoreBlankNodes() ? ""
+                                    + tripleStore.getBNodeCount() : "N/A")
+                            + "\n");
 
 			sb.append(IndexMetadata.Options.BTREE_BRANCHING_FACTOR
 					+ "="
@@ -250,24 +303,6 @@ public class NanoSparqlServer extends AbstractHTTPD {
 				sb.append("nextOffset\t= "
 						+ jnl.getRootBlockView().getNextOffset() + "\n");
 
-				/*
-				 * @todo The rest of this is all metadata that is only
-				 * interesting after the server has been running for a while.
-				 * It could be issued in response to a STATUS message.
-				 */
-				
-//				if (LRUNexus.INSTANCE != null)
-//					sb.append(LRUNexus.INSTANCE.toString() + "\n");
-				
-				// if (false) {
-				//
-				// // show the disk access details.
-				//
-				// sb.append(((Journal) sail.getDatabase().getIndexManager())
-				// .getBufferStrategy().getCounters().toString());
-				//
-				// }
-
 			}
 
 			// sb.append(tripleStore.predicateUsage());
@@ -283,7 +318,14 @@ public class NanoSparqlServer extends AbstractHTTPD {
     }
     
     synchronized public void shutdown() {
-    	queryService.shutdown();
+        System.err.println("Normal shutdown.");
+        queryService.shutdown();
+        try {
+            System.err.println("Awaiting termination of running queries.");
+            queryService.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
+        } catch (InterruptedException ex) {
+            throw new RuntimeException(ex);
+        }
     	super.shutdown();
 		synchronized (alive) {
 			alive.set(false);
@@ -292,14 +334,30 @@ public class NanoSparqlServer extends AbstractHTTPD {
     }
 
     synchronized public void shutdownNow() {
+        System.err.println("Immediate shutdown");
+        // interrupt all running queries.
     	queryService.shutdownNow();
+        /*
+         * Wait a moment for any running queries to close their query
+         * connections.
+         */
+        try {
+            Thread.sleep(1000/* ms */);
+        } catch (InterruptedException ex) {
+            // ignore 
+        }
     	super.shutdown();
 		synchronized (alive) {
 			alive.set(false);
 			alive.notifyAll();
 		}
     }
-    
+
+    /**
+     * Note: This uses an atomic boolean in order to give us a synchronization
+     * object whose state also serves as a condition variable. findbugs objects,
+     * but this is a deliberate usage.
+     */
     private final AtomicBoolean alive = new AtomicBoolean(true);
 
 //    @Override
@@ -337,7 +395,11 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		
 		if("/stop".equals(uri)) {
 
-			queryService.execute(new Runnable() {
+            /*
+             * Create a new thread to run shutdown since we do not want this to
+             * block on the queryService.
+             */
+			final Thread t = new Thread(new Runnable() {
 				public void run() {
 					System.err.println("Will shutdown.");
 					try {
@@ -354,9 +416,18 @@ public class NanoSparqlServer extends AbstractHTTPD {
 				}
 			});
 
+			t.setDaemon(true);
+			
+			// Start the shutdown thread.
+			t.start();
+			
 //			// Shutdown.
 //			shutdown();
-//			// Note: Client probably will not see this response.
+
+            /*
+             * Note: Client probably might not see this response since the
+             * shutdown thread may have already terminated the httpd service.
+             */
 			return new Response(HTTP_OK, MIME_TEXT_PLAIN, "Shutting down.");
 
 		}
@@ -381,11 +452,158 @@ public class NanoSparqlServer extends AbstractHTTPD {
 			log.info("params=" + params);
 		}
 
+		if (uri == null || uri.length() == 0) {
+
+			return doQuery(uri, method, header, params);
+
+		}
+		
+		if("/status".equals(uri)) {
+			
+			return doStatus(uri, method, header, params);
+			
+		}
+		
+		return new Response(HTTP_NOTFOUND, MIME_TEXT_PLAIN, uri);
+		
+	}
+
+	/**
+	 * Respond to a status request.
+	 * 
+	 * @param uri
+	 * @param method
+	 * @param header
+	 * @param params
+	 * @return
+	 * @throws Exception
+	 */
+	public Response doStatus(final String uri, final String method,
+			final Properties header,
+			final LinkedHashMap<String, Vector<String>> params) throws Exception {
+
+        final boolean showQueries = params.get("showQueries") != null;
+
+        final boolean showKBInfo = params.get("showKBInfo") != null;
+
+        final StringBuilder sb = new StringBuilder();
+
+        sb.append("Accepted query count=" + queryIdFactory.get() + "\n");
+
+        sb.append("Running query count=" + queries.size() + "\n");
+
+        if (showKBInfo) {
+
+            // General information on the connected kb.
+            sb.append(getKBInfo());
+
+        }
+		
+		if (repo.getDatabase().getIndexManager() instanceof IJournal) {
+
+	        /*
+	         * Stuff which is specific to a local/embedded database.
+	         */
+
+			final AbstractJournal jnl = (AbstractJournal) repo.getDatabase()
+					.getIndexManager();
+
+			if (LRUNexus.INSTANCE != null) {
+
+				sb.append(LRUNexus.Options.CLASS + "="
+						+ LRUNexus.INSTANCE.toString().getClass() + "\n");
+
+				sb.append(LRUNexus.INSTANCE.toString() + "\n");
+
+			} else {
+				
+				sb.append("LRUNexus is disabled.");
+				
+			}
+
+			// show the disk access details.
+
+			sb.append(jnl.getBufferStrategy().getCounters().toString()+"\n\n");
+
+		}
+		
+		if(showQueries) {
+		    
+		    /*
+		     * Show the queries which are currently executing.
+		     */
+			
+			final long now = System.nanoTime();
+			
+			final TreeMap<Long, RunningQuery> ages = new TreeMap<Long, RunningQuery>();
+			
+			{
+
+				final Iterator<RunningQuery> itr = queries.values().iterator();
+
+				while (itr.hasNext()) {
+
+					final RunningQuery query = itr.next();
+
+					final long age = now - query.begin;
+
+					ages.put(age, query);
+
+				}
+
+			}
+
+			{
+
+				final Iterator<RunningQuery> itr = ages.values().iterator();
+
+				while (itr.hasNext()) {
+
+					final RunningQuery query = itr.next();
+
+					final long age = now - query.begin;
+
+					sb.append("age="
+							+ java.util.concurrent.TimeUnit.NANOSECONDS
+									.toMillis(age) + "ms, queryId="
+							+ query.queryId + ", query=" + query.query+"\n");
+
+				}
+
+			}
+			
+		}
+		
+		return new Response(HTTP_OK, MIME_TEXT_PLAIN, sb.toString());
+
+	}
+	
+	/**
+	 * Answer a SPARQL query.
+	 * 
+	 * @param uri
+	 * @param method
+	 * @param header
+	 * @param params
+	 * @return
+	 * @throws Exception
+	 */
+	public Response doQuery(final String uri, final String method,
+			final Properties header,
+			final LinkedHashMap<String, Vector<String>> params) throws Exception {
+
 		final String queryStr = params.get("query").get(0);
+
+		if (queryStr == null) {
+
+			return new Response(HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+					"Specify query using ?query=....");
+
+		}
 
 		if (log.isInfoEnabled())
 			log.info("query: " + queryStr);
-
+		
 		/*
 		 * Setup pipes. The [os] will be passed into the task that executes the
 		 * query. The [is] will be passed into the Response. The task is
@@ -401,9 +619,6 @@ public class NanoSparqlServer extends AbstractHTTPD {
 				os));
 		try {
 
-			// Begin executing the query (asynchronous).
-			queryService.execute(ft);
-			
 			// Choose an appropriate MIME type.
 			final String mimeType;
 			final QueryType queryType = QueryType.fromQuery(queryStr);
@@ -420,6 +635,9 @@ public class NanoSparqlServer extends AbstractHTTPD {
 				throw new RuntimeException("Unknown query type: "+queryType);
 			}
 
+			// Begin executing the query (asynchronous).
+			queryService.execute(ft);
+			
 			// Setup the response.
 			final Response r = new Response(HTTP_OK, mimeType + "; charset='"
 					+ charset + "'", is);
@@ -505,14 +723,17 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		 * position of having to parse the query here and then again when it is
 		 * executed.
 		 */
-		final ParsedQuery q = engine.parseQuery(queryStr, null/*baseURI*/);
+		/*final ParsedQuery q =*/ engine.parseQuery(queryStr, null/*baseURI*/);
 
 		final NanoSparqlClient.QueryType queryType = NanoSparqlClient.QueryType
 				.fromQuery(queryStr);
 
 		switch (queryType) {
-		//case ASK:
-		// @todo ASK as boolean - which task to run?
+		case ASK:
+			/*
+			 * FIXME handle ASK.
+			 */
+			break;
 		case DESCRIBE:
 		case CONSTRUCT:
 			return new GraphQueryTask(queryStr, os);
@@ -536,9 +757,13 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
     }
 
-	/**
-	 * Executes a tuple query.
-	 */
+    /**
+     * Executes a tuple query.
+     * 
+     * @todo Extract a base class which handles the timing, pipe, reporting,
+     *       obtains the connection, and provides the finally {} semantics for
+     *       each type of query task.
+     */
 	private class TupleQueryTask implements Callable<Void> {
 
 		private final String queryStr;
@@ -552,8 +777,11 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		}
 
 		public Void call() throws Exception {
+			final Long queryId = Long.valueOf(queryIdFactory.incrementAndGet());
 			final SailRepositoryConnection cxn = getQueryConnection();
 			try {
+				final long begin = System.nanoTime();
+				queries.put(queryId, new RunningQuery(queryId.longValue(), queryStr, begin));
 				final TupleQuery query = cxn.prepareTupleQuery(
 						QueryLanguage.SPARQL, queryStr);
 				query.evaluate(new SPARQLResultsXMLWriter(new XMLWriter(os)));
@@ -563,7 +791,11 @@ public class NanoSparqlServer extends AbstractHTTPD {
 				// launder and rethrow the exception.
 				throw launderThrowable(t,os);
 			} finally {
-				cxn.close();
+				try {
+					cxn.close();
+				} finally {
+					queries.remove(queryId);
+				}
 			}
 		}
 
@@ -585,22 +817,24 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		}
 
 		public Void call() throws Exception {
+			final Long queryId = Long.valueOf(queryIdFactory.incrementAndGet());
 			final SailRepositoryConnection cxn = getQueryConnection();
 			try {
+				final long begin = System.nanoTime();
+				queries.put(queryId, new RunningQuery(queryId.longValue(), queryStr, begin));
 				final BigdataSailGraphQuery query = (BigdataSailGraphQuery) cxn
 						.prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
-				/*
-				 * FIXME BSBM constructs statements with values not actually in
-				 * the database, which breaks the native construct iterator.
-				 */
-				query.setUseNativeConstruct(false);
 				query.evaluate(new RDFXMLWriter(os));
 				os.close();
 				return null;
 			} catch (Throwable t) {
 				throw launderThrowable(t, os);
 			} finally {
-				cxn.close();
+				try {
+					cxn.close();
+				} finally {
+					queries.remove(queryId);
+				}
 			}
 		}
 	
@@ -617,7 +851,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 	 * even though the shutdown request was accepted and processed by the server.  I'm not
 	 * sure why. 
 	 */
-	public static void sendStop(int port) throws IOException {
+	public static void sendStop(final int port) throws IOException {
 		
 		final URL url = new URL("http://localhost:" + port+"/stop");
 		HttpURLConnection conn = null;
@@ -668,19 +902,45 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
 	}
 	
+    /**
+     * Configuration object.
+     */
+    private static class Config {
+
+		/**
+		 * The port on which the server will answer requests.
+		 */
+		public int port;
+		
+		/**
+		 * The namespace of the KB instance.
+		 */
+		public String namespace;
+    	
+    	/**
+		 * The #of threads to use to handle SPARQL queries -or- ZERO (0) for an
+		 * unbounded pool.
+		 */
+    	public int queryThreadPoolSize = 8;
+
+    	public Config() {
+    	}
+    	
+    }
+    
 	private static void usage() {
 		
 		System.err.println("port (-stop | <i>namespace</i> (propertyFile|configFile) )");
 		
 	}
-	
+
 	/**
 	 * Run an httpd service exposing a SPARQL endpoint. The service will respond
 	 * at the root path for the specified port.
 	 * 
 	 * @param args
-	 *            USAGE:
-	 *            <code>port (-stop | <i>namespace</i> (propertyFile|configFile) )</code>
+	 *            USAGE: <code>port -stop</code> to stop the server; OR<br/>
+	 *            <code>(options) <i>namespace</i> (propertyFile|configFile) )</code>
 	 *            where
 	 *            <dl>
 	 *            <dt>port</dt>
@@ -689,35 +949,56 @@ public class NanoSparqlServer extends AbstractHTTPD {
 	 *            <dd>The namespace of the target KB instance ("kb" is the
 	 *            default namespace).</dd>
 	 *            <dt>propertyFile</dt>
-	 *            <dd>A java properties file for a standalone {@link Journal}</dd>
+	 *            <dd>A java properties file for a standalone {@link Journal}.</dd>
 	 *            <dt>configFile</dt>
-	 *            <dd>A jini configuration file for a bigdata federation</dd>
+	 *            <dd>A jini configuration file for a bigdata federation.</dd>
 	 *            </dl>
-	 * 
-	 * @todo introduce "-jnl" or "-fed" options to specify the standalone
-	 *       journal or a jini federation?
+	 *            and <i>options</i> are any of:
+	 *            <dl>
+	 *            <dt>-nthreads</dt>
+	 *            <dd>The #of threads which will be used to answer SPARQL queries.</dd>
+	 *            <dt></dt>
+	 *            <dd></dd>
+	 *            <dt></dt>
+	 *            <dd></dd>
+	 *            <dt></dt>
+	 *            <dd></dd>
+	 *            <dt></dt>
+	 *            <dd></dd>
+	 *            <dt></dt>
+	 *            <dd></dd>
+	 *            </dl>
 	 */
 	public static void main(final String[] args) {
-		int port = 80;
+		final Config config = new Config();
+		config.port = 80;
 		Journal jnl = null;
 		JiniClient<?> jiniClient = null;
 		NanoSparqlServer server = null;
 		try {
+			/*
+			 * `
+			 * modify the rest of this to handle additional options, which get
+			 * set on [config].
+			 */
 			if (args.length == 2) {
-				port = Integer.valueOf(args[0]);
+				final int port = Integer.valueOf(args[0]);
 				if("-stop".equals(args[1])) {
 					// Send stop to server.
 					sendStop(port);
 					// Normal exit.
 					System.exit(0);
+				} else {
+					usage();
+					System.exit(1);
 				}
 			}
 			if (args.length != 3) {
 				usage();
 				System.exit(1);
 			}
-			port = Integer.valueOf(args[0]);
-			final String namespace = args[1];
+			config.port = Integer.valueOf(args[0]);
+			config.namespace = args[1];
 			final String propertyFile = args[2];
 			final File file = new File(propertyFile);
 			if (!file.exists()) {
@@ -740,8 +1021,8 @@ public class NanoSparqlServer extends AbstractHTTPD {
 								+ file);
 				System.exit(1);
 			}
-			System.out.println("port: " + port);
-			System.out.println("namespace: " + namespace);
+			System.out.println("port: " + config.port);
+			System.out.println("namespace: " + config.namespace);
 			System.out.println("file: " + file.getAbsoluteFile());
 
 			/*
@@ -792,7 +1073,41 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
 			}
 
-			server = new NanoSparqlServer(port, namespace, indexManager);
+			// start the server.
+			server = new NanoSparqlServer(config, indexManager);
+
+            /*
+             * Install a shutdown hook so that the master will cancel any
+             * running clients if it is interrupted (normal kill will trigger
+             * this hook).
+             */
+            {
+                
+                final NanoSparqlServer tmp = server;
+                
+                Runtime.getRuntime().addShutdownHook(new Thread() {
+
+                    public void run() {
+
+                        tmp.shutdownNow();
+
+                        System.err.println("Caught signal, shutting down: "
+                                + new Date());
+
+                    }
+
+                });
+
+            }
+
+            System.out.println("Service is running.");
+
+            if (true) { // @todo if(!quiet) or if(verbose)
+                /*
+                 * Log some information about the kb (#of statements, etc).
+                 */
+                System.out.println(server.getKBInfo());
+            }
 
 			/*
 			 * Wait until the server is terminated.
@@ -809,7 +1124,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
 			}
 
-		} catch (Exception ex) {
+		} catch (Throwable ex) {
 			ex.printStackTrace();
 		} finally {
 			if (server != null)

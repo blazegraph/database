@@ -547,10 +547,15 @@ public class NanoHTTPD implements IServiceShutdown
 				if ( is == null) return;
 				final BufferedReader in = new BufferedReader( new InputStreamReader( is ));
 
-				// Read the request line
-				final StringTokenizer st = new StringTokenizer( in.readLine());
-				if ( !st.hasMoreTokens())
-					sendError( HTTP_BADREQUEST, "BAD REQUEST: Syntax error. Usage: GET /example/file.html" );
+                // Read the request line
+                final String requestLine = in.readLine();
+                if (requestLine == null)
+                    sendError(HTTP_BADREQUEST, "BAD REQUEST: Syntax error. Usage: GET /example/file.html");
+
+                // Tokenize the request line.
+                final StringTokenizer st = new StringTokenizer( requestLine );
+                if ( !st.hasMoreTokens())
+                    sendError( HTTP_BADREQUEST, "BAD REQUEST: Syntax error. Usage: GET /example/file.html" );
 
 				final String method = st.nextToken();
 

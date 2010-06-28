@@ -29,7 +29,7 @@ public class QueueSizeMovingAverageTask extends MovingAverageTask implements Run
      * @param queue
      *            The queue to be monitored.
      */
-    public QueueSizeMovingAverageTask(String name, BlockingQueue queue) {
+    public QueueSizeMovingAverageTask(String name, BlockingQueue<?> queue) {
 
         this(name, queue, DEFAULT_WEIGHT);
 
@@ -46,7 +46,7 @@ public class QueueSizeMovingAverageTask extends MovingAverageTask implements Run
      *            The weight to be used by
      *            {@link #getMovingAverage(double, double, double)}
      */
-    public QueueSizeMovingAverageTask(final String name, final BlockingQueue queue,
+    public QueueSizeMovingAverageTask(final String name, final BlockingQueue<?> queue,
             final double w) {
 
         super(name, new Callable<Integer>() {

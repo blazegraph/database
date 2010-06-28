@@ -799,7 +799,8 @@ public class LRUNexus {
 
             if (BigdataStatics.debug || log.isInfoEnabled()) {
 
-                final String msg = s.toString();
+                final String msg = s.enabled ? s.toString()
+                        : "LRUNexus is disabled";
 
                 if (BigdataStatics.debug)
                     System.err.println(msg);

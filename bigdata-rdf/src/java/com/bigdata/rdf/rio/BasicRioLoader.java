@@ -28,14 +28,14 @@ import java.io.Reader;
 import java.util.Iterator;
 import java.util.Vector;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.Rio;
-
-import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
  * Parses data but does not load it into the indices.
@@ -45,7 +45,26 @@ import com.bigdata.rdf.model.BigdataValueFactory;
  */
 public class BasicRioLoader implements IRioLoader {
 
-    long stmtsAdded;
+    /**
+     * Note: This logger was historically associated with the {@link IRioLoader}
+     * interface and it is still named for that interface.
+     */
+    protected static final transient Logger log = Logger
+            .getLogger(IRioLoader.class);
+
+    /**
+     * Force the load of the NxParser integration class.
+     * 
+     * @todo Should be done via META-INFO.
+     */
+    static {
+
+        // Force the load of the NXParser integration.
+        NQuadsParser.forceLoad();
+        
+    }
+    
+    public long stmtsAdded;
     
     long insertTime;
     
@@ -53,9 +72,9 @@ public class BasicRioLoader implements IRioLoader {
     
     Vector<RioLoaderListener> listeners;
 
-    private final BigdataValueFactory valueFactory;
+    private final ValueFactory valueFactory;
     
-    public BasicRioLoader(BigdataValueFactory valueFactory) {
+    public BasicRioLoader(final ValueFactory valueFactory) {
         
         if (valueFactory == null)
             throw new IllegalArgumentException();
@@ -82,7 +101,7 @@ public class BasicRioLoader implements IRioLoader {
         
     }
 
-    final public void addRioLoaderListener( RioLoaderListener l ) {
+    final public void addRioLoaderListener( final RioLoaderListener l ) {
         
         if ( listeners == null ) {
             
@@ -94,17 +113,18 @@ public class BasicRioLoader implements IRioLoader {
         
     }
     
-    final public void removeRioLoaderListener( RioLoaderListener l ) {
+    final public void removeRioLoaderListener( final RioLoaderListener l ) {
         
         listeners.remove( l );
         
     }
     
     final protected void notifyListeners() {
-        
-        if(listeners==null) return;
-        
-        RioLoaderEvent e = new RioLoaderEvent
+
+        if (listeners == null)
+            return;
+
+        final RioLoaderEvent e = new RioLoaderEvent
             ( stmtsAdded,
               System.currentTimeMillis() - insertStart
               );
@@ -123,10 +143,8 @@ public class BasicRioLoader implements IRioLoader {
      * constructor.
      * 
      * @return The parser.
-     * 
-     * @todo reuse parser instances for the same {@link RDFFormat}?
      */
-    final protected RDFParser getParser(RDFFormat rdfFormat) {
+    final protected RDFParser getParser(final RDFFormat rdfFormat) {
 
         final RDFParser parser = Rio.createParser(rdfFormat, valueFactory);
         
@@ -134,17 +152,19 @@ public class BasicRioLoader implements IRioLoader {
 
     }
 
-    final public void loadRdf(InputStream is, String baseURI,
-            RDFFormat rdfFormat, boolean verifyData) throws Exception {
+    final public void loadRdf(final InputStream is, final String baseURI,
+            final RDFFormat rdfFormat, final RDFParserOptions options)
+            throws Exception {
 
-        loadRdf2(is, baseURI, rdfFormat, verifyData);
+        loadRdf2(is, baseURI, rdfFormat, options);
         
     }
     
-    final public void loadRdf(Reader reader, String baseURI,
-            RDFFormat rdfFormat, boolean verifyData) throws Exception {
-        
-        loadRdf2(reader, baseURI, rdfFormat, verifyData);
+    final public void loadRdf(final Reader reader, final String baseURI,
+            final RDFFormat rdfFormat, final RDFParserOptions options)
+            throws Exception {
+
+        loadRdf2(reader, baseURI, rdfFormat, options);
         
     }
 
@@ -155,13 +175,14 @@ public class BasicRioLoader implements IRioLoader {
      *            A {@link Reader} or {@link InputStream}.
      * @param baseURI
      * @param rdfFormat
-     * @param verifyData
+     * @param options
      * 
      * @throws Exception
      */
-    protected void loadRdf2(Object source, String baseURI,
-            RDFFormat rdfFormat, boolean verifyData) throws Exception {
-        
+    protected void loadRdf2(final Object source, final String baseURI,
+            final RDFFormat rdfFormat, final RDFParserOptions options)
+            throws Exception {
+
         if (source == null)
             throw new IllegalArgumentException();
 
@@ -171,16 +192,18 @@ public class BasicRioLoader implements IRioLoader {
             
         }
 
-        if (INFO)
-            log.info("format=" + rdfFormat + ", verify=" + verifyData);
+        if (options == null)
+            throw new IllegalArgumentException();
+
+        if (log.isInfoEnabled())
+            log.info("format=" + rdfFormat + ", options=" + options);
         
         final RDFParser parser = getParser(rdfFormat);
+
+        // apply options to the parser
+        options.apply(parser);
         
-        // FIXME it should be easier to configure these features on the underlying RIO parser.
-//        parser.setPreserveBNodeIDs(true);
-        
-        parser.setVerifyData( verifyData );
-        
+        // set the handler from the factory.
         parser.setRDFHandler( newRDFHandler() );
     
         // Note: reset to that rates reflect load times not clock times.
@@ -209,7 +232,7 @@ public class BasicRioLoader implements IRioLoader {
 
             insertTime = System.currentTimeMillis() - insertStart;
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("parse complete: elapsed=" + insertTime
                         + "ms, toldTriples=" + stmtsAdded + ", tps="
                         + getInsertRate());

@@ -1,5 +1,6 @@
 package com.bigdata.util.concurrent;
 
+import java.util.Queue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -8,12 +9,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
-import com.bigdata.journal.AbstractTask;
-import com.bigdata.journal.WriteExecutorService;
-import com.bigdata.util.concurrent.IQueueCounters.ITaskCounters;
 import com.bigdata.util.concurrent.IQueueCounters.IThreadPoolExecutorCounters;
-import com.bigdata.util.concurrent.IQueueCounters.IThreadPoolExecutorTaskCounters;
-import com.bigdata.util.concurrent.IQueueCounters.IWriteServiceExecutorCounters;
 
 /**
  * Class tracks a variety of information about a {@link ThreadPoolExecutor}

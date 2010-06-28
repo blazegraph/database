@@ -1,5 +1,9 @@
 package com.bigdata.rdf.load;
 
+import info.aduna.concurrent.locks.Lock;
+
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.rmi.RemoteException;
 import java.util.concurrent.ExecutionException;
@@ -13,6 +17,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.rdf.load.MappedRDFDataLoadMaster.JobState;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.rio.AsynchronousStatementBufferFactory;
+import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.IRemoteExecutor;
@@ -52,51 +57,94 @@ implements Serializable {
     final protected transient static Logger log = Logger
             .getLogger(MappedRDFFileLoadTask.class);
 
+//    /**
+//     * The original version.
+//     */
+//    private static final long serialVersionUID = 6787939197771556658L;
+
     /**
-     * 
+     * This version added {@link #isDone} and made the {@link Lock},
+     * {@link #allDone} and {@link #ready} part of the serialized state.
      */
-    private static final long serialVersionUID = 6787939197771556658L;
+    private static final long serialVersionUID = 2L;
 
     protected final S jobState;
 
     protected final L locator;
-    
+
     /**
      * Instantiated by {@link #call()} on the {@link IRemoteExecutor} service.
+     * This is volatile because it is used by some methods which do not obtain
+     * the {@link #lock}.
      */
-    private transient AsynchronousStatementBufferFactory<BigdataStatement,V> statementBufferFactory;
+    private transient volatile AsynchronousStatementBufferFactory<BigdataStatement,V> statementBufferFactory;
 
     /**
-     * Note: transient field set by {@link #call()}. 
+     * Lock used to protect the condition variables {@link #isReady} and
+     * {@link #isDone}.
+     * <p>
+     * Note: This field is set by {@link #readObject(ObjectInputStream)} on
+     * deserialization. It is volatile to ensure visibility of the field value.
      */
-    private transient ReentrantLock lock;
+    private transient volatile ReentrantLock lock;
 
     /**
-     * Condition signaled when done.
+     * Condition signaled when {@link #isDone}.
      * <p>
-     * Note: transient field set by {@link #call()}.
+     * Note: This field is set by {@link #readObject(ObjectInputStream)} on
+     * deserialization. It is volatile to ensure visibility of the field value.
      */
-    private transient Condition allDone;
-    
+    private transient volatile Condition allDone;
+
     /**
-     * Condition signaled when ready.
+     * Condition signaled when {@link #isReady}.
      * <p>
-     * Note: transient field set by {@link #call()}.
+     * Note: This field is set by {@link #readObject(ObjectInputStream)} on
+     * deserialization. It is volatile to ensure visibility of the value set by
+     * {@link #readObject(ObjectInputStream)}.
      */
-    private transient Condition ready;
-    
+    private transient volatile Condition ready;
+
     /**
      * Flag set once {@link #call()} has initialized our transient state.
      * <p>
-     * Note: this flag is serialized so it is <code>false</code> before the
-     * methods on this class can be invoked using RMI, especially
-     * {@link #accept(Serializable[])}.
+     * Note: This field is set by {@link #readObject(ObjectInputStream)} on
+     * deserialization. It is volatile to ensure visibility of the value set by
+     * {@link #readObject(ObjectInputStream)}.
      */
-    private volatile boolean isReady = false;
+    private transient volatile boolean isReady;
     
+    /**
+     * Condition variable set when the task is done.
+     */
+    private transient volatile boolean isDone;
+
+    /**
+     * @todo This is here for debugging purposes (I am trying to track down a
+     *       problem where the client stops self-reporting performance counters
+     *       to the load balancer).
+     */
+    private transient volatile CounterSet counters;
+    
+    private void readObject(final ObjectInputStream in) throws IOException,
+            ClassNotFoundException {
+        in.defaultReadObject();
+        lock = new ReentrantLock();
+        allDone = lock.newCondition();
+        ready = lock.newCondition();
+        isReady = false;
+        isDone = false;
+    }
+
     public String toString() {
 
-        return getClass().getName() + "{clientNum=" + locator + "}";
+        return getClass().getName() + //
+                "{clientNum=" + locator + //
+                ",jobState=" + jobState + //
+                ",ready=" + isReady + //
+                ",done=" + isDone + //
+                ",counters=" + counters + //
+                "}";
 
     }
 
@@ -105,13 +153,16 @@ implements Serializable {
 
         super(notifyProxy);
 
+        if (jobState == null)
+            throw new IllegalArgumentException();
+
         if (locator == null)
             throw new IllegalArgumentException();
 
         this.jobState = jobState;
 
         this.locator = locator;
-
+        
     }
 
     /**
@@ -127,13 +178,16 @@ implements Serializable {
     protected void setUp() throws InterruptedException {
 
         // set transient fields.
-        lock = new ReentrantLock();
-        allDone = lock.newCondition();
-        ready = lock.newCondition();
+//        lock = new ReentrantLock();
+//        allDone = lock.newCondition();
+//        ready = lock.newCondition();
 
         lock.lockInterruptibly();
         try {
 
+            if (log.isInfoEnabled())
+                log.info(toString());
+            
             final AbstractTripleStore tripleStore = (AbstractTripleStore) getFederation()
                     .getResourceLocator().locate(jobState.namespace,
                             ITx.UNISOLATED);
@@ -145,13 +199,31 @@ implements Serializable {
 
             }
 
+            final RDFParserOptions parserOptions = jobState.parserOptions;
+            
+            if (tripleStore.getLexiconRelation().isStoreBlankNodes()
+                    && !parserOptions.getPreserveBNodeIDs()) {
+
+                /*
+                 * Override and enable preservation of blank nodes by the RDF
+                 * parser since we will be storing the node IDs in the database.
+                 */
+
+                parserOptions.setPreserveBNodeIDs(true);
+
+                log
+                        .warn("Overriding parser configuration to set preserveBNodeIDs true since the target stores blank node IDs: namespace="
+                                + tripleStore.getNamespace());
+
+            }
+
             statementBufferFactory = new AsynchronousStatementBufferFactory<BigdataStatement, V>(
                     (ScaleOutTripleStore) tripleStore,//
                     jobState.producerChunkSize,//
                     jobState.valuesInitialCapacity,//
                     jobState.bnodesInitialCapacity,//
-                    jobState.getFallbackRDFFormat(), // 
-                    jobState.parserValidates,//
+                    jobState.getRDFFormat(), // 
+                    parserOptions,//
                     false, // deleteAfter is handled by the master!
                     jobState.parserPoolSize, //  
                     jobState.parserQueueCapacity, // 
@@ -172,6 +244,14 @@ implements Serializable {
                 protected Runnable newSuccessTask(final V resource) {
                     return new Runnable() {
                         public void run() {
+                            if(isDone) {
+                                /*
+                                 * Rather than attempting RMI back to the
+                                 * master, this is a NOP if the master was
+                                 * cancelled.
+                                 */
+                                return;
+                            }
                             try {
                                 getNotifyProxy().success(resource, locator);
                             } catch (Throwable ex) {
@@ -186,6 +266,14 @@ implements Serializable {
                         final Throwable cause) {
                     return new Runnable() {
                         public void run() {
+                            if(isDone) {
+                                /*
+                                 * Rather than attempting RMI back to the
+                                 * master, this is a NOP if the master was
+                                 * cancelled.
+                                 */
+                                return;
+                            }
                             try {
                                 getNotifyProxy()
                                         .error(resource, locator, cause);
@@ -199,31 +287,13 @@ implements Serializable {
             };
 
             /*
-             * Update the flag and notify all blocked threads since they can now
-             * execute.
-             */
-            isReady = true;
-
-            ready.signalAll();
-
-        } finally {
-
-            lock.unlock();
-            
-        }
-        
-    }
-    
-    public Void call() throws Exception {
-
-        setUp();
-        
-        try {
-
-            /*
              * Add the counters to be reported to the client's counter set. The
              * added counters will be reported when the client reports its own
              * counters.
+             * 
+             * Note: This needs to be done before we signal [ready] since the
+             * job master may have already sent a chunk of resources our
+             * accept(chunk[]) method.
              */
             {
 
@@ -235,10 +305,53 @@ implements Serializable {
                 // Create path to counter set.
                 final CounterSet tmp = serviceRoot.makePath(relPath);
 
-                // Attach counters.
-                tmp
-                        .attach(statementBufferFactory.getCounters(), true/* replace */);
+                final CounterSet counters = statementBufferFactory
+                        .getCounters();
+
+//                if (log.isDebugEnabled())
+//                    log.debug("Attaching counters: locator=" + locator + " : "
+//                            + counters);
+
+                // Attach counters [the counters are MOVEd to tmp].
+                tmp.attach(counters, true/* replace */);
+
+                // Note reference to the current counters for log messages.
+                this.counters = tmp;
+
+//                if (log.isDebugEnabled())
+//                    log.debug("Attached counters: locator=" + locator + " :  "
+//                            + tmp);
+
+//                if (log.isDebugEnabled())
+//                    log.debug("Service counters : locator=" + locator + " : "
+//                            + serviceRoot.getPath(relPath));
+
             }
+
+            /*
+             * Update the flag and notify all blocked threads since they can now
+             * execute.
+             */
+            isReady = true;
+
+            ready.signalAll();
+
+            if (log.isInfoEnabled())
+                log.info("ready: " + toString());
+            
+        } finally {
+
+            lock.unlock();
+            
+        }
+        
+    }
+    
+    public Void call() throws Exception {
+
+        try {
+
+            setUp();
             
             /*
              * Wait until either (a) interrupted by the master using
@@ -247,24 +360,33 @@ implements Serializable {
              */
             lock.lockInterruptibly();
             try {
-                try {
+                while (!isDone) {
                     allDone.await();
-                } catch (InterruptedException ex) {
                     if (log.isInfoEnabled())
-                        log.info("Client will terminate.");
+                        log.info("done: " + toString());
                 }
+            } catch (InterruptedException ex) {
+                // @todo change to WARN.
+                log.error("Client cancelled by interrupt: " + toString());
             } finally {
+                // set flag in case interrupted.
+                isDone = true;
                 lock.unlock();
             }
 
         } finally {
 
-            try {
-                statementBufferFactory
-                        .cancelAll(true/* mayInterruptIfRunning */);
-            } catch (Throwable t2) {
-                log.warn(this, t2);
+            if (statementBufferFactory != null) {
+                try {
+                    statementBufferFactory
+                            .cancelAll(true/* mayInterruptIfRunning */);
+                } catch (Throwable t2) {
+                    log.warn(this, t2);
+                }
             }
+
+            if (log.isInfoEnabled())
+                log.info("Client terminated: " + toString());
 
         }
 
@@ -319,10 +441,13 @@ implements Serializable {
              * running on the remote executor service has been fully initialized
              * before we allow access to its methods other than call().
              */
-            if (!isReady) {
+            while (!isReady) {
 
                 // wait until ready.
                 ready.await();
+
+                if (log.isInfoEnabled())
+                    log.info("ready: " + toString());
 
             }
 
@@ -339,21 +464,31 @@ implements Serializable {
 
         awaitReady();
 
+        if (log.isDebugEnabled())
+            log.debug("accepting: " + chunk.length + " resources : "
+                    + toString());
+
         for (V resource : chunk) {
 
+            if (isDone)
+                throw new IllegalStateException("task done: " + toString());
+            
             try {
-                
+
                 /*
                  * Try to submit the resource for processing.
                  */
-                
+
+                if (log.isTraceEnabled())
+                    log.trace("locator=" + locator + ", resource=" + resource);
+
                 statementBufferFactory.submitOne(resource,
                         jobState.rejectedExecutionDelay);
                 
             } catch (InterruptedException ex) {
                 
                 /*
-                 * The client was interrupted.
+                 * The client was interrupted by the master (job cancellation).
                  */
                 
                 throw ex;
@@ -363,7 +498,12 @@ implements Serializable {
                 /*
                  * The client was not able to process this resource.
                  */
+
+                // @todo additional logging since (per below) getNotifyProxy() log error not found.
+                log.error(ex.getMessage() + ", locator=" + locator
+                        + ", resource=" + resource);
                 
+                // @todo I am not finding getNotifyProxy() errors in the log. Why?
                 getNotifyProxy().error(resource, locator, ex);
                 
             }
@@ -375,29 +515,47 @@ implements Serializable {
     public void close() throws RemoteException, InterruptedException {
 
         awaitReady();
-        
+
         lock.lockInterruptibly();
         try {
 
+            if (log.isInfoEnabled())
+                log.info("awaiting StatementBufferFactory: " + toString());
+
+            /*
+             * @todo Why is this done while holding the lock? It seems like this
+             * should be invoked without holding the lock unless the intention
+             * is to prevent concurrent calls to accept(chunk).
+             */
             statementBufferFactory.awaitAll();
 
             if (log.isInfoEnabled())
-                log.info("Done.");
+                log.info("StatementBufferFactory complete: " + toString());
 
-            /*
-             * Signal in case master did not interrupt the main thread in
-             * call().
-             */
-            allDone.signal();
-            
         } catch (ExecutionException ex) {
 
             throw new RuntimeException(ex);
-            
+
         } finally {
 
-            lock.unlock();
+            try {
+                /*
+                 * Set the condition variable and signal [allDone] in case
+                 * master did not interrupt the main thread in call().
+                 */
+                isDone = true;
+
+                allDone.signalAll();
+
+                if (log.isInfoEnabled())
+                    log.info("done: " + toString());
+
+            } finally {
             
+                lock.unlock();
+                
+            }
+
         }
 
     }

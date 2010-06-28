@@ -134,256 +134,101 @@
 
 	
 	
-	
+
 	<!-- This generates an osgi bundle jar, and does not bundled the dependencies.
 		 See 'bundleJar'. -->
 	<target name="osgi" depends="compile, bundle" description="Generates the osgi bundle jar (see also bundleJar).">
-		<jar destfile="${build.dir}/com.bigdata.source_${osgi.version}.jar">
-			<manifest>
-							<attribute name="Eclipse-SourceBundle" value='com.bigdata;version="${osgi.version}";roots="."'/>
-							<attribute name="Bundle-Vendor" value="Systap"/>
-							<attribute name="Bundle-Version" value="${build.ver.osgi}"/>
-							<attribute name="Bundle-ManifestVersion" value="2"/>
-							<attribute name="Bundle-SymbolicName" value="com.bigdata.source"/>
-							<attribute name="Bundle-DocURL" value="http://www.bigdata.com"/>
-							<attribute name="Bundle-Description" value="Bigdata Source"/>
-			</manifest>
-			<fileset dir="bigdata/src/java"/>
-				<fileset dir="bigdata/src/java" />
-				<fileset dir="bigdata-jini/src/java" />
-				<fileset dir="bigdata-rdf/src/java" />
-				<fileset dir="bigdata-sails/src/java" />
-				<fileset dir="lgpl-utils/src/java" />
-		</jar>
-		<jar destfile="${build.dir}/com.bigdata-${osgi.version}.jar">
-			<fileset dir="${build.dir}/classes"  />
-			<fileset dir="bigdata/LEGAL"  />
-			<zipfileset src="${build.dir}/lib/unimi/colt-1.2.0.jar"/>
-			<zipfileset src="${build.dir}/lib/unimi/fastutil-5.1.5.jar" />
-			<zipfileset src="${build.dir}/lib/ctc_utils-5-4-2005.jar" />
-			<zipfileset src="${build.dir}/lib/cweb-commons-1.1-b2-dev.jar" />
-			<zipfileset src="${build.dir}/lib/cweb-extser-0.1-b2-dev.jar" />
-			<zipfileset src="${build.dir}/lib/dsi-utils-1.0.6-020610.jar" />
-			<zipfileset src="${build.dir}/lib/iris-0.58.jar" />
-			<zipfileset src="${build.dir}/lib/lgpl-utils-1.0.6-020610.jar" />
-			<zipfileset src="${build.dir}/lib/high-scale-lib-v1.1.2.jar" />
-			
-			<manifest>
-				<attribute name="Bundle-Name" value="com.bigdata"/>
-				<attribute name="Bundle-Vendor" value="Systap"/>
-				<attribute name="Bundle-Version" value="${osgi.version}"/>
-				<attribute name="Bundle-ManifestVersion" value="2"/>
-				<attribute name="Bundle-SymbolicName" value="com.bigdata"/>
-				<attribute name="Bundle-DocURL" value="http://www.bigdata.com"/>
-				<attribute name="Bundle-Description" value="Bigdata API"/>
-				<attribute name="DynamicImport-Package" value="*"/>
-				<attribute name="Bundle-ClassPath" value="."/>
-				<attribute name="Export-Package" value='
-com.bigdata;version="${osgi.version}",
-com.bigdata.bfs;version="${osgi.version}",
-com.bigdata.btree;version="${osgi.version}",
-com.bigdata.btree.data;version="${osgi.version}",
-com.bigdata.btree.filter;version="${osgi.version}",
-com.bigdata.btree.isolation;version="${osgi.version}",
-com.bigdata.btree.keys;version="${osgi.version}",
-com.bigdata.btree.proc;version="${osgi.version}",
-com.bigdata.btree.raba;version="${osgi.version}",
-com.bigdata.btree.raba.codec;version="${osgi.version}",
-com.bigdata.btree.view;version="${osgi.version}",
-com.bigdata.cache;version="${osgi.version}",
-com.bigdata.concurrent;version="${osgi.version}",
-com.bigdata.config;version="${osgi.version}",
-com.bigdata.counters;version="${osgi.version}",
-com.bigdata.counters.httpd;version="${osgi.version}",
-com.bigdata.counters.linux;version="${osgi.version}",
-com.bigdata.counters.query;version="${osgi.version}",
-com.bigdata.counters.render;version="${osgi.version}",
-com.bigdata.counters.store;version="${osgi.version}",
-com.bigdata.counters.win;version="${osgi.version}",
-com.bigdata.gis;version="${osgi.version}",
-com.bigdata.io;version="${osgi.version}",
-com.bigdata.io.compression;version="${osgi.version}",
-com.bigdata.jini.lookup.entry;version="${osgi.version}",
-com.bigdata.jini.start;version="${osgi.version}",
-com.bigdata.jini.start.config;version="${osgi.version}",
-com.bigdata.jini.start.process;version="${osgi.version}",
-com.bigdata.jini.util;version="${osgi.version}",
-com.bigdata.journal;version="${osgi.version}",
-com.bigdata.mdi;version="${osgi.version}",
-com.bigdata.net;version="${osgi.version}",
-com.bigdata.rawstore;version="${osgi.version}",
-com.bigdata.rdf.axioms;version="${osgi.version}",
-com.bigdata.rdf.inf;version="${osgi.version}",
-com.bigdata.rdf.lexicon;version="${osgi.version}",
-com.bigdata.rdf.load;version="${osgi.version}",
-com.bigdata.rdf.magic;version="${osgi.version}",
-com.bigdata.rdf.model;version="${osgi.version}",
-com.bigdata.rdf.rio;version="${osgi.version}",
-com.bigdata.rdf.rules;version="${osgi.version}",
-com.bigdata.rdf.spo;version="${osgi.version}",
-com.bigdata.rdf.store;version="${osgi.version}",
-com.bigdata.rdf.vocab;version="${osgi.version}",
-com.bigdata.relation;version="${osgi.version}",
-com.bigdata.relation.accesspath;version="${osgi.version}",
-com.bigdata.relation.locator;version="${osgi.version}",
-com.bigdata.relation.rule;version="${osgi.version}",
-com.bigdata.relation.rule.eval;version="${osgi.version}",
-com.bigdata.relation.rule.eval.pipeline;version="${osgi.version}",
-com.bigdata.resources;version="${osgi.version}",
-com.bigdata.search;version="${osgi.version}",
-com.bigdata.service;version="${osgi.version}",
-com.bigdata.service.jini;version="${osgi.version}",
-com.bigdata.service.jini.benchmark;version="${osgi.version}",
-com.bigdata.service.jini.lookup;version="${osgi.version}",
-com.bigdata.service.jini.master;version="${osgi.version}",
-com.bigdata.service.jini.util;version="${osgi.version}",
-com.bigdata.service.mapred;version="${osgi.version}",
-com.bigdata.service.mapred.jini;version="${osgi.version}",
-com.bigdata.service.mapred.jobs;version="${osgi.version}",
-com.bigdata.service.mapred.tasks;version="${osgi.version}",
-com.bigdata.service.ndx;version="${osgi.version}",
-com.bigdata.service.ndx.pipeline;version="${osgi.version}",
-com.bigdata.service.proxy;version="${osgi.version}",
-com.bigdata.sparse;version="${osgi.version}",
-com.bigdata.striterator;version="${osgi.version}",
-com.bigdata.util;version="${osgi.version}",
-com.bigdata.util.concurrent;version="${osgi.version}",
-com.bigdata.util.httpd;version="${osgi.version}",
-com.bigdata.zookeeper;version="${osgi.version}",
-org.apache.system;version="${osgi.version}"'/>				
-				<attribute name="Import-Package" value='
-com.bigdata;version="${osgi.version}",
-com.bigdata.bfs;version="${osgi.version}",
-com.bigdata.btree;version="${osgi.version}",
-com.bigdata.btree.data;version="${osgi.version}",
-com.bigdata.btree.filter;version="${osgi.version}",
-com.bigdata.btree.isolation;version="${osgi.version}",
-com.bigdata.btree.keys;version="${osgi.version}",
-com.bigdata.btree.proc;version="${osgi.version}",
-com.bigdata.btree.raba;version="${osgi.version}",
-com.bigdata.btree.raba.codec;version="${osgi.version}",
-com.bigdata.btree.view;version="${osgi.version}",
-com.bigdata.cache;version="${osgi.version}",
-com.bigdata.concurrent;version="${osgi.version}",
-com.bigdata.config;version="${osgi.version}",
-com.bigdata.counters;version="${osgi.version}",
-com.bigdata.counters.httpd;version="${osgi.version}",
-com.bigdata.counters.linux;version="${osgi.version}",
-com.bigdata.counters.query;version="${osgi.version}",
-com.bigdata.counters.render;version="${osgi.version}",
-com.bigdata.counters.store;version="${osgi.version}",
-com.bigdata.counters.win;version="${osgi.version}",
-com.bigdata.gis;version="${osgi.version}",
-com.bigdata.io;version="${osgi.version}",
-com.bigdata.io.compression;version="${osgi.version}",
-com.bigdata.jini.lookup.entry;version="${osgi.version}",
-com.bigdata.jini.start;version="${osgi.version}",
-com.bigdata.jini.start.config;version="${osgi.version}",
-com.bigdata.jini.start.process;version="${osgi.version}",
-com.bigdata.jini.util;version="${osgi.version}",
-com.bigdata.journal;version="${osgi.version}",
-com.bigdata.mdi;version="${osgi.version}",
-com.bigdata.net;version="${osgi.version}",
-com.bigdata.rawstore;version="${osgi.version}",
-com.bigdata.rdf.axioms;version="${osgi.version}",
-com.bigdata.rdf.inf;version="${osgi.version}",
-com.bigdata.rdf.lexicon;version="${osgi.version}",
-com.bigdata.rdf.load;version="${osgi.version}",
-com.bigdata.rdf.magic;version="${osgi.version}",
-com.bigdata.rdf.model;version="${osgi.version}",
-com.bigdata.rdf.rio;version="${osgi.version}",
-com.bigdata.rdf.rules;version="${osgi.version}",
-com.bigdata.rdf.spo;version="${osgi.version}",
-com.bigdata.rdf.store;version="${osgi.version}",
-com.bigdata.rdf.vocab;version="${osgi.version}",
-com.bigdata.relation;version="${osgi.version}",
-com.bigdata.relation.accesspath;version="${osgi.version}",
-com.bigdata.relation.locator;version="${osgi.version}",
-com.bigdata.relation.rule;version="${osgi.version}",
-com.bigdata.relation.rule.eval;version="${osgi.version}",
-com.bigdata.relation.rule.eval.pipeline;version="${osgi.version}",
-com.bigdata.resources;version="${osgi.version}",
-com.bigdata.search;version="${osgi.version}",
-com.bigdata.service;version="${osgi.version}",
-com.bigdata.service.jini;version="${osgi.version}",
-com.bigdata.service.jini.benchmark;version="${osgi.version}",
-com.bigdata.service.jini.lookup;version="${osgi.version}",
-com.bigdata.service.jini.master;version="${osgi.version}",
-com.bigdata.service.jini.util;version="${osgi.version}",
-com.bigdata.service.mapred;version="${osgi.version}",
-com.bigdata.service.mapred.jini;version="${osgi.version}",
-com.bigdata.service.mapred.jobs;version="${osgi.version}",
-com.bigdata.service.mapred.tasks;version="${osgi.version}",
-com.bigdata.service.ndx;version="${osgi.version}",
-com.bigdata.service.ndx.pipeline;version="${osgi.version}",
-com.bigdata.service.proxy;version="${osgi.version}",
-com.bigdata.sparse;version="${osgi.version}",
-com.bigdata.striterator;version="${osgi.version}",
-com.bigdata.util;version="${osgi.version}",
-com.bigdata.util.concurrent;version="${osgi.version}",
-com.bigdata.util.httpd;version="${osgi.version}",
-com.bigdata.zookeeper;version="${osgi.version}",
-com.ibm.icu.text,
-com.ibm.icu.util;version="3.8.1",
-com.sun.jini.admin;version="2.1",
-com.sun.jini.config;version="2.1.0",
-com.sun.jini.resource;version="2.1.0",
-com.sun.jini.start;version="2.1",
-com.sun.jini.tool;version="2.1.0",
-info.aduna.net,
-info.aduna.xml,
-javax.xml.datatype,
-javax.xml.namespace,
-javax.xml.parsers,
-net.jini.admin;version="2.1",
-net.jini.config;version="2.1",
-net.jini.core.discovery;version="2.1",
-net.jini.core.entry;version="2.1",
-net.jini.core.lookup;version="2.1",
-net.jini.discovery;version="2.1",
-net.jini.entry;version="2.1",
-net.jini.export;version="2.1",
-net.jini.io.context;version="2.1",
-net.jini.jeri;version="2.1",
-net.jini.jeri.tcp;version="2.1",
-net.jini.lease;version="2.1",
-net.jini.lookup;version="2.1",
-net.jini.lookup.entry;version="2.1",
-org.apache.commons.io;version="1.4",
-org.apache.log4j,
-org.apache.lucene.analysis;version="3.0.0",
-org.apache.lucene.analysis.br;version="3.0.0",
-org.apache.lucene.analysis.cjk;version="3.0.0",
-org.apache.lucene.analysis.cn;version="3.0.0",
-org.apache.lucene.analysis.cz;version="3.0.0",
-org.apache.lucene.analysis.de;version="3.0.0",
-org.apache.lucene.analysis.el;version="3.0.0",
-org.apache.lucene.analysis.fr;version="3.0.0",
-org.apache.lucene.analysis.nl;version="3.0.0",
-org.apache.lucene.analysis.ru;version="3.0.0",
-org.apache.lucene.analysis.standard;version="3.0.0",
-org.apache.lucene.analysis.th;version="3.0.0",
-org.apache.lucene.analysis.tokenattributes;version="3.0.0",
-org.apache.lucene.util;version="3.0.0",
-org.apache.zookeeper;version="3.1",
-org.apache.zookeeper.data;version="3.1",
-org.apache.zookeeper.server;version="3.2.1",
-org.apache.zookeeper.server.quorum;version="3.1",
-org.openrdf.model;version="2.0",
-org.openrdf.model.datatypes;version="2.0",
-org.openrdf.model.impl;version="2.0",
-org.openrdf.model.util;version="2.0",
-org.openrdf.model.vocabulary;version="2.0",
-org.openrdf.rio;version="2.0",
-org.openrdf.rio.helpers;version="2.0",
-org.openrdf.rio.rdfxml;version="2.0",
-org.openrdf.sail;version="2.0.0",
-org.xml.sax,
-org.xml.sax.helpers,
-sun.misc;resolution:=optional
-				'/>
-			</manifest>
-		</jar>
+		<taskdef resource="aQute/bnd/ant/taskdef.properties"  classpath="bigdata/lib/bnd-0.0.384.jar"/> 
+		<mkdir dir="${build.dir}/bundles" />
+		<jar destfile="${build.dir}/bundles/com.bigdata.source_${osgi.version}.jar">
+					<manifest>
+									<attribute name="Eclipse-SourceBundle" value='com.bigdata;version="${osgi.version}";roots="."'/>
+									<attribute name="Bundle-Vendor" value="Systap"/>
+									<attribute name="Bundle-Version" value="${build.ver.osgi}"/>
+									<attribute name="Bundle-ManifestVersion" value="2"/>
+									<attribute name="Bundle-SymbolicName" value="com.bigdata.source"/>
+									<attribute name="Bundle-DocURL" value="http://www.bigdata.com"/>
+									<attribute name="Bundle-Description" value="Bigdata Source"/>
+					</manifest>
+					<fileset dir="bigdata/src/java"/>
+						<fileset dir="bigdata/src/java" />
+						<fileset dir="bigdata-jini/src/java" />
+						<fileset dir="bigdata-rdf/src/java" />
+						<fileset dir="bigdata-sails/src/java" />
+				</jar>
+		<bnd 
+			   	  output="${build.dir}/bundles/com.bigata-${osgi.version}.jar"
+			      classpath="${build.dir}/classes" 
+			      eclipse="false" 
+			      failok="false" 
+			      exceptions="true" 
+			      files="${basedir}/osgi/bigdata.bnd"/> 
+		
+		<bndwrap
+			jars="${build.dir}/lib/unimi/colt-1.2.0.jar"
+		    output="${build.dir}/bundles/colt-1.2.0.jar"
+			definitions="${basedir}/osgi/"
+		/>
+		<bndwrap
+			jars="${build.dir}/lib/unimi/fastutil-5.1.5.jar"
+			output="${build.dir}/bundles/fastutil-5.1.5.jar"
+			definitions="${basedir}/osgi/"
+		/>
+		<bndwrap
+			jars="${build.dir}/lib/ctc_utils-5-4-2005.jar"
+			output="${build.dir}/bundles/ctc_utils-5-4-2005.jar"
+			definitions="${basedir}/osgi/"
+		/>
+		<bndwrap
+			jars="${build.dir}/lib/cweb-commons-1.1-b2-dev.jar"
+			output="${build.dir}/bundles/cweb-commons-1.1.2.jar"
+			definitions="${basedir}/osgi/"
+		/>
+		<bndwrap
+			jars="${build.dir}/lib/cweb-extser-0.1-b2-dev.jar"
+			output="${build.dir}/bundles/cweb-extser-1.1.2.jar"
+			definitions="${basedir}/osgi/"
+		/>
+		<bndwrap
+			jars="${build.dir}/lib/dsi-utils-1.0.6-020610.jar"
+			output="${build.dir}/bundles/dsi-utils-1.0.6-020610.jar"
+			definitions="${basedir}/osgi/"
+		/>
+		<bndwrap
+			jars="${build.dir}/lib/iris-0.58.jar"
+			output="${build.dir}/bundles/iris-0.58.jar"
+			definitions="${basedir}/osgi/"
+		/>
+		<bndwrap
+			jars="${build.dir}/lib/jgrapht-jdk1.5-0.7.1.jar"
+			output="${build.dir}/bundles/jgrapht-jdk1.5-0.7.1.jar"
+			definitions="${basedir}/osgi/"
+		/>
+		<bndwrap
+			jars="${build.dir}/lib/lgpl-utils-1.0.6-020610.jar"
+			output="${build.dir}/bundles/lgpl-utils-1.0.6-020610.jar"
+			definitions="${basedir}/osgi/"
+		/>
+		<bndwrap
+			jars="${build.dir}/lib/high-scale-lib-v1.1.2.jar"
+			output="${build.dir}/bundles/high-scale-lib-v1.1.2.jar"
+			definitions="${basedir}/osgi/"
+		/>
+		<bndwrap
+			jars="${build.dir}/lib/openrdf-sesame-2.3.0-onejar.jar"
+			output="${build.dir}/bundles/openrdf-sesame-2.3.0.jar"
+			definitions="${basedir}/osgi/"
+		/>
+		<bndwrap
+			jars="${build.dir}/lib/apache/zookeeper-3.2.1.jar"
+			output="${build.dir}/bundles/zookeeper-3.2.1.jar"
+			definitions="${basedir}/osgi/"
+		/>
+		<bndwrap
+			jars="${build.dir}/lib/nxparser-6-22-2010.jar"
+			output="${build.dir}/bundles/nxparser-2010.6.22.jar"
+			definitions="${basedir}/osgi/"
+		/>
 	</target>
 	
 	
@@ -1334,6 +1179,10 @@ ${postInstallMessage}</echo>
       <copy file="${bigdata-rdf.lib}/slf4j-log4j12-1.4.3.jar"
             tofile="${dist.lib}/slf4j-log4j.jar"/>
 
+      <!-- NxParser (RDF NQuads support) -->
+  	<copy file="${bigdata-rdf.lib}/nxparser-6-22-2010.jar"
+  	            tofile="${dist.lib}/nxparser.jar"/>
+      	    	
       <!-- Zookeeper library -->
       <copy file="${bigdata-zookeeper.lib}/zookeeper-3.2.1.jar"
             tofile="${dist.lib}/zookeeper.jar"/>
@@ -1496,7 +1345,7 @@ ${postInstallMessage}</echo>
       <mkdir dir="${bigdata-test.lib}"/>
       <property name="bigdata-test.jar" location="${bigdata-test.lib}/bigdata-test.jar" />
 
-      <property name="javac.test.classpath" value="${classes.dir}:${junit.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/classserver.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/highscalelib.jar:${dist.lib}/dsiutils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/log4j.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/zookeeper.jar"/>
+      <property name="javac.test.classpath" value="${classes.dir}:${junit.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/classserver.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/highscalelib.jar:${dist.lib}/dsiutils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/log4j.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/nxparser.jar:${dist.lib}/zookeeper.jar"/>
 
       <echo>javac
 </echo>
@@ -1754,10 +1603,11 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/openrdf-sesame.jar"/>
         <pathelement location="${dist.lib}/slf4j.jar"/>
         <pathelement location="${dist.lib}/slf4j-log4j.jar"/>
+        <pathelement location="${dist.lib}/nxparser.jar"/>
         <pathelement location="${dist.lib}/zookeeper.jar"/>
       </path>
 
-      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/highscalelib.jar:${dist.lib}/utils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
+      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/highscalelib.jar:${dist.lib}/disutils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/nxparser.jar:${dist.lib}/zookeeper.jar"/>
 
       <echo>    classpath:    ${run.class.path}
 </echo>
@@ -1852,6 +1702,7 @@ ${postInstallMessage}</echo>
         <sysproperty key="iris.jar" value="${dist.lib}/iris.jar" />
         <sysproperty key="openrdf-sesame.jar" value="${dist.lib}/openrdf-sesame.jar" />
         <sysproperty key="slf4j.jar" value="${dist.lib}/slf4j.jar" />
+        <sysproperty key="nxparser.jar" value="${dist.lib}/nxparser.jar" />
         <sysproperty key="zookeeper.jar" value="${dist.lib}/zookeeper.jar" />
 
         <!-- Jini group name -->
@@ -1952,9 +1803,10 @@ ${postInstallMessage}</echo>
 	        <pathelement location="${dist.lib}/openrdf-sesame.jar"/>
 	        <pathelement location="${dist.lib}/slf4j.jar"/>
 	        <pathelement location="${dist.lib}/slf4j-log4j.jar"/>
+	        <pathelement location="${dist.lib}/nxparser.jar"/>
 	        <pathelement location="${dist.lib}/zookeeper.jar"/>
 	      </path>
-	      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/highscalelib.jar:${dist.lib}/dsiutils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
+	      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/highscalelib.jar:${dist.lib}/dsiutils.jar:${dist.lib}/lgplutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/nxparser.jar:${dist.lib}/zookeeper.jar"/>
 		<!-- Generate the LUBM dataset. 
 		<mkdir dir="${data}"/>
 		<java classname="edu.lehigh.swat.bench.uba.Generator" dir="${data}" fork="yes">
