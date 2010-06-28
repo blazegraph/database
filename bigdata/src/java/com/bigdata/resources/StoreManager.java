@@ -2470,7 +2470,7 @@ abstract public class StoreManager extends ResourceEvents implements
                     + "{file="
                     + getFile()
                     + ", open="
-                    + isOpen()
+                    + ManagedJournal.this.isOpen()
                     + (rootBlock != null ? ", uuid="
                             + getRootBlockView().getUUID() : "") + "}";
             
@@ -3832,9 +3832,8 @@ abstract public class StoreManager extends ResourceEvents implements
 
             final File file = resourceFiles.remove(uuid);
 
-//            if (log.isInfoEnabled())
-//                log.info
-                log.warn("DELETE: file=" + file + ", uuid=" + uuid + ", isJournal="
+            if (log.isInfoEnabled())
+                log.info("DELETE: file=" + file + ", uuid=" + uuid + ", isJournal="
                     + isJournal);
             
             if (file == null) {
@@ -4104,9 +4103,9 @@ abstract public class StoreManager extends ResourceEvents implements
              * Note: This logs the file as reported by [resourceFiles] as well
              * as the file in IResourceMetadata in case any discrepency arises.
              */
-//            if (log.isInfoEnabled())
-//                log.info
-                log.warn("DELETE: " + resourceMetadata + " : " + file);
+            if (log.isInfoEnabled())
+                log.info("DELETE: " + resourceMetadata + " : " + file);
+//                log.warn("DELETE: " + resourceMetadata + " : " + file);
             
             if (file == null) {
 

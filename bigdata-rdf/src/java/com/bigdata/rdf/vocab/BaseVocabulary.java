@@ -37,7 +37,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.CognitiveWeb.extser.LongPacker;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;

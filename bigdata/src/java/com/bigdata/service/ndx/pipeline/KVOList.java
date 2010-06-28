@@ -1,6 +1,7 @@
 package com.bigdata.service.ndx.pipeline;
 
-import java.util.LinkedList;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.bigdata.btree.keys.KVO;
 
@@ -21,11 +22,16 @@ import com.bigdata.btree.keys.KVO;
 public class KVOList<O> extends KVO<O> {
 
     /**
-     * A doubly-linked chain. Access to this object MUST be protected by
-     * synchronization on the {@link KVOList}.
+     * A doubly-linked chain.
+     * <p>
+     * Note: it is less expensive to allocate this with the {@link KVOList} than
+     * to allocate an {@link AtomicReference} and then allocate this list lazily
+     * but with guaranteed consistency.
      */
-    private LinkedList<KVO<O>> duplicateList;
+    private final ConcurrentLinkedQueue<KVO<O>> duplicateList = new ConcurrentLinkedQueue<KVO<O>>();
 
+    private volatile boolean done = false;
+    
     /**
      * 
      * @param key
@@ -50,54 +56,73 @@ public class KVOList<O> extends KVO<O> {
      * @param o
      *            A duplicate of this object.
      */
+    // Note: MUTUX with done().
+    synchronized//
     public void add(final KVO<O> o) {
 
         if (o == null)
             throw new IllegalArgumentException();
 
-        if (o == this)
-            throw new IllegalArgumentException();
+        if(done)
+            throw new IllegalStateException();
+        
+        duplicateList.add(o);
 
-        synchronized (this) {
+        if (o instanceof KVOList<?>) {
 
-            if (duplicateList == null) {
+            /*
+             * During a redirect, the last chunk written by the sink may be
+             * combined with another chunk drained from the master. In these
+             * cases we can see KVOLists identified as duplicates for KVOLists
+             * which already have a list of duplicates. We handle this by
+             * merging those lists.
+             * 
+             * Note: This is not a atomic operation if concurrent inserts are
+             * allowed on the other KVOList. However, locking would make us open
+             * to deadlock. The atomic guarantee arises from the fact that this
+             * code is invoked from the sink, and the sink is single threaded,
+             * so we don't really need all this synchronization in KVOList
+             * anyway!
+             * 
+             * FIXME Review that MUXTEX guarantee!!!!
+             * 
+             * The atomic guarantee breaks down into three cases.
+             * 
+             * (1) The other list (the own passed in by the caller) is immutable
+             * since this occurs when handling a stale locator exception, and
+             * that behavior is single threaded. Hence the source list will not
+             * have concurrent add()s.
+             * 
+             * (3) add() and done() must be mutually exclusive to ensure that
+             * the behavior applied by done() is applied to all duplicates (this
+             * is a race condition). The typical behavior is to decrement a
+             * Latch.
+             * 
+             * (2) add() must not be allowed for this list once done() has been
+             * invoked. The guarantee here arises from how duplicates are
+             * detected. Duplicate detection occurs when taking a chunk from the
+             * sink's queue. All items which can be duplicates wind up at the
+             * same sink. The logic which takes a chunk from the sink's queue
+             * and eliminates any duplicates is single threaded.
+             * 
+             * The second problem is making sure that no new
+             * 
+             * @todo Review this guarantee if we move to an NIO model for the
+             * data transfers for the sinks. It will probably still be Ok since
+             * the single threaded concerns here are the transfer of chunks from
+             * the master and the handling of stale locator exceptions. In both
+             * of those cases the other list (the one being added to this list)
+             * will be immutable.
+             */
 
-                duplicateList = new LinkedList<KVO<O>>();
+            final KVOList<O> t = (KVOList<O>) o;
 
-            }
+            duplicateList.addAll(t.duplicateList);
 
-            duplicateList.add(o);
-
-            if (o instanceof KVOList) {
-
-                /*
-                 * During a redirect, the last chunk written by the sink may be
-                 * combined with another chunk drained from the master. In these
-                 * cases we can see KVOLists identified as duplicates for
-                 * KVOLists which already have a list of duplicates. We handle
-                 * this by merging those lists.
-                 * 
-                 * Note: This is not really thread-safe since we are not
-                 * synchronized on the other KVOList. However, synchronization
-                 * would make us open to deadlock. And, this code is invoked
-                 * from the sink, and the sink is single threaded, so we don't
-                 * really need all this synchronization in KVOList anyway!
-                 */
-
-                final KVOList<O> t = (KVOList<O>) o;
-
-                if (t.duplicateList != null) {
-
-                    duplicateList.addAll(t.duplicateList);
-
-                    t.duplicateList.clear();
-
-                }
-
-            }
+            t.duplicateList.clear();
 
         }
-        
+
     }
 
     /**
@@ -106,14 +131,7 @@ public class KVOList<O> extends KVO<O> {
      */
     public int getDuplicateCount() {
         
-        synchronized(this) {
-            
-            if(duplicateList == null)
-                return 0;
-            
-            return duplicateList.size();
-            
-        }
+        return duplicateList.size();
         
     }
 
@@ -122,11 +140,7 @@ public class KVOList<O> extends KVO<O> {
      */
     public boolean isDuplicateListEmpty() {
 
-        synchronized (this) {
-
-            return duplicateList == null;
-            
-        }
+        return duplicateList.isEmpty();
         
     }
     
@@ -134,24 +148,23 @@ public class KVOList<O> extends KVO<O> {
      * Extended to map the operation over the duplicate list.
      */
     @Override
+    // Note: MUTEX with add(o)
+    synchronized//
     public void done() {
 
-        synchronized (this) {
+        if(done)
+            throw new IllegalStateException();
+        
+        done = true;
+        
+        super.done();
 
-            super.done();
+        for (KVO<O> o : duplicateList) {
 
-            if (duplicateList != null) {
-
-                for (KVO<O> o : duplicateList) {
-
-                    o.done();
-
-                }
-
-            }
+            o.done();
 
         }
-        
+   
     }
 
     /**
@@ -180,19 +193,11 @@ public class KVOList<O> extends KVO<O> {
         if (op == null)
             throw new IllegalArgumentException();
         
-        synchronized (this) {
-
 //            op.apply(this);
 
-            if (duplicateList != null) {
+        for (KVO<O> o : duplicateList) {
 
-                for (KVO<O> o : duplicateList) {
-
-                    op.apply( o );
-
-                }
-
-            }
+            op.apply( o );
 
         }
 

@@ -30,9 +30,8 @@ package com.bigdata.rdf.rio;
 import java.io.InputStream;
 import java.io.Reader;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFParser;
 
 /**
  * Interface for parsing RDF data using the Sesame RIO parser.
@@ -41,20 +40,6 @@ import org.openrdf.rio.RDFFormat;
  * @version $Id$
  */
 public interface IRioLoader {
-    
-    public static Logger log = Logger.getLogger(IRioLoader.class);
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final public boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final public boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
     
     public long getStatementsAdded();
     
@@ -87,12 +72,12 @@ public interface IRioLoader {
      *            The base URL for those data.
      * @param rdfFormat
      *            The interchange format.
-     * @param verify
-     *            Verification is enabled when <code>true</code>.
+     * @param options
+     *            Options to be applied to the {@link RDFParser}.
      * @throws Exception
      */
     public void loadRdf(Reader reader, String baseURL, RDFFormat rdfFormat,
-            boolean verify) throws Exception;
+            RDFParserOptions options) throws Exception;
 
     /**
      * Parse RDF data.
@@ -103,11 +88,11 @@ public interface IRioLoader {
      *            The base URL for those data.
      * @param rdfFormat
      *            The interchange format.
-     * @param verify
-     *            Verification is enabled when <code>true</code>.
+     * @param options
+     *            Options to be applied to the {@link RDFParser}.
      * @throws Exception
      */
     public void loadRdf(InputStream is, String baseURI, RDFFormat rdfFormat,
-            boolean verify ) throws Exception;
+            RDFParserOptions options) throws Exception;
     
 }

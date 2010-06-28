@@ -515,9 +515,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         
         public CounterSet getCounters() {
 
-            if (root == null) {
-
-                root = new CounterSet();
+            final CounterSet root = new CounterSet();
 
                 // IRawStore API
                 {
@@ -737,12 +735,10 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
                 }
 
-            }
-
             return root;
 
         }
-        private CounterSet root;
+//        private CounterSet root;
         
         /**
          * Human readable representation of the counters.
