@@ -439,6 +439,11 @@ public class RWStore implements IStore {
 		if (log.isDebugEnabled())
 			log.debug("m_allocation: " + nxtalloc + ", m_metaStartAddr: " + metaStartAddr + ", m_metaBitsAddr: "
 					+ metaBitsAddr + ", m_commitCounter: " + commitCounter);
+		
+		/**
+		 * Ensure rootblock is in sync with external request
+		 */
+		m_rb = rbv;
 	}
 
 	/**
@@ -667,10 +672,11 @@ public class RWStore implements IStore {
         readLock.lock();
         
 		try {
-			if (length > (MAX_FIXED_ALLOC-4)) {
+			// length includes space for the checksum
+			if (length > MAX_FIXED_ALLOC) {
 				try {
 					int nblocks = 1 + (length/(MAX_FIXED_ALLOC-4));
-					byte[] hdrbuf = new byte[4 * (nblocks + 1)];
+					byte[] hdrbuf = new byte[4 * (nblocks + 1) + 4]; // plus 4 bytes for checksum
 					BlobAllocator ba = (BlobAllocator) getBlock((int) addr);
 					getData(ba.getBlobHdrAddress(getOffset((int) addr)), hdrbuf); // read in header 
 					DataInputStream hdrstr = new DataInputStream(new ByteArrayInputStream(hdrbuf));
@@ -684,13 +690,14 @@ public class RWStore implements IStore {
 					}
 					// Now we have the header addresses, we can read MAX_FIXED_ALLOCS until final buffer
 					int cursor = 0;
-					int rdlen = MAX_FIXED_ALLOC-4;
+					int rdlen = MAX_FIXED_ALLOC;
 					for (int i = 0; i < nblocks; i++) {
 						if (i == (nblocks - 1)) {
 							rdlen = length - cursor;
+							// System.out.println("Calculated last read as " + rdlen);
 						}
-						getData(blobHdr[i], buf, cursor, rdlen);
-						cursor += rdlen;
+						getData(blobHdr[i], buf, cursor, rdlen); // include space for checksum
+						cursor += rdlen-4; // but only increase cursor by data
 					}
 					
 					return;
@@ -711,31 +718,31 @@ public class RWStore implements IStore {
 
 				/**
 				 * Check WriteCache first
+				 * 
+				 * Note that the buffer passed in should include the checksum 
+				 * value, so the cached data is 4 bytes less than the
+				 * buffer size.
 				 */
 				ByteBuffer bbuf = m_writeCache.read(paddr);
 				if (bbuf != null) {
 					byte[] in = bbuf.array(); // reads in with checksum - no need to check if in cache
-					// if (in.length != (length+4)) {
-					if (in.length != length) {
+					if (in.length != length-4) {
 						throw new IllegalStateException("Incompatible buffer size for addr: " + addr + ", " + in.length
 								+ " != " + length);
 					}
-					for (int i = 0; i < length; i++) {
+					for (int i = 0; i < length-4; i++) {
 						buf[offset+i] = in[i];
 					}
 					m_cacheReads++;
 				} else {
-//						k
-//						m_raf.readFully(buf, offset, length);
-//					m_raf.getChannel().read(ByteBuffer.wrap(buf, offset, length), paddr);
-					FileChannelUtility.readAll(m_reopener, ByteBuffer.wrap(buf, offset, length), paddr);
-					ByteBuffer chkbuf = ByteBuffer.allocate(4);
-//					m_raf.getChannel().read(chkbuf, paddr+length);
-					FileChannelUtility.readAll(m_reopener, chkbuf, paddr+length);
-					chkbuf.position(0);
-					int chk = chkbuf.getInt(); // read checksum
-					if (chk != ChecksumUtility.getCHK().checksum(buf, offset, length)) {
-						log.warn("Invalid data checksum for addr: " + paddr + ", chk: " + chk + ", length: " + length
+					// If checksum is required then the buffer should be sized to include checksum in final 4 bytes
+					ByteBuffer bb = ByteBuffer.wrap(buf, offset, length);
+					FileChannelUtility.readAll(m_reopener, bb, paddr);
+					int chk = ChecksumUtility.getCHK().checksum(buf, offset, length-4); // read checksum
+					int tstchk = bb.getInt(offset + length-4);
+					if (chk != tstchk) {
+						log.warn("Invalid data checksum for addr: " + paddr 
+								+ ", chk: " + chk + ", tstchk: " + tstchk + ", length: " + length
 								+ ", first byte: " + buf[0] + ", successful reads: " + m_diskReads
 								+ ", at last extend: " + m_readsAtExtend + ", cacheReads: " + m_cacheReads);
 						throw new IllegalStateException("Invalid data checksum");
@@ -989,8 +996,8 @@ public class RWStore implements IStore {
 		int chk = ChecksumUtility.getCHK().checksum(buf, size);
 
 		try {
-
-			m_writeCache.write(physicalAddress(newAddr), ByteBuffer.wrap(buf, 0, size), chk);
+			// System.out.println("Writing checksum: " + chk + "for buffer size: " + size);
+			m_writeCache.write(physicalAddress(newAddr), ByteBuffer.wrap(buf,  0, size), chk);
 		} catch (IllegalStateException e) {
 			reopen(m_fmv);
 
