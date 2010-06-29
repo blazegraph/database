@@ -32,6 +32,8 @@ import java.nio.ByteBuffer;
 import java.rmi.Remote;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import junit.framework.TestCase;
 
@@ -97,6 +99,13 @@ abstract public class AbstractHAJournalTestCase
      * The fixture provides a mock of the distributed quorum state machine.
      */
     protected MockQuorumFixture fixture = null;
+    /**
+     * The logical service identifier.
+     */
+    protected String logicalServiceId = null;
+    /**
+     * The {@link Journal}s which are the members of the logical service.
+     */
     private Journal[] stores = null;
 
     /**
@@ -112,6 +121,7 @@ abstract public class AbstractHAJournalTestCase
 
         fixture = new MockQuorumFixture();
         fixture.start();
+        logicalServiceId = "logicalService_" + getName();
 
         k = 3;
         
@@ -136,6 +146,8 @@ abstract public class AbstractHAJournalTestCase
             fixture.terminate();
             fixture = null;
         }
+        
+        logicalServiceId = null;
         
         super.tearDown(testCase);
 
@@ -169,6 +181,32 @@ abstract public class AbstractHAJournalTestCase
 //
 //        stores[1].takeRootBlocksFromLeader();
 //        stores[2].takeRootBlocksFromLeader();
+
+        /*
+         * @todo we probably have to return the service which joined as the
+         * leader from getStore().
+         */
+        final Quorum<HAGlue, QuorumService<HAGlue>> q = stores[0].getQuorum();
+
+        try {
+        
+            final long token = q.awaitQuorum(1L,TimeUnit.SECONDS);
+            assertEquals(token, stores[1].getQuorum().awaitQuorum(1L,TimeUnit.SECONDS));
+            assertEquals(token, stores[2].getQuorum().awaitQuorum(1L,TimeUnit.SECONDS));
+
+            q.getClient().assertLeader(token);
+
+            assertEquals(k, q.getMembers().length);
+        
+        } catch (TimeoutException ex) {
+        
+            throw new RuntimeException(ex);
+
+        } catch (InterruptedException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
         
         // return the master.
         return stores[0];
@@ -185,6 +223,11 @@ abstract public class AbstractHAJournalTestCase
 
         final HAJournal jnl = new HAJournal(properties, quorum);
 
+        /*
+         * FIXME This probably should be a constant across the life cycle of the
+         * service, in which case it needs to be elevated outside of this method
+         * which is used both to open and re-open the journal.
+         */
         final UUID serviceId = UUID.randomUUID();
 
         /*
@@ -193,7 +236,8 @@ abstract public class AbstractHAJournalTestCase
          * FIXME The client needs to manage the quorumToken and various other
          * things.
          */
-        quorum.start(newQuorumService(serviceId, jnl.newHAGlue(serviceId),jnl));
+        quorum.start(newQuorumService(logicalServiceId, serviceId, jnl
+                .newHAGlue(serviceId), jnl));
 
 //      // discard the current write set.
 //      abort();
@@ -274,11 +318,12 @@ abstract public class AbstractHAJournalTestCase
      *            supporting HA operations.
      */
     protected QuorumServiceBase<HAGlue, AbstractJournal> newQuorumService(
+            final String logicalServiceId,
             final UUID serviceId, final HAGlue remoteServiceImpl,
             final AbstractJournal store) {
 
-        return new QuorumServiceBase<HAGlue, AbstractJournal>(serviceId,
-                remoteServiceImpl, store) {
+        return new QuorumServiceBase<HAGlue, AbstractJournal>(logicalServiceId,
+                serviceId, remoteServiceImpl, store) {
 
             /**
              * Only the local service implementation object can be resolved.

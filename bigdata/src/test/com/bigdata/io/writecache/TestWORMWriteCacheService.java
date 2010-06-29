@@ -222,15 +222,11 @@ public class TestWORMWriteCacheService extends TestCase3 {
          */
         final AtomicLong nreceived = new AtomicLong();
         
-        /**
-         * @param quorum
-         * 
-         * @throws IOException 
-         */
-        protected MyMockQuorumMember(final MockQuorumFixture fixture)
+        protected MyMockQuorumMember(final MockQuorumFixture fixture,
+                final String logicalServiceId)
                 throws IOException {
 
-            super(UUID.randomUUID());
+            super(logicalServiceId, UUID.randomUUID()/* serviceId */);
 
             this.fixture = fixture;
 
@@ -339,12 +335,13 @@ public class TestWORMWriteCacheService extends TestCase3 {
         final int k = 1;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         try {
             
             fixture.start();
-            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?,?> actor = quorum.getActor();
 
@@ -390,12 +387,13 @@ public class TestWORMWriteCacheService extends TestCase3 {
         final int k = 1;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         try {
 
             fixture.start();
-            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?,?> actor = quorum.getActor();
 
@@ -435,12 +433,13 @@ public class TestWORMWriteCacheService extends TestCase3 {
         final int k = 1;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         try {
             
             fixture.start();
-            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?,?> actor = quorum.getActor();
 
@@ -487,12 +486,13 @@ public class TestWORMWriteCacheService extends TestCase3 {
         final int k = 1;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         try {
             
             fixture.start();
-            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?,?> actor = quorum.getActor();
 
@@ -532,12 +532,13 @@ public class TestWORMWriteCacheService extends TestCase3 {
         final int k = 1;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         try {
             
             fixture.start();
-            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?,?> actor = quorum.getActor();
 
@@ -584,12 +585,13 @@ public class TestWORMWriteCacheService extends TestCase3 {
         final int k = 1;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         try {
             
             fixture.start();
-            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?,?> actor = quorum.getActor();
 
@@ -630,12 +632,13 @@ public class TestWORMWriteCacheService extends TestCase3 {
         final int k = 1;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         try {
             
             fixture.start();
-            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?,?> actor = quorum.getActor();
 
@@ -683,12 +686,13 @@ public class TestWORMWriteCacheService extends TestCase3 {
         final int k = 1;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         try {
             
             fixture.start();
-            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?,?> actor = quorum.getActor();
 
@@ -732,6 +736,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         final int k = 3;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum0 = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum1= new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
@@ -741,9 +746,9 @@ public class TestWORMWriteCacheService extends TestCase3 {
         try {
             
             fixture.start();
-            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
-            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
-//            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+//            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?,?> actor0 = quorum0.getActor();
             final QuorumActor<?,?> actor1 = quorum1.getActor();
@@ -816,6 +821,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         final int k = 3;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum0 = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum1= new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
@@ -825,9 +831,9 @@ public class TestWORMWriteCacheService extends TestCase3 {
         try {
             
             fixture.start();
-            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
-            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
-//            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+//            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?,?> actor0 = quorum0.getActor();
             final QuorumActor<?,?> actor1 = quorum1.getActor();
@@ -917,6 +923,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         final int k = 3;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum0 = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum1= new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
@@ -926,9 +933,9 @@ public class TestWORMWriteCacheService extends TestCase3 {
         try {
             
             fixture.start();
-            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
-            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
-            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?,?> actor0 = quorum0.getActor();
             final QuorumActor<?,?> actor1 = quorum1.getActor();
@@ -1036,6 +1043,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         final int k = 3;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum0 = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum1= new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
@@ -1045,9 +1053,9 @@ public class TestWORMWriteCacheService extends TestCase3 {
         try {
             
             fixture.start();
-            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
-            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
-//            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+//            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?,?> actor0 = quorum0.getActor();
             final QuorumActor<?,?> actor1 = quorum1.getActor();
@@ -1120,6 +1128,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         final int k = 3;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum0 = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum1= new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
@@ -1129,9 +1138,9 @@ public class TestWORMWriteCacheService extends TestCase3 {
         try {
             
             fixture.start();
-            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
-            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
-//            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+//            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?,?> actor0 = quorum0.getActor();
             final QuorumActor<?,?> actor1 = quorum1.getActor();
@@ -1211,6 +1220,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         final int k = 3;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum0 = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum1= new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
@@ -1220,9 +1230,9 @@ public class TestWORMWriteCacheService extends TestCase3 {
         try {
             
             fixture.start();
-            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
-            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
-//            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+//            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?,?> actor0 = quorum0.getActor();
             final QuorumActor<?,?> actor1 = quorum1.getActor();
@@ -1295,6 +1305,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         final int k = 3;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum0 = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum1= new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
@@ -1304,9 +1315,9 @@ public class TestWORMWriteCacheService extends TestCase3 {
         try {
             
             fixture.start();
-            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
-            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
-//            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+//            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?,?> actor0 = quorum0.getActor();
             final QuorumActor<?,?> actor1 = quorum1.getActor();
@@ -1386,6 +1397,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         final int k = 3;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum0 = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum1= new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
@@ -1395,9 +1407,9 @@ public class TestWORMWriteCacheService extends TestCase3 {
         try {
             
             fixture.start();
-            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
-            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
-//            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+//            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?,?> actor0 = quorum0.getActor();
             final QuorumActor<?,?> actor1 = quorum1.getActor();
@@ -1470,6 +1482,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         final int k = 3;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum0 = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum1= new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
@@ -1479,9 +1492,9 @@ public class TestWORMWriteCacheService extends TestCase3 {
         try {
             
             fixture.start();
-            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
-            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
-            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?,?> actor0 = quorum0.getActor();
             final QuorumActor<?,?> actor1 = quorum1.getActor();
@@ -1559,6 +1572,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
         final int k = 3;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum0 = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum1= new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
@@ -1568,9 +1582,9 @@ public class TestWORMWriteCacheService extends TestCase3 {
         try {
             
             fixture.start();
-            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
-            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
-            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum0.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+            quorum1.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
+            quorum2.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?,?> actor0 = quorum0.getActor();
             final QuorumActor<?,?> actor1 = quorum1.getActor();

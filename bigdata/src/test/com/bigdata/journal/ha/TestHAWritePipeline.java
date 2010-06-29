@@ -78,15 +78,17 @@ public class TestHAWritePipeline extends ProxyTestCase<Journal> {
 
         try {
 
-            /*
-             * @todo we probably have to return the service which joined as the
-             * leader from getStore().
-             */
-            final Quorum<HAGlue,QuorumService<HAGlue>> q = store.getQuorum();
-
-            final long token = q.token();
-
-            q.getClient().assertLeader(token);
+//            /*
+//             * @todo we probably have to return the service which joined as the
+//             * leader from getStore().
+//             */
+//            final Quorum<HAGlue,QuorumService<HAGlue>> q = store.getQuorum();
+//
+//            final long token = q.token();
+//
+//            q.getClient().assertLeader(token);
+//
+//            assertEquals(k, q.getMembers().length);
 
             // @todo verify binary state of all stores.
             

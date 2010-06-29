@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -22,47 +22,36 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Oct 14, 2006
+ * Created on Jun 29, 2010
  */
 
-package com.bigdata.journal.ha.zk;
+package com.bigdata.quorum.zk;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import junit.framework.TestCase2;
 
 /**
- * Runs all tests for all journal implementations.
+ * Test suite for {@link ZKQuorum}. 
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAll extends TestCase {
+public class TestZkQuorum extends TestCase2 {
 
     /**
      * 
      */
-    public TestAll() {
+    public TestZkQuorum() {
     }
 
     /**
-     * @param arg0
+     * @param name
      */
-    public TestAll(String arg0) {
-        super(arg0);
+    public TestZkQuorum(String name) {
+        super(name);
     }
 
-    /**
-     * Returns a test that will run each of the implementation specific test
-     * suites in turn.
-     */
-    public static Test suite()
-    {
-
-        final TestSuite suite = new TestSuite("journal/HA+ZK");
-
-        return suite;
-
+    public void test_something() {
+        fail("write tests");
     }
-
+    
 }

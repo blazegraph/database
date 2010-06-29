@@ -47,8 +47,21 @@ abstract public class AbstractQuorumClient<S extends Remote> implements
 
     private final AtomicReference<Quorum<?, ?>> quorum = new AtomicReference<Quorum<?, ?>>();
 
-    protected AbstractQuorumClient() {
+    private final String logicalServiceId;
 
+    public String getLogicalServiceId() {
+        
+        return logicalServiceId;
+        
+    }
+    
+    protected AbstractQuorumClient(final String logicalServiceId) {
+
+        if(logicalServiceId == null)
+            throw new IllegalArgumentException();
+        
+        this.logicalServiceId = logicalServiceId;
+        
     }
 
     public Quorum<?,?> getQuorum() {

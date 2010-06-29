@@ -39,6 +39,8 @@ import org.apache.zookeeper.data.ACL;
 
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.start.config.ServiceConfiguration;
+import com.bigdata.quorum.Quorum;
+import com.bigdata.quorum.zk.QuorumTokenState;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
@@ -218,6 +220,31 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
          */
         zookeeper.create(logicalServiceZPath + "/"
                 + BigdataZooDefs.MASTER_ELECTION, new byte[0], acl,
+                CreateMode.PERSISTENT);
+
+        /*
+         * Setup the quorum state.
+         */
+        zookeeper.create(logicalServiceZPath + "/" + BigdataZooDefs.QUORUM,
+                SerializerUtil.serialize(new QuorumTokenState(//
+                        Quorum.NO_QUORUM,// lastValidToken
+                        Quorum.NO_QUORUM// currentToken
+                        )), acl, CreateMode.PERSISTENT);
+
+        zookeeper.create(logicalServiceZPath + "/"
+                + BigdataZooDefs.QUORUM_MEMBER, new byte[0]/* empty */, acl,
+                CreateMode.PERSISTENT);
+
+        zookeeper.create(logicalServiceZPath + "/"
+                + BigdataZooDefs.QUORUM_VOTES, new byte[0]/* empty */, acl,
+                CreateMode.PERSISTENT);
+
+        zookeeper.create(logicalServiceZPath + "/"
+                + BigdataZooDefs.QUORUM_JOINED, new byte[0]/* empty */, acl,
+                CreateMode.PERSISTENT);
+
+        zookeeper.create(logicalServiceZPath + "/"
+                + BigdataZooDefs.QUORUM_PIPELINE, new byte[0]/* empty */, acl,
                 CreateMode.PERSISTENT);
 
         try {

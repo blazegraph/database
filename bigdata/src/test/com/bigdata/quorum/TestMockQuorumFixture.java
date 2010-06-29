@@ -104,6 +104,8 @@ public class TestMockQuorumFixture extends TestCase2 {
 
         final int k = 1;
         
+        final String logicalServiceId = getName();
+        
         // Create fixture providing mock of the distributed quorum state.
         final MockQuorumFixture fixture = new MockQuorumFixture();
 
@@ -114,7 +116,7 @@ public class TestMockQuorumFixture extends TestCase2 {
         final MockQuorum clientQuorum = new MockQuorum(k,fixture);
         
         // Run the client's quorum.
-        clientQuorum.start(new MockQuorumMember());
+        clientQuorum.start(new MockQuorumMember(logicalServiceId));
         
         // Terminate the client's quorum.
         clientQuorum.terminate();
@@ -133,6 +135,8 @@ public class TestMockQuorumFixture extends TestCase2 {
 
         // The service replication factor.
         final int k = 3;
+        // The logical service identifier.
+        final String logicalServiceId = getName();
         // The per-client quorum objects.
         final MockQuorum[] quorums = new MockQuorum[k];
         final MockQuorumMember[] clients = new MockQuorumMember[k];
@@ -149,7 +153,7 @@ public class TestMockQuorumFixture extends TestCase2 {
              */
             for (int i = 0; i < k; i++) {
                 quorums[i] = new MockQuorum(k,fixture);
-                clients[i] = new MockQuorumMember();
+                clients[i] = new MockQuorumMember(logicalServiceId);
                 quorums[i].start(clients[i]);
                 actors [i] = quorums[i].getActor();
             }

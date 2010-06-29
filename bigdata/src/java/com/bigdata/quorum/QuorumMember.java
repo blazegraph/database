@@ -53,7 +53,10 @@ public interface QuorumMember<S extends Remote> extends QuorumClient<S>,
         QuorumStateChangeListener {
 
     /**
-     * The identifier for this service.
+     * The identifier for this service (the quorum member). Each quorum member
+     * is a physical service instance of some highly available logical service.
+     * 
+     * @see QuorumClient#getLogicalServiceId()
      */
     UUID getServiceId();
 

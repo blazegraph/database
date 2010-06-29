@@ -109,6 +109,7 @@ public class TestRWWriteCacheService extends TestCase3 {
         final int k = 1;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         File file = null;
@@ -117,7 +118,7 @@ public class TestRWWriteCacheService extends TestCase3 {
         try {
 
             fixture.start();
-            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?,?> actor = quorum.getActor();
 
@@ -162,6 +163,7 @@ public class TestRWWriteCacheService extends TestCase3 {
         final int k = 1;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         File file = null;
@@ -170,7 +172,7 @@ public class TestRWWriteCacheService extends TestCase3 {
         try {
 
             fixture.start();
-            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?, ?> actor = quorum.getActor();
 
@@ -264,6 +266,7 @@ public class TestRWWriteCacheService extends TestCase3 {
         final int k = 1;
         final long lastCommitTime = 0L;
         final MockQuorumFixture fixture = new MockQuorumFixture();
+        final String logicalServiceId = "logicalService_"+getName();
         final MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>> quorum = new MockQuorum<HAPipelineGlue, MyMockQuorumMember<HAPipelineGlue>>(
                 k, fixture);
         File file = null;
@@ -272,7 +275,7 @@ public class TestRWWriteCacheService extends TestCase3 {
         try {
             
             fixture.start();
-            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture));
+            quorum.start(new MyMockQuorumMember<HAPipelineGlue>(fixture,logicalServiceId));
 
             final QuorumActor<?, ?> actor = quorum.getActor();
 
