@@ -40,8 +40,8 @@ public class FixedAllocator implements Allocator {
     protected static final Logger log = Logger.getLogger(FixedAllocator.class);
 
 	private RWWriteCacheService m_writeCache = null;
-	private int m_freeBits;
-	private int m_freeTransients;
+	volatile private int m_freeBits;
+	volatile private int m_freeTransients;
 
 	private long m_diskAddr;
 	int m_index;
@@ -73,7 +73,7 @@ public class FixedAllocator implements Allocator {
 			// cat.info("Comparing: " + getStartAddr() + " with " + other.getStartAddr());
 
 			if (val == 0) {
-				throw new Error("Die ... bugger die .... Two allocators at same address");
+				throw new Error("Two allocators at same address");
 			}
 
 			return (int) val;
@@ -249,6 +249,14 @@ public class FixedAllocator implements Allocator {
 		m_size = size;
 
 		m_bitSize = 32;
+		
+		/**
+		 * For smaller allocations we'll allocate a larger span, this is needed
+		 * to ensure the minimum allocation is large enough to guarantee 
+		 * a unique address for a BlobAllocator.
+		 */
+		if (m_size < 256) 
+			m_bitSize = 64;
 
 		m_writeCache = cache;
 
@@ -375,6 +383,8 @@ public class FixedAllocator implements Allocator {
 	    	addr += 3; // tweek to ensure non-zero address for offset 0
 
 	    	if (--m_freeBits == 0) {
+	    		if (log.isTraceEnabled())
+	    			log.trace("Remove from free list");
 				m_freeList.remove(this);
 			}
 
@@ -384,6 +394,9 @@ public class FixedAllocator implements Allocator {
 
 			return value;
 		} else {
+    		if (log.isInfoEnabled())
+    			log.info("FixedAllocator returning null address");
+    		
 			return 0;
 		}
 	}

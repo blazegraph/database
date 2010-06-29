@@ -64,11 +64,12 @@ public class BlobAllocator implements Allocator {
 		}
 		
 		// read in header block, then free each reference
-		byte[] hdr = new byte[(blcks+1) * 4];
+		byte[] hdr = new byte[(blcks+1) * 4 + 4]; // add space for checksum
 		m_store.getData(hdr_addr, hdr);
 		
 		try {
-			DataInputStream instr = new DataInputStream(new ByteArrayInputStream(hdr));
+			DataInputStream instr = new DataInputStream(
+					new ByteArrayInputStream(hdr, 0, hdr.length-4) );
 			int allocs = instr.readInt();
 			for (int i = 0; i < allocs; i++) {
 				int nxt = instr.readInt();
