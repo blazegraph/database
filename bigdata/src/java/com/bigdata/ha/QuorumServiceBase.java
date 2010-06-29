@@ -72,18 +72,21 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
     private final QuorumReadImpl<S> readImpl;
 
     /**
+     * @param logicalServiceId
+     *            The identifier of the logical service.
      * @param serviceId
-     *            The {@link UUID} for this service.
+     *            The {@link UUID} for this service (a physical instance of the
+     *            logical service).
      * @param service
      *            The interface for the local service that is exposed to remote
      *            clients (typically as a smart proxy).
      * @param localService
      *            The local service implementation.
      */ 
-    protected QuorumServiceBase(final UUID serviceId, final S service,
-            final L localService) {
+    protected QuorumServiceBase(final String logicalServiceId,
+            final UUID serviceId, final S service, final L localService) {
 
-        super(serviceId);
+        super(logicalServiceId, serviceId);
 
         if (localService == null)
             throw new IllegalArgumentException();

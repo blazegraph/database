@@ -44,6 +44,15 @@ import java.util.UUID;
 public interface QuorumClient<S extends Remote> extends QuorumListener {
 
     /**
+     * The identifier of the logical service whose quorum state will be
+     * monitored. A highly available service is comprised of multiple physical
+     * services which are instances of the same logical service.
+     * 
+     * @see QuorumMember#getServiceId()
+     */
+    String getLogicalServiceId();
+    
+    /**
      * Life cycle message sent when the client will begin to receive messages
      * from the {@link Quorum}. At a minimum, the client should save a reference
      * to the {@link Quorum}.

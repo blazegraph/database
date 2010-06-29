@@ -665,14 +665,17 @@ public class MockQuorumFixture {
         }
         
         @Override
-        protected QuorumActorBase newActor(final UUID serviceId) {
-            return new MockQuorumActor(serviceId);
+        protected QuorumActorBase newActor(final String logicalServiceId,
+                final UUID serviceId) {
+         
+            return new MockQuorumActor(logicalServiceId, serviceId);
+            
         }
 
         @Override
-        protected QuorumWatcherBase newWatcher() {
+        protected QuorumWatcherBase newWatcher(final String logicalServiceUUID) {
 
-            return new MockQuorumWatcher();
+            return new MockQuorumWatcher(logicalServiceUUID);
             
         }
 
@@ -769,13 +772,13 @@ public class MockQuorumFixture {
          */
         protected class MockQuorumActor extends QuorumActorBase {
 
-            private final UUID serviceId;
-            
-            public MockQuorumActor(final UUID serviceId) {
-                super(serviceId);
-                this.serviceId = serviceId;
+            public MockQuorumActor(final String logicalServiceId,
+                    final UUID serviceId) {
+
+                super(logicalServiceId, serviceId);
+
             }
-           
+
             protected void doMemberAdd() {
                 fixture.memberAdd(serviceId);
             }
@@ -860,6 +863,12 @@ public class MockQuorumFixture {
         protected class MockQuorumWatcher extends QuorumWatcherBase implements
                 QuorumListener {
 
+            protected MockQuorumWatcher(final String logicalServiceUUID) {
+             
+                super(logicalServiceUUID);
+                
+            }
+            
             /**
              * The queue into which the fixture pumps events. This only needs a
              * capacity of ONE (1) because the fixture hands off the events
@@ -1037,13 +1046,13 @@ public class MockQuorumFixture {
          * The downstream service in the write pipeline.
          */
         protected volatile UUID downStreamId = null;
-        
+
         /**
          * @param quorum
          */
-        protected MockQuorumMember() {
-            
-            super(UUID.randomUUID());
+        protected MockQuorumMember(final String logicalServiceId) {
+
+            super(logicalServiceId, UUID.randomUUID()/* serviceId */);
             
         }
 

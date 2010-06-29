@@ -4,6 +4,8 @@ import java.rmi.Remote;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 
 /**
@@ -246,6 +248,26 @@ public interface Quorum<S extends Remote, C extends QuorumClient<S>> {
      */
     long awaitQuorum() throws InterruptedException,
             AsynchronousQuorumCloseException;
+
+    /**
+     * Await a met quorum (blocking). If the {@link Quorum}is not met, then this
+     * will block until the {@link Quorum} meets.
+     * 
+     * @param timeout
+     *            The timeout.
+     * @param units
+     *            The timeout units.
+     * 
+     * @return The current quorum token.
+     * 
+     * @throws AsynchronousQuorumCloseException
+     *             if {@link #terminate()} is invoked while awaiting a quorum
+     *             meet.
+     * @throws TimeoutException
+     *             if the timeout expired before the quorum met.
+     */
+    long awaitQuorum(long timeout, TimeUnit units) throws InterruptedException,
+            AsynchronousQuorumCloseException, TimeoutException;
 
     /**
      * Assert that the quorum associated with the token is still valid. The

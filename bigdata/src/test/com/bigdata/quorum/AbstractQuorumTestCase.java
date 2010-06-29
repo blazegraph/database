@@ -62,7 +62,7 @@ abstract public class AbstractQuorumTestCase extends TestCase2 {
      * The per-client quorum actor objects. The unit tests send events on the
      * behalf of the clients using these actor objects.
      */
-    protected MockQuorumActor[] actors = new MockQuorumActor[k];
+    protected MockQuorumActor[] actors;
 
     /** The mock shared quorum state object. */
     protected MockQuorumFixture fixture;
@@ -91,9 +91,10 @@ abstract public class AbstractQuorumTestCase extends TestCase2 {
         /*
          * Setup the client quorums.
          */
+        final String logicalServiceId = "testLogicalService1";
         for (int i = 0; i < k; i++) {
             quorums[i] = new MockQuorum(k,fixture);
-            clients[i] = new MockQuorumMember();
+            clients[i] = new MockQuorumMember(logicalServiceId);
             quorums[i].start(clients[i]);
             actors [i] = quorums[i].getActor();
         }

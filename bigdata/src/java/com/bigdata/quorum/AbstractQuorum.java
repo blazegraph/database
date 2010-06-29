@@ -16,12 +16,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.concurrent.TimeoutException;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.zookeeper.ZooKeeperAccessor;
@@ -278,9 +278,10 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             // addListener(client);
             if (client instanceof QuorumMember<?>) {
                 // create actor for that service.
-                this.actor = newActor(((QuorumMember<?>) client).getServiceId());
+                this.actor = newActor(client.getLogicalServiceId(),
+                        ((QuorumMember<?>) client).getServiceId());
             }
-            this.watcher = newWatcher();
+            this.watcher = newWatcher(client.getLogicalServiceId());
             this.eventService = (sendSynchronous ? null : Executors
                     .newSingleThreadExecutor(new DaemonThreadFactory(
                             "QuorumEventService")));
@@ -333,7 +334,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 eventService.shutdown();
                 try {
                     eventService.awaitTermination(1000, TimeUnit.MILLISECONDS);
-                } catch (TimeoutException ex) {
+                } catch (com.bigdata.concurrent.TimeoutException ex) {
                     // Ignore.
                 } catch (InterruptedException ex) {
                     // Will be propagated below.
@@ -358,6 +359,9 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      * Factory method invoked by {@link #start(QuorumClient)} iff the
      * {@link QuorumClient} is a {@link QuorumMember}.
      * 
+     * @param logicalServiceId
+     *            The identifier of the logical service corresponding to the
+     *            highly available quorum.
      * @param serviceId
      *            The {@link UUID} of the service on whose behalf the actor will
      *            act.
@@ -365,7 +369,8 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      * @return The {@link QuorumActor} which will effect changes in the
      *         distributed state of the quorum.
      */
-    abstract protected QuorumActorBase newActor(UUID serviceId);
+    abstract protected QuorumActorBase newActor(String logicalServiceId,
+            UUID serviceId);
 
     /**
      * Factory method invoked by {@link #start(QuorumClient)}.
@@ -373,11 +378,15 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      * Note: Additional information can be passed to the watcher factor by
      * derived classes. For example, the {@link UUID} of the logical service to
      * 
+     * @param logicalServiceId
+     *            The identifier of the logical service whose quorum state
+     *            will be watched.
+     * 
      * @return The {@link QuorumWatcher} which will inform this
      *         {@link AbstactQuorum} of changes occurring in the distributed
      *         state of the quorum.
      */
-    abstract protected QuorumWatcherBase newWatcher();
+    abstract protected QuorumWatcherBase newWatcher(String logicalServiceId);
 
     public String toString() {
         /*
@@ -749,6 +758,28 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         }
     }
 
+    public long awaitQuorum(final long timeout, final TimeUnit units)
+            throws InterruptedException, TimeoutException,
+            AsynchronousQuorumCloseException {
+        final long begin = System.nanoTime();
+        long nanos = units.toNanos(timeout);
+        if(!lock.tryLock(nanos, TimeUnit.NANOSECONDS))
+            throw new TimeoutException();
+        try {
+            // remaining -= (now - begin) [aka elapsed]
+            nanos -= System.nanoTime() - begin;
+            while (!isQuorumMet() && client != null) {
+                if(!quorumMeet.await(nanos,TimeUnit.NANOSECONDS))
+                    throw new TimeoutException();
+            }
+            if (client == null)
+                throw new AsynchronousQuorumCloseException();
+            return token;
+        } finally {
+            lock.unlock();
+        }
+    }
+
     /**
      * Base class for {@link QuorumActor} implementations. The methods on this
      * base class are designed maintain certain invariants in the distributed,
@@ -837,12 +868,29 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      */
     abstract protected class QuorumActorBase implements QuorumActor<S, C> {
 
-        private final UUID serviceId;
+        protected final String logicalServiceId;
+        protected final UUID serviceId;
 
         private final QuorumMember<S> client;
 
-        protected QuorumActorBase(final UUID serviceId) {
+        /**
+         * 
+         * @param logicalServiceId
+         *            The identifier of the logical service.
+         * @param serviceId
+         *            The {@link UUID} of the physical service.
+         */
+        protected QuorumActorBase(final String logicalServiceId,
+                final UUID serviceId) {
 
+            if (logicalServiceId == null)
+                throw new IllegalArgumentException();
+
+            if (serviceId == null)
+                throw new IllegalArgumentException();
+
+            this.logicalServiceId = logicalServiceId;
+            
             this.serviceId = serviceId;
 
             this.client = getClientAsMember();
@@ -1228,6 +1276,21 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      */
     abstract protected class QuorumWatcherBase implements QuorumWatcher<S, C> {
 
+        /**
+         * The identifier of the logical service whose quorum state is being
+         * watched.
+         */
+        protected final String logicalServiceUUID;
+
+        protected QuorumWatcherBase(final String logicalServiceId) {
+
+            if (logicalServiceId == null)
+                throw new IllegalArgumentException();
+            
+            this.logicalServiceUUID = logicalServiceId;
+            
+        }
+        
         /**
          * Method is invoked by {@link AbstractQuorum#start(QuorumClient)} and
          * provides the {@link QuorumWatcher} with an opportunity to setup setup
@@ -1648,7 +1711,10 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                      */
                     // This must be updated before the token is set.
                     assert lastValidToken != NO_QUORUM;
-                    // 
+                    /*
+                     * FIXME This is getting tripped by some unit tests. I think
+                     * that the problem is the MockQuorumFixture.
+                     */
                     assert joined.size() >= (k + 1) / 2 : "Not enough joined services: njoined="
                             + joined.size() + " : " + AbstractQuorum.this;
                 }
