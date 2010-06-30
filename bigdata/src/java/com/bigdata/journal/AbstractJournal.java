@@ -2237,9 +2237,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 */
 			final long commitRecordIndexAddr = _commitRecordIndex.writeCheckpoint();
 
-			// next offset at which user data would be written.
-			final long nextOffset = _bufferStrategy.getNextOffset();
-
             if (quorum != null) {
                 /*
                  * Verify that the last negotiated quorum is still in valid.
@@ -2254,6 +2251,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 * allocations.
 			 */
 			_bufferStrategy.commit();
+
+			/*
+			 *  next offset at which user data would be written.
+			 *  Calculated, after commit!
+			 */
+			
+			final long nextOffset = _bufferStrategy.getNextOffset();
 
 			/*
 			 * Prepare the new root block.
@@ -2578,7 +2582,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		// the address of the current commit record from the root block.
 		final long commitRecordAddr = _rootBlock.getCommitRecordAddr();
-
+		
+		if (log.isInfoEnabled())
+			log.info("Reading commit record from: " + commitRecordAddr);
+		
 		if (commitRecordAddr == NULL) {
 
 			// No commit record on the store yet.

@@ -329,7 +329,7 @@ public class RWStore implements IStore {
 
 	volatile private long m_commitCounter;
 
-	volatile private long m_metaBitsAddr;
+	volatile private int m_metaBitsAddr;
 
 	// Constructor
 
@@ -423,6 +423,11 @@ public class RWStore implements IStore {
 																					// file
 		}
 		
+		if (log.isInfoEnabled()) {
+			int commitRecordAddr = (int) (rbv.getCommitRecordAddr() >> 32);
+			log.info("CommitRecord " + rbv.getCommitRecordAddr() + " at physical address: " + physicalAddress(commitRecordAddr));
+		}
+		
 		long commitCounter = rbv.getCommitCounter();
 
 		int metaStartAddr = (int) -(metaAddr >> 32);
@@ -473,6 +478,10 @@ public class RWStore implements IStore {
 		m_nextAllocation = -(int) (nxtOffset >> 32);
 
 		m_metaBitsAddr = -(int) nxtOffset;
+		
+		if (log.isInfoEnabled()) {
+			log.info("MetaBitsAddr: " + m_metaBitsAddr);
+		}
 
 		long metaAddr = m_rb.getMetaStartAddr();
 		m_metaStartAddr = (int) -(metaAddr >> 32);
@@ -485,6 +494,9 @@ public class RWStore implements IStore {
 														// sufficient)
 		rawmbaddr >>= 16;
 		m_metaBits = new int[m_metaBitsSize];
+		if (log.isInfoEnabled()) {
+			log.info("Raw MetaBitsAddr: " + rawmbaddr);
+		}
 
 		// RWStore now restore metabits
 		byte[] buf = new byte[m_metaBitsSize * 4];
@@ -502,9 +514,14 @@ public class RWStore implements IStore {
 		checkCoreAllocations();
 
 		readAllocationBlocks();
+		
+		if (physicalAddress(m_metaBitsAddr) == 0) {
+			throw new IllegalStateException("Free/Invalid metaBitsAddr on load");
+		}
 
 		if (log.isInfoEnabled())
-			log.info("restored from RootBlock: " + m_nextAllocation + ", " + m_metaStartAddr + ", " + m_metaBitsAddr);
+			log.info("restored from RootBlock: " + m_nextAllocation 
+					+ ", " + m_metaStartAddr + ", " + m_metaBitsAddr);
 	}
 
 	/*********************************************************************
@@ -534,15 +551,13 @@ public class RWStore implements IStore {
 			if (tstBit(m_metaBits, i++)) {
 				byte buf[] = new byte[ALLOC_BLOCK_SIZE];
 
-//				m_raf.seek(addr);
-//				m_raf.readFully(buf);
-//				m_raf.getChannel().read(ByteBuffer.wrap(buf), addr);
 				FileChannelUtility.readAll(m_reopener, ByteBuffer.wrap(buf), addr);
 				
 				DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
 
 				int allocSize = strBuf.readInt(); // will return Blob startAddress if Blob and be < 0
 				Allocator allocator = null;
+				ArrayList freeList = null;
 				if (allocSize > 0) {
 					int index = 0;
 					int fixedSize = MIN_FIXED_ALLOC;
@@ -551,14 +566,14 @@ public class RWStore implements IStore {
 
 					allocator = new FixedAllocator(allocSize, m_preserveSession, m_writeCache);
 					
-					allocator.setFreeList(m_freeFixed[index]);
+					freeList = m_freeFixed[index];
 				} else {
 					allocator = new BlobAllocator(this, allocSize);
-					allocator.setFreeList(m_freeBlobs);
+					freeList = m_freeBlobs;
 				}
 
 				allocator.read(strBuf);
-
+				allocator.setFreeList(freeList);
 
 				blocks.add(allocator);
 
@@ -809,7 +824,6 @@ public class RWStore implements IStore {
 	 * @param sze 
 	 */
 	public void free(long laddr, int sze) {
-
 		int addr = (int) laddr;
 
 		switch (addr) {
@@ -913,6 +927,18 @@ public class RWStore implements IStore {
 
 					m_allocs.add(allocator);
 				} else {
+					// Verify free list only has allocators with free bits
+					{
+						int tsti = 0;
+						Iterator<Allocator> allocs = list.iterator();
+						while (allocs.hasNext()) {
+							Allocator tstAlloc = allocs.next();
+							if (!tstAlloc.hasFree()) {
+								throw new IllegalStateException("Free list contains full allocator, " + tsti + " of " + list.size());
+							}
+							tsti++;
+						}
+					}
 					allocator = (Allocator) list.get(0);
 					addr = allocator.alloc(this, size);
 					if (addr == 0) {
@@ -969,7 +995,7 @@ public class RWStore implements IStore {
 	 * TODO: Instead of using PSOutputStream instead manage allocations written
 	 * to the WriteCacheService, building BlobHeader as you go.
 	 **/
-	public long alloc(byte buf[], int size) {
+	public long alloc(byte buf[], final int size) {
 		if (size >= MAX_FIXED_ALLOC) {
 			if (log.isDebugEnabled())
 				log.debug("BLOB ALLOC: " + size);
@@ -996,7 +1022,6 @@ public class RWStore implements IStore {
 		int chk = ChecksumUtility.getCHK().checksum(buf, size);
 
 		try {
-			// System.out.println("Writing checksum: " + chk + "for buffer size: " + size);
 			m_writeCache.write(physicalAddress(newAddr), ByteBuffer.wrap(buf,  0, size), chk);
 		} catch (IllegalStateException e) {
 			reopen(m_fmv);
@@ -1108,7 +1133,10 @@ public class RWStore implements IStore {
 
 		str.flush();
 
-		long addr = physicalAddress((int) m_metaBitsAddr);
+		long addr = physicalAddress(m_metaBitsAddr);
+		if (addr == 0) {
+			throw new IllegalStateException("Invalid metabits address: " + m_metaBitsAddr);
+		}
 		try {
 			m_writeCache.write(addr, ByteBuffer.wrap(buf), 0, false);
 		} catch (IllegalStateException e) {
@@ -1206,6 +1234,13 @@ public class RWStore implements IStore {
 				long oldMetaBits = m_metaBitsAddr;
 				int oldMetaBitsSize = m_metaBitsSize * 4;
 				m_metaBitsAddr = alloc(getRequiredMetaBitsStorage());
+				// System.out.println("Allocated metaBits: " + m_metaBitsAddr);
+				// DEBUG SANITY CHECK!
+				if (physicalAddress(m_metaBitsAddr) == 0) {
+					throw new IllegalStateException("Returned MetaBits Address not valid!");
+				}
+
+				// System.out.println("Freeing metaBits: " + oldMetaBits);
 				free(oldMetaBits, oldMetaBitsSize);
 
 				// save allocation headers
@@ -1936,8 +1971,12 @@ public class RWStore implements IStore {
 	public long getMetaBitsAddr() {
 		long ret = physicalAddress((int) m_metaBitsAddr);
 		ret <<= 16;
-		ret += m_metaBitsSize;
+		
+		if (log.isDebugEnabled())
+			log.debug("Returning metabitsAddr: " + ret + ", for " + m_metaBitsAddr);
 
+		ret += m_metaBitsSize;
+		
 		return ret;
 	}
 
@@ -1963,6 +2002,9 @@ public class RWStore implements IStore {
 		long ret = -m_nextAllocation;
 		ret <<= 32;
 		ret += -m_metaBitsAddr;
+
+		if (log.isDebugEnabled())
+			log.debug("Returning nextOffset: " + ret + ", for " + m_metaBitsAddr);
 
 		return ret;
 	}

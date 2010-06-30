@@ -47,9 +47,20 @@ import com.bigdata.util.ChecksumUtility;
  * The hook that accesses the RWStore to provide read/write services as opposed
  * to the WORM characteristics of the DiskOnlyStrategy AddressManager
  * 
+ * The intent behind this approach is to try to manage the protocol
+ * differences between the IStore implementation, assumed as a backing
+ * service to the CTC ObjectManager, and an IBufferStrategy service for a
+ * BigData Journal.
+ * 
+ * The most fundamental difference is with the root data, with RootBlock
+ * including both low-level store data - such as metabits info - and
+ * higher level, journal maintained data.
+ * 
+ * TODO: Rationalise rootBlock access - use rootblock held by RWStore
+ * 
  * TODO: Implement use of IByteArraySlice as alternative to ByteBuffer
  * 
- * @author mgc
+ * @author Martyn Cutcher
  */
 public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHABufferStrategy {
     protected static final Logger log = Logger.getLogger(RWStrategy.class);
@@ -196,10 +207,14 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 			throw new IllegalArgumentException();
 		}
 		
-		byte buf[] = new byte[sze];
+		/**
+		 * Allocate buffer to include checksum to allow single read
+		 * but then return ByteBuffer excluding those bytes
+		 */
+		byte buf[] = new byte[sze+4]; // 4 bytes for checksum
 		m_store.getData(rwaddr, buf);
 
-		return ByteBuffer.wrap(buf);
+		return ByteBuffer.wrap(buf, 0, sze);
 	}
 
 	public long write(ByteBuffer data) {
@@ -374,7 +389,17 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		try {
 			m_store.checkRootBlock(rootBlock);
 			
+			if (log.isInfoEnabled()) {
+				log.info("Writing new rootblock with commitCounter: " 
+						+ rootBlock.getCommitCounter()
+						+ ", commitRecordAddr: " + rootBlock.getCommitRecordAddr()
+						+ ", commitRecordIndexAddr: " + rootBlock.getCommitRecordIndexAddr());
+			}
+			
 			m_fileMetadata.writeRootBlock(rootBlock, forceOnCommit);
+			
+			// Current rootBlock is retained
+			m_rb = rootBlock;
 
 		}
 
