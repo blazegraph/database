@@ -1224,8 +1224,9 @@ public class FileMetadata {
 		}
 
 		if (log.isDebugEnabled())
-			log.debug("Writing ROOTBLOCK");
-
+			log.debug("Writing ROOTBLOCK with commitCounter: " + rootBlock.getCommitCounter()
+					+ ", commitRecordIndexAddr: " + rootBlock.getCommitRecordIndexAddr()
+					+ ", commitRecordAddr: " + rootBlock.getCommitRecordAddr());
 	}
 
 	/**
