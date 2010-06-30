@@ -12,7 +12,7 @@ import com.bigdata.rdf.model.BigdataValue;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @see BigdataValue#getTermId()
+ * @see BigdataValue#getIV()
  */
 public class KVOTermIdComparator implements Comparator<KVO<BigdataValue>> {
 
@@ -25,8 +25,8 @@ public class KVOTermIdComparator implements Comparator<KVO<BigdataValue>> {
     public int compare(final KVO<BigdataValue> term1,
             final KVO<BigdataValue> term2) {
 
-        final long id1 = term1.obj.getTermId();
-        final long id2 = term2.obj.getTermId();
+        final long id1 = term1.obj.getIV();
+        final long id2 = term2.obj.getIV();
 
         if (id1 < id2)
             return -1;

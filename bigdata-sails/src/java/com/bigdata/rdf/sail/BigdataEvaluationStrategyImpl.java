@@ -980,7 +980,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         if (val == null) {
             result = com.bigdata.relation.rule.Var.var(name);
         } else {
-            final Long id = database.getTermId(val);
+            final Long id = database.getIV(val);
             if (id.longValue() == NULL)
                 return null;
             result = new Constant<Long>(id);
@@ -1031,7 +1031,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             var = com.bigdata.relation.rule.Var.var(((Var) left).getName());
         } else if (left instanceof ValueConstant) {
             Value value = ((ValueConstant) left).getValue();
-            final Long id = database.getTermId(value);
+            final Long id = database.getIV(value);
             if (id.longValue() == NULL)
                 return null;
             constant = new Constant<Long>(id);
@@ -1043,7 +1043,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             var = com.bigdata.relation.rule.Var.var(((Var) right).getName());
         } else if (right instanceof ValueConstant) {
             Value value = ((ValueConstant) right).getValue();
-            final Long id = database.getTermId(value);
+            final Long id = database.getIV(value);
             if (id.longValue() == NULL)
                 return null;
             constant = new Constant<Long>(id);

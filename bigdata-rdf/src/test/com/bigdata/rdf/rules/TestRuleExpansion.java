@@ -141,13 +141,13 @@ public class TestRuleExpansion extends AbstractInferenceEngineTestCase {
 //                buffer.flush();
             }
             
-            termIds.put(A, db.getTermId(A));
-            termIds.put(B, db.getTermId(B));
-            termIds.put(W, db.getTermId(W));
-            termIds.put(X, db.getTermId(X));
-            termIds.put(Y, db.getTermId(Y));
-            termIds.put(Z, db.getTermId(Z));
-            termIds.put(OWL.SAMEAS, db.getTermId(OWL.SAMEAS));
+            termIds.put(A, db.getIV(A));
+            termIds.put(B, db.getIV(B));
+            termIds.put(W, db.getIV(W));
+            termIds.put(X, db.getIV(X));
+            termIds.put(Y, db.getIV(Y));
+            termIds.put(Z, db.getIV(Z));
+            termIds.put(OWL.SAMEAS, db.getIV(OWL.SAMEAS));
             
             if (log.isInfoEnabled())
                 log.info("\n" +db.dumpStore(true, true, false));

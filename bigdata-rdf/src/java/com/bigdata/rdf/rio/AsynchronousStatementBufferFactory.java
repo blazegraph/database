@@ -2762,7 +2762,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                 } else {
 
                     // assign the term identifier.
-                    chunk[i].obj.setTermId(termId);
+                    chunk[i].obj.setIV(termId);
 
                     if (chunk[i] instanceof KVOList) {
 
@@ -3057,13 +3057,13 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                         }
 
-                        if (v.getTermId() == IRawTripleStore.NULL) {
+                        if (v.getIV() == IRawTripleStore.NULL) {
 
                             throw new RuntimeException("No TID: " + v);
 
                         }
 
-                        final byte[] key = tmp.reset().append(v.getTermId())
+                        final byte[] key = tmp.reset().append(v.getIV())
                                 .getKey();
 
                         // Serialize the term.

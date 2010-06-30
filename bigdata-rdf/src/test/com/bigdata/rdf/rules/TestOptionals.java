@@ -150,23 +150,23 @@ public class TestOptionals extends AbstractInferenceEngineTestCase {
 //                buffer.flush();
             }
             
-            final long a = db.getTermId(A); termIds.put(A, a);
-            final long b = db.getTermId(B); termIds.put(B, b);
+            final long a = db.getIV(A); termIds.put(A, a);
+            final long b = db.getIV(B); termIds.put(B, b);
 //            final long c = noClosure.getTermId(C);
 //            final long d = noClosure.getTermId(D);
 //            final long e = noClosure.getTermId(E);
 //            final long v = noClosure.getTermId(V);
             // final long w = db.getTermId(W); termIds.put(W, w);
-            final long x = db.getTermId(X); termIds.put(X, x);
+            final long x = db.getIV(X); termIds.put(X, x);
             // final long y = db.getTermId(Y); termIds.put(Y, y);
             // final long z = db.getTermId(Z); termIds.put(Z, z);
             // final long SAMEAS = db.getTermId(OWL.SAMEAS); termIds.put(OWL.SAMEAS, SAMEAS);
-            termIds.put(foo, db.getTermId(foo));
-            termIds.put(bar, db.getTermId(bar));
-            final long TYPE = db.getTermId(RDF.TYPE); termIds.put(RDF.TYPE, TYPE);
-            final long LABEL = db.getTermId(RDFS.LABEL); termIds.put(RDFS.LABEL, LABEL);
-            final long COMMENT = db.getTermId(RDFS.COMMENT); termIds.put(RDFS.COMMENT, COMMENT);
-            final long RESOURCE = db.getTermId(RDFS.RESOURCE); termIds.put(RDFS.RESOURCE, RESOURCE);
+            termIds.put(foo, db.getIV(foo));
+            termIds.put(bar, db.getIV(bar));
+            final long TYPE = db.getIV(RDF.TYPE); termIds.put(RDF.TYPE, TYPE);
+            final long LABEL = db.getIV(RDFS.LABEL); termIds.put(RDFS.LABEL, LABEL);
+            final long COMMENT = db.getIV(RDFS.COMMENT); termIds.put(RDFS.COMMENT, COMMENT);
+            final long RESOURCE = db.getIV(RDFS.RESOURCE); termIds.put(RDFS.RESOURCE, RESOURCE);
             
             if (log.isInfoEnabled())
                 log.info("\n" +db.dumpStore(true, true, false));

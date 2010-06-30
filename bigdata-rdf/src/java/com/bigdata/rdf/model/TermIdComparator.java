@@ -4,12 +4,12 @@ import java.util.Comparator;
 
 /**
  * Places {@link BigdataValue}s into an ordering determined by their assigned
- * {@link BigdataValue#getTermId() term identifiers}.
+ * {@link BigdataValue#getIV() term identifiers}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @see BigdataValue#getTermId()
+ * @see BigdataValue#getIV()
  */
 public class TermIdComparator implements Comparator<BigdataValue> {
 
@@ -22,8 +22,8 @@ public class TermIdComparator implements Comparator<BigdataValue> {
      */
     public int compare(BigdataValue term1, BigdataValue term2) {
 
-        final long id1 = term1.getTermId();
-        final long id2 = term2.getTermId();
+        final long id1 = term1.getIV();
+        final long id2 = term2.getIV();
         
         if(id1 < id2) return -1;
         if(id1 > id2) return 1;

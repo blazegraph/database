@@ -230,7 +230,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 //                // 64 bit random term identifier.
 //                final long termId = r.nextLong();
 
-                final InternalValue<?, ?> v = new AbstractInternalValue(vte,
+                final IV<?, ?> v = new AbstractInternalValue(vte,
                         true/* inline */, false/* extension */, dte) {
 
                     @Override
@@ -341,7 +341,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      * @return The key builder.
      */
     private void encodeValue(final IKeyBuilder keyBuilder,
-            final InternalValue<?, ?> v) {
+            final IV<?, ?> v) {
 
         // First emit the flags byte.
         keyBuilder.append(v.flags());
@@ -426,7 +426,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      * @param key
      *            The key.
      * 
-     * @return An ordered array of the {@link InternalValue}s for that key.
+     * @return An ordered array of the {@link IV}s for that key.
      * 
      *         FIXME handle all of the inline value types.
      * 
@@ -434,9 +434,9 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      *         will have to scope how the RDF Value is represented to the
      *         lexicon relation with which it is associated.
      */
-    public InternalValue<?, ?>[] decodeStatementKey(final byte[] key) {
+    public IV<?, ?>[] decodeStatementKey(final byte[] key) {
         
-        final InternalValue<?,?>[] a = new InternalValue[4];
+        final IV<?,?>[] a = new IV[4];
 
         // The byte offset into the key.
         int offset = 0;
@@ -473,7 +473,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
             final DTE dte = AbstractInternalValue
                     .getInternalDataTypeEnum(flags);
             
-            final InternalValue<?,?> v;
+            final IV<?,?> v;
             switch (dte) {
             case XSDBoolean: {
                 final byte x = KeyBuilder.decodeByte(key[offset++]);
@@ -622,8 +622,8 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      * @return
      */
     private byte[] encodeStatement(final IKeyBuilder keyBuilder,
-            final InternalValue<?, ?> s, final InternalValue<?, ?> p,
-            final InternalValue<?, ?> o, final InternalValue<?, ?> c) {
+            final IV<?, ?> s, final IV<?, ?> p,
+            final IV<?, ?> o, final IV<?, ?> c) {
 
         keyBuilder.reset();
 
@@ -644,13 +644,13 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     }
 
     /**
-     * Encodes an array of {@link InternalValue}s and then decodes them and
+     * Encodes an array of {@link IV}s and then decodes them and
      * verifies that the decoded values are equal-to the original values.
      * 
      * @param e
      *            The array of the expected values.
      */
-    protected void doEncodeDecodeTest(final InternalValue<?, ?>[] e) {
+    protected void doEncodeDecodeTest(final IV<?, ?>[] e) {
 
         /*
          * Encode.
@@ -672,7 +672,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
          * Decode
          */
         {
-            final InternalValue<?, ?>[] a = decodeStatementKey(key);
+            final IV<?, ?>[] a = decodeStatementKey(key);
 
             for (int i = 0; i < e.length; i++) {
 
@@ -695,7 +695,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      */
     public void test_SPO_encodeDecode_allTermIds() {
 
-        final InternalValue<?, ?>[] e = {//
+        final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
                 new TermId<BigdataURI>(VTE.URI, 3L),//
@@ -711,7 +711,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      */
     public void test_SPO_encodeDecode_XSDBoolean() {
 
-        final InternalValue<?, ?>[] e = {//
+        final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDBooleanInternalValue<BigdataLiteral>(true),//
@@ -731,7 +731,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      */
     public void test_SPO_encodeDecode_XSDByte() {
 
-        final InternalValue<?, ?>[] e = {//
+        final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDByteInternalValue<BigdataLiteral>((byte)1),//
@@ -763,7 +763,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      */
     public void test_SPO_encodeDecode_XSDShort() {
 
-        final InternalValue<?, ?>[] e = {//
+        final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDShortInternalValue<BigdataLiteral>((short)1),//
@@ -795,7 +795,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      */
     public void test_SPO_encodeDecode_XSDInt() {
 
-        final InternalValue<?, ?>[] e = {//
+        final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDIntInternalValue<BigdataLiteral>(1),//
@@ -827,7 +827,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      */
     public void test_SPO_encodeDecode_XSDLong() {
 
-        final InternalValue<?, ?>[] e = {//
+        final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDLongInternalValue<BigdataLiteral>(1L),//
@@ -859,7 +859,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      */
     public void test_SPO_encodeDecode_XSDFloat() {
 
-        final InternalValue<?, ?>[] e = {//
+        final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDFloatInternalValue<BigdataLiteral>(1f),//
@@ -907,7 +907,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      */
     public void test_SPO_encodeDecode_XSDDouble() {
 
-        final InternalValue<?, ?>[] e = {//
+        final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDDoubleInternalValue<BigdataLiteral>(1d),//
@@ -966,7 +966,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      */
     public void test_SPO_encodeDecode_XSDFloat_NaN() {
 
-        final InternalValue<?, ?>[] e = {//
+        final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDFloatInternalValue<BigdataLiteral>(Float.NaN),//
@@ -995,7 +995,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      */
     public void test_SPO_encodeDecode_XSDDouble_NaN() {
 
-        final InternalValue<?, ?>[] e = {//
+        final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDDoubleInternalValue<BigdataLiteral>(Double.NaN),//
@@ -1013,7 +1013,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      */
     public void test_SPO_encodeDecode_UUID() {
 
-        final InternalValue<?, ?>[] e = {//
+        final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
                 new UUIDInternalValue<BigdataLiteral>(UUID.randomUUID()),//
@@ -1037,7 +1037,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      */
     public void test_SPO_encodeDecode_XSDInteger() {
 
-        final InternalValue<?, ?>[] e = {//
+        final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDIntegerInternalValue<BigdataLiteral>(BigInteger

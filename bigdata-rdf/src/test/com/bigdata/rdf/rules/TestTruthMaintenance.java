@@ -115,9 +115,9 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             
             store.addTerms(new BigdataValue[] { x, y, z });
             
-            final long x1 = x.getTermId();
-            final long y2 = y.getTermId();
-            final long z3 = z.getTermId();
+            final long x1 = x.getIV();
+            final long y2 = y.getIV();
+            final long z3 = z.getIV();
             
             /*
              * Setup the database.

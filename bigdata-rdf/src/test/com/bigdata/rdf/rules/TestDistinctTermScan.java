@@ -121,7 +121,7 @@ public class TestDistinctTermScan extends AbstractRuleTestCase {
 
                 Long[] expected = new Long[] {
 
-                store.getTermId(A), store.getTermId(C)
+                store.getIV(A), store.getIV(C)
 
                 };
 
@@ -138,7 +138,7 @@ public class TestDistinctTermScan extends AbstractRuleTestCase {
 
                 Long[] expected = new Long[] {
 
-                store.getTermId(B), store.getTermId(E)
+                store.getIV(B), store.getIV(E)
 
                 };
 
@@ -155,7 +155,7 @@ public class TestDistinctTermScan extends AbstractRuleTestCase {
 
                 Long[] expected = new Long[] {
 
-                store.getTermId(C), store.getTermId(D)
+                store.getIV(C), store.getIV(D)
 
                 };
 

@@ -222,11 +222,11 @@ public class DefaultGraphSolutionExpander implements ISolutionExpander<ISPO> {
 
             final BigdataURI uri = (BigdataURI) itr.next();
 
-            if (uri.getTermId() != IRawTripleStore.NULL) {
+            if (uri.getIV() != IRawTripleStore.NULL) {
 
                 if (++nknownLocal == 1) {
 
-                    firstContextLocal = uri.getTermId();
+                    firstContextLocal = uri.getIV();
 
                 }
 
@@ -687,7 +687,7 @@ public class DefaultGraphSolutionExpander implements ISolutionExpander<ISPO> {
                 
                 for (URI g : defaultGraphs) {
 
-                    final long termId = ((BigdataURI)g).getTermId();
+                    final long termId = ((BigdataURI)g).getIV();
 
                     if (termId == IRawTripleStore.NULL) {
 
@@ -868,7 +868,7 @@ public class DefaultGraphSolutionExpander implements ISolutionExpander<ISPO> {
                 
                 for(URI g : defaultGraphs) {
 
-                    final long termId = ((BigdataURI)g).getTermId();
+                    final long termId = ((BigdataURI)g).getIV();
 
                     if (termId == IRawTripleStore.NULL) {
                         

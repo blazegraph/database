@@ -183,21 +183,21 @@ public class TestSlice extends AbstractRuleTestCase {
                     Var.var("y"), Var.var("z") };
             
             final IBindingSet bs0 = new ArrayBindingSet(vars, new IConstant[] {//
-                    new Constant<Long>(x0.getTermId()),//
-                    new Constant<Long>(y0.getTermId()),//
-                    new Constant<Long>(z0.getTermId())//
+                    new Constant<Long>(x0.getIV()),//
+                    new Constant<Long>(y0.getIV()),//
+                    new Constant<Long>(z0.getIV())//
                     }
             ); 
             final IBindingSet bs1 = new ArrayBindingSet(vars, new IConstant[] {//
-                    new Constant<Long>(x1.getTermId()),//
-                    new Constant<Long>(y1.getTermId()),//
-                    new Constant<Long>(z1.getTermId())//
+                    new Constant<Long>(x1.getIV()),//
+                    new Constant<Long>(y1.getIV()),//
+                    new Constant<Long>(z1.getIV())//
                     }
             ); 
             final IBindingSet bs2 = new ArrayBindingSet(vars, new IConstant[] {//
-                    new Constant<Long>(x2.getTermId()),//
-                    new Constant<Long>(y2.getTermId()),//
-                    new Constant<Long>(z2.getTermId())//
+                    new Constant<Long>(x2.getIV()),//
+                    new Constant<Long>(y2.getIV()),//
+                    new Constant<Long>(z2.getIV())//
                     }
             ); 
             
@@ -273,19 +273,19 @@ public class TestSlice extends AbstractRuleTestCase {
     protected IRule newRule(AbstractTripleStore store, ISlice slice,
             BigdataValue foo, BigdataValue bar) {
         
-        assert foo.getTermId() != NULL;
-        assert bar.getTermId() != NULL;
+        assert foo.getIV() != NULL;
+        assert bar.getIV() != NULL;
         
         return new Rule<ISPO>(getName(),
                 null/* head */, new SPOPredicate[] {
                 //
                 new SPOPredicate(store.getSPORelation()
                     .getNamespace(), Var.var("x"), new Constant<Long>(foo
-                    .getTermId()), Var.var("y")),
+                    .getIV()), Var.var("y")),
                 //
                 new SPOPredicate(store.getSPORelation()
                             .getNamespace(), Var.var("y"), new Constant<Long>(bar
-                            .getTermId()), Var.var("z")),
+                            .getIV()), Var.var("z")),
                 },//
                 new QueryOptions(false/* distinct */, true/* stable */,
                         null/* orderBy */, slice),//

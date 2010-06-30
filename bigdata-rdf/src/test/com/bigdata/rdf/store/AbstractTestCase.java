@@ -418,7 +418,7 @@ abstract public class AbstractTestCase
                 
                 final BigdataValue term = tuple.getObject();
                 
-                System.err.println(term.getTermId()+ ":" + term);
+                System.err.println(term.getIV()+ ":" + term);
 
             }
 
@@ -1021,7 +1021,7 @@ abstract public class AbstractTestCase
                 int nunknown = 0;
                 for (BigdataValue term : terms) {
 
-                    if (term.getTermId() == NULL) {
+                    if (term.getIV() == NULL) {
 
                         error("Unknown term: " + term);
                         
@@ -1053,7 +1053,7 @@ abstract public class AbstractTestCase
                 
                 for(BigdataValue term : termSet.values()) {
                     
-                    final long id = term.getTermId();
+                    final long id = term.getIV();
                     
                     if (id == NULL) {
 
@@ -1071,7 +1071,7 @@ abstract public class AbstractTestCase
                 
                 for(BigdataValue expectedTerm : termSet.values()) {
                     
-                    final long id = expectedTerm.getTermId();
+                    final long id = expectedTerm.getIV();
                     
                     if (id == NULL) {
 
@@ -1146,8 +1146,8 @@ abstract public class AbstractTestCase
                     } else {
 
                         // Leave the StatementType blank for bulk complete.
-                        b[n2++] = new SPO(s.getTermId(), p.getTermId(), o
-                                .getTermId() /*, StatementType */);
+                        b[n2++] = new SPO(s.getIV(), p.getIV(), o
+                                .getIV() /*, StatementType */);
 
                     }
                     

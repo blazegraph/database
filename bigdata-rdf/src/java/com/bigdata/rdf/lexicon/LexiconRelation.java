@@ -78,6 +78,7 @@ import com.bigdata.io.FixedByteArrayBuffer;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc.Term2IdWriteProcConstructor;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataValue;
@@ -1622,7 +1623,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                             .deserialize(data);
                     
                     // Set the term identifier.
-                    value.setTermId(lid.longValue());
+                    value.setIV(lid.longValue());
 
                     if (termCache != null) {
 
@@ -1653,8 +1654,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                      * IllegalStateException if the value somehow was assigned
                      * the wrong term identifier (paranoia test).
                      */
-                    assert value.getTermId() == lid : "expecting id=" + lid
-                            + ", but found " + value.getTermId();
+                    assert value.getIV() == lid : "expecting id=" + lid
+                            + ", but found " + value.getIV();
 					assert (value).getValueFactory() == valueFactory;
 
                     // save in caller's concurrent map.
@@ -1909,7 +1910,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                     + Long.toString(id));
 
             // set the term identifier on the object.
-            stmt.setTermId(id);
+            stmt.setIV(id);
 
             // mark as a statement identifier.
 			stmt.setStatementIdentifier(true);
@@ -1937,7 +1938,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                     + Long.toString(id));
 
             // set the term identifier on the object.
-            bnode.setTermId(id);
+            bnode.setIV(id);
 
             return bnode;
 
@@ -1961,7 +1962,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * <p>
      * Note: Statement identifiers (when enabled) are not stored in the reverse
      * lexicon and are recognized using
-     * {@link AbstractTripleStore#isStatement(long)}. If the term identifier is
+     * {@link AbstractTripleStore#isStatement(IV)}. If the term identifier is
      * recognized as being, in fact, a statement identifier, then it is
      * externalized as a {@link BNode}. This fits rather well with the notion
      * in a quad store that the context position may be either a {@link URI} or
@@ -1970,7 +1971,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * <p>
      * Note: Handles both unisolatable and isolatable indices.
      * <P>
-     * Note: Sets {@link BigdataValue#getTermId()} as a side-effect.
+     * Note: Sets {@link BigdataValue#getIV()} as a side-effect.
      * <p>
      * Note: this always mints a new {@link BNode} instance when the term
      * identifier identifies a {@link BNode} or a {@link Statement}.
@@ -2008,7 +2009,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         value = valueFactory.getValueSerializer().deserialize(data);
         
         // This sets the term identifier.
-        value.setTermId(id);
+        value.setIV(id);
 
         if (termCache != null) {
 
@@ -2040,8 +2041,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
         }
 
-        assert value.getTermId() == id : "expecting id=" + id + ", but found "
-                + value.getTermId();
+        assert value.getIV() == id : "expecting id=" + id + ", but found "
+                + value.getIV();
         //        value.setTermId( id );
 
         return value;
@@ -2049,9 +2050,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     }
 
     /**
-     * Note: If {@link BigdataValue#getTermId()} is set, then returns that value
+     * Note: If {@link BigdataValue#getIV()} is set, then returns that value
      * immediately. Otherwise looks up the termId in the index and
-     * {@link BigdataValue#setTermId(long) sets the term identifier} as a
+     * {@link BigdataValue#setIV(IV) sets the term identifier} as a
      * side-effect.
      */
     final public long getTermId(final Value value) {
@@ -2063,9 +2064,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         }
 
         if (value instanceof BigdataValue
-                && ((BigdataValue) value).getTermId() != IRawTripleStore.NULL) {
+                && ((BigdataValue) value).getIV() != IRawTripleStore.NULL) {
 
-            return ((BigdataValue) value).getTermId();
+            return ((BigdataValue) value).getIV();
 
         }
 
@@ -2111,7 +2112,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 			final BigdataValue impl = (BigdataValue) value;
             
             // set as side-effect.
-            impl.setTermId(termId);
+            impl.setIV(termId);
 
             /*
              * Note that we have the termId and the term, we stick the value
@@ -2340,7 +2341,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                 
                 final BigdataValue term = tuple.getObject();
                 
-                sb.append(term.getTermId()+ " : " + term+"\n");
+                sb.append(term.getIV()+ " : " + term+"\n");
 
             }
 

@@ -161,19 +161,19 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             
             final SPO[] stmts = new SPO[] {
 
-                new SPO(x.getTermId(), rdfType.getTermId(), C.getTermId(), StatementEnum.Explicit),
-                new SPO(y.getTermId(), rdfType.getTermId(), B.getTermId(), StatementEnum.Explicit),
-                new SPO(z.getTermId(), rdfType.getTermId(), A.getTermId(), StatementEnum.Explicit),
+                new SPO(x.getIV(), rdfType.getIV(), C.getIV(), StatementEnum.Explicit),
+                new SPO(y.getIV(), rdfType.getIV(), B.getIV(), StatementEnum.Explicit),
+                new SPO(z.getIV(), rdfType.getIV(), A.getIV(), StatementEnum.Explicit),
                 
-                new SPO(A.getTermId(), rdfsLabel.getTermId(), lit1.getTermId(), StatementEnum.Explicit),
-                new SPO(B.getTermId(), rdfsLabel.getTermId(), lit2.getTermId(), StatementEnum.Explicit),
-                new SPO(C.getTermId(), rdfsLabel.getTermId(), lit3.getTermId(), StatementEnum.Explicit),
+                new SPO(A.getIV(), rdfsLabel.getIV(), lit1.getIV(), StatementEnum.Explicit),
+                new SPO(B.getIV(), rdfsLabel.getIV(), lit2.getIV(), StatementEnum.Explicit),
+                new SPO(C.getIV(), rdfsLabel.getIV(), lit3.getIV(), StatementEnum.Explicit),
                 
-                new SPO(B.getTermId(), rdfsSubClassOf.getTermId(), A.getTermId(), StatementEnum.Explicit),
-                new SPO(C.getTermId(), rdfsSubClassOf.getTermId(), B.getTermId(), StatementEnum.Explicit),
+                new SPO(B.getIV(), rdfsSubClassOf.getIV(), A.getIV(), StatementEnum.Explicit),
+                new SPO(C.getIV(), rdfsSubClassOf.getIV(), B.getIV(), StatementEnum.Explicit),
                     
-                new SPO(bn1.getTermId(), rdfsLabel.getTermId(), lit1.getTermId(), StatementEnum.Explicit),
-                new SPO(bn2.getTermId(), rdfsLabel.getTermId(), lit2.getTermId(), StatementEnum.Explicit),
+                new SPO(bn1.getIV(), rdfsLabel.getIV(), lit1.getIV(), StatementEnum.Explicit),
+                new SPO(bn2.getIV(), rdfsLabel.getIV(), lit2.getIV(), StatementEnum.Explicit),
 
             };
 
@@ -460,7 +460,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             
             final SPO[] stmts1 = new SPO[] {
 
-                new SPO(x.getTermId(), rdfType.getTermId(), A.getTermId(), StatementEnum.Explicit),
+                new SPO(x.getIV(), rdfType.getIV(), A.getIV(), StatementEnum.Explicit),
                 
             };
             
@@ -470,7 +470,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             
             final SPO[] stmts2 = new SPO[] {
               
-                    new SPO(sid1, dcCreator.getTermId(), lit1.getTermId(), StatementEnum.Explicit),
+                    new SPO(sid1, dcCreator.getIV(), lit1.getIV(), StatementEnum.Explicit),
                     
             };
 
@@ -576,7 +576,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
              */
             SPO[] stmts1 = new SPO[] {
 
-                new SPO(x.getTermId(), rdfType.getTermId(), A.getTermId(), StatementEnum.Explicit),
+                new SPO(x.getIV(), rdfType.getIV(), A.getIV(), StatementEnum.Explicit),
                 
             };
             
@@ -592,7 +592,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             
             SPO[] stmts2 = new SPO[] {
                     
-                    new SPO(sid1, dcCreator.getTermId(), lit1.getTermId(), StatementEnum.Explicit),
+                    new SPO(sid1, dcCreator.getIV(), lit1.getIV(), StatementEnum.Explicit),
                     
             };
 
@@ -610,7 +610,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
             SPO[] stmts3 = new SPO[] {
                     
-                    new SPO(sid2, dcCreator.getTermId(), lit2.getTermId(),
+                    new SPO(sid2, dcCreator.getIV(), lit2.getIV(),
                     StatementEnum.Explicit),
                     
             };

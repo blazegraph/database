@@ -104,16 +104,16 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
 
             }
             
-            final long a = noClosure.getTermId(A);
-            final long b = noClosure.getTermId(B);
-            final long w = noClosure.getTermId(W);
-            final long x = noClosure.getTermId(X);
-            final long y = noClosure.getTermId(Y);
-            final long z = noClosure.getTermId(Z);
-            final long same = noClosure.getTermId(OWL.SAMEAS);
-            final long type = noClosure.getTermId(RDF.TYPE);
-            final long property = noClosure.getTermId(RDF.PROPERTY);
-            final long subpropof = noClosure.getTermId(RDFS.SUBPROPERTYOF);
+            final long a = noClosure.getIV(A);
+            final long b = noClosure.getIV(B);
+            final long w = noClosure.getIV(W);
+            final long x = noClosure.getIV(X);
+            final long y = noClosure.getIV(Y);
+            final long z = noClosure.getIV(Z);
+            final long same = noClosure.getIV(OWL.SAMEAS);
+            final long type = noClosure.getIV(RDF.TYPE);
+            final long property = noClosure.getIV(RDF.PROPERTY);
+            final long subpropof = noClosure.getIV(RDFS.SUBPROPERTYOF);
             
             if (log.isInfoEnabled())
                 log.info("\n" +noClosure.dumpStore(true, true, false));

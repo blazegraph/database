@@ -30,8 +30,8 @@ package com.bigdata.rdf.internal;
 import com.bigdata.rdf.lexicon.ITermIdCodes;
 
 /**
- * Value Type Enumeration (VTE) is a class with methods for interpreting and
- * setting the bit flags used to identify the type of an RDF Value (URI,
+ * Value Type Enumeration (IVTE) is a class with methods for interpreting and 
+ * setting the bit flags used to identify the type of an RDF Value (URI, 
  * Literal, Blank Node, SID, etc).
  * 
  * @todo This replaces {@link ITermIdCodes}.

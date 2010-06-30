@@ -28,6 +28,7 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 
 import com.bigdata.io.ByteArrayBuffer;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
@@ -39,9 +40,9 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * are enabled, the context position (if bound) will be a blank node that
  * represents the statement having that subject, predicate, and object and its
  * term identifier, when assigned, will report <code>true</code> for
- * {@link AbstractTripleStore#isStatement(long)}. When used to model a quad, the
+ * {@link AbstractTripleStore#isStatement(IV)}. When used to model a quad, the
  * 4th position will be a {@link BigdataValue} but its term identifier will
- * report <code>false</code> for {@link AbstractTripleStore#isStatement(long)}.
+ * report <code>false</code> for {@link AbstractTripleStore#isStatement(IV)}.
  * <p>
  * Note: The ctors are intentionally protected. Use the
  * {@link BigdataValueFactory} to create instances of this class - it will
@@ -214,44 +215,44 @@ public class BigdataStatementImpl implements BigdataStatement {
 
     }
 
-    final public long s() {
+    final public IV s() {
 
-        return s.getTermId();
+        return s.getIV();
         
     }
 
-    final public long p() {
+    final public IV p() {
         
-        return p.getTermId();
+        return p.getIV();
         
     }
 
-    final public long o() {
+    final public IV o() {
         
-        return o.getTermId();
+        return o.getIV();
         
     }
     
-    final public long c() {
+    final public IV c() {
 
         if (c == null)
             return NULL;
         
-        return c.getTermId();
+        return c.getIV();
         
     }
 
-    public long get(final int index) {
+    public IV get(final int index) {
 
         switch (index) {
         case 0:
-            return s.getTermId();
+            return s.getIV();
         case 1:
-            return p.getTermId();
+            return p.getIV();
         case 2:
-            return o.getTermId();
+            return o.getIV();
         case 3: // 4th position MAY be unbound.
-            return (c == null) ? NULL : c.getTermId();
+            return (c == null) ? NULL : c.getIV();
         default:
             throw new IllegalArgumentException();
         }
@@ -264,7 +265,7 @@ public class BigdataStatementImpl implements BigdataStatement {
 
     }
 
-    public final void setStatementIdentifier(final long sid) {
+    public final void setStatementIdentifier(final IV sid) {
 
         if (sid == NULL)
             throw new IllegalArgumentException();
@@ -280,28 +281,28 @@ public class BigdataStatementImpl implements BigdataStatement {
 
         }
 
-        if (c != null && c.getTermId() != sid)
+        if (c != null && c.getIV() != sid)
             throw new IllegalStateException(
                     "Different statement identifier already defined: "
                             + toString() + ", new=" + sid);
 
-        c.setTermId(sid);
+        c.setIV(sid);
 
     }
 
-    public final long getStatementIdentifier() {
+    public final IV getStatementIdentifier() {
 
         if (!hasStatementIdentifier())
             throw new IllegalStateException("No statement identifier: "
                     + toString());
 
-        return c.getTermId();
+        return c.getIV();
 
     }
     
     final public boolean hasStatementIdentifier() {
         
-        return c != null && AbstractTripleStore.isStatement(c.getTermId());
+        return c != null && AbstractTripleStore.isStatement(c.getIV());
         
     }
 
@@ -320,7 +321,7 @@ public class BigdataStatementImpl implements BigdataStatement {
     public byte[] serializeValue(final ByteArrayBuffer buf) {
 
         return SPO.serializeValue(buf, override, type, c != null ? c
-                .getTermId() : NULL);
+                .getIV() : NULL);
 
     }
 

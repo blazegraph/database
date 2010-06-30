@@ -30,6 +30,7 @@ package com.bigdata.rdf.internal;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.UUID;
+import org.openrdf.model.URI;
 
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
@@ -94,23 +95,23 @@ public enum DTE {
      * not preserved.
      */
     XSDBoolean((byte) 0, Bytes.SIZEOF_BYTE, Boolean.class,
-            BigdataValueFactoryImpl.xsd + "boolean", DTEFlags.NOFLAGS), //
+            XSD.BOOLEAN.stringValue(), DTEFlags.NOFLAGS), //
 
     /** The "inline" value is a signed byte (xsd:byte). */
     XSDByte((byte) 1, Bytes.SIZEOF_BYTE, Byte.class,
-            BigdataValueFactoryImpl.xsd + "byte", DTEFlags.NUMERIC), //
+            XSD.BYTE.stringValue(), DTEFlags.NUMERIC), //
 
     /** The "inline" value is a signed short (xsd:short). */
     XSDShort((byte) 2, Bytes.SIZEOF_SHORT, Short.class,
-            BigdataValueFactoryImpl.xsd + "short", DTEFlags.NUMERIC), //
+            XSD.SHORT.stringValue(), DTEFlags.NUMERIC), //
 
     /** The "inline" value is a signed 4 byte integer (xsd:int). */
     XSDInt((byte) 3, Bytes.SIZEOF_INT, Integer.class,
-            BigdataValueFactoryImpl.xsd + "int", DTEFlags.NUMERIC), //
+            XSD.INT.stringValue(), DTEFlags.NUMERIC), //
 
     /** The "inline" value is a signed 8 byte integer (xsd:long). */
     XSDLong((byte) 4, Bytes.SIZEOF_LONG, Long.class,
-            BigdataValueFactoryImpl.xsd + "long", DTEFlags.NUMERIC), //
+            XSD.LONG.stringValue(), DTEFlags.NUMERIC), //
 
     /*
      * unsigned byte, short, int, long.
@@ -118,22 +119,22 @@ public enum DTE {
 
     /** The "inline" value is an unsigned byte (xsd:unsignedByte). */
     XSDUnsignedByte((byte) 5, Bytes.SIZEOF_BYTE, Byte.class,
-            BigdataValueFactoryImpl.xsd + "unsignedByte",
+            XSD.UNSIGNED_BYTE.stringValue(),
             DTEFlags.UNSIGNED_NUMERIC), //
 
     /** The "inline" value is a unsigned short (xsd:unsignedShort). */
     XSDUnsignedShort((byte) 6, Bytes.SIZEOF_SHORT, Short.class,
-            BigdataValueFactoryImpl.xsd + "unsignedShort",
+            XSD.UNSIGNED_SHORT.stringValue(),
             DTEFlags.UNSIGNED_NUMERIC), //
 
     /** The "inline" value is an unsigned 4 byte integer (xsd:unsignedInt). */
     XSDUnsignedInt((byte) 7, Bytes.SIZEOF_INT, Integer.class,
-            BigdataValueFactoryImpl.xsd + "unsignedInt",
+            XSD.UNSIGNED_INT.stringValue(),
             DTEFlags.UNSIGNED_NUMERIC), //
 
     /** The "inline" value is an unsigned 8 byte integer (xsd:unsignedLong). */
     XSDUnsignedLong((byte) 8, Bytes.SIZEOF_LONG, Long.class,
-            BigdataValueFactoryImpl.xsd + "unsignedLong",
+            XSD.UNSIGNED_LONG.stringValue(),
             DTEFlags.UNSIGNED_NUMERIC), //
             
     /*
@@ -145,14 +146,14 @@ public enum DTE {
      * (xsd:float).
      */
     XSDFloat((byte) 9, Bytes.SIZEOF_FLOAT, Float.class,
-            BigdataValueFactoryImpl.xsd + "float", DTEFlags.NUMERIC), //
+            XSD.FLOAT.stringValue(), DTEFlags.NUMERIC), //
             
     /**
      * The "inline" value is a double precision floating point number
      * (xsd:double).
      */
     XSDDouble((byte) 10, Bytes.SIZEOF_DOUBLE, Double.class,
-            BigdataValueFactoryImpl.xsd + "double", DTEFlags.NUMERIC), //
+            XSD.DOUBLE.stringValue(), DTEFlags.NUMERIC), //
 
     /*
      * xsd:integer, xsd:decimal.
@@ -163,7 +164,7 @@ public enum DTE {
      * {@link BigInteger}.
      */
     XSDInteger((byte) 11, 0/* variable length */, BigInteger.class,
-            BigdataValueFactoryImpl.xsd + "integer", DTEFlags.NUMERIC), //
+            XSD.INTEGER.stringValue(), DTEFlags.NUMERIC), //
 
     /**
      * The "inline" value is an xsd:decimal. This is mostly equivalent to
@@ -174,7 +175,7 @@ public enum DTE {
      * represent the precision, we could not use xsd:decimal in an index!)
      */
     XSDDecimal((byte) 12, 0/* variable length */, BigDecimal.class,
-            BigdataValueFactoryImpl.xsd + "decimal", DTEFlags.NUMERIC), //
+            XSD.DECIMAL.stringValue(), DTEFlags.NUMERIC), //
 
     /*
      * custom intrinsic data types.
@@ -187,7 +188,7 @@ public enum DTE {
      * 
      * @todo What is the datatype URI for UUID data types? (bd:UUID)
      */
-    UUID((byte) 13, Bytes.SIZEOF_UUID, UUID.class, null/* N/A */,
+    UUID((byte) 13, Bytes.SIZEOF_UUID, UUID.class, XSD.UUID.stringValue(),
             DTEFlags.NOFLAGS), //
 
     /** This is reserved against use as a possible 15th intrinsic data type. */
@@ -273,6 +274,46 @@ public enum DTE {
         default:
             throw new IllegalArgumentException(Byte.toString(b));
         }
+    }
+
+    static final public DTE valueOf(final URI datatype) {
+        /*
+         * Note: This switch MUST correspond to the declarations above (you can
+         * not made the cases of the switch from [v] since it is not considered
+         * a to be constant by the compiler).
+         * 
+         * Note: This masks off everything but the lower 4 bits.
+         */
+        if (datatype.equals(XSD.BOOLEAN))
+            return XSDBoolean;
+        if (datatype.equals(XSD.BYTE))
+            return XSDByte;
+        if (datatype.equals(XSD.SHORT))
+            return XSDShort;
+        if (datatype.equals(XSD.INT))
+            return XSDInt;
+        if (datatype.equals(XSD.LONG))
+            return XSDLong;
+        if (datatype.equals(XSD.UNSIGNED_BYTE))
+            return XSDUnsignedByte;
+        if (datatype.equals(XSD.UNSIGNED_SHORT))
+            return XSDUnsignedShort;
+        if (datatype.equals(XSD.UNSIGNED_INT))
+            return XSDUnsignedInt;
+        if (datatype.equals(XSD.UNSIGNED_LONG))
+            return XSDUnsignedLong;
+        if (datatype.equals(XSD.FLOAT))
+            return XSDFloat;
+        if (datatype.equals(XSD.DOUBLE))
+            return XSDDouble;
+        if (datatype.equals(XSD.INTEGER))
+            return XSDInteger;
+        if (datatype.equals(XSD.DECIMAL))
+            return XSDDecimal;
+        if (datatype.equals(XSD.UUID))
+            return UUID;
+
+        throw new IllegalArgumentException(datatype.stringValue());
     }
 
     /**

@@ -70,11 +70,11 @@ public class TestComparators extends TestCase2 {
         final BigdataValueFactory f = BigdataValueFactoryImpl
                 .getInstance(getName()/*namespace*/);
 
-        final BigdataValue vmin = f.createLiteral("a"); vmin.setTermId( lmin);
-        final BigdataValue vm1  = f.createLiteral("b"); vm1 .setTermId( lm1 );
-        final BigdataValue v0   = f.createLiteral("c"); v0  .clearTermId(); // Note: equivilent to setTermId( l0  );
-        final BigdataValue vp1  = f.createLiteral("d"); vp1 .setTermId( lp1 );
-        final BigdataValue vmax = f.createLiteral("e"); vmax.setTermId( lmax);
+        final BigdataValue vmin = f.createLiteral("a"); vmin.setIV( lmin);
+        final BigdataValue vm1  = f.createLiteral("b"); vm1 .setIV( lm1 );
+        final BigdataValue v0   = f.createLiteral("c"); v0  .clearInternalValue(); // Note: equivilent to setTermId( l0  );
+        final BigdataValue vp1  = f.createLiteral("d"); vp1 .setIV( lp1 );
+        final BigdataValue vmax = f.createLiteral("e"); vmax.setIV( lmax);
 
         // ids out of order.
         final long[] actualIds = new long[] { lm1, lmax, l0, lp1, lmin };

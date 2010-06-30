@@ -193,15 +193,15 @@ public class BigdataConstructIterator implements
             Value object = bindingSet.getValue("object");
             long s = IRawTripleStore.NULL; 
             if (subject instanceof BigdataValue) {
-                s = ((BigdataValue) subject).getTermId();
+                s = ((BigdataValue) subject).getIV();
             }
             long p = IRawTripleStore.NULL; 
             if (predicate instanceof BigdataValue) {
-                p = ((BigdataValue) predicate).getTermId();
+                p = ((BigdataValue) predicate).getIV();
             }
             long o = IRawTripleStore.NULL; 
             if (object instanceof BigdataValue) {
-                o = ((BigdataValue) object).getTermId();
+                o = ((BigdataValue) object).getIV();
             }
             SPO spo = new SPO(s, p, o);
             return spo;

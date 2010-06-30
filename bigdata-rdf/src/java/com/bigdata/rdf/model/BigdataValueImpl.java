@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.model;
 
+import com.bigdata.rdf.internal.IV;
+
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -83,35 +85,35 @@ public abstract class BigdataValueImpl implements BigdataValue {
         
     }
 
-    final public void clearTermId() {
+    final public void clearInternalValue() {
 
         termId = NULL;
         
     }
 
-    final public long getTermId() {
+    final public IV getIV() {
 
         return termId;
         
     }
 
-    final public void setTermId(final long termId) {
+    final public void setIV(final IV iv) {
 
-        if (termId == NULL) {
+        if (iv == NULL) {
 
             throw new IllegalArgumentException(
                     "Can not set termId to NULL: term=" + this);
 
         }
 
-        if (this.termId != NULL && this.termId != termId) {
+        if (this.termId != NULL && this.termId != iv) {
 
             throw new IllegalStateException("termId already assigned: old="
-                    + this.termId + ", new=" + termId);
+                    + this.termId + ", new=" + iv);
 
         }
         
-        this.termId = termId;
+        this.termId = iv;
         
     }
 

@@ -103,13 +103,13 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
     protected void doAddTermTest(final AbstractTripleStore store,
             final BigdataValue term) {
 
-        assertEquals(NULL, store.getTermId(term));
+        assertEquals(NULL, store.getIV(term));
 
         final long id = store.addTerm(term);
 
         assertNotSame(NULL, id);
 
-        assertEquals(id, store.getTermId(term));
+        assertEquals(id, store.getIV(term));
 
         assertEquals(term, store.getTerm(id));
 

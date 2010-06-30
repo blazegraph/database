@@ -118,20 +118,20 @@ public class TestOwlSameAsPropertiesExpandingIterator extends AbstractInferenceE
 //                buffer.flush();
             }
             
-            final long a = db.getTermId(A);
-            final long b = db.getTermId(B);
+            final long a = db.getIV(A);
+            final long b = db.getIV(B);
 //            final long c = noClosure.getTermId(C);
 //            final long d = noClosure.getTermId(D);
 //            final long e = noClosure.getTermId(E);
 //            final long v = noClosure.getTermId(V);
-            final long w = db.getTermId(W);
-            final long x = db.getTermId(X);
-            final long y = db.getTermId(Y);
-            final long z = db.getTermId(Z);
-            final long same = db.getTermId(OWL.SAMEAS);
-            final long type = db.getTermId(RDF.TYPE);
-            final long property = db.getTermId(RDF.PROPERTY);
-            final long subpropof = db.getTermId(RDFS.SUBPROPERTYOF);
+            final long w = db.getIV(W);
+            final long x = db.getIV(X);
+            final long y = db.getIV(Y);
+            final long z = db.getIV(Z);
+            final long same = db.getIV(OWL.SAMEAS);
+            final long type = db.getIV(RDF.TYPE);
+            final long property = db.getIV(RDF.PROPERTY);
+            final long subpropof = db.getIV(RDFS.SUBPROPERTYOF);
             
             if (log.isInfoEnabled())
                 log.info("\n" +db.dumpStore(true, true, false));

@@ -198,7 +198,7 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<Long, Bigdata
 
         final BigdataValue tmp = valueSer.deserialize(tuple.getValueStream());
 
-        tmp.setTermId(id);
+        tmp.setIV(id);
 
         return tmp;
 

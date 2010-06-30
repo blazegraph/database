@@ -95,16 +95,16 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
             
 //            store.commit();
     
-            final long a = store.getTermId(A);
+            final long a = store.getIV(A);
 //            final long b = store.getTermId(B);
 //            final long c = store.getTermId(C);
 //            final long d = store.getTermId(D);
 //            final long e = store.getTermId(E);
-            final long v = store.getTermId(V);
-            final long w = store.getTermId(W);
-            final long x = store.getTermId(X);
-            final long y = store.getTermId(Y);
-            final long z = store.getTermId(Z);
+            final long v = store.getIV(V);
+            final long w = store.getIV(W);
+            final long x = store.getIV(X);
+            final long y = store.getIV(Y);
+            final long z = store.getIV(Z);
             
             if (log.isInfoEnabled())
                 log.info("\n" + store.dumpStore(true, true, false));

@@ -45,6 +45,7 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexMetadata.Options;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
@@ -360,7 +361,7 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
         
     }
     
-    final public boolean isAxiom(final long s, final long p, final long o) {
+    final public boolean isAxiom(final IV s, final IV p, final IV o) {
 
         if (btree == null)
             throw new IllegalStateException();

@@ -674,7 +674,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                             .debug("adding term: "
                                     + values[i]
                                     + " (termId="
-                                    + values[i].getTermId()
+                                    + values[i].getIV()
                                     + ")"
                                     + ((values[i] instanceof BNode) ? "sid="
                                             + ((BigdataBNode) values[i]).isStatementIdentifier()
@@ -688,7 +688,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                             .debug(" added term: "
                                     + values[i]
                                     + " (termId="
-                                    + values[i].getTermId()
+                                    + values[i].getIV()
                                     + ")"
                                     + ((values[i] instanceof BNode) ? "sid="
                                             + ((BigdataBNode) values[i]).isStatementIdentifier()
@@ -917,15 +917,15 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
                     final long sid = spo.getStatementIdentifier();
                     
-                    if(c.getTermId() != NULL) {
+                    if(c.getIV() != NULL) {
                         
-                        if (sid != c.getTermId()) {
+                        if (sid != c.getIV()) {
 
                             throw new UnificationException(
                                     "Can not unify blankNode "
                                             + c
                                             + "("
-                                            + c.getTermId()
+                                            + c.getIV()
                                             + ")"
                                             + " in context position with statement identifier="
                                             + sid + ": " + stmt + " (" + spo
@@ -936,7 +936,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                     } else {
                         
                         // assign the statement identifier.
-                        c.setTermId(sid);
+                        c.setIV(sid);
                         
                         if(DEBUG) {
                             
@@ -1275,7 +1275,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
             
         }
 
-        if (c != null && !duplicateC && ((BigdataValue) c).getTermId() == NULL) {
+        if (c != null && !duplicateC && ((BigdataValue) c).getIV() == NULL) {
 
             if (c instanceof URI) {
 

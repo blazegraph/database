@@ -118,8 +118,8 @@ public class TestSPOStarJoin extends AbstractTripleStoreTestCase {
             final SPOPredicate pred = new SPOPredicate(
                     store.getSPORelation().getNamespace(),
                     Var.var("frameClass"),
-                    new Constant<Long>(store.getTermId(RDF.TYPE)),
-                    new Constant<Long>(frameClass.getTermId())
+                    new Constant<Long>(store.getIV(RDF.TYPE)),
+                    new Constant<Long>(frameClass.getIV())
                     );
             
             final SPOStarJoin starJoin = new SPOStarJoin(
@@ -128,11 +128,11 @@ public class TestSPOStarJoin extends AbstractTripleStoreTestCase {
                     );
             
             starJoin.addStarConstraint(new SPOStarJoin.SPOStarConstraint(
-                    new Constant(ontologyClass.getTermId()),
+                    new Constant(ontologyClass.getIV()),
                     Var.var("class")));
             
             starJoin.addStarConstraint(new SPOStarJoin.SPOStarConstraint(
-                    new Constant(frameProperty.getTermId()),
+                    new Constant(frameProperty.getIV()),
                     Var.var("frameProperty")));
             
             final Rule rule = new Rule(
@@ -172,19 +172,19 @@ public class TestSPOStarJoin extends AbstractTripleStoreTestCase {
             */
             Collection<IBindingSet> answer = new LinkedList<IBindingSet>();
             answer.add(createBindingSet(
-                    new Binding(Var.var("frameClass"), new Constant<Long>(fc1.getTermId())),
-                    new Binding(Var.var("class"), new Constant<Long>(class1.getTermId())),
-                    new Binding(Var.var("frameProperty"), new Constant<Long>(fp1.getTermId()))
+                    new Binding(Var.var("frameClass"), new Constant<Long>(fc1.getIV())),
+                    new Binding(Var.var("class"), new Constant<Long>(class1.getIV())),
+                    new Binding(Var.var("frameProperty"), new Constant<Long>(fp1.getIV()))
                     ));
             answer.add(createBindingSet(
-                    new Binding(Var.var("frameClass"), new Constant<Long>(fc2.getTermId())),
-                    new Binding(Var.var("class"), new Constant<Long>(class1.getTermId())),
-                    new Binding(Var.var("frameProperty"), new Constant<Long>(fp1.getTermId()))
+                    new Binding(Var.var("frameClass"), new Constant<Long>(fc2.getIV())),
+                    new Binding(Var.var("class"), new Constant<Long>(class1.getIV())),
+                    new Binding(Var.var("frameProperty"), new Constant<Long>(fp1.getIV()))
                     ));
             answer.add(createBindingSet(
-                    new Binding(Var.var("frameClass"), new Constant<Long>(fc2.getTermId())),
-                    new Binding(Var.var("class"), new Constant<Long>(class1.getTermId())),
-                    new Binding(Var.var("frameProperty"), new Constant<Long>(fp2.getTermId()))
+                    new Binding(Var.var("frameClass"), new Constant<Long>(fc2.getIV())),
+                    new Binding(Var.var("class"), new Constant<Long>(class1.getIV())),
+                    new Binding(Var.var("frameProperty"), new Constant<Long>(fp2.getIV()))
                     ));
             
             compare(itr1, answer);
@@ -265,8 +265,8 @@ public class TestSPOStarJoin extends AbstractTripleStoreTestCase {
             final SPOPredicate pred = new SPOPredicate(
                     store.getSPORelation().getNamespace(),
                     Var.var("frameProperty"),
-                    new Constant<Long>(store.getTermId(RDF.TYPE)),
-                    new Constant<Long>(store.getTermId(RDFS.RESOURCE))
+                    new Constant<Long>(store.getIV(RDF.TYPE)),
+                    new Constant<Long>(store.getIV(RDFS.RESOURCE))
                     );
             
             final SPOStarJoin starJoin = new SPOStarJoin(
@@ -275,15 +275,15 @@ public class TestSPOStarJoin extends AbstractTripleStoreTestCase {
                     );
             
             starJoin.addStarConstraint(new SPOStarJoin.SPOStarConstraint(
-                    new Constant(ontologyProperty.getTermId()),
+                    new Constant(ontologyProperty.getIV()),
                     Var.var("value")));
             
             starJoin.addStarConstraint(new SPOStarJoin.SPOStarConstraint(
-                    new Constant(multiValued.getTermId()),
+                    new Constant(multiValued.getIV()),
                     Var.var("multiValued1")));
             
             starJoin.addStarConstraint(new SPOStarJoin.SPOStarConstraint(
-                    new Constant(propertyRange.getTermId()),
+                    new Constant(propertyRange.getIV()),
                     Var.var("range1"),
                     true));
             
@@ -324,38 +324,38 @@ public class TestSPOStarJoin extends AbstractTripleStoreTestCase {
             */
             Collection<IBindingSet> answer = new LinkedList<IBindingSet>();
             answer.add(createBindingSet(
-                    new Binding(Var.var("frameProperty"), new Constant<Long>(fp1.getTermId())),
-                    new Binding(Var.var("value"), new Constant<Long>(v1.getTermId())),
-                    new Binding(Var.var("multiValued1"), new Constant<Long>(mv1.getTermId()))
+                    new Binding(Var.var("frameProperty"), new Constant<Long>(fp1.getIV())),
+                    new Binding(Var.var("value"), new Constant<Long>(v1.getIV())),
+                    new Binding(Var.var("multiValued1"), new Constant<Long>(mv1.getIV()))
                     ));
             answer.add(createBindingSet(
-                    new Binding(Var.var("frameProperty"), new Constant<Long>(fp1.getTermId())),
-                    new Binding(Var.var("value"), new Constant<Long>(v1.getTermId())),
-                    new Binding(Var.var("multiValued1"), new Constant<Long>(mv2.getTermId()))
+                    new Binding(Var.var("frameProperty"), new Constant<Long>(fp1.getIV())),
+                    new Binding(Var.var("value"), new Constant<Long>(v1.getIV())),
+                    new Binding(Var.var("multiValued1"), new Constant<Long>(mv2.getIV()))
                     ));
             answer.add(createBindingSet(
-                    new Binding(Var.var("frameProperty"), new Constant<Long>(fp2.getTermId())),
-                    new Binding(Var.var("value"), new Constant<Long>(v2.getTermId())),
-                    new Binding(Var.var("multiValued1"), new Constant<Long>(mv1.getTermId())),
-                    new Binding(Var.var("range1"), new Constant<Long>(r1.getTermId()))
+                    new Binding(Var.var("frameProperty"), new Constant<Long>(fp2.getIV())),
+                    new Binding(Var.var("value"), new Constant<Long>(v2.getIV())),
+                    new Binding(Var.var("multiValued1"), new Constant<Long>(mv1.getIV())),
+                    new Binding(Var.var("range1"), new Constant<Long>(r1.getIV()))
                     ));
             answer.add(createBindingSet(
-                    new Binding(Var.var("frameProperty"), new Constant<Long>(fp2.getTermId())),
-                    new Binding(Var.var("value"), new Constant<Long>(v2.getTermId())),
-                    new Binding(Var.var("multiValued1"), new Constant<Long>(mv2.getTermId())),
-                    new Binding(Var.var("range1"), new Constant<Long>(r1.getTermId()))
+                    new Binding(Var.var("frameProperty"), new Constant<Long>(fp2.getIV())),
+                    new Binding(Var.var("value"), new Constant<Long>(v2.getIV())),
+                    new Binding(Var.var("multiValued1"), new Constant<Long>(mv2.getIV())),
+                    new Binding(Var.var("range1"), new Constant<Long>(r1.getIV()))
                     ));
             answer.add(createBindingSet(
-                    new Binding(Var.var("frameProperty"), new Constant<Long>(fp2.getTermId())),
-                    new Binding(Var.var("value"), new Constant<Long>(v2.getTermId())),
-                    new Binding(Var.var("multiValued1"), new Constant<Long>(mv1.getTermId())),
-                    new Binding(Var.var("range1"), new Constant<Long>(r2.getTermId()))
+                    new Binding(Var.var("frameProperty"), new Constant<Long>(fp2.getIV())),
+                    new Binding(Var.var("value"), new Constant<Long>(v2.getIV())),
+                    new Binding(Var.var("multiValued1"), new Constant<Long>(mv1.getIV())),
+                    new Binding(Var.var("range1"), new Constant<Long>(r2.getIV()))
                     ));
             answer.add(createBindingSet(
-                    new Binding(Var.var("frameProperty"), new Constant<Long>(fp2.getTermId())),
-                    new Binding(Var.var("value"), new Constant<Long>(v2.getTermId())),
-                    new Binding(Var.var("multiValued1"), new Constant<Long>(mv2.getTermId())),
-                    new Binding(Var.var("range1"), new Constant<Long>(r2.getTermId()))
+                    new Binding(Var.var("frameProperty"), new Constant<Long>(fp2.getIV())),
+                    new Binding(Var.var("value"), new Constant<Long>(v2.getIV())),
+                    new Binding(Var.var("multiValued1"), new Constant<Long>(mv2.getIV())),
+                    new Binding(Var.var("range1"), new Constant<Long>(r2.getIV()))
                     ));
             
             compare(itr1, answer);

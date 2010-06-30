@@ -138,7 +138,7 @@ public class BigdataRDFFullTextIndex extends FullTextIndex implements
              * cost of re-indexing each time we see a term.
              */
 
-            final long termId = val.getTermId();
+            final long termId = val.getIV();
 
             assert termId != IRawTripleStore.NULL; // the termId must have been
                                                     // assigned.

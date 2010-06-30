@@ -155,7 +155,7 @@ public class Term2IdWriteTask implements
 
                     for (int i = 0; i < numTerms; i++) {
 
-                        if (b[i].obj.getTermId() != IRawTripleStore.NULL) {
+                        if (b[i].obj.getIV() != IRawTripleStore.NULL) {
                             
                             if (log.isDebugEnabled())
                                 log.debug("term identifier already assigned: "
@@ -295,7 +295,7 @@ public class Term2IdWriteTask implements
                 } else {
 
                     // assign the term identifier.
-                    a[i].obj.setTermId(termId);
+                    a[i].obj.setIV(termId);
 
                     if(a[i] instanceof KVOList) {
                         
@@ -358,7 +358,7 @@ public class Term2IdWriteTask implements
 
         public void apply(final KVO<BigdataValue> t) {
 
-            t.obj.setTermId(tid);
+            t.obj.setIV(tid);
             
 //            System.err.println("Assigned term identifier to duplicate: "+tid+" : "+t.obj);
             
