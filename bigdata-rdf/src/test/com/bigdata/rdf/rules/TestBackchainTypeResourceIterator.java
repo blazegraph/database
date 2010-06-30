@@ -121,7 +121,7 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             {
 
                 final IAccessPath<ISPO> accessPath = store.getAccessPath(store
-                        .getTermId(A), NULL, NULL);
+                        .getIV(A), NULL, NULL);
              
                 itr = BackchainTypeResourceIterator.newInstance(//
                     accessPath.iterator(),//
@@ -138,15 +138,15 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
                     new SPO[]{
                     
                     new SPO(//
-                            store.getTermId(A),//
-                            store.getTermId(RDF.TYPE),//
-                            store.getTermId(B),//
+                            store.getIV(A),//
+                            store.getIV(RDF.TYPE),//
+                            store.getIV(B),//
                             StatementEnum.Explicit),
                             
                     new SPO(//
-                            store.getTermId(A), //
-                            store.getTermId(RDF.TYPE), //
-                            store.getTermId(RDFS.RESOURCE), //
+                            store.getIV(A), //
+                            store.getIV(RDF.TYPE), //
+                            store.getIV(RDFS.RESOURCE), //
                             StatementEnum.Inferred)
                     },
                     
@@ -213,7 +213,7 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             {
 
                 final IAccessPath<ISPO> accessPath = store.getAccessPath(store
-                        .getTermId(A), NULL, NULL);
+                        .getIV(A), NULL, NULL);
 
                 itr = BackchainTypeResourceIterator.newInstance(//
                         accessPath.iterator(),//
@@ -228,15 +228,15 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             assertSameSPOsAnyOrder(store, new SPO[]{
                     
                     new SPO(//
-                            store.getTermId(A),//
-                            store.getTermId(RDF.TYPE),//
-                            store.getTermId(B),//
+                            store.getIV(A),//
+                            store.getIV(RDF.TYPE),//
+                            store.getIV(B),//
                             StatementEnum.Explicit),
                             
                     new SPO(//
-                            store.getTermId(A), //
-                            store.getTermId(RDF.TYPE), //
-                            store.getTermId(RDFS.RESOURCE), //
+                            store.getIV(A), //
+                            store.getIV(RDF.TYPE), //
+                            store.getIV(RDFS.RESOURCE), //
                             StatementEnum.Explicit)
                     },
                 
@@ -316,39 +316,39 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             assertSameSPOsAnyOrder(store, new SPO[]{
 
                     new SPO(//
-                            store.getTermId(A),//
-                            store.getTermId(RDF.TYPE),//
-                            store.getTermId(B),//
+                            store.getIV(A),//
+                            store.getIV(RDF.TYPE),//
+                            store.getIV(B),//
                             StatementEnum.Explicit),
 
                     new SPO(//
-                            store.getTermId(B),//
-                            store.getTermId(RDF.TYPE),//
-                            store.getTermId(C),//
+                            store.getIV(B),//
+                            store.getIV(RDF.TYPE),//
+                            store.getIV(C),//
                             StatementEnum.Explicit),
                     
                     new SPO(//
-                            store.getTermId(A), //
-                            store.getTermId(RDF.TYPE), //
-                            store.getTermId(RDFS.RESOURCE), //
+                            store.getIV(A), //
+                            store.getIV(RDF.TYPE), //
+                            store.getIV(RDFS.RESOURCE), //
                             StatementEnum.Explicit),
                     
                     new SPO(//
-                            store.getTermId(B), //
-                            store.getTermId(RDF.TYPE), //
-                            store.getTermId(RDFS.RESOURCE), //
+                            store.getIV(B), //
+                            store.getIV(RDF.TYPE), //
+                            store.getIV(RDFS.RESOURCE), //
                             StatementEnum.Inferred),
                     
                     new SPO(//
-                            store.getTermId(C), //
-                            store.getTermId(RDF.TYPE), //
-                            store.getTermId(RDFS.RESOURCE), //
+                            store.getIV(C), //
+                            store.getIV(RDF.TYPE), //
+                            store.getIV(RDFS.RESOURCE), //
                             StatementEnum.Inferred),
                     
                     new SPO(//
-                            store.getTermId(RDFS.RESOURCE), //
-                            store.getTermId(RDF.TYPE), //
-                            store.getTermId(RDFS.RESOURCE), //
+                            store.getIV(RDFS.RESOURCE), //
+                            store.getIV(RDF.TYPE), //
+                            store.getIV(RDFS.RESOURCE), //
                             StatementEnum.Inferred)
 
             },
@@ -407,7 +407,7 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             final IChunkedOrderedIterator<ISPO> itr;
             {
                 final IAccessPath<ISPO> accessPath = store.getAccessPath(NULL,
-                        NULL, store.getTermId(B));
+                        NULL, store.getIV(B));
 
                 itr = BackchainTypeResourceIterator.newInstance(//
                         accessPath.iterator(),//
@@ -428,9 +428,9 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             assertSameSPOsAnyOrder(store, new SPO[]{
                     
                     new SPO(//
-                            store.getTermId(A),//
-                            store.getTermId(RDF.TYPE),//
-                            store.getTermId(B),//
+                            store.getIV(A),//
+                            store.getIV(RDF.TYPE),//
+                            store.getIV(B),//
                             StatementEnum.Explicit)
                     
                 },

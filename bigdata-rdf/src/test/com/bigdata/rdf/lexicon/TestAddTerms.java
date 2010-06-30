@@ -249,7 +249,7 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
 
         for(BigdataValue t : a) {
             
-            ids.add(t.getTermId());
+            ids.add(t.getIV());
             
         }
         
@@ -269,19 +269,19 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
         for(BigdataValue expected : a) {
 
             assertNotSame("Did not assign term identifier? : " + expected,
-                    NULL, expected.getTermId());
+                    NULL, expected.getIV());
 
-            final BigdataValue actual = tmp.get(expected.getTermId());
+            final BigdataValue actual = tmp.get(expected.getIV());
 
             if (actual == null) {
 
                 fail("Lexicon does not have value: termId="
-                        + expected.getTermId() + ", term=" + expected);
+                        + expected.getIV() + ", term=" + expected);
                 
             }
             
             assertEquals("Id mapped to a different term? id="
-                    + expected.getTermId(), expected, actual);
+                    + expected.getIV(), expected, actual);
 
         }
         

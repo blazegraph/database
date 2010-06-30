@@ -47,7 +47,7 @@ public final class InGraphHashSetFilter extends SPOFilter {
         
         for (URI uri : graphs) {
         
-            final long termId = ((BigdataURI) uri).getTermId();
+            final long termId = ((BigdataURI) uri).getIV();
             
             if (termId != IRawTripleStore.NULL) {
 

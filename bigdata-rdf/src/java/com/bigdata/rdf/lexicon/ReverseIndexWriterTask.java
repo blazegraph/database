@@ -118,7 +118,7 @@ public class ReverseIndexWriterTask implements Callable<Long> {
 
                 }
 
-                keys[nonBNodeCount] = tmp.reset().append(x.getTermId())
+                keys[nonBNodeCount] = tmp.reset().append(x.getIV())
                         .getKey();
 
                 // Serialize the term.

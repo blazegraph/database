@@ -3137,9 +3137,9 @@ public class BigdataSail extends SailBase implements Sail {
                         
                         if (log.isDebugEnabled())
                             log.debug("value: " + val + " : " + val2 + " ("
-                                    + val2.getTermId() + ")");
+                                    + val2.getIV() + ")");
 
-                        if (val2.getTermId() == NULL) {
+                        if (val2.getIV() == NULL) {
 
                             /*
                              * Since the term identifier is NULL this value is
@@ -3170,9 +3170,9 @@ public class BigdataSail extends SailBase implements Sail {
                     
                     if (log.isDebugEnabled())
                         log.debug("value: " + val + " : " + val2 + " ("
-                                + val2.getTermId() + ")");
+                                + val2.getIV() + ")");
 
-                    if (val2.getTermId() == NULL) {
+                    if (val2.getIV() == NULL) {
 
                         /*
                          * Since the term identifier is NULL this value is

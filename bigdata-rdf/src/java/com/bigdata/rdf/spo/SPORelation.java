@@ -67,6 +67,7 @@ import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.Justification;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.ITermIdFilter;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.StatementEnum;
@@ -942,7 +943,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * @throws UnsupportedOperationException
      *             unless the {@link #getKeyArity()} is <code>3</code>.
      * 
-     * @deprecated by {@link #getAccessPath(long, long, long, long)}
+     * @deprecated by {@link #getAccessPath(IV, IV, IV, IV)}
      */
     public IAccessPath<ISPO> getAccessPath(final long s, final long p,
             final long o) {
@@ -958,8 +959,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * Return the access path for a triple or quad pattern with an optional
      * filter.
      */
-    public IAccessPath<ISPO> getAccessPath(final long s, final long p,
-            final long o, final long c) {
+    public IAccessPath<ISPO> getAccessPath(final IV s, final IV p,
+            final IV o, final IV c) {
         
         return getAccessPath(s, p, o, c, null/*filter*/);
         

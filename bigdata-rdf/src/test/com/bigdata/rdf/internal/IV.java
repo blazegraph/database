@@ -47,7 +47,7 @@ import com.bigdata.rdf.store.AbstractTripleStore.Options;
  *       unsigned byte[]s, and also {@link BytesUtil#successor(byte[])}, which
  *       handles variable length unsigned byte[]s.
  */
-public interface InternalValue<V extends BigdataValue, T> extends Serializable {
+public interface IV<V extends BigdataValue, T> extends Serializable {
 
     /**
      * The value of the flags representing the {@link VTE} and
@@ -62,7 +62,7 @@ public interface InternalValue<V extends BigdataValue, T> extends Serializable {
      */
 
     /**
-     * Return the {@link VTE} for the {@link InternalValue}
+     * Return the {@link VTE} for the {@link IV}
      */
     VTE getInternalValueTypeEnum();
 
@@ -91,11 +91,11 @@ public interface InternalValue<V extends BigdataValue, T> extends Serializable {
      */
 
     /**
-     * Return the {@link DTE} for the {@link InternalValue} .
+     * Return the {@link DTE} for the {@link IV} .
      * This will be {@link DTE#TermId} iff the internal "value"
      * is a term identifier. Otherwise it will be the type safe enum
      * corresponding to the specific data type which can be decoded from this
-     * {@link InternalValue} using {@link #getInlineValue()}.
+     * {@link IV} using {@link #getInlineValue()}.
      */
     DTE getInternalDataTypeEnum();
 
@@ -198,7 +198,7 @@ public interface InternalValue<V extends BigdataValue, T> extends Serializable {
      *             determined by the lexicon configuration, and that choice is
      *             probably captured by a BigdataValueFactory configuration
      *             object. Therefore we do need to convert to a different
-     *             instance when the {@link InternalValue} will be used in a
+     *             instance when the {@link IV} will be used in a
      *             different lexicon configuration context.
      *             <P>
      *             It would be nice to support shared lexicons for a collection

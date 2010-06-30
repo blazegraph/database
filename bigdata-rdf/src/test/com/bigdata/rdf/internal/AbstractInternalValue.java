@@ -201,7 +201,7 @@ import com.bigdata.rdf.model.BigdataValue;
  *            The generic type for the inline value.
  */
 public abstract class AbstractInternalValue<V extends BigdataValue, T>
-        implements InternalValue<V, T> {
+        implements IV<V, T> {
 
     /**
      * 

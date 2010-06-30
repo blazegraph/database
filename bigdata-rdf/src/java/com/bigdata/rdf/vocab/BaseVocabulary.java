@@ -193,7 +193,7 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
         // pair values with their assigned term identifiers.
         for (BigdataValue v : a) {
             
-            values.put(v, v.getTermId());
+            values.put(v, v.getIV());
             
         }
         

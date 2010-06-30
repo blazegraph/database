@@ -398,30 +398,30 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
              * stmt3.o.
              */
             final BigdataStatement stmt3 = getOnlyStatement(store, stmt2
-                    .getSubject().getTermId(), store.getTermId(dcCreator), NULL);
+                    .getSubject().getIV(), store.getIV(dcCreator), NULL);
 
             /*
              * only one matching statement using the term identifier for
              * [_bigdata].
              */
             final BigdataStatement stmt4 = getOnlyStatement(store, stmt3
-                    .getObject().getTermId(), store.getTermId(rdfType), store
-                    .getTermId(Software));
+                    .getObject().getIV(), store.getIV(rdfType), store
+                    .getIV(Software));
 
             /*
              * only one match statement using an independent query that gives us
              * the term identifier for [_bigdata] (stmt5.s).
              */
             final BigdataStatement stmt5 = getOnlyStatement(store, NULL, store
-                    .getTermId(rdfsLabel), store.getTermId(bigdata));
+                    .getIV(rdfsLabel), store.getIV(bigdata));
 
             // verify term identifier.
-            assertEquals(stmt5.getSubject().getTermId(), stmt3.getObject()
-                    .getTermId());
+            assertEquals(stmt5.getSubject().getIV(), stmt3.getObject()
+                    .getIV());
 
             // verify term identifier.
-            assertEquals(stmt5.getSubject().getTermId(), stmt4.getSubject()
-                    .getTermId());
+            assertEquals(stmt5.getSubject().getIV(), stmt4.getSubject()
+                    .getIV());
 
             /*
              * Query has only one solution and gives us the term identifier for
@@ -436,8 +436,8 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
              * only one each with each of the distinct blank nodes.
              */
             final BigdataStatement stmt7 = getOnlyStatement(store, stmt6
-                    .getSubject().getTermId(), store.getTermId(rdfType), store
-                    .getTermId(Software));
+                    .getSubject().getIV(), store.getIV(rdfType), store
+                    .getIV(Software));
 
         }
 
@@ -602,29 +602,29 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
              */
             {
 
-                final ISPO spo1 = store.getStatement(x.getTermId(), rdfType
-                        .getTermId(), A.getTermId());
-                final ISPO spo2 = store.getStatement(y.getTermId(), rdfType
-                        .getTermId(), B.getTermId());
-                final ISPO spo3 = store.getStatement(z.getTermId(), rdfType
-                        .getTermId(), C.getTermId());
+                final ISPO spo1 = store.getStatement(x.getIV(), rdfType
+                        .getIV(), A.getIV());
+                final ISPO spo2 = store.getStatement(y.getIV(), rdfType
+                        .getIV(), B.getIV());
+                final ISPO spo3 = store.getStatement(z.getIV(), rdfType
+                        .getIV(), C.getIV());
 
                 assertNotNull(spo1);
                 assertNotNull(spo2);
                 assertNotNull(spo3);
 
-                assertEquals(sid1.getTermId(), spo1.getStatementIdentifier());
-                assertEquals(sid2.getTermId(), spo2.getStatementIdentifier());
-                assertEquals(sid3.getTermId(), spo3.getStatementIdentifier());
+                assertEquals(sid1.getIV(), spo1.getStatementIdentifier());
+                assertEquals(sid2.getIV(), spo2.getStatementIdentifier());
+                assertEquals(sid3.getIV(), spo3.getStatementIdentifier());
 
-                assertNotNull(store.getStatement(sid1.getTermId(), dcCreator
-                        .getTermId(), bryan.getTermId()));
-                assertNotNull(store.getStatement(sid2.getTermId(), dcCreator
-                        .getTermId(), bryan.getTermId()));
-                assertNotNull(store.getStatement(sid2.getTermId(), dcCreator
-                        .getTermId(), mike.getTermId()));
-                assertNotNull(store.getStatement(sid3.getTermId(), dcCreator
-                        .getTermId(), mike.getTermId()));
+                assertNotNull(store.getStatement(sid1.getIV(), dcCreator
+                        .getIV(), bryan.getIV()));
+                assertNotNull(store.getStatement(sid2.getIV(), dcCreator
+                        .getIV(), bryan.getIV()));
+                assertNotNull(store.getStatement(sid2.getIV(), dcCreator
+                        .getIV(), mike.getIV()));
+                assertNotNull(store.getStatement(sid3.getIV(), dcCreator
+                        .getIV(), mike.getIV()));
 
             }
         }
@@ -735,12 +735,12 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
              * care about TM here.
              */
             
-            final ISPO spo1 = tempStore.getStatement(x.getTermId(), rdfType
-                    .getTermId(), A.getTermId());
-            final ISPO spo2 = tempStore.getStatement(y.getTermId(), rdfType
-                    .getTermId(), B.getTermId());
-            final ISPO spo3 = tempStore.getStatement(z.getTermId(), rdfType
-                    .getTermId(), C.getTermId());
+            final ISPO spo1 = tempStore.getStatement(x.getIV(), rdfType
+                    .getIV(), A.getIV());
+            final ISPO spo2 = tempStore.getStatement(y.getIV(), rdfType
+                    .getIV(), B.getIV());
+            final ISPO spo3 = tempStore.getStatement(z.getIV(), rdfType
+                    .getIV(), C.getIV());
 
             assertNotNull(spo1);
             assertNotNull(spo2);
@@ -754,14 +754,14 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
             assertEquals(sid2, spo2.getStatementIdentifier());
             assertEquals(sid3, spo3.getStatementIdentifier());
 
-            assertNotNull(tempStore.getStatement(sid1, dcCreator.getTermId(),
-                    bryan.getTermId()));
-            assertNotNull(tempStore.getStatement(sid2, dcCreator.getTermId(),
-                    bryan.getTermId()));
-            assertNotNull(tempStore.getStatement(sid2, dcCreator.getTermId(),
-                    mike.getTermId()));
-            assertNotNull(tempStore.getStatement(sid3, dcCreator.getTermId(),
-                    mike.getTermId()));
+            assertNotNull(tempStore.getStatement(sid1, dcCreator.getIV(),
+                    bryan.getIV()));
+            assertNotNull(tempStore.getStatement(sid2, dcCreator.getIV(),
+                    bryan.getIV()));
+            assertNotNull(tempStore.getStatement(sid2, dcCreator.getIV(),
+                    mike.getIV()));
+            assertNotNull(tempStore.getStatement(sid3, dcCreator.getIV(),
+                    mike.getIV()));
             
         } finally {
             

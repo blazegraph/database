@@ -124,9 +124,9 @@ public class TestDefaultGraphAccessPath extends AbstractTripleStoreTestCase {
 
             }
 
-            assertTrue(c1.getTermId() != 0L);
-            assertTrue(c2.getTermId() != 0L);
-            assertTrue(c4.getTermId() != 0L);
+            assertTrue(c1.getIV() != 0L);
+            assertTrue(c2.getIV() != 0L);
+            assertTrue(c4.getIV() != 0L);
 
             assertTrue(store.hasStatement(john, loves, mary, c1));
             assertTrue(store.hasStatement(mary, loves, paul, c2));
@@ -185,8 +185,8 @@ public class TestDefaultGraphAccessPath extends AbstractTripleStoreTestCase {
 
                 TestSPOKeyOrder.assertSameIteratorAnyOrder("iterator()",
                         new ISPO[] { //
-                        new SPO(john.getTermId(), loves.getTermId(), mary
-                                .getTermId()) //
+                        new SPO(john.getIV(), loves.getIV(), mary
+                                .getIV()) //
                         }, expander.getAccessPath(baseAccessPath)
                         .iterator());
 
@@ -220,10 +220,10 @@ public class TestDefaultGraphAccessPath extends AbstractTripleStoreTestCase {
 
                 TestSPOKeyOrder.assertSameIteratorAnyOrder("iterator()",
                         new ISPO[] { //
-                        new SPO(john.getTermId(), loves.getTermId(), mary
-                                .getTermId()), //
-                        new SPO(mary.getTermId(), loves.getTermId(), paul
-                                .getTermId()) //
+                        new SPO(john.getIV(), loves.getIV(), mary
+                                .getIV()), //
+                        new SPO(mary.getIV(), loves.getIV(), paul
+                                .getIV()) //
                         }, expander.getAccessPath(baseAccessPath).iterator());
 
                 assertFalse("isEmpty", expander.getAccessPath(baseAccessPath)
@@ -257,8 +257,8 @@ public class TestDefaultGraphAccessPath extends AbstractTripleStoreTestCase {
 
                 TestSPOKeyOrder.assertSameIteratorAnyOrder("iterator()",
                         new ISPO[] { //
-                        new SPO(john.getTermId(), loves.getTermId(), mary
-                                .getTermId()), //
+                        new SPO(john.getIV(), loves.getIV(), mary
+                                .getIV()), //
                         }, expander.getAccessPath(baseAccessPath).iterator());
 
                 assertFalse("isEmpty", expander.getAccessPath(baseAccessPath)
@@ -292,8 +292,8 @@ public class TestDefaultGraphAccessPath extends AbstractTripleStoreTestCase {
 
                 TestSPOKeyOrder.assertSameIteratorAnyOrder("iterator()",
                         new ISPO[] { //
-                        new SPO(mary.getTermId(), loves.getTermId(), paul
-                                .getTermId()), //
+                        new SPO(mary.getIV(), loves.getIV(), paul
+                                .getIV()), //
                         }, expander.getAccessPath(baseAccessPath).iterator());
 
                 assertFalse("isEmpty", expander.getAccessPath(baseAccessPath)
@@ -327,8 +327,8 @@ public class TestDefaultGraphAccessPath extends AbstractTripleStoreTestCase {
 
                 TestSPOKeyOrder.assertSameIteratorAnyOrder("iterator()",
                         new ISPO[] { //
-                        new SPO(john.getTermId(), loves.getTermId(), mary
-                                .getTermId()), //
+                        new SPO(john.getIV(), loves.getIV(), mary
+                                .getIV()), //
                         }, expander.getAccessPath(baseAccessPath).iterator());
 
                 assertFalse("isEmpty", expander.getAccessPath(baseAccessPath)
@@ -396,12 +396,12 @@ public class TestDefaultGraphAccessPath extends AbstractTripleStoreTestCase {
 
                 TestSPOKeyOrder.assertSameIteratorAnyOrder("iterator()",
                         new ISPO[] { //
-                                new SPO(john.getTermId(), loves.getTermId(),
-                                        mary.getTermId()), //
-                                new SPO(mary.getTermId(), loves.getTermId(),
-                                        paul.getTermId()), //
-                                new SPO(paul.getTermId(), loves.getTermId(),
-                                        sam.getTermId()) //
+                                new SPO(john.getIV(), loves.getIV(),
+                                        mary.getIV()), //
+                                new SPO(mary.getIV(), loves.getIV(),
+                                        paul.getIV()), //
+                                new SPO(paul.getIV(), loves.getIV(),
+                                        sam.getIV()) //
                         }, expander.getAccessPath(baseAccessPath).iterator());
 
                 assertFalse("isEmpty", expander.getAccessPath(baseAccessPath)

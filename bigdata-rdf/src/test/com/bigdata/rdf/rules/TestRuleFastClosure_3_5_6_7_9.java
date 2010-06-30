@@ -123,9 +123,9 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
             Set<Long> subProperties = task.getSubProperties();
 
             assertTrue(subProperties.contains(store
-                    .getTermId(rdfsSubPropertyOf)));
-            assertTrue(subProperties.contains(store.getTermId(A)));
-            assertTrue(subProperties.contains(store.getTermId(B)));
+                    .getIV(rdfsSubPropertyOf)));
+            assertTrue(subProperties.contains(store.getIV(A)));
+            assertTrue(subProperties.contains(store.getIV(B)));
 
             assertEquals(3, subProperties.size());
 
@@ -136,10 +136,10 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
             subProperties = task.getSubProperties();
 
             assertTrue(subProperties.contains(store
-                    .getTermId(rdfsSubPropertyOf)));
-            assertTrue(subProperties.contains(store.getTermId(A)));
-            assertTrue(subProperties.contains(store.getTermId(B)));
-            assertTrue(subProperties.contains(store.getTermId(C)));
+                    .getIV(rdfsSubPropertyOf)));
+            assertTrue(subProperties.contains(store.getIV(A)));
+            assertTrue(subProperties.contains(store.getIV(B)));
+            assertTrue(subProperties.contains(store.getIV(C)));
 
             assertEquals(4, subProperties.size());
 
@@ -215,9 +215,9 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
 
             Set<Long> R = new HashSet<Long>();
 
-            R.add(store.getTermId(RDFS.RANGE));
+            R.add(store.getIV(RDFS.RANGE));
 
-            R.add(store.getTermId(MyRange));
+            R.add(store.getIV(MyRange));
 
             /*
              * setup the rule execution.

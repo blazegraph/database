@@ -18,8 +18,16 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
      */
     private static final long serialVersionUID = 4309045651680610931L;
     
+    /**
+     * Value used for a "NULL" term identifier.
+     */
+    public static final long NULL = 0L;
+    
+
     /** The term identifier. */
     private final long termId;
+    
+
 
 //    /** The datatype term identifier. */
 //    private final long dataTypeId;
@@ -139,11 +147,10 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
     }
 
     /**
-     * Return <code>true</code> iff the term identifier is
-     * {@link IRawTripleStore#NULL}.
+     * Return <code>true</code> iff the term identifier is null.
      */
     final public boolean isNull() {
-        return termId == IRawTripleStore.NULL;
+        return termId == NULL;
     }
 
     /**

@@ -104,12 +104,12 @@ public class TestAxioms extends AbstractTripleStoreTestCase {
             assertEquals(naxioms, store.getStatementCount());
 
             // point test for an axiom NOT defined by this model.
-            assertFalse(axioms.isAxiom(rdfType.getTermId(), rdfType.getTermId(),
-                    rdfProperty.getTermId()));
+            assertFalse(axioms.isAxiom(rdfType.getIV(), rdfType.getIV(),
+                    rdfProperty.getIV()));
 
             // point test for an axiom NOT defined by this model.
-            assertFalse(axioms.isAxiom(rdfType.getTermId(), rdfType.getTermId(),
-                    unknownURI.getTermId()));
+            assertFalse(axioms.isAxiom(rdfType.getIV(), rdfType.getIV(),
+                    unknownURI.getIV()));
 
             {
                 
@@ -117,12 +117,12 @@ public class TestAxioms extends AbstractTripleStoreTestCase {
                 final Axioms axioms2 = doRoundTripTest(axioms);
                 
                 // point test for an axiom NOT defined by this model.
-                assertFalse(axioms2.isAxiom(rdfType.getTermId(), rdfType.getTermId(),
-                        rdfProperty.getTermId()));
+                assertFalse(axioms2.isAxiom(rdfType.getIV(), rdfType.getIV(),
+                        rdfProperty.getIV()));
 
                 // point test for an axiom NOT defined by this model.
-                assertFalse(axioms2.isAxiom(rdfType.getTermId(), rdfType.getTermId(),
-                        unknownURI.getTermId()));
+                assertFalse(axioms2.isAxiom(rdfType.getIV(), rdfType.getIV(),
+                        unknownURI.getIV()));
                 
             }
             
@@ -135,12 +135,12 @@ public class TestAxioms extends AbstractTripleStoreTestCase {
                 assertSameAxioms(axioms, axioms2);
                 
                 // point test for an axiom NOT defined by this model.
-                assertFalse(axioms2.isAxiom(rdfType.getTermId(), rdfType.getTermId(),
-                        rdfProperty.getTermId()));
+                assertFalse(axioms2.isAxiom(rdfType.getIV(), rdfType.getIV(),
+                        rdfProperty.getIV()));
 
                 // point test for an axiom NOT defined by this model.
-                assertFalse(axioms2.isAxiom(rdfType.getTermId(), rdfType.getTermId(),
-                        unknownURI.getTermId()));
+                assertFalse(axioms2.isAxiom(rdfType.getIV(), rdfType.getIV(),
+                        unknownURI.getIV()));
 
             }
 
@@ -183,12 +183,12 @@ public class TestAxioms extends AbstractTripleStoreTestCase {
             assertEquals(naxioms, store.getStatementCount());
 
             // point test for an axiom.
-            assertTrue(axioms.isAxiom(rdfType.getTermId(), rdfType.getTermId(),
-                    rdfProperty.getTermId()));
+            assertTrue(axioms.isAxiom(rdfType.getIV(), rdfType.getIV(),
+                    rdfProperty.getIV()));
 
             // point test for NOT an axiom.
-            assertFalse(axioms.isAxiom(rdfType.getTermId(), rdfType.getTermId(),
-                    unknownURI.getTermId()));
+            assertFalse(axioms.isAxiom(rdfType.getIV(), rdfType.getIV(),
+                    unknownURI.getIV()));
 
             // verify (de-)serialization.
             {
@@ -196,12 +196,12 @@ public class TestAxioms extends AbstractTripleStoreTestCase {
                 final Axioms axioms2 = doRoundTripTest(axioms);
 
                 // point test for an axiom.
-                assertTrue(axioms2.isAxiom(rdfType.getTermId(), rdfType.getTermId(),
-                        rdfProperty.getTermId()));
+                assertTrue(axioms2.isAxiom(rdfType.getIV(), rdfType.getIV(),
+                        rdfProperty.getIV()));
 
                 // point test for NOT an axiom.
-                assertFalse(axioms2.isAxiom(rdfType.getTermId(), rdfType.getTermId(),
-                        unknownURI.getTermId()));
+                assertFalse(axioms2.isAxiom(rdfType.getIV(), rdfType.getIV(),
+                        unknownURI.getIV()));
 
             }
             
@@ -214,12 +214,12 @@ public class TestAxioms extends AbstractTripleStoreTestCase {
                 assertSameAxioms(axioms, axioms2);
                 
                 // point test for an axiom.
-                assertTrue(axioms2.isAxiom(rdfType.getTermId(), rdfType.getTermId(),
-                        rdfProperty.getTermId()));
+                assertTrue(axioms2.isAxiom(rdfType.getIV(), rdfType.getIV(),
+                        rdfProperty.getIV()));
 
                 // point test for NOT an axiom.
-                assertFalse(axioms2.isAxiom(rdfType.getTermId(), rdfType.getTermId(),
-                        unknownURI.getTermId()));
+                assertFalse(axioms2.isAxiom(rdfType.getIV(), rdfType.getIV(),
+                        unknownURI.getIV()));
 
             }
             
@@ -264,16 +264,16 @@ public class TestAxioms extends AbstractTripleStoreTestCase {
             assertEquals(naxioms, store.getStatementCount());
             
             // point test for an RDFS axiom.
-            assertTrue(axioms.isAxiom(rdfType.getTermId(), rdfType.getTermId(),
-                    rdfProperty.getTermId()));
+            assertTrue(axioms.isAxiom(rdfType.getIV(), rdfType.getIV(),
+                    rdfProperty.getIV()));
 
             // point test for an OWL axiom.
-            assertTrue(axioms.isAxiom(owlEquivalentClass.getTermId(), rdfType.getTermId(),
-                    rdfProperty.getTermId()));
+            assertTrue(axioms.isAxiom(owlEquivalentClass.getIV(), rdfType.getIV(),
+                    rdfProperty.getIV()));
 
             // point test for NOT an axiom.
-            assertFalse(axioms.isAxiom(rdfType.getTermId(), rdfType.getTermId(),
-                    unknownURI.getTermId()));
+            assertFalse(axioms.isAxiom(rdfType.getIV(), rdfType.getIV(),
+                    unknownURI.getIV()));
 
             {
             
@@ -281,16 +281,16 @@ public class TestAxioms extends AbstractTripleStoreTestCase {
                 final Axioms axioms2 = doRoundTripTest(axioms);
 
                 // point test for an RDFS axiom.
-                assertTrue(axioms2.isAxiom(rdfType.getTermId(), rdfType.getTermId(),
-                        rdfProperty.getTermId()));
+                assertTrue(axioms2.isAxiom(rdfType.getIV(), rdfType.getIV(),
+                        rdfProperty.getIV()));
 
                 // point test for an OWL axiom.
-                assertTrue(axioms2.isAxiom(owlEquivalentClass.getTermId(), rdfType.getTermId(),
-                        rdfProperty.getTermId()));
+                assertTrue(axioms2.isAxiom(owlEquivalentClass.getIV(), rdfType.getIV(),
+                        rdfProperty.getIV()));
 
                 // point test for NOT an axiom.
-                assertFalse(axioms2.isAxiom(rdfType.getTermId(), rdfType.getTermId(),
-                        unknownURI.getTermId()));
+                assertFalse(axioms2.isAxiom(rdfType.getIV(), rdfType.getIV(),
+                        unknownURI.getIV()));
 
             }
 
@@ -303,16 +303,16 @@ public class TestAxioms extends AbstractTripleStoreTestCase {
                 assertSameAxioms(axioms, axioms2);
                 
                 // point test for an RDFS axiom.
-                assertTrue(axioms2.isAxiom(rdfType.getTermId(), rdfType.getTermId(),
-                        rdfProperty.getTermId()));
+                assertTrue(axioms2.isAxiom(rdfType.getIV(), rdfType.getIV(),
+                        rdfProperty.getIV()));
 
                 // point test for an OWL axiom.
-                assertTrue(axioms2.isAxiom(owlEquivalentClass.getTermId(), rdfType.getTermId(),
-                        rdfProperty.getTermId()));
+                assertTrue(axioms2.isAxiom(owlEquivalentClass.getIV(), rdfType.getIV(),
+                        rdfProperty.getIV()));
 
                 // point test for NOT an axiom.
-                assertFalse(axioms2.isAxiom(rdfType.getTermId(), rdfType.getTermId(),
-                        unknownURI.getTermId()));
+                assertFalse(axioms2.isAxiom(rdfType.getIV(), rdfType.getIV(),
+                        unknownURI.getIV()));
 
             }
             

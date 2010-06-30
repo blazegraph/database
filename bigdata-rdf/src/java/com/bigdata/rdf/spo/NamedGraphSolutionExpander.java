@@ -151,11 +151,11 @@ public class NamedGraphSolutionExpander implements ISolutionExpander<ISPO> {
 
                 final BigdataURI uri = (BigdataURI) itr.next();
 
-                if (uri.getTermId() != IRawTripleStore.NULL) {
+                if (uri.getIV() != IRawTripleStore.NULL) {
 
                     if (++nknown == 1) {
 
-                        firstContext = uri.getTermId();
+                        firstContext = uri.getIV();
 
                     }
 
@@ -602,7 +602,7 @@ public class NamedGraphSolutionExpander implements ISolutionExpander<ISPO> {
 
                         for (URI g : namedGraphs) {
 
-                            final long termId = ((BigdataURI)g).getTermId();
+                            final long termId = ((BigdataURI)g).getIV();
 
                             if (termId == IRawTripleStore.NULL) {
 
@@ -709,7 +709,7 @@ public class NamedGraphSolutionExpander implements ISolutionExpander<ISPO> {
 
             for (URI g : namedGraphs) {
 
-                final long termId = ((BigdataURI) g).getTermId();
+                final long termId = ((BigdataURI) g).getIV();
 
                 if (termId == IRawTripleStore.NULL) {
 

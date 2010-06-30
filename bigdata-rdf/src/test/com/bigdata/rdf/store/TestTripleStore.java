@@ -119,7 +119,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
     protected void doAddTermTest(final AbstractTripleStore store,
             final Value term) {
 
-        assertEquals(NULL, store.getTermId(term));
+        assertEquals(NULL, store.getIV(term));
 
         // add to the database.
         final long id = store.addTerm(term);
@@ -154,7 +154,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                 || !(term instanceof BNode)) {
 
             // test lookup in the forward mapping (term -> id)
-            assertEquals("forward mapping", id, store.getTermId(term));
+            assertEquals("forward mapping", id, store.getIV(term));
 
         }
 
@@ -218,19 +218,19 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
              * verify that we can detect literals by examining the term identifier.
              */
 
-            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new LiteralImpl("abc"))));
+            assertTrue(AbstractTripleStore.isLiteral(store.getIV(new LiteralImpl("abc"))));
             
-            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new LiteralImpl("abc",XMLSchema.DECIMAL))));
+            assertTrue(AbstractTripleStore.isLiteral(store.getIV(new LiteralImpl("abc",XMLSchema.DECIMAL))));
             
-            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new LiteralImpl("abc", "en"))));
+            assertTrue(AbstractTripleStore.isLiteral(store.getIV(new LiteralImpl("abc", "en"))));
 
-            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new URIImpl("http://www.bigdata.com"))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getIV(new URIImpl("http://www.bigdata.com"))));
 
-            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(RDF.TYPE)));
+            assertFalse(AbstractTripleStore.isLiteral(store.getIV(RDF.TYPE)));
 
-            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new BNodeImpl(UUID.randomUUID().toString()))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getIV(new BNodeImpl(UUID.randomUUID().toString()))));
             
-            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new BNodeImpl("a12"))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getIV(new BNodeImpl("a12"))));
             
         } finally {
             
@@ -275,20 +275,20 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             for (int i = 0; i < terms.length; i++) {
     
                 // verify set by side-effect on batch insert.
-                assertNotSame(NULL, terms[i].getTermId());
+                assertNotSame(NULL, terms[i].getIV());
                 
                 // save & clear
-                final long termId = terms[i].getTermId();
-                terms[i].clearTermId();
+                final long termId = terms[i].getIV();
+                terms[i].clearInternalValue();
 
                 if (storeBlankNodes || !(terms[i] instanceof BNode)) {
 
                     // check the forward mapping (term -> id)
                     assertEquals("forward mapping", termId, store
-                            .getTermId(terms[i]));
+                            .getIV(terms[i]));
                     
                     // verify set by side effect.
-                    assertEquals(termId, terms[i].getTermId());
+                    assertEquals(termId, terms[i].getIV());
 
                 }
 
@@ -316,19 +316,19 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
              * identifier.
              */
 
-            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new LiteralImpl("abc"))));
+            assertTrue(AbstractTripleStore.isLiteral(store.getIV(new LiteralImpl("abc"))));
             
-            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new LiteralImpl("abc",XMLSchema.DECIMAL))));
+            assertTrue(AbstractTripleStore.isLiteral(store.getIV(new LiteralImpl("abc",XMLSchema.DECIMAL))));
             
-            assertTrue(AbstractTripleStore.isLiteral(store.getTermId(new LiteralImpl("abc", "en"))));
+            assertTrue(AbstractTripleStore.isLiteral(store.getIV(new LiteralImpl("abc", "en"))));
 
-            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new URIImpl("http://www.bigdata.com"))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getIV(new URIImpl("http://www.bigdata.com"))));
 
-            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(RDF.TYPE)));
+            assertFalse(AbstractTripleStore.isLiteral(store.getIV(RDF.TYPE)));
 
-            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new BNodeImpl(UUID.randomUUID().toString()))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getIV(new BNodeImpl(UUID.randomUUID().toString()))));
             
-            assertFalse(AbstractTripleStore.isLiteral(store.getTermId(new BNodeImpl("a12"))));
+            assertFalse(AbstractTripleStore.isLiteral(store.getIV(new BNodeImpl("a12"))));
 
         } finally {
 
@@ -360,40 +360,40 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             store.addTerms(new BigdataValue[] { x, y, b, c, x, b, z, z, c, y, x, });
             
             // none are NULL.
-            assertNotSame(x.getTermId(),NULL);
-            assertNotSame(y.getTermId(),NULL);
-            assertNotSame(z.getTermId(),NULL);
-            assertNotSame(b.getTermId(),NULL);
-            assertNotSame(c.getTermId(),NULL);
+            assertNotSame(x.getIV(),NULL);
+            assertNotSame(y.getIV(),NULL);
+            assertNotSame(z.getIV(),NULL);
+            assertNotSame(b.getIV(),NULL);
+            assertNotSame(c.getIV(),NULL);
 
             // all distinct.
-            assertNotSame(x.getTermId(), y.getTermId());
-            assertNotSame(x.getTermId(), z.getTermId());
-            assertNotSame(x.getTermId(), b.getTermId());
-            assertNotSame(x.getTermId(), c.getTermId());
+            assertNotSame(x.getIV(), y.getIV());
+            assertNotSame(x.getIV(), z.getIV());
+            assertNotSame(x.getIV(), b.getIV());
+            assertNotSame(x.getIV(), c.getIV());
             
-            assertNotSame(y.getTermId(), z.getTermId());
-            assertNotSame(y.getTermId(), b.getTermId());
-            assertNotSame(y.getTermId(), c.getTermId());
+            assertNotSame(y.getIV(), z.getIV());
+            assertNotSame(y.getIV(), b.getIV());
+            assertNotSame(y.getIV(), c.getIV());
             
-            assertNotSame(z.getTermId(), b.getTermId());
-            assertNotSame(z.getTermId(), c.getTermId());
+            assertNotSame(z.getIV(), b.getIV());
+            assertNotSame(z.getIV(), c.getIV());
             
-            assertNotSame(b.getTermId(), c.getTermId());
+            assertNotSame(b.getIV(), c.getIV());
 
             // correct type of term identifier was assigned.
-            assertTrue(AbstractTripleStore.isURI(x.getTermId()));
-            assertTrue(AbstractTripleStore.isURI(y.getTermId()));
-            assertTrue(AbstractTripleStore.isLiteral(z.getTermId()));
-            assertTrue(AbstractTripleStore.isBNode(b.getTermId()));
-            assertTrue(AbstractTripleStore.isBNode(c.getTermId()));
+            assertTrue(AbstractTripleStore.isURI(x.getIV()));
+            assertTrue(AbstractTripleStore.isURI(y.getIV()));
+            assertTrue(AbstractTripleStore.isLiteral(z.getIV()));
+            assertTrue(AbstractTripleStore.isBNode(b.getIV()));
+            assertTrue(AbstractTripleStore.isBNode(c.getIV()));
             
             // reverse lookup is consistent with the assigned term identifiers.
-            assertEquals(x,store.getTerm(x.getTermId()));
-            assertEquals(y,store.getTerm(y.getTermId()));
-            assertEquals(z,store.getTerm(z.getTermId()));
-            assertTrue(store.getTerm(b.getTermId()) instanceof BNode);
-            assertTrue(store.getTerm(c.getTermId()) instanceof BNode);
+            assertEquals(x,store.getTerm(x.getIV()));
+            assertEquals(y,store.getTerm(y.getIV()));
+            assertEquals(z,store.getTerm(z.getIV()));
+            assertTrue(store.getTerm(b.getIV()) instanceof BNode);
+            assertTrue(store.getTerm(c.getIV()) instanceof BNode);
             
         } finally {
             
@@ -428,30 +428,30 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             // add terms - lots of duplicates here.
             store.addTerms(new BigdataValue[] { x, y, x, z, y, z});
             
-            final long _x = x.getTermId();
-            final long _y = y.getTermId();
-            final long _z = z.getTermId();
+            final long _x = x.getIV();
+            final long _y = y.getIV();
+            final long _z = z.getIV();
             
             // none are NULL.
-            assertNotSame(x.getTermId(),NULL);
-            assertNotSame(y.getTermId(),NULL);
-            assertNotSame(z.getTermId(),NULL);
+            assertNotSame(x.getIV(),NULL);
+            assertNotSame(y.getIV(),NULL);
+            assertNotSame(z.getIV(),NULL);
 
             // all distinct.
-            assertNotSame(x.getTermId(), y.getTermId());
-            assertNotSame(x.getTermId(), z.getTermId());
+            assertNotSame(x.getIV(), y.getIV());
+            assertNotSame(x.getIV(), z.getIV());
             
-            assertNotSame(y.getTermId(), z.getTermId());
+            assertNotSame(y.getIV(), z.getIV());
             
             // correct type of term identifier was assigned.
-            assertTrue(AbstractTripleStore.isURI(x.getTermId()));
-            assertTrue(AbstractTripleStore.isURI(y.getTermId()));
-            assertTrue(AbstractTripleStore.isLiteral(z.getTermId()));
+            assertTrue(AbstractTripleStore.isURI(x.getIV()));
+            assertTrue(AbstractTripleStore.isURI(y.getIV()));
+            assertTrue(AbstractTripleStore.isLiteral(z.getIV()));
             
             // reverse lookup is consistent with the assigned term identifiers.
-            assertEquals(x,store.getTerm(x.getTermId()));
-            assertEquals(y,store.getTerm(y.getTermId()));
-            assertEquals(z,store.getTerm(z.getTermId()));
+            assertEquals(x,store.getTerm(x.getIV()));
+            assertEquals(y,store.getTerm(y.getIV()));
+            assertEquals(z,store.getTerm(z.getIV()));
 
             /*
              * re-adding the same term instances does not change their term
@@ -461,9 +461,9 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             // add terms - lots of duplicates here.
             store.addTerms(new BigdataValue[] { x, y, x, z, y, z});
 
-            assertEquals(_x, x.getTermId());
-            assertEquals(_y, y.getTermId());
-            assertEquals(_z, z.getTermId());
+            assertEquals(_x, x.getIV());
+            assertEquals(_y, y.getIV());
+            assertEquals(_z, z.getIV());
             
             /*
              * verify that re-adding distinct term identifier instances having
@@ -479,9 +479,9 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                 store.addTerms(new BigdataValue[] { x1, y1, x1, z1, y1, z1});
 
                 // same term identifiers were assigned.
-                assertEquals(_x, x1.getTermId());
-                assertEquals(_y, y1.getTermId());
-                assertEquals(_z, z1.getTermId());
+                assertEquals(_x, x1.getIV());
+                assertEquals(_y, y1.getIV());
+                assertEquals(_z, z1.getIV());
 
             }
             
@@ -552,28 +552,28 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                  * defeats the caching of the termId on the _Value).
                  */
     
-                x_termId = store.getTermId(new URIImpl("http://www.foo.org/x"));
+                x_termId = store.getIV(new URIImpl("http://www.foo.org/x"));
     
                 assertTrue(x_termId != NULL);
     
             }
     
-            final long x_id = store.getTermId(x);
+            final long x_id = store.getIV(x);
             assertTrue(x_id != NULL);
             assertEquals(x_termId, x_id);
-            final long y_id = store.getTermId(y);
+            final long y_id = store.getIV(y);
             assertTrue(y_id != NULL);
-            final long z_id = store.getTermId(z);
+            final long z_id = store.getIV(z);
             assertTrue(z_id != NULL);
-            final long A_id = store.getTermId(A);
+            final long A_id = store.getIV(A);
             assertTrue(A_id != NULL);
-            final long B_id = store.getTermId(B);
+            final long B_id = store.getIV(B);
             assertTrue(B_id != NULL);
-            final long C_id = store.getTermId(C);
+            final long C_id = store.getIV(C);
             assertTrue(C_id != NULL);
-            final long rdfType_id = store.getTermId(rdfType);
+            final long rdfType_id = store.getIV(rdfType);
             assertTrue(rdfType_id != NULL);
-            final long rdfsSubClassOf_id = store.getTermId(rdfsSubClassOf);
+            final long rdfsSubClassOf_id = store.getIV(rdfsSubClassOf);
             assertTrue(rdfsSubClassOf_id != NULL);
     
             final long lit1_id = store.addTerm(lit1);
@@ -599,14 +599,14 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                 assertEquals("#bnodes", 0, store.getBNodeCount());
             }
     
-            assertEquals(x_id, store.getTermId(x));
-            assertEquals(y_id, store.getTermId(y));
-            assertEquals(z_id, store.getTermId(z));
-            assertEquals(A_id, store.getTermId(A));
-            assertEquals(B_id, store.getTermId(B));
-            assertEquals(C_id, store.getTermId(C));
-            assertEquals(rdfType_id, store.getTermId(rdfType));
-            assertEquals(rdfsSubClassOf_id, store.getTermId(rdfsSubClassOf));
+            assertEquals(x_id, store.getIV(x));
+            assertEquals(y_id, store.getIV(y));
+            assertEquals(z_id, store.getIV(z));
+            assertEquals(A_id, store.getIV(A));
+            assertEquals(B_id, store.getIV(B));
+            assertEquals(C_id, store.getIV(C));
+            assertEquals(rdfType_id, store.getIV(rdfType));
+            assertEquals(rdfsSubClassOf_id, store.getIV(rdfsSubClassOf));
     
             {
                 final Iterator<SPOKeyOrder> itr = store.getSPORelation()
@@ -944,7 +944,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
                     },//
                     store.getAccessPath(NULL, NULL, NULL).iterator());
 
-            assertEquals(1, store.getAccessPath(NULL, NULL, store.getTermId(B))
+            assertEquals(1, store.getAccessPath(NULL, NULL, store.getIV(B))
                     .removeAll());
 
             if (log.isInfoEnabled()) {
@@ -1123,9 +1123,9 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
     
             store.addTerms(new BigdataValue[] { x, y, z });
             
-            final long x1 = x.getTermId();
-            final long y2 = y.getTermId();
-            final long z3 = z.getTermId();
+            final long x1 = x.getIV();
+            final long y2 = y.getIV();
+            final long z3 = z.getIV();
             
             // verify nothing in the store.
             assertSameIterator(new Statement[]{},

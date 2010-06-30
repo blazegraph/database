@@ -188,13 +188,13 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
             
             store.addStatement(Y, sco, Z);
             
-            log.info("U: " + U.getTermId());
-            log.info("V: " + V.getTermId());
-            log.info("W: " + W.getTermId());
-            log.info("X: " + X.getTermId());
-            log.info("Y: " + Y.getTermId());
-            log.info("Z: " + Z.getTermId());
-            log.info("sco: " + sco.getTermId());
+            log.info("U: " + U.getIV());
+            log.info("V: " + V.getIV());
+            log.info("W: " + W.getIV());
+            log.info("X: " + X.getIV());
+            log.info("Y: " + Y.getIV());
+            log.info("Z: " + Z.getIV());
+            log.info("sco: " + sco.getIV());
             
             if (log.isInfoEnabled())
                 log.info("database contents:\n"
@@ -238,7 +238,7 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
                                 store.getSPORelation().getNamespace(),
                                 tempStore.getSPORelation().getNamespace()
                             },
-                            new Constant<Long>(U.getTermId()),
+                            new Constant<Long>(U.getIV()),
                             Var.var("p"),
                             Var.var("o"))
                     },

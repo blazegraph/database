@@ -701,10 +701,10 @@ public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestC
                 
                 cxn.commit();
                 
-                System.err.println("<mike> = " + sail.getDatabase().getTermId(mike));
-                System.err.println("<jane> = " + sail.getDatabase().getTermId(jane));
-                System.err.println("\"Mike\" = " + sail.getDatabase().getTermId(new LiteralImpl("Mike")));
-                System.err.println("\"Jane\" = " + sail.getDatabase().getTermId(new LiteralImpl("Jane")));
+                System.err.println("<mike> = " + sail.getDatabase().getIV(mike));
+                System.err.println("<jane> = " + sail.getDatabase().getIV(jane));
+                System.err.println("\"Mike\" = " + sail.getDatabase().getIV(new LiteralImpl("Mike")));
+                System.err.println("\"Jane\" = " + sail.getDatabase().getIV(new LiteralImpl("Jane")));
                 
                 String query = 
                     "select ?s ?label " +
