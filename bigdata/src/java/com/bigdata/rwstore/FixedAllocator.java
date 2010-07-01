@@ -70,13 +70,12 @@ public class FixedAllocator implements Allocator {
 			return -1;
 		} else {
 			long val = getStartAddr() - other.getStartAddr();
-			// cat.info("Comparing: " + getStartAddr() + " with " + other.getStartAddr());
 
 			if (val == 0) {
 				throw new Error("Two allocators at same address");
 			}
 
-			return (int) val;
+			return val < 0 ? -1 : 1;
 		}
 	}
 
@@ -165,6 +164,7 @@ public class FixedAllocator implements Allocator {
 
 				m_freeTransients = 0;
 			}
+
 			return buf;
 		} catch (IOException e) {
 			throw new StorageTerminalError("Error on write", e);
@@ -429,5 +429,9 @@ public class FixedAllocator implements Allocator {
 
 	public int getIndex() {
 		return m_index;
+	}
+
+	public void appendShortStats(StringBuffer str) {
+		str.append("Index: " + m_index + ", address: " + getStartAddr() + ", " + m_size + "\n");
 	}
 }

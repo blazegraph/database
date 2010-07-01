@@ -38,6 +38,7 @@ import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.OverlappingFileLockException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeSet;
@@ -515,6 +516,12 @@ public class RWStore implements IStore {
 
 		readAllocationBlocks();
 		
+		if (log.isTraceEnabled()) {
+			StringBuffer str = new StringBuffer();
+			this.showAllocators(str);
+			log.trace(str);
+		}
+		
 		if (physicalAddress(m_metaBitsAddr) == 0) {
 			throw new IllegalStateException("Free/Invalid metaBitsAddr on load");
 		}
@@ -532,6 +539,8 @@ public class RWStore implements IStore {
 	}
 
 	protected void readAllocationBlocks() throws IOException {
+		
+		assert m_allocs.size() == 0;
 
 		long addr = convertAddr(m_fileSize);
 		long metaStart = convertAddr(m_metaStartAddr);
@@ -544,7 +553,7 @@ public class RWStore implements IStore {
 		 * the metaAllocation if two allocation blocks were loaded for the same
 		 * address (must be two version of same Allocator).
 		 */
-		TreeSet blocks = new TreeSet();
+		// TreeSet blocks = new TreeSet();
 
 		while (addr > metaStart) {
 			addr -= ALLOC_BLOCK_SIZE;
@@ -573,17 +582,19 @@ public class RWStore implements IStore {
 				}
 
 				allocator.read(strBuf);
+				allocator.setDiskAddr(addr);
 				allocator.setFreeList(freeList);
 
-				blocks.add(allocator);
+				// blocks.add(allocator);
+				m_allocs.add(allocator);
 
-				allocator.setDiskAddr(addr);
 			}
 		}
 
 		// add sorted blocks into index array and set index number for address
 		// encoding
-		m_allocs.addAll(blocks);
+		// m_allocs.addAll(blocks);
+		Collections.sort(m_allocs);
 		for (int index = 0; index < m_allocs.size(); index++) {
 			((Allocator) m_allocs.get(index)).setIndex(index);
 		}
@@ -1689,6 +1700,18 @@ public class RWStore implements IStore {
 		}
 
 		return stats;
+	}
+	
+	/**
+	 * Utility debug outputing the allocator array, showing index, start
+	 * address and alloc type/size
+	 */
+	public void showAllocators(StringBuffer str) {
+		Iterator allocs = m_allocs.iterator();
+		while (allocs.hasNext()) {
+			Allocator alloc = (Allocator) allocs.next();
+			alloc.appendShortStats(str);
+		}
 	}
 
 	public ArrayList getStorageBlockAddresses() {

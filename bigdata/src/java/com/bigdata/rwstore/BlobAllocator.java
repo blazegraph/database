@@ -256,4 +256,8 @@ public class BlobAllocator implements Allocator {
 		return m_hdrs[hdrIndex];
 	}
 
+	public void appendShortStats(StringBuffer str) {
+		str.append("Index: " + m_index + ", address: " + getStartAddr() + ", BLOB\n");
+	}
+
 }

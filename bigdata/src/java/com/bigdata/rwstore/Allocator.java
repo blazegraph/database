@@ -48,4 +48,6 @@ public interface Allocator extends Comparable {
   public void addAddresses(ArrayList addrs);
   public int getRawStartAddr();
   public int getIndex();
+  public void appendShortStats(StringBuffer str);
 }
+	
