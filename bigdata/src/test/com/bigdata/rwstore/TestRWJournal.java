@@ -236,11 +236,11 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
             properties.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
 
-            properties.setProperty(Options.CREATE_TEMP_FILE, "false");
+            properties.setProperty(Options.CREATE_TEMP_FILE, "true");
             
-            properties.setProperty(Options.FILE, "/Volumes/SSDData/TestRW/tmp.rw");
+            // properties.setProperty(Options.FILE, "/Volumes/SSDData/TestRW/tmp.rw");
 
-            properties.setProperty(Options.DELETE_ON_EXIT, "false");
+            properties.setProperty(Options.DELETE_ON_EXIT, "true");
 
             properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
                     + writeCacheEnabled);
