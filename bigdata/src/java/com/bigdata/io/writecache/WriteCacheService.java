@@ -1424,9 +1424,24 @@ abstract public class WriteCacheService implements IWriteCache {
 			try {
 
 				// write on the cache.
+				if (offset == 90565632L) {
+					System.out.println("Writing to problem address 90565632L");
+				}
 				if (cache.write(offset, data, chk, useChecksum)) {
-
-					if (recordMap.put(offset, cache) != null) {
+					WriteCache old = recordMap.put(offset, cache);
+					// There should be no duplicate address in the record
+					//	map since these entries should be removed, although
+					//	write data may still exist in an old WriteCache.
+					// A duplicate may also be indicative of an allocation
+					//	error, which we need to be pretty strict about!
+					// For the RWStore:
+					// Since writes can also be for allocators, there remains
+					//	the possibility that an old allocation write might
+					//	be retained after an extend.
+					// TODO: fix extendFile in the RWStore to ensure writes
+					//	to old allocator space is removed, OR add writeCache
+					//	method to allow adding to cache w/o recording address!
+					if (old == cache) {
 						throw new AssertionError("Record already in cache: offset=" + offset);
 					}
 
@@ -1908,6 +1923,9 @@ abstract public class WriteCacheService implements IWriteCache {
      */
 	public void clearWrite(final long offset) {
 		try {
+			if (offset == 90565632L) {
+				System.out.println("Clearing problem offset 90565632L");
+			}
 			final WriteCache cache = recordMap.remove(offset);
 			if (cache == null)
 				return;
