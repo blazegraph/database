@@ -118,6 +118,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
         properties.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
 
         properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+        
+        // properties.setProperty(Options.FILE, "/Volumes/SSDData/TestRW/tmp.rw");
 
         properties.setProperty(Options.DELETE_ON_EXIT, "true");
 
@@ -228,6 +230,25 @@ public class TestRWJournal extends AbstractJournalTestCase {
             
         }
 
+        public Properties getProperties() {
+
+            final Properties properties = super.getProperties();
+
+            properties.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
+
+            properties.setProperty(Options.CREATE_TEMP_FILE, "false");
+            
+            properties.setProperty(Options.FILE, "/Volumes/SSDData/TestRW/tmp.rw");
+
+            properties.setProperty(Options.DELETE_ON_EXIT, "false");
+
+            properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
+                    + writeCacheEnabled);
+
+            return properties;
+
+        }
+        
 //        /**
 //         * Test that allocate() pre-extends the store when a record is allocated
 //         * which would overflow the current user extent.
@@ -438,10 +459,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
             r.nextBytes(batchBuffer);
 	        for (int i = 0; i < bsize; i++) {
 	        	int as = base + r.nextInt(scope);
-	        	System.out.println("Allocating " + i + " - " + as + " bytes");
-	        	if (i == 400) {
-		        	System.out.println("About to allocate the 401th");
-	        	}
 	        	retaddrs[i] = (int) rw.alloc(batchBuffer, as);
 	        }
 	        
@@ -464,8 +481,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 RWStore rw = bufferStrategy.getRWStore();
                 long numAllocs = rw.getTotalAllocations();
                 long startAllocations = rw.getTotalAllocationsSize();
-                reallocBatch(rw, 10000, 275, 10000);
-                reallocBatch(rw, 10000, 860, 10000);
+                reallocBatch(rw, 1000, 275, 1000);
+                reallocBatch(rw, 1000, 860, 1000);
                 System.out.println("Final allocations: " + (rw.getTotalAllocations() - numAllocs)
                 		+ ", allocated bytes: " + (rw.getTotalAllocationsSize() - startAllocations)
                  + ", file length: " + rw.getStoreFile().length());
@@ -493,11 +510,120 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	        
 	        return 0L;
 		}
+        
+        public void test_reallocationWithReadAndReopen() {
+            
+            Journal store = (Journal) getStore();
+
+            try {
+
+				RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
+
+				RWStore rw = bufferStrategy.getRWStore();
+
+				long numAllocs = rw.getTotalAllocations();
+				long startAllocations = rw.getTotalAllocationsSize();
+				// reallocBatchWithRead(bufferStrategy, 100000, 275, 5);
+				reallocBatchWithRead(store, 1, 250, 500000); 
+				store.close();
+				
+				// added to try and foce bug
+				System.out.println("Re-open Journal");
+				store = (Journal) getStore();
+				reallocBatchWithRead(store, 1, 1500, 500000);
+				reallocBatchWithRead(store, 1, 250, 500000);
+				reallocBatchWithRead(store, 1, 250, 500000); 
+				store.close();
+				// .. end add to force bug
+				
+				System.out.println("Re-open Journal");
+				store = (Journal) getStore();
+				reallocBatchWithRead(store, 1, 10000, 500000);
+				reallocBatchWithRead(store, 1, 500, 500000);
+				store.close();
+				System.out.println("Re-open Journal");
+				store = (Journal) getStore();
+				reallocBatchWithRead(store, 1, 1256, 500000);
+				reallocBatchWithRead(store, 1, 250, 500000);
+				reallocBatchWithRead(store, 1, 250, 500000); 
+				store.close();
+				System.out.println("Re-open Journal");
+				store = (Journal) getStore();
+				reallocBatchWithRead(store, 1, 1000, 500000);
+				reallocBatchWithRead(store, 1, 2000, 500000);
+				reallocBatchWithRead(store, 1, 1000, 500000);
+				store.close();
+				System.out.println("Re-open Journal");
+				store = (Journal) getStore();
+
+				bufferStrategy = (RWStrategy) store.getBufferStrategy();
+
+				rw = bufferStrategy.getRWStore();
+
+				System.out.println("Final allocations: " + (rw.getTotalAllocations() - numAllocs)
+						+ ", allocated bytes: " + (rw.getTotalAllocationsSize() - startAllocations) + ", file length: "
+						+ rw.getStoreFile().length());
+			} finally {
+
+				store.destroy();
+            
+            }
+
+        	
+        }
+
+        private long reallocBatchWithRead(Journal store, int tsts, int sze, int grp) {
+            RWStrategy bs = (RWStrategy) store
+            .getBufferStrategy();
+
+            byte[] buf = new byte[sze+4]; // extra for checksum
+            r.nextBytes(buf);
+       	                      
+            RWStore rw = bs.getRWStore();
+            
+        	long[] addr = new long[grp];
+        	int[] szes = new int[grp];
+        	for (int i = 0; i < grp; i++) {
+        		szes[i] = 50 + r.nextInt(sze-50);
+                ByteBuffer bb = ByteBuffer.wrap(buf, 0, szes[i]);
+        		addr[i] = bs.write(bb);
+        	}
+        	
+        	store.commit();
+        	
+        	System.out.println("CommitRecord: " + store.getCommitRecord());
+        	
+        	for (int t = 0; t < tsts; t++) {
+            	for (int i = 0; i < grp; i++) {
+            		long old = addr[i];
+            		try {
+            			bs.read(old);
+            		} catch (Exception e) {
+            			throw new RuntimeException("problem handling read: " + i + " in test: " + t + " from address: " + old, e);
+            		}
+                    ByteBuffer bb = ByteBuffer.wrap(buf, 0, szes[i]);
+                    addr[i] = bs.write(bb);
+            		bb.flip();
+            		bs.delete(old);
+            	}       		
+        	}
+        	
+        	store.commit();
+        	
+        	rw.reopen();
+        	
+        	System.out.println("CommitRecord after realloc: " + store.getCommitRecord());
+	        
+	        return 0L;
+		}
 
         /**
          * Test of blob allocation, does not check on read back, just the allocation
          */
         public void test_blob_allocs() {
+            if (false) {
+            	return;
+            }
             
             final Journal store = (Journal) getStore();
 
@@ -543,6 +669,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 RWStore rw = bs.getRWStore();
                 
                 long faddr = bs.write(bb); // rw.alloc(buf, buf.length);
+                
+                log.info("Blob Allocation at " + rw.convertFromAddr(faddr));
                 
                 bb.position(0);
                 
