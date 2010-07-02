@@ -94,9 +94,13 @@ public class FileMetadata {
 	 */
 	final BufferMode bufferMode;
 
-	/**
-	 * The interface for IO performed on that file.
-	 */
+    /**
+     * The interface for IO performed on that file.
+     * <p>
+     * Note: this field is only safe for use during the initial file
+     * create/open. It is not safe to use once a file has been closed, whether
+     * directly or by an interrupt during an IO operation.
+     */
 	RandomAccessFile raf;
 
 	/**
@@ -148,7 +152,7 @@ public class FileMetadata {
 	/**
 	 * The #of write cache buffers to be used if the write cache is enabled.
 	 */
-	final int writeCacheBufferCount;
+	public final int writeCacheBufferCount;
 
 	/**
 	 * <code>true</code> iff record level checksums are enabled. These are used

@@ -1587,7 +1587,7 @@ abstract public class WriteCacheService implements IWriteCache {
 					/*
 					 * Should never happen.
 					 */
-					throw new IllegalStateException("Unable to write into current WriteCache");
+					throw new AssertionError("Unable to write into current WriteCache");
 
 				} finally {
 

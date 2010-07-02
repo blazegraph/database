@@ -24,8 +24,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore;
 
-import java.util.*;
-import java.io.*;
+import java.io.DataInputStream;
+import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicLong;
 
 public interface Allocator extends Comparable {
   public int getBlockSize();
@@ -43,7 +44,7 @@ public interface Allocator extends Comparable {
   public void read(DataInputStream str);
   public boolean hasFree();
   public void setFreeList(ArrayList list);
-  public String getStats();
+  public String getStats(AtomicLong counter);
   public void preserveSessionData();
   public void addAddresses(ArrayList addrs);
   public int getRawStartAddr();

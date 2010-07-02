@@ -24,11 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.File;
-import java.io.OutputStream;
-import java.io.InputStream;
 
 /************************************************************************************************
  * The IStore interface provides persistent file-backed storage.
@@ -36,43 +32,44 @@ import java.io.InputStream;
  *	to support the Generic Persistent Object model.
  **/
 public interface IStore {
-	/*********************************************************************
-	 * Provides a link to an object to carryout any additional data updates
-	 *	before the physical commit - used by the GPO object managers for example
-	 **/
-	public static interface ICommitCallback {
-	  public void commitCallback();
-	  public void commitComplete();
-	}
+    
+//	/*********************************************************************
+//	 * Provides a link to an object to carryout any additional data updates
+//	 *	before the physical commit - used by the GPO object managers for example
+//	 **/
+//	public static interface ICommitCallback {
+//	  public void commitCallback();
+//	  public void commitComplete();
+//	}
 	
 	public boolean isLongAddress();
 	
-	/**************************************************************
-	 * Registers a commitCallback object.
-	 *
-	 * <p>This method may be called more than once, there maybe several
-	 *	such objects.</p>
-	 *
-	 * <p>It is used by the GPO object managers to allow them to store
-	 *	index information and other updated data after a commit
-	 *	cycle.</p>
-	 **/
-	public void setCommitCallback(ICommitCallback callback);
+//	/**************************************************************
+//	 * Registers a commitCallback object.
+//	 *
+//	 * <p>This method may be called more than once, there maybe several
+//	 *	such objects.</p>
+//	 *
+//	 * <p>It is used by the GPO object managers to allow them to store
+//	 *	index information and other updated data after a commit
+//	 *	cycle.</p>
+//	 **/
+//	public void setCommitCallback(ICommitCallback callback);
 	
 	/**************************************************************
 	 * called when used as a server, returns whether facility is enabled
 	 **/
 	public boolean preserveSessionData(); 
 
-	/**************************************************************
-	 * the filestore may be explicitly limited
-	 *	- useful when testing, it is all too easy to fill a disk
-	 *
-	 * <p>the default is 1GB</p>
-	 *
-	 * @param size the new max filesize &gt;&gt; 8
-	 **/
-	public void setMaxFileSize(int size);
+//	/**************************************************************
+//	 * the filestore may be explicitly limited
+//	 *	- useful when testing, it is all too easy to fill a disk
+//	 *
+//	 * <p>the default is 1GB</p>
+//	 *
+//	 * @param size the new max filesize &gt;&gt; 8
+//	 **/
+//	public void setMaxFileSize(int size);
 	
 	/**************************************************************
 	 * the lowest level interface should normally not be used directly.
@@ -88,15 +85,15 @@ public interface IStore {
 	 **/
 	public void free(long addr, int size);
 
-	/**************************************************************
-	 * Reallocates storage
-	 *
-	 * @param oldAddr is the existing address to be freed
-	 * @return a stream to write to the store
-	 **/
-	public PSOutputStream realloc(long oldAddr, int size);
-	
-	public PSInputStream getData(long value);
+//	/**************************************************************
+//	 * Reallocates storage
+//	 *
+//	 * @param oldAddr is the existing address to be freed
+//	 * @return a stream to write to the store
+//	 **/
+//	public PSOutputStream realloc(long oldAddr, int size);
+//	
+//	public PSInputStream getData(long value);
 
 	/**************************************************************
 	 * Odd method needed by PSInputStream to fetch data of unknown
@@ -112,17 +109,17 @@ public interface IStore {
 	 **/
 	public int getDataSize(long addr, byte buf[]);
 
-	/**************************************************************
-	 * if the caller can be sure of the size, then a more efficient allocation can be made,
-	 * but the corresponding getData call must also be made with an explicit size.
-	 *
-	 * <p>this should not generally be used - but specific objects can exploit this 
-	 *	interface for storing special purpose fixed size structures.</p>
-	 *
-	 * <p>Note that the Write Once Store will not automatically preserve historical
-	 *	address information if explicit buffers are used.</p>
-	 **/	
-	public long realloc(long oldaddr, int oldsze, byte buf[]);
+//	/**************************************************************
+//	 * if the caller can be sure of the size, then a more efficient allocation can be made,
+//	 * but the corresponding getData call must also be made with an explicit size.
+//	 *
+//	 * <p>this should not generally be used - but specific objects can exploit this 
+//	 *	interface for storing special purpose fixed size structures.</p>
+//	 *
+//	 * <p>Note that the Write Once Store will not automatically preserve historical
+//	 *	address information if explicit buffers are used.</p>
+//	 **/	
+//	public long realloc(long oldaddr, int oldsze, byte buf[]);
 	
 	/**************************************************************
 	 * Used to retrieve data of a known size, typically after having
@@ -134,7 +131,7 @@ public interface IStore {
 	public void getData(long l, byte buf[]);
 	
 	/**************************************************************
-	 * a debug method that verifies a sotorage address as active
+	 * a debug method that verifies a storage address as active
 	 *
 	 * @param a the storage address to be tested
 	 **/	
@@ -151,50 +148,50 @@ public interface IStore {
 	 **/
 	public boolean isNativeAddress(long value);
 
-	/***************************************************************************************
-	 * the root address enables the store to be self contained!
-	 *	Along with the allocation information to manage the data, the store by default
-	 *	can store and provide a root address to data needed to initialize the system.
-	 *
-	 * @param addr the address to be stored as "root"
-	 **/
-	public void setRootAddr(long addr);
+//	/***************************************************************************************
+//	 * the root address enables the store to be self contained!
+//	 *	Along with the allocation information to manage the data, the store by default
+//	 *	can store and provide a root address to data needed to initialize the system.
+//	 *
+//	 * @param addr the address to be stored as "root"
+//	 **/
+//	public void setRootAddr(long addr);
+//	
+//	/***************************************************************************************
+//	 * @return the root address previously set
+//	 **/
+//	public long getRootAddr();
 	
-	/***************************************************************************************
-	 * @return the root address previously set
-	 **/
-	public long getRootAddr();
+//	/***************************************************************************************
+//	 * A utility equivalent to : store.getData(store.getRootAddr());
+//	 *
+//	 * @return an InputStream for any data stored at the root address
+//	 **/
+//	public PSInputStream getRoot();
 	
-	/***************************************************************************************
-	 * A utility equivalent to : store.getData(store.getRootAddr());
-	 *
-	 * @return an InputStream for any data stored at the root address
-	 **/
-	public PSInputStream getRoot();
-	
-	/***************************************************************************************
-	 * clears all data from the store.
-	 **/
-	public void clear();
+//	/***************************************************************************************
+//	 * clears all data from the store.
+//	 **/
+//	public void clear();
 
 
-	/***************************************************************************************
-	 * increments the current nested transaction level
-	 **/
-	public void startTransaction();
-	
-	/***************************************************************************************
-	 * decrements the current nested transaction level, if the value is reduced to zero then
-	 *	a physical commit is carried out, if the level is already zero, a runtime exception
-	 *	is thrown.
-	 **/
-	public void commitTransaction();
-	
-	/***************************************************************************************
-	 * if the transaction level is greater than one, all modifcations are undone, and the
-	 *	transaction level set to zero.
-	 **/
-	public void rollbackTransaction();
+//	/***************************************************************************************
+//	 * increments the current nested transaction level
+//	 **/
+//	public void startTransaction();
+//	
+//	/***************************************************************************************
+//	 * decrements the current nested transaction level, if the value is reduced to zero then
+//	 *	a physical commit is carried out, if the level is already zero, a runtime exception
+//	 *	is thrown.
+//	 **/
+//	public void commitTransaction();
+//	
+//	/***************************************************************************************
+//	 * if the transaction level is greater than one, all modifcations are undone, and the
+//	 *	transaction level set to zero.
+//	 **/
+//	public void rollbackTransaction();
 
 	/***************************************************************************************
 	 * does what it says
@@ -232,32 +229,32 @@ public interface IStore {
 	 **/
 	public int absoluteReadLong(long addr, int offset);
 	
-	/***************************************************************************************
-	 * copies the store to a new file, this is not necessarily a byte for byte copy
-	 *	since the store could write only consolidated data - particulalry relevant for the
-	 *	Write Once store.
-	 *
-	 * @param filename specifies the file to be copied to.
-	 **/
-	public void backup(String filename) throws FileNotFoundException, IOException;
-
-	/***************************************************************************************
-	 * copies the store to a new file, this is not necessarily a byte for byte copy
-	 *	since the store could write only consolidated data - particulalry relevant for the
-	 *	Write Once store.
-	 *
-	 * @param outstr specifies stream to be copied to.
-	 **/
-	public void backup(OutputStream outstr) throws IOException;
-
-	/***************************************************************************************
-	 * useful in deployed web services to be able to restore a previously backed-up
-	 *	store.  Can also be useful to copy databases, for example, when running
-	 *	a test system that can be simply restored to a backup extracted from a live system.
-	 *
-	 * @param instr specifies stream to be restored from.
-	 **/
-	public void restore(InputStream instr) throws IOException;
+//	/***************************************************************************************
+//	 * copies the store to a new file, this is not necessarily a byte for byte copy
+//	 *	since the store could write only consolidated data - particulalry relevant for the
+//	 *	Write Once store.
+//	 *
+//	 * @param filename specifies the file to be copied to.
+//	 **/
+//	public void backup(String filename) throws FileNotFoundException, IOException;
+//
+//	/***************************************************************************************
+//	 * copies the store to a new file, this is not necessarily a byte for byte copy
+//	 *	since the store could write only consolidated data - particulalry relevant for the
+//	 *	Write Once store.
+//	 *
+//	 * @param outstr specifies stream to be copied to.
+//	 **/
+//	public void backup(OutputStream outstr) throws IOException;
+//
+//	/***************************************************************************************
+//	 * useful in deployed web services to be able to restore a previously backed-up
+//	 *	store.  Can also be useful to copy databases, for example, when running
+//	 *	a test system that can be simply restored to a backup extracted from a live system.
+//	 *
+//	 * @param instr specifies stream to be restored from.
+//	 **/
+//	public void restore(InputStream instr) throws IOException;
 
   /*********************************************************************************************
    * Retrieves files associated with this store.
