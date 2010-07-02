@@ -32,6 +32,12 @@ class OrderedSetDifference<T> {
     }
     
     /**
+     * For ordered set difference we take a co-routine approach
+     * either adding members from the old to the remove set or
+     * adding members from the new to the added.
+     * 
+     * Travers the new list, removing members from old or adding members
+     * from the new if a match cannot be found
      * 
      * @param aold
      *            The old set.
@@ -40,45 +46,23 @@ class OrderedSetDifference<T> {
      */
     public OrderedSetDifference(final T[] aold, final T[] anew) {
 
-        {
-            // look for members that left.
-            for (int i = 0; i < aold.length; i++) {
-                boolean found = false;
-                // consider an old member.
-                final T t = aold[i];
-                // look at the new members.
-                for (T u : anew) {
-                    if (t.equals(u)) {
-                        // old member is still present.
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    // in old, but not in new.
-                    removed.add(t);
-                }
-            }
-        }
-        {
-            // look for new members.
-            for (int i = 0; i < anew.length; i++) {
-                boolean found = false;
-                // consider a new member.
-                final T t = anew[i];
-                // look at the old members.
-                for (T u : aold) {
-                    if (t.equals(u)) {
-                        // new member was already known.
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    // in new, but not in old.
-                    added.add(t);
-                }
-            }
+        int oi = 0;
+        
+        for (int i = 0; i < anew.length; i++) {
+        	boolean found = false;
+    		while (!found && oi < aold.length) {
+    			if (aold[oi].equals(anew[i])) {
+    				found = true;
+    			} else {
+    				removed.add(aold[oi]);
+    			}
+    			
+    			oi++;
+    		}
+    		
+        	if (!found) {
+        		added.add(anew[i]); // none left in old, so must be added
+        	}
         }
     }
 
