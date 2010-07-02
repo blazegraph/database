@@ -39,7 +39,7 @@ class UnorderedSetDifference<T extends Comparable<T>> {
      * @param anew
      *            The new set.
      */
-    public void UnorderedSetDifference(final T[] aold, final T[] anew) {
+    public UnorderedSetDifference(final T[] aold, final T[] anew) {
 
         // sort both arrays.
         Arrays.sort(aold);
