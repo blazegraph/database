@@ -27,10 +27,7 @@ package com.bigdata.rwstore;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
@@ -41,7 +38,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.TreeSet;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -51,7 +48,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.WriteCache;
-import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.ForceEnum;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RWStrategy.FileMetadataView;
@@ -176,69 +172,81 @@ public class RWStore implements IStore {
 	
 	static final int ALLOCATION_SCALEUP = 16; // multiplier to convert allocations based on minimum allocation of 32k
 
-	ICommitCallback m_commitCallback;
-
-	public void setCommitCallback(ICommitCallback callback) {
-		m_commitCallback = callback;
-	}
+//	private ICommitCallback m_commitCallback;
+//
+//	public void setCommitCallback(final ICommitCallback callback) {
+//		m_commitCallback = callback;
+//	}
 
 	// ///////////////////////////////////////////////////////////////////////////////////////
 	// RWStore Data
 	// ///////////////////////////////////////////////////////////////////////////////////////
 
-	protected File m_fd;
-	protected RandomAccessFile m_raf;
-	protected FileMetadata m_metadata;
-	protected int m_transactionCount;
-	protected boolean m_committing;
+	private File m_fd;
+	private RandomAccessFile m_raf;
+//	protected FileMetadata m_metadata;
+//	protected int m_transactionCount;
+//	private boolean m_committing;
 
-	protected boolean m_preserveSession = false;
-	protected boolean m_readOnly;
+	private boolean m_preserveSession = false;
+	private boolean m_readOnly;
 
-	// lists of total alloc blocks
-	ArrayList m_allocs;
+    /**
+     * lists of total alloc blocks.
+     * 
+     * @todo examine concurrency and lock usage for {@link #m_alloc}, which is
+     *       used by {@link #getStats(boolean)}, and the rest of these lists as
+     *       well.
+     */
+	private ArrayList<Allocator> m_allocs;
 
 	// lists of free alloc blocks
-	ArrayList m_freeFixed[];
+	private ArrayList m_freeFixed[];
 	
 	// lists of free blob allocators
-	ArrayList m_freeBlobs;
+	private ArrayList m_freeBlobs;
 
 	// lists of blocks requiring commitment
-	ArrayList m_commitList;
+	private ArrayList m_commitList;
 
-	WriteBlock m_writes;
-	final Quorum<?,?> m_quorum;
-	RWWriteCacheService m_writeCache;
+	private WriteBlock m_writes;
+	private final Quorum<?,?> m_quorum;
+	private RWWriteCacheService m_writeCache;
 
     /**
      * This lock is used to exclude readers when the extent of the backing file
      * is about to be changed.
-     * 
-     * At present we use synchronized (this)  for alloc/commitChanges and getData,
-     * since only alloc and commitChanges can cause a file extend, and only getData
-     * can read.
-     * 
+     * <p>
+     * At present we use synchronized (this) for alloc/commitChanges and
+     * getData, since only alloc and commitChanges can cause a file extend, and
+     * only getData can read.
+     * <p>
      * By using an explicit extensionLock we can unsure that that the taking of
      * the lock is directly related to the functionality, plus we can support
      * concurrent reads.
+     * <p>
+     * You MUST hold the {@link #m_allocationLock} before acquiring the
+     * {@link ReentrantReadWriteLock#writeLock()} of the
+     * {@link #m_extensionLock}.
      */
     final private ReentrantReadWriteLock m_extensionLock = new ReentrantReadWriteLock();
     
     /**
      * An explicit allocation lock allows for reads concurrent with allocation requests.
-     * It is only when an allocation triggers a file extention that the write
+     * It is only when an allocation triggers a file extension that the write
      * extensionLock needs to be taken.
+     * 
      * TODO: There is scope to take advantage of the different allocator sizes
      * and provide allocation locks on the fixed allocators.  We will still need
      * a store-wide allocation lock when creating new allocation areas, but 
      * significant contention may be avoided.
      */
     final private ReentrantLock m_allocationLock = new ReentrantLock();
-    ReopenFileChannel m_reopener = null;
+
+    private ReopenFileChannel m_reopener = null;
 
     private void baseInit() {
-		m_commitCallback = null;
+//		m_commitCallback = null;
 
 		m_metaBitsSize = cDefaultMetaBitsSize;
 
@@ -248,9 +256,9 @@ public class RWStore implements IStore {
 		m_maxFileSize = 2 * 1024 * 1024; // 1gb max (mult by 128)!!
 
 		m_commitList = new ArrayList();
-		m_allocs = new ArrayList();
+		m_allocs = new ArrayList<Allocator>();
 
-		int numFixed = ALLOC_SIZES.length;
+		final int numFixed = ALLOC_SIZES.length;
 
 		m_freeFixed = new ArrayList[numFixed];
 
@@ -260,8 +268,8 @@ public class RWStore implements IStore {
 		
 		m_freeBlobs = new ArrayList();
 
-		m_transactionCount = 0;
-		m_committing = false;
+//		m_transactionCount = 0;
+//		m_committing = false;
 		
 		try {
 			m_reopener = new ReopenFileChannel(m_fd, m_raf, "rw");
@@ -270,11 +278,9 @@ public class RWStore implements IStore {
 		}
 
 		try {
-			/**
-			 * TODO: Configure number of WriteCache buffers for WriteCacheService
-			 */
-            m_writeCache = new RWWriteCacheService(6, m_raf.length(),
-                    m_reopener, m_quorum) {
+            m_writeCache = new RWWriteCacheService(
+                    m_fmv.getFileMetadata().writeCacheBufferCount, m_raf
+                            .length(), m_reopener, m_quorum) {
             	
 		                public WriteCache newWriteCache(final ByteBuffer buf,
 		                        final boolean useChecksum,
@@ -321,8 +327,9 @@ public class RWStore implements IStore {
         }
 		
 	};
-	protected String m_filename;
-	protected LockFile m_lockFile;
+	
+	private String m_filename;
+	private LockFile m_lockFile;
 
 	private FileMetadataView m_fmv;
 
@@ -346,14 +353,22 @@ public class RWStore implements IStore {
 		}
 
         m_quorum = quorum;
-	    
+
+        /*
+         * FIXME elevate as much as possible into the constructor and make those
+         * fields final.
+         */
 		reopen(fileMetadataView);
 	}
 
+	/** @deprecated by {@link #reset()}
+	 */
 	public void reopen() {
 		reopen(m_fmv);
 	}
-	public void reopen(FileMetadataView fileMetadataView) {
+    /** @deprecated by {@link #reset()}
+     */
+	public void reopen(final FileMetadataView fileMetadataView) {
 		m_fmv = fileMetadataView;
 		m_fd = fileMetadataView.getFile();
 		m_raf = fileMetadataView.getRandomAccessFile();
@@ -375,8 +390,9 @@ public class RWStore implements IStore {
 
 				m_raf.setLength(convertAddr(m_fileSize));
 
-				startTransaction();
-				commitTransaction();
+//				startTransaction();
+//				commitTransaction();
+				commitChanges();
 
 			} else {
 				initfromRootBlock();
@@ -406,14 +422,14 @@ public class RWStore implements IStore {
 	 * 
 	 * @param rbv
 	 */
-	public void checkRootBlock(IRootBlockView rbv) {
-		long nxtOffset = rbv.getNextOffset();
-		int nxtalloc = -(int) (nxtOffset >> 32);
+	public void checkRootBlock(final IRootBlockView rbv) {
+		final long nxtOffset = rbv.getNextOffset();
+		final int nxtalloc = -(int) (nxtOffset >> 32);
 
-		int metaBitsAddr = -(int) nxtOffset;
+		final int metaBitsAddr = -(int) nxtOffset;
 
-		long metaAddr = rbv.getMetaStartAddr();
-		long rawMetaBitsAddr = rbv.getMetaBitsAddr();
+		final long metaAddr = rbv.getMetaStartAddr();
+		final long rawMetaBitsAddr = rbv.getMetaBitsAddr();
 		if (metaAddr == 0 || rawMetaBitsAddr == 0) {
 			log.warn("No meta allocation data included in root block for RWStore"); // possible
 																					// when
@@ -429,14 +445,14 @@ public class RWStore implements IStore {
 			log.info("CommitRecord " + rbv.getCommitRecordAddr() + " at physical address: " + physicalAddress(commitRecordAddr));
 		}
 		
-		long commitCounter = rbv.getCommitCounter();
+		final long commitCounter = rbv.getCommitCounter();
 
-		int metaStartAddr = (int) -(metaAddr >> 32);
-		int fileSize = (int) -(metaAddr & 0xFFFFFFFF);
+		final int metaStartAddr = (int) -(metaAddr >> 32);
+		final int fileSize = (int) -(metaAddr & 0xFFFFFFFF);
 
 		// I think this is now right!
-		long metaAlloc = convertAddr(metaStartAddr);
-		long heapAlloc = convertAddr(nxtalloc);
+		final long metaAlloc = convertAddr(metaStartAddr);
+		final long heapAlloc = convertAddr(nxtalloc);
 		if (metaAlloc < heapAlloc) {
 			throw new IllegalStateException("Incompatible Root Block values: " + metaAlloc + " < " + heapAlloc
 					+ " with " + nxtOffset + " and " + metaAddr);
@@ -475,7 +491,7 @@ public class RWStore implements IStore {
 
 		m_commitCounter = m_rb.getCommitCounter();
 
-		long nxtOffset = m_rb.getNextOffset();
+		final long nxtOffset = m_rb.getNextOffset();
 		m_nextAllocation = -(int) (nxtOffset >> 32);
 
 		m_metaBitsAddr = -(int) nxtOffset;
@@ -484,7 +500,7 @@ public class RWStore implements IStore {
 			log.info("MetaBitsAddr: " + m_metaBitsAddr);
 		}
 
-		long metaAddr = m_rb.getMetaStartAddr();
+		final long metaAddr = m_rb.getMetaStartAddr();
 		m_metaStartAddr = (int) -(metaAddr >> 32);
 		m_fileSize = (int) -(metaAddr & 0xFFFFFFFF);
 
@@ -500,13 +516,13 @@ public class RWStore implements IStore {
 		}
 
 		// RWStore now restore metabits
-		byte[] buf = new byte[m_metaBitsSize * 4];
+		final byte[] buf = new byte[m_metaBitsSize * 4];
 		//m_raf.seek(rawmbaddr);
 		//m_raf.read(buf);
 		// m_raf.getChannel().read(ByteBuffer.wrap(buf), rawmbaddr);
 		FileChannelUtility.readAll(m_reopener, ByteBuffer.wrap(buf), rawmbaddr);
 
-		DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
+		final DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
 		for (int i = 0; i < m_metaBitsSize; i++) {
 			m_metaBits[i] = strBuf.readInt();
 		}
@@ -517,7 +533,7 @@ public class RWStore implements IStore {
 		readAllocationBlocks();
 		
 		if (log.isTraceEnabled()) {
-			StringBuffer str = new StringBuffer();
+			final StringBuffer str = new StringBuffer();
 			this.showAllocators(str);
 			log.trace(str);
 		}
@@ -543,7 +559,7 @@ public class RWStore implements IStore {
 		assert m_allocs.size() == 0;
 
 		long addr = convertAddr(m_fileSize);
-		long metaStart = convertAddr(m_metaStartAddr);
+		final long metaStart = convertAddr(m_metaStartAddr);
 		int i = 0;
 
 		/**
@@ -558,13 +574,13 @@ public class RWStore implements IStore {
 		while (addr > metaStart) {
 			addr -= ALLOC_BLOCK_SIZE;
 			if (tstBit(m_metaBits, i++)) {
-				byte buf[] = new byte[ALLOC_BLOCK_SIZE];
+				final byte buf[] = new byte[ALLOC_BLOCK_SIZE];
 
 				FileChannelUtility.readAll(m_reopener, ByteBuffer.wrap(buf), addr);
 				
-				DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
+				final DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
 
-				int allocSize = strBuf.readInt(); // will return Blob startAddress if Blob and be < 0
+				final int allocSize = strBuf.readInt(); // will return Blob startAddress if Blob and be < 0
 				Allocator allocator = null;
 				ArrayList freeList = null;
 				if (allocSize > 0) {
@@ -600,74 +616,73 @@ public class RWStore implements IStore {
 		}
 	}
 
-	// Root interface
-	public long getRootAddr() {
-		return m_rootAddr;
-	}
+//	// Root interface
+//	public long getRootAddr() {
+//		return m_rootAddr;
+//	}
+//
+//	// Root interface
+//	public PSInputStream getRoot() {
+//		try {
+//			return getData(m_rootAddr);
+//		} catch (Exception e) {
+//			throw new StorageTerminalError("Unable to read root data", e);
+//		}
+//	}
+//
+//	public void setRootAddr(long rootAddr) {
+//		m_rootAddr = (int) rootAddr;
+//	}
 
-	// Root interface
-	public PSInputStream getRoot() {
-		try {
-			return getData(m_rootAddr);
-		} catch (Exception e) {
-			throw new StorageTerminalError("Unable to read root data", e);
-		}
-	}
-
-	public void setRootAddr(long rootAddr) {
-		m_rootAddr = (int) rootAddr;
-	}
-
-	// Limits
-	public void setMaxFileSize(int maxFileSize) {
-		m_maxFileSize = maxFileSize;
-	}
+//	// Limits
+//	public void setMaxFileSize(final int maxFileSize) {
+//		m_maxFileSize = maxFileSize;
+//	}
 
 	public long getMaxFileSize() {
 		long maxSize = m_maxFileSize;
 		return maxSize << 8;
 	}
 
-	// Allocators
-	public PSInputStream getData(long addr) {
-		return getData((int) addr, addr2Size((int) addr));
-	}
-
-	// Allocators
-	public PSInputStream getData(int addr, int size) {
-        final Lock readLock = m_extensionLock.readLock();
-
-        readLock.lock();
-        
-		try {
-			try {
-				m_writeCache.flush(false);
-			} catch (InterruptedException e1) {
-				// TODO Auto-generated catch block
-				e1.printStackTrace();
-			}
-
-			if (addr == 0) {
-				return null;
-			}
-
-			PSInputStream instr = PSInputStream.getNew(this, size);
-
-			try {
-//				m_raf.seek(physicalAddress(addr));
-//				m_raf.readFully(instr.getBuffer(), 0, size);
-//				m_raf.getChannel().read(ByteBuffer.wrap(instr.getBuffer(), 0, size), physicalAddress(addr));
-				FileChannelUtility.readAll(m_reopener, ByteBuffer.wrap(instr.getBuffer(), 0, size),
-						physicalAddress(addr));
-			} catch (IOException e) {
-				throw new StorageTerminalError("Unable to read data", e);
-			}
-
-			return instr;
-		} finally {
-			readLock.unlock();
-		}
-	}
+//	// Allocators
+//	public PSInputStream getData(final long addr) {
+//		return getData((int) addr, addr2Size((int) addr));
+//	}
+//
+//	// Allocators
+//	public PSInputStream getData(final int addr, final int size) {
+//        final Lock readLock = m_extensionLock.readLock();
+//
+//        readLock.lock();
+//        
+//		try {
+//			try {
+//				m_writeCache.flush(false);
+//			} catch (InterruptedException e1) {
+//			    throw new RuntimeException(e1);
+//			}
+//
+//			if (addr == 0) {
+//				return null;
+//			}
+//
+//			final PSInputStream instr = PSInputStream.getNew(this, size);
+//
+//			try {
+////				m_raf.seek(physicalAddress(addr));
+////				m_raf.readFully(instr.getBuffer(), 0, size);
+////				m_raf.getChannel().read(ByteBuffer.wrap(instr.getBuffer(), 0, size), physicalAddress(addr));
+//				FileChannelUtility.readAll(m_reopener, ByteBuffer.wrap(instr.getBuffer(), 0, size),
+//						physicalAddress(addr));
+//			} catch (IOException e) {
+//				throw new StorageTerminalError("Unable to read data", e);
+//			}
+//
+//			return instr;
+//		} finally {
+//			readLock.unlock();
+//		}
+//	}
 
 	volatile private long m_cacheReads = 0;
 	volatile private long m_diskReads = 0;
@@ -829,12 +844,13 @@ public class RWStore implements IStore {
 	 * If the address is greater than zero than it is interpreted as a physical address and
 	 * the allocators are searched to find the allocations.  Otherwise the address directly encodes
 	 * the allocator index and bit offset, allowing direct access to clear the allocation.
-	 * 
+	 * <p>
 	 * A blob allocator contains the allocator index and offset, so an allocator contains up to
 	 * 245 blob references.
+	 * 
 	 * @param sze 
 	 */
-	public void free(long laddr, int sze) {
+	public void free(final long laddr, final int sze) {
 		int addr = (int) laddr;
 
 		switch (addr) {
@@ -847,8 +863,8 @@ public class RWStore implements IStore {
 		m_allocationLock.lock();
 		try {
 			while (addr != 0) {
-				Allocator alloc = getBlockByAddress(addr);
-				long pa = alloc.getPhysicalAddress(getOffset(addr));
+				final Allocator alloc = getBlockByAddress(addr);
+				final long pa = alloc.getPhysicalAddress(getOffset(addr));
 				m_writeCache.clearWrite(pa);
 				alloc.free(addr, sze);
 				m_frees++;
@@ -897,9 +913,10 @@ public class RWStore implements IStore {
 	 * from file extension).
 	 */
 
-	volatile long m_maxAllocation = 0;
-	volatile long m_spareAllocation = 0;
-	public int alloc(int size) {
+	private volatile long m_maxAllocation = 0;
+	private volatile long m_spareAllocation = 0;
+	
+	public int alloc(final int size) {
 		if (size > MAX_FIXED_ALLOC) {
 			throw new IllegalArgumentException("Alloation size to big: " + size);
 		}
@@ -977,7 +994,7 @@ public class RWStore implements IStore {
 				
 				return addr;
 			} catch (Throwable t) {
-				t.printStackTrace();
+				log.error(t,t);
 
 				throw new RuntimeException(t);
 			}
@@ -990,7 +1007,7 @@ public class RWStore implements IStore {
 	 * The base realloc method that returns a stream for writing to rather than
 	 * handle the reallocation immediately.
 	 **/
-	public PSOutputStream realloc(long oldAddr, int size) {
+	public PSOutputStream realloc(final long oldAddr, final int size) {
 		free(oldAddr, size);
 
 		return PSOutputStream.getNew(this);
@@ -999,22 +1016,22 @@ public class RWStore implements IStore {
 	/****************************************************************************
 	 * Called by PSOutputStream to make to actual allocation or directly by lower
 	 * level API clients.
-	 * 
+	 * <p>
 	 * If the allocation is for greater than MAX_FIXED_ALLOC, then a PSOutputStream
 	 * is used to manage the chained buffers.
 	 * 
 	 * TODO: Instead of using PSOutputStream instead manage allocations written
 	 * to the WriteCacheService, building BlobHeader as you go.
 	 **/
-	public long alloc(byte buf[], final int size) {
+	public long alloc(final byte buf[], final int size) {
 		if (size >= MAX_FIXED_ALLOC) {
 			if (log.isDebugEnabled())
 				log.debug("BLOB ALLOC: " + size);
 
-			PSOutputStream psout = PSOutputStream.getNew(this);
+			final PSOutputStream psout = PSOutputStream.getNew(this);
 			try {
 				int i = 0;
-				int lsize = size - 512;
+				final int lsize = size - 512;
 				while (i < lsize) {
 					psout.write(buf, i, 512); // add 512 bytes at a time
 					i += 512;
@@ -1023,108 +1040,107 @@ public class RWStore implements IStore {
 
 				return psout.save();
 			} catch (IOException e) {
-				throw new RuntimeException("Close Store", e);
+				throw new RuntimeException("Closed Store?", e);
 			}
 
 		}
 
-		int newAddr = alloc(size + 4); // allow size for checksum
+		final int newAddr = alloc(size + 4); // allow size for checksum
 
-		int chk = ChecksumUtility.getCHK().checksum(buf, size);
+		final int chk = ChecksumUtility.getCHK().checksum(buf, size);
 
 		try {
 			m_writeCache.write(physicalAddress(newAddr), ByteBuffer.wrap(buf,  0, size), chk);
-		} catch (IllegalStateException e) {
-			reopen(m_fmv);
-
-			throw new RuntimeException("Close Store", e);
 		} catch (InterruptedException e) {
-			throw new RuntimeException("Close Store", new ClosedByInterruptException());
+            throw new RuntimeException("Closed Store?", e);
 		}
 
 		return newAddr;
 	}
 
-	/****************************************************************************
-	 * Fixed buffer size reallocation
-	 **/
-	public long realloc(long oldAddr, int oldSize, byte buf[]) {
-		free(oldAddr, oldSize);
+//	/****************************************************************************
+//	 * Fixed buffer size reallocation
+//	 **/
+//	public long realloc(final long oldAddr, final int oldSize, final byte buf[]) {
+//		
+//	    free(oldAddr, oldSize);
+//
+//		return alloc(buf, buf.length);
+//	}
 
-		return alloc(buf, buf.length);
-	}
-
-	/**
-	 * Must handle valid possibility that a request to start/commit transaction
-	 * could be made within a commitCallback request
-	 */
-	synchronized public void startTransaction() {
-		if (m_committing) {
-			return;
-		}
-
-		m_transactionCount++;
-	}
-
-	synchronized public void commitTransaction() {
-		if (m_committing) {
-			return;
-		}
-
-		if (log.isDebugEnabled())
-			log.debug("Commit Transaction");
-		
-		if (--m_transactionCount <= 0) {
-			commitChanges();
-
-			m_transactionCount = 0;
-		}
-	}
-
-	public int getTransactionCount() {
-		return m_transactionCount;
-	}
-
-	// --------------------------------------------------------------------------------------------
-	// rollbackTransaction
-	//
-	// clear write cache
-	// read in last committed header
-	synchronized public void rollbackTransaction() {
-		if (m_transactionCount > 0 || m_readOnly) { // hack for resync
-			baseInit();
-
-			try {
-				m_writeCache.reset(); // dirty writes are discarded
-
-				readAllocationBlocks();
-			} catch (Exception e) {
-				throw new StorageTerminalError("Unable to rollback transaction", e);
-			}
-		}
-	}
+//	/**
+//	 * Must handle valid possibility that a request to start/commit transaction
+//	 * could be made within a commitCallback request
+//	 */
+//	synchronized public void startTransaction() {
+//		if (m_committing) {
+//			return;
+//		}
+//
+//		m_transactionCount++;
+//	}
+//
+//	synchronized public void commitTransaction() {
+//		if (m_committing) {
+//			return;
+//		}
+//
+//		if (log.isDebugEnabled())
+//			log.debug("Commit Transaction");
+//		
+//		if (--m_transactionCount <= 0) {
+//			commitChanges();
+//
+//			m_transactionCount = 0;
+//		}
+//	}
+//
+//	public int getTransactionCount() {
+//		return m_transactionCount;
+//	}
+//
+//	// --------------------------------------------------------------------------------------------
+//	// rollbackTransaction
+//	//
+//	// clear write cache
+//	// read in last committed header
+//	synchronized public void rollbackTransaction() {
+//		if (m_transactionCount > 0 || m_readOnly) { // hack for resync
+//			baseInit();
+//
+//			try {
+//				m_writeCache.reset(); // dirty writes are discarded
+//
+//				readAllocationBlocks();
+//			} catch (Exception e) {
+//				throw new StorageTerminalError("Unable to rollback transaction", e);
+//			}
+//		}
+//	}
 
 	// --------------------------------------------------------------------------------------------
 	// reset
 	//
 	// Similar to rollbackTransaction but will force a re-initialization if transactions are not being
 	//	used - update w/o commit protocol.
-	synchronized public void reset() {
-		baseInit();
-
+	public void reset() {
+	    m_allocationLock.lock();
 		try {
+	        baseInit();
 			m_writeCache.reset(); // dirty writes are discarded
 			m_writeCache.setExtent(convertAddr(m_fileSize)); // notify of current file length.
 
 			readAllocationBlocks();
 		} catch (Exception e) {
 			throw new IllegalStateException("Unable reset the store", e);
+		} finally {
+		    m_allocationLock.lock();
 		}
 	}
 
-	synchronized public boolean isActiveTransaction() {
-		return m_transactionCount > 0;
-	}
+//	synchronized public boolean isActiveTransaction() {
+//		return m_transactionCount > 0;
+//	}
 
 	/**
 	 * writeMetaBits must be called after all allocations have been made, the
@@ -1134,24 +1150,22 @@ public class RWStore implements IStore {
 	 * @throws IOException
 	 */
 	private void writeMetaBits() throws IOException {
-		int len = 4 * m_metaBitsSize;
-		byte buf[] = new byte[len];
+	    final int len = 4 * m_metaBitsSize;
+		final byte buf[] = new byte[len];
 
-		FixedOutputStream str = new FixedOutputStream(buf);
+		final FixedOutputStream str = new FixedOutputStream(buf);
 		for (int i = 0; i < m_metaBitsSize; i++) {
 			str.writeInt(m_metaBits[i]);
 		}
 
 		str.flush();
 
-		long addr = physicalAddress(m_metaBitsAddr);
+		final long addr = physicalAddress(m_metaBitsAddr);
 		if (addr == 0) {
 			throw new IllegalStateException("Invalid metabits address: " + m_metaBitsAddr);
 		}
 		try {
 			m_writeCache.write(addr, ByteBuffer.wrap(buf), 0, false);
-		} catch (IllegalStateException e) {
-			throw new RuntimeException(e);
 		} catch (InterruptedException e) {
 			throw new RuntimeException(e);
 		}
@@ -1192,34 +1206,34 @@ public class RWStore implements IStore {
 		m_fmv.getFileMetadata().writeRootBlock(m_rb, ForceEnum.Force);
 	}
 
-	float m_vers = 0.0f;
-
-	protected void readFileSpec() {
-		if (true) {
-			throw new Error("Unexpected old format initialisation called");
-		}
-
-		try {
-			m_raf.seek(0);
-			m_curHdrAddr = m_raf.readLong();
-
-			m_fileSize = m_raf.readInt();
-			m_metaStartAddr = m_raf.readInt();
-
-			m_vers = m_raf.readFloat();
-
-			if (m_vers != s_version) {
-				String msg = "Incorrect store version : " + m_vers + " expects : " + s_version;
-
-				throw new IOException(msg);
-			} else {
-				m_headerSize = m_raf.readInt();
-			}
-
-		} catch (IOException e) {
-			throw new StorageTerminalError("Unable to read file spec", e);
-		}
-	}
+//	float m_vers = 0.0f;
+//
+//	protected void readFileSpec() {
+//		if (true) {
+//			throw new Error("Unexpected old format initialisation called");
+//		}
+//
+//		try {
+//			m_raf.seek(0);
+//			m_curHdrAddr = m_raf.readLong();
+//
+//			m_fileSize = m_raf.readInt();
+//			m_metaStartAddr = m_raf.readInt();
+//
+//			m_vers = m_raf.readFloat();
+//
+//			if (m_vers != s_version) {
+//				String msg = "Incorrect store version : " + m_vers + " expects : " + s_version;
+//
+//				throw new IOException(msg);
+//			} else {
+//				m_headerSize = m_raf.readInt();
+//			}
+//
+//		} catch (IOException e) {
+//			throw new StorageTerminalError("Unable to read file spec", e);
+//		}
+//	}
 
 	public String getVersionString() {
 		return "RWStore " + s_version;
@@ -1235,11 +1249,11 @@ public class RWStore implements IStore {
 		m_allocationLock.lock();
 		
 		try {
-				m_committing = true;
+//				m_committing = true;
 
-				if (m_commitCallback != null) {
-					m_commitCallback.commitCallback();
-				}
+//				if (m_commitCallback != null) {
+//					m_commitCallback.commitCallback();
+//				}
 
 				// Allocate storage for metaBits
 				long oldMetaBits = m_metaBitsAddr;
@@ -1257,11 +1271,11 @@ public class RWStore implements IStore {
 				// save allocation headers
 				Iterator iter = m_commitList.iterator();
 				while (iter.hasNext()) {
-					Allocator allocator = (Allocator) iter.next();
-					long old = allocator.getDiskAddr();
+					final Allocator allocator = (Allocator) iter.next();
+					final long old = allocator.getDiskAddr();
 					metaFree(old);
 					
-					long naddr = metaAlloc();
+					final long naddr = metaAlloc();
 					allocator.setDiskAddr(naddr);
 					
 					if (log.isDebugEnabled())
@@ -1270,8 +1284,6 @@ public class RWStore implements IStore {
 
 					try {
 						m_writeCache.write(allocator.getDiskAddr(), ByteBuffer.wrap(allocator.write()), 0, false); // do not use checksum
-					} catch (IllegalStateException e) {
-						throw new RuntimeException(e);
 					} catch (InterruptedException e) {
 						throw new RuntimeException(e);
 					}
@@ -1293,15 +1305,15 @@ public class RWStore implements IStore {
 
 				m_metaTransientBits = (int[]) m_metaBits.clone();
 
-				if (m_commitCallback != null) {
-					m_commitCallback.commitComplete();
-				}
+//				if (m_commitCallback != null) {
+//					m_commitCallback.commitComplete();
+//				}
 
 				m_raf.getChannel().force(false); // TODO, check if required!
 		} catch (IOException e) {
 			throw new StorageTerminalError("Unable to commit transaction", e);
 		} finally {
-			m_committing = false;
+//			m_committing = false;
 			m_recentAlloc = false;
 			m_allocationLock.unlock();
 		}
@@ -1477,30 +1489,30 @@ public class RWStore implements IStore {
 		return (int) val;
 	}
 
-	/*
-	 * clear
-	 * 
-	 * reset the file size commit the root blocks
-	 */
-	public void clear() {
-		try {
-			baseInit();
-
-			m_fileSize = -4;
-			m_metaStartAddr = m_fileSize;
-			m_nextAllocation = -1; // keep on a 8K boundary (8K minimum
-			// allocation)
-			m_raf.setLength(convertAddr(m_fileSize));
-
-			m_curHdrAddr = 0;
-			m_rootAddr = 0;
-
-			startTransaction();
-			commitTransaction();
-		} catch (Exception e) {
-			throw new StorageTerminalError("Unable to clear store", e);
-		}
-	}
+//	/*
+//	 * clear
+//	 * 
+//	 * reset the file size commit the root blocks
+//	 */
+//	public void clear() {
+//		try {
+//			baseInit();
+//
+//			m_fileSize = -4;
+//			m_metaStartAddr = m_fileSize;
+//			m_nextAllocation = -1; // keep on a 8K boundary (8K minimum
+//			// allocation)
+//			m_raf.setLength(convertAddr(m_fileSize));
+//
+//			m_curHdrAddr = 0;
+//			m_rootAddr = 0;
+//
+//			startTransaction();
+//			commitTransaction();
+//		} catch (Exception e) {
+//			throw new StorageTerminalError("Unable to clear store", e);
+//		}
+//	}
 
 	public static long convertAddr(int addr) {
 		long laddr = addr;
@@ -1514,10 +1526,12 @@ public class RWStore implements IStore {
 		}
 	}
 
-	public int convertFromAddr(long addr) {
+	public int convertFromAddr(final long addr) {
 		return (int) -(addr >> ALLOCATION_SCALEUP); 
 	}
-	volatile boolean m_extendingFile = false;
+
+	private volatile boolean m_extendingFile = false;
+	
 	/**
 	 * extendFile will extend by 10% and round up to be a multiple of 16k
 	 * 
@@ -1525,7 +1539,7 @@ public class RWStore implements IStore {
 	 * idea if these were moved with an overlapping copy!
 	 * 
 	 * After moving the physical memory the in-memory allocation blocks must
-	 * then be updated with their new posiiton.
+	 * then be updated with their new position.
 	 * 
 	 * Note that since version 3.0 the size of the metaBits is variable. This
 	 * must be taken into consideration when moving data. - Has the location
@@ -1545,12 +1559,12 @@ public class RWStore implements IStore {
 	 * allocation areas.
 	 * 
 	 * Extend file is only triggered by either alloc or metaAlloc which are s
-	 * ynchronized by the allocation lock. So extend file ends up being 
+	 * synchronized by the allocation lock. So extend file ends up being 
 	 * synchronized by the same lock.
 	 *
 	 * If we knew that the write cache had no writes to the allocation areas, 
 	 * we would not need to flush, but calling flush prior to the extend is 
-	 * suffucient to guarantee, in conjunction with holding the allocation lock,
+	 * sufficient to guarantee, in conjunction with holding the allocation lock,
 	 * that no new writes to the allocation areas will be made.
 	 * 
 	 * Once the flush is complete we take the extension writeLock to prevent 
@@ -1558,13 +1572,15 @@ public class RWStore implements IStore {
 	 * the disk, then force the new rootblocks to disk.
 	 */
 	private void extendFile() {
-		int adjust = -1200 + (m_nextAllocation - m_metaStartAddr) + (m_fileSize - m_metaStartAddr) + (m_fileSize / 10);
+	    
+		final int adjust = -1200 + (m_nextAllocation - m_metaStartAddr) + (m_fileSize - m_metaStartAddr) + (m_fileSize / 10);
 		
 		extendFile(adjust);
 	}
-	volatile long m_readsAtExtend = 0;
 	
-	private void extendFile(int adjust) {
+	private volatile long m_readsAtExtend = 0;
+	
+	private void extendFile(final int adjust) {
 		if (m_extendingFile) {
 			throw new IllegalStateException("File concurrently extended");
 		}
@@ -1582,14 +1598,14 @@ public class RWStore implements IStore {
 			throw new RuntimeException("Flush interrupted in extend file");
 		}
 
-		Lock writeLock = this.m_extensionLock.writeLock();
+		final Lock writeLock = this.m_extensionLock.writeLock();
 		
 		writeLock.lock();
 		try {
 			m_extendingFile = true;
 
-			long fromAddr = convertAddr(m_fileSize);
-			long oldMetaStart = convertAddr(m_metaStartAddr);
+			final long fromAddr = convertAddr(m_fileSize);
+			final long oldMetaStart = convertAddr(m_metaStartAddr);
 
 			m_fileSize += adjust;
 			m_metaStartAddr += adjust;
@@ -1599,13 +1615,13 @@ public class RWStore implements IStore {
 				throw new Error("System greater than maximum size");
 			}
 
-			long toAddr = convertAddr(m_fileSize);
+			final long toAddr = convertAddr(m_fileSize);
 			if (log.isInfoEnabled()) log.info("Extending file to: " + toAddr);
 			m_raf.setLength(toAddr);
 
 			// Read in entire allocation block area from end of file and move to new position
-			long sze = fromAddr - oldMetaStart;
-			byte buf[] = new byte[(int) sze];
+			final long sze = fromAddr - oldMetaStart;
+			final byte buf[] = new byte[(int) sze];
 			m_raf.seek(oldMetaStart);
 			m_raf.readFully(buf);
 			m_raf.seek(toAddr - sze);
@@ -1675,31 +1691,34 @@ public class RWStore implements IStore {
 	}
 
 	// --------------------------------------------------------------------------------------
-	private String allocListStats(ArrayList list) {
-		StringBuffer stats = new StringBuffer();
-		Iterator iter = list.iterator();
+	private String allocListStats(ArrayList list,final AtomicLong counter) {
+		final StringBuffer stats = new StringBuffer();
+		final Iterator iter = list.iterator();
 		while (iter.hasNext()) {
-			stats.append(((Allocator) iter.next()).getStats());
+			stats.append(((Allocator) iter.next()).getStats(counter));
 		}
 
 		return stats.toString();
 	}
 
-	protected static int s_allocation = 0;
+	public String getStats(final boolean full) {
+		
+        final AtomicLong counter = new AtomicLong();
 
-	public String getStats(boolean full) {
-		s_allocation = 0;
-
-		String stats = "FileSize : " + m_fileSize + " allocated : " + m_nextAllocation + " meta data : "
-				+ (m_fileSize - m_metaStartAddr) + "\r\n";
+        final StringBuilder sb = new StringBuilder("FileSize : " + m_fileSize
+                + " allocated : " + m_nextAllocation + " meta data : "
+                + (m_fileSize - m_metaStartAddr) + "\r\n");
 
 		if (full) {
-			stats = stats + allocListStats(m_allocs);
 
-			stats = stats + "Allocated : " + s_allocation;
+            sb.append(allocListStats(m_allocs, counter));
+
+            sb.append("Allocated : " + counter);
+
 		}
 
-		return stats;
+		return sb.toString();
+
 	}
 	
 	/**
@@ -1837,68 +1856,68 @@ public class RWStore implements IStore {
 		return m_preserveSession;
 	}
 
-	/*********************************************************************
-	 * create backup file, copy data to it, and close it.
-	 **/
-	synchronized public void backup(String filename) throws FileNotFoundException, IOException {
-		File destFile = new File(filename);
-		destFile.createNewFile();
-
-		RandomAccessFile dest = new RandomAccessFile(destFile, "rw");
-
-		int bufSize = 64 * 1024;
-		byte[] buf = new byte[bufSize];
-
-		m_raf.seek(0);
-
-		int rdSize = bufSize;
-		while (rdSize == bufSize) {
-			rdSize = m_raf.read(buf);
-			if (rdSize > 0) {
-				dest.write(buf, 0, rdSize);
-			}
-		}
-
-		dest.close();
-	}
-
-	/*********************************************************************
-	 * copy storefile to output stream.
-	 **/
-	synchronized public void backup(OutputStream outstr) throws IOException {
-		int bufSize = 64 * 1024;
-		byte[] buf = new byte[bufSize];
-
-		m_raf.seek(0);
-
-		int rdSize = bufSize;
-		while (rdSize == bufSize) {
-			rdSize = m_raf.read(buf);
-			if (rdSize > 0) {
-				outstr.write(buf, 0, rdSize);
-			}
-		}
-	}
-
-	synchronized public void restore(InputStream instr) throws IOException {
-		int bufSize = 64 * 1024;
-		byte[] buf = new byte[bufSize];
-
-		m_raf.seek(0);
-
-		int rdSize = bufSize;
-		while (rdSize == bufSize) {
-			rdSize = instr.read(buf);
-			if (rdSize > 0) {
-				m_raf.write(buf, 0, rdSize);
-			}
-		}
-	}
+//	/*********************************************************************
+//	 * create backup file, copy data to it, and close it.
+//	 **/
+//	synchronized public void backup(String filename) throws FileNotFoundException, IOException {
+//		File destFile = new File(filename);
+//		destFile.createNewFile();
+//
+//		RandomAccessFile dest = new RandomAccessFile(destFile, "rw");
+//
+//		int bufSize = 64 * 1024;
+//		byte[] buf = new byte[bufSize];
+//
+//		m_raf.seek(0);
+//
+//		int rdSize = bufSize;
+//		while (rdSize == bufSize) {
+//			rdSize = m_raf.read(buf);
+//			if (rdSize > 0) {
+//				dest.write(buf, 0, rdSize);
+//			}
+//		}
+//
+//		dest.close();
+//	}
+//
+//	/*********************************************************************
+//	 * copy storefile to output stream.
+//	 **/
+//	synchronized public void backup(OutputStream outstr) throws IOException {
+//		int bufSize = 64 * 1024;
+//		byte[] buf = new byte[bufSize];
+//
+//		m_raf.seek(0);
+//
+//		int rdSize = bufSize;
+//		while (rdSize == bufSize) {
+//			rdSize = m_raf.read(buf);
+//			if (rdSize > 0) {
+//				outstr.write(buf, 0, rdSize);
+//			}
+//		}
+//	}
+//
+//	synchronized public void restore(InputStream instr) throws IOException {
+//		int bufSize = 64 * 1024;
+//		byte[] buf = new byte[bufSize];
+//
+//		m_raf.seek(0);
+//
+//		int rdSize = bufSize;
+//		while (rdSize == bufSize) {
+//			rdSize = instr.read(buf);
+//			if (rdSize > 0) {
+//				m_raf.write(buf, 0, rdSize);
+//			}
+//		}
+//	}
 
 	/***************************************************************************************
 	 * Needed by PSOutputStream for BLOB buffer chaining.
 	 **/
-	public void absoluteWriteInt(int addr, int offset, int value) {
+	public void absoluteWriteInt(final int addr, final int offset, final int value) {
 		try {
 			// must check write cache!!, or the write may be overwritten - just
 			// flush for now

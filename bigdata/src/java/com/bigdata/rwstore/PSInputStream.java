@@ -61,6 +61,8 @@ import java.io.*;
  *
  * To this end, the output stream has a fixed buffer size, and they are recycled
  *	from a pool of output streams.
+ *
+ *@deprecated Unused as of 7/2/2010
  **/
 public class PSInputStream extends InputStream {
 

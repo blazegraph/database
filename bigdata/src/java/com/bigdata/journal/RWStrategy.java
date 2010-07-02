@@ -381,7 +381,8 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
 	}
 
-	public void writeRootBlock(IRootBlockView rootBlock, ForceEnum forceOnCommit) {
+    public void writeRootBlock(final IRootBlockView rootBlock,
+            final ForceEnum forceOnCommit) {
 
 		if (rootBlock == null)
 			throw new IllegalArgumentException();

@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rwstore;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.io.*;
 
 import org.apache.log4j.Logger;
@@ -274,8 +275,11 @@ public class FixedAllocator implements Allocator {
 		m_preserveSession = preserveSessionData;
 	}
 
-	public String getStats() {
-		String stats = "Block size : " + m_size + " start : " + getStartAddr() + " free : " + m_freeBits + "\r\n";
+	public String getStats(final AtomicLong counter) {
+
+        final StringBuilder sb = new StringBuilder("Block size : " + m_size
+                + " start : " + getStartAddr() + " free : " + m_freeBits
+                + "\r\n");
 
 		Iterator iter = m_allocBlocks.iterator();
 		while (iter.hasNext()) {
@@ -283,11 +287,11 @@ public class FixedAllocator implements Allocator {
 			if (block.m_addr == 0) {
 				break;
 			}
-			stats = stats + block.getStats() + "\r\n";
-			RWStore.s_allocation += block.getAllocBits() * m_size;
+            sb.append(block.getStats() + "\r\n");
+			counter.addAndGet(block.getAllocBits() * m_size);
 		}
 
-		return stats;
+		return sb.toString();
 	}
 
 	public boolean verify(int addr) {

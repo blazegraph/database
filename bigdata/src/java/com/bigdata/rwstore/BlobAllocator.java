@@ -5,7 +5,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.util.ChecksumUtility;
 
@@ -120,8 +120,8 @@ public class BlobAllocator implements Allocator {
 		return RWStore.convertAddr(m_sortAddr);
 	}
 
-	public String getStats() {
-		return null;
+	public String getStats(final AtomicLong counter) {
+		return "";
 	}
 
 	/**
