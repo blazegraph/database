@@ -1424,9 +1424,6 @@ abstract public class WriteCacheService implements IWriteCache {
 			try {
 
 				// write on the cache.
-				if (offset == 90565632L) {
-					System.out.println("Writing to problem address 90565632L");
-				}
 				if (cache.write(offset, data, chk, useChecksum)) {
 					WriteCache old = recordMap.put(offset, cache);
 					// There should be no duplicate address in the record
@@ -1923,9 +1920,6 @@ abstract public class WriteCacheService implements IWriteCache {
      */
 	public void clearWrite(final long offset) {
 		try {
-			if (offset == 90565632L) {
-				System.out.println("Clearing problem offset 90565632L");
-			}
 			final WriteCache cache = recordMap.remove(offset);
 			if (cache == null)
 				return;
