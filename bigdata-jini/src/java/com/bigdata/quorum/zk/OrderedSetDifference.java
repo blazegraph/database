@@ -30,14 +30,14 @@ class OrderedSetDifference<T> {
     public List<T> removed() {
         return Collections.unmodifiableList(removed); 
     }
-    
+
     /**
      * For ordered set difference we take a co-routine approach
      * either adding members from the old to the remove set or
      * adding members from the new to the added.
-     * 
-     * Travers the new list, removing members from old or adding members
-     * from the new if a match cannot be found
+     * <p>
+     * Traverse the new list, removing members from old or adding members
+     * from the new if a match cannot be found.
      * 
      * @param aold
      *            The old set.
@@ -66,5 +66,13 @@ class OrderedSetDifference<T> {
         }
     }
 
+    public String toString() {
+
+        return getClass().getName() + //
+                "{removed=" + removed + //
+                ",added=" + added + //
+                "}";
+        
+    }
     
 }

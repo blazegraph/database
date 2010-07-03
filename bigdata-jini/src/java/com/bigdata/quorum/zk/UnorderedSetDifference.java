@@ -86,4 +86,13 @@ class UnorderedSetDifference<T extends Comparable<T>> {
         }
     }
 
+    public String toString() {
+
+        return getClass().getName() + //
+                "{removed=" + removed + //
+                ",added=" + added + //
+                "}";
+        
+    }
+    
 }
