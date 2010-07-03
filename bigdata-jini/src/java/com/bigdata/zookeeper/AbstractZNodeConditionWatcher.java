@@ -287,7 +287,7 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
     
     /**
      * This implementation always returns <code>false</code> but may be
-     * overriden to permit cancellation of
+     * overridden to permit cancellation of
      * {@link #awaitCondition(long, TimeUnit)}.
      * 
      * @return
@@ -320,7 +320,7 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
      * reconnect {@link WatchedEvent} is received, it will test the condition
      * and then reset or clear its watch as necessary.
      * <p>
-     * Note: the resolution is millseconds at most.
+     * Note: the resolution is milliseconds at most.
      * 
      * @param timeout
      *            The timeout.

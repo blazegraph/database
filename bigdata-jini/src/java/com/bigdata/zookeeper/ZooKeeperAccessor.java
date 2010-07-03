@@ -138,6 +138,17 @@ public class ZooKeeperAccessor {
         getZookeeper();
 
     }
+
+    /**
+     * Ensure that we close the associated {@link ZooKeeper} connection.
+     */
+    protected void finalize() throws Throwable {
+        
+        close();
+        
+        super.finalize();
+        
+    }
     
     /**
      * Return a {@link ZooKeeper} instance that is not "dead" as reported by
