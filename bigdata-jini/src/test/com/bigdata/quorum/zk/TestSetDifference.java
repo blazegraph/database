@@ -79,6 +79,19 @@ public class TestSetDifference extends TestCase {
         assertEquals(osd.removed(), toList(removed));
     }
 
+    public void testOrderedSetDifference5() {
+        String[] old = {"a","b"};
+        String[] fut = {"a"};
+        
+        OrderedSetDifference<String> osd = 
+            new OrderedSetDifference<String>(old, fut);
+        
+        String[] added = {};
+        assertEquals(osd.added(), toList(added));
+        String[] removed = {"b"};
+        assertEquals(osd.removed(), toList(removed));
+    }
+
 	private List<String> toList(final String[] arr) {
 		
 	    final ArrayList<String> ret = new ArrayList<String>();
