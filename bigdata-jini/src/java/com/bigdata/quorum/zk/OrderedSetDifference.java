@@ -46,32 +46,29 @@ class OrderedSetDifference<T> {
      */
     public OrderedSetDifference(final T[] aold, final T[] anew) {
 
-    	// boundary condition if new list is empty
-    	if (anew.length == 0) {
-    		for (int i = 0; i < aold.length; i++) {
-				removed.add(aold[i]);
-    		}   		
-    	} else {
-	        int oi = 0;
-	        
-	        for (int i = 0; i < anew.length; i++) {
-	        	boolean found = false;
-	    		while (!found && oi < aold.length) {
-	    			if (aold[oi].equals(anew[i])) {
-	    				found = true;
-	    			} else {
-	    				removed.add(aold[oi]);
-	    			}
-	    			
-	    			oi++;
-	    		}
-	    		
-	        	if (!found) {
-	        		added.add(anew[i]); // none left in old, so must be added
-	        	}
-	        }
-    	}
-    }
+        int oi = 0;
+        
+        for (int i = 0; i < anew.length; i++) {
+        	boolean found = false;
+    		while (!found && oi < aold.length) {
+    			if (aold[oi].equals(anew[i])) {
+    				found = true;
+    			} else {
+    				removed.add(aold[oi]);
+    			}
+    			
+    			oi++;
+    		}
+    		
+        	if (!found) {
+        		added.add(anew[i]); // none left in old, so must be added
+        	}
+        }
+        
+        while (oi < aold.length) {
+        	removed.add(aold[oi++]);
+        }
+     }
 
     public String toString() {
 
