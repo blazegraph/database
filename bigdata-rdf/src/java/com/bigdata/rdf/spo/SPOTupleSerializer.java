@@ -41,6 +41,8 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.model.StatementEnum;
 
 /**
@@ -59,7 +61,7 @@ import com.bigdata.rdf.model.StatementEnum;
  * <p>
  * Note: While the static methods used to decode an existing key are safe for
  * concurrent readers, concurrent readers also form keys using
- * {@link #statement2Key(long, long, long)} and therefore require a thread-local
+ * {@link #statement2Key(IV, IV, IV)} and therefore require a thread-local
  * {@link IKeyBuilder}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -164,7 +166,7 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
             // SIDs only valid for triples.
             assert keyOrder.getKeyArity() == 3;
 
-            spo.setStatementIdentifier(vbuf.getLong(1));
+            spo.setStatementIdentifier(new TermId(vbuf.getLong(1)));
 
         }
 
@@ -261,11 +263,10 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
      * 
      * @return The sort key for the statement with those values.
      */
-    public byte[] statement2Key(final long id1, final long id2, final long id3) {
+    public byte[] statement2Key(final IV id1, final IV id2, final IV id3) {
 
-        return getKeyBuilder().reset().append(id1).append(id2).append(id3)
-                .getKey();
-
+        return keyOrder.encodeKey(getKeyBuilder(), id1, id2, id3);
+        
     }
 
     /**
@@ -295,7 +296,7 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
                 assert type == StatementEnum.Explicit : "Statement identifier not allowed: type="
                         + type;
 
-                buf.putLong(spo.getStatementIdentifier());
+                buf.putLong(spo.getStatementIdentifier().getTermId());
 
             }
 

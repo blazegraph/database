@@ -36,17 +36,18 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.UUID;
-
 import org.CognitiveWeb.extser.LongPacker;
 import org.openrdf.model.Value;
-
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexMetadata.Options;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -55,8 +56,6 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOTupleSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
-
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
 
@@ -76,8 +75,6 @@ import cutthecrap.utils.striterators.Striterator;
  * @version $Id$
  */
 public abstract class BaseAxioms implements Axioms, Externalizable {
-    
-    private static transient final long NULL = IRawTripleStore.NULL;
     
     /**
      * The axioms in SPO order.
@@ -314,11 +311,11 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
 //            
 //            final long o = LongPacker.unpackLong(in);
 
-            final long s = in.readLong();
+            final IV s = new TermId<BigdataURI>(VTE.URI, in.readLong());
             
-            final long p = in.readLong();
+            final IV p = new TermId<BigdataURI>(VTE.URI, in.readLong());
             
-            final long o = in.readLong();
+            final IV o = new TermId<BigdataURI>(VTE.URI, in.readLong());
             
             final SPO spo = new SPO(s, p, o, StatementEnum.Axiom);
             
@@ -351,11 +348,11 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
 //            
 //            LongPacker.packLong(out, spo.o());
 
-            out.writeLong(spo.s());
+            out.writeLong(spo.s().getTermId());
 
-            out.writeLong(spo.p());
+            out.writeLong(spo.p().getTermId());
 
-            out.writeLong(spo.o());
+            out.writeLong(spo.o().getTermId());
             
         }
         
@@ -367,7 +364,7 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
             throw new IllegalStateException();
 
         // fast rejection.
-        if (s == NULL || p == NULL || o == NULL) {
+        if (s == null || p == null || o == null) {
 
             return false;
             

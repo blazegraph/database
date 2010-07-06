@@ -55,6 +55,7 @@ import java.util.NoSuchElementException;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.striterator.IChunkedIterator;
 
@@ -81,7 +82,7 @@ public class BigdataValueIteratorImpl implements BigdataValueIterator {
     /**
      * The source iterator.
      */
-    private final IChunkedIterator<Long> src;
+    private final IChunkedIterator<IV> src;
     
     /**
      * The index of the last entry returned in the current {@link #chunk} and
@@ -92,13 +93,13 @@ public class BigdataValueIteratorImpl implements BigdataValueIterator {
     /**
      * The current chunk from the source iterator and initially <code>null</code>.
      */
-    private Long[] chunk = null;
+    private IV[] chunk = null;
 
     /**
      * The map that will be used to resolve term identifiers to terms for the
      * current {@link #chunk} and initially <code>null</code>.
      */
-    private Map<Long, BigdataValue> terms = null;
+    private Map<IV, BigdataValue> terms = null;
 
     /**
      * 
@@ -108,7 +109,7 @@ public class BigdataValueIteratorImpl implements BigdataValueIterator {
      *            The source iterator.
      */
     public BigdataValueIteratorImpl(final AbstractTripleStore db,
-            final IChunkedIterator<Long> src) {
+            final IChunkedIterator<IV> src) {
 
         if (db == null)
             throw new IllegalArgumentException();
@@ -156,19 +157,19 @@ public class BigdataValueIteratorImpl implements BigdataValueIterator {
              * chunk.
              */
 
-            final Collection<Long> ids = new HashSet<Long>(chunk.length);
+            final Collection<IV> ivs = new HashSet<IV>(chunk.length);
 
-            for (Long id : chunk) {
+            for (IV id : chunk) {
 
-                ids.add(id);
+                ivs.add(id);
 
             }
 
             if(log.isInfoEnabled())
-            log.info("Resolving "+ids.size()+" term identifiers");
+            log.info("Resolving "+ivs.size()+" term identifiers");
             
             // batch resolve term identifiers to terms.
-            terms = db.getLexiconRelation().getTerms(ids);
+            terms = db.getLexiconRelation().getTerms(ivs);
 
             // reset the index.
             lastIndex = 0;
@@ -187,26 +188,26 @@ public class BigdataValueIteratorImpl implements BigdataValueIterator {
         }
         
         // the current term identifier.
-        final Long id = chunk[lastIndex];
+        final IV iv = chunk[lastIndex];
 
         if (log.isDebugEnabled())
-            log.debug("termId=" + id);
+            log.debug("iv=" + iv);
                 
         /*
          * Resolve term identifiers to terms using the map populated when we
          * fetched the current chunk.
          */
-        final BigdataValue val = terms.get(id);
+        final BigdataValue val = terms.get(iv);
         
         if (val == null) {
 
-            throw new RuntimeException("No value for term identifier: id=" + id);
+            throw new RuntimeException("No value for term identifier: id=" + iv);
 
         }
         
         if(log.isDebugEnabled()) {
             
-            log.debug("termId=" + id + ", value=" + val);
+            log.debug("termId=" + iv + ", value=" + val);
 
         }
 

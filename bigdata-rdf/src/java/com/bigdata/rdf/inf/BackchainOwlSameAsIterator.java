@@ -3,21 +3,16 @@ package com.bigdata.rdf.inf;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
-
 import org.apache.log4j.Logger;
-
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedIterator<ISPO> {
     
     protected final static Logger log = Logger.getLogger(BackchainOwlSameAsIterator.class);
-    
-    protected final static transient long NULL = IRawTripleStore.NULL;
     
     /**
      * The database.
@@ -54,26 +49,26 @@ public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedItera
     
     }
     
-    protected Set<Long> getSelfAndSames(long id) {
-        Set<Long> selfAndSames = new TreeSet<Long>();
-        selfAndSames.add(id);
-        getSames(id, selfAndSames);
+    protected Set<IV> getSelfAndSames(IV iv) {
+        Set<IV> selfAndSames = new TreeSet<IV>();
+        selfAndSames.add(iv);
+        getSames(iv, selfAndSames);
         return selfAndSames;
     }
 
-    protected Set<Long> getSames(long id) {
-        Set<Long> sames = new TreeSet<Long>();
-        sames.add(id);
-        getSames(id, sames);
-        sames.remove(id);
+    protected Set<IV> getSames(IV iv) {
+        Set<IV> sames = new TreeSet<IV>();
+        sames.add(iv);
+        getSames(iv, sames);
+        sames.remove(iv);
         return sames;
     }
 
-    protected void getSames(long id, Set<Long> sames) {
-        IChunkedOrderedIterator<ISPO> it = db.getAccessPath(id, sameAs, NULL).iterator();
+    protected void getSames(IV id, Set<IV> sames) {
+        IChunkedOrderedIterator<ISPO> it = db.getAccessPath(id, sameAs, null).iterator();
         try {
             while (it.hasNext()) {
-                long same = it.next().o();
+                IV same = it.next().o();
                 if (!sames.contains(same)) {
                     sames.add(same);
                     getSames(same, sames);
@@ -82,10 +77,10 @@ public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedItera
         } finally {
             it.close();
         }
-        it = db.getAccessPath(NULL, sameAs, id).iterator();
+        it = db.getAccessPath(null, sameAs, id).iterator();
         try {
             while (it.hasNext()) {
-                long same = it.next().s();
+                IV same = it.next().s();
                 if (!sames.contains(same)) {
                     sames.add(same);
                     getSames(same, sames);

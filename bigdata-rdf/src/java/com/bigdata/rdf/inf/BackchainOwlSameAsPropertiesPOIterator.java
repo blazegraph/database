@@ -28,7 +28,7 @@ package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
 import java.util.Iterator;
-
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ISPO;
@@ -81,8 +81,9 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
      *            The term identifier that corresponds to owl:sameAs for the
      *            database.
      */
-    public BackchainOwlSameAsPropertiesPOIterator(IChunkedOrderedIterator<ISPO> src, long p,
-            long o, AbstractTripleStore db, final long sameAs) {
+    public BackchainOwlSameAsPropertiesPOIterator(
+            final IChunkedOrderedIterator<ISPO> src, final IV p,
+            final IV o, AbstractTripleStore db, final IV sameAs) {
         
         super(src, db, sameAs);
         
@@ -102,12 +103,12 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
             SPO[] spos = new SPO[chunkSize];
             int numSPOs = 0;
             // get all of o's sames
-            Iterator<Long> samesIt = getSames(o).iterator();
+            Iterator<IV> samesIt = getSames(o).iterator();
             while (samesIt.hasNext()) {
-                long same = samesIt.next();
+                IV same = samesIt.next();
                 // attach all of the same's reverse properties to o
                 final IChunkedOrderedIterator<ISPO> reversePropsIt = 
-                    db.getAccessPath(NULL, p, same).iterator();
+                    db.getAccessPath(null, p, same).iterator();
                 while (reversePropsIt.hasNext()) {
                     final ISPO reverseProp = reversePropsIt.next();
                     // do not add ( s sameAs s ) inferences
@@ -230,11 +231,11 @@ public class BackchainOwlSameAsPropertiesPOIterator extends
         final ISPO[] spos = new ISPO[chunkSize];
         int numSPOs = 0;
         // get all of s's sames
-        final Iterator<Long> samesIt = getSames(spo.s()).iterator();
+        final Iterator<IV> samesIt = getSames(spo.s()).iterator();
         while (samesIt.hasNext()) {
-            long same = samesIt.next();
+            IV same = samesIt.next();
             // do not add ( s sameAs s ) inferences
-            if (spo.p() == sameAs && same == spo.o()) {
+            if (spo.p().equals(sameAs) && same.equals(spo.o())) {
                 continue;
             }
             // flush the buffer if necessary

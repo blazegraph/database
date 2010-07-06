@@ -40,6 +40,7 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -85,8 +86,6 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
    
     final protected boolean INFO = log.isInfoEnabled();
     final protected boolean DEBUG = log.isDebugEnabled();
-    
-    protected final long NULL = IRawTripleStore.NULL;
     
     /**
      * Buffer for parsed RDF {@link Value}s.
@@ -511,12 +510,12 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
                         if (stmt.getSubject() instanceof BNode
                                 && ((BigdataBNode) stmt.getSubject()).isStatementIdentifier()
-                                && stmt.s() == NULL)
+                                && stmt.s() == null)
                             continue;
 
                         if (stmt.getObject() instanceof BNode
                                 && ((BigdataBNode) stmt.getObject()).isStatementIdentifier()
-                                && stmt.o() == NULL)
+                                && stmt.o() == null)
                             continue;
 
                         if(DEBUG) {
@@ -915,11 +914,11 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                 
                 if( c instanceof BNode) {
 
-                    final long sid = spo.getStatementIdentifier();
+                    final IV sid = spo.getStatementIdentifier();
                     
-                    if(c.getIV() != NULL) {
+                    if(c.getIV() != null) {
                         
-                        if (sid != c.getIV()) {
+                        if (!sid.equals(c.getIV())) {
 
                             throw new UnificationException(
                                     "Can not unify blankNode "
@@ -1275,7 +1274,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
             
         }
 
-        if (c != null && !duplicateC && ((BigdataValue) c).getIV() == NULL) {
+        if (c != null && !duplicateC && ((BigdataValue) c).getIV() == null) {
 
             if (c instanceof URI) {
 

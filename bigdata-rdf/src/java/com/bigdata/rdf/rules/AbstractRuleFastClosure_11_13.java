@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.rules;
 
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IConstraint;
@@ -60,10 +61,10 @@ import com.bigdata.relation.rule.Rule;
  */
 abstract public class AbstractRuleFastClosure_11_13 extends Rule {
 
-    protected final long propertyId;
+    protected final IV propertyId;
     
-    final IVariable<Long> x, y, z, a, b;
-    final IConstant<Long> C1, C2;
+    final IVariable<IV> x, y, z, a, b;
+    final IConstant<IV> C1, C2;
     
     /**
      * 
@@ -80,19 +81,19 @@ abstract public class AbstractRuleFastClosure_11_13 extends Rule {
         assert body.length == 3;
 
         // (x,y,z)
-        x = (IVariable<Long>) body[0].s();
-        y = (IVariable<Long>) body[0].p();
-        z = (IVariable<Long>) body[0].o();
+        x = (IVariable<IV>) body[0].s();
+        y = (IVariable<IV>) body[0].p();
+        z = (IVariable<IV>) body[0].o();
 
         // (y,C1,a)
-        assert y == (IVariable<Long>) body[1].s();
-        C1 = (IConstant<Long>) body[1].p();
-        a = (IVariable<Long>) body[1].o();
+        assert y.equals((IVariable<IV>) body[1].s());
+        C1 = (IConstant<IV>) body[1].p();
+        a = (IVariable<IV>) body[1].o();
 
         // (a,C2,b)
-        assert a == (IVariable<Long>) body[2].s();
-        C2 = (IConstant<Long>) body[2].p();
-        b = (IVariable<Long>)body[2].o();
+        assert a.equals((IVariable<IV>) body[2].s());
+        C2 = (IConstant<IV>) body[2].p();
+        b = (IVariable<IV>)body[2].o();
 
         this.propertyId = C2.get();
         

@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -98,6 +99,7 @@ import com.bigdata.rdf.internal.XSDIntegerInternalValue;
 import com.bigdata.rdf.internal.XSDLongInternalValue;
 import com.bigdata.rdf.internal.XSDShortInternalValue;
 import com.bigdata.rdf.lexicon.BigdataRDFFullTextIndex;
+import com.bigdata.rdf.lexicon.ITermIdCodes;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.lexicon.ITextIndexer;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -207,7 +209,7 @@ import com.bigdata.striterator.IKeyOrder;
  */
 abstract public class AbstractTripleStore extends
         AbstractResource<IDatabase<AbstractTripleStore>> implements ITripleStore,
-        IRawTripleStore, IMutableDatabase<AbstractTripleStore> {
+        IRawTripleStore, IMutableDatabase<AbstractTripleStore>, ITermIdCodes {
 
     final static protected Logger log = Logger.getLogger(ITripleStore.class);
 
@@ -1854,90 +1856,10 @@ abstract public class AbstractTripleStore extends
      */
     final public IV getIV(final Value value) {
 
-        if (value instanceof Resource) {
-            
-            return getTermIdIV(value);
-            
-        } else {
-            
-            Literal l = (Literal) value;
-            
-            URI datatype = l.getDatatype();
-            
-            DTE dte = null;
-            
-            if (datatype != null) {
-                
-                dte = DTE.valueOf(datatype);
-                
-            }
-            
-            if (dte == null) {
-                
-                return getTermIdIV(value);
-                
-            }
-            
-            final String v = value.stringValue();
-            
-            switch(dte) {
-            
-            case XSDBoolean:
-                return new XSDBooleanInternalValue(Boolean.valueOf(v)); 
-            case XSDByte:
-                return new XSDByteInternalValue(Byte.valueOf(v));
-            case XSDShort:
-                return new XSDShortInternalValue(Short.valueOf(v));
-            case XSDInt:
-                return new XSDIntInternalValue(Integer.valueOf(v));
-            case XSDLong:
-                return new XSDLongInternalValue(Long.valueOf(v));
-
-            case XSDFloat:
-                return new XSDFloatInternalValue(Float.valueOf(v));
-            case XSDDouble:
-                return new XSDDoubleInternalValue(Double.valueOf(v));
-            case XSDInteger:
-                return new XSDIntegerInternalValue(new BigInteger(v));
-            case XSDDecimal:
-                return new XSDDecimalInternalValue(new BigDecimal(v));
-            case UUID:
-                return new UUIDInternalValue(UUID.fromString(v));
-
-// what do we do for these little unsigned beasties?
-            case XSDUnsignedByte:
-            case XSDUnsignedShort:
-            case XSDUnsignedInt:
-            case XSDUnsignedLong:
-            default:
-                return getTermIdIV(value);
-                
-            }
-            
-        }
+        return getLexiconRelation().getIV(value);
         
     }
-    
-    private IV getTermIdIV(Value value) {
         
-        final long tid = getLexiconRelation().getTermId(value);
-        
-        VTE vte = null;
-        
-        if (value instanceof URI) {
-            vte = VTE.URI;
-        } else if (value instanceof Literal) {
-            vte = VTE.LITERAL;
-        } else {
-            vte = VTE.BNODE;
-        }
-        
-        // how do we tell whether a bnode is a bnode or a sid????
-        
-        return new TermId(vte, tid);
-        
-    }
-
     public void addTerms(final BigdataValue[] terms) {
 
         getLexiconRelation().addTerms( terms, terms.length, false/*readOnly*/);
@@ -2085,7 +2007,7 @@ abstract public class AbstractTripleStore extends
      * 
      * @deprecated by {@link #hasStatement(IV, IV, IV, IV)}
      */
-    final public boolean hasStatement(final long s, final long p, final long o) {
+    final public boolean hasStatement(final IV s, final IV p, final IV o) {
 
         return hasStatement(s, p, o, null/* c */);
 
@@ -2313,7 +2235,7 @@ abstract public class AbstractTripleStore extends
 
         }
 
-        final Map<Long, BigdataValue> terms = getLexiconRelation()
+        final Map<IV, BigdataValue> terms = getLexiconRelation()
                 .getTerms(ivs);
 
         /*
@@ -2324,7 +2246,7 @@ abstract public class AbstractTripleStore extends
                 (BigdataResource)  terms.get(spo.s()),//
                 (BigdataURI)       terms.get(spo.p()),//
                 (BigdataValue)     terms.get(spo.o()),//
-                (BigdataResource)  (c != NULL ? terms.get(c) : null),//
+                (BigdataResource)  (c != null ? terms.get(c) : null),//
                 spo.getStatementType()//
                 );
         
@@ -2419,16 +2341,16 @@ abstract public class AbstractTripleStore extends
          * statement pattern.
          */
 
-        if (s != null && _s.getIV() == NULL)
+        if (s != null && _s.getIV() == null)
             return new EmptyAccessPath<ISPO>();
 
-        if (p != null && _p.getIV() == NULL)
+        if (p != null && _p.getIV() == null)
             return new EmptyAccessPath<ISPO>();
 
-        if (o != null && _o.getIV() == NULL)
+        if (o != null && _o.getIV() == null)
             return new EmptyAccessPath<ISPO>();
 
-        if (quads && c != null && _c.getIV() == NULL)
+        if (quads && c != null && _c.getIV() == null)
             return new EmptyAccessPath<ISPO>();
 
 //        /*
@@ -2457,10 +2379,10 @@ abstract public class AbstractTripleStore extends
          */
 
         return getSPORelation().getAccessPath(//
-                s == null ? NULL : _s.getIV(), //
-                p == null ? NULL : _p.getIV(),//
-                o == null ? NULL : _o.getIV(),//
-                (c == null || !quads) ? NULL : _c.getIV(),//
+                s == null ? null : _s.getIV(), //
+                p == null ? null : _p.getIV(),//
+                o == null ? null : _o.getIV(),//
+                (c == null || !quads) ? null : _c.getIV(),//
                 filter//
         );
 
@@ -2470,26 +2392,26 @@ abstract public class AbstractTripleStore extends
             final IV o) {
 
         return getSPORelation()
-                .getAccessPath(s, p, o, NULL/* c */, null/* filter */);
+                .getAccessPath(s, p, o, null/* c */, null/* filter */);
 
     }
 
-    final public IAccessPath<ISPO> getAccessPath(final long s, final long p,
-            final long o, final IElementFilter<ISPO> filter) {
+    final public IAccessPath<ISPO> getAccessPath(final IV s, final IV p,
+            final IV o, final IElementFilter<ISPO> filter) {
 
-        return getSPORelation().getAccessPath(s, p, o, NULL/* c */, filter);
+        return getSPORelation().getAccessPath(s, p, o, null/* c */, filter);
 
     }
-	final public IAccessPath<ISPO> getAccessPath(final long s, final long p,
-            final long o,final long c) {
+	final public IAccessPath<ISPO> getAccessPath(final IV s, final IV p,
+            final IV o,final IV c) {
 
         return getSPORelation()
                 .getAccessPath(s, p, o, c, null/* filter */);
 
     }
 
-    final public IAccessPath<ISPO> getAccessPath(final long s, final long p,
-            final long o,final long c, final IElementFilter<ISPO> filter) {
+    final public IAccessPath<ISPO> getAccessPath(final IV s, final IV p,
+            final IV o, final IV c, final IElementFilter<ISPO> filter) {
 
         return getSPORelation().getAccessPath(s, p, o, c, filter);
 
@@ -2640,7 +2562,7 @@ abstract public class AbstractTripleStore extends
 
     final public String toString(final IV s, final IV p, final IV o) {
 
-        return toString(s, p, o, NULL);
+        return toString(s, p, o, null);
 
     }
 
@@ -2658,102 +2580,15 @@ abstract public class AbstractTripleStore extends
 
     }
 
-    /**
-     * Return true iff the term identifier is marked as a RDF {@link Literal}.
-     * <p>
-     * Note: This simply examines the low bits of the term identifier, which
-     * marks whether or not the term identifier is a {@link Literal}.
-     * <p>
-     * Note: Some entailments require the ability to filter based on whether or
-     * not a term is a literal. For example, literals may not be entailed into
-     * the subject position. This method makes it possible to determine whether
-     * or not a term is a literal without materializing the term, thereby
-     * allowing the entailments to be computed purely within the term identifier
-     * space.
-     * 
-     * @param termId
-     *            The term identifier.
-     * 
-     * @return <code>true</code> iff the term identifier is marked as an RDF
-     *         {@link Literal}.
-     */
-    static final public boolean isLiteral(final long termId) {
-
-        return (termId & TERMID_CODE_MASK) == TERMID_CODE_LITERAL;
-
-    }
-
-    /**
-     * Return true iff the term identifier is marked as a RDF {@link BNode}.
-     * <p>
-     * Note: This simply examines the low bits of the term identifier, which
-     * marks whether or not the term identifier is a {@link BNode}.
-     * 
-     * @param termId
-     *            The term identifier.
-     * 
-     * @return <code>true</code> iff the term identifier is marked as an RDF
-     *         {@link BNode}.
-     */
-    static final public boolean isBNode(final long termId) {
-
-        return (termId & TERMID_CODE_MASK) == TERMID_CODE_BNODE;
-
-    }
-
-    /**
-     * Return true iff the term identifier is marked as a RDF {@link URI}.
-     * <p>
-     * Note: This simply examines the low bits of the term identifier, which
-     * marks whether or not the term identifier is a {@link URI}.
-     * 
-     * @param termId
-     *            The term identifier.
-     * 
-     * @return <code>true</code> iff the term identifier is marked as an RDF
-     *         {@link URI}.
-     */
-    static final public boolean isURI(final long termId) {
-
-        /*
-         * Note: The additional != NULL test is necessary for a URI term
-         * identifier so that it will not report 'true' for 0L since the two low
-         * order bits used to mark a URI are both zero.
-         */
-        
-        return (termId & TERMID_CODE_MASK) == TERMID_CODE_URI && termId != NULL;
-
-    }
-
-    /**
-     * Return true iff the term identifier identifies a statement (this feature
-     * is enabled with {@link Options#STATEMENT_IDENTIFIERS}).
-     * <p>
-     * Note: This simply examines the low bits of the term identifier, which
-     * marks whether or not the term identifier is actually a statement
-     * identifier.
-     * 
-     * @param termId
-     *            The term identifier.
-     * 
-     * @return <code>true</code> iff the term identifier identifies a
-     *         statement.
-     */
-    static final public boolean isStatement(final IV termId) {
-
-        return (termId & TERMID_CODE_MASK) == TERMID_CODE_STATEMENT;
-
-    }
-
     final public String toString(final IV iv) {
 
-        if (iv == NULL)
+        if (iv == null)
             return IRawTripleStore.NULLSTR;
 
-        if(isStatement(iv)){
+        if(iv.isStatement()){
 
             // Note: SIDs are not stored in the reverse lexicon.
-            return Long.toString(iv) + "S";
+            return Long.toString(iv.getTermId()) + "S";
         
         }
 
@@ -2823,7 +2658,7 @@ abstract public class AbstractTripleStore extends
         }
         
         // visit distinct term identifiers for the predicate position.
-        final IChunkedIterator<Long> itr = getSPORelation().distinctTermScan(
+        final IChunkedIterator<IV> itr = getSPORelation().distinctTermScan(
                 quads ? SPOKeyOrder.POCS : SPOKeyOrder.POS);
 
         // resolve term identifiers to terms efficiently during iteration.
@@ -2838,10 +2673,10 @@ abstract public class AbstractTripleStore extends
 
                 final BigdataValue term = itr2.next();
 
-                final long p = term.getIV();
+                final IV p = term.getIV();
                 
-                final long n = getSPORelation().getAccessPath(NULL, p, NULL,
-                        NULL, null/* filter */).rangeCount(false/* exact */);
+                final long n = getSPORelation().getAccessPath(null, p, null,
+                        null, null/* filter */).rangeCount(false/* exact */);
 
                 /*
                  * FIXME do efficient term resolution for scale-out. This will
@@ -3637,8 +3472,8 @@ abstract public class AbstractTripleStore extends
          */
         long statementCount0;
         long statementCount1;
-//        final HashSet<Long> sids = new HashSet<Long>();
-        final LongOpenHashSet sids = new LongOpenHashSet();
+        final HashSet<IV> sids = new HashSet<IV>();
+//        final LongOpenHashSet sids = new LongOpenHashSet();
         int nrounds = 0;
         do {
 
@@ -3662,13 +3497,13 @@ abstract public class AbstractTripleStore extends
                 
                 while(itr.hasNext()) {
                     
-                    final long sid = itr.next().getStatementIdentifier();
+                    final IV sid = itr.next().getStatementIdentifier();
                     
                     if(sids.contains(sid)) continue;
                     
                     // sid in the subject position.
                     tempStore.addStatements(tempStore, true/* copyOnly */, db
-                                    .getAccessPath(sid, NULL, NULL).iterator(),
+                                    .getAccessPath(sid, null, null).iterator(),
                                     null/* filter */);
 
                     /*
@@ -3678,12 +3513,12 @@ abstract public class AbstractTripleStore extends
                      * might use it.
                      */
                     tempStore.addStatements(tempStore, true/* copyOnly */, db
-                                    .getAccessPath(NULL, sid, NULL).iterator(),
+                                    .getAccessPath(null, sid, null).iterator(),
                                     null/* filter */);
 
                     // sid in the object position.
                     tempStore.addStatements(tempStore, true/*copyOnly*/, db
-                                    .getAccessPath(NULL, NULL, sid).iterator(),
+                                    .getAccessPath(null, null, sid).iterator(),
                                     null/* filter */);
 
                     // finished with this sid.
@@ -4054,19 +3889,19 @@ abstract public class AbstractTripleStore extends
         /*
          * Translate the predicates into term identifiers.
          */
-        final IConstant<Long>[] _preds = new IConstant[preds.length];
+        final IConstant<IV>[] _preds = new IConstant[preds.length];
         {
 
             int nknown = 0;
 
             for (int i = 0; i < preds.length; i++) {
 
-                final long tid = terms[i].getIV();
+                final IV iv = terms[i].getIV();
 
-                if (tid != NULL)
+                if (iv != null)
                     nknown++;
 
-                _preds[i] = new Constant<Long>(tid);
+                _preds[i] = new Constant<IV>(iv);
 
             }
 
@@ -4083,9 +3918,9 @@ abstract public class AbstractTripleStore extends
         /*
          * Translate the class constraint into a term identifier.
          */
-        final long _cls = terms[preds.length].getIV();
+        final IV _cls = terms[preds.length].getIV();
 
-        if (_cls == NULL) {
+        if (_cls == null) {
 
             log.warn("Unknown class: class=" + cls);
 
@@ -4149,17 +3984,17 @@ abstract public class AbstractTripleStore extends
      *         {@link MatchRule}.
      */
     protected Program getMatchProgram(final Literal[] lits,
-            final IConstant<Long>[] _preds, final long _cls) {
+            final IConstant<IV>[] _preds, final IV _cls) {
         
-        final Iterator<Long> termIdIterator = getLexiconRelation().prefixScan(
+        final Iterator<IV> ivIterator = getLexiconRelation().prefixScan(
                 lits);
 
         // the term identifier for the completed literal.
-        final IVariable<Long> lit = Var.var("lit");
+        final IVariable<IV> lit = Var.var("lit");
 
         // instantiate the rule.
         final Rule r = new MatchRule(getSPORelation().getNamespace(),
-                getVocabulary(), lit, _preds, new Constant<Long>(_cls));
+                getVocabulary(), lit, _preds, new Constant<IV>(_cls));
 
 //        // bindings used to specialize the rule for each completed literal.
 //        final IBindingSet bindings = new ArrayBindingSet(r.getVariableCount());
@@ -4167,13 +4002,13 @@ abstract public class AbstractTripleStore extends
         final Program program = new Program("match", true/* parallel */);
         
         // specialize and apply to each completed literal.
-        while (termIdIterator.hasNext()) {
+        while (ivIterator.hasNext()) {
 
-            final Long tid = termIdIterator.next();
+            final IV iv = ivIterator.next();
 
             final IBindingSet constants = new ArrayBindingSet(1);
 
-            constants.set(lit, new Constant<Long>(tid));
+            constants.set(lit, new Constant<IV>(iv));
 
             final IRule tmp = r.specialize(constants, null/* constraints */);
 

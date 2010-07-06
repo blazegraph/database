@@ -68,6 +68,7 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.lexicon.ITermIdFilter;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.StatementEnum;
@@ -124,8 +125,6 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     protected static final transient Logger log = Logger
             .getLogger(SPORelation.class);
-
-    private static transient final long NULL = IRawTripleStore.NULL;
 
     private final Set<String> indexNames;
 
@@ -945,13 +944,12 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * 
      * @deprecated by {@link #getAccessPath(IV, IV, IV, IV)}
      */
-    public IAccessPath<ISPO> getAccessPath(final long s, final long p,
-            final long o) {
+    public IAccessPath<ISPO> getAccessPath(final IV s, final IV p, final IV o) {
 
         if (keyArity != 3)
             throw new UnsupportedOperationException();
 
-        return getAccessPath(s, p, o, NULL/* c */, null/* filter */);
+        return getAccessPath(s, p, o, null/* c */, null/* filter */);
 
     }
 
@@ -993,24 +991,24 @@ public class SPORelation extends AbstractRelation<ISPO> {
      *             <i>c</i> is non-{@link #NULL}.
      */
     @SuppressWarnings("unchecked")
-    public IAccessPath<ISPO> getAccessPath(final long s, final long p,
-            final long o, final long c, IElementFilter<ISPO> filter) {
+    public IAccessPath<ISPO> getAccessPath(final IV s, final IV p,
+            final IV o, final IV c, IElementFilter<ISPO> filter) {
         
-        final IVariableOrConstant<Long> S = (s == NULL ? Var.var("s")
-                : new Constant<Long>(s));
+        final IVariableOrConstant<IV> S = (s == null ? Var.var("s")
+                : new Constant<IV>(s));
 
-        final IVariableOrConstant<Long> P = (p == NULL ? Var.var("p")
-                : new Constant<Long>(p));
+        final IVariableOrConstant<IV> P = (p == null ? Var.var("p")
+                : new Constant<IV>(p));
 
-        final IVariableOrConstant<Long> O = (o == NULL ? Var.var("o")
-                : new Constant<Long>(o));
+        final IVariableOrConstant<IV> O = (o == null ? Var.var("o")
+                : new Constant<IV>(o));
         
-        IVariableOrConstant<Long> C = null;
+        IVariableOrConstant<IV> C = null;
 
         switch (keyArity) {
 
         case 3:
-            if (!statementIdentifiers && c != NULL) {
+            if (!statementIdentifiers && c != null) {
                 /*
                  * The 4th position should never become bound for a triple store
                  * without statement identifiers.
@@ -1019,7 +1017,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
             }
             break;
         case 4:
-            C = (c == NULL ? Var.var("c") : new Constant<Long>(c));
+            C = (c == null ? Var.var("c") : new Constant<IV>(c));
             break;
         default:
             throw new AssertionError();
@@ -1338,7 +1336,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * 
      * @return An iterator visiting the distinct term identifiers.
      */
-    public IChunkedIterator<Long> distinctTermScan(final IKeyOrder<ISPO> keyOrder) {
+    public IChunkedIterator<IV> distinctTermScan(final IKeyOrder<ISPO> keyOrder) {
 
         return distinctTermScan(keyOrder,/* termIdFilter */null);
         
@@ -1359,7 +1357,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * @todo add the ability to specify {@link IRangeQuery#PARALLEL} here for
      *       fast scans across multiple shards when chunk-wise order is Ok.
      */
-    public IChunkedIterator<Long> distinctTermScan(
+    public IChunkedIterator<IV> distinctTermScan(
             final IKeyOrder<ISPO> keyOrder, final ITermIdFilter termIdFilter) {
 
         final FilterConstructor<SPO> filter = new FilterConstructor<SPO>();
@@ -1386,7 +1384,9 @@ public class SPORelation extends AbstractRelation<ISPO> {
                     final long id = KeyBuilder.decodeLong(tuple
                             .getKeyBuffer().array(), 0);
 
-                    return termIdFilter.isValid(id);
+                    final TermId tid = new TermId(id);
+                    
+                    return termIdFilter.isValid(tid);
 
                 }
 
@@ -1395,7 +1395,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
         }
 
         @SuppressWarnings("unchecked")
-        final Iterator<Long> itr = new Striterator(getIndex(keyOrder)
+        final Iterator<IV> itr = new Striterator(getIndex(keyOrder)
                 .rangeIterator(null/* fromKey */, null/* toKey */,
                         0/* capacity */, IRangeQuery.KEYS | IRangeQuery.CURSOR,
                         filter)).addFilter(new Resolver() {
@@ -1404,13 +1404,13 @@ public class SPORelation extends AbstractRelation<ISPO> {
                      * Resolve SPO key to Long.
                      */
                     @Override
-                    protected Long resolve(Object obj) {
-                        return KeyBuilder.decodeLong(((ITuple) obj)
-                                .getKeyBuffer().array(), 0);
+                    protected IV resolve(Object obj) {
+                        return new TermId(KeyBuilder.decodeLong(((ITuple) obj)
+                                .getKeyBuffer().array(), 0));
                     }
                 });
 
-        return new ChunkedWrappedIterator<Long>(itr);
+        return new ChunkedWrappedIterator<IV>(itr);
                 
     }
 	/**
@@ -1425,9 +1425,10 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * 
      * @return An iterator visiting the distinct term identifiers.
      */
-    public IChunkedIterator<Long> distinctMultiTermScan(final IKeyOrder<ISPO> keyOrder,long[] knownTerms) {
+    public IChunkedIterator<IV> distinctMultiTermScan(
+            final IKeyOrder<ISPO> keyOrder, TermId[] knownTerms) {
 
-        return distinctMultiTermScan(keyOrder,knownTerms,/* termIdFilter */null);
+        return distinctMultiTermScan(keyOrder, knownTerms,/* termIdFilter */null);
 
     }
 
@@ -1451,24 +1452,24 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * @todo add the ability to specify {@link IRangeQuery#PARALLEL} here for
      *       fast scans across multiple shards when chunk-wise order is Ok.
      */
-    public IChunkedIterator<Long> distinctMultiTermScan(
-            final IKeyOrder<ISPO> keyOrder, final long[] knownTerms,
+    public IChunkedIterator<IV> distinctMultiTermScan(
+            final IKeyOrder<ISPO> keyOrder, final TermId[] knownTerms,
             final ITermIdFilter termIdFilter) {
 
         final FilterConstructor<SPO> filter = new FilterConstructor<SPO>();
         final int nterms = knownTerms.length;
 
         final KeyBuilder fromKey = new KeyBuilder(getKeyArity() * 8);
-        for (long l : knownTerms) {
-            fromKey.append(l);
+        for (TermId tid : knownTerms) {
+            fromKey.append(tid.getTermId());
         }
 
         final KeyBuilder toKey = new KeyBuilder(getKeyArity() * 8);
         for (int i = 0; i < nterms; i++) {
             if (i == nterms - 1) {
-                toKey.append(knownTerms[i] + 1);
+                toKey.append(knownTerms[i].getTermId() + 1);
             } else {
-                toKey.append(knownTerms[i]);
+                toKey.append(knownTerms[i].getTermId());
             }
         }
         
@@ -1493,8 +1494,10 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
                     final long id = KeyBuilder.decodeLong(tuple
                             .getKeyBuffer().array(), 0);
+                    
+                    final TermId tid = new TermId(id);
 
-                    return termIdFilter.isValid(id);
+                    return termIdFilter.isValid(tid);
 
                 }
 
@@ -1503,7 +1506,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
         }
 
         @SuppressWarnings("unchecked")
-        final Iterator<Long> itr = new Striterator(getIndex(keyOrder)
+        final Iterator<IV> itr = new Striterator(getIndex(keyOrder)
                 .rangeIterator(fromKey.getKey(), toKey.getKey(),
                         0/* capacity */, IRangeQuery.KEYS | IRangeQuery.CURSOR,
                         filter)).addFilter(new Resolver() {
@@ -1514,13 +1517,13 @@ public class SPORelation extends AbstractRelation<ISPO> {
              * Resolve SPO key to Long.
              */
             @Override
-            protected Long resolve(Object obj) {
-                return KeyBuilder.decodeLong(((ITuple) obj).getKeyBuffer()
-                        .array(), (nterms - 1) * 8);
+            protected IV resolve(Object obj) {
+                return new TermId(KeyBuilder.decodeLong(((ITuple) obj)
+                        .getKeyBuffer().array(), (nterms - 1) * 8));
             }
         });
 
-        return new ChunkedWrappedIterator<Long>(itr);
+        return new ChunkedWrappedIterator<IV>(itr);
 
     }
 
@@ -1533,11 +1536,11 @@ public class SPORelation extends AbstractRelation<ISPO> {
         if (bindingSet == null)
             throw new IllegalArgumentException();
         
-        final long s = asBound(predicate, 0, bindingSet);
+        final IV s = asBound(predicate, 0, bindingSet);
 
-        final long p = asBound(predicate, 1, bindingSet);
+        final IV p = asBound(predicate, 1, bindingSet);
 
-        final long o = asBound(predicate, 2, bindingSet);
+        final IV o = asBound(predicate, 2, bindingSet);
 
         final SPO spo = new SPO(s, p, o, StatementEnum.Inferred);
         
@@ -1568,23 +1571,23 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * @return The bound value.
      */
     @SuppressWarnings("unchecked")
-    private long asBound(final IPredicate<ISPO> pred, final int index,
+    private IV asBound(final IPredicate<ISPO> pred, final int index,
             final IBindingSet bindingSet) {
 
-        final IVariableOrConstant<Long> t = pred.get(index);
+        final IVariableOrConstant<IV> t = pred.get(index);
 
-        final IConstant<Long> c;
+        final IConstant<IV> c;
         if(t.isVar()) {
             
             c = bindingSet.get((IVariable) t);
             
         } else {
             
-            c = (IConstant<Long>)t;
+            c = (IConstant<IV>)t;
             
         }
 
-        return c.get().longValue();
+        return c.get();
 
     }
 

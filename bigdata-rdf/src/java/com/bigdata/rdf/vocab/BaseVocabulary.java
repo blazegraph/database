@@ -43,6 +43,8 @@ import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ValueFactoryImpl;
 
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueSerializer;
@@ -214,7 +216,7 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
         
     }
     
-    final public long get(Value value) {
+    final public TermId get(Value value) {
 
         if (values == null)
             throw new IllegalStateException();
@@ -231,7 +233,7 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
 
     }
 
-    final public IConstant<Long> getConstant(Value value) {
+    final public IConstant<IV> getConstant(Value value) {
 
         if (values == null)
             throw new IllegalStateException();
