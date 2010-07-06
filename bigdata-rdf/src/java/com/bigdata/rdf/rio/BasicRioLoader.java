@@ -30,13 +30,12 @@ import java.util.Vector;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.Rio;
-
-import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
  * Parses data but does not load it into the indices.
@@ -53,7 +52,19 @@ public class BasicRioLoader implements IRioLoader {
     protected static final transient Logger log = Logger
             .getLogger(IRioLoader.class);
 
-    long stmtsAdded;
+    /**
+     * Force the load of the NxParser integration class.
+     * 
+     * @todo Should be done via META-INFO.
+     */
+    static {
+
+        // Force the load of the NXParser integration.
+        NQuadsParser.forceLoad();
+        
+    }
+    
+    public long stmtsAdded;
     
     long insertTime;
     
@@ -61,9 +72,9 @@ public class BasicRioLoader implements IRioLoader {
     
     Vector<RioLoaderListener> listeners;
 
-    private final BigdataValueFactory valueFactory;
+    private final ValueFactory valueFactory;
     
-    public BasicRioLoader(final BigdataValueFactory valueFactory) {
+    public BasicRioLoader(final ValueFactory valueFactory) {
         
         if (valueFactory == null)
             throw new IllegalArgumentException();
@@ -132,8 +143,6 @@ public class BasicRioLoader implements IRioLoader {
      * constructor.
      * 
      * @return The parser.
-     * 
-     * @todo reuse parser instances for the same {@link RDFFormat}?
      */
     final protected RDFParser getParser(final RDFFormat rdfFormat) {
 

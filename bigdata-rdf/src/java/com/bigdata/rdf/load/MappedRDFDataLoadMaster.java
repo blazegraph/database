@@ -26,6 +26,8 @@ package com.bigdata.rdf.load;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.Date;
 import java.util.Properties;
@@ -44,6 +46,7 @@ import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.ClosureStats;
+import com.bigdata.rdf.rio.NQuadsParser;
 import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -249,16 +252,19 @@ V extends Serializable//
          * @see RDFParserOptions
          */
         String PARSER_OPTIONS = "parserOptions";
-        
-//        /**
-//         * When the {@link RDFFormat} of a resource is not evident, assume that
-//         * it is the format specified by this value (default
-//         * {@value #DEFAULT_FALLBACK_RDF_FORMAT}).
-//         */
-//        String FALLBACK_RDF_FORMAT = "fallbackRDFFormat";
-//        
-//        RDFFormat DEFAULT_FALLBACK_RDF_FORMAT = RDFFormat.RDFXML;
-        
+
+        /**
+         * When the {@link RDFFormat} of a resource is not evident, assume that
+         * it is the format specified by this value (default
+         * {@value #DEFAULT_RDF_FORMAT}). The value is one of the {@link String}
+         * values of the known {@link RDFFormat}s, including
+         * {@link NQuadsParser#nquads}. It may be null, in which case there is
+         * no default.
+         */
+        String RDF_FORMAT = "rdfFormat";
+
+        String DEFAULT_RDF_FORMAT = RDFFormat.RDFXML.toString();
+
 //        /**
 //         * The maximum #of times an attempt will be made to load any given file.
 //         */
@@ -277,10 +283,7 @@ V extends Serializable//
      */
     public static class JobState extends MappedTaskMaster.JobState {
 
-        /**
-         * 
-         */
-        private static final long serialVersionUID = -7097810235721797668L;
+        private static final long serialVersionUID = 2L;
 
         /**
          * The namespace of the {@link ITripleStore} into which the data will be
@@ -384,22 +387,61 @@ V extends Serializable//
          */
         final public RDFParserOptions parserOptions;
         
-//        /**
-//         * The {@link RDFFormat} that will be used when the format can not be
-//         * deduced from the file extension or other metadata.
-//         */
-//        final public RDFFormat fallbackRDFFormat;
+        /**
+         * The {@link RDFFormat} that will be used when the format can not be
+         * deduced from the file extension or other metadata.
+         */
+        public RDFFormat getRDFFormat() {return rdfFormat;}
 
         /**
-         * Return the {@link RDFFormat} that will be used when the format can
-         * not be deduced from the file extension or other metadata.
+         * Note: {@link RDFFormat} is not serializable so we handle
+         * serialization for this transient field ourselves in
+         * {@link #writeObject(ObjectOutputStream)} and
+         * {@link #readObject(ObjectInputStream)}.
          */
-        public RDFFormat getFallbackRDFFormat() {
+        private transient RDFFormat rdfFormat;
+
+        /**
+         * Force the load of the NxParser integration class and its registration
+         * of the NQuadsParser#nquads RDFFormat.
+         * 
+         * @todo Should be done via META-INFO.
+         */
+        static {
+
+            // Force the load of the NXParser integration.
+            NQuadsParser.forceLoad();
+
+        }
+
+        private void writeObject(final ObjectOutputStream out)
+                throws IOException {
             
-            // Note: RDFFormat is not Serializable, hence this workaround.
-//            return RDFFormat.valueOf(fallbackRDFFormat);
-            return RDFFormat.RDFXML;
+            out.defaultWriteObject();
             
+            out.writeObject(rdfFormat == null ? null : rdfFormat.getName());
+            
+        }
+
+        private void readObject(final ObjectInputStream in) throws IOException,
+                ClassNotFoundException {
+
+            in.defaultReadObject();
+
+            final String tmp = (String) in.readObject();
+
+            if (tmp != null) {
+
+                rdfFormat = RDFFormat.valueOf(tmp);
+
+                if (rdfFormat == null) {
+                    
+                    log.error("Could not resolve RDFFormat: name=" + tmp);
+                    
+                }
+                
+            }
+
         }
 
         @Override
@@ -452,9 +494,8 @@ V extends Serializable//
             sb.append(", " + ConfigurationOptions.PARSER_OPTIONS + "="
                     + parserOptions);
             
-//            sb.append(", " + ConfigurationOptions.FALLBACK_RDF_FORMAT + "="
-//                    + fallbackRDFFormat);
-            
+            sb.append(", " + ConfigurationOptions.RDF_FORMAT + "=" + rdfFormat);
+
             sb.append(", " + ConfigurationOptions.FORCE_OVERFLOW_BEFORE_CLOSURE + "="
                     + forceOverflowBeforeClosure);
 
@@ -538,11 +579,27 @@ V extends Serializable//
                     ConfigurationOptions.PARSER_OPTIONS,
                     RDFParserOptions.class, new RDFParserOptions());
 
-            // @todo enable once RDFFormat is Serializable. 
-//            fallbackRDFFormat = ((RDFFormat) config.getEntry(component,
-//                    ConfigurationOptions.FALLBACK_RDF_FORMAT, RDFFormat.class,
-//                    ConfigurationOptions.DEFAULT_FALLBACK_RDF_FORMAT))
-//                    .toString();
+            {
+
+                final String tmp = (String) config.getEntry(component,
+                        ConfigurationOptions.RDF_FORMAT, String.class,
+                        ConfigurationOptions.DEFAULT_RDF_FORMAT.toString());
+
+                if (tmp != null) {
+
+                    NQuadsParser.forceLoad();
+
+                    rdfFormat = RDFFormat.valueOf(tmp);
+
+                    if (rdfFormat == null) {
+
+                        log.error("Could not resolve RDFFormat: name=" + tmp);
+                        
+                    }
+
+                }
+
+            }
 
             rejectedExecutionDelay = (Long) config.getEntry(
                     component,
@@ -769,7 +826,15 @@ V extends Serializable//
 
             sb.append("literalCount\t" + tripleStore.getLiteralCount() + "\n");
 
-            sb.append("bnodeCount\t" + tripleStore.getBNodeCount() + "\n");
+            /*
+             * Note: blank node counts are not available unless the store uses
+             * the told bnodes mode.
+             */
+            sb.append("bnodeCount\t"
+                            + (tripleStore.getLexiconRelation()
+                                    .isStoreBlankNodes() ? ""
+                                    + tripleStore.getBNodeCount() : "N/A")
+                            + "\n");
 
             // sb.append(tripleStore.predicateUsage());
 
@@ -789,6 +854,9 @@ V extends Serializable//
     protected void beginJob(final S jobState) throws Exception {
 
         super.beginJob(jobState);
+
+        System.out.println("namespace=" + jobState.namespace + ", jobName="
+                + jobState.jobName + ", nclients=" + jobState.nclients);
 
         // create/re-open the kb.
         openTripleStore();
@@ -910,7 +978,7 @@ V extends Serializable//
         tripleStore.getDataLoader().loadFiles(//
                 jobState.ontology,//file
                 jobState.ontology.getPath(),//baseURI
-                jobState.getFallbackRDFFormat(),//
+                jobState.getRDFFormat(),//
                 jobState.ontologyFileFilter //
                 );
 
