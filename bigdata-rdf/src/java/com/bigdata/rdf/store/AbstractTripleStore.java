@@ -1781,6 +1781,8 @@ abstract public class AbstractTripleStore extends
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
      * Note: Will always return zero (0) if {@value Options#STORE_BLANK_NODES}
      * is <code>false</code>.
      */
@@ -3973,7 +3975,7 @@ abstract public class AbstractTripleStore extends
 
             if (nknown == 0) {
 
-                log.warn("No known predicates: preds=" + preds);
+                log.warn("No known predicates: preds=" + Arrays.toString(preds));
 
                 return new EmptyChunkedIterator<IBindingSet>(null/* keyOrder */);
 

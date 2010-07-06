@@ -54,6 +54,7 @@ import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.load.IStatementBufferFactory;
 import com.bigdata.rdf.rio.LoadStats;
+import com.bigdata.rdf.rio.NQuadsParser;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.rio.RioLoaderEvent;
@@ -1198,27 +1199,37 @@ public class DataLoader {
         // default namespace.
         String namespace = "kb";
         boolean doClosure = false;
+        RDFFormat rdfFormat = null;
+        String baseURI = null;
         
         int i = 0;
 
         while (i < args.length) {
             
             final String arg = args[i];
-            
-            if(arg.startsWith("-")) {
-                
-                if(arg.equals("-namespace")) {
-                    
+
+            if (arg.startsWith("-")) {
+
+                if (arg.equals("-namespace")) {
+
                     namespace = args[++i];
-                
-                } else if(arg.equals("-closure")) {
-                        
-                	doClosure = true;
-                    
+
+                } else if (arg.equals("-format")) {
+
+                    rdfFormat = RDFFormat.valueOf(args[++i]);
+
+                } else if (arg.equals("-baseURI")) {
+
+                    baseURI = args[++i];
+
+                } else if (arg.equals("-closure")) {
+
+                    doClosure = true;
+
                 } else {
-                    
+
                     System.err.println("Unknown argument: " + arg);
-                    
+
                     usage();
                     
                 }
@@ -1346,11 +1357,11 @@ public class DataLoader {
             for (File fileOrDir : files) {
 
 //                dataLoader.loadFiles(fileOrDir, null/* baseURI */,
-//                        null/* rdfFormat */, filter);
+//                        rdfFormat, filter);
 
-				dataLoader.loadFiles(totals, 0/* depth */, fileOrDir,
-						null/* baseURI */, null/* rdfFormat */, filter, true/* endOfBatch */
-				);
+                dataLoader.loadFiles(totals, 0/* depth */, fileOrDir, baseURI,
+                        rdfFormat, filter, true/* endOfBatch */
+                );
 
             }
             
@@ -1445,4 +1456,14 @@ public class DataLoader {
 
     };
 
+    /**
+     * Force the load of the NxParser integration class.
+     */
+    static {
+
+        // Force the load of the NXParser integration.
+        NQuadsParser.forceLoad();
+        
+    }
+    
 }

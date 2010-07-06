@@ -61,6 +61,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.GZIPInputStream;
@@ -656,6 +657,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         
         otherWriterService.shutdownNow();
 
+        notifyService.shutdownNow();
+
         if (serviceStatisticsTask != null) {
             
             serviceStatisticsTask.cancel();
@@ -901,7 +904,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         if(!lock.isHeldByCurrentThread())
             throw new IllegalMonitorStateException();
         
-        // sum latches for the distinct workflow states for a document.
+        /*
+         * Sum the latches for the distinct workflow states for a document
+         * across all documents.
+         */
         final long n1 = workflowLatch_parser.get()//
                 + workflowLatch_bufferTerm2Id.get()//
                 + workflowLatch_bufferOther.get()//
@@ -1315,18 +1321,22 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             log.info("resource=" + resourceStr);
         
         final RDFFormat defaultFormat = getDefaultRDFFormat();
-
-        // @todo when resource is URL use reported MimeTYPE also.
+        /* @todo This might be ignorant of .gz and .zip extensions.
+         * @todo when resource is URL use reported MimeTYPE also.
+         */
         final RDFFormat rdfFormat = (defaultFormat == null //
                 ? RDFFormat.forFileName(resourceStr) //
                 : RDFFormat.forFileName(resourceStr, defaultFormat)//
         );
         
         if (rdfFormat == null) {
+            
+            final String msg = "Could not determine interchange syntax - skipping : file="
+                    + resource;
 
-            throw new RuntimeException(
-                    "Could not determine interchange syntax - skipping : file="
-                            + resource);
+            log.error(msg);
+            
+            throw new RuntimeException(msg);
 
         }
 
@@ -2043,6 +2053,9 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      */
     final protected void documentDone(final R resource) {
 
+        if (!lock.isHeldByCurrentThread())
+            throw new IllegalMonitorStateException();
+        
         try {
             
             final Runnable task = newSuccessTask(resource);
@@ -2050,7 +2063,12 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             if (task != null) {
 
                 // increment before we submit the task.
-                guardLatch_notify.inc();
+//                lock.lock();
+//                try {
+                    guardLatch_notify.inc();
+//                } finally {
+//                    lock.unlock();
+//                }
                 try {
 
                     // queue up success notice.
@@ -2059,7 +2077,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                             try {
                                 task.run();
                             } finally {
-                                lock.lock();
+                                lock.lock(); // acquire latch w/in task.
                                 try {
                                     // decrement after the task is done.
                                     guardLatch_notify.dec();
@@ -2072,12 +2090,12 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                 } catch (RejectedExecutionException ex) {
                     // decrement latch since tasks did not run.
-                    lock.lock();
-                    try {
+//                    lock.lock();
+//                    try {
                         guardLatch_notify.dec();
-                    } finally {
-                        lock.unlock();
-                    }
+//                    } finally {
+//                        lock.unlock();
+//                    }
                     // rethrow exception (will be logged below).
                     throw ex;
                 }
@@ -2086,7 +2104,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             
         } catch (Throwable t) {
 
-            log.error(t,t);
+            // Log @ ERROR and ignore.
+            log.error(t, t);
             
         }
 
@@ -2104,7 +2123,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      */
     final protected void documentError(final R resource, final Throwable t) {
 
-        assert lock.isHeldByCurrentThread();
+        if (!lock.isHeldByCurrentThread()) throw new IllegalMonitorStateException();
 
         documentErrorCount.incrementAndGet();
 
@@ -2136,7 +2155,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                             try {
                                 task.run();
                             } finally {
-                                lock.lock();
+                                lock.lock(); // acquire latch w/in task.
                                 try {
                                     // decrement after the task is done.
                                     guardLatch_notify.dec();
@@ -2149,12 +2168,12 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                 } catch (RejectedExecutionException ex) {
                     // decrement latch since tasks did not run.
-                    lock.lock();
-                    try {
+//                    lock.lock();
+//                    try {
                         guardLatch_notify.dec();
-                    } finally {
-                        lock.unlock();
-                    }
+//                    } finally {
+//                        lock.unlock();
+//                    }
                     // rethrow exception (will be logged below).
                     throw ex;
                 }
@@ -2255,8 +2274,9 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
     }
 
     /**
-     * Delete a resource whose data have been made restart safe on the database
-     * from the local file system.
+     * Delete a file whose data have been made restart safe on the database from
+     * the local file system (this must be overridden to handle resources which
+     * are not {@link File}s).
      * 
      * @param resource
      *            The resource.
@@ -2265,7 +2285,11 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
         if(resource instanceof File) {
 
-            ((File)resource).delete();
+            if (!((File) resource).delete()) {
+
+                log.warn("Could not delete: " + resource);
+
+            }
             
         }
 
@@ -3257,8 +3281,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
          * so if you are loading a large document with a lot of blank nodes the
          * map will also become large.
          */
-        private Map<String, BigdataBNode> bnodes;
-
+        private final AtomicReference<Map<String, BigdataBNode>> bnodes = new AtomicReference<Map<String, BigdataBNode>>();
+        
         /**
          * The total #of parsed statements so far.
          * 
@@ -3349,7 +3373,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
              * it possible for the caller to reuse the same map across multiple
              * StatementBuffer instances.
              */
-            bnodes = null;
+            bnodes.set(null);
 
             values = null;
 
@@ -3364,10 +3388,12 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             if (bnodes == null)
                 throw new IllegalArgumentException();
 
-            if (this.bnodes != null)
+            if (!this.bnodes
+                    .compareAndSet(null/* expect */, bnodes/* update */)) {
+
                 throw new IllegalStateException();
 
-            this.bnodes = bnodes;
+            }
 
         }
 
@@ -3431,16 +3457,21 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             // the BNode's ID.
             final String id = bnode.getID();
 
+            Map<String, BigdataBNode> bnodes = this.bnodes.get();
             if (bnodes == null) {
 
                 /*
                  * Allocate a canonicalizing map for blank nodes. Since this
                  * will be a private map it does not need to be thread-safe.
                  */
-                bnodes = new HashMap<String, BigdataBNode>(
-                        bnodesInitialCapacity);
+                setBNodeMap(new HashMap<String, BigdataBNode>(
+                        bnodesInitialCapacity));
 
                 // fall through.
+                bnodes = this.bnodes.get();
+
+                if (bnodes == null)
+                    throw new AssertionError();
 
             }
 
@@ -3654,9 +3685,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         private void bufferTerm2IdWrites() throws Exception {
 
             if (log.isInfoEnabled()) {
-                log.info("bnodeCount=" + (bnodes == null ? 0 : bnodes.size())
-                        + ", values=" + values.size() + ", statementCount="
-                        + statementCount);
+                final Map<String, BigdataBNode> bnodes = this.bnodes.get();
+                final int bnodeCount = (bnodes == null ? 0 : bnodes.size());
+                log.info("bnodeCount=" + bnodeCount + ", values="
+                        + values.size() + ", statementCount=" + statementCount);
             }
 
             if (isAnyDone()) {
@@ -3666,12 +3698,12 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             }
 
             /*
+             * Run task which will queue BigdataValue[] chunks onto the TERM2ID
+             * async write buffer.
+             * 
              * Note: This is responsible for assigning the TIDs (term
              * identifiers) to the {@link BigdataValue}s. We CAN NOT write on
              * the other indices until we have those TIDs.
-             * 
-             * Run task which will queue BigdataValue[] chunks onto the TERM2ID
-             * async write buffer.
              * 
              * Note: If there is not enough load being placed the async index
              * write then it can wait up to its idle/chunk timeout. Normally we
@@ -3702,11 +3734,25 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                 protected void signal() throws InterruptedException {
 
                     super.signal();
+                    /*
+                     * Note: There is no requirement for an atomic state
+                     * transition for these two counters so there is no reason
+                     * to take the lock here.
+                     */
+//                    lock.lock();
+//                    try {
 
-                    documentTIDsWaitingCount.decrementAndGet();
-                    
-                    documentTIDsReadyCount.incrementAndGet();
+                        documentTIDsWaitingCount.decrementAndGet();
 
+                        documentTIDsReadyCount.incrementAndGet();
+
+//                    } finally {
+//                    
+//                        lock.unlock();
+//                        
+//                    }
+
+                    // Note: otherWriterService MUST have unbounded queue.
                     otherWriterService.submit(new BufferOtherWritesTask(
                             AsynchronousStatementBufferImpl.this));
 
@@ -3831,12 +3877,13 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                                 .addAndGet(toldTriplesThisDocument);
                         outstandingStatementCount
                                 .addAndGet(-toldTriplesThisDocument);
-                    } finally {
-
-                        lock.unlock();
 
                         // notify that the document is done.
                         documentDone(getDocumentIdentifier());
+                        
+                    } finally {
+
+                        lock.unlock();
 
                     }
 
@@ -3944,7 +3991,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
         private final AsynchronousStatementBufferImpl buffer;
 
-        public BufferTerm2IdWrites(AsynchronousStatementBufferImpl buffer) {
+        public BufferTerm2IdWrites(final AsynchronousStatementBufferImpl buffer) {
 
             if (buffer == null)
                 throw new IllegalArgumentException();
@@ -4016,7 +4063,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
         private final AsynchronousStatementBufferImpl buffer;
 
-        public BufferOtherWritesTask(AsynchronousStatementBufferImpl buffer) {
+        public BufferOtherWritesTask(final AsynchronousStatementBufferImpl buffer) {
 
             if (buffer == null)
                 throw new IllegalArgumentException();
@@ -4092,9 +4139,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
          * @param workQueue
          * @param threadFactory
          */
-        public ParserThreadPoolExecutor(int corePoolSize, int maximumPoolSize,
-                long keepAliveTime, TimeUnit unit,
-                BlockingQueue<Runnable> workQueue, ThreadFactory threadFactory) {
+        public ParserThreadPoolExecutor(final int corePoolSize,
+                final int maximumPoolSize, final long keepAliveTime,
+                final TimeUnit unit, final BlockingQueue<Runnable> workQueue,
+                final ThreadFactory threadFactory) {
 
             super(corePoolSize, maximumPoolSize, keepAliveTime, unit,
                     workQueue, threadFactory);
@@ -4142,9 +4190,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                                         .toString());
                     
                     while (isPaused()) {
-
-                        if (!unpaused.await(60, TimeUnit.SECONDS)) {
-
+                        unpaused.await();
+                    }
+//                        if (!unpaused.await(60, TimeUnit.SECONDS)) {
+//
 //                            /*
 //                             * Note: This was a trial workaround for a liveness
 //                             * problem.  Unfortunately, it did not fix the
@@ -4156,12 +4205,12 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 //                                            + AbstractStatisticsCollector.fullyQualifiedHostName);
 //
 //                            reopenBuffer_term2Id();
-
-                            // fall through : while(isPaused()) will retest.
-                            
-                        }
-
-                    }
+//
+//                            // fall through : while(isPaused()) will retest.
+//                            
+//                        }
+//
+//                    }
 
                     pausedThreadCount.decrementAndGet();
 

@@ -40,10 +40,10 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
      */
     private final ThreadPoolExecutor service;
 
-    /**
-     * The time when we started to collect data about the {@link #service} (set by the ctor).
-     */
-    private final long startNanos;
+//    /**
+//     * The time when we started to collect data about the {@link #service} (set by the ctor).
+//     */
+//    private final long startNanos;
     
     /**
      * The weight used to compute the moving average.
@@ -209,7 +209,7 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
         
         this.service = service;
         
-        this.startNanos = System.nanoTime();
+//        this.startNanos = System.nanoTime();
         
         this.taskCounters = taskCounters;
         
