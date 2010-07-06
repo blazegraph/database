@@ -4,15 +4,12 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-
-import org.CognitiveWeb.extser.LongPacker;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
-
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOFilter;
 import com.bigdata.rdf.vocab.Vocabulary;
-import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
  * Filter matches <code>(x rdf:type rdfs:Resource).
@@ -27,8 +24,8 @@ public class RdfTypeRdfsResourceFilter extends SPOFilter implements Externalizab
      */
     private static final long serialVersionUID = -2157234197316632000L;
     
-    private long rdfType;
-    private long rdfsResource;
+    private IV rdfType;
+    private IV rdfsResource;
     
     /**
      * De-serialization ctor.
@@ -51,7 +48,7 @@ public class RdfTypeRdfsResourceFilter extends SPOFilter implements Externalizab
 
     public boolean accept(ISPO spo) {
 
-        if (spo.p() == rdfType && spo.o() == rdfsResource) {
+        if (spo.p().equals(rdfType) && spo.o().equals(rdfsResource)) {
             
             // reject (?x, rdf:type, rdfs:Resource )
             
@@ -71,9 +68,9 @@ public class RdfTypeRdfsResourceFilter extends SPOFilter implements Externalizab
 //
 //        rdfsResource = LongPacker.unpackLong(in);
 
-        rdfType = in.readLong();
+        rdfType = (IV) in.readObject();
 
-        rdfsResource = in.readLong();
+        rdfsResource = (IV) in.readObject();
         
     }
 
@@ -83,9 +80,9 @@ public class RdfTypeRdfsResourceFilter extends SPOFilter implements Externalizab
 //
 //        LongPacker.packLong(out,rdfsResource);
 
-        out.writeLong(rdfType);
+        out.writeObject(rdfType);
 
-        out.writeLong(rdfsResource);
+        out.writeObject(rdfsResource);
         
     }
     

@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.rules;
 
 import java.io.Serializable;
-
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.SPOAccessPath;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOPredicate;
@@ -68,7 +68,7 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
     /**
      * The sole unbound variable in the head of the rule.
      */
-    private final IVariable<Long> h;
+    private final IVariable<IV> h;
 
     /**
      * The access path that corresponds to the position of the unbound variable
@@ -96,15 +96,15 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
         // figure out which position in the head is the variable.
         if(head.s().isVar()) {
             
-            h = (IVariable<Long>)head.s();
+            h = (IVariable<IV>)head.s();
             
         } else if( head.p().isVar() ) {
             
-            h = (IVariable<Long>)head.p();
+            h = (IVariable<IV>)head.p();
             
         } else if( head.o().isVar() ) {
         
-            h = (IVariable<Long>)head.o();
+            h = (IVariable<IV>)head.o();
         
         } else {
             
@@ -154,7 +154,7 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
         /**
          * The sole unbound variable in the head of the rule.
          */
-        private final IVariable<Long> h;
+        private final IVariable<IV> h;
         
         /**
          * The access path that corresponds to the position of the unbound
@@ -162,7 +162,7 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
          */
         private final SPOKeyOrder keyOrder;
 
-        public DistinctTermScanRuleTaskFactory(IVariable<Long> h,
+        public DistinctTermScanRuleTaskFactory(IVariable<IV> h,
                 SPOKeyOrder keyOrder) {
 
             this.h = h;
@@ -206,7 +206,7 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
         /**
          * The sole unbound variable in the head of the rule.
          */
-        private final IVariable<Long> h;
+        private final IVariable<IV> h;
 
         /**
          * The access path that corresponds to the position of the unbound variable
@@ -229,7 +229,7 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
          *            unbound variable reference from the head.
          */
         public DistinctTermScan(final IRule rule, final IJoinNexus joinNexus,
-                final IBuffer<ISolution[]> buffer, final IVariable<Long> h,
+                final IBuffer<ISolution[]> buffer, final IVariable<IV> h,
                 final SPOKeyOrder keyOrder) {
         
             if (rule == null)
@@ -296,14 +296,14 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
             // there is only a single unbound variable for this rule.
             final IBindingSet bindingSet = new ArrayBindingSet(1/*capacity*/);
 
-            final IChunkedIterator<Long> itr = relation.distinctTermScan(keyOrder); 
+            final IChunkedIterator<IV> itr = relation.distinctTermScan(keyOrder); 
             
             try {
 
                 while (itr.hasNext()) {
 
                     // Note: chunks are in ascending order since using scan on SPO index.
-                    final Long[] chunk = itr.nextChunk();
+                    final IV[] chunk = itr.nextChunk();
 
                     ruleStats.chunkCount[0]++;
 
@@ -312,7 +312,7 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
                     final IBuffer<ISolution> tmp = joinNexus
                             .newUnsynchronizedBuffer(buffer, chunk.length);
                     
-                    for (Long id : chunk) {
+                    for (IV iv : chunk) {
 
                         // [id] is a distinct term identifier for the selected
                         // access path.
@@ -325,7 +325,7 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
                          * wildcards for those variables.
                          */
 
-                        bindingSet.set(h, new Constant<Long>(id));
+                        bindingSet.set(h, new Constant<IV>(iv));
 
                         if (rule.isConsistent(bindingSet)) {
 

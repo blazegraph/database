@@ -54,7 +54,7 @@ import com.bigdata.relation.rule.IVariableOrConstant;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPO implements ISPO, Comparable<SPO> {
+public class SPO implements ISPO {
     
     /** The internal value for the subject position. */
     public final IV s;
@@ -418,15 +418,13 @@ public class SPO implements ISPO, Comparable<SPO> {
             assert sid != TermId.NULL : "statement identifier is NULL for explicit statement: "
                 + spo.toString();
 
-            final IV iv = new TermId<BigdataValue>(VTE.STATEMENT, sid);
-            
-            assert AbstractTripleStore.isStatement(iv) : "Not a statement identifier: "
-                    + toString(iv);
+            assert VTE.isStatement(sid) : "Not a statement identifier: "
+                    + sid;
 
             assert type == StatementEnum.Explicit : "statement identifier for non-explicit statement : "
                     + spo.toString();
 
-            spo.setStatementIdentifier(iv);
+            spo.setStatementIdentifier(new TermId(sid));
             
         }
 
@@ -539,45 +537,6 @@ public class SPO implements ISPO, Comparable<SPO> {
         }
 
         return hashCode;
-
-    }
-
-    /**
-     * Imposes s:p:o ordering based on termIds.
-     * <p>
-     * Note: By design, this does NOT differentiate between statements with the
-     * different {@link StatementEnum} values.
-     */
-    public int compareTo(final SPO stmt2) {
-
-        if (stmt2 == this) {
-
-            return 0;
-
-        }
-
-        final SPO stmt1 = this;
-
-        /*
-         * Note: logic avoids possible overflow of [long] by not computing the
-         * difference between two longs.
-         */
-
-        int ret = stmt1.s < stmt2.s ? -1 : stmt1.s > stmt2.s ? 1 : 0;
-
-        if (ret == 0) {
-
-            ret = stmt1.p < stmt2.p ? -1 : stmt1.p > stmt2.p ? 1 : 0;
-
-            if (ret == 0) {
-
-                ret = stmt1.o < stmt2.o ? -1 : stmt1.o > stmt2.o ? 1 : 0;
-
-            }
-
-        }
-
-        return ret;
 
     }
 

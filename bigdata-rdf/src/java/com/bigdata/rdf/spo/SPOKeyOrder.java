@@ -30,13 +30,32 @@ package com.bigdata.rdf.spo;
 import java.io.Externalizable;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.UUID;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.AbstractDatatypeLiteralInternalValue;
+import com.bigdata.rdf.internal.AbstractInternalValue;
+import com.bigdata.rdf.internal.DTE;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.UUIDInternalValue;
+import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.XSDBooleanInternalValue;
+import com.bigdata.rdf.internal.XSDByteInternalValue;
+import com.bigdata.rdf.internal.XSDDoubleInternalValue;
+import com.bigdata.rdf.internal.XSDFloatInternalValue;
+import com.bigdata.rdf.internal.XSDIntInternalValue;
+import com.bigdata.rdf.internal.XSDIntegerInternalValue;
+import com.bigdata.rdf.internal.XSDLongInternalValue;
+import com.bigdata.rdf.internal.XSDShortInternalValue;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.rule.IPredicate;
@@ -64,8 +83,6 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
      */
     private static final long serialVersionUID = 87501920529732159L;
     
-    static private final transient long NULL = IRawTripleStore.NULL;
-
     /*
      * Note: these constants make it possible to use switch(index()) constructs.
      */
@@ -363,9 +380,9 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
             // compare terms one by one in the appropriate key order
             for (int i = 0; i < keyMap.length; i++) {
                 
-                final long t1 = o1.get(keyMap[i]);
+                final byte[] t1 = o1.get(keyMap[i]);
                 
-                final long t2 = o2.get(keyMap[i]);
+                final byte[] t2 = o2.get(keyMap[i]);
                 
                 int ret = t1 < t2 ? -1 : t1 > t2 ? 1 : 0;
                 
@@ -505,7 +522,8 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
 
         for (int i = 0; i < a.length; i++) {
 
-            keyBuilder.append(spo.get(a[i]));
+            // keyBuilder.append(spo.get(a[i]));
+            encodeIV(keyBuilder, spo.get(a[i]));
 
         }
         
@@ -513,6 +531,102 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
 
     }
     
+    final public byte[] encodeKey(final IKeyBuilder keyBuilder, 
+            final IV iv1, final IV iv2, final IV iv3) {
+
+        keyBuilder.reset();
+
+        encodeIV(keyBuilder, iv1);
+        encodeIV(keyBuilder, iv2);
+        encodeIV(keyBuilder, iv3);
+        
+        return keyBuilder.getKey();
+
+    }
+    
+    /**
+     * Encode an RDF value into a key for one of the statement indices.
+     * 
+     * @param keyBuilder
+     *            The key builder.
+     * @param v
+     *            The RDF value.
+     * 
+     * @return The key builder.
+     */
+    private void encodeIV(final IKeyBuilder keyBuilder, final IV v) {
+
+        // First emit the flags byte.
+        keyBuilder.append(v.flags());
+
+        if (!v.isInline()) {
+            /*
+             * Since the RDF Value is not inline, it will be represented as a
+             * term identifier.
+             */
+            keyBuilder.append(v.getTermId());
+            return;
+        }
+        
+        /*
+         * Append the natural value type representation.
+         * 
+         * Note: We have to handle the unsigned byte, short, int and long values
+         * specially to get the correct total key order.
+         */
+        final DTE dte = v.getInternalDataTypeEnum();
+        
+        final AbstractDatatypeLiteralInternalValue<?, ?> t = (AbstractDatatypeLiteralInternalValue<?, ?>) v;
+        
+        switch (dte) {
+        case XSDBoolean:
+            keyBuilder.append((byte) (t.booleanValue() ? 1 : 0));
+            break;
+        case XSDByte:
+            keyBuilder.append(t.byteValue());
+            break;
+        case XSDShort:
+            keyBuilder.append(t.shortValue());
+            break;
+        case XSDInt:
+            keyBuilder.append(t.intValue());
+            break;
+        case XSDLong:
+            keyBuilder.append(t.longValue());
+            break;
+        case XSDFloat:
+            keyBuilder.append(t.floatValue());
+            break;
+        case XSDDouble:
+            keyBuilder.append(t.doubleValue());
+            break;
+        case XSDInteger:
+            keyBuilder.append(t.integerValue());
+            break;
+        case XSDDecimal:
+            keyBuilder.append(t.decimalValue());
+            break;
+        case UUID:
+            keyBuilder.append((UUID)t.getInlineValue());
+            break;
+//        case XSDUnsignedByte:
+//            keyBuilder.appendUnsigned(t.byteValue());
+//            break;
+//        case XSDUnsignedShort:
+//            keyBuilder.appendUnsigned(t.shortValue());
+//            break;
+//        case XSDUnsignedInt:
+//            keyBuilder.appendUnsigned(t.intValue());
+//            break;
+//        case XSDUnsignedLong:
+//            keyBuilder.appendUnsigned(t.longValue());
+//            break;
+        default:
+            throw new AssertionError(v.toString());
+        }
+
+    }
+
     /**
      * Decode the key into an {@link SPO}. The {@link StatementEnum} and the
      * optional SID will not be decoded, since it is carried in the B+Tree
@@ -535,22 +649,23 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
         final int keyArity = getKeyArity();
 
         assert key.length >= 8 * keyArity;
-
-        final long _0 = KeyBuilder.decodeLong(key, 0);
         
-        final long _1 = KeyBuilder.decodeLong(key, 8);
+        final IV[] ivs = decodeStatementKey(key);
+
+        final IV _0 = ivs[0];
+        
+        final IV _1 = ivs[1];
       
-        final long _2 = KeyBuilder.decodeLong(key, 8+8);
+        final IV _2 = ivs[2];
 
         // 4th key position exists iff quad keys.
-        final long _3 = keyArity == 4 ? KeyBuilder.decodeLong(key, 8 + 8 + 8)
-                : IRawTripleStore.NULL;
+        final IV _3 = keyArity == 4 ? ivs[3] : null;
 
         /*
          * Re-order the key into SPO order.
          */
         
-        final long s, p, o, c;
+        final IV s, p, o, c;
         
         switch (index) {
 
@@ -565,21 +680,21 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
             s = _0;
             p = _1;
             o = _2;
-            c = IRawTripleStore.NULL;
+            c = null;
             break;
             
         case SPOKeyOrder._POS:
             p = _0;
             o = _1;
             s = _2;
-            c = IRawTripleStore.NULL;
+            c = null;
             break;
             
         case SPOKeyOrder._OSP:
             o = _0;
             s = _1;
             p = _2;
-            c = IRawTripleStore.NULL;
+            c = null;
             break;
 
         /*
@@ -637,6 +752,159 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
         return new SPO(s, p, o, c);
 
     }
+    
+    /**
+     * Decode a key from one of the statement indices. The components of the key
+     * are returned in the order in which they appear in the key. The caller
+     * must reorder those components using their knowledge of which index is
+     * being decoded in order to reconstruct the corresponding RDF statement.
+     * The returned array will always have 4 components. However, the last key
+     * component will be <code>null</code> if there are only three components in
+     * the <i>key</i>.
+     * 
+     * @param key
+     *            The key.
+     * 
+     * @return An ordered array of the {@link IV}s for that key.
+     * 
+     *         FIXME handle all of the inline value types.
+     * 
+     *         FIXME Construct the InternalValue objects using factory since we
+     *         will have to scope how the RDF Value is represented to the
+     *         lexicon relation with which it is associated.
+     */
+    public IV[] decodeStatementKey(final byte[] key) {
+        
+        final IV[] a = new IV[4];
+
+        // The byte offset into the key.
+        int offset = 0;
+        
+        for (int i = 0; i < 4; i++) {
+
+            final byte flags = KeyBuilder.decodeByte(key[offset]);
+            offset++;
+
+            if(!AbstractInternalValue.isInline(flags)) {
+                
+                /*
+                 * Handle a term identifier (versus an inline value).
+                 */
+
+                // decode the term identifier.
+                final long termId = KeyBuilder.decodeLong(key, offset);
+                offset += Bytes.SIZEOF_LONG;
+
+                a[i] = new TermId(flags, termId);
+
+                continue;
+                
+            }
+            
+            /*
+             * Handle an inline value.
+             */
+            // The value type (URI, Literal, BNode, SID)
+            final VTE vte = AbstractInternalValue
+                    .getInternalValueTypeEnum(flags);
+
+            // The data type
+            final DTE dte = AbstractInternalValue
+                    .getInternalDataTypeEnum(flags);
+            
+            final IV<?,?> v;
+            switch (dte) {
+            case XSDBoolean: {
+                final byte x = KeyBuilder.decodeByte(key[offset++]);
+                if (x == 0) {
+                    v = XSDBooleanInternalValue.FALSE;
+                } else {
+                    v = XSDBooleanInternalValue.TRUE;
+                }
+                break;
+            }
+            case XSDByte: {
+                final byte x = KeyBuilder.decodeByte(key[offset++]);
+                v = new XSDByteInternalValue<BigdataLiteral>(x);
+                break;
+            }
+            case XSDShort: {
+                final short x = KeyBuilder.decodeShort(key, offset);
+                offset += Bytes.SIZEOF_SHORT;
+                v = new XSDShortInternalValue<BigdataLiteral>(x);
+                break;
+            }
+            case XSDInt: {
+                final int x = KeyBuilder.decodeInt(key, offset);
+                offset += Bytes.SIZEOF_INT;
+                v = new XSDIntInternalValue<BigdataLiteral>(x);
+                break;
+            }
+            case XSDLong: {
+                final long x = KeyBuilder.decodeLong(key, offset);
+                offset += Bytes.SIZEOF_LONG;
+                v = new XSDLongInternalValue<BigdataLiteral>(x);
+                break;
+            }
+            case XSDFloat: {
+                final float x = KeyBuilder.decodeFloat(key, offset);
+                offset += Bytes.SIZEOF_FLOAT;
+                v = new XSDFloatInternalValue<BigdataLiteral>(x);
+                break;
+            }
+            case XSDDouble: {
+                final double x = KeyBuilder.decodeDouble(key, offset);
+                offset += Bytes.SIZEOF_DOUBLE;
+                v = new XSDDoubleInternalValue<BigdataLiteral>(x);
+                break;
+            }
+            case UUID: {
+                final UUID x = KeyBuilder.decodeUUID(key, offset);
+                offset += Bytes.SIZEOF_UUID;
+                v = new UUIDInternalValue<BigdataLiteral>(x);
+                break;
+            }
+            case XSDInteger: {
+                final byte[] b = KeyBuilder.decodeBigInteger2(offset, key);
+                offset += 2 + b.length;
+                final BigInteger x = new BigInteger(b);
+                v = new XSDIntegerInternalValue<BigdataLiteral>(x);
+                break;
+            }
+//            case XSDDecimal:
+//                keyBuilder.append(t.decimalValue());
+//                break;
+//            case XSDUnsignedByte:
+//                keyBuilder.appendUnsigned(t.byteValue());
+//                break;
+//            case XSDUnsignedShort:
+//                keyBuilder.appendUnsigned(t.shortValue());
+//                break;
+//            case XSDUnsignedInt:
+//                keyBuilder.appendUnsigned(t.intValue());
+//                break;
+//            case XSDUnsignedLong:
+//                keyBuilder.appendUnsigned(t.longValue());
+//                break;
+            default:
+                throw new UnsupportedOperationException("vte=" + vte + ", dte="
+                        + dte);
+            }
+            
+            a[i] = v;
+
+            if (i == 2 && offset == key.length) {
+                // We have three components and the key is exhausted.
+                break;
+            }
+
+        }
+        
+        return a; 
+        
+    }
+
+    
 
     /**
      * Imposes the canonicalizing mapping during object de-serialization.
@@ -673,32 +941,32 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
     static public SPOKeyOrder getKeyOrder(final IPredicate<ISPO> predicate,
             final int keyArity) {
 
-        final long s = predicate.get(0).isVar() ? NULL : (Long) predicate
+        final IV s = predicate.get(0).isVar() ? null : (IV) predicate
                 .get(0).get();
         
-        final long p = predicate.get(1).isVar() ? NULL : (Long) predicate
+        final IV p = predicate.get(1).isVar() ? null : (IV) predicate
                 .get(1).get();
         
-        final long o = predicate.get(2).isVar() ? NULL : (Long) predicate
+        final IV o = predicate.get(2).isVar() ? null : (IV) predicate
                 .get(2).get();
 
         if (keyArity == 3) {
 
             // Note: Context is ignored!
 
-            if (s != NULL && p != NULL && o != NULL) {
+            if (s != null && p != null && o != null) {
                 return SPO;
-            } else if (s != NULL && p != NULL) {
+            } else if (s != null && p != null) {
                 return SPO;
-            } else if (s != NULL && o != NULL) {
+            } else if (s != null && o != null) {
                 return OSP;
-            } else if (p != NULL && o != NULL) {
+            } else if (p != null && o != null) {
                 return POS;
-            } else if (s != NULL) {
+            } else if (s != null) {
                 return SPO;
-            } else if (p != NULL) {
+            } else if (p != null) {
                 return POS;
-            } else if (o != NULL) {
+            } else if (o != null) {
                 return OSP;
             } else {
                 return SPO;
@@ -707,41 +975,41 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
         } else {
 
             @SuppressWarnings("unchecked")
-            final IVariableOrConstant<Long> t = predicate.get(3);
+            final IVariableOrConstant<IV> t = predicate.get(3);
             
-            final long c = t == null ? NULL : (t.isVar() ? NULL : t.get());
+            final IV c = t == null ? null : (t.isVar() ? null : t.get());
             
             /*
-             * if ((s == NULL && p == NULL && o == NULL && c == NULL) || (s !=
-             * NULL && p == NULL && o == NULL && c == NULL) || (s != NULL && p
-             * != NULL && o == NULL && c == NULL) || (s != NULL && p != NULL &&
-             * o != NULL && c == NULL) || (s != NULL && p != NULL && o != NULL
-             * && c != NULL)) { return SPOKeyOrder.SPOC; }
+             * if ((s == null && p == null && o == null && c == null) || (s !=
+             * null && p == null && o == null && c == null) || (s != null && p
+             * != null && o == null && c == null) || (s != null && p != null &&
+             * o != null && c == null) || (s != null && p != null && o != null
+             * && c != null)) { return SPOKeyOrder.SPOC; }
              */
             
-            if ((s == NULL && p != NULL && o == NULL && c == NULL)
-                    || (s == NULL && p != NULL && o != NULL && c == NULL)
-                    || (s == NULL && p != NULL && o != NULL && c != NULL)) {
+            if ((s == null && p != null && o == null && c == null)
+                    || (s == null && p != null && o != null && c == null)
+                    || (s == null && p != null && o != null && c != null)) {
                 return POCS;
             }
 
-            if ((s == NULL && p == NULL && o != NULL && c == NULL)
-                    || (s == NULL && p == NULL && o != NULL && c != NULL)
-                    || (s != NULL && p == NULL && o != NULL && c != NULL)) {
+            if ((s == null && p == null && o != null && c == null)
+                    || (s == null && p == null && o != null && c != null)
+                    || (s != null && p == null && o != null && c != null)) {
                 return OCSP;
             }
 
-            if ((s == NULL && p == NULL && o == NULL && c != NULL)
-                    || (s != NULL && p == NULL && o == NULL && c != NULL)
-                    || (s != NULL && p != NULL && o == NULL && c != NULL)) {
+            if ((s == null && p == null && o == null && c != null)
+                    || (s != null && p == null && o == null && c != null)
+                    || (s != null && p != null && o == null && c != null)) {
                 return CSPO;
             }
 
-            if ((s == NULL && p != NULL && o == NULL && c != NULL)) {
+            if ((s == null && p != null && o == null && c != null)) {
                 return PCSO;
             }
 
-            if ((s != NULL && p == NULL && o != NULL && c == NULL)) {
+            if ((s != null && p == null && o != null && c == null)) {
                 return SOPC;
             }
 
