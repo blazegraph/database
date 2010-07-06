@@ -41,6 +41,8 @@ import com.bigdata.btree.raba.codec.EmptyRabaValueCoder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Justification;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
 
 /**
  * (De-)serializes {@link Justification}s.
@@ -129,15 +131,15 @@ public class JustificationTupleSerializer extends
         // A justification must include at least a head and one tuple in the tail.
         assert m >= N * 2 : "keyLen="+keyLen+", N="+N+", m="+m;
         
-        final long[] ids = new long[m];
+        final IV[] ivs = new IV[m];
         
         for (int i = 0; i < m; i++) {
 
-            ids[i] = KeyBuilder.decodeLong(data, i * Bytes.SIZEOF_LONG);
+            ivs[i] = new TermId(KeyBuilder.decodeLong(data, i * Bytes.SIZEOF_LONG));
             
         }
 
-        return new Justification(N,ids);
+        return new Justification(N,ivs);
         
     }
 

@@ -36,14 +36,13 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
-
 import com.bigdata.BigdataStatics;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.StatementEnum;
@@ -151,7 +150,7 @@ public class DefaultGraphSolutionExpander implements ISolutionExpander<ISPO> {
      * if no graphs were specified having a term identifier.
      */
     // note: not 'final' due to bizarre compiler error under linux for JDK 1.6.0_16
-    private /*final*/ long firstContext;
+    private /*final*/ IV firstContext;
 
     /**
      * Filter iff we will leave [c] unbound and filter for graphs which are in
@@ -206,7 +205,7 @@ public class DefaultGraphSolutionExpander implements ISolutionExpander<ISPO> {
             
             this.filter = null;
             
-            this.firstContext = IRawTripleStore.NULL;
+            this.firstContext = null;
 
             return;
             
@@ -214,7 +213,7 @@ public class DefaultGraphSolutionExpander implements ISolutionExpander<ISPO> {
 
         final Iterator<? extends URI> itr = defaultGraphs.iterator();
 
-        long firstContextLocal = IRawTripleStore.NULL;
+        IV firstContextLocal = null;
         
         int nknownLocal = 0;
 
@@ -222,7 +221,7 @@ public class DefaultGraphSolutionExpander implements ISolutionExpander<ISPO> {
 
             final BigdataURI uri = (BigdataURI) itr.next();
 
-            if (uri.getIV() != IRawTripleStore.NULL) {
+            if (uri.getIV() != null) {
 
                 if (++nknownLocal == 1) {
 
@@ -274,7 +273,7 @@ public class DefaultGraphSolutionExpander implements ISolutionExpander<ISPO> {
 
         final SPOAccessPath accessPath = (SPOAccessPath) accessPath1;
         
-        final IVariableOrConstant<Long> c = accessPath.getPredicate().get(3);
+        final IVariableOrConstant<IV> c = accessPath.getPredicate().get(3);
 
         if (c != null && c.isConstant()) {
 
@@ -681,15 +680,15 @@ public class DefaultGraphSolutionExpander implements ISolutionExpander<ISPO> {
                  * 
                  * FIXME ordered visitation for named graphs also.
                  */
-                final long[] a = new long[nknown];
+                final IV[] a = new IV[nknown];
                 
                 int i = 0;
                 
                 for (URI g : defaultGraphs) {
 
-                    final long termId = ((BigdataURI)g).getIV();
+                    final IV termId = ((BigdataURI)g).getIV();
 
-                    if (termId == IRawTripleStore.NULL) {
+                    if (termId == null) {
 
                         // unknown URI means no data for that graph.
                         continue;
@@ -711,7 +710,7 @@ public class DefaultGraphSolutionExpander implements ISolutionExpander<ISPO> {
 
                         final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
 
-                        for (long termId : a) {
+                        for (IV termId : a) {
 
                             tasks.add(new DrainIteratorTask(termId));
 
@@ -750,9 +749,9 @@ public class DefaultGraphSolutionExpander implements ISolutionExpander<ISPO> {
              */
             private final class DrainIteratorTask implements Callable<Void> {
 
-                final long termId;
+                final IV termId;
 
-                public DrainIteratorTask(final long termId) {
+                public DrainIteratorTask(final IV termId) {
 
                     this.termId = termId;
 
@@ -868,9 +867,9 @@ public class DefaultGraphSolutionExpander implements ISolutionExpander<ISPO> {
                 
                 for(URI g : defaultGraphs) {
 
-                    final long termId = ((BigdataURI)g).getIV();
+                    final IV termId = ((BigdataURI)g).getIV();
 
-                    if (termId == IRawTripleStore.NULL) {
+                    if (termId == null) {
                         
                         // unknown URI means no data for that graph.
                         continue;
@@ -914,14 +913,14 @@ public class DefaultGraphSolutionExpander implements ISolutionExpander<ISPO> {
          */
         private class RangeCountTask implements Callable<Long> {
 
-            private final long c;
+            private final IV c;
 
             /**
              * 
              * @param c
              *            The graph identifier.
              */
-            public RangeCountTask(final long c) {
+            public RangeCountTask(final IV c) {
 
                 this.c = c;
 
@@ -1112,7 +1111,7 @@ public class DefaultGraphSolutionExpander implements ISolutionExpander<ISPO> {
          * @param sourceAccessPath
          *            The original access path.
          */
-        public StripContextAccessPath(final long c,
+        public StripContextAccessPath(final IV c,
                 final SPOAccessPath sourceAccessPath) {
 
             this.sourceAccessPath = sourceAccessPath.bindContext(c);
