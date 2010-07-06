@@ -33,6 +33,7 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
 import com.bigdata.jini.start.BigdataZooDefs;
+import com.bigdata.quorum.Quorum;
 
 /**
  * A object whose state contains both the lastValidToken and the current token.
@@ -48,8 +49,8 @@ public class QuorumTokenState implements Externalizable {
 
     /**
      * The initial version. The version appears as the first byte. The remaining
-     * fields for this version are: the lastValidToken (long) followed by the
-     * currentToken (long).
+     * fields for this version are: the {@link #lastValidToken()} followed by the
+     * {@link #currentToken}.
      */
     protected static final byte VERSION0 = 0;
 
@@ -57,12 +58,34 @@ public class QuorumTokenState implements Externalizable {
 
     private long currentToken;
 
+    public String toString() {
+        return getClass().getName() + //
+                "{lastValidToken=" + lastValidToken + //
+                ",currentToken=" + currentToken + //
+                "}";
+    }
+    
+    /**
+     * Deserialization constructor.
+     */
+    public QuorumTokenState() {
+        
+    }
+    
     public QuorumTokenState(final long lastValidToken, final long currentToken) {
 
         this.lastValidToken = lastValidToken;
 
         this.currentToken = currentToken;
 
+        if (currentToken != Quorum.NO_QUORUM && lastValidToken != currentToken) {
+            /*
+             * When the current token is set, it must be the same as the last
+             * valid token.
+             */
+            throw new IllegalArgumentException();
+        }
+        
     }
 
     public long lastValidToken() {

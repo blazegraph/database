@@ -354,6 +354,131 @@ Open questions:
 - Can we kill a client's zk connection if it is not reachable or are
   we going to wait until it times out?
 
+============================================================
+
+Zookeeper integration:
+
+ZookeeperClientConfig{ zroot=/systap16, sessionTimeout=600000, servers=10.48.89.194:2181, acl=[31,s{'world,'anyone}
+]}
+systap16(3 children)
+  config(5 children)
+    com.bigdata.service.jini.DataServer(13 children) com.bigdata.jini.start.config.DataServerConfiguration{...}
+      logicalService0000000000(2 children)
+        masterElection(1 children)
+          lock0000000000 (Ephemeral83720574352883740)
+        physicalServices(1 children)
+          669eedd6-0961-4c46-a526-d7d45a19f085 [attributes]
+      logicalService0000000001(2 children)
+        masterElection(1 children)
+          lock0000000000 (Ephemeral83720574352883745)
+        physicalServices(1 children)
+          bdda83c1-5e05-4378-b715-0581c394fc15 [attributes]
+
+ - The logicalServiceZPath is the container for all zookeeper state
+   about a logical service.  In the example above, this would be:
+
+   systap16/config/com.bigdata.service.jini.DataServer/logicalService0000000000 {k}
+
+   which corresponds to:
+
+   fedName/config/serviceClassName}/logicalServiceZNode [k]
+
+   We do not need a UUID for the logicalService.  Just use its
+   zpath. That includes the federation, the service type, and the
+   logical service znode and is unambiguous.  Within a context where
+   the service type and federation are known, we can get away with
+   using only the logicalServiceZNode or even decoding the 10 digit
+   integer which is its zk assigned identifier.
+
+ - We need to add a quorum znode as a child of the
+   logicalServiceZPath.  This znode is the container for all quorum
+   state for a given logical service.
+
+   {fedName}/config/{serviceClassName}/{logicalServiceZNode}/quorum
+
+   The children of the quorum are:
+
+   quorum [lastValidToken, currentToken]
+	/member
+		/ServiceId (Ephemeral)
+	/votes
+		/{lastCommitTime}
+			/[ServiceUUID]
+	/joined
+		/(Ephemeral) [ServiceUUID]
+	/pipeline
+		/(Ephemeral) [ServiceUUID,addrSelf]
+
+ - The masterElection znode has to go.  It is replaced by whatever is
+   the first child of .../quorum/joined.
+
+ - The physicalServices znode can stay.  It has the attributes for the
+   physical service. 
+
+     (*) This is a likely place to mark services which have scheduled
+	 down time.
+
+Commit log:
+
+Modified the QuorumActor contract and implementation such that an
+actor awaits the observation of the enacted state change by the paired
+QuorumWatcher.  This cleans up the semantics nicely.
+
+Some of the MockQuorumFixture based unit tests are now failing because
+they verify that all quorum instances are synchronized, but the
+MockQuorumFixture does not enforce that.  I have not yet decided
+whether the fixture can be fixed or whether it is an error to attempt
+to test such synchronous state changes in a distributed system.
+
+The change in semantics for the MockQuorumFixture has broken several
+unit tests which depended on each action being taken in the order in
+which they were executed in the main thread.  This was guaranteed by
+fixture.eventDone, but that is now signalled as soon as the event is
+accepted by the MockQuorumWatcher.
+
+  (***) The fixture should be fixed such that it provides the same
+        serialization of updates as zookeeper.  This is a bit tricky
+        to get right....
+
+	FIXME Actually, just modify the AbstractQuorum to allow it to
+	      run more than one client/member and then chuck out the
+	      fixture (well, most of it).  For ZKQuorumImpl, the
+	      QuorumMember under test needs to implement
+	      getService(UUID).
+
+        FIXME AbstractQuorum ~ 1906 : This is getting tripped due to
+	      the recursion within QuorumWatcherBase and the
+	      parallelism permitted when consuming watched events
+	      necessary to support that recursion.  Specifically, with
+	      a singleton quorum, once the service casts its vote the
+	      QuorumWatcherBase in the thread handling the event will
+	      instruct the actor to do a serviceJoin in
+	      QuorumWatcheBase#castVote() around line ~1779.
+
+	      The recursion looks like this:
+
+		  castVote -> 
+		     serviceJoin ->
+		        (setLastModified, setToken)
+
+                    assert joined.size() >= (k + 1) / 2 : "Not enough
+                            joined services: njoined=" + joined.size()
+                            + " : " + AbstractQuorum.this;
+
+
+I have also touched several of the zookeeper integration classes, but
+these changes are mainly javadoc edits and removing static INFO and
+DEBUG flags.
+
+Zookeeper watchers have been implemented for ZKQuorumImpl.  These
+watchers are triggered on the basic zookeeper events (znode existence
+/ data change or znode children child).  The watchers simply pump
+tasks into a queue.  When the task runs, it uses some utility classes
+to compute the net change between the previous state of the watched
+collection (members, joined, pipeline, votes for some lastCommitTime)
+and the current state of that collection.  Those deltas are fed back
+through QuorumWatcherBase into AbstractQuorumWatcher's internal state.
+
 TODO:
 
    - RWStore, write cache, write replication, standalone HA in

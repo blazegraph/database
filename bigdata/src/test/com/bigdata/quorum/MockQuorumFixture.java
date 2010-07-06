@@ -43,9 +43,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+
+import junit.framework.AssertionFailedError;
 
 import org.apache.log4j.Logger;
 
@@ -374,40 +377,24 @@ public class MockQuorumFixture {
      * 
      * @throws InterruptedException
      * 
-     *             FIXME Make this method private and invoke it from the
-     *             {@link MockQuorumActor} for each request which it issues such
-     *             that the client never gets ahead of the observations of its
-     *             own actions (or those of any other client).
-     *             <p>
-     *             The {@link #deque} must be unbounded since each action can
-     *             trigger additional actions.
-     *             <p>
-     *             The logic in {@link MockQuorumWatcher#notify(QuorumEvent)}
-     *             currently holds the {@link #globalSynchronousLock} while
-     *             processing the event. In order for us to make this change it
-     *             will have to locally queue the event and then process it
-     *             later (or simply notify that a specific watched event has
-     *             occurred and then inspect the quorum state to decide what the
-     *             event was and how to handle it). If these changes are made
-     *             then we can make {@link #lock} and alias for
-     *             {@link #globalSynchronousLock}, make this method a NOP, and
-     *             add a private variant which is invoked by the
-     *             {@link MockQuorumActor} for each action which it takes. All
-     *             of this would make the {@link MockQuorumFixture} more
-     *             "zookeeper" like in its guarantee of global synchronous
-     *             notification and the actions which clients must take to
-     *             handle those notifications.
+     * @deprecated The semantics of the {@link QuorumActor} have been modified
+     *             to require it to block until the requested change has been
+     *             observed by the {@link QuorumWatcher} and made visible in the
+     *             local model of the quorum state maintained by the
+     *             {@link AbstractQuorum}.<p>
+     *             If you need more control over the visibility of state changes
+     *             use {@link #assertCondition(Runnable)}.
      */
     public void awaitDeque() throws InterruptedException {
-        lock.lock();
-        try {
-            assertRunning();
-            while (!deque.isEmpty()) {
-                dequeEmpty.await();
-            }
-        } finally {
-            lock.unlock();
-        }
+//        lock.lock();
+//        try {
+//            assertRunning();
+//            while (!deque.isEmpty()) {
+//                dequeEmpty.await();
+//            }
+//        } finally {
+//            lock.unlock();
+//        }
     }
 
     /**
@@ -435,6 +422,103 @@ public class MockQuorumFixture {
         } finally {
             lock.unlock();
         }
+    }
+
+    /**
+     * Wait up to a timeout until some condition succeeds.
+     * <p>
+     * Whenever more than one {@link AbstractQuorum} is under test there will be
+     * concurrent indeterminism concerning the precise ordering and timing as
+     * updates propagate from the {@link AbstractQuorum} which takes some action
+     * (castVote(), pipelineAdd(), etc.) to the other quorums attached to the
+     * same {@link MockQuorumFixture}. This uncertainty about the ordering and
+     * timing state changes is not dissimilar from the uncertainty we face in a
+     * real distributed system.
+     * <p>
+     * While there are times when this uncertainty does not affect the behavior
+     * of the tests, there are other times when we must have a guarantee that a
+     * specific vote order or pipeline order was established. For those cases,
+     * this method may be used to await an arbitrary condition. This method
+     * simply retries until the condition becomes true, sleeping a little after
+     * each failure.
+     * <p>
+     * Actions executed in the main thread of the unit test will directly update
+     * the internal state of the {@link MockQuorumFixture}, which is shared
+     * across the {@link MockQuorum}s. However, uncertainty about ordering can
+     * arise as a result of the interleaving of the actions taken by the
+     * {@link QuorumWatcher}s in response to both top-level actions and actions
+     * taken by other {@link QuorumWatcher}s. For example, the vote order or the
+     * pipeline order are fully determined based on sequence such as the
+     * following:
+     * 
+     * <pre>
+     * actor0.pipelineAdd();
+     * actor2.pipelineAdd();
+     * actor1.pipelineAdd();
+     * </pre>
+     * 
+     * When in doubt, or when a unit test displays stochastic behavior, you can
+     * use this method to wait until the quorum state has been correctly
+     * replicated to the {@link Quorum}s under test.
+     * 
+     * @param cond
+     *            The condition, which must throw an
+     *            {@link AssertionFailedError} if it does not succeed.
+     * @param timeout
+     *            The timeout.
+     * @param unit
+     * 
+     * @throws AssertionFailedError
+     *             if the condition does not succeed within the timeout.
+     */
+    public void assertCondition(final Runnable cond,
+            final long timeout, final TimeUnit units) {
+        final long begin = System.nanoTime();
+        long nanos = units.toNanos(timeout);
+        // remaining -= (now - begin) [aka elapsed]
+        nanos -= System.nanoTime() - begin;
+        while (true) {
+            try {
+                // try the condition
+                cond.run();
+                // success.
+                return;
+            } catch (AssertionFailedError e) {
+                if (nanos < 0) {
+                    // Timeout - rethrow the failed assertion.
+                    throw e;
+                }
+            }
+            // sleep and retry.
+            try {
+                // sleep up to 10ms or nanos, which ever is less.
+                Thread
+                        .sleep(Math.min(TimeUnit.NANOSECONDS.toMillis(nanos),
+                                10));
+            } catch (InterruptedException e1) {
+                // propagate the interrupt.
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+    }
+
+    /**
+     * Waits up to 5 seconds for the condition to succeed.
+     * 
+     * @param cond
+     *            The condition, which must throw an
+     *            {@link AssertionFailedError} if it does not succeed.
+     * 
+     * @throws AssertionFailedError
+     *             if the condition does not succeed within the timeout.
+     * 
+     * @see #assertCondition(Runnable, long, TimeUnit)
+     */
+    public void assertCondition(final Runnable cond) {
+        
+        assertCondition(cond, 5, TimeUnit.SECONDS);
+        
     }
     
     /*
@@ -750,8 +834,15 @@ public class MockQuorumFixture {
                     final QuorumEvent e = watcher.queue.take();
                     if (log.isInfoEnabled())
                         log.info("Accepted event : " + e);
+                    // delegate the event
+//                        new Thread() {
+//                            public void run() {
+//                                if (log.isInfoEnabled())
+//                                    log.info("Running event : " + e);
+//                                watcher.notify(e);
+//                            }
+//                        }.start();
                     try {
-                        // delegate the event.
                         watcher.notify(e);
                     } catch (Throwable t) {
                         // log an errors.
@@ -1003,17 +1094,22 @@ public class MockQuorumFixture {
             }
 
             /**
-             * FIXME We really should scan the fixture's quorumImpl state using
-             * getMembers(), getVotes(), getPipelineMembers(), getJoined(), and
-             * token() and setup the client's quorum to mirror the state of the
-             * fixture. This code could not be reused directly for zookeeper
-             * because the watchers need to be setup atomically as we read the
-             * distributed quorum state.
+             * @todo We really should scan the fixture's quorumImpl state using
+             *       getMembers(), getVotes(), getPipelineMembers(),
+             *       getJoined(), and token() and setup the client's quorum to
+             *       mirror the state of the fixture. This code could not be
+             *       reused directly for zookeeper because the watchers need to
+             *       be setup atomically as we read the distributed quorum
+             *       state.
              */
             @Override
-            protected void setupDiscovery() {
+            protected void start() {
                 if (log.isInfoEnabled())
                     log.info("");
+            }
+            
+            protected void terminate() {
+                
             }
 
         }

@@ -31,7 +31,6 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-import java.net.InetSocketAddress;
 import java.util.UUID;
 
 import com.bigdata.jini.start.BigdataZooDefs;
@@ -45,59 +44,53 @@ import com.bigdata.jini.start.BigdataZooDefs;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class QuorumPipelineState extends QuorumServiceState implements
-        Externalizable {
+public class QuorumServiceState implements Externalizable {
 
     private static final long serialVersionUID = 1L;
 
     /**
      * The initial version. The version appears as the first byte. The remaining
-     * fields for this version are: {@link #addrSelf}.
+     * fields for this version are: the {@link #serviceUUID} written as the most
+     * significant bits (long) followed by least significant bits (long).
      */
     protected static final byte VERSION0 = 0;
 
-    private InetSocketAddress addrSelf;
+    private UUID serviceUUID;
 
     public String toString() {
         return getClass().getName() + //
                 "{serviceUUID=" + serviceUUID() + //
-                ",addrSelf=" + addrSelf() + //
                 "}";
     }
 
     /**
      * Deserialization constructor.
      */
-    public QuorumPipelineState() {
+    public QuorumServiceState() {
         
     }
-    
-    public QuorumPipelineState(final UUID serviceUUID,
-            final InetSocketAddress addrSelf) {
 
-        super(serviceUUID);
-        
-        if (addrSelf == null)
+    public QuorumServiceState(final UUID serviceUUID) {
+
+        if (serviceUUID == null)
             throw new IllegalArgumentException();
         
-        this.addrSelf = addrSelf;
+        this.serviceUUID = serviceUUID;
 
     }
 
-    public InetSocketAddress addrSelf() {
-        return addrSelf;
+    public UUID serviceUUID() {
+        return serviceUUID;
     }
 
-    public void readExternal(final ObjectInput in) throws IOException,
+    public void readExternal(ObjectInput in) throws IOException,
             ClassNotFoundException {
 
-        super.readExternal(in);
-        
         final byte version = in.readByte();
 
         switch (version) {
         case VERSION0: {
-            addrSelf = (InetSocketAddress) in.readObject();
+            serviceUUID = new UUID(in.readLong()/* MSB */, in.readLong()/* LSB */);
             break;
         }
         default:
@@ -106,13 +99,13 @@ public class QuorumPipelineState extends QuorumServiceState implements
 
     }
 
-    public void writeExternal(final ObjectOutput out) throws IOException {
+    public void writeExternal(ObjectOutput out) throws IOException {
 
-        super.writeExternal(out);
-        
         out.write(VERSION0);
 
-        out.writeObject(addrSelf);
+        out.writeLong(serviceUUID.getMostSignificantBits());
+        
+        out.writeLong(serviceUUID.getLeastSignificantBits());
 
     }
 

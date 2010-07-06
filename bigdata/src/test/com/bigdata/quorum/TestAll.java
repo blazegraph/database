@@ -36,11 +36,6 @@ import junit.framework.TestSuite;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- *          FIXME Test with HA Journal integration (once this test suite has
- *          been built out).
- * 
- *          FIXME Test with Zookeeper integration (in the bigdata-jini module).
  */
 public class TestAll extends TestCase {
 

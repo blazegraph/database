@@ -9,16 +9,11 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
 
-import com.bigdata.ha.QuorumPipeline;
 import com.bigdata.jini.start.config.IServiceConstraint;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.IResourceLockService;
-import com.bigdata.quorum.Quorum;
-import com.bigdata.quorum.QuorumClient;
-import com.bigdata.quorum.QuorumMember;
-import com.bigdata.quorum.zk.QuorumPipelineState;
-import com.bigdata.quorum.zk.QuorumTokenState;
+import com.bigdata.quorum.zk.ZKQuorum;
 import com.bigdata.service.jini.TransactionServer;
 import com.bigdata.zookeeper.DumpZookeeper;
 import com.bigdata.zookeeper.ZLock;
@@ -149,6 +144,8 @@ import com.bigdata.zookeeper.ZLock;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @see ZKQuorum
  */
 public interface BigdataZooDefs {
 
@@ -223,19 +220,17 @@ public interface BigdataZooDefs {
      * using the {@link IResourceLockService}.
      */
     String LOCKS_RESOURCES = LOCKS + ZSLASH + "resources";
-    
+
     /**
      * The prefix for the name of a znode that represents a logical service.
      * This znode is a {@link CreateMode#PERSISTENT_SEQUENTIAL} child of the
-     * {@link #CONFIG} znode. This znode should have two children:
-     * {@link #PHYSICAL_SERVICES_CONTAINER} and {@link #MASTER_ELECTION}.
+     * {@link #CONFIG} znode. This znode should have children:
+     * {@link #PHYSICAL_SERVICES_CONTAINER} (the children are the list of
+     * physical service instances) and {@link ZKQuorum#QUORUM} (the znode
+     * spanning the quorum state for the logical service).
      */
     String LOGICAL_SERVICE_PREFIX = "logicalService";
 
-    /*
-     * Quorums.
-     */
-    
     /**
      * The name of the znode whose children represent the physical service
      * instances.
@@ -266,116 +261,6 @@ public interface BigdataZooDefs {
      * {@link UUID} using {@link JiniUtil#serviceID2UUID(ServiceID)}.
      */
     String PHYSICAL_SERVICES_CONTAINER = "physicalServices";
-
-    /**
-     * The name of the znode dominating the quorum state for a given logical
-     * service. The data of this znode are a {@link QuorumTokenState} object
-     * whose attributes are:
-     * <dl>
-     * <dt>lastValidToken</dt>
-     * <dd>The last token assigned by an elected leader and initially -1 (MINUS
-     * ONE).</dd>
-     * <dt>currentToken</dt>
-     * <dd>The current token. This is initially -1 (MINUS ONE) and is cleared
-     * that value each time the quorum breaks.</dd>
-     * </dl>
-     * The atomic signal that the quorum has met or has broken is the set/clear
-     * of the <i>currentToken</i>. All {@link QuorumClient}s must watch that
-     * data field.
-     */
-    String QUORUM = "quorum";
-
-    /**
-     * The relative zpath for the {@link QuorumMember}s (services which are
-     * instances of the logical service which have registered themselves with
-     * the quorum state). The direct children of this znode are ephemeral znodes
-     * corresponding to the {@link ZooKeeper} connection for each
-     * {@link QuorumMember} which is registered with the {@link Quorum} for the
-     * dominating <i>logicalService</i>.
-     */
-    String QUORUM_MEMBER = QUORUM + ZSLASH + "member";
-
-    /**
-     * The prefix used by the ephemeral children of the {@link #QUORUM_MEMBER}
-     * znode.
-     */
-    String QUORUM_MEMBER_PREFIX = "member";
-
-    /**
-     * The relative zpath dominating the votes cast by {@link QuorumMember}s for
-     * specific <i>lastCommitTime</i>s. The direct children of this znode are
-     * <i>lastCommitTime</i> values for the current root block associated with a
-     * {@link QuorumMember} as of the last time which it cast a vote. Each
-     * {@link QuorumMember} gets only a single vote. The children of the
-     * <i>lastCommitTime</i> znodes are ephemeral znodes corresponding to the
-     * {@link ZooKeeper} connection for each {@link QuorumMember} who has cast a
-     * vote.
-     * <p>
-     * The {@link QuorumMember} must withdraw its current vote (if any) before
-     * casting a new vote. If there are no more votes for a given
-     * <i>lastCommitTime</i> znode, then that znode should be destroyed
-     * (ignoring any errors if there is a concurrent create of a child due to a
-     * service casting its vote for that <i>lastCommitTime</i>). Services will
-     * <i>join</i> the quorum in their <i>vote order</i> once
-     * <code>(k+1)/2</code> {@link QuorumMember}s have cast their vote for the
-     * same <i>lastCommitTime</i>.
-     */
-    String QUORUM_VOTES = QUORUM + ZSLASH + "votes";
-
-    /**
-     * The prefix used by the ephemeral children appearing under each
-     * <i>lastCommitTime</i> for the {@link #QUORUM_VOTES} znode.
-     */
-    String QUORUM_VOTE_PREFIX = "vote";
-
-    /**
-     * The relative zpath for the {@link QuorumMember}s joined with the quorum.
-     * The direct children of this znode are ephemeral znodes corresponding to
-     * the {@link ZooKeeper} connection for the {@link QuorumMember}s joined
-     * with the quorum.
-     * <p>
-     * Once <code>k+1/2</code> services are joined, the first service in the
-     * quorum order will be elected the quorum leader. It will update the
-     * <i>lastValidToken</i> on the {@link #QUORUM} and then set the
-     * <i>currentToken</i> on the {@link #QUORUM_JOINED}.
-     */
-    String QUORUM_JOINED = QUORUM + ZSLASH + "joined";
-
-    /**
-     * The prefix used by the ephemeral children of the {@link #QUORUM_JOINED}
-     * znode.
-     */
-    String QUORUM_JOINED_PREFIX = "joined";
-
-    /**
-     * The relative zpath for the {@link QuorumMember}s who are participating in
-     * the write pipeline ({@link QuorumPipeline}). The direct children of this
-     * znode are the ephemeral znodes corresponding to the {@link ZooKeeper}
-     * connection for each {@link QuorumMember} which has added itself to the
-     * write pipeline.
-     * <p>
-     * The write pipeline provides an efficient replication of low-level cache
-     * blocks from the quorum leader to each service joined with the quorum. In
-     * addition to the joined services, services synchronizing with the quorum
-     * may also be present in the write pipeline.
-     * <p>
-     * When the quorum leader is elected, it MAY reorganize the write pipeline
-     * to (a) ensure that it is the first service in the write pipeline order;
-     * and (b) optionally optimize the write pipeline based on the network
-     * topology.
-     * <p>
-     * The data associated with the leaf ephemeral znodes are
-     * {@link QuorumPipelineState} objects, whose state includes the internet
-     * address and port at which the service will listen for replicated writes
-     * send along the write pipeline.
-     */
-    String QUORUM_PIPELINE = QUORUM + ZSLASH + "pipeline";
-
-    /**
-     * The prefix used by the ephemeral children of the {@link #QUORUM_PIPELINE}
-     * znode.
-     */
-    String QUORUM_PIPELINE_PREFIX = "pipeline";
 
     /**
      * The name of the znode that is a child of {@link #LOGICAL_SERVICE_PREFIX}

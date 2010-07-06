@@ -63,6 +63,13 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("zookeeper quorum integration");
 
+        // test suite for deltas (added/removed) in (un)ordered sets.
+        suite.addTestSuite(TestSetDifference.class);
+
+        // @todo verify serializability and versioning of QuorumTokenState
+        // @todo verify serializability and versioning of QuorumServiceState
+        // @todo verify serializability and versioning of QuorumPipelineState
+        
         suite.addTestSuite(TestZkQuorum.class);
         
         return suite;

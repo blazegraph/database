@@ -764,14 +764,15 @@ public class TestWORMWriteCacheService extends TestCase3 {
 //            actor2.pipelineAdd();
             fixture.awaitDeque();
             
-            // actor0 will become the leader.
+            // cast votes.  someone will become the leader.
             actor0.castVote(lastCommitTime);
             actor1.castVote(lastCommitTime);
 //            actor2.castVote(lastCommitTime);
             fixture.awaitDeque();
                         
-            // note token and verify expected leader.
-            final long token = quorum0.token();
+            // await quorum meets.
+            final long token = quorum0.awaitQuorum();
+            assertEquals(token, quorum1.awaitQuorum());
             quorum0.assertLeader(token);
 
             // Verify the expected services joined.
@@ -867,7 +868,8 @@ public class TestWORMWriteCacheService extends TestCase3 {
             fixture.awaitDeque();
                         
             // note token and verify expected leader.
-            final long token = quorum0.token();
+            final long token = quorum0.awaitQuorum();
+            assertEquals(token,quorum1.awaitQuorum());
             quorum0.assertLeader(token);
 
             // Verify the expected services joined.
@@ -970,11 +972,19 @@ public class TestWORMWriteCacheService extends TestCase3 {
             fixture.awaitDeque();
                         
             // note token and verify expected leader.
-            final long token = quorum0.token();
+            final long token = quorum0.awaitQuorum();
+            assertEquals(token, quorum1.awaitQuorum());
+            assertEquals(token, quorum2.awaitQuorum());
             quorum0.assertLeader(token);
 
             // Verify the expected services joined.
-            assertEquals(3,quorum0.getJoinedMembers().length);
+            fixture.assertCondition(new Runnable() {
+                public void run() {
+                    assertEquals(3, quorum0.getJoinedMembers().length);
+                    assertEquals(3, quorum1.getJoinedMembers().length);
+                    assertEquals(3, quorum2.getJoinedMembers().length);
+                }
+            });
 
             /*
              * Verify the pipeline was reorganized into the vote order.
@@ -1078,7 +1088,8 @@ public class TestWORMWriteCacheService extends TestCase3 {
             fixture.awaitDeque();
 
             // note token and verify expected leader.
-            final long token = quorum0.token();
+            final long token = quorum0.awaitQuorum();
+            assertEquals(token,quorum1.awaitQuorum());
             quorum0.assertLeader(token);
 
             // Verify the expected services joined.
@@ -1163,7 +1174,8 @@ public class TestWORMWriteCacheService extends TestCase3 {
             fixture.awaitDeque();
 
             // note token and verify expected leader.
-            final long token = quorum0.token();
+            final long token = quorum0.awaitQuorum();
+            assertEquals(token,quorum1.awaitQuorum());
             quorum0.assertLeader(token);
 
             // Verify the expected services joined.
@@ -1255,7 +1267,8 @@ public class TestWORMWriteCacheService extends TestCase3 {
             fixture.awaitDeque();
 
             // note token and verify expected leader.
-            final long token = quorum0.token();
+            final long token = quorum0.awaitQuorum();
+            assertEquals(token,quorum1.awaitQuorum());
             quorum0.assertLeader(token);
 
             // Verify the expected services joined.
@@ -1340,7 +1353,8 @@ public class TestWORMWriteCacheService extends TestCase3 {
             fixture.awaitDeque();
 
             // note token and verify expected leader.
-            final long token = quorum0.token();
+            final long token = quorum0.awaitQuorum();
+            assertEquals(token,quorum1.awaitQuorum());
             quorum0.assertLeader(token);
 
             // Verify the expected services joined.
@@ -1432,7 +1446,8 @@ public class TestWORMWriteCacheService extends TestCase3 {
             fixture.awaitDeque();
 
             // note token and verify expected leader.
-            final long token = quorum0.token();
+            final long token = quorum0.awaitQuorum();
+            assertEquals(token,quorum1.awaitQuorum());
             quorum0.assertLeader(token);
 
             // Verify the expected services joined.
@@ -1517,11 +1532,19 @@ public class TestWORMWriteCacheService extends TestCase3 {
             fixture.awaitDeque();
 
             // note token and verify expected leader.
-            final long token = quorum0.token();
+            final long token = quorum0.awaitQuorum();
+            assertEquals(token,quorum1.awaitQuorum());
+            assertEquals(token,quorum2.awaitQuorum());
             quorum0.assertLeader(token);
 
             // Verify the expected services joined.
-            assertEquals(3,quorum0.getJoinedMembers().length);
+            fixture.assertCondition(new Runnable() {
+                public void run() {
+                    assertEquals(3, quorum0.getJoinedMembers().length);
+                    assertEquals(3, quorum1.getJoinedMembers().length);
+                    assertEquals(3, quorum2.getJoinedMembers().length);
+                }
+            });
 
             final long nsend = doStressTest(nbuffers, nrecs, maxreclen,
                     largeRecordRate, useChecksums, isHighlyAvailable,
@@ -1607,11 +1630,19 @@ public class TestWORMWriteCacheService extends TestCase3 {
             fixture.awaitDeque();
                         
             // note token and verify expected leader.
-            final long token = quorum0.token();
+            final long token = quorum0.awaitQuorum();
+            assertEquals(token,quorum1.awaitQuorum());
+            assertEquals(token,quorum2.awaitQuorum());
             quorum0.assertLeader(token);
 
             // Verify the expected services joined.
-            assertEquals(3,quorum0.getJoinedMembers().length);
+            fixture.assertCondition(new Runnable() {
+                public void run() {
+                    assertEquals(3, quorum0.getJoinedMembers().length);
+                    assertEquals(3, quorum1.getJoinedMembers().length);
+                    assertEquals(3, quorum2.getJoinedMembers().length);
+                }
+            });
 
             final long nsend = doStressTest(nbuffers, nrecs, maxreclen,
                     largeRecordRate, useChecksums, isHighlyAvailable,

@@ -37,7 +37,7 @@ import java.util.UUID;
  * service terminates abnormally, is partitioned from the distributed quorum,
  * etc., then the distributed quorum state MAY temporary be inconsistent. For
  * example, when a service loses its zookeeper connection, zookeeper will remove
- * all <i>ephemeral</i> znodes for that service, but the order in which those
+ * all <em>ephemeral</em> znodes for that service, but the order in which those
  * tokens are removed is not specified.
  * <p>
  * The {@link QuorumActor} will reject operations whose preconditions are not
@@ -82,6 +82,14 @@ import java.util.UUID;
  * will initiate local state changes required to prepare themselves to form a
  * new quorum.</dd>
  * </dl>
+ * <p>
+ * The methods on this interface must be atomic with respect to the observed
+ * state change reported by the paired {@link QuorumWatcher} and the update of
+ * the local {@link Quorum} object's internal state. Without this postcondition,
+ * a {@link QuorumActor} could issue two requests, such as
+ * <code>{@link #memberAdd()}; {@link #pipelineAdd()};</code> and have the
+ * second request rejected based on preconditions if the {@link QuorumWatcher}
+ * had not yet seen the state change for the first request.
  * 
  * @author thompsonbry@users.sourceforge.net
  * @see QuorumWatcher
