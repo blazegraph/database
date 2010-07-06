@@ -2,7 +2,6 @@ package com.bigdata.quorum;
 
 import java.rmi.Remote;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -40,25 +39,6 @@ import java.util.concurrent.TimeoutException;
  * a {@link Quorum} for the corresponding logical service to observe and manage
  * state changes in the emergent quorum of physical services for the same
  * logical service.
- * 
- * @todo There are three distinct needs for listeners: (1) Remote services that
- *       want to be informed about quorum state changes; (2) A service that is
- *       highly available and needs to take various actions in order to realize
- *       the semantics of quorum state changes; and (3) A process which monitors
- *       the shared quorum state (in zookeeper) and notifies either (1) or (2)
- *       of interesting events.
- * 
- * @todo The quorum api should make it possible for a client to watch the quorum
- *       state for another service or to rediscover the leader when the leader
- *       fails over (robust messaging). That will mean breaking up this
- *       interface into a facet for services monitoring a quorum and a facet for
- *       a service that is a member of that quorum. There are also a bunch of
- *       methods that are used solely by the quorum members to communicate with
- *       one another to manage their shared state (commit protocol, write
- *       replication, bad reads, synchronization, etc).
- * 
- * @todo When services join with a quorum they should validate their root blocks
- *       in detail.
  * 
  * @todo Consider hot spare allocation. When a hot spare is assigned to a
  *       quorum, the hot spare will be a quorum member and will join the write
@@ -188,7 +168,20 @@ public interface Quorum<S extends Remote, C extends QuorumClient<S>> {
     /**
      * Return an immutable snapshot of the votes cast by the quorum members.
      */
-    Map<Long,Set<UUID>> getVotes();
+    Map<Long,UUID[]> getVotes();
+    
+    /**
+     * Return the vote cast by the service.
+     * 
+     * @param serviceId
+     *            The service.
+     * @return The vote cast by that service -or- <code>null</code> if the
+     *         service has not cast a vote.
+     * 
+     * @throws IllegalArgumentException
+     *             if the serviceId is <code>null</code>.
+     */
+    Long getCastVote(final UUID serviceId);
     
     /**
      * Return the identifiers for the member services joined with this quorum.
@@ -267,6 +260,35 @@ public interface Quorum<S extends Remote, C extends QuorumClient<S>> {
      *             if the timeout expired before the quorum met.
      */
     long awaitQuorum(long timeout, TimeUnit units) throws InterruptedException,
+            AsynchronousQuorumCloseException, TimeoutException;
+
+    /**
+     * Await a met break (blocking). If the {@link Quorum} is met, then this
+     * will block until the {@link Quorum} breaks.
+     * 
+     * @throws AsynchronousQuorumCloseException
+     *             if {@link #terminate()} is invoked while awaiting a quorum
+     *             break.
+     */
+    void awaitBreak() throws InterruptedException,
+            AsynchronousQuorumCloseException;
+
+    /**
+     * Await a met break (blocking). If the {@link Quorum} is met, then this
+     * will block until the {@link Quorum} breaks.
+     * 
+     * @param timeout
+     *            The timeout.
+     * @param units
+     *            The timeout units.
+     * 
+     * @throws AsynchronousQuorumCloseException
+     *             if {@link #terminate()} is invoked while awaiting a quorum
+     *             break.
+     * @throws TimeoutException
+     *             if the timeout expired before the quorum breaks.
+     */
+    void awaitBreak(long timeout, TimeUnit units) throws InterruptedException,
             AsynchronousQuorumCloseException, TimeoutException;
 
     /**

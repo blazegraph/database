@@ -173,9 +173,10 @@ public class TestMockQuorumFixture extends TestCase2 {
             actors[0].memberAdd();
             fixture.awaitDeque();
             
+            // Note: No visibility guarantee for the other clients.
             assertEquals(new UUID[]{serviceId},quorums[0].getMembers());
-            assertEquals(new UUID[]{serviceId},quorums[1].getMembers());
-            assertEquals(new UUID[]{serviceId},quorums[2].getMembers());
+//            assertEquals(new UUID[]{serviceId},quorums[1].getMembers());
+//            assertEquals(new UUID[]{serviceId},quorums[2].getMembers());
 
             // The client should now be a quorum member.
             assertTrue(clients[0].isMember());

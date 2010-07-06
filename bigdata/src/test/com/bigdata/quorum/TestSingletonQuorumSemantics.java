@@ -145,10 +145,15 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
 
     }
 
-	/**
-	 * Unit test for the voting protocol for a singleton quorum.
-	 * @throws InterruptedException 
-	 */
+    /**
+     * Unit test for the voting protocol for a singleton quorum.
+     * 
+     * @throws InterruptedException
+     * 
+     * @todo For some reason this unit test occasionally takes much longer to
+     *       run than would otherwise be expected (up to a few seconds versus a
+     *       small fraction of a second). I have not tracked this down yet.
+     */
 	public void test_voting() throws InterruptedException {
 
         final Quorum<?, ?> quorum = quorums[0];
@@ -227,7 +232,7 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
      */
     public void test_serviceJoin() throws InterruptedException {
 
-        final Quorum<?, ?> quorum = quorums[0];
+        final AbstractQuorum<?, ?> quorum = quorums[0];
         final MockQuorumMember<?> client = clients[0];
         final QuorumActor<?,?> actor = actors[0];
         final UUID serviceId = client.getServiceId();
@@ -255,22 +260,23 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
 
         assertEquals(1,quorum.getVotes().size());
         assertEquals(new UUID[] { serviceId }, quorum.getVotes().get(
-                lastCommitTime).toArray(new UUID[0]));
+                lastCommitTime));
 
         // verify the consensus was updated.
         assertEquals(lastCommitTime, client.lastConsensusValue);
 
+        // wait for quorum meet.
+        final long token1 = quorum.awaitQuorum();
+        
         // verify service was joined.
         assertTrue(client.isJoinedMember(quorum.token()));
         assertEquals(new UUID[] { serviceId }, quorum.getJoinedMembers());
 
         // validate the token was assigned.
-//        Thread.sleep(1000);
-//        fixture.awaitDeque();
+        fixture.awaitDeque();
         assertEquals(Quorum.NO_QUORUM + 1, quorum.lastValidToken());
         assertEquals(Quorum.NO_QUORUM + 1, quorum.token());
         assertTrue(quorum.isQuorumMet());
-        final long token1 = quorum.token();
         
         /*
          * Do service leave, quorum should break. 
@@ -279,6 +285,8 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
         actor.serviceLeave();
         fixture.awaitDeque();
 
+        quorum.awaitBreak();
+        
         // vote was withdrawn.
         assertEquals(0,quorum.getVotes().size());
         assertEquals(null,quorum.getVotes().get(lastCommitTime));
@@ -307,16 +315,18 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
         assertEquals(1,quorum.getVotes().size());
         assertEquals(null,quorum.getVotes().get(lastCommitTime));
         assertEquals(new UUID[] { serviceId }, quorum.getVotes().get(
-                lastCommitTime2).toArray(new UUID[0]));
+                lastCommitTime2));
 
         // verify the consensus was updated.
         assertEquals(lastCommitTime2, client.lastConsensusValue);
+
+        // await meet.
+        final long token2 = quorum.awaitQuorum();
 
         // verify the joined services. 
         assertEquals(new UUID[] { serviceId }, quorum.getJoinedMembers());
 
         // validate the token was assigned by the leader.
-        final long token2 = quorum.token();
         assertTrue(quorum.isQuorumMet());
         assertEquals(token1 + 1, token2);
         assertEquals(token1 + 1, quorum.lastValidToken());
@@ -331,6 +341,8 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
         actor.serviceLeave();
         fixture.awaitDeque();
 
+        quorum.awaitBreak();
+        
         // vote was withdrawn.
         assertEquals(0,quorum.getVotes().size());
         assertEquals(null,quorum.getVotes().get(lastCommitTime));
