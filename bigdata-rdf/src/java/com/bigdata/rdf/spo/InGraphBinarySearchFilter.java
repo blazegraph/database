@@ -1,17 +1,14 @@
 package com.bigdata.rdf.spo;
 
-import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
-
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.Arrays;
-
+import java.util.HashSet;
 import org.openrdf.model.URI;
-
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
  * "IN" filter for the context position based on a sorted long[] of the
@@ -36,7 +33,7 @@ public final class InGraphBinarySearchFilter extends SPOFilter
     /**
      * Note: Not final since the class implements {@link Externalizable}.
      */
-    private long[] a;
+    private IV[] a;
 
     /**
      * Deserialization constructor.
@@ -57,13 +54,13 @@ public final class InGraphBinarySearchFilter extends SPOFilter
          * we will accept.
          */
 
-        final LongLinkedOpenHashSet contextSet = new LongLinkedOpenHashSet();
+        final HashSet<IV> contextSet = new HashSet<IV>();
         
         for (URI uri : graphs) {
         
-            final long termId = ((BigdataURI) uri).getIV();
+            final IV termId = ((BigdataURI) uri).getIV();
             
-            if (termId != IRawTripleStore.NULL) {
+            if (termId != null) {
 
                 contextSet.add(termId);
                 
@@ -71,7 +68,7 @@ public final class InGraphBinarySearchFilter extends SPOFilter
             
         }
         
-        a = contextSet.toArray(new long[0]);
+        a = contextSet.toArray(new IV[0]);
         
         Arrays.sort(a);
         
@@ -88,11 +85,11 @@ public final class InGraphBinarySearchFilter extends SPOFilter
         
         final int size = in.readInt();
         
-        a = new long[size];
+        a = new IV[size];
         
         for(int i=0; i<size; i++) {
             
-            a[i] = in.readLong();
+            a[i] = (IV) in.readObject();
             
         }
         
@@ -102,9 +99,9 @@ public final class InGraphBinarySearchFilter extends SPOFilter
 
         out.writeInt(a.length);
         
-        for(long id : a) {
+        for(IV iv : a) {
             
-            out.writeLong(id);
+            out.writeObject(iv);
             
         }
         

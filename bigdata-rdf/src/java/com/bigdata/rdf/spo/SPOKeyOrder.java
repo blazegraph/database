@@ -380,11 +380,11 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
             // compare terms one by one in the appropriate key order
             for (int i = 0; i < keyMap.length; i++) {
                 
-                final byte[] t1 = o1.get(keyMap[i]);
+                final IV t1 = o1.get(keyMap[i]);
                 
-                final byte[] t2 = o2.get(keyMap[i]);
+                final IV t2 = o2.get(keyMap[i]);
                 
-                int ret = t1 < t2 ? -1 : t1 > t2 ? 1 : 0;
+                int ret = t1.compareTo(t2);
                 
                 if (ret != 0) {
                 
@@ -418,7 +418,7 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
         
         for (int i = 0; i < keyArity; i++) {
         
-            final IVariableOrConstant<Long> term = predicate.get(getKeyOrder(i));
+            final IVariableOrConstant<IV> term = predicate.get(getKeyOrder(i));
             
             final long l;
             
@@ -429,7 +429,17 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
                 
             } else {
                 
-                l = term.get();
+                IV iv = term.get();
+                
+                /*
+                 * This is the SPOKeyOrder implementation for backwards
+                 * compatibility.  We should not see inline values here.
+                 */
+                if (iv.isInline()) {
+                    throw new RuntimeException();
+                }
+                
+                l = term.get().getTermId();
 
                 noneBound = false;
                 
@@ -462,7 +472,7 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
         
         for (int i = 0; i < keyArity; i++) {
         
-            final IVariableOrConstant<Long> term = predicate
+            final IVariableOrConstant<IV> term = predicate
                     .get(getKeyOrder(i));
             
             long l;
@@ -474,7 +484,17 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
                 
             } else {
                 
-                l = term.get();
+                IV iv = term.get();
+                
+                /*
+                 * This is the SPOKeyOrder implementation for backwards
+                 * compatibility.  We should not see inline values here.
+                 */
+                if (iv.isInline()) {
+                    throw new RuntimeException();
+                }
+                
+                l = term.get().getTermId();
                 
                 noneBound = false;
                 
@@ -488,7 +508,7 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
                         
                     } else {
                         
-                        final IVariableOrConstant<Long> next = predicate
+                        final IVariableOrConstant<IV> next = predicate
                                 .get(getKeyOrder(i + 1));
                         
                         // Note: next can be null for quads (context pos).
@@ -521,10 +541,19 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
         final int[] a = orders[index];
 
         for (int i = 0; i < a.length; i++) {
+            
+            IV iv = spo.get(a[i]);
 
-            // keyBuilder.append(spo.get(a[i]));
-            encodeIV(keyBuilder, spo.get(a[i]));
-
+            /*
+             * This is the SPOKeyOrder implementation for backwards
+             * compatibility.  We should not see inline values here.
+             */
+            if (iv.isInline()) {
+                throw new IllegalArgumentException();
+            }
+            
+            keyBuilder.append(iv.getTermId());
+            
         }
         
         return keyBuilder.getKey();
@@ -534,11 +563,18 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
     final public byte[] encodeKey(final IKeyBuilder keyBuilder, 
             final IV iv1, final IV iv2, final IV iv3) {
 
+        /*
+         * This is the SPOKeyOrder implementation for backwards
+         * compatibility.  We should not see inline values here.
+         */
+        if (iv1.isInline() || iv2.isInline() || iv3.isInline()) {
+            throw new IllegalArgumentException();
+        }
+        
         keyBuilder.reset();
-
-        encodeIV(keyBuilder, iv1);
-        encodeIV(keyBuilder, iv2);
-        encodeIV(keyBuilder, iv3);
+        keyBuilder.append(iv1.getTermId());
+        keyBuilder.append(iv1.getTermId());
+        keyBuilder.append(iv1.getTermId());
         
         return keyBuilder.getKey();
 
@@ -554,7 +590,7 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
      * 
      * @return The key builder.
      */
-    private void encodeIV(final IKeyBuilder keyBuilder, final IV v) {
+    private void encodeKey(final IKeyBuilder keyBuilder, final IV v) {
 
         // First emit the flags byte.
         keyBuilder.append(v.flags());
@@ -576,7 +612,8 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
          */
         final DTE dte = v.getInternalDataTypeEnum();
         
-        final AbstractDatatypeLiteralInternalValue<?, ?> t = (AbstractDatatypeLiteralInternalValue<?, ?>) v;
+        final AbstractDatatypeLiteralInternalValue<?, ?> t = 
+            (AbstractDatatypeLiteralInternalValue<?, ?>) v;
         
         switch (dte) {
         case XSDBoolean:
@@ -650,6 +687,17 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
 
         assert key.length >= 8 * keyArity;
         
+        final IV _0 = new TermId(KeyBuilder.decodeLong(key, 0));
+        
+        final IV _1 = new TermId(KeyBuilder.decodeLong(key, 8));
+      
+        final IV _2 = new TermId(KeyBuilder.decodeLong(key, 8+8));
+
+        // 4th key position exists iff quad keys.
+        final IV _3 = keyArity == 4 
+                ? new TermId(KeyBuilder.decodeLong(key, 8 + 8 + 8))
+                : null;
+/*
         final IV[] ivs = decodeStatementKey(key);
 
         final IV _0 = ivs[0];
@@ -660,7 +708,7 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
 
         // 4th key position exists iff quad keys.
         final IV _3 = keyArity == 4 ? ivs[3] : null;
-
+*/
         /*
          * Re-order the key into SPO order.
          */

@@ -455,4 +455,12 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
      */
     abstract public boolean equals(Object o);
     
+    /**
+     * Imposes an ordering of IVs based on thier natural sort ordering in the 
+     * index.
+     */
+    public int compareTo(IV iv) {
+        throw new RuntimeException("implement me!");
+    }
+    
 }

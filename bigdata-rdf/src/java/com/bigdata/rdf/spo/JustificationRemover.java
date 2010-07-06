@@ -109,17 +109,29 @@ public class JustificationRemover implements Callable<Long> {
             final ISPO spo = a[i];
 
             /*
+             * This is the implementation for backwards
+             * compatibility.  We should not see inline values here.
+             */
+            if (spo.s().isInline() || spo.p().isInline() || spo.o().isInline()) {
+                throw new RuntimeException();
+            }
+            
+            final long _s = spo.s().getTermId();
+            final long _p = spo.p().getTermId();
+            final long _o = spo.o().getTermId();
+            
+            /*
              * Form an iterator that will range scan the justifications having
              * that statement as their 'head'. The iterator uses the REMOVEALL
              * flag to have the justifications deleted on the server and does
              * not actually send back the keys or vals to the client.
              */
 
-            final byte[] fromKey = keyBuilder.reset().append(spo.s()).append(
-                    spo.p()).append(spo.o()).getKey();
+            final byte[] fromKey = keyBuilder.reset().append(_s).append(
+                    _p).append(_o).getKey();
 
-            final byte[] toKey = keyBuilder.reset().append(spo.s()).append(spo.p())
-                    .append(spo.o() + 1).getKey();
+            final byte[] toKey = keyBuilder.reset().append(_s).append(_p)
+                    .append(_o + 1).getKey();
 
             final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey,
                     0/* capacity */, IRangeQuery.REMOVEALL, null/* filter */);

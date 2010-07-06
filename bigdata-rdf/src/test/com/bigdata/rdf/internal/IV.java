@@ -47,7 +47,8 @@ import com.bigdata.rdf.store.AbstractTripleStore.Options;
  *       unsigned byte[]s, and also {@link BytesUtil#successor(byte[])}, which
  *       handles variable length unsigned byte[]s.
  */
-public interface IV<V extends BigdataValue, T> extends Serializable {
+public interface IV<V extends BigdataValue, T> extends Serializable, 
+        Comparable<IV> {
 
     /**
      * The value of the flags representing the {@link VTE} and
