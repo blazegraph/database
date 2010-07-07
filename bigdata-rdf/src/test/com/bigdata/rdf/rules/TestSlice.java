@@ -28,8 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.rules;
 
 import java.util.Properties;
-
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -183,21 +183,21 @@ public class TestSlice extends AbstractRuleTestCase {
                     Var.var("y"), Var.var("z") };
             
             final IBindingSet bs0 = new ArrayBindingSet(vars, new IConstant[] {//
-                    new Constant<Long>(x0.getIV()),//
-                    new Constant<Long>(y0.getIV()),//
-                    new Constant<Long>(z0.getIV())//
+                    new Constant<IV>(x0.getIV()),//
+                    new Constant<IV>(y0.getIV()),//
+                    new Constant<IV>(z0.getIV())//
                     }
             ); 
             final IBindingSet bs1 = new ArrayBindingSet(vars, new IConstant[] {//
-                    new Constant<Long>(x1.getIV()),//
-                    new Constant<Long>(y1.getIV()),//
-                    new Constant<Long>(z1.getIV())//
+                    new Constant<IV>(x1.getIV()),//
+                    new Constant<IV>(y1.getIV()),//
+                    new Constant<IV>(z1.getIV())//
                     }
             ); 
             final IBindingSet bs2 = new ArrayBindingSet(vars, new IConstant[] {//
-                    new Constant<Long>(x2.getIV()),//
-                    new Constant<Long>(y2.getIV()),//
-                    new Constant<Long>(z2.getIV())//
+                    new Constant<IV>(x2.getIV()),//
+                    new Constant<IV>(y2.getIV()),//
+                    new Constant<IV>(z2.getIV())//
                     }
             ); 
             
@@ -280,11 +280,11 @@ public class TestSlice extends AbstractRuleTestCase {
                 null/* head */, new SPOPredicate[] {
                 //
                 new SPOPredicate(store.getSPORelation()
-                    .getNamespace(), Var.var("x"), new Constant<Long>(foo
+                    .getNamespace(), Var.var("x"), new Constant<IV>(foo
                     .getIV()), Var.var("y")),
                 //
                 new SPOPredicate(store.getSPORelation()
-                            .getNamespace(), Var.var("y"), new Constant<Long>(bar
+                            .getNamespace(), Var.var("y"), new Constant<IV>(bar
                             .getIV()), Var.var("z")),
                 },//
                 new QueryOptions(false/* distinct */, true/* stable */,

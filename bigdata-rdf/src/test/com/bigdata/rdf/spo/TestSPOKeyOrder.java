@@ -29,13 +29,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.spo;
 
 import java.util.Iterator;
-
 import junit.framework.TestCase2;
-
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.Var;
 import com.bigdata.striterator.ICloseableIterator;
@@ -73,6 +74,10 @@ public class TestSPOKeyOrder extends TestCase2 {
 
     }
 
+    private TermId tid(long tid) {
+        return new TermId(VTE.URI, tid);
+    }
+    
     /**
      * Unit tests verifies all of the triple key encoding orders. It encodes a
      * known key in each order in turn and verifies by decoding using the SPO
@@ -83,7 +88,7 @@ public class TestSPOKeyOrder extends TestCase2 {
 
         final KeyBuilder keyBuilder = new KeyBuilder(4 * Bytes.SIZEOF_LONG);
         
-        final long S = 1, P = 2, O = 3, C = 4;
+        final IV S = tid(1), P = tid(2), O = tid(3), C = tid(4);
         
         final SPO expected = new SPO(S, P, O, C);
 
@@ -108,7 +113,7 @@ public class TestSPOKeyOrder extends TestCase2 {
 
         final KeyBuilder keyBuilder = new KeyBuilder(4 * Bytes.SIZEOF_LONG);
 
-        final long S = 1, P = 2, O = 3, C = 4;
+        final IV S = tid(1), P = tid(2), O = tid(3), C = tid(4);
 
         final SPO expected = new SPO(S, P, O, C);
 
@@ -157,7 +162,7 @@ public class TestSPOKeyOrder extends TestCase2 {
 
             final SPOKeyOrder keyOrder = SPOKeyOrder.valueOf(i);
 
-            final SPO expected = new SPO(1, 2, 3, 4);
+            final SPO expected = new SPO(tid(1), tid(2), tid(3), tid(4));
 
             final byte[] key = keyOrder.encodeKey(keyBuilder, expected);
 
@@ -175,10 +180,10 @@ public class TestSPOKeyOrder extends TestCase2 {
      */
     public void test_getFromKey_getToKey_quads() {
 
-        final long P = 1;
+        final IV P = tid(1);
 
         final SPOPredicate pred = new SPOPredicate("testRelation",
-                Var.var("s"), new Constant<Long>(P), Var.var("o"), Var.var("c"));
+                Var.var("s"), new Constant<IV>(P), Var.var("o"), Var.var("c"));
 
         final KeyBuilder keyBuilder = new KeyBuilder();
 
@@ -188,7 +193,7 @@ public class TestSPOKeyOrder extends TestCase2 {
                 Long.MIN_VALUE).append(Long.MIN_VALUE).append(Long.MIN_VALUE)
                 .getKey();
 
-        final byte[] toKey = keyBuilder.reset().append(P + 1).append(
+        final byte[] toKey = keyBuilder.reset().append(tid(2)).append(
                 Long.MIN_VALUE).append(Long.MIN_VALUE).append(Long.MIN_VALUE)
                 .getKey();
 
@@ -218,10 +223,10 @@ public class TestSPOKeyOrder extends TestCase2 {
      */
     public void test_getFromKey_getToKey_triples() {
 
-        final long P = 1;
+        final IV P = tid(1);
 
         final SPOPredicate pred = new SPOPredicate("testRelation",
-                Var.var("s"), new Constant<Long>(P), Var.var("o"), Var.var("c"));
+                Var.var("s"), new Constant<IV>(P), Var.var("o"), Var.var("c"));
 
         final KeyBuilder keyBuilder = new KeyBuilder();
 
@@ -230,7 +235,7 @@ public class TestSPOKeyOrder extends TestCase2 {
         final byte[] fromKey = keyBuilder.reset().append(P).append(
                 Long.MIN_VALUE).append(Long.MIN_VALUE).getKey();
 
-        final byte[] toKey = keyBuilder.reset().append(P + 1).append(
+        final byte[] toKey = keyBuilder.reset().append(tid(2)).append(
                 Long.MIN_VALUE).append(Long.MIN_VALUE).getKey();
 
         if (log.isInfoEnabled()) {

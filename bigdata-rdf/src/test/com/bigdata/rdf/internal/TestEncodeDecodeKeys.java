@@ -244,6 +244,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                     public int hashCode() {
                         return 0;
                     }
+                    
+                    public int compareTo(Object o) {
+                        throw new UnsupportedOperationException();
+                    }
 
                     public BigdataValue asValue(BigdataValueFactory f)
                             throws UnsupportedOperationException {

@@ -32,10 +32,9 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
-
 import org.openrdf.model.vocabulary.RDF;
-
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -116,7 +115,7 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
 //            terms.add(f.createBNode());
 //            terms.add(f.createBNode("a"));
 
-            final Map<Long, BigdataValue> ids = doAddTermsTest(store, terms);
+            final Map<IV, BigdataValue> ids = doAddTermsTest(store, terms);
 
             if (store.isStable()) {
                 
@@ -126,12 +125,12 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
 
                 // verify same reverse mappings.
 
-                final Map<Long, BigdataValue> ids2 = store.getLexiconRelation()
+                final Map<IV, BigdataValue> ids2 = store.getLexiconRelation()
                         .getTerms(ids.keySet());
 
                 assertEquals(ids.size(),ids2.size());
                 
-                for (Long id : ids.keySet()) {
+                for (IV id : ids.keySet()) {
 
                     assertEquals("Id mapped to a different term? : termId="
                             + id, ids.get(id), ids2.get(id));
@@ -194,7 +193,7 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
             terms.add(f.createBNode());
             terms.add(f.createBNode("a"));
 
-            final Map<Long, BigdataValue> ids = doAddTermsTest(store, terms);
+            final Map<IV, BigdataValue> ids = doAddTermsTest(store, terms);
 
             if (store.isStable()) {
                 
@@ -204,12 +203,12 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
 
                 // verify same reverse mappings.
 
-                final Map<Long, BigdataValue> ids2 = store.getLexiconRelation()
+                final Map<IV, BigdataValue> ids2 = store.getLexiconRelation()
                         .getTerms(ids.keySet());
 
                 assertEquals(ids.size(),ids2.size());
                 
-                for (Long id : ids.keySet()) {
+                for (IV id : ids.keySet()) {
 
                     assertEquals("Id mapped to a different term? : termId="
                             + id, ids.get(id), ids2.get(id));
@@ -231,7 +230,7 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
      * @param terms
      * @return
      */
-    private Map<Long, BigdataValue> doAddTermsTest(
+    private Map<IV, BigdataValue> doAddTermsTest(
             final AbstractTripleStore store,
             final Collection<BigdataValue> terms) {
 
@@ -245,7 +244,7 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
                 .addTerms(a, size, false/* readOnly */);
 
         // populate map w/ the assigned term identifiers.
-        final Collection<Long> ids = new ArrayList<Long>();
+        final Collection<IV> ids = new ArrayList<IV>();
 
         for(BigdataValue t : a) {
             
@@ -256,7 +255,7 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
         /*
          * Resolve the assigned term identifiers against the lexicon.
          */
-        final Map<Long, BigdataValue> tmp = store.getLexiconRelation()
+        final Map<IV, BigdataValue> tmp = store.getLexiconRelation()
                 .getTerms(ids);
         
         assertEquals(size,tmp.size());
@@ -269,7 +268,7 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
         for(BigdataValue expected : a) {
 
             assertNotSame("Did not assign term identifier? : " + expected,
-                    NULL, expected.getIV());
+                    null, expected.getIV());
 
             final BigdataValue actual = tmp.get(expected.getIV());
 

@@ -32,8 +32,8 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.OWL;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
-import com.bigdata.rdf.inf.BackchainOwlSameAsPropertiesIterator;
 import com.bigdata.rdf.inf.OwlSameAsPropertiesExpandingIterator;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPO;
@@ -118,20 +118,20 @@ public class TestOwlSameAsPropertiesExpandingIterator extends AbstractInferenceE
 //                buffer.flush();
             }
             
-            final long a = db.getIV(A);
-            final long b = db.getIV(B);
-//            final long c = noClosure.getTermId(C);
-//            final long d = noClosure.getTermId(D);
-//            final long e = noClosure.getTermId(E);
-//            final long v = noClosure.getTermId(V);
-            final long w = db.getIV(W);
-            final long x = db.getIV(X);
-            final long y = db.getIV(Y);
-            final long z = db.getIV(Z);
-            final long same = db.getIV(OWL.SAMEAS);
-            final long type = db.getIV(RDF.TYPE);
-            final long property = db.getIV(RDF.PROPERTY);
-            final long subpropof = db.getIV(RDFS.SUBPROPERTYOF);
+            final IV a = db.getIV(A);
+            final IV b = db.getIV(B);
+//            final IV c = noClosure.getTermId(C);
+//            final IV d = noClosure.getTermId(D);
+//            final IV e = noClosure.getTermId(E);
+//            final IV v = noClosure.getTermId(V);
+            final IV w = db.getIV(W);
+            final IV x = db.getIV(X);
+            final IV y = db.getIV(Y);
+            final IV z = db.getIV(Z);
+            final IV same = db.getIV(OWL.SAMEAS);
+            final IV type = db.getIV(RDF.TYPE);
+            final IV property = db.getIV(RDF.PROPERTY);
+            final IV subpropof = db.getIV(RDFS.SUBPROPERTYOF);
             
             if (log.isInfoEnabled())
                 log.info("\n" +db.dumpStore(true, true, false));

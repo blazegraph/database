@@ -30,20 +30,15 @@ package com.bigdata.rdf.rules;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-
 import org.openrdf.model.Literal;
-import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.model.vocabulary.OWL;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
-
-import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.AbstractRelation;
@@ -111,7 +106,7 @@ public class TestOptionals extends AbstractInferenceEngineTestCase {
         
         try {
 
-            final Map<Value, Long> termIds = new HashMap<Value, Long>();
+            final Map<Value, IV> termIds = new HashMap<Value, IV>();
             
             final URI A = new URIImpl("http://www.bigdata.com/A");
             final URI B = new URIImpl("http://www.bigdata.com/B");
@@ -150,41 +145,41 @@ public class TestOptionals extends AbstractInferenceEngineTestCase {
 //                buffer.flush();
             }
             
-            final long a = db.getIV(A); termIds.put(A, a);
-            final long b = db.getIV(B); termIds.put(B, b);
-//            final long c = noClosure.getTermId(C);
-//            final long d = noClosure.getTermId(D);
-//            final long e = noClosure.getTermId(E);
-//            final long v = noClosure.getTermId(V);
-            // final long w = db.getTermId(W); termIds.put(W, w);
-            final long x = db.getIV(X); termIds.put(X, x);
-            // final long y = db.getTermId(Y); termIds.put(Y, y);
-            // final long z = db.getTermId(Z); termIds.put(Z, z);
-            // final long SAMEAS = db.getTermId(OWL.SAMEAS); termIds.put(OWL.SAMEAS, SAMEAS);
+            final IV a = db.getIV(A); termIds.put(A, a);
+            final IV b = db.getIV(B); termIds.put(B, b);
+//            final IV c = noClosure.getTermId(C);
+//            final IV d = noClosure.getTermId(D);
+//            final IV e = noClosure.getTermId(E);
+//            final IV v = noClosure.getTermId(V);
+            // final IV w = db.getTermId(W); termIds.put(W, w);
+            final IV x = db.getIV(X); termIds.put(X, x);
+            // final IV y = db.getTermId(Y); termIds.put(Y, y);
+            // final IV z = db.getTermId(Z); termIds.put(Z, z);
+            // final IV SAMEAS = db.getTermId(OWL.SAMEAS); termIds.put(OWL.SAMEAS, SAMEAS);
             termIds.put(foo, db.getIV(foo));
             termIds.put(bar, db.getIV(bar));
-            final long TYPE = db.getIV(RDF.TYPE); termIds.put(RDF.TYPE, TYPE);
-            final long LABEL = db.getIV(RDFS.LABEL); termIds.put(RDFS.LABEL, LABEL);
-            final long COMMENT = db.getIV(RDFS.COMMENT); termIds.put(RDFS.COMMENT, COMMENT);
-            final long RESOURCE = db.getIV(RDFS.RESOURCE); termIds.put(RDFS.RESOURCE, RESOURCE);
+            final IV TYPE = db.getIV(RDF.TYPE); termIds.put(RDF.TYPE, TYPE);
+            final IV LABEL = db.getIV(RDFS.LABEL); termIds.put(RDFS.LABEL, LABEL);
+            final IV COMMENT = db.getIV(RDFS.COMMENT); termIds.put(RDFS.COMMENT, COMMENT);
+            final IV RESOURCE = db.getIV(RDFS.RESOURCE); termIds.put(RDFS.RESOURCE, RESOURCE);
             
             if (log.isInfoEnabled())
                 log.info("\n" +db.dumpStore(true, true, false));
   
-            for (Map.Entry<Value, Long> e : termIds.entrySet()) {
+            for (Map.Entry<Value, IV> e : termIds.entrySet()) {
                 System.err.println(e.getKey() + " = " + e.getValue());
             }
             
             { // works great
                 
                 final String SPO = db.getSPORelation().getNamespace();
-                final IVariableOrConstant<Long> s = Var.var("s");
-                final IVariableOrConstant<Long> type = new Constant<Long>(TYPE);
-                final IVariableOrConstant<Long> t = new Constant<Long>(x);
-                final IVariableOrConstant<Long> label = new Constant<Long>(LABEL);
-                final IVariableOrConstant<Long> comment = new Constant<Long>(COMMENT);
-                final IVariableOrConstant<Long> l = Var.var("l");
-                final IVariableOrConstant<Long> c = Var.var("c");
+                final IVariableOrConstant<IV> s = Var.var("s");
+                final IVariableOrConstant<IV> type = new Constant<IV>(TYPE);
+                final IVariableOrConstant<IV> t = new Constant<IV>(x);
+                final IVariableOrConstant<IV> label = new Constant<IV>(LABEL);
+                final IVariableOrConstant<IV> comment = new Constant<IV>(COMMENT);
+                final IVariableOrConstant<IV> l = Var.var("l");
+                final IVariableOrConstant<IV> c = Var.var("c");
                 final IRule rule =
                         new Rule("test_optional", null, // head
                                 new IPredicate[] {
@@ -226,13 +221,13 @@ public class TestOptionals extends AbstractInferenceEngineTestCase {
               // be [2,0,1], and it is.
             
                 final String SPO = db.getSPORelation().getNamespace();
-                final IVariableOrConstant<Long> s = Var.var("s");
-                final IVariableOrConstant<Long> type = new Constant<Long>(TYPE);
-                final IVariableOrConstant<Long> t = new Constant<Long>(x);
-                final IVariableOrConstant<Long> label = new Constant<Long>(LABEL);
-                final IVariableOrConstant<Long> comment = new Constant<Long>(COMMENT);
-                final IVariableOrConstant<Long> l = Var.var("l");
-                final IVariableOrConstant<Long> c = Var.var("c");
+                final IVariableOrConstant<IV> s = Var.var("s");
+                final IVariableOrConstant<IV> type = new Constant<IV>(TYPE);
+                final IVariableOrConstant<IV> t = new Constant<IV>(x);
+                final IVariableOrConstant<IV> label = new Constant<IV>(LABEL);
+                final IVariableOrConstant<IV> comment = new Constant<IV>(COMMENT);
+                final IVariableOrConstant<IV> l = Var.var("l");
+                final IVariableOrConstant<IV> c = Var.var("c");
                 final IRule rule =
                         new Rule("test_optional", null, // head
                                 new IPredicate[] {
@@ -271,13 +266,13 @@ public class TestOptionals extends AbstractInferenceEngineTestCase {
             { // two optionals does not work either
             
                 final String SPO = db.getSPORelation().getNamespace();
-                final IVariableOrConstant<Long> s = Var.var("s");
-                final IVariableOrConstant<Long> type = new Constant<Long>(TYPE);
-                final IVariableOrConstant<Long> t = new Constant<Long>(x);
-                final IVariableOrConstant<Long> label = new Constant<Long>(LABEL);
-                final IVariableOrConstant<Long> comment = new Constant<Long>(COMMENT);
-                final IVariableOrConstant<Long> l = Var.var("l");
-                final IVariableOrConstant<Long> c = Var.var("c");
+                final IVariableOrConstant<IV> s = Var.var("s");
+                final IVariableOrConstant<IV> type = new Constant<IV>(TYPE);
+                final IVariableOrConstant<IV> t = new Constant<IV>(x);
+                final IVariableOrConstant<IV> label = new Constant<IV>(LABEL);
+                final IVariableOrConstant<IV> comment = new Constant<IV>(COMMENT);
+                final IVariableOrConstant<IV> l = Var.var("l");
+                final IVariableOrConstant<IV> c = Var.var("c");
                 final IRule rule =
                         new Rule("test_optional", null, // head
                                 new IPredicate[] {

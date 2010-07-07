@@ -29,9 +29,7 @@ package com.bigdata.rdf.spo;
 
 import java.io.IOException;
 import java.util.Random;
-
 import junit.framework.TestCase2;
-
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.raba.IRaba;
@@ -42,6 +40,9 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.FixedByteArrayBuffer;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.lexicon.ITermIdCodes;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.StatementEnum;
@@ -83,18 +84,26 @@ public class TestSPOValueCoders extends TestCase2 {
      * triple store are assigned by the {@link ICounter} for the
      * {@link LexiconRelation}'s TERM2id index.
      */
-    protected long getTermId() {
+    protected TermId getTermId() {
         
-        return r.nextInt(Integer.MAX_VALUE - 1) + 1;
+        return new TermId(VTE.URI, r.nextInt(Integer.MAX_VALUE - 1) + 1);
         
     }
 
-    protected long getSID() {
+    protected TermId getTermId(long tid) {
         
-        return (r.nextInt(Integer.MAX_VALUE - 1) + 1) << 2
-                | ITermIdCodes.TERMID_CODE_STATEMENT;
+        return new TermId(VTE.URI, tid);
+        
+    }
+
+    protected TermId getSID() {
+        
+        return new TermId(VTE.STATEMENT, (r.nextInt(Integer.MAX_VALUE - 1) + 1) << 2
+                | ITermIdCodes.TERMID_CODE_STATEMENT);
 
     }
+    
+    private final TermId _0 = getTermId(0);
 
     /**
      * Return an array of {@link SPO}s.
@@ -191,21 +200,21 @@ public class TestSPOValueCoders extends TestCase2 {
      */
     public void test_FastRDFValueCoder2_001() {
 
-        doRoundTripTest(new SPO[] { new SPO(0, 0, 0, StatementEnum.Axiom) },
+        doRoundTripTest(new SPO[] { new SPO(_0, _0, _0, StatementEnum.Axiom) },
                 new FastRDFValueCoder2());
 
-        doRoundTripTest(new SPO[] { new SPO(0, 0, 0, StatementEnum.Explicit) },
+        doRoundTripTest(new SPO[] { new SPO(_0, _0, _0, StatementEnum.Explicit) },
                 new FastRDFValueCoder2());
 
-        doRoundTripTest(new SPO[] { new SPO(0, 0, 0, StatementEnum.Inferred) },
+        doRoundTripTest(new SPO[] { new SPO(_0, _0, _0, StatementEnum.Inferred) },
                 new FastRDFValueCoder2());
 
-        doRoundTripTest(new SPO[] { new SPO(0, 0, 0, StatementEnum.Axiom),
-                new SPO(0, 0, 0, StatementEnum.Inferred) },
+        doRoundTripTest(new SPO[] { new SPO(_0, _0, _0, StatementEnum.Axiom),
+                new SPO(_0, _0, _0, StatementEnum.Inferred) },
                 new FastRDFValueCoder2());
 
-        doRoundTripTest(new SPO[] { new SPO(0, 0, 0, StatementEnum.Explicit),
-                new SPO(0, 0, 0, StatementEnum.Axiom) },
+        doRoundTripTest(new SPO[] { new SPO(_0, _0, _0, StatementEnum.Explicit),
+                new SPO(_0, _0, _0, StatementEnum.Axiom) },
                 new FastRDFValueCoder2());
 
     }

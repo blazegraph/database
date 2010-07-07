@@ -48,16 +48,14 @@ Modifications:
 package com.bigdata.rdf.spo;
 
 import junit.framework.TestCase2;
-
 import com.bigdata.btree.AbstractTuple;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleSerializer;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.lexicon.ITermIdCodes;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOKeyOrder;
-import com.bigdata.rdf.spo.SPOTupleSerializer;
 
 /**
  * Test suite for {@link SPOTupleSerializer}.
@@ -69,6 +67,12 @@ import com.bigdata.rdf.spo.SPOTupleSerializer;
  */
 public class TestSPOTupleSerializer extends TestCase2 {
 
+    private TermId _1 = tid(1), _2 = tid(2), _3 = tid(3), _4 = tid(4);
+    
+    private TermId tid(long tid) {
+        return new TermId(VTE.URI, tid);
+    }
+    
     /**
      * 
      */
@@ -86,28 +90,28 @@ public class TestSPOTupleSerializer extends TestCase2 {
 
         SPOTupleSerializer fixture = new SPOTupleSerializer(SPOKeyOrder.SPO);
         
-        byte[] k1 = fixture.serializeKey(new SPO(1, 2, 3));
-        byte[] k2 = fixture.serializeKey(new SPO(2, 2, 3));
-        byte[] k3 = fixture.serializeKey(new SPO(2, 2, 4));
+        byte[] k_1 = fixture.serializeKey(new SPO(_1, _2, _3));
+        byte[] k_2 = fixture.serializeKey(new SPO(_2, _2, _3));
+        byte[] k_3 = fixture.serializeKey(new SPO(_2, _2, _4));
         
-        System.err.println("k1(1,2,2) = "+BytesUtil.toString(k1));
-        System.err.println("k2(2,2,3) = "+BytesUtil.toString(k2));
-        System.err.println("k3(2,2,4) = "+BytesUtil.toString(k3));
+        System.err.println("k_1(_1,_2,_2) = "+BytesUtil.toString(k_1));
+        System.err.println("k_2(_2,_2,_3) = "+BytesUtil.toString(k_2));
+        System.err.println("k_3(_2,_2,_4) = "+BytesUtil.toString(k_3));
         
-        assertTrue(BytesUtil.compareBytes(k1, k2)<0);
-        assertTrue(BytesUtil.compareBytes(k2, k3)<0);
+        assertTrue(BytesUtil.compareBytes(k_1, k_2)<0);
+        assertTrue(BytesUtil.compareBytes(k_2, k_3)<0);
 
     }
 
     public void test_encodeDecodeTriple() {
 
-        doEncodeDecodeTest(new SPO(1, 2, 3, StatementEnum.Axiom),
+        doEncodeDecodeTest(new SPO(_1, _2, _3, StatementEnum.Axiom),
                 SPOKeyOrder.SPO);
 
-        doEncodeDecodeTest(new SPO(1, 2, 3, StatementEnum.Explicit),
+        doEncodeDecodeTest(new SPO(_1, _2, _3, StatementEnum.Explicit),
                 SPOKeyOrder.POS);
 
-        doEncodeDecodeTest(new SPO(1, 2, 3, StatementEnum.Inferred),
+        doEncodeDecodeTest(new SPO(_1, _2, _3, StatementEnum.Inferred),
                 SPOKeyOrder.OSP);
 
     }
@@ -119,11 +123,11 @@ public class TestSPOTupleSerializer extends TestCase2 {
          * 
          * Note: Only explicit statements may have statement identifiers.
          */
-        final long sid = 1 << 2 | ITermIdCodes.TERMID_CODE_STATEMENT;
+        final TermId sid = new TermId(VTE.STATEMENT, 1 << 2 | ITermIdCodes.TERMID_CODE_STATEMENT);
 
         {
 
-            final SPO spo = new SPO(3, 1, 2, StatementEnum.Explicit);
+            final SPO spo = new SPO(_3, _1, _2, StatementEnum.Explicit);
 
             spo.setStatementIdentifier(sid);
 
@@ -133,7 +137,7 @@ public class TestSPOTupleSerializer extends TestCase2 {
 
         {
 
-            final SPO spo = new SPO(3, 1, 2, StatementEnum.Explicit);
+            final SPO spo = new SPO(_3, _1, _2, StatementEnum.Explicit);
 
             spo.setStatementIdentifier(sid);
 
@@ -143,7 +147,7 @@ public class TestSPOTupleSerializer extends TestCase2 {
 
         {
 
-            final SPO spo = new SPO(3, 1, 2, StatementEnum.Explicit);
+            final SPO spo = new SPO(_3, _1, _2, StatementEnum.Explicit);
 
             spo.setStatementIdentifier(sid);
             
@@ -159,13 +163,13 @@ public class TestSPOTupleSerializer extends TestCase2 {
          
             final SPOKeyOrder keyOrder = SPOKeyOrder.valueOf(i);
             
-            doEncodeDecodeTest(new SPO(1, 2, 3, 4, StatementEnum.Axiom),
+            doEncodeDecodeTest(new SPO(_1, _2, _3, _4, StatementEnum.Axiom),
                     keyOrder);
             
-            doEncodeDecodeTest(new SPO(1, 2, 3, 4, StatementEnum.Inferred),
+            doEncodeDecodeTest(new SPO(_1, _2, _3, _4, StatementEnum.Inferred),
                     keyOrder);
             
-            doEncodeDecodeTest(new SPO(1, 2, 3, 4, StatementEnum.Explicit),
+            doEncodeDecodeTest(new SPO(_1, _2, _3, _4, StatementEnum.Explicit),
                     keyOrder);
             
         }

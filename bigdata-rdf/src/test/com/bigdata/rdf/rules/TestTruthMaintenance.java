@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
-
 import org.apache.log4j.MDC;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
@@ -42,8 +41,8 @@ import org.openrdf.model.vocabulary.OWL;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.rio.RDFFormat;
-
 import com.bigdata.rdf.inf.TruthMaintenance;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
@@ -53,6 +52,7 @@ import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOComparator;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
@@ -115,9 +115,9 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             
             store.addTerms(new BigdataValue[] { x, y, z });
             
-            final long x1 = x.getIV();
-            final long y2 = y.getIV();
-            final long z3 = z.getIV();
+            final IV x1 = x.getIV();
+            final IV y2 = y.getIV();
+            final IV z3 = z.getIV();
             
             /*
              * Setup the database.
@@ -1207,7 +1207,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
         final int nsubjects;
         {
 
-            final IChunkedIterator<Long> termIds = db.getSPORelation()
+            final IChunkedIterator<IV> termIds = db.getSPORelation()
                     .distinctTermScan(SPOKeyOrder.SPO);
 
             try {
@@ -1239,11 +1239,11 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
          * Choose N distinct subjects from the graph at random.
          */
 
-        final Set<Long> subjects = new HashSet<Long>(N);
+        final Set<IV> subjects = new HashSet<IV>(N);
 
         for (int i = 0; i < nsubjects && subjects.size() < N; i++) {
 
-            final IChunkedIterator<Long> termIds = db.getSPORelation()
+            final IChunkedIterator<IV> termIds = db.getSPORelation()
                     .distinctTermScan(SPOKeyOrder.SPO);
 
             try {
@@ -1251,7 +1251,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
                 // choose subject at random.
                 int index = r.nextInt(nsubjects);
 
-                long s = NULL;
+                IV s = NULL;
 
                 for (int j = 0; termIds.hasNext() && j < index; j++) {
 
@@ -1282,7 +1282,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
         
         List<ISPO> stmts = new ArrayList<ISPO>(N);
         
-        for( long s : subjects ) {
+        for( IV s : subjects ) {
             
             final IAccessPath<ISPO> accessPath = db.getAccessPath(s, NULL, NULL,
                     ExplicitSPOFilter.INSTANCE);
@@ -1392,7 +1392,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
                 
                 if (!expectedSPO.equals(actualSPO)) {
 
-                    while (actualSPO.compareTo(expectedSPO) < 0) {
+                    while (SPOComparator.INSTANCE.compare(actualSPO, expectedSPO) < 0) {
 
                         log.warn("Not expecting: " + actualSPO.toString(actual));
 
@@ -1404,7 +1404,7 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
 
                     }
 
-                    while (expectedSPO.compareTo(actualSPO) < 0) {
+                    while (SPOComparator.INSTANCE.compare(expectedSPO, actualSPO) < 0) {
 
                         log.warn("Expecting: " + expectedSPO.toString(actual));
 
