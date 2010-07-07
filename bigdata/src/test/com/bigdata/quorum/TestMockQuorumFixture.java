@@ -116,7 +116,7 @@ public class TestMockQuorumFixture extends TestCase2 {
         final MockQuorum clientQuorum = new MockQuorum(k,fixture);
         
         // Run the client's quorum.
-        clientQuorum.start(new MockQuorumMember(logicalServiceId));
+        clientQuorum.start(new MockQuorumMember(logicalServiceId,fixture));
         
         // Terminate the client's quorum.
         clientQuorum.terminate();
@@ -153,7 +153,7 @@ public class TestMockQuorumFixture extends TestCase2 {
              */
             for (int i = 0; i < k; i++) {
                 quorums[i] = new MockQuorum(k,fixture);
-                clients[i] = new MockQuorumMember(logicalServiceId);
+                clients[i] = new MockQuorumMember(logicalServiceId,fixture);
                 quorums[i].start(clients[i]);
                 actors [i] = quorums[i].getActor();
             }

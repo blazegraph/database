@@ -70,7 +70,14 @@ public class TestAll extends TestCase {
         // @todo verify serializability and versioning of QuorumServiceState
         // @todo verify serializability and versioning of QuorumPipelineState
         
+        // bootstrap test.
         suite.addTestSuite(TestZkQuorum.class);
+        
+        // unit tests for a singleton quorum.
+        suite.addTestSuite(TestZkSingletonQuorumSemantics.class);
+        
+        // unit tests for a highly available quorum.
+        suite.addTestSuite(TestZkHA3QuorumSemantics.class);
         
         return suite;
 

@@ -1,5 +1,6 @@
 package com.bigdata.quorum;
 
+import java.io.IOException;
 import java.rmi.Remote;
 import java.util.Arrays;
 import java.util.Collections;
@@ -11,10 +12,13 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Condition;
@@ -23,6 +27,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -76,7 +81,17 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      * Text when an operation is not permitted because the quorum can not meet.
      */
     static protected final transient String ERR_CAN_NOT_MEET = "Quorum can not meet : ";
-    
+
+    /**
+     * A timeout used to await some precondition to become true.
+     * 
+     * @see #awaitEnoughJoinedToMeet()
+     * 
+     * @todo make this configurable (settable). We might want to set it to the
+     *       <code>2 x tickTime</code> for zookeeper.
+     */
+    private final long timeout = TimeUnit.SECONDS.toNanos(1);
+
     /**
      * The replication factor.
      * 
@@ -235,7 +250,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      * A service used by {@link QuorumWatcherBase} to execute actions outside of
      * the thread in which it handles the observed state change.
      */
-    private ExecutorService watcherActionService;
+    private ThreadPoolExecutor watcherActionService;
 
     /**
      * A single threaded service used to pump events to clients outside of the
@@ -325,9 +340,16 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 this.actor = newActor(client.getLogicalServiceId(),
                         ((QuorumMember<?>) client).getServiceId());
             }
-            this.watcherActionService = Executors
-                    .newCachedThreadPool(new DaemonThreadFactory(
-                            "WatcherActionService"));
+            // Note: Use because exposes getActiveCount()
+            this.watcherActionService = 
+                new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
+                        new LinkedBlockingQueue<Runnable>(),
+                        new DaemonThreadFactory(
+                        "WatcherActionService"));
+            //this.watcherActionService = Executors.newSingleThreadExecutor(new DaemonThreadFactory("WatcherActionService"));
+//            this.watcherActionService = Executors
+//            .newCachedThreadPool(new DaemonThreadFactory(
+//                    "WatcherActionService"));
             this.watcher = newWatcher(client.getLogicalServiceId());
             this.eventService = (sendSynchronous ? null : Executors
                     .newSingleThreadExecutor(new DaemonThreadFactory(
@@ -380,14 +402,25 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             if (watcherActionService != null) {
                 watcherActionService.shutdown();
                 try {
-                    watcherActionService.awaitTermination(5000,
-                            TimeUnit.MILLISECONDS);
+                    if (!watcherActionService.awaitTermination(//
+                            // Long.MAX_VALUE,
+                            3000,//
+                            TimeUnit.MILLISECONDS)) {
+                        log
+                                .error("WatcherActionService termination timeout: activeCount="
+                                        + ((ThreadPoolExecutor) watcherActionService)
+                                                .getActiveCount());
+                    }
                 } catch (com.bigdata.concurrent.TimeoutException ex) {
                     // Ignore.
                 } catch (InterruptedException ex) {
                     // Will be propagated below.
                     interrupted = true;
                 } finally {
+                    /*
+                     * Cancel any tasks which did terminate in a timely manner.
+                     */
+                    watcherActionService.shutdownNow();
                     watcherActionService = null;
                 }
             }
@@ -738,7 +771,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         return -1;
     }
 
-    public UUID[] getJoinedMembers() {
+    public UUID[] getJoined() {
         lock.lock();
         try {
             return joined.toArray(new UUID[0]);
@@ -880,6 +913,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             while (!isQuorumMet() && client != null) {
                 if(!quorumMeet.await(nanos,TimeUnit.NANOSECONDS))
                     throw new TimeoutException();
+                nanos -= System.nanoTime() - begin;
             }
             if (client == null)
                 throw new AsynchronousQuorumCloseException();
@@ -917,12 +951,45 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             while (isQuorumMet() && client != null) {
                 if (!quorumBreak.await(nanos, TimeUnit.NANOSECONDS))
                     throw new TimeoutException();
+                nanos -= System.nanoTime() - begin;
             }
             if (client == null)
                 throw new AsynchronousQuorumCloseException();
             return;
         } finally {
             lock.unlock();
+        }
+    }
+
+    /**
+     * Enforce a precondition that at least <code>(k+1)/2</code> services have
+     * joined.
+     * <p>
+     * Note: This is used in certain places to work around concurrent
+     * indeterminism.
+     */
+    private void awaitEnoughJoinedToMeet() throws QuorumException {
+        if (!lock.isHeldByCurrentThread())
+            throw new IllegalMonitorStateException();
+        try {
+            final long begin = System.nanoTime();
+            long nanos = timeout;
+            while (joined.size() < ((k + 1) / 2)) {
+                if (client == null)
+                    throw new AsynchronousQuorumCloseException();
+                if (!joinedChange.await(nanos, TimeUnit.NANOSECONDS))
+                    throw new QuorumException(
+                            "Not enough joined services: njoined="
+                                    + joined.size() + " : "
+                                    + AbstractQuorum.this);
+                // remaining -= (now - begin) [aka elapsed]
+                nanos -= System.nanoTime() - begin;
+            }
+            return;
+        } catch (InterruptedException e) {
+            // propagate interrupt.
+            Thread.currentThread().interrupt();
+            return;
         }
     }
 
@@ -1244,6 +1311,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         final public void pipelineRemove() {
             lock.lock();
             try {
+                conditionalWithdrawVoteImpl();
                 conditionalServiceLeaveImpl();
                 conditionalPipelineRemoveImpl();
             } catch(InterruptedException e) {
@@ -1381,7 +1449,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                     throw new AssertionError(AbstractQuorum.this.toString());
                 }
                 // Get the join order.
-                final UUID[] joined = getJoinedMembers();
+                final UUID[] joined = getJoined();
                 /*
                  * No services may join out of the vote order. Verify that the
                  * predecessor(s) of this service in the vote order are joined
@@ -1476,10 +1544,68 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
          * pipeline (the leader MUST be the first service in the write
          * pipeline); and (b) to optionally <em>optimize</em> the write pipeline
          * for the network topology.
+         * <p>
+         * The default implementation directs each service before this service
+         * in the write pipeline to move itself to the end of the write
+         * pipeline.
+         * 
+         * @return <code>true</code> if the pipeline order was modified.
          * 
          * @see HAGlue#moveToEndOfPipeline()
+         * 
+         * @todo Provide hooks to optimize the write pipeline for the network
+         *       topology.
          */
-        abstract protected void reorganizePipeline();
+        protected boolean reorganizePipeline() {
+            final UUID[] pipeline = getPipeline();
+            final UUID[] joined = getJoined();
+            final UUID leaderId = joined[0];
+            boolean trace = false;
+            if(trace) {// @todo remove trace or convert to logging.
+             System.err.println("pipeline="+Arrays.toString(pipeline));
+             System.err.println("joined  ="+Arrays.toString(pipeline));
+             System.err.println("leader  ="+leaderId);
+             System.err.println("self    ="+serviceId);
+            }
+            boolean modified = false;
+            for (int i = 0; i < pipeline.length; i++) {
+                final UUID otherId = pipeline[i];
+                if (leaderId.equals(otherId)) {
+                    // Done.
+                    return modified;
+                }
+                // some other service in the pipeline ahead of the leader.
+                final S otherService = getQuorumMember().getService(otherId);
+                if (otherService == null) {
+                    throw new QuorumException(
+                            "Could not discover service: serviceId="
+                                    + serviceId);
+                }
+                try {
+                    // ask it to move itself to the end of the pipeline.
+                    ((HAPipelineGlue) otherService).moveToEndOfPipeline().get();
+                } catch (IOException ex) {
+                    throw new QuorumException(
+                            "Could not move service to end of the pipeline: serviceId="
+                                    + serviceId + ", otherId=" + otherId, ex);
+                } catch (InterruptedException e) {
+                    // propagate interrupt.
+                    Thread.currentThread().interrupt();
+                    return modified;
+                } catch (ExecutionException e) {
+                    throw new QuorumException(
+                            "Could not move service to end of the pipeline: serviceId="
+                                    + serviceId + ", otherId=" + otherId, e);
+                }
+                if(trace) {
+                 System.err.println("moved   ="+otherId);
+                 System.err.println("pipeline="+Arrays.toString(getPipeline()));
+                 System.err.println("joined  ="+Arrays.toString(getJoined()));
+                }
+                modified = true;
+            }
+            return modified;
+        }
         
         abstract protected void doServiceJoin();
 
@@ -1511,6 +1637,45 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      * for the first service in the vote order will issue the requests to the
      * {@link QuorumActor} which are necessary to execute the leader election
      * protocol.
+     * 
+     * @todo This may need to be modified per one of the following approaches to
+     *       be more robust. The current implemention is predicated on seeing
+     *       all state transitions, and in fact the API requires that we observe
+     *       each state transition since the {@link QuorumWatcherBase} methods
+     *       only allow a single change at a time to be made to the internal
+     *       quorum model. However, the order in which those state changes are
+     *       observed can vary substantially when there are multiple services in
+     *       the quorum since each service is acting independently based on its
+     *       local model of the distributed quorum state.
+     *       <p>
+     *       (1) Instead of having logic in each method on
+     *       {@link QuorumActorBase} to decide on postcondition actions, have a
+     *       single method which examines the current state and makes decisions
+     *       about what action(s) need to be executed in order to bring the
+     *       system from an unstable state into a stable state. For example,
+     *       when a vote is cast it may be that services should join, and when
+     *       services join it may be that the quorum should meet. Those are
+     *       transition from unstable states into stable states.
+     *       <p>
+     *       (2) Another approach would be to raise a protocol for consistent
+     *       state changes into the API. For example, by having a revision
+     *       number associated with each datum, much like zookeeper, and making
+     *       changes conditional on the revision number not being concurrently
+     *       incremented.
+     * 
+     * @todo Some of these methods will await preconditions become true, but no
+     *       longer than a timeout, e.g., using
+     *       {@link AbstractQuorum#awaitEnoughJoinedToMeet()}. This is used to
+     *       compensate for uncertainty in the ordering of events in a
+     *       distributed system such that the watcher might see the request to
+     *       set the current token before it has seen the request to set the
+     *       lastValidToken. Those requests can not be processed out of order
+     *       since that would cause the token to regress. However, this approach
+     *       can introduce occasional pauses while the timeout expires which are
+     *       somewhat suprising. Option (1) above would address this concern
+     *       using a single postcondition path for all state transitions, in
+     *       which case we should be able to make due without the timeout /
+     *       condition await.
      */
     abstract protected class QuorumWatcherBase implements QuorumWatcher<S, C> {
 
@@ -1562,7 +1727,15 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 throw new IllegalMonitorStateException();
             if (watcherActionService == null)
                 throw new IllegalStateException();
-            watcherActionService.execute(r);
+            watcherActionService.execute(new Runnable() {
+                public void run() {
+                    try {
+                        r.run();
+                    } catch (Throwable t) {
+                        log.error(t, t);
+                    }
+                }
+            });
 //            new Thread(r).start();// asynchronous
 //            r.run();// blocking
         }
@@ -1844,50 +2017,51 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                                  * The client is the first service in the vote
                                  * order, so it will be the first service to
                                  * join and will become the leader when the
-                                 * other services join. For now, we tell the
-                                 * client's actor to join it now. The other
-                                 * clients will notice the service join and join
-                                 * once their predecessor in the vote order
-                                 * joins.
-                                 */
-                                log.warn("First service will join");
-                                if (!joined.isEmpty()) {
-                                    throw new AssertionError(
-                                            "Services already joined: "
-                                                    + AbstractQuorum.this);
-                                }
-                                /*
+                                 * other services join.
+                                 * 
+                                 * Instruct the client's actor to join now. The
+                                 * other clients will notice the service join
+                                 * and join once their predecessor in the vote
+                                 * order joins.
+                                 * 
                                  * Note: This will cause recursion through the
                                  * actor-watcher reflex arc unless it is run in
                                  * another thread.
                                  */
+                                log.warn("First service will join");
                                 doAction(new Runnable() {public void run() {actor.serviceJoin();}});
-                            } else if (clientId.equals(serviceId)) {
-                                /*
-                                 * The service which just joined is our client.
-                                 * If the service before our client in the vote
-                                 * order is joined, then it is time for our
-                                 * client to join.
-                                 */
-                                final int index = getIndexInVoteOrder(clientId,
-                                        voteOrder);
-                                final UUID waitsFor = voteOrder[index - 1];
-                                if (joined.contains(waitsFor)) {
-                                    log
-                                            .warn("Service will join already met quorum : njoined="
-                                                    + joined.size()
-                                                    + ", serviceId=" + clientId);
-                                    if (joined.size() != voteOrder.length - 1)
+                            } else {
+                                if (clientId.equals(serviceId)) {
+                                    /*
+                                     * The service which just cast its vote is
+                                     * our client. If the service before our
+                                     * client in the vote order is already
+                                     * joined, then it is time for our client to
+                                     * join.
+                                     */
+                                    final int index = getIndexInVoteOrder(
+                                            clientId, voteOrder);
+                                    if (index == -1) {
                                         throw new AssertionError(
-                                                "Expecting "
-                                                        + (voteOrder.length - 1)
-                                                        + " joined services, but there are "
-                                                        + joined.size()
-                                                        + " joined services : "
-                                                        + AbstractQuorum.this);
-                                    doAction(new Runnable() {public void run() {actor.serviceJoin();}});
-//                                    actor.serviceJoin();
-                               }
+                                                AbstractQuorum.this.toString());
+                                    }
+                                    // the service our client waits for to join.
+                                    final UUID waitsFor = voteOrder[index - 1];
+                                    if (joined.contains(waitsFor)) {
+                                        // our client can join immediately.
+                                        log.warn("Follower will join: "
+                                                + AbstractQuorum.this
+                                                        .toString());
+                                        doAction(new Runnable() {
+                                            public void run() {
+                                                actor.serviceJoin();
+                                                System.err
+                                                        .println("After join: "
+                                                                + AbstractQuorum.this);
+                                            }
+                                        });
+                                    }
+                                }
                             }
                         }
                     }
@@ -1961,6 +2135,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         protected void setLastValidToken(final long newToken) {
             lock.lock();
             try {
+                awaitEnoughJoinedToMeet();
                 lastValidToken = newToken;
                 lastValidTokenChange.signalAll();
                 if (log.isInfoEnabled())
@@ -1988,19 +2163,8 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                         throw new AssertionError(
                                 "Last valid token never set : "
                                         + AbstractQuorum.this);
-                    /*
-                     * Note: This can be tripped if the watcher attempts to
-                     * submit the actions in its thread (recursively while
-                     * holding the lock) and the test fixture allows events to
-                     * be processed in parallel. The fix was to have the watcher
-                     * submit its actions for execution by a different thread.
-                     */
-                    if (joined.size() < (k + 1) / 2)
-                        throw new AssertionError(
-                                "Not enough joined services: njoined="
-                                        + joined.size() + " : "
-                                        + AbstractQuorum.this);
                 }
+                awaitEnoughJoinedToMeet();
                 // Set the token from the lastValidToken.
                 final long token = AbstractQuorum.this.token = lastValidToken;
                 // signal everyone that the quorum has met.
@@ -2125,9 +2289,8 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 if (client != null) {
                     /*
                      * Since our client is a quorum member, figure out whether
-                     * or not it is the leader, in which case it will do the
-                     * leader election, or a follower, in which case we need do
-                     * a service join if it is next in the vote order.
+                     * or not it just joined, in which case we send it a
+                     * synchronous message.
                      */
                     final UUID clientId = client.getServiceId();
                     if(serviceId.equals(clientId)) {
@@ -2137,7 +2300,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 // queue event.
                 sendEvent(new E(QuorumEventEnum.SERVICE_JOIN, lastValidToken,
                         token, serviceId));
-                if(client!=null) {
+                if (client != null) {
                     final UUID clientId = client.getServiceId();
                     // The current consensus -or- null if our client is not in a
                     // consensus.
@@ -2157,27 +2320,44 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                         final boolean isLeader = leaderId.equals(clientId);
                         if (isLeader) {
                             final int njoined = joined.size();
-                            if (njoined == ((k + 1) / 2)) {
+                            if (njoined >= ((k + 1) / 2) && token == NO_QUORUM) {
                                 /*
                                  * Elect the leader.
-                                 * 
-                                 * Note: We are guaranteed that the #of joined
-                                 * services just rose to (k+1)/2 (rather than
-                                 * falling) because this is part of a
-                                 * serviceJoin event which modified the joined
-                                 * services set.
-                                 * 
-                                 * Note: The followers will get their
-                                 * electedFollower() message when they notice
-                                 * the token was set.
                                  */
-                                log.warn("Electing leader: "
-                                        + AbstractQuorum.this.toString());
-                                doAction(new Runnable() {public void run() {
-                                    actor.reorganizePipeline();
-                                    actor.setLastValidToken(lastValidToken + 1);
-                                    actor.setToken();
-                                    }});
+                                log
+                                        .warn("Ready to elect leader or reorganize pipeline: "
+                                                + AbstractQuorum.this
+                                                        .toString());
+                                doAction(new Runnable() {
+                                    public void run() {
+                                        if (actor.reorganizePipeline()) {
+                                            /*
+                                             * Reorganizing the pipeline can
+                                             * cause service leaves for services
+                                             * before the leader in the pipeline
+                                             * order. This means that we need to
+                                             * wait until the pipeline is
+                                             * properly organized and then try
+                                             * again.
+                                             */
+                                            log
+                                                    .warn("Reorganized the pipeline: "
+                                                            + AbstractQuorum.this
+                                                                    .toString());
+                                        } else {
+                                            /*
+                                             * The pipeline is well organized,
+                                             * so elect the leader now.
+                                             */
+                                            log.warn("Electing leader: "
+                                                    + AbstractQuorum.this
+                                                            .toString());
+                                            actor
+                                                    .setLastValidToken(lastValidToken + 1);
+                                            actor.setToken();
+                                        }
+                                    }
+                                });
 //                                client.electedLeader(); // moved to watcher.
                             }
                         } else {
@@ -2188,17 +2368,17 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                                 throw new AssertionError(AbstractQuorum.this
                                         .toString());
                             }
-
+                            final UUID waitsFor = voteOrder[index - 1];
                             /*
                              * If the service which joined immediately proceeds
                              * our client in the vote order, then do a service
                              * join for our client now.
                              */
-                            if (serviceId.equals(voteOrder[index - 1])) {
+                            if (serviceId.equals(waitsFor)) {
                                 /*
                                  * Elect a follower.
                                  */
-                                log.warn("Electing follower: "
+                                log.warn("Follower will join: "
                                         + AbstractQuorum.this.toString());
                                 doAction(new Runnable() {public void run() {actor.serviceJoin();}});
                             }

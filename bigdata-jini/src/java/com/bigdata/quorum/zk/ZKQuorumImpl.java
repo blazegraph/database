@@ -30,9 +30,11 @@ package com.bigdata.quorum.zk;
 import java.io.IOException;
 import java.rmi.Remote;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
@@ -447,38 +449,57 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
             }
         }
 
-        /**
-         * Directs each service before this service in the write pipeline to
-         * move itself to the end of the write pipeline.
-         * 
-         * @todo optimize the write pipeline for the network topology.
-         */
-        @Override
-        protected void reorganizePipeline() {
-            final UUID[] pipeline = getPipeline();
-            for (int i = 0; i < pipeline.length; i++) {
-                final UUID t = pipeline[i];
-                if (serviceId.equals(t)) {
-                    // Done.
-                    return;
-                }
-                // some other service in the pipeline ahead of the leader.
-                final S otherService = getQuorumMember().getService(serviceId);
-                if (otherService == null) {
-                    throw new QuorumException(
-                            "Could not discover service: serviceId="
-                                    + serviceId);
-                }
-                try {
-                    // ask it to move itself to the end of the pipeline.
-                    ((HAPipelineGlue) otherService).moveToEndOfPipeline();
-                } catch (IOException ex) {
-                    throw new QuorumException(
-                            "Could not move service to end of the pipeline: serviceId="
-                                    + serviceId);
-                }
-            }
-        }
+//        /**
+//         * Directs each service before this service in the write pipeline to
+//         * move itself to the end of the write pipeline.
+//         * 
+//         * @todo optimize the write pipeline for the network topology.
+//         */
+//        @Override
+//        protected boolean reorganizePipeline() {
+//            final UUID[] pipeline = getPipeline();
+//            final UUID[] joined = getJoinedMembers();
+//            final UUID leaderId = joined[0];
+////            System.err.println("pipeline="+Arrays.toString(pipeline));
+////            System.err.println("joined  ="+Arrays.toString(pipeline));
+////            System.err.println("leader  ="+leaderId);
+////            System.err.println("self    ="+serviceId);
+//            boolean modified = false;
+//            for (int i = 0; i < pipeline.length; i++) {
+//                final UUID otherId = pipeline[i];
+//                if (leaderId.equals(otherId)) {
+//                    // Done.
+//                    return modified;
+//                }
+//                // some other service in the pipeline ahead of the leader.
+//                final S otherService = getQuorumMember().getService(otherId);
+//                if (otherService == null) {
+//                    throw new QuorumException(
+//                            "Could not discover service: serviceId="
+//                                    + serviceId);
+//                }
+//                try {
+//                    // ask it to move itself to the end of the pipeline.
+//                    ((HAPipelineGlue) otherService).moveToEndOfPipeline().get();
+//                } catch (IOException ex) {
+//                    throw new QuorumException(
+//                            "Could not move service to end of the pipeline: serviceId="
+//                                    + serviceId+", otherId="+otherId, ex);
+//                } catch (InterruptedException e) {
+//                    // propagate interrupt.
+//                    Thread.currentThread().interrupt();
+//                    return modified;
+//                } catch (ExecutionException e) {
+//                    throw new QuorumException(
+//                            "Could not move service to end of the pipeline: serviceId="
+//                                    + serviceId + ", otherId=" + otherId, e);
+//                }
+////                System.err.println("moved   ="+otherId);
+////                System.err.println("pipeline="+Arrays.toString(getPipeline()));
+//                modified = true;
+//            }
+//            return modified;
+//        }
 
         @Override
         protected void doCastVote(final long lastCommitTime) {
@@ -875,12 +896,6 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
 
         @Override
         protected void doSetLastValidToken(final long newToken) {
-            /*
-             * Note: Unlike clearToken(), which can be done by anyone, only the
-             * quorum leader should be updating the lastValidToken. For that
-             * reason, there should be only one thread in the entire distributed
-             * system taking this action and we should not have to retry.
-             */
             // get a valid zookeeper connection object.
             final ZooKeeper zk;
             try {
@@ -891,72 +906,97 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                 return;
             }
             /*
-             * Read the current quorum state.
+             * Try in a loop until we can read the data and update it without
+             * having a concurrent update. If the token has been cleared, then
+             * we are done (it does not matter which service observing a quorum
+             * break actually clears the token, only that it is quickly
+             * cleared).
+             * 
+             * Note: Conflicts can come from ANY change to the QUORUM znode's
+             * state.
              */
-            final Stat stat = new Stat();
-            final QuorumTokenState oldState;
-            try {
-                oldState = (QuorumTokenState) SerializerUtil.deserialize(zk
-                        .getData(logicalServiceId + "/" + QUORUM,
-                                false/* watch */, stat));
-            } catch (KeeperException e) {
-                throw new RuntimeException(e);
-            } catch (InterruptedException e) {
-                // propagate the interrupt.
-                Thread.currentThread().interrupt();
-                return;
-            }
-            /*
-             * Check some preconditions.
-             */
-            if (oldState.lastValidToken() >= newToken) {
-                // the lastValidToken must advance.
-                throw new QuorumException(
-                        "New value must be GT old value: oldValue="
-                                + oldState.lastValidToken() + ", but newValue="
-                                + newToken);
-            }
-            if (oldState.token() != Quorum.NO_QUORUM) {
+            while (true) {
                 /*
-                 * A new value for lastValidToken should not be assigned unless
-                 * the quorum has broken. The quorum token should have been
-                 * cleared when the quorum broken.
+                 * Read the current quorum state.
                  */
-                throw new QuorumException(
-                        "The quorum token has not been cleared");
-            }
-            try {
-                // new local state object w/ the current token cleared.
-                final QuorumTokenState newState = new QuorumTokenState(
-                        newToken, oldState.token());
-                // update data (verifying the version!)
-                zk.setData(logicalServiceId + "/" + QUORUM, SerializerUtil
-                        .serialize(newState), stat.getVersion());
-                // done.
-                if (log.isInfoEnabled())
-                    log.info("Set: lastValidToken=" + newToken);
-                return;
-            } catch (KeeperException e) {
-                throw new RuntimeException(e);
-            } catch (InterruptedException e) {
-                // propagate the interrupt.
-                Thread.currentThread().interrupt();
-                return;
+                final Stat stat = new Stat();
+                final QuorumTokenState oldState;
+                try {
+                    oldState = (QuorumTokenState) SerializerUtil.deserialize(zk
+                            .getData(logicalServiceId + "/" + QUORUM,
+                                    false/* watch */, stat));
+                } catch (KeeperException e) {
+                    throw new RuntimeException(e);
+                } catch (InterruptedException e) {
+                    // propagate the interrupt.
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                /*
+                 * Check some preconditions.
+                 */
+                if (oldState.lastValidToken() >= newToken) {
+                    // the lastValidToken must advance.
+                    throw new QuorumException(
+                            "New value must be GT old value: oldValue="
+                                    + oldState.lastValidToken()
+                                    + ", but newValue=" + newToken);
+                }
+                if (oldState.token() != Quorum.NO_QUORUM) {
+                    /*
+                     * A new value for lastValidToken should not be assigned
+                     * unless the quorum has broken. The quorum token should
+                     * have been cleared when the quorum broken.
+                     */
+                    throw new QuorumException(
+                            "The quorum token has not been cleared");
+                }
+                try {
+                    // new local state object w/ the current token cleared.
+                    final QuorumTokenState newState = new QuorumTokenState(
+                            newToken, oldState.token());
+                    // update data (verifying the version!)
+                    zk.setData(logicalServiceId + "/" + QUORUM, SerializerUtil
+                            .serialize(newState), stat.getVersion());
+                    // done.
+                    if (log.isInfoEnabled())
+                        log.info("Set: lastValidToken=" + newToken);
+                    return;
+                } catch (BadVersionException e) {
+                    /*
+                     * If we get a version conflict, then just retry. Either the
+                     * token was cleared by someone else or we will try to clear
+                     * it ourselves.
+                     */
+                    log.warn("Concurrent update (retry): serviceId="
+                            + serviceIdStr);
+                    continue;
+                } catch (KeeperException e) {
+                    throw new RuntimeException(e);
+                } catch (InterruptedException e) {
+                    // propagate the interrupt.
+                    Thread.currentThread().interrupt();
+                    return;
+                }
             }
         }
 
         /**
          * @todo For zookeeper, we can atomically update both the lastValidToken
-         *       and the currentToken. This might be true in general. [Change the
-         *       quorum dynamics to reflect this.]
+         *       and the currentToken. This might be true in general. [Change
+         *       the quorum dynamics to reflect this.]
          */
         @Override
         protected void doSetToken() {
             /*
-             * Note: Unlike clearToken(), which can be done by anyone, only the
-             * quorum leader should be updating the currentToken. For that
-             * reason, there should be only one thread in the entire distributed
-             * system taking this action and we should not have to retry.
+             * Try in a loop until we can read the data and update it without
+             * having a concurrent update. If the token has been cleared, then
+             * we are done (it does not matter which service observing a quorum
+             * break actually clears the token, only that it is quickly
+             * cleared).
+             * 
+             * Note: Conflicts can come from ANY change to the QUORUM znode's
+             * state.
              */
             // get a valid zookeeper connection object.
             final ZooKeeper zk;
@@ -967,58 +1007,69 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                 Thread.currentThread().interrupt();
                 return;
             }
-            /*
-             * Read the current quorum state.
-             */
-            final Stat stat = new Stat();
-            final QuorumTokenState oldState;
-            try {
-                oldState = (QuorumTokenState) SerializerUtil.deserialize(zk
-                        .getData(logicalServiceId + "/" + QUORUM,
-                                false/* watch */, stat));
-            } catch (KeeperException e) {
-                throw new RuntimeException(e);
-            } catch (InterruptedException e) {
-                // propagate the interrupt.
-                Thread.currentThread().interrupt();
-                return;
-            }
-            /*
-             * Check some preconditions.
-             */
-            if (oldState.token() != Quorum.NO_QUORUM) {
+            while (true) {
                 /*
-                 * A new value for lastValidToken should not be assigned unless
-                 * the quorum has broken. The quorum token should have been
-                 * cleared when the quorum broken.
+                 * Read the current quorum state.
                  */
-                throw new QuorumException(
-                        "The quorum token has not been cleared");
-            }
-            try {
+                final Stat stat = new Stat();
+                final QuorumTokenState oldState;
+                try {
+                    oldState = (QuorumTokenState) SerializerUtil.deserialize(zk
+                            .getData(logicalServiceId + "/" + QUORUM,
+                                    false/* watch */, stat));
+                } catch (KeeperException e) {
+                    throw new RuntimeException(e);
+                } catch (InterruptedException e) {
+                    // propagate the interrupt.
+                    Thread.currentThread().interrupt();
+                    return;
+                }
                 /*
-                 * Take the new quorum token from the lastValidToken field and
-                 * create a new local state object w/ the current token set.
+                 * Check some preconditions.
                  */
-                final long newToken = oldState.lastValidToken();
-                final QuorumTokenState newState = new QuorumTokenState(oldState
-                        .lastValidToken(), newToken);
-                // update data (verifying the version!)
-                zk.setData(logicalServiceId + "/" + QUORUM, SerializerUtil
-                        .serialize(newState), stat.getVersion());
-                // done.
-                if (log.isInfoEnabled())
-                    log.info("Set: token=" + newToken);
-                return;
-            } catch (KeeperException e) {
-                throw new RuntimeException(e);
-            } catch (InterruptedException e) {
-                // propagate the interrupt.
-                Thread.currentThread().interrupt();
-                return;
+                if (oldState.token() != Quorum.NO_QUORUM) {
+                    /*
+                     * A new value for lastValidToken should not be assigned
+                     * unless the quorum has broken. The quorum token should
+                     * have been cleared when the quorum broken.
+                     */
+                    throw new QuorumException(
+                            "The quorum token has not been cleared");
+                }
+                try {
+                    /*
+                     * Take the new quorum token from the lastValidToken field
+                     * and create a new local state object w/ the current token
+                     * set.
+                     */
+                    final long newToken = oldState.lastValidToken();
+                    final QuorumTokenState newState = new QuorumTokenState(
+                            oldState.lastValidToken(), newToken);
+                    // update data (verifying the version!)
+                    zk.setData(logicalServiceId + "/" + QUORUM, SerializerUtil
+                            .serialize(newState), stat.getVersion());
+                    // done.
+                    if (log.isInfoEnabled())
+                        log.info("Set: token=" + newToken);
+                    return;
+                } catch (BadVersionException e) {
+                    /*
+                     * If we get a version conflict, then just retry. Either the
+                     * token was cleared by someone else or we will try to clear
+                     * it ourselves.
+                     */
+                    log.warn("Concurrent update (retry): serviceId="
+                            + serviceIdStr);
+                    continue;
+                } catch (KeeperException e) {
+                    throw new RuntimeException(e);
+                } catch (InterruptedException e) {
+                    // propagate the interrupt.
+                    Thread.currentThread().interrupt();
+                    return;
+                }
             }
         }
-
     }
 
     /**
@@ -1368,9 +1419,7 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
         private class QuorumMemberWatcher extends AbstractSetQuorumWatcher {
 
             QuorumMemberWatcher(final String zpath) {
-
                 super(zpath);
-
             }
 
             @Override
@@ -1429,15 +1478,33 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                 // the known pipeline order.
                 final UUID[] aold = getPipeline();
                 // the new pipeline order.
-                final UUID[] anew = new UUID[children.length];
+                final UUID[] anew;
                 {
-                    int i = 0;
+                    /*
+                     * Znodes identified above can be concurrently deleted here
+                     * so we insert them into a list as we go and then convert
+                     * the list to a dense array having the same order as the
+                     * children.
+                     */
+                    final List<UUID> tmp = new LinkedList<UUID>();
                     for (String s : children) {
-                        final QuorumServiceState state = (QuorumServiceState) SerializerUtil
-                                .deserialize(zk.getData(zpath + "/" + s,
-                                        false/* watch */, null/* stat */));
-                        anew[i++] = state.serviceUUID();
+                        try {
+                            final QuorumPipelineState state = (QuorumPipelineState) SerializerUtil
+                                    .deserialize(zk.getData(zpath + "/" + s,
+                                            false/* watch */, null/* stat */));
+                            tmp.add(state.serviceUUID());
+                        } catch (NoNodeException ex) {
+                            /*
+                             * Concurrent delete.
+                             * 
+                             * Note: Since the concurrent delete, by definition,
+                             * occurred after we get the children, we will see
+                             * another watch trigger with this change soon.
+                             */
+                            continue;
+                        }
                     }
+                    anew = tmp.toArray(new UUID[0]);
                 }
                 applyOrderedSetSemantics(aold, anew);
             }
@@ -1461,9 +1528,7 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
         private class QuorumJoinedWatcher extends AbstractSetQuorumWatcher {
 
             QuorumJoinedWatcher(final String zpath) {
-
                 super(zpath);
-
             }
 
             @Override
@@ -1475,17 +1540,29 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                 // lexiographic sort orders children by sequential suffixes.
                 Arrays.sort(children);
                 // the known join order.
-                final UUID[] aold = getJoinedMembers();
+                final UUID[] aold = getJoined();
                 // the new join order.
-                final UUID[] anew = new UUID[children.length];
+                final UUID[] anew;
                 {
-                    int i = 0;
+                    /*
+                     * Znodes identified above can be concurrently deleted here
+                     * so we insert them into a list as we go and then convert
+                     * the list to a dense array having the same order as the
+                     * children.
+                     */
+                    final List<UUID> tmp = new LinkedList<UUID>();
                     for (String s : children) {
-                        final QuorumServiceState state = (QuorumServiceState) SerializerUtil
-                                .deserialize(zk.getData(zpath + "/" + s,
-                                        false/* watch */, null/* stat */));
-                        anew[i++] = state.serviceUUID();
+                        try {
+                            final QuorumServiceState state = (QuorumServiceState) SerializerUtil
+                                    .deserialize(zk.getData(zpath + "/" + s,
+                                            false/* watch */, null/* stat */));
+                            tmp.add(state.serviceUUID());
+                        } catch(NoNodeException ex) {
+                            // concurrent delete.
+                            continue;
+                        }
                     }
+                    anew = tmp.toArray(new UUID[0]);
                 }
                 applyOrderedSetSemantics(aold, anew);
             }
@@ -1509,9 +1586,7 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
         private class QuorumTokenStateWatcher extends InternalQuorumWatcher {
 
             protected QuorumTokenStateWatcher(final String zpath) {
-
                 super(zpath);
-
             }
 
             /** pump mock event. */
@@ -1691,15 +1766,27 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                 final UUID[] aold = votes.containsKey(lastCommitTime) ? votes
                         .get(lastCommitTime) : new UUID[0];
                 // the new vote order.
-                final UUID[] anew = new UUID[children.length];
+                final UUID[] anew;
                 {
-                    int i = 0;
+                    /*
+                     * Znodes identified above can be concurrently deleted here
+                     * so we insert them into a list as we go and then convert
+                     * the list to a dense array having the same order as the
+                     * children.
+                     */
+                    final List<UUID> tmp = new LinkedList<UUID>();
                     for (String s : children) {
-                        QuorumServiceState state = (QuorumServiceState) SerializerUtil
-                                .deserialize(zk.getData(zpath + "/" + s,
-                                        false/* watch */, null/* stat */));
-                        anew[i++] = state.serviceUUID();
+                        try {
+                            final QuorumServiceState state = (QuorumServiceState) SerializerUtil
+                                    .deserialize(zk.getData(zpath + "/" + s,
+                                            false/* watch */, null/* stat */));
+                            tmp.add(state.serviceUUID());
+                        } catch(NoNodeException ex) {
+                            // concurrent delete.
+                            continue;
+                        }
                     }
+                    anew = tmp.toArray(new UUID[0]);
                 }
                 applyOrderedSetSemantics(aold, anew);
             }

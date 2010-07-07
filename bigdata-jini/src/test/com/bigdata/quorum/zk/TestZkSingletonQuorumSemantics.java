@@ -25,11 +25,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jun 2, 2010
  */
 
-package com.bigdata.quorum;
+package com.bigdata.quorum.zk;
 
 import java.util.UUID;
 
-import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
+import com.bigdata.quorum.AbstractQuorum;
+import com.bigdata.quorum.Quorum;
+import com.bigdata.quorum.QuorumActor;
+import com.bigdata.quorum.QuorumMember;
 
 /**
  * Test the quorum semantics for a singleton quorum. This test suite allows us
@@ -40,23 +43,23 @@ import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
  * @version $Id: TestSingletonQuorumSemantics.java 2984 2010-06-06 22:10:32Z
  *          thompsonbry $
  */
-public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
+public class TestZkSingletonQuorumSemantics extends AbstractZkQuorumTestCase {
 
     /**
      * 
      */
-    public TestSingletonQuorumSemantics() {
+    public TestZkSingletonQuorumSemantics() {
     }
 
     /**
      * @param name
      */
-    public TestSingletonQuorumSemantics(String name) {
+    public TestZkSingletonQuorumSemantics(String name) {
         super(name);
     }
 
     @Override
-    protected void setUp() throws Exception {
+    public void setUp() throws Exception {
         k = 1;
         super.setUp();
     }
@@ -79,7 +82,6 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
         
         // instruct actor to add client as a member.
         actor.memberAdd();
-        fixture.awaitDeque();
 
         // client is a member.
         assertTrue(client.isMember());
@@ -87,7 +89,6 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
 
         // instruct actor to remove client as a member.
         actor.memberRemove();
-        fixture.awaitDeque();
         
         // client is not a member.
         assertFalse(client.isMember());
@@ -112,7 +113,6 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
         assertEquals(new UUID[]{},quorum.getPipeline());
 
         actor.memberAdd();
-        fixture.awaitDeque();
 
 		/*
 		 * add to the pipeline. since this is a singleton quorum, the downstream
@@ -120,7 +120,6 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
 		 */
 		assertNull(client.downStreamId);
         actor.pipelineAdd();
-        fixture.awaitDeque();
 
         assertNull(client.downStreamId);
         assertTrue(client.isPipelineMember());
@@ -132,14 +131,12 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
 		 */
 		assertNull(client.downStreamId);
         actor.pipelineRemove();
-        fixture.awaitDeque();
 
         assertNull(client.downStreamId);
         assertFalse(client.isPipelineMember());
         assertEquals(new UUID[]{},quorum.getPipeline());
 
         actor.memberRemove();
-        fixture.awaitDeque();
 
         assertFalse(client.isMember());
 
@@ -149,13 +146,6 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
      * Unit test for the voting protocol for a singleton quorum.
      * 
      * @throws InterruptedException
-     * 
-     * @todo For some reason this unit test occasionally takes much longer to
-     *       run than would otherwise be expected (up to a few seconds versus a
-     *       small fraction of a second). You can see this in the timestamps of
-     *       the logger. (This appears to be related to a watcher's action that
-     *       is not terminating but gets interrupted when the unit test shuts
-     *       down after a 5 second shutdown timeout).
      */
 	public void test_voting() throws InterruptedException {
 
@@ -173,13 +163,11 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
 
 		// add as member service.
         actor.memberAdd();
-        fixture.awaitDeque();
 
         assertTrue(clients[0].isMember());
 
         // join the pipeline.
         actor.pipelineAdd();
-        fixture.awaitDeque();
         
         // Verify that timestamps must be non-negative.
 		try {
@@ -195,7 +183,6 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
         
 		// Cast a vote.
 		actor.castVote(lastCommitTime1);
-        fixture.awaitDeque();
 		
 		// Should be just one vote.
 		assertEquals(1,quorum.getVotes().size());
@@ -205,7 +192,6 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
 
 		// Cast another vote.
 		actor.castVote(lastCommitTime2);
-        fixture.awaitDeque();
 
         // Should be just one vote since a service can only vote for one
         // lastCommitTime at a time.
@@ -219,7 +205,6 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
 
 		// Remove as a member.
         actor.memberRemove();
-        fixture.awaitDeque();
 
         assertFalse(clients[0].isMember());
         // The service vote was also removed.
@@ -245,21 +230,18 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
 
         // declare the service as a quorum member.
         actor.memberAdd();
-        fixture.awaitDeque();
         
         assertTrue(client.isMember());
         assertEquals(new UUID[]{serviceId},quorum.getMembers());
         
         // add to the pipeline.
         actor.pipelineAdd();
-        fixture.awaitDeque();
 
         assertTrue(client.isPipelineMember());
         assertEquals(new UUID[]{serviceId},quorum.getPipeline());
 
         // cast a vote for a lastCommitTime.
         actor.castVote(lastCommitTime);
-        fixture.awaitDeque();
 
         assertEquals(1,quorum.getVotes().size());
         assertEquals(new UUID[] { serviceId }, quorum.getVotes().get(
@@ -276,7 +258,6 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
         assertEquals(new UUID[] { serviceId }, quorum.getJoined());
 
         // validate the token was assigned.
-        fixture.awaitDeque();
         assertEquals(Quorum.NO_QUORUM + 1, quorum.lastValidToken());
         assertEquals(Quorum.NO_QUORUM + 1, quorum.token());
         assertTrue(quorum.isQuorumMet());
@@ -286,7 +267,6 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
          */
 
         actor.serviceLeave();
-        fixture.awaitDeque();
 
         quorum.awaitBreak();
         
@@ -310,10 +290,8 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
          */
 
         actor.pipelineAdd();
-        fixture.awaitDeque();
 
         actor.castVote(lastCommitTime2);
-        fixture.awaitDeque();
 
         assertEquals(1,quorum.getVotes().size());
         assertEquals(null,quorum.getVotes().get(lastCommitTime));
@@ -342,7 +320,6 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
          */
         
         actor.serviceLeave();
-        fixture.awaitDeque();
 
         quorum.awaitBreak();
         

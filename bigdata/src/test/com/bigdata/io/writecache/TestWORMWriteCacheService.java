@@ -40,6 +40,7 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -63,6 +64,7 @@ import com.bigdata.io.writecache.WriteCache.FileChannelWriteCache;
 import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.AbstractQuorumMember;
+import com.bigdata.quorum.AbstractQuorumTestCase;
 import com.bigdata.quorum.MockQuorumFixture;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumActor;
@@ -126,6 +128,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
      * The #of records to write. 10k is small and the file system cache can
      * often absorb the data immediately. 100k is reasonable.
      */
+//    static final int nrecs = 10;
     static final int nrecs = 100000;
 
     /**
@@ -190,14 +193,45 @@ public class TestWORMWriteCacheService extends TestCase3 {
          */
         public RunnableFuture<Void> moveToEndOfPipeline() throws IOException {
 
-//            return new FutureTask<Void>(new Runnable() {
-//                public void run() {
-//                    member.getActor().pipelineRemove();
-//                    member.getActor().pipelineAdd();
-//                }
-//            }, null);
+            final FutureTask<Void> ft = new FutureTask<Void>(
+                    new Runnable() {
+                        public void run() {
 
-            throw new UnsupportedOperationException(); 
+                            // note the current vote (if any).
+                            final Long lastCommitTime = member.getQuorum()
+                                    .getCastVote(getServiceId());
+
+                            if (member.isPipelineMember()) {
+
+                                // System.err
+                                // .println("Will remove self from the pipeline: "
+                                // + getServiceId());
+
+                                member.getActor().pipelineRemove();
+
+                                // System.err
+                                // .println("Will add self back into the pipeline: "
+                                // + getServiceId());
+
+                                member.getActor().pipelineAdd();
+
+                                if (lastCommitTime != null) {
+
+                                    // System.err
+                                    // .println("Will cast our vote again: lastCommitTime="
+                                    // + +lastCommitTime
+                                    // + ", "
+                                    // + getServiceId());
+
+                                    member.getActor().castVote(lastCommitTime);
+
+                                }
+
+                            }
+                        }
+                    }, null/* result */);
+            member.getExecutor().execute(ft);
+            return ft;
 
         }
         
@@ -776,7 +810,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             quorum0.assertLeader(token);
 
             // Verify the expected services joined.
-            assertEquals(2,quorum0.getJoinedMembers().length);
+            assertEquals(2,quorum0.getJoined().length);
 
             final long nsend = doStressTest(nbuffers, nrecs, maxreclen,
                     largeRecordRate, useChecksums, isHighlyAvailable,
@@ -789,7 +823,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             quorum0.assertLeader(token);
             
             // Verify the expected services still joined.
-            assertEquals(2,quorum0.getJoinedMembers().length);
+            assertEquals(2,quorum0.getJoined().length);
 
         } finally {
             quorum0.terminate();
@@ -873,7 +907,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             quorum0.assertLeader(token);
 
             // Verify the expected services joined.
-            assertEquals(2,quorum0.getJoinedMembers().length);
+            assertEquals(2,quorum0.getJoined().length);
 
             // Verify the pipeline was reorganized into the vote order.
             assertEquals(new UUID[] {//
@@ -892,7 +926,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             quorum0.assertLeader(token);
             
             // Verify the expected services still joined.
-            assertEquals(2,quorum0.getJoinedMembers().length);
+            assertEquals(2,quorum0.getJoined().length);
 
         } finally {
             quorum0.terminate();
@@ -978,11 +1012,11 @@ public class TestWORMWriteCacheService extends TestCase3 {
             quorum0.assertLeader(token);
 
             // Verify the expected services joined.
-            fixture.assertCondition(new Runnable() {
+            AbstractQuorumTestCase.assertCondition(new Runnable() {
                 public void run() {
-                    assertEquals(3, quorum0.getJoinedMembers().length);
-                    assertEquals(3, quorum1.getJoinedMembers().length);
-                    assertEquals(3, quorum2.getJoinedMembers().length);
+                    assertEquals(3, quorum0.getJoined().length);
+                    assertEquals(3, quorum1.getJoined().length);
+                    assertEquals(3, quorum2.getJoined().length);
                 }
             });
 
@@ -1016,7 +1050,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             quorum0.assertLeader(token);
             
             // Verify the expected services still joined.
-            assertEquals(3,quorum0.getJoinedMembers().length);
+            assertEquals(3,quorum0.getJoined().length);
 
         } finally {
             quorum0.terminate();
@@ -1093,7 +1127,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             quorum0.assertLeader(token);
 
             // Verify the expected services joined.
-            assertEquals(2,quorum0.getJoinedMembers().length);
+            assertEquals(2,quorum0.getJoined().length);
 
             final long nsend = doStressTest(nbuffers, nrecs, maxreclen,
                     largeRecordRate, useChecksums, isHighlyAvailable,
@@ -1106,7 +1140,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             quorum0.assertLeader(token);
             
             // Verify the expected services still joined.
-            assertEquals(2,quorum0.getJoinedMembers().length);
+            assertEquals(2,quorum0.getJoined().length);
 
         } finally {
 
@@ -1179,7 +1213,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             quorum0.assertLeader(token);
 
             // Verify the expected services joined.
-            assertEquals(2,quorum0.getJoinedMembers().length);
+            assertEquals(2,quorum0.getJoined().length);
 
             final long nsend = doStressTest(nbuffers, nrecs, maxreclen,
                     largeRecordRate, useChecksums, isHighlyAvailable,
@@ -1192,7 +1226,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             quorum0.assertLeader(token);
             
             // Verify the expected services still joined.
-            assertEquals(2,quorum0.getJoinedMembers().length);
+            assertEquals(2,quorum0.getJoined().length);
 
         } finally {
 
@@ -1272,7 +1306,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             quorum0.assertLeader(token);
 
             // Verify the expected services joined.
-            assertEquals(2,quorum0.getJoinedMembers().length);
+            assertEquals(2,quorum0.getJoined().length);
             
             final long nsend = doStressTest(nbuffers, nrecs, maxreclen,
                     largeRecordRate, useChecksums, isHighlyAvailable,
@@ -1285,7 +1319,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             quorum0.assertLeader(token);
             
             // Verify the expected services still joined.
-            assertEquals(2,quorum0.getJoinedMembers().length);
+            assertEquals(2,quorum0.getJoined().length);
 
         } finally {
 
@@ -1358,7 +1392,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             quorum0.assertLeader(token);
 
             // Verify the expected services joined.
-            assertEquals(2,quorum0.getJoinedMembers().length);
+            assertEquals(2,quorum0.getJoined().length);
 
             final long nsend = doStressTest(nbuffers, nrecs, maxreclen,
                     largeRecordRate, useChecksums, isHighlyAvailable,
@@ -1371,7 +1405,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             quorum0.assertLeader(token);
             
             // Verify the expected services still joined.
-            assertEquals(2,quorum0.getJoinedMembers().length);
+            assertEquals(2,quorum0.getJoined().length);
 
         } finally {
 
@@ -1451,7 +1485,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             quorum0.assertLeader(token);
 
             // Verify the expected services joined.
-            assertEquals(2,quorum0.getJoinedMembers().length);
+            assertEquals(2,quorum0.getJoined().length);
 
             final long nsend = doStressTest(nbuffers, nrecs, maxreclen,
                     largeRecordRate, useChecksums, isHighlyAvailable,
@@ -1464,7 +1498,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             quorum0.assertLeader(token);
             
             // Verify the expected services still joined.
-            assertEquals(2,quorum0.getJoinedMembers().length);
+            assertEquals(2,quorum0.getJoined().length);
 
         } finally {
 
@@ -1538,11 +1572,11 @@ public class TestWORMWriteCacheService extends TestCase3 {
             quorum0.assertLeader(token);
 
             // Verify the expected services joined.
-            fixture.assertCondition(new Runnable() {
+            AbstractQuorumTestCase.assertCondition(new Runnable() {
                 public void run() {
-                    assertEquals(3, quorum0.getJoinedMembers().length);
-                    assertEquals(3, quorum1.getJoinedMembers().length);
-                    assertEquals(3, quorum2.getJoinedMembers().length);
+                    assertEquals(3, quorum0.getJoined().length);
+                    assertEquals(3, quorum1.getJoined().length);
+                    assertEquals(3, quorum2.getJoined().length);
                 }
             });
 
@@ -1557,7 +1591,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             quorum0.assertLeader(token);
             
             // Verify the expected services still joined.
-            assertEquals(3,quorum0.getJoinedMembers().length);
+            assertEquals(3,quorum0.getJoined().length);
 
         } finally {
             quorum0.terminate();
@@ -1636,11 +1670,11 @@ public class TestWORMWriteCacheService extends TestCase3 {
             quorum0.assertLeader(token);
 
             // Verify the expected services joined.
-            fixture.assertCondition(new Runnable() {
+            AbstractQuorumTestCase.assertCondition(new Runnable() {
                 public void run() {
-                    assertEquals(3, quorum0.getJoinedMembers().length);
-                    assertEquals(3, quorum1.getJoinedMembers().length);
-                    assertEquals(3, quorum2.getJoinedMembers().length);
+                    assertEquals(3, quorum0.getJoined().length);
+                    assertEquals(3, quorum1.getJoined().length);
+                    assertEquals(3, quorum2.getJoined().length);
                 }
             });
 
@@ -1655,7 +1689,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
             quorum0.assertLeader(token);
             
             // Verify the expected services still joined.
-            assertEquals(3,quorum0.getJoinedMembers().length);
+            assertEquals(3,quorum0.getJoined().length);
             
         } finally {
             quorum0.terminate();

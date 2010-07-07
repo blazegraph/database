@@ -254,7 +254,7 @@ public class TestHAWritePipeline extends ProxyTestCase<Journal> {
              * gives us the guarantee that this service is still the leader and
              * that the UUID in position zero is this service.
              */
-            final UUID[] joinOrder = q.getJoinedMembers();
+            final UUID[] joinOrder = q.getJoined();
 
             /*
              * Verify the quorum is valid before we proceed with our assumptions

@@ -25,11 +25,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jun 2, 2010
  */
 
-package com.bigdata.quorum;
+package com.bigdata.quorum.zk;
 
+import java.util.Arrays;
 import java.util.UUID;
 
-import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
+import com.bigdata.quorum.AbstractQuorum;
+import com.bigdata.quorum.Quorum;
+import com.bigdata.quorum.QuorumActor;
+import com.bigdata.quorum.QuorumMember;
 
 /**
  * Test the quorum semantics for a highly available quorum of 3 services. The
@@ -64,23 +68,23 @@ import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
  * 
  *          FIXME There will need to be unit tests for hot spares.
  */
-public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
+public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
 
     /**
      * 
      */
-    public TestHA3QuorumSemantics() {
+    public TestZkHA3QuorumSemantics() {
     }
 
     /**
      * @param name
      */
-    public TestHA3QuorumSemantics(String name) {
+    public TestZkHA3QuorumSemantics(String name) {
         super(name);
     }
 
     @Override
-    protected void setUp() throws Exception {
+    public void setUp() throws Exception {
         k = 3;
         super.setUp();
     }
@@ -117,7 +121,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
         
         // instruct an actor to add its client as a member.
         actor0.memberAdd();
-        fixture.awaitDeque();
+
         
         // client is a member.
         assertTrue(client0.isMember());
@@ -129,7 +133,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
 
         // instruct an actor to add its client as a member.
         actor1.memberAdd();
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
         
         // the client is now a member.
 //        assertTrue(client0.isMember());
@@ -141,7 +145,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
 
         // instruct an actor to remove its client as a member.
         actor0.memberRemove();
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
         
         // the client is no longer a member.
         assertFalse(client0.isMember());
@@ -153,7 +157,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
 
         // instruct an actor to remove its client as a member.
         actor1.memberRemove();
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
         
         // the client is no longer a member.
 //        assertFalse(client0.isMember());
@@ -204,7 +208,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
         actor0.memberAdd();
         actor1.memberAdd();
         actor2.memberAdd();
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
         
         assertEquals(new UUID[] { serviceId0, serviceId1, serviceId2 }, quorum0
                 .getMembers());
@@ -214,7 +218,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
          * the pipeline state as we go.
          */
         actor0.pipelineAdd();
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
         
         assertTrue(client0.isPipelineMember());
 //        assertFalse(client1.isPipelineMember());
@@ -227,7 +231,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
 //        assertNull(client2.downStreamId);
 
         actor1.pipelineAdd();
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
         
 //        assertTrue(client0.isPipelineMember());
         assertTrue(client1.isPipelineMember());
@@ -240,7 +244,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
 //        assertNull(client2.downStreamId);
 
         actor2.pipelineAdd();
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
         
 //        assertTrue(client0.isPipelineMember());
 //        assertTrue(client1.isPipelineMember());
@@ -266,7 +270,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
 
         // remove one from the pipeline.
         actor1.pipelineRemove();
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
         
 //        assertTrue(client0.isPipelineMember());
         assertFalse(client1.isPipelineMember());
@@ -280,7 +284,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
 
         // remove another from the pipeline.
         actor0.pipelineRemove();
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
         
         assertFalse(client0.isPipelineMember());
 //        assertFalse(client1.isPipelineMember());
@@ -294,7 +298,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
 
         // remove the last service from the pipeline.
         actor2.pipelineRemove();
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
         
 //        assertFalse(client0.isPipelineMember());
 //        assertFalse(client1.isPipelineMember());
@@ -310,7 +314,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
         actor0.memberRemove();
         actor1.memberRemove();
         actor2.memberRemove();
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
 
     }
 
@@ -349,13 +353,13 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
         actor0.memberAdd();
         actor1.memberAdd();
         actor2.memberAdd();
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
         
         // join the pipeline.
         actor0.pipelineAdd();
         actor1.pipelineAdd();
         actor2.pipelineAdd();
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
         
         // Should not be any votes.
         assertEquals(0,quorum0.getVotes().size());
@@ -364,7 +368,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
         
         // Cast a vote.
         actor0.castVote(lastCommitTime1);
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
         
         // The last consensus timestamp should not have been updated.
         assertEquals(-1L, client0.lastConsensusValue);
@@ -378,7 +382,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
 
         // Cast a vote for a different timestamp.
         actor1.castVote(lastCommitTime2);
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
         
         // The last consensus timestamp should not have been updated.
         assertEquals(-1L, client0.lastConsensusValue);
@@ -399,7 +403,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
          * consensus (simple majority) and the quorum will meet.
          */
         actor2.castVote(lastCommitTime1);
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
 
         // wait for quorums to meet (visibility guarantee).
         final long token1 = quorum0.awaitQuorum();
@@ -433,7 +437,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
         
         // Remove as a member.  This should not affect the consensus.
         actor1.memberRemove();
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
         
         // The last consensus timestamp should not have changed.
         assertEquals(lastCommitTime1, client0.lastConsensusValue);
@@ -457,7 +461,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
          * and (since the quorum was actually met) this will break the quorum.
          */
         actor0.memberRemove();
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
 
         // wait break to provide visibility for changes (but changes not
         // required for a quorum break might still not be visible.)
@@ -490,7 +494,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
 
         // Remove the last member service.
         actor2.memberRemove();
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
 
         assertCondition(new Runnable() {
             public void run() {
@@ -545,7 +549,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
         actor0.memberAdd();
         actor1.memberAdd();
         actor2.memberAdd();
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
         assertCondition(new Runnable() {
             public void run() {
                 assertEquals(3, quorum0.getMembers().length);
@@ -560,7 +564,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
         actor0.pipelineAdd();
         actor1.pipelineAdd();
         actor2.pipelineAdd();
-        fixture.awaitDeque();
+        //         fixture.awaitDeque();
 
         assertCondition(new Runnable() {
             public void run() {
@@ -582,7 +586,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
         
             actor0.castVote(lastCommitTime);
             actor1.castVote(lastCommitTime);
-            fixture.awaitDeque();
+            //         fixture.awaitDeque();
 
             // validate the token was assigned (must wait for meet).
             token1 = quorum0.awaitQuorum();
@@ -600,8 +604,6 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
                 public void run() {
                     // services have voted for a single lastCommitTime.
                     assertEquals(1, quorum0.getVotes().size());
-                    assertEquals(1, quorum1.getVotes().size());
-                    assertEquals(1, quorum2.getVotes().size());
 
                     // verify the vote order.
                     assertEquals(new UUID[] { serviceId0, serviceId1 }, quorum0
@@ -642,7 +644,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
          */
         {
             actor2.castVote(lastCommitTime);
-            fixture.awaitDeque();
+            //         fixture.awaitDeque();
 
             assertCondition(new Runnable() {
                 public void run() {
@@ -698,26 +700,25 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
              * there are still (k+1)/2 services in the quorum.
              */
             actor1.serviceLeave();
-            fixture.awaitDeque();
+            //         fixture.awaitDeque();
 
+            // services have voted for a single lastCommitTime.
+            assertEquals(1, quorum0.getVotes().size());
+
+            // verify the vote order.
+            assertEquals(new UUID[] { serviceId0, serviceId2 }, quorum0
+                    .getVotes().get(lastCommitTime));
+
+            // verify the consensus was NOT updated.
+            assertEquals(lastCommitTime, client0.lastConsensusValue);
+            assertEquals(lastCommitTime, client1.lastConsensusValue);
+            assertEquals(lastCommitTime, client2.lastConsensusValue);
+
+            /*
+             * Service join in the same order in which they cast their votes.
+             */
             assertCondition(new Runnable() {
                 public void run() {
-                    // services have voted for a single lastCommitTime.
-                    assertEquals(1, quorum0.getVotes().size());
-
-                    // verify the vote order.
-                    assertEquals(new UUID[] { serviceId0, serviceId2 }, quorum0
-                            .getVotes().get(lastCommitTime));
-
-                    // verify the consensus was NOT updated.
-                    assertEquals(lastCommitTime, client0.lastConsensusValue);
-                    assertEquals(lastCommitTime, client1.lastConsensusValue);
-                    assertEquals(lastCommitTime, client2.lastConsensusValue);
-
-                    /*
-                     * Service join in the same order in which they cast their
-                     * votes.
-                     */
                     assertEquals(new UUID[] { serviceId0, serviceId2 }, quorum0
                             .getJoined());
                     assertEquals(new UUID[] { serviceId0, serviceId2 }, quorum1
@@ -738,29 +739,24 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
             assertTrue(quorum1.isQuorumMet());
             assertTrue(quorum2.isQuorumMet());
 
-            assertCondition(new Runnable() {
-                public void run() {
-                    // The pipeline order is the same as the vote order.
-                    assertEquals(new UUID[] { serviceId0, serviceId2 }, quorum0
-                            .getPipeline());
-                    assertEquals(new UUID[] { serviceId0, serviceId2 }, quorum1
-                            .getPipeline());
-                    assertEquals(new UUID[] { serviceId0, serviceId2 }, quorum2
-                            .getPipeline());
-                }
-            });
-            
+            // The pipeline order is the same as the vote order.
+            assertEquals(new UUID[] { serviceId0, serviceId2 }, quorum0
+                    .getPipeline());
+            assertEquals(new UUID[] { serviceId0, serviceId2 }, quorum1
+                    .getPipeline());
+            assertEquals(new UUID[] { serviceId0, serviceId2 }, quorum2
+                    .getPipeline());
+
             /*
              * Rejoin the service.
              */
             actor1.pipelineAdd();
-            fixture.awaitDeque();
+            //         fixture.awaitDeque();
             actor1.castVote(lastCommitTime);
-            fixture.awaitDeque();
+            //         fixture.awaitDeque();
 
             assertCondition(new Runnable() {
                 public void run() {
-
                     // services have voted for a single lastCommitTime.
                     assertEquals(1, quorum0.getVotes().size());
                     assertEquals(1, quorum1.getVotes().size());
@@ -782,14 +778,15 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
                     assertEquals(lastCommitTime, client1.lastConsensusValue);
                     assertEquals(lastCommitTime, client2.lastConsensusValue);
 
-                    // Service join in the same order in which they cast their
-                    // votes.
-                    assertEquals(new UUID[] { serviceId0, serviceId2,
-                            serviceId1 }, quorum0.getJoined());
-                    assertEquals(new UUID[] { serviceId0, serviceId2,
-                            serviceId1 }, quorum1.getJoined());
-                    assertEquals(new UUID[] { serviceId0, serviceId2,
-                            serviceId1 }, quorum2.getJoined());
+                    /*
+                     * Service join in the same order in which they cast their votes.
+                     */
+                    assertEquals(new UUID[] { serviceId0, serviceId2, serviceId1 },
+                            quorum0.getJoined());
+                    assertEquals(new UUID[] { serviceId0, serviceId2, serviceId1 },
+                            quorum1.getJoined());
+                    assertEquals(new UUID[] { serviceId0, serviceId2, serviceId1 },
+                            quorum2.getJoined());
                 }
             });
 
@@ -829,11 +826,11 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
         {
 
             actor0.serviceLeave();
-            fixture.awaitDeque();
+            //         fixture.awaitDeque();
 
-            // the votes were withdrawn.
             assertCondition(new Runnable() {
                 public void run() {
+                    // the votes were withdrawn.
                     assertEquals(0, quorum0.getVotes().size());
                     assertEquals(0, quorum1.getVotes().size());
                     assertEquals(0, quorum2.getVotes().size());
@@ -870,7 +867,6 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
                     assertEquals(new UUID[] {}, quorum2.getPipeline());
                 }
             });
-
         }
         
         /*
@@ -882,21 +878,20 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
             actor0.pipelineAdd();
             actor1.pipelineAdd();
             actor2.pipelineAdd();
-            fixture.awaitDeque();
+            //         fixture.awaitDeque();
 
             actor0.castVote(lastCommitTime);
             actor1.castVote(lastCommitTime);
             actor2.castVote(lastCommitTime);
-            fixture.awaitDeque();
-            
+            //         fixture.awaitDeque();
+
             assertCondition(new Runnable() {
                 public void run() {
-                    
                     // services have voted for a single lastCommitTime.
-                    assertEquals(1,quorum0.getVotes().size());
-                    assertEquals(1,quorum1.getVotes().size());
-                    assertEquals(1,quorum2.getVotes().size());
-                    
+                    assertEquals(1, quorum0.getVotes().size());
+                    assertEquals(1, quorum1.getVotes().size());
+                    assertEquals(1, quorum2.getVotes().size());
+
                     // verify the vote order.
                     assertEquals(new UUID[] { serviceId0, serviceId1,
                             serviceId2 }, quorum0.getVotes()
@@ -913,10 +908,8 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
                     assertEquals(lastCommitTime, client1.lastConsensusValue);
                     assertEquals(lastCommitTime, client2.lastConsensusValue);
 
-                    /*
-                     * Service join in the same order in which they cast their
-                     * votes.
-                     */
+                    // Service join in the same order in which they cast their
+                    // votes.
                     assertEquals(new UUID[] { serviceId0, serviceId1,
                             serviceId2 }, quorum0.getJoined());
                     assertEquals(new UUID[] { serviceId0, serviceId1,
@@ -963,7 +956,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
              * Fail one follower.  The quorum should not break.
              */
             actor2.serviceLeave();
-            fixture.awaitDeque();
+            //         fixture.awaitDeque();
 
             assertCondition(new Runnable() {
                 public void run() {
@@ -1026,7 +1019,7 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
              * Fail the remaining follower.  The quorum will break.
              */
             actor1.serviceLeave();
-            fixture.awaitDeque();
+            //         fixture.awaitDeque();
 
             assertCondition(new Runnable() {
                 public void run() {
@@ -1112,7 +1105,6 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
         actor0.memberAdd();
         actor1.memberAdd();
         actor2.memberAdd();
-        fixture.awaitDeque();
 
         /*
          * Have the services join the pipeline a different order from the order
@@ -1125,14 +1117,13 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
         // actor2.pipelineAdd();
         actor1.pipelineAdd();
         actor0.pipelineAdd();
-        fixture.awaitDeque();
 
-        /*
-         * The service which we will cause to vote first (and hence will become
-         * the leader) is NOT at the head of the pipeline.
-         */
         assertCondition(new Runnable() {
             public void run() {
+                /*
+                 * The service which we will cause to vote first (and hence will
+                 * become the leader) is NOT at the head of the pipeline.
+                 */
                 assertEquals(new UUID[] { serviceId1, serviceId0 }, quorum0
                         .getPipeline());
                 assertEquals(new UUID[] { serviceId1, serviceId0 }, quorum1
@@ -1151,12 +1142,15 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
         
             actor0.castVote(lastCommitTime);
             actor1.castVote(lastCommitTime);
-            fixture.awaitDeque();
 
             // validate the token was assigned.
+            System.err.println("Awaiting quorums to report met.");
             token1 = quorum0.awaitQuorum();
+            System.err.println("Quorum0 reports met.");
             assertEquals(token1, quorum1.awaitQuorum());
+            System.err.println("Quorum1 reports met.");
             assertEquals(token1, quorum2.awaitQuorum());
+            System.err.println("Quorum2 reports met.");
             assertEquals(token1, quorum1.lastValidToken());
             assertEquals(token1, quorum2.lastValidToken());
             assertEquals(Quorum.NO_QUORUM + 1, quorum0.lastValidToken());
@@ -1172,6 +1166,13 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
                     assertEquals(1, quorum2.getVotes().size());
 
                     // verify the vote order.
+                    System.err.println("expected: "
+                            + Arrays.toString(new UUID[] { serviceId0,
+                                    serviceId1 }));
+                    System.err.println("actual  : "
+                            + Arrays.toString(quorum0.getVotes().get(
+                                    lastCommitTime)));
+
                     assertEquals(new UUID[] { serviceId0, serviceId1 }, quorum0
                             .getVotes().get(lastCommitTime));
                     assertEquals(new UUID[] { serviceId0, serviceId1 }, quorum1

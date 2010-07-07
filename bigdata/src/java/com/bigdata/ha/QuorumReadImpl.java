@@ -113,7 +113,7 @@ public class QuorumReadImpl<S extends HAReadGlue> extends
         // Block if necessary awaiting a met quorum.
         final long token = member.getQuorum().awaitQuorum();
 
-        final UUID[] joinedServiceIds = member.getQuorum().getJoinedMembers();
+        final UUID[] joinedServiceIds = member.getQuorum().getJoined();
 
         // Figure out which other joined service we will read on.
         final UUID otherId = getNextBadReadServiceId(joinedServiceIds);

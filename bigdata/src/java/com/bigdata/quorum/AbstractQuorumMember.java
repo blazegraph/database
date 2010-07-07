@@ -103,7 +103,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
     }
 
     public boolean isJoinedMember(final long token) {
-        final UUID[] a = getQuorum().getJoinedMembers();
+        final UUID[] a = getQuorum().getJoined();
         for(UUID t : a) {
             if(serviceId.equals(t)) {
                 // verify the token is still valid.
@@ -146,7 +146,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
      */
     public boolean isFollower(final long token) {
         final UUID serviceId = getServiceId();
-        final UUID[] joined = getQuorum().getJoinedMembers();
+        final UUID[] joined = getQuorum().getJoined();
         for (int i = 0; i < joined.length; i++) {
             final boolean eq = serviceId.equals(joined[i]);
             if (!eq)
@@ -211,7 +211,7 @@ abstract public class AbstractQuorumMember<S extends Remote> extends
 
     protected void assertFollower(final long token) {
         final UUID serviceId = getServiceId();
-        final UUID[] joined = getQuorum().getJoinedMembers();
+        final UUID[] joined = getQuorum().getJoined();
         for (int i = 0; i < joined.length; i++) {
             final boolean eq = serviceId.equals(joined[i]);
             if (!eq)

@@ -25,16 +25,26 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jun 2, 2010
  */
 
-package com.bigdata.quorum;
+package com.bigdata.quorum.zk;
 
+import java.io.IOException;
+import java.rmi.Remote;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import junit.framework.AssertionFailedError;
-import junit.framework.TestCase2;
 
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.ZooDefs.Ids;
+
+import com.bigdata.quorum.AbstractQuorum;
+import com.bigdata.quorum.MockQuorumFixture;
+import com.bigdata.quorum.Quorum;
+import com.bigdata.quorum.QuorumActor;
+import com.bigdata.quorum.QuorumWatcher;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum;
-import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
-import com.bigdata.quorum.MockQuorumFixture.MockQuorum.MockQuorumActor;
+import com.bigdata.zookeeper.AbstractZooTestCase;
+import com.bigdata.zookeeper.ZooKeeperAccessor;
 
 /**
  * Abstract base class for testing using a {@link MockQuorumFixture}.
@@ -42,86 +52,89 @@ import com.bigdata.quorum.MockQuorumFixture.MockQuorum.MockQuorumActor;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractQuorumTestCase extends TestCase2 {
+abstract public class AbstractZkQuorumTestCase extends AbstractZooTestCase {
 
-    public AbstractQuorumTestCase() {
+    public AbstractZkQuorumTestCase() {
         
     }
 
-    public AbstractQuorumTestCase(String name) {
+    public AbstractZkQuorumTestCase(String name) {
         super(name);
     }
 
-    /** The service replication factor (this must be set in {@link #setupUp()}). */
+    /**
+     * The service replication factor (this mus be set in {@link #setupUp()}).
+     */
     protected int k;
 
-    /** The per-client quorum objects. */
-    protected MockQuorum[] quorums;
+    // The logical service identifier (guaranteed unique in test namespace).
+    final String logicalServiceId = "/test/" + getName()
+            + UUID.randomUUID();
 
-    /** The clients. */
-    protected MockQuorumMember[] clients;
-
-    /**
-     * The per-client quorum actor objects. The unit tests send events on the
-     * behalf of the clients using these actor objects.
-     */
-    protected MockQuorumActor[] actors;
-
-    /** The mock shared quorum state object. */
-    protected MockQuorumFixture fixture;
+    // The per-client quorum objects.
+    ZKQuorumImpl[] quorums;
+    MockQuorumMember[] clients;
+    ZooKeeperAccessor[] accessors;
+    QuorumActor[] actors;
+    final MockServiceRegistrar<Remote> registrar = new MockServiceRegistrar();
     
     @Override
-    protected void setUp() throws Exception {
+    public void setUp() throws Exception {
 
         super.setUp();
         
         if(log.isInfoEnabled())
-            log.info(getName());
+            log.info(": " + getName());
 
         if (k == 0)
             throw new AssertionError("k is not set");
         
-        quorums = new MockQuorum[k];
+        // Create that znode. it will be the parent for this experiment.
+        zookeeper.create(logicalServiceId, new byte[0], Ids.OPEN_ACL_UNSAFE,
+                CreateMode.PERSISTENT);
+        
+        quorums = new ZKQuorumImpl[k];
         
         clients = new MockQuorumMember[k];
 
-        actors  = new MockQuorumActor[k];
-
-        fixture = new MockQuorumFixture();
-
-        fixture.start(); 
+        accessors = new ZooKeeperAccessor[k];
+        
+        actors  = new QuorumActor[k];
 
         /*
          * Setup the client quorums.
          */
-        final String logicalServiceId = "testLogicalService1";
         for (int i = 0; i < k; i++) {
-            quorums[i] = new MockQuorum(k,fixture);
-            clients[i] = new MockQuorumMember(logicalServiceId,fixture);
+            accessors[i] = getZooKeeperAccessorWithDistinctSession();
+            quorums[i] = new ZKQuorumImpl(k, accessors[i], acl);
+            clients[i] = new MockQuorumMember(logicalServiceId, registrar) {
+                public Remote newService() {
+                    try {
+                        return new MockService();
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            };
+            registrar.put(clients[i].getServiceId(), clients[i].getService());
             quorums[i].start(clients[i]);
-            actors [i] = quorums[i].getActor();
+            actors[i] = quorums[i].getActor();
         }
     
     }
 
-    protected void tearDown() throws Exception {
+    @Override
+    public void tearDown() throws Exception {
         if(log.isInfoEnabled())
-            log.info(getName());
-        if (quorums != null) {
-            for (int i = 0; i < k; i++) {
-                if (quorums[i] != null) {
-                    quorums[i].terminate();
-                    quorums[i] = null;
-                }
+            log.info(": " + getName());
+        for (int i = 0; i < k; i++) {
+            if (quorums[i] != null)
+                quorums[i].terminate();
+            if (accessors[i] != null) {
+                accessors[i].close();
             }
         }
-        if (fixture != null) {
-            fixture.terminate();
-        }
-        quorums = null;
-        clients = null;
-        actors  = null;
-        fixture = null;
+        super.tearDown();
     }
 
     /**
@@ -171,14 +184,13 @@ abstract public class AbstractQuorumTestCase extends TestCase2 {
      * @throws AssertionFailedError
      *             if the condition does not succeed within the timeout.
      */
-    static public void assertCondition(final Runnable cond,
-            final long timeout, final TimeUnit units) {
+    public void assertCondition(final Runnable cond, final long timeout,
+            final TimeUnit units) {
         final long begin = System.nanoTime();
         long nanos = units.toNanos(timeout);
         // remaining -= (now - begin) [aka elapsed]
         nanos -= System.nanoTime() - begin;
         while (true) {
-            AssertionFailedError cause = null;
             try {
                 // try the condition
                 cond.run();
@@ -190,16 +202,13 @@ abstract public class AbstractQuorumTestCase extends TestCase2 {
                     // Timeout - rethrow the failed assertion.
                     throw e;
                 }
-                cause = e;
             }
-            // Sleep up to 10ms or the remaining nanos, which ever is less.
-            final int millis = (int) Math.min(TimeUnit.NANOSECONDS
-                    .toMillis(nanos), 10);
-            if (log.isInfoEnabled())
-                log.info("Will retry: millis=" + millis + ", cause=" + cause);
             // sleep and retry.
             try {
-                Thread.sleep(millis);
+                // sleep up to 10ms or nanos, which ever is less.
+                Thread
+                        .sleep(Math.min(TimeUnit.NANOSECONDS.toMillis(nanos),
+                                10));
             } catch (InterruptedException e1) {
                 // propagate the interrupt.
                 Thread.currentThread().interrupt();
@@ -220,10 +229,10 @@ abstract public class AbstractQuorumTestCase extends TestCase2 {
      * 
      * @see #assertCondition(Runnable, long, TimeUnit)
      */
-    static public void assertCondition(final Runnable cond) {
-        
+    public void assertCondition(final Runnable cond) {
+
         assertCondition(cond, 5, TimeUnit.SECONDS);
-        
+
     }
     
 }

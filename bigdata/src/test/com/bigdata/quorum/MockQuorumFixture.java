@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.quorum;
 
+import java.io.IOException;
+import java.net.BindException;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.rmi.Remote;
 import java.util.Collections;
 import java.util.Iterator;
@@ -41,18 +45,18 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import junit.framework.AssertionFailedError;
-
 import org.apache.log4j.Logger;
 
-import com.bigdata.quorum.MockQuorumFixture.MockQuorum.MockQuorumActor;
+import com.bigdata.ha.HAPipelineGlue;
+import com.bigdata.journal.ha.HAWriteMessage;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum.MockQuorumWatcher;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -411,10 +415,10 @@ public class MockQuorumFixture {
         lock.lock();
         try {
             assertRunning();
-            if (false) {
-                // stack trace so we can see who generated this event.
-                log.warn("event=" + e, new RuntimeException("stack trace"));
-            }
+//            if (false) {
+//                // stack trace so we can see who generated this event.
+//                log.warn("event=" + e, new RuntimeException("stack trace"));
+//            }
             deque.put(e);
             dequeNotEmpty.signalAll();
         } catch (InterruptedException ex) {
@@ -424,103 +428,6 @@ public class MockQuorumFixture {
         }
     }
 
-    /**
-     * Wait up to a timeout until some condition succeeds.
-     * <p>
-     * Whenever more than one {@link AbstractQuorum} is under test there will be
-     * concurrent indeterminism concerning the precise ordering and timing as
-     * updates propagate from the {@link AbstractQuorum} which takes some action
-     * (castVote(), pipelineAdd(), etc.) to the other quorums attached to the
-     * same {@link MockQuorumFixture}. This uncertainty about the ordering and
-     * timing state changes is not dissimilar from the uncertainty we face in a
-     * real distributed system.
-     * <p>
-     * While there are times when this uncertainty does not affect the behavior
-     * of the tests, there are other times when we must have a guarantee that a
-     * specific vote order or pipeline order was established. For those cases,
-     * this method may be used to await an arbitrary condition. This method
-     * simply retries until the condition becomes true, sleeping a little after
-     * each failure.
-     * <p>
-     * Actions executed in the main thread of the unit test will directly update
-     * the internal state of the {@link MockQuorumFixture}, which is shared
-     * across the {@link MockQuorum}s. However, uncertainty about ordering can
-     * arise as a result of the interleaving of the actions taken by the
-     * {@link QuorumWatcher}s in response to both top-level actions and actions
-     * taken by other {@link QuorumWatcher}s. For example, the vote order or the
-     * pipeline order are fully determined based on sequence such as the
-     * following:
-     * 
-     * <pre>
-     * actor0.pipelineAdd();
-     * actor2.pipelineAdd();
-     * actor1.pipelineAdd();
-     * </pre>
-     * 
-     * When in doubt, or when a unit test displays stochastic behavior, you can
-     * use this method to wait until the quorum state has been correctly
-     * replicated to the {@link Quorum}s under test.
-     * 
-     * @param cond
-     *            The condition, which must throw an
-     *            {@link AssertionFailedError} if it does not succeed.
-     * @param timeout
-     *            The timeout.
-     * @param unit
-     * 
-     * @throws AssertionFailedError
-     *             if the condition does not succeed within the timeout.
-     */
-    public void assertCondition(final Runnable cond,
-            final long timeout, final TimeUnit units) {
-        final long begin = System.nanoTime();
-        long nanos = units.toNanos(timeout);
-        // remaining -= (now - begin) [aka elapsed]
-        nanos -= System.nanoTime() - begin;
-        while (true) {
-            try {
-                // try the condition
-                cond.run();
-                // success.
-                return;
-            } catch (AssertionFailedError e) {
-                if (nanos < 0) {
-                    // Timeout - rethrow the failed assertion.
-                    throw e;
-                }
-            }
-            // sleep and retry.
-            try {
-                // sleep up to 10ms or nanos, which ever is less.
-                Thread
-                        .sleep(Math.min(TimeUnit.NANOSECONDS.toMillis(nanos),
-                                10));
-            } catch (InterruptedException e1) {
-                // propagate the interrupt.
-                Thread.currentThread().interrupt();
-                return;
-            }
-        }
-    }
-
-    /**
-     * Waits up to 5 seconds for the condition to succeed.
-     * 
-     * @param cond
-     *            The condition, which must throw an
-     *            {@link AssertionFailedError} if it does not succeed.
-     * 
-     * @throws AssertionFailedError
-     *             if the condition does not succeed within the timeout.
-     * 
-     * @see #assertCondition(Runnable, long, TimeUnit)
-     */
-    public void assertCondition(final Runnable cond) {
-        
-        assertCondition(cond, 5, TimeUnit.SECONDS);
-        
-    }
-    
     /*
      * Private methods implement the conditional tests on the local state an
      * invoke the protected methods which actually carry out the action to
@@ -914,30 +821,36 @@ public class MockQuorumFixture {
                 fixture.clearToken();
             }
 
-            /**
-             * {@inheritDoc}
-             * <p>
-             * This implementation tunnels through to the fixture and makes the
-             * necessary changes directly. Those changes will be noticed by the
-             * {@link QuorumWatcher} implementations for the other clients in
-             * the unit test.
-             * <p>
-             * Note: This operations IS NOT atomic. Each pipeline remove/add is
-             * a separate atomic operation.
-             */
-            @Override
-            protected void reorganizePipeline() {
-                final UUID[] pipeline = getPipeline();
-                for (int i = 0; i < pipeline.length; i++) {
-                    final UUID t = pipeline[i];
-                    if (serviceId.equals(t)) {
-                        // Done.
-                        return;
-                    }
-                    fixture.pipelineRemove(t);
-                    fixture.pipelineAdd(t);
-                }
-            }
+//            /**
+//             * {@inheritDoc}
+//             * <p>
+//             * This implementation tunnels through to the fixture and makes the
+//             * necessary changes directly. Those changes will be noticed by the
+//             * {@link QuorumWatcher} implementations for the other clients in
+//             * the unit test.
+//             * <p>
+//             * Note: This operations IS NOT atomic. Each pipeline remove/add is
+//             * a separate atomic operation.
+//             */
+//            @Override
+//            protected boolean reorganizePipeline() {
+//                final UUID[] pipeline = getPipeline();
+//                final UUID[] joined = getJoinedMembers(); 
+//                final UUID leaderId = joined[0];
+//                boolean modified = false;
+//                for (int i = 0; i < pipeline.length; i++) {
+//                    final UUID otherId = pipeline[i];
+//                    if (leaderId.equals(otherId)) {
+//                        return modified;
+//                    }
+//                    final HAPipelineGlue otherService = (HAPipelineGlue) getQuorumMember()
+//                            .getService(otherId);
+//                    fixture.pipelineRemove(otherId);
+//                    fixture.pipelineAdd(otherId);
+//                    modified = true;
+//                }
+//                return modified;
+//            }
             
         }
 
@@ -1143,30 +1056,39 @@ public class MockQuorumFixture {
          */
         protected volatile UUID downStreamId = null;
 
+        private final S service;
+
+        private final MockQuorumFixture fixture;
+        
+        private volatile ExecutorService executorService = null;
+        
         /**
          * @param quorum
          */
-        protected MockQuorumMember(final String logicalServiceId) {
+        protected MockQuorumMember(final String logicalServiceId,
+                MockQuorumFixture fixture) {
 
             super(logicalServiceId, UUID.randomUUID()/* serviceId */);
+
+            this.service = newService();
+
+            this.fixture = fixture;
             
         }
 
-//        /**
-//         * Strengthened return type
-//         */
-//        public MockQuorum<S, QuorumMember<S>> getQuourm() {
-//         
-//            return (MockQuorum<S, QuorumMember<S>>) super.getQuorum();
-//            
-//        }
-        
         /**
-         * Can not resolve services (this functionality is not required for the
-         * unit tests in the <code>com.bigdata.quorum</code> package.
+         * Factory for the local service implementation object. The default
+         * implementation uses a {@link MockService}.
+         */
+        protected S newService() {
+            return (S) new MockService();
+        }
+
+        /**
+         * Resolves the service using the {@link MockQuorumFixture}.
          */
         public S getService(UUID serviceId) {
-            throw new UnsupportedOperationException();
+            return (S) fixture.getService(serviceId);
         }
 
 		/**
@@ -1186,38 +1108,166 @@ public class MockQuorumFixture {
             super.lostConsensus();
             this.lastConsensusValue = -1L;
         }
-        
-		/**
-		 * {@inheritDoc}
-		 * 
-		 * Overridden to save the current downstream service {@link UUID} on
-		 * {@link #downStreamId}
-		 */
-		public void pipelineChange(final UUID oldDownStreamId,
-				final UUID newDownStreamId) {
-			super.pipelineChange(oldDownStreamId, newDownStreamId);
-			this.downStreamId = newDownStreamId;
-		}
+
+        /**
+         * {@inheritDoc}
+         * 
+         * Overridden to save the current downstream service {@link UUID} on
+         * {@link #downStreamId}
+         */
+        public void pipelineChange(final UUID oldDownStreamId,
+                final UUID newDownStreamId) {
+            super.pipelineChange(oldDownStreamId, newDownStreamId);
+            this.downStreamId = newDownStreamId;
+        }
 
         /**
          * {@inheritDoc}
          * 
          * Overridden to clear the {@link #downStreamId}.
          */
-		public void pipelineRemove() {
-		    super.pipelineRemove();
-		    this.downStreamId = null;
-		}
+        public void pipelineRemove() {
+            super.pipelineRemove();
+            this.downStreamId = null;
+        }
 
+        @Override
+        public void start(final Quorum<?, ?> quorum) {
+            if (executorService == null)
+                executorService = Executors
+                        .newSingleThreadExecutor(DaemonThreadFactory
+                                .defaultThreadFactory());
+            super.start(quorum);
+        }
+        
+        @Override
+        public void terminate() {
+            super.terminate();
+            if(executorService!=null) {
+                executorService.shutdownNow();
+                executorService = null;
+            }
+        }
+        
         public Executor getExecutor() {
-            throw new UnsupportedOperationException();
+            return executorService;
         }
 
         public S getService() {
-            throw new UnsupportedOperationException();
+            return service;
         }
-		
-	}
+
+        /**
+         * Inner base class for service implementations provides access to the
+         * {@link MockQuorumMember}.
+         */
+        protected class ServiceBase implements Remote {
+
+        }
+
+        /**
+         * Mock service class.
+         */
+        class MockService extends ServiceBase implements HAPipelineGlue {
+
+            final InetSocketAddress addrSelf;
+
+            public MockService() {
+                try {
+                    this.addrSelf = new InetSocketAddress(getPort(0));
+                } catch (IOException ex) {
+                    throw new RuntimeException(ex);
+                }
+            }
+
+            public InetSocketAddress getWritePipelineAddr() {
+                return addrSelf;
+            }
+
+            /**
+             * @todo This is not fully general purpose since it is not strictly
+             *       forbidden that the service's lastCommitTime could change,
+             *       e.g., due to explicit intervention, and hence be updated
+             *       across this operation. The real implemention should be a
+             *       little more sophisticated.
+             */
+            public Future<Void> moveToEndOfPipeline() throws IOException {
+                final FutureTask<Void> ft = new FutureTask<Void>(
+                        new Runnable() {
+                            public void run() {
+
+                                // note the current vote (if any).
+                                final Long lastCommitTime = getQuorum()
+                                        .getCastVote(getServiceId());
+
+                                if (isPipelineMember()) {
+
+                                    // System.err
+                                    // .println("Will remove self from the pipeline: "
+                                    // + getServiceId());
+
+                                    getActor().pipelineRemove();
+
+                                    // System.err
+                                    // .println("Will add self back into the pipeline: "
+                                    // + getServiceId());
+
+                                    getActor().pipelineAdd();
+
+                                    if (lastCommitTime != null) {
+
+                                        // System.err
+                                        // .println("Will cast our vote again: lastCommitTime="
+                                        // + +lastCommitTime
+                                        // + ", "
+                                        // + getServiceId());
+
+                                        getActor().castVote(lastCommitTime);
+
+                                    }
+
+                                }
+                            }
+                        }, null/* result */);
+                getExecutor().execute(ft);
+                return ft;
+            }
+
+            public Future<Void> receiveAndReplicate(HAWriteMessage msg)
+                    throws IOException {
+                throw new UnsupportedOperationException();
+            }
+
+        } // MockService
+
+    } // MockQuorumMember
+
+    /**
+     * Return an open port on current machine. Try the suggested port first. If
+     * suggestedPort is zero, just select a random port
+     */
+    protected static int getPort(final int suggestedPort) throws IOException {
+
+        ServerSocket openSocket;
+
+        try {
+
+            openSocket = new ServerSocket(suggestedPort);
+
+        } catch (BindException ex) {
+
+            // the port is busy, so look for a random open port
+            openSocket = new ServerSocket(0);
+
+        }
+
+        final int port = openSocket.getLocalPort();
+
+        openSocket.close();
+
+        return port;
+
+    }
 
     public String toString() {
         /*

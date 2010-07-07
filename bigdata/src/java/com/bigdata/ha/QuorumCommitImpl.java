@@ -129,7 +129,7 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
          * For services (other than the leader) in the quorum, submit the
          * RunnableFutures to an Executor.
          */
-        final UUID[] joinedServiceIds = getQuorum().getJoinedMembers();
+        final UUID[] joinedServiceIds = getQuorum().getJoined();
         
         // Verify the quorum is valid.
         member.assertLeader(token);
@@ -238,7 +238,7 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
          * For services (other than the leader) in the quorum, submit the
          * RunnableFutures to an Executor.
          */
-        final UUID[] joinedServiceIds = getQuorum().getJoinedMembers();
+        final UUID[] joinedServiceIds = getQuorum().getJoined();
         
         member.assertLeader(token);
 
@@ -341,7 +341,7 @@ public class QuorumCommitImpl<S extends HACommitGlue> extends
          * For services (other than the leader) in the quorum, submit the
          * RunnableFutures to an Executor.
          */
-        final UUID[] joinedServiceIds = getQuorum().getJoinedMembers();
+        final UUID[] joinedServiceIds = getQuorum().getJoined();
 
         member.assertLeader(token);
 

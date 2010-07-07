@@ -28,13 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.quorum.zk;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.rmi.Remote;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -43,14 +39,8 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooDefs.Ids;
 
-import com.bigdata.ha.HAPipelineGlue;
-import com.bigdata.journal.ha.HAWriteMessage;
-import com.bigdata.quorum.AbstractQuorumMember;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
-import com.bigdata.quorum.MockQuorumFixture;
 import com.bigdata.quorum.QuorumActor;
-import com.bigdata.quorum.QuorumMember;
-import com.bigdata.quorum.MockQuorumFixture.MockQuorum;
 import com.bigdata.zookeeper.AbstractZooTestCase;
 import com.bigdata.zookeeper.ZooKeeperAccessor;
 
@@ -125,14 +115,13 @@ public class TestZkQuorum extends AbstractZooTestCase {
      * @throws IOException
      * @throws TimeoutException
      * @throws AsynchronousQuorumCloseException
-     * 
-     * @todo Do the same test with k:=3 using a doXXX() helper.
      */
     public void test_run1() throws InterruptedException, KeeperException,
             IOException, AsynchronousQuorumCloseException, TimeoutException {
 
         // The service replication factor.
         final int k = 1;
+
         // The logical service identifier (guaranteed unique in test namespace).
         final String logicalServiceId = "/test/" + getName()
                 + UUID.randomUUID();
@@ -155,8 +144,15 @@ public class TestZkQuorum extends AbstractZooTestCase {
             for (int i = 0; i < k; i++) {
                 accessors[i] = getZooKeeperAccessorWithDistinctSession();
                 quorums[i] = new ZKQuorumImpl(k, accessors[i], acl);
-                clients[i] = new MockQuorumMember(logicalServiceId,
-                        new MockService(), registrar);
+                clients[i] = new MockQuorumMember(logicalServiceId, registrar){
+                    public Remote newService() {
+                        try {
+                            return new MockService();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                };
                 registrar.put(clients[i].getServiceId(), clients[i].getService());
                 quorums[i].start(clients[i]);
                 actors[i] = quorums[i].getActor();
@@ -228,178 +224,6 @@ public class TestZkQuorum extends AbstractZooTestCase {
             }
         }
 
-    }
-
-    /**
-     * Trivial mock for a service registery.
-     * 
-     * @param <V>
-     */
-    private static class MockServiceRegistrar<V extends Remote> {
-        
-        private final ConcurrentHashMap<UUID, V> services = new ConcurrentHashMap<UUID, V>();
-        
-        public MockServiceRegistrar() {
-            
-        }
-        
-        public void put(UUID serviceId,V service) {
-            services.put(serviceId, service);
-        }
-        
-        public V get(UUID serviceId) {
-            return services.get(serviceId);
-        }
-        
-    }
-    
-    /**
-     * NOP client base class used for the individual clients for each
-     * {@link MockQuorum} registered with of a shared {@link MockQuorumFixture}
-     * - you can actually use any {@link QuorumMember} implementation you like
-     * with the {@link MockQuorumFixture}, not just this one. The implementation
-     * you use DOES NOT have to be derived from this class. .
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     * @version $Id: MockQuorumFixture.java 2970 2010-06-03 22:21:22Z
-     *          thompsonbry $
-     */
-    static class MockQuorumMember<S extends Remote> extends
-            AbstractQuorumMember<S> {
-
-        /**
-         * The local implementation of the {@link Remote} interface.
-         */
-        private final S service;
-        
-        /**
-         * Simple service registrar.
-         */
-        private final MockServiceRegistrar<S> registrar;
-        
-        /**
-         * The last lastCommitTime value around which a consensus was achieved
-         * and initially -1L, but this is cleared to -1L each time the consensus
-         * is lost.
-         */
-        protected volatile long lastConsensusValue = -1L;
-
-        /**
-         * The downstream service in the write pipeline.
-         */
-        protected volatile UUID downStreamId = null;
-
-        /**
-         * @param quorum
-         */
-        protected MockQuorumMember(final String logicalServiceId,
-                final S service,
-                final MockServiceRegistrar<S> registrar) {
-
-            super(logicalServiceId, UUID.randomUUID()/* serviceId */);
-            
-            this.service = service;
-            
-            this.registrar = registrar;
-            
-        }
-
-        // /**
-        // * Strengthened return type
-        // */
-        // public MockQuorum<S, QuorumMember<S>> getQuourm() {
-        //         
-        // return (MockQuorum<S, QuorumMember<S>>) super.getQuorum();
-        //            
-        // }
-
-        /**
-         * Can not resolve services (this functionality is not required for the
-         * unit tests in the <code>com.bigdata.quorum</code> package.
-         */
-        public S getService(UUID serviceId) {
-            return registrar.get(serviceId);
-        }
-
-        /**
-         * {@inheritDoc}
-         * 
-         * Overridden to save the <i>lastCommitTime</i> on
-         * {@link #lastConsensusValue}.
-         */
-        @Override
-        public void consensus(long lastCommitTime) {
-            super.consensus(lastCommitTime);
-            this.lastConsensusValue = lastCommitTime;
-        }
-
-        @Override
-        public void lostConsensus() {
-            super.lostConsensus();
-            this.lastConsensusValue = -1L;
-        }
-
-        /**
-         * {@inheritDoc}
-         * 
-         * Overridden to save the current downstream service {@link UUID} on
-         * {@link #downStreamId}
-         */
-        public void pipelineChange(final UUID oldDownStreamId,
-                final UUID newDownStreamId) {
-            super.pipelineChange(oldDownStreamId, newDownStreamId);
-            this.downStreamId = newDownStreamId;
-        }
-
-        /**
-         * {@inheritDoc}
-         * 
-         * Overridden to clear the {@link #downStreamId}.
-         */
-        public void pipelineRemove() {
-            super.pipelineRemove();
-            this.downStreamId = null;
-        }
-
-        public Executor getExecutor() {
-            throw new UnsupportedOperationException();
-        }
-
-        public S getService() {
-            return service;
-        }
-
-    }
-
-    /**
-     * Mock service class.
-     */
-    static private class MockService implements HAPipelineGlue {
-
-        final InetSocketAddress addrSelf;
-        
-        public MockService() throws IOException {
-            this.addrSelf = new InetSocketAddress(getPort(0));
-        }
-        
-        public InetSocketAddress getWritePipelineAddr() {
-            return addrSelf;
-        }
-
-        /**
-         * FIXME Implementation requires access to the {@link QuorumActor}. Then
-         * do pipelineRemove(), pipelineAdd().
-         */
-        public Future<Void> moveToEndOfPipeline() throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public Future<Void> receiveAndReplicate(HAWriteMessage msg)
-                throws IOException {
-            throw new UnsupportedOperationException();
-        }
-        
     }
     
 }
