@@ -191,7 +191,7 @@ public interface Quorum<S extends Remote, C extends QuorumClient<S>> {
      * 
      * @return The {@link UUID}s of the member services joined with this quorum.
      */
-    UUID[] getJoinedMembers();
+    UUID[] getJoined();
 
     /**
      * Return the service identifiers for the services in the write pipeline in

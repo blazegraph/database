@@ -39,6 +39,8 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
      * When the service reconnects, it will reestablish those connections.
      * 
      * @todo Good idea? Bad idea?
+     * 
+     * @see http://wiki.apache.org/hadoop/ZooKeeper/FAQ#A4
      */
     public Future<Void> bounceZookeeperConnection();
     

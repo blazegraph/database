@@ -183,7 +183,7 @@ public interface QuorumStateChangeListener {
      * <li>There will be at least <code>(k+1)/2</code> services which have voted
      * for the same <i>lastCommitTime</i>.</li>
      * <li>There will be at <code>(k+1)/2</code> services joined with the
-     * quorum. The {@link Quorum#getJoinedMembers() join order} will be the same
+     * quorum. The {@link Quorum#getJoined() join order} will be the same
      * as the {@link Quorum#getVotes()} for the services which voted for the
      * <i>lastCommitTime</li> around which a consensus was formed.</li>
      * <li>If this quorum member is joined with the quorum it will have observed

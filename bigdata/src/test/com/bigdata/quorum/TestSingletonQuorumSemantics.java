@@ -152,7 +152,10 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
      * 
      * @todo For some reason this unit test occasionally takes much longer to
      *       run than would otherwise be expected (up to a few seconds versus a
-     *       small fraction of a second). I have not tracked this down yet.
+     *       small fraction of a second). You can see this in the timestamps of
+     *       the logger. (This appears to be related to a watcher's action that
+     *       is not terminating but gets interrupted when the unit test shuts
+     *       down after a 5 second shutdown timeout).
      */
 	public void test_voting() throws InterruptedException {
 
@@ -270,7 +273,7 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
         
         // verify service was joined.
         assertTrue(client.isJoinedMember(quorum.token()));
-        assertEquals(new UUID[] { serviceId }, quorum.getJoinedMembers());
+        assertEquals(new UUID[] { serviceId }, quorum.getJoined());
 
         // validate the token was assigned.
         fixture.awaitDeque();
@@ -298,7 +301,7 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
         assertEquals(Quorum.NO_QUORUM, quorum.token());
         assertEquals(token1, quorum.lastValidToken());
         assertFalse(client.isJoinedMember(quorum.token()));
-        assertEquals(new UUID[]{},quorum.getJoinedMembers());
+        assertEquals(new UUID[]{},quorum.getJoined());
         assertFalse(client.isPipelineMember());
         assertEquals(new UUID[]{},quorum.getPipeline());
 
@@ -324,7 +327,7 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
         final long token2 = quorum.awaitQuorum();
 
         // verify the joined services. 
-        assertEquals(new UUID[] { serviceId }, quorum.getJoinedMembers());
+        assertEquals(new UUID[] { serviceId }, quorum.getJoined());
 
         // validate the token was assigned by the leader.
         assertTrue(quorum.isQuorumMet());
@@ -355,7 +358,7 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
         assertEquals(Quorum.NO_QUORUM, quorum.token());
         assertEquals(token2, quorum.lastValidToken());
         assertFalse(client.isJoinedMember(quorum.token()));
-        assertEquals(new UUID[]{},quorum.getJoinedMembers());
+        assertEquals(new UUID[]{},quorum.getJoined());
         assertFalse(client.isPipelineMember());
         assertEquals(new UUID[]{},quorum.getPipeline());
         
