@@ -104,7 +104,7 @@ public class VerifyStatementBuffer extends StatementBuffer {
 
             nterms.incrementAndGet();
 
-            if (v.getIV() == IRawTripleStore.NULL) {
+            if (v.getIV() == null) {
                 
                 if(WARN) log.warn("Unknown term: "+v);
 

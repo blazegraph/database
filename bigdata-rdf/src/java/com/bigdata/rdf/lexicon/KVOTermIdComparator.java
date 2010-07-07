@@ -3,6 +3,7 @@ package com.bigdata.rdf.lexicon;
 import java.util.Comparator;
 
 import com.bigdata.btree.keys.KVO;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -25,14 +26,10 @@ public class KVOTermIdComparator implements Comparator<KVO<BigdataValue>> {
     public int compare(final KVO<BigdataValue> term1,
             final KVO<BigdataValue> term2) {
 
-        final long id1 = term1.obj.getIV();
-        final long id2 = term2.obj.getIV();
+        final IV iv1 = term1.obj.getIV();
+        final IV iv2 = term2.obj.getIV();
 
-        if (id1 < id2)
-            return -1;
-        if (id1 > id2)
-            return 1;
-        return 0;
+        return iv1.compareTo(iv2);
 
     }
 

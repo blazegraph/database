@@ -1,6 +1,7 @@
 package com.bigdata.rdf.model;
 
 import java.util.Comparator;
+import com.bigdata.rdf.internal.IV;
 
 /**
  * Places {@link BigdataValue}s into an ordering determined by their assigned
@@ -22,12 +23,10 @@ public class TermIdComparator implements Comparator<BigdataValue> {
      */
     public int compare(BigdataValue term1, BigdataValue term2) {
 
-        final long id1 = term1.getIV();
-        final long id2 = term2.getIV();
+        final IV id1 = term1.getIV();
+        final IV id2 = term2.getIV();
         
-        if(id1 < id2) return -1;
-        if(id1 > id2) return 1;
-        return 0;
+        return id1.compareTo(id2);
 
     }
 

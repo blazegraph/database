@@ -34,6 +34,7 @@ import java.util.Properties;
 import org.openrdf.model.Literal;
 
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
@@ -138,12 +139,17 @@ public class BigdataRDFFullTextIndex extends FullTextIndex implements
              * cost of re-indexing each time we see a term.
              */
 
-            final long termId = val.getIV();
+            final IV termId = val.getIV();
 
-            assert termId != IRawTripleStore.NULL; // the termId must have been
+            assert termId != null; // the termId must have been
                                                     // assigned.
 
-            index(buffer, termId, 0/* fieldId */, languageCode,
+            // don't bother text indexing inline values for now
+            if (termId.isInline()) {
+                continue;
+            }
+            
+            index(buffer, termId.getTermId(), 0/* fieldId */, languageCode,
                     new StringReader(text));
 
             n++;

@@ -61,11 +61,6 @@ import com.bigdata.rdf.store.IRawTripleStore;
 public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     /**
-     * @see IRawTripleStore#NULL
-     */
-    protected final long NULL = IRawTripleStore.NULL;
-
-    /**
      * WARNING: Use {@link #getInstance(String)} NOT this constructor.
      */
     private BigdataValueFactoryImpl() {

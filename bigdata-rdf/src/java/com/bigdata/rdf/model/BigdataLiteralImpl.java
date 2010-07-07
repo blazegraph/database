@@ -79,7 +79,7 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
     BigdataLiteralImpl(final BigdataValueFactory valueFactory,
             final String label, final String language, final BigdataURI datatype) {
 
-        super(valueFactory, NULL);
+        super(valueFactory, null);
 
         if (label == null)
             throw new IllegalArgumentException();

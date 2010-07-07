@@ -19,8 +19,6 @@ import com.bigdata.striterator.IKeyOrder;
 
 public class MagicAccessPath extends AbstractAccessPath<IMagicTuple> {
     
-    private static transient final long NULL = IRawTripleStore.NULL;
-
     private MagicTupleSerializer tupleSer;
     
     /** Relation (resolved lazily if not specified to the ctor). */

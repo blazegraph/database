@@ -49,6 +49,7 @@ package com.bigdata.rdf.rules;
 
 import java.util.Set;
 
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IRule;
@@ -74,8 +75,8 @@ public abstract class AbstractRuleFastClosure_5_6_7_9 extends
             final String name,
             final String database,
             final String focusStore,
-            final IConstant<Long> rdfsSubPropertyOf,
-            final IConstant<Long> propertyId) {
+            final IConstant<IV> rdfsSubPropertyOf,
+            final IConstant<IV> propertyId) {
 
         super(name, database, rdfsSubPropertyOf, propertyId,
                 new FastClosure_5_6_7_9_RuleTaskFactory(database, focusStore,
@@ -98,15 +99,15 @@ public abstract class AbstractRuleFastClosure_5_6_7_9 extends
 
         private final String focusStore;
 
-        private final IConstant<Long> rdfsSubPropertyOf;
+        private final IConstant<IV> rdfsSubPropertyOf;
 
-        private final IConstant<Long> propertyId;
+        private final IConstant<IV> propertyId;
         
         public FastClosure_5_6_7_9_RuleTaskFactory(
                 final String database,
                 final String focusStore,
-                final IConstant<Long> rdfsSubPropertyOf,
-                final IConstant<Long> propertyId) {
+                final IConstant<IV> rdfsSubPropertyOf,
+                final IConstant<IV> propertyId) {
             
             this.database = database;
             
@@ -125,9 +126,9 @@ public abstract class AbstractRuleFastClosure_5_6_7_9 extends
                     joinNexus, buffer, /* P, */
                     rdfsSubPropertyOf, propertyId) {
 
-                public Set<Long> getSet() {
+                public Set<IV> getSet() {
 
-                    final Set<Long> set = getSubPropertiesOf(propertyId);
+                    final Set<IV> set = getSubPropertiesOf(propertyId);
 
                     if (log.isDebugEnabled()) {
 

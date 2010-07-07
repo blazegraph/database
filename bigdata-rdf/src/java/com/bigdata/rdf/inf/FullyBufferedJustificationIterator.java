@@ -88,11 +88,21 @@ public class FullyBufferedJustificationIterator implements IJustificationIterato
         keyBuilder = new KeyBuilder(db.getSPOKeyArity() * (1 + 3)
                 * Bytes.SIZEOF_LONG);
 
-        final byte[] fromKey = keyBuilder.reset().append(head.s()).append(
-                head.p()).append(head.o()).getKey();
+        /*
+         * This is the implementation for backwards
+         * compatibility.  We should not see inline values here.
+         */
+        if (head.s().isInline() || head.p().isInline() || head.o().isInline()) {
+            throw new RuntimeException();
+        }
+        
+        final byte[] fromKey = keyBuilder.reset().append(head.s().getTermId())
+                .append(head.p().getTermId())
+                .append(head.o().getTermId()).getKey();
 
-        final byte[] toKey = keyBuilder.reset().append(head.s()).append(
-                head.p()).append(head.o() + 1).getKey();
+        final byte[] toKey = keyBuilder.reset().append(head.s().getTermId())
+                .append(head.p().getTermId())
+                .append(head.o().getTermId() + 1).getKey();
 
         final long rangeCount = ndx.rangeCount(fromKey,toKey);
 

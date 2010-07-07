@@ -47,6 +47,8 @@ import org.deri.iris.builtins.BuiltinsFactory;
 import org.deri.iris.optimisations.magicsets.MagicSets;
 import org.deri.iris.terms.TermFactory;
 
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.rules.MappedProgram;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
@@ -539,9 +541,9 @@ type (triple vs. NOT_EQUAL for example).
         if (TRIPLE.equals(literal.getAtom().getPredicate())) {
             
             ITuple tuple = literal.getAtom().getTuple();
-            IVariableOrConstant<Long> s = convertToBigdataTerm(tuple.get(0));
-            IVariableOrConstant<Long> p = convertToBigdataTerm(tuple.get(1));
-            IVariableOrConstant<Long> o = convertToBigdataTerm(tuple.get(2));
+            IVariableOrConstant<IV> s = convertToBigdataTerm(tuple.get(0));
+            IVariableOrConstant<IV> p = convertToBigdataTerm(tuple.get(1));
+            IVariableOrConstant<IV> o = convertToBigdataTerm(tuple.get(2));
             
             return new SPOPredicate(
                 db.getSPORelation().getNamespace(), // will get set correctly later by TMUtility
@@ -553,7 +555,7 @@ type (triple vs. NOT_EQUAL for example).
             ITuple tuple = literal.getAtom().getTuple();
             org.deri.iris.api.basics.IPredicate predicate = 
                 literal.getAtom().getPredicate();
-            IVariableOrConstant<Long>[] terms = 
+            IVariableOrConstant<IV>[] terms = 
                 new IVariableOrConstant[predicate.getArity()];
             for (int i = 0; i < terms.length; i++) {
                 terms[i] = convertToBigdataTerm(tuple.get(i));
@@ -589,11 +591,11 @@ type (triple vs. NOT_EQUAL for example).
      * @return
      *              the bigdata term
      */
-    private static IVariableOrConstant<Long> convertToBigdataTerm(ITerm term) {
+    private static IVariableOrConstant<IV> convertToBigdataTerm(ITerm term) {
      
         String value = (String) term.getValue();
         if (term.isGround()) {
-            return new Constant<Long>(Long.valueOf(value));
+            return new Constant<IV>(new TermId(Long.valueOf(value)));
         } else {
             return Var.var(value);
         }

@@ -42,6 +42,8 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
@@ -54,7 +56,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Id2TermTupleSerializer extends DefaultTupleSerializer<Long, BigdataValue> {
+public class Id2TermTupleSerializer extends DefaultTupleSerializer<IV, BigdataValue> {
 
     /**
      * 
@@ -150,13 +152,13 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<Long, Bigdata
      * 
      * @return The term identifier.
      */
-    public Long deserializeKey(ITuple tuple) {
+    public IV deserializeKey(ITuple tuple) {
 
         final byte[] key = tuple.getKeyBuffer().array();
 
         final long id = KeyBuilder.decodeLong(key, 0);
 
-        return id;
+        return new TermId(id);
 
     }
 
@@ -194,11 +196,11 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<Long, Bigdata
      */
     public BigdataValue deserialize(final ITuple tuple) {
 
-        final long id = deserializeKey(tuple);
+        final IV iv = deserializeKey(tuple);
 
         final BigdataValue tmp = valueSer.deserialize(tuple.getValueStream());
 
-        tmp.setIV(id);
+        tmp.setIV(iv);
 
         return tmp;
 

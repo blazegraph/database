@@ -57,6 +57,7 @@ import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
 import com.bigdata.BigdataStatics;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.rules.RuleContextEnum;
@@ -256,8 +257,6 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
     protected static final boolean INFO = log.isInfoEnabled();
 
     protected static final boolean DEBUG = log.isDebugEnabled();
-
-    private final long NULL = IRawTripleStore.NULL;
 
     protected final BigdataTripleSource tripleSource;
 
@@ -1250,33 +1249,33 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         // @todo why is [s] handled differently?
         // because [s] is the variable in free text searches, no need to test
         // to see if the free text search expander is in place
-        final IVariableOrConstant<Long> s = generateVariableOrConstant(
+        final IVariableOrConstant<IV> s = generateVariableOrConstant(
                 stmtPattern.getSubjectVar());
         if (s == null) {
             return null;
         }
         
-        final IVariableOrConstant<Long> p;
+        final IVariableOrConstant<IV> p;
         if (expander == null) {
             p = generateVariableOrConstant(stmtPattern.getPredicateVar());
         } else {
-            p = new Constant<Long>(IRawTripleStore.NULL);
+            p = new Constant<IV>(null);
         }
         if (p == null) {
             return null;
         }
         
-        final IVariableOrConstant<Long> o;
+        final IVariableOrConstant<IV> o;
         if (expander == null) {
             o = generateVariableOrConstant(stmtPattern.getObjectVar());
         } else {
-            o = new Constant<Long>(IRawTripleStore.NULL);
+            o = new Constant<IV>(null);
         }
         if (o == null) {
             return null;
         }
         
-        final IVariableOrConstant<Long> c;
+        final IVariableOrConstant<IV> c;
         if (!database.isQuads()) {
             /*
              * Either triple store mode or provenance mode.
@@ -1443,17 +1442,17 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
      * @param var
      * @return
      */
-    private IVariableOrConstant<Long> generateVariableOrConstant(final Var var) {
-        final IVariableOrConstant<Long> result;
+    private IVariableOrConstant<IV> generateVariableOrConstant(final Var var) {
+        final IVariableOrConstant<IV> result;
         final BigdataValue val = (BigdataValue) var.getValue();
         final String name = var.getName();
         if (val == null) {
             result = com.bigdata.relation.rule.Var.var(name);
         } else {
-            final Long id = val.getIV();
-            if (id.longValue() == NULL)
+            final IV iv = val.getIV();
+            if (iv == null)
                 return null;
-            result = new Constant<Long>(id);
+            result = new Constant<IV>(iv);
         }
         return result;
     }
@@ -1494,16 +1493,16 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
 
     private IConstraint generateConstraint(ValueExpr left, ValueExpr right,
             CompareOp operator) {
-        IVariable<Long> var = null;
-        IConstant<Long> constant = null;
+        IVariable<IV> var = null;
+        IConstant<IV> constant = null;
         if (left instanceof Var) {
             var = com.bigdata.relation.rule.Var.var(((Var) left).getName());
         } else if (left instanceof ValueConstant) {
             BigdataValue value = (BigdataValue) ((ValueConstant) left).getValue();
-            final Long id = value.getIV();
-            if (id.longValue() == NULL)
+            final IV iv = value.getIV();
+            if (iv == null)
                 return null;
-            constant = new Constant<Long>(id);
+            constant = new Constant<IV>(iv);
         } else {
             return null;
         }
@@ -1511,10 +1510,10 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             var = com.bigdata.relation.rule.Var.var(((Var) right).getName());
         } else if (right instanceof ValueConstant) {
             BigdataValue value = (BigdataValue) ((ValueConstant) right).getValue();
-            final Long id = value.getIV();
-            if (id.longValue() == NULL)
+            final IV iv = value.getIV();
+            if (iv == null)
                 return null;
-            constant = new Constant<Long>(id);
+            constant = new Constant<IV>(iv);
         } else {
             return null;
         }

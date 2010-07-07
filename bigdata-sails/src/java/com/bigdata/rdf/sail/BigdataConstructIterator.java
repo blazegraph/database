@@ -11,6 +11,7 @@ import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
@@ -178,9 +179,9 @@ public class BigdataConstructIterator implements
          * actually exist in the lexicon (not always the case with construct).
          */
         private boolean isValid(SPO spo) {
-            return spo.s != IRawTripleStore.NULL &&
-                   spo.p != IRawTripleStore.NULL &&
-                   spo.o != IRawTripleStore.NULL;
+            return spo.s != null &&
+                   spo.p != null &&
+                   spo.o != null;
         }
         
         /**
@@ -191,15 +192,15 @@ public class BigdataConstructIterator implements
             Value subject = bindingSet.getValue("subject");
             Value predicate = bindingSet.getValue("predicate");
             Value object = bindingSet.getValue("object");
-            long s = IRawTripleStore.NULL; 
+            IV s = null; 
             if (subject instanceof BigdataValue) {
                 s = ((BigdataValue) subject).getIV();
             }
-            long p = IRawTripleStore.NULL; 
+            IV p = null; 
             if (predicate instanceof BigdataValue) {
                 p = ((BigdataValue) predicate).getIV();
             }
-            long o = IRawTripleStore.NULL; 
+            IV o = null; 
             if (object instanceof BigdataValue) {
                 o = ((BigdataValue) object).getIV();
             }

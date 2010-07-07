@@ -28,7 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation.rule;
 
 import junit.framework.TestCase2;
-
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.spo.SPOPredicate;
 
 /**
@@ -51,20 +53,20 @@ abstract public class AbstractRuleTestCase extends TestCase2 {
         super(name);
     }
 
-    protected final static Constant<Long> rdfsSubClassOf = new Constant<Long>(
-            1L);
+    protected final static Constant<IV> rdfsSubClassOf = new Constant<IV>(
+            new TermId(VTE.URI, 1L));
     
-    protected final static Constant<Long> rdfsResource = new Constant<Long>(
-            2L);
+    protected final static Constant<IV> rdfsResource = new Constant<IV>(
+            new TermId(VTE.URI, 2L));
     
-    protected final static Constant<Long> rdfType = new Constant<Long>(
-            3L);
+    protected final static Constant<IV> rdfType = new Constant<IV>(
+            new TermId(VTE.URI, 3L));
     
-    protected final static Constant<Long> rdfsClass = new Constant<Long>(
-            4L);
+    protected final static Constant<IV> rdfsClass = new Constant<IV>(
+            new TermId(VTE.URI, 4L));
 
-    protected final static Constant<Long> rdfProperty = new Constant<Long>(
-            5L);
+    protected final static Constant<IV> rdfProperty = new Constant<IV>(
+            new TermId(VTE.URI, 5L));
 
     /**
      * this is rdfs9:
@@ -133,8 +135,8 @@ abstract public class AbstractRuleTestCase extends TestCase2 {
          * @param p
          * @param o
          */
-        public P(String relation, IVariableOrConstant<Long> s,
-                IVariableOrConstant<Long> p, IVariableOrConstant<Long> o) {
+        public P(String relation, IVariableOrConstant<IV> s,
+                IVariableOrConstant<IV> p, IVariableOrConstant<IV> o) {
 
 //            super(relation, new IVariableOrConstant[] { s, p, o });
             super(relation, s, p, o );

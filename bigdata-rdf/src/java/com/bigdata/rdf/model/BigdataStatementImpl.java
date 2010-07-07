@@ -236,7 +236,7 @@ public class BigdataStatementImpl implements BigdataStatement {
     final public IV c() {
 
         if (c == null)
-            return NULL;
+            return null;
         
         return c.getIV();
         
@@ -252,7 +252,7 @@ public class BigdataStatementImpl implements BigdataStatement {
         case 2:
             return o.getIV();
         case 3: // 4th position MAY be unbound.
-            return (c == null) ? NULL : c.getIV();
+            return (c == null) ? null : c.getIV();
         default:
             throw new IllegalArgumentException();
         }
@@ -261,16 +261,16 @@ public class BigdataStatementImpl implements BigdataStatement {
     
     final public boolean isFullyBound() {
         
-        return s() != NULL && p() != NULL && o() != NULL;
+        return s() != null && p() != null && o() != null;
 
     }
 
     public final void setStatementIdentifier(final IV sid) {
 
-        if (sid == NULL)
+        if (sid == null)
             throw new IllegalArgumentException();
 
-        if (!AbstractTripleStore.isStatement(sid))
+        if (!sid.isStatement())
             throw new IllegalArgumentException("Not a statement identifier: "
                     + sid);
 
@@ -302,7 +302,7 @@ public class BigdataStatementImpl implements BigdataStatement {
     
     final public boolean hasStatementIdentifier() {
         
-        return c != null && AbstractTripleStore.isStatement(c.getIV());
+        return c != null && c.getIV().isStatement();
         
     }
 
@@ -321,7 +321,7 @@ public class BigdataStatementImpl implements BigdataStatement {
     public byte[] serializeValue(final ByteArrayBuffer buf) {
 
         return SPO.serializeValue(buf, override, type, c != null ? c
-                .getIV() : NULL);
+                .getIV() : null);
 
     }
 

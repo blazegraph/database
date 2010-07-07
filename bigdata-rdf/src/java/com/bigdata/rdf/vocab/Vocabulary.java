@@ -30,7 +30,6 @@ package com.bigdata.rdf.vocab;
 import java.util.Iterator;
 import org.openrdf.model.Value;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.relation.rule.IConstant;
 
 /**
@@ -51,7 +50,7 @@ public interface Vocabulary {
      * @throws IllegalArgumentException
      *             if that {@link Value} is not defined for this vocabulary.
      */
-    public TermId get(Value value);
+    public IV get(Value value);
     
     /**
      * Returns the {@link IConstant} for the {@link Value}.
