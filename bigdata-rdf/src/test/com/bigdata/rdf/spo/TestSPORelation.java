@@ -29,8 +29,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.spo;
 
 import java.util.Properties;
-
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.lexicon.ITermIdCodes;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.RuleContextEnum;
@@ -93,9 +95,9 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
      * necessitated by the change to {@link ISPO#hasStatementIdentifier()} to
      * test the term id bits.
      */
-    private static long uriId(long in) {
-        return in << ITermIdCodes.TERMID_CODE_MASK_BITS
-                | ITermIdCodes.TERMID_CODE_URI;
+    private static TermId uriId(long in) {
+        return new TermId(VTE.URI, in << ITermIdCodes.TERMID_CODE_MASK_BITS
+                | ITermIdCodes.TERMID_CODE_URI);
     }
 
 //    private static long literalId(long in) {
@@ -108,19 +110,19 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 //                | ITermIdCodes.TERMID_CODE_BNODE;
 //    }
 
-    protected final static Constant<Long> rdfsSubClassOf = new Constant<Long>(
+    protected final static Constant<IV> rdfsSubClassOf = new Constant<IV>(
             uriId(1L));
     
-    protected final static Constant<Long> rdfsResource = new Constant<Long>(
+    protected final static Constant<IV> rdfsResource = new Constant<IV>(
             uriId(2L));
     
-    protected final static Constant<Long> rdfType = new Constant<Long>(
+    protected final static Constant<IV> rdfType = new Constant<IV>(
             uriId(3L));
     
-    protected final static Constant<Long> rdfsClass = new Constant<Long>(
+    protected final static Constant<IV> rdfsClass = new Constant<IV>(
             uriId(4L));
 
-    protected final static Constant<Long> rdfProperty = new Constant<Long>(
+    protected final static Constant<IV> rdfProperty = new Constant<IV>(
             uriId(5L));
 
     /**
@@ -162,8 +164,8 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
          * @param p
          * @param o
          */
-        public P(String relation, IVariableOrConstant<Long> s,
-                IVariableOrConstant<Long> p, IVariableOrConstant<Long> o) {
+        public P(String relation, IVariableOrConstant<IV> s,
+                IVariableOrConstant<IV> p, IVariableOrConstant<IV> o) {
 
             super(relation, s, p, o );
             
@@ -253,10 +255,10 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
                         // tail
                         new SPOPredicate[] {//
                                 new SPOPredicate(relationIdentifier,
-                                        new Constant<Long>(uriId(2L)), Var.var("y"),
+                                        new Constant<IV>(uriId(2L)), Var.var("y"),
                                         Var.var("z")),//
                                 new SPOPredicate(relationIdentifier, Var.var("x"),
-                                        Var.var("y"), new Constant<Long>(uriId(1L))) //
+                                        Var.var("y"), new Constant<IV>(uriId(1L))) //
                         },
                         // constraints
                         new IConstraint[] {});
@@ -314,12 +316,12 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
             final SPORelation spoRelation = store.getSPORelation();
 
             // define some vocabulary.
-            final IConstant<Long> U1 = new Constant<Long>(uriId(11L));
-            final IConstant<Long> U2 = new Constant<Long>(uriId(12L));
-            final IConstant<Long> V1 = new Constant<Long>(uriId(21L));
-            final IConstant<Long> V2 = new Constant<Long>(uriId(22L));
-            final IConstant<Long> X1 = new Constant<Long>(uriId(31L));
-            // final IConstant<Long> X2 = new Constant<Long>(32L);
+            final IConstant<IV> U1 = new Constant<IV>(uriId(11L));
+            final IConstant<IV> U2 = new Constant<IV>(uriId(12L));
+            final IConstant<IV> V1 = new Constant<IV>(uriId(21L));
+            final IConstant<IV> V2 = new Constant<IV>(uriId(22L));
+            final IConstant<IV> X1 = new Constant<IV>(uriId(31L));
+            // final IConstant<IV> X2 = new Constant<IV>(32L);
 
             // (?u,rdfs:subClassOf,?x), (?v,rdf:type,?u) -> (?v,rdf:type,?x)
             final Rule rule = new TestRuleRdfs9(relationIdentifier);
@@ -467,9 +469,9 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
                         bindings);
 
                 // verify the entailed statement.
-                assertEquals(V1.get().longValue(), solution.get().s);
-                assertEquals(rdfType.get().longValue(), solution.get().p);
-                assertEquals(X1.get().longValue(), solution.get().o);
+                assertEquals(V1.get(), solution.get().s);
+                assertEquals(rdfType.get(), solution.get().p);
+                assertEquals(X1.get(), solution.get().o);
 
                 // verify rule is reported.
                 assertTrue(rule == solution.getRule());
@@ -526,12 +528,12 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
             final SPORelation spoRelation = store.getSPORelation();
 
             // define some vocabulary.
-            final IConstant<Long> U1 = new Constant<Long>(uriId(11L));
-            final IConstant<Long> U2 = new Constant<Long>(uriId(12L));
-            final IConstant<Long> V1 = new Constant<Long>(uriId(21L));
-            final IConstant<Long> V2 = new Constant<Long>(uriId(22L));
-            final IConstant<Long> X1 = new Constant<Long>(uriId(31L));
-            // final IConstant<Long> X2 = new Constant<Long>(32L);
+            final IConstant<IV> U1 = new Constant<IV>(uriId(11L));
+            final IConstant<IV> U2 = new Constant<IV>(uriId(12L));
+            final IConstant<IV> V1 = new Constant<IV>(uriId(21L));
+            final IConstant<IV> V2 = new Constant<IV>(uriId(22L));
+            final IConstant<IV> X1 = new Constant<IV>(uriId(31L));
+            // final IConstant<IV> X2 = new Constant<IV>(32L);
 
             // (?u,rdfs:subClassOf,?x), (?v,rdf:type,?u) -> (?v,rdf:type,?x)
             final Rule rule = new TestRuleRdfs9(relationIdentifier);

@@ -52,13 +52,13 @@ import java.io.Writer;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.UUID;
-
 import org.openrdf.model.Statement;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
-
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -189,14 +189,14 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
              */
             for(int i=0; i<stmts.length; i++) {
                 
-                final long sid = stmts[i].getStatementIdentifier();
+                final IV sid = stmts[i].getStatementIdentifier();
                 
                 assertNotSame(NULL, sid);
                 
-                assertTrue(AbstractTripleStore.isStatement(sid));
-                assertFalse(AbstractTripleStore.isLiteral(sid));
-                assertFalse(AbstractTripleStore.isURI(sid));
-                assertFalse(AbstractTripleStore.isBNode(sid));
+                assertTrue(VTE.isStatement(sid.getTermId()));
+                assertFalse(VTE.isLiteral(sid.getTermId()));
+                assertFalse(VTE.isURI(sid.getTermId()));
+                assertFalse(VTE.isBNode(sid.getTermId()));
                 
                 if (log.isInfoEnabled())
                     log.info(stmts[i].toString(store) + " ::: "
@@ -466,7 +466,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             
             assertEquals(1,store.addStatements(stmts1, stmts1.length));
 
-            final long sid1 = stmts1[0].getStatementIdentifier();
+            final IV sid1 = stmts1[0].getStatementIdentifier();
             
             final SPO[] stmts2 = new SPO[] {
               
@@ -584,7 +584,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             assertEquals(1,store.addStatements(stmts1, stmts1.length));
             
             // the statement identifier for the original stmt. 
-            final long sid1 = stmts1[0].getStatementIdentifier();
+            final IV sid1 = stmts1[0].getStatementIdentifier();
             
             /*
              * create a statement about that statement.
@@ -602,7 +602,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             assertEquals(2,store.getStatementCount(true/*exact*/));
 
             // the stmt identifier for the statement about the original stmt.
-            final long sid2 = stmts2[0].getStatementIdentifier();
+            final IV sid2 = stmts2[0].getStatementIdentifier();
 
             /*
              * create a statement about the statement about the original statement.

@@ -29,18 +29,14 @@ package com.bigdata.rdf.rules;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.OWL;
-import org.openrdf.model.vocabulary.RDF;
-import org.openrdf.model.vocabulary.RDFS;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.rdf.inf.BackchainOwlSameAsPropertiesIterator;
-import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtil;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
@@ -57,7 +53,6 @@ import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
-import com.bigdata.relation.rule.NE;
 import com.bigdata.relation.rule.NEConstant;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.Var;
@@ -104,7 +99,7 @@ public class TestRuleExpansion extends AbstractInferenceEngineTestCase {
         
         try {
 
-            final Map<Value, Long> termIds = new HashMap<Value, Long>();
+            final Map<Value, IV> termIds = new HashMap<Value, IV>();
             
             final URI A = new URIImpl("http://www.bigdata.com/A");
             final URI B = new URIImpl("http://www.bigdata.com/B");
@@ -152,7 +147,7 @@ public class TestRuleExpansion extends AbstractInferenceEngineTestCase {
             if (log.isInfoEnabled())
                 log.info("\n" +db.dumpStore(true, true, false));
   
-            for (Map.Entry<Value, Long> e : termIds.entrySet()) {
+            for (Map.Entry<Value, IV> e : termIds.entrySet()) {
                 System.err.println(e.getKey() + " = " + e.getValue());
             }
 /*            
@@ -204,11 +199,11 @@ public class TestRuleExpansion extends AbstractInferenceEngineTestCase {
                         return false;
                     }
                     public IAccessPath<ISPO> getAccessPath(final IAccessPath<ISPO> accessPath) {
-                        final IVariableOrConstant<Long> s = accessPath.getPredicate().get(0);
-                        final IVariableOrConstant<Long> p = accessPath.getPredicate().get(1);
-                        final IVariableOrConstant<Long> o = accessPath.getPredicate().get(2);
+                        final IVariableOrConstant<IV> s = accessPath.getPredicate().get(0);
+                        final IVariableOrConstant<IV> p = accessPath.getPredicate().get(1);
+                        final IVariableOrConstant<IV> o = accessPath.getPredicate().get(2);
                         boolean isValid = true;
-                        if (!p.isConstant() || p.get() != termIds.get(OWL.SAMEAS)) {
+                        if (!p.isConstant() || !IVUtil.equals(p.get(), termIds.get(OWL.SAMEAS))) {
                             if (log.isInfoEnabled())
                                 log.info("p must be owl:sameAs");
                             isValid = false;
@@ -225,7 +220,7 @@ public class TestRuleExpansion extends AbstractInferenceEngineTestCase {
                         }
                         final SPO spo;
                         if (isValid) {
-                            final long constant = s.isConstant() ? s.get() : o.get();
+                            final IV constant = s.isConstant() ? s.get() : o.get();
                             spo = s.isConstant() ?
                                     new SPO(s.get(), p.get(), constant) :
                                     new SPO(constant, p.get(), o.get());
@@ -311,12 +306,12 @@ public class TestRuleExpansion extends AbstractInferenceEngineTestCase {
                 };
                 
                 final String SPO = db.getSPORelation().getNamespace();
-                final IConstant<Long> s = new Constant<Long>(termIds.get(X));
-                final IVariable<Long> _p = Var.var("p");
-                final IVariable<Long> _o = Var.var("o");
-                final IVariable<Long> _sameS = Var.var("sameS");
-                final IVariable<Long> _sameO = Var.var("sameO");
-                final IConstant<Long> sameAs = new Constant<Long>(termIds.get(OWL.SAMEAS));
+                final IConstant<IV> s = new Constant<IV>(termIds.get(X));
+                final IVariable<IV> _p = Var.var("p");
+                final IVariable<IV> _o = Var.var("o");
+                final IVariable<IV> _sameS = Var.var("sameS");
+                final IVariable<IV> _sameO = Var.var("sameO");
+                final IConstant<IV> sameAs = new Constant<IV>(termIds.get(OWL.SAMEAS));
                 final IRule rule =
                         new Rule("sameas", null, /*new SPOPredicate(SPO, s, _p, _sameO), // head*/
                                 new IPredicate[] {

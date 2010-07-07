@@ -1,14 +1,22 @@
 package com.bigdata.rdf.magic;
 
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IVariableOrConstant;
 
 public class MagicTuple implements IMagicTuple {
     private IV[] terms;
 
+    public MagicTuple(int... terms) {
+        IV[] ivs = new IV[terms.length];
+        for (int i = 0; i < terms.length; i++) {
+            ivs[1] = new TermId(VTE.URI, terms[i]);
+        }
+        this.terms = ivs;
+    }
+    
     public MagicTuple(IV... terms) {
         this.terms = terms;
     }

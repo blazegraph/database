@@ -30,9 +30,7 @@ package com.bigdata.rdf.spo;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
-
 import junit.framework.TestCase2;
-
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.raba.IRaba;
@@ -45,6 +43,8 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.FixedByteArrayBuffer;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 
 /**
@@ -88,9 +88,9 @@ public class TestSPOKeyCoders extends TestCase2 {
      * triple store are assigned by the {@link ICounter} for the
      * {@link LexiconRelation}'s TERM2id index.
      */
-    protected long getTermId() {
+    protected TermId getTermId() {
         
-        return r.nextInt(Integer.MAX_VALUE - 1) + 1;
+        return new TermId(VTE.URI, r.nextInt(Integer.MAX_VALUE - 1) + 1);
         
     }
     

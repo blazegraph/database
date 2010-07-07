@@ -30,7 +30,7 @@ package com.bigdata.rdf.store;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
-
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
@@ -95,16 +95,16 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
             
 //            store.commit();
     
-            final long a = store.getIV(A);
-//            final long b = store.getTermId(B);
-//            final long c = store.getTermId(C);
-//            final long d = store.getTermId(D);
-//            final long e = store.getTermId(E);
-            final long v = store.getIV(V);
-            final long w = store.getIV(W);
-            final long x = store.getIV(X);
-            final long y = store.getIV(Y);
-            final long z = store.getIV(Z);
+            final IV a = store.getIV(A);
+//            final IV b = store.getTermId(B);
+//            final IV c = store.getTermId(C);
+//            final IV d = store.getTermId(D);
+//            final IV e = store.getTermId(E);
+            final IV v = store.getIV(V);
+            final IV w = store.getIV(W);
+            final IV x = store.getIV(X);
+            final IV y = store.getIV(Y);
+            final IV z = store.getIV(Z);
             
             if (log.isInfoEnabled())
                 log.info("\n" + store.dumpStore(true, true, false));
@@ -202,17 +202,17 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
             final URI Y = new URIImpl("http://www.bigdata.com/Y");
             final URI Z = new URIImpl("http://www.bigdata.com/Z");
             
-            final long a = store.addTerm(A);
-//            final long b = store.addTerm(B);
-//            final long c = store.addTerm(C);
-//            final long d = store.addTerm(D);
-//            final long e = store.addTerm(E);
+            final IV a = store.addTerm(A);
+//            final IV b = store.addTerm(B);
+//            final IV c = store.addTerm(C);
+//            final IV d = store.addTerm(D);
+//            final IV e = store.addTerm(E);
             
-            final long v = store.addTerm(V);
-            final long w = store.addTerm(W);
-            final long x = store.addTerm(X);
-            final long y = store.addTerm(Y);
-            final long z = store.addTerm(Z);
+            final IV v = store.addTerm(V);
+            final IV w = store.addTerm(W);
+            final IV x = store.addTerm(X);
+            final IV y = store.addTerm(Y);
+            final IV z = store.addTerm(Z);
             
             SPO[] stmts = new SPO[] {
                 new SPO(x,a,y,StatementEnum.Explicit),

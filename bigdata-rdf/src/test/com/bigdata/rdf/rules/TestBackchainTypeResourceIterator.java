@@ -28,18 +28,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.rules;
 
 import java.util.Properties;
-
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
-
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.BackchainTypeResourceIterator;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.rules.InferenceEngine.Options;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTestCase;
@@ -472,13 +470,13 @@ public class TestBackchainTypeResourceIterator extends AbstractRuleTestCase {
             final BigdataURI P = f.createURI("http://www.bigdata.com/p");
             final BigdataURI O = f.createURI("http://www.bigdata.com/o");
             
-            final long s = store.addTerm(S);
-            final long p = store.addTerm(P);
-            final long o = store.addTerm(O);
+            final IV s = store.addTerm(S);
+            final IV p = store.addTerm(P);
+            final IV o = store.addTerm(O);
 
-            final long rdfType = vocab.get(RDF.TYPE);
+            final IV rdfType = vocab.get(RDF.TYPE);
 
-            final long rdfsResource = vocab.get(RDFS.RESOURCE);
+            final IV rdfsResource = vocab.get(RDFS.RESOURCE);
             
             store.addStatements(new SPO[] {//
                     new SPO(s, p, o, StatementEnum.Explicit) //

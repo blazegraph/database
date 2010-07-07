@@ -31,12 +31,11 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.UUID;
-
 import org.openrdf.model.BNode;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
-
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -106,33 +105,33 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
             store.addStatement(B, rdfsSubClassOf, A);
             store.addStatement(C, rdfsSubClassOf, B);
 
-            final long x_id = store.getIV(x);
+            final IV x_id = store.getIV(x);
             assertTrue(x_id != NULL);
-            final long y_id = store.getIV(y);
+            final IV y_id = store.getIV(y);
             assertTrue(y_id != NULL);
-            final long z_id = store.getIV(z);
+            final IV z_id = store.getIV(z);
             assertTrue(z_id != NULL);
-            final long A_id = store.getIV(A);
+            final IV A_id = store.getIV(A);
             assertTrue(A_id != NULL);
-            final long B_id = store.getIV(B);
+            final IV B_id = store.getIV(B);
             assertTrue(B_id != NULL);
-            final long C_id = store.getIV(C);
+            final IV C_id = store.getIV(C);
             assertTrue(C_id != NULL);
-            final long rdfType_id = store.getIV(rdfType);
+            final IV rdfType_id = store.getIV(rdfType);
             assertTrue(rdfType_id != NULL);
-            final long rdfsSubClassOf_id = store.getIV(rdfsSubClassOf);
+            final IV rdfsSubClassOf_id = store.getIV(rdfsSubClassOf);
             assertTrue(rdfsSubClassOf_id != NULL);
 
-            final long lit1_id = store.addTerm(lit1);
+            final IV lit1_id = store.addTerm(lit1);
             assertTrue(lit1_id != NULL);
-            final long lit2_id = store.addTerm(lit2);
+            final IV lit2_id = store.addTerm(lit2);
             assertTrue(lit2_id != NULL);
-            final long lit3_id = store.addTerm(lit3);
+            final IV lit3_id = store.addTerm(lit3);
             assertTrue(lit3_id != NULL);
 
-            final long bn1_id = store.addTerm(bn1);
+            final IV bn1_id = store.addTerm(bn1);
             assertTrue(bn1_id != NULL);
-            final long bn2_id = store.addTerm(bn2);
+            final IV bn2_id = store.addTerm(bn2);
             assertTrue(bn2_id != NULL);
 
             final boolean storeBlankNodes = store.getLexiconRelation()

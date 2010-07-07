@@ -124,9 +124,9 @@ public class TestDefaultGraphAccessPath extends AbstractTripleStoreTestCase {
 
             }
 
-            assertTrue(c1.getIV() != 0L);
-            assertTrue(c2.getIV() != 0L);
-            assertTrue(c4.getIV() != 0L);
+            assertTrue(c1.getIV() != null);
+            assertTrue(c2.getIV() != null);
+            assertTrue(c4.getIV() != null);
 
             assertTrue(store.hasStatement(john, loves, mary, c1));
             assertTrue(store.hasStatement(mary, loves, paul, c2));

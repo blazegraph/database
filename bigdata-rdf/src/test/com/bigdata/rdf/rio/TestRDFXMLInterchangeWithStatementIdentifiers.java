@@ -52,7 +52,6 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Properties;
-
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
@@ -67,8 +66,8 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
-//import org.openrdf.sail.SailException;
-
+import org.openrdf.sail.SailException;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -274,7 +273,7 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
          * @throws SailException
          */
         private BigdataStatement getOnlyStatement(AbstractTripleStore store,
-                long s, long p, long o) {
+                IV s, IV p, IV o) {
 
             final IChunkedOrderedIterator<ISPO> itr = store.getAccessPath(s, p,
                     o).iterator();
@@ -746,9 +745,9 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
             assertNotNull(spo2);
             assertNotNull(spo3);
 
-            final long sid1 = spo1.getStatementIdentifier();
-            final long sid2 = spo2.getStatementIdentifier();
-            final long sid3 = spo3.getStatementIdentifier();
+            final IV sid1 = spo1.getStatementIdentifier();
+            final IV sid2 = spo2.getStatementIdentifier();
+            final IV sid3 = spo3.getStatementIdentifier();
             
             assertEquals(sid1, spo1.getStatementIdentifier());
             assertEquals(sid2, spo2.getStatementIdentifier());

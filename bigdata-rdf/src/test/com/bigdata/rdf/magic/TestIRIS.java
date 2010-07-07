@@ -29,7 +29,6 @@ package com.bigdata.rdf.magic;
 
 import java.util.Iterator;
 import java.util.Properties;
-
 import org.deri.iris.api.factory.IBasicFactory;
 import org.deri.iris.api.factory.IBuiltinsFactory;
 import org.deri.iris.api.factory.ITermFactory;
@@ -40,9 +39,9 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.TupleExpr;
-
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.ClosureStats;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rules.AbstractInferenceEngineTestCase;
@@ -55,10 +54,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
-import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.QueryOptions;
 import com.bigdata.relation.rule.Rule;
@@ -238,7 +235,7 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
                                 store.getSPORelation().getNamespace(),
                                 tempStore.getSPORelation().getNamespace()
                             },
-                            new Constant<Long>(U.getIV()),
+                            new Constant<IV>(U.getIV()),
                             Var.var("p"),
                             Var.var("o"))
                     },

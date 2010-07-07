@@ -50,11 +50,9 @@ package com.bigdata.rdf.lexicon;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
-
 import org.openrdf.model.Literal;
 import org.openrdf.model.impl.LiteralImpl;
-
-import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -128,7 +126,7 @@ public class TestCompletionScan extends AbstractTripleStoreTestCase {
 
                 expected.add(new LiteralImpl("minority report"));
                 
-                final Iterator<Long> itr = store.getLexiconRelation()
+                final Iterator<IV> itr = store.getLexiconRelation()
                         .prefixScan(new LiteralImpl("minor"));
 
                 while(itr.hasNext()) {
@@ -139,7 +137,7 @@ public class TestCompletionScan extends AbstractTripleStoreTestCase {
                         
                     }
                     
-                    final Long tid = itr.next();
+                    final IV tid = itr.next();
                     
                     final Literal lit = (Literal) store.getLexiconRelation()
                             .getTerm(tid);

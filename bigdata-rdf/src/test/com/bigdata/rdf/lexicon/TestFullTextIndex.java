@@ -31,13 +31,12 @@ import java.util.Arrays;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-
 import junit.framework.AssertionFailedError;
-
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
-
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.spo.TestSPOKeyOrder;
@@ -105,7 +104,7 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
         assertEquals(NULL, store.getIV(term));
 
-        final long id = store.addTerm(term);
+        final IV id = store.addTerm(term);
 
         assertNotSame(NULL, id);
 
@@ -139,13 +138,13 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
         // assertEquals("#hits", (long) expected.length, itr.size());
 
         final ICloseableIterator<BigdataValue> itr2 = new BigdataValueIteratorImpl(
-                store, new ChunkedWrappedIterator<Long>(new Striterator(hitr)
+                store, new ChunkedWrappedIterator<IV>(new Striterator(hitr)
                         .addFilter(new Resolver() {
                             private static final long serialVersionUID = 1L;
 
                             @Override
                             protected Object resolve(Object e) {
-                                return ((Hit) e).getDocId();
+                                return new TermId(((Hit) e).getDocId());
                             }
                         })));
 
