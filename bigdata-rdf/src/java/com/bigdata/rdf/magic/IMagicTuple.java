@@ -1,12 +1,14 @@
 package com.bigdata.rdf.magic;
 
+import com.bigdata.rdf.internal.IV;
+
 public interface IMagicTuple {
     
-    long getTerm(int index);
+    IV getTerm(int index);
     
     int getTermCount();
     
-    long[] getTerms();
+    IV[] getTerms();
     
     boolean isFullyBound();
     

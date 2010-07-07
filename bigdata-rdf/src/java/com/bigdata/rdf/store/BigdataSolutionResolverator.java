@@ -9,6 +9,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.rule.Constant;
@@ -77,7 +78,7 @@ public class BigdataSolutionResolverator
          * chunk.
          */
         
-        final Collection<Long> ids = new HashSet<Long>(chunk.length
+        final Collection<IV> ids = new HashSet<IV>(chunk.length
                 * state.getSPOKeyArity());
 
         for (ISolution solution : chunk) {
@@ -93,16 +94,16 @@ public class BigdataSolutionResolverator
 
                 final Map.Entry<IVariable, IConstant> entry = itr.next();
 
-                final Long termId = (Long) entry.getValue().get();
+                final IV iv = (IV) entry.getValue().get();
 
-                if (termId.longValue() == IRawTripleStore.NULL) {
+                if (iv == null) {
 
                     throw new RuntimeException("NULL? : var=" + entry.getKey()
                             + ", " + bindingSet);
                     
                 }
                 
-                ids.add(termId);
+                ids.add(iv);
 
             }
 
@@ -112,7 +113,7 @@ public class BigdataSolutionResolverator
             log.info("Resolving " + ids.size() + " term identifiers");
 
         // batch resolve term identifiers to terms.
-        final Map<Long, BigdataValue> terms = state.getLexiconRelation()
+        final Map<IV, BigdataValue> terms = state.getLexiconRelation()
                 .getTerms(ids);
 
         /*
@@ -162,7 +163,7 @@ public class BigdataSolutionResolverator
      *       {@link Long} that is a term identifier.
      */
     private IBindingSet getBindingSet(final ISolution solution,
-            final Map<Long, BigdataValue> terms) {
+            final Map<IV, BigdataValue> terms) {
 
         if (solution == null)
             throw new IllegalArgumentException();
@@ -187,7 +188,7 @@ public class BigdataSolutionResolverator
 
             final Object boundValue = entry.getValue().get();
 
-            if (!(boundValue instanceof Long)) {
+            if (!(boundValue instanceof IV)) {
 
                 /*
                  * FIXME This assumes that any Long is a term identifier. The
@@ -198,14 +199,14 @@ public class BigdataSolutionResolverator
 
             }
 
-            final Long termId = (Long) boundValue;
+            final IV iv = (IV) boundValue;
 
-            final BigdataValue value = terms.get(termId);
+            final BigdataValue value = terms.get(iv);
 
             if (value == null) {
 
                 throw new RuntimeException("Could not resolve termId="
-                        + termId);
+                        + iv);
             }
 
             /*

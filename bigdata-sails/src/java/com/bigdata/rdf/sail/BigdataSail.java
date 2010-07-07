@@ -115,6 +115,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.TruthMaintenance;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -383,11 +384,6 @@ public class BigdataSail extends SailBase implements Sail {
      *      Resource...)
      */
     public static final transient URI NULL_GRAPH = BD.NULL_GRAPH;
-
-    /**
-     * The equivalent of a null identifier for an internal RDF Value.
-     */
-    protected static final long NULL = IRawTripleStore.NULL;
 
     final protected AbstractTripleStore database;
 
@@ -1392,13 +1388,13 @@ public class BigdataSail extends SailBase implements Sail {
         private Map<String, BigdataBNode> bnodes;
 
         /**
-         * A reverse mapping from the assigned term identifiers for blank nodes
+         * A reverse mapping from the assigned internal values for blank nodes
          * to the {@link BigdataBNodeImpl} object. This is used to resolve blank
          * nodes recovered during query from within the same
          * {@link SailConnection} without loosing the blank node identifier.
          * This behavior is required by the contract for {@link SailConnection}.
          */
-        private Map<Long, BigdataBNode> bnodes2;
+        private Map<IV, BigdataBNode> bnodes2;
         
         /**
          * Used to coordinate between read/write transactions and the unisolated
@@ -1582,7 +1578,7 @@ public class BigdataSail extends SailBase implements Sail {
                  * encapsulation.
                  */
                 bnodes = new ConcurrentHashMap<String, BigdataBNode>();
-                bnodes2 = new ConcurrentHashMap<Long, BigdataBNode>();
+                bnodes2 = new ConcurrentHashMap<IV, BigdataBNode>();
 //                bnodes = Collections
 //                        .synchronizedMap(new HashMap<String, BigdataBNodeImpl>(
 //                                bufferCapacity));
@@ -2012,8 +2008,8 @@ public class BigdataSail extends SailBase implements Sail {
                  * store instance.
                  */
                 
-                database.getAccessPath(null/* s */, null/* p */, null/* o */,
-                        null/* c */, null/* filter */).removeAll();
+                database.getAccessPath((Resource)null/* s */, (URI)null/* p */, 
+                        (Value)null/* o */, null/* c */, null/* filter */).removeAll();
 
                 return;
                 
@@ -2345,7 +2341,7 @@ public class BigdataSail extends SailBase implements Sail {
             flushStatementBuffers(true/* assertions */, true/* retractions */);
             
             // Visit the distinct term identifiers for the context position.
-            final IChunkedIterator<Long> itr = database.getSPORelation()
+            final IChunkedIterator<IV> itr = database.getSPORelation()
                     .distinctTermScan(SPOKeyOrder.CSPO);
 
             // Resolve the term identifiers to terms efficiently during iteration.
@@ -2856,6 +2852,8 @@ public class BigdataSail extends SailBase implements Sail {
                 
             }
             
+            final IV NULL = null;
+            
             database
                     .getAccessPath(NULL, NULL, NULL, InferredSPOFilter.INSTANCE)
                     .removeAll();
@@ -3139,7 +3137,7 @@ public class BigdataSail extends SailBase implements Sail {
                             log.debug("value: " + val + " : " + val2 + " ("
                                     + val2.getIV() + ")");
 
-                        if (val2.getIV() == NULL) {
+                        if (val2.getIV() == null) {
 
                             /*
                              * Since the term identifier is NULL this value is
@@ -3172,7 +3170,7 @@ public class BigdataSail extends SailBase implements Sail {
                         log.debug("value: " + val + " : " + val2 + " ("
                                 + val2.getIV() + ")");
 
-                    if (val2.getIV() == NULL) {
+                    if (val2.getIV() == null) {
 
                         /*
                          * Since the term identifier is NULL this value is

@@ -38,6 +38,8 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.btree.raba.codec.IRabaCoder;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
@@ -168,13 +170,13 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
                 // The term identifier.
                 final long id = KeyBuilder.decodeLong(key, 0);
 
-                assert id != IRawTripleStore.NULL;
+                assert id != TermId.NULL;
                 
                 // Note: BNodes are not allowed in the reverse index.
-                assert ! AbstractTripleStore.isBNode(id);
+                assert ! VTE.isBNode(id);
                 
                 // Note: SIDS are not allowed in the reverse index.
-                assert ! AbstractTripleStore.isStatement(id);
+                assert ! VTE.isStatement(id);
                 
                 /*
                  * When the term identifier is found in the reverse mapping
@@ -208,13 +210,13 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
                     if (! BytesUtil.bytesEqual(val, oldval)) {
 
                         final char suffix;
-                        if (AbstractTripleStore.isLiteral(id))
+                        if (VTE.isLiteral(id))
                             suffix = 'L';
-                        else if (AbstractTripleStore.isURI(id))
+                        else if (VTE.isURI(id))
                             suffix = 'U';
-                        else if (AbstractTripleStore.isBNode(id))
+                        else if (VTE.isBNode(id))
                             suffix = 'B';
-                        else if (AbstractTripleStore.isStatement(id))
+                        else if (VTE.isStatement(id))
                             suffix = 'S';
                         else
                             suffix = '?';

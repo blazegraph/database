@@ -29,6 +29,7 @@ package com.bigdata.rdf.inf;
 import java.util.Arrays;
 import java.util.Iterator;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtil;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ISPO;
@@ -119,7 +120,8 @@ public class BackchainOwlSameAsPropertiesSPIterator extends
                 while (propsIt.hasNext()) {
                     final ISPO prop = propsIt.next();
                     // do not add ( s sameAs s ) inferences
-                    if (prop.p().equals(sameAs) && s.equals(prop.o())) {
+                    if (IVUtil.equals(prop.p(), sameAs) && 
+                        IVUtil.equals(s, prop.o())) {
                         continue;
                     }
                     // flush the buffer if necessary

@@ -29,6 +29,8 @@ package com.bigdata.rdf.inf;
 import java.util.Arrays;
 import java.util.Set;
 
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtil;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ISPO;
@@ -86,8 +88,8 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
      *            database.
      */
     public BackchainOwlSameAsPropertiesSPOIterator(
-            IChunkedOrderedIterator<ISPO> src, long s, long p, long o,
-            AbstractTripleStore db, final long sameAs) {
+            IChunkedOrderedIterator<ISPO> src, IV s, IV p, IV o,
+            AbstractTripleStore db, final IV sameAs) {
         
         super(src, db, sameAs);
         
@@ -110,20 +112,20 @@ public class BackchainOwlSameAsPropertiesSPOIterator extends
             SPO[] spos = new SPO[chunkSize];
             int numSPOs = 0;
             // collect up the links between {s,? sameAs s} X {o,? sameAs o}
-            final Set<Long> sAndSames = getSelfAndSames(s);
-            final Set<Long> oAndSames = getSelfAndSames(o);
+            final Set<IV> sAndSames = getSelfAndSames(s);
+            final Set<IV> oAndSames = getSelfAndSames(o);
             if (sAndSames.size() == 1 && oAndSames.size() == 1) {
                 // no point in continuing if there are no sames
 //                return;
             }
-            for (long s1 : sAndSames) {
-                for (long o1 : oAndSames) {
+            for (IV s1 : sAndSames) {
+                for (IV o1 : oAndSames) {
                     // get the links between this {s,o} tuple
                     final IChunkedOrderedIterator<ISPO> it = db.getAccessPath(s1, p, o1).iterator();
                     while (it.hasNext()) {
-                        final long p1 = it.next().p();
+                        final IV p1 = it.next().p();
                         // do not add ( s sameAs s ) inferences
-                        if (p1 == sameAs && s == o) {
+                        if (IVUtil.equals(p1, sameAs) && IVUtil.equals(s, o)) {
                             continue;
                         }
                         if (numSPOs == chunkSize) {

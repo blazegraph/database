@@ -4,6 +4,8 @@ import java.util.Arrays;
 import org.apache.log4j.Logger;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtil;
 import com.bigdata.rdf.rules.RuleContextEnum;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
@@ -40,24 +42,22 @@ public class OwlSameAsPropertiesExpandingIterator implements
     protected final static Logger log =
             Logger.getLogger(OwlSameAsPropertiesExpandingIterator.class);
 
-    private final static transient long NULL = IRawTripleStore.NULL;
-
     private final IChunkedOrderedIterator<ISPO> src;
 
     private final IKeyOrder<ISPO> keyOrder;
 
-    private final long s, p, o;
+    private final IV s, p, o;
 
     private final AbstractTripleStore db;
 
-    private final long sameAs;
+    private final IV sameAs;
 
     private IChunkedOrderedIterator<ISolution> solutions;
 
     private ISolutionExpander<ISPO> sameAsSelfExpander;
 
-    public OwlSameAsPropertiesExpandingIterator(long s, long p, long o,
-            AbstractTripleStore db, final long sameAs,
+    public OwlSameAsPropertiesExpandingIterator(IV s, IV p, IV o,
+            AbstractTripleStore db, final IV sameAs,
             final IKeyOrder<ISPO> keyOrder) {
         this.db = db;
         this.s = s;
@@ -73,13 +73,13 @@ public class OwlSameAsPropertiesExpandingIterator implements
         } else {
             this.src = null;
             try {
-                if (s != NULL && o != NULL) {
+                if (s != null && o != null) {
                     accessSPO();
-                } else if (s != NULL && o == NULL) {
+                } else if (s != null && o == null) {
                     accessSP();
-                } else if (s == NULL && o != NULL) {
+                } else if (s == null && o != null) {
                     accessPO();
-                } else if (s == NULL && o == NULL) {
+                } else if (s == null && o == null) {
                     accessP();
                 } else
                     throw new AssertionError();
@@ -99,13 +99,13 @@ public class OwlSameAsPropertiesExpandingIterator implements
          }
          */
         final String SPO = db.getSPORelation().getNamespace();
-        final IVariable<Long> _sameS = Var.var("sameS");
-        final IVariable<Long> _sameO = Var.var("sameO");
-        final IConstant<Long> sameAs = new Constant<Long>(this.sameAs);
-        final IConstant<Long> s = new Constant<Long>(this.s);
-        final IConstant<Long> o = new Constant<Long>(this.o);
-        final IVariableOrConstant<Long> _p =
-                this.p != NULL ? new Constant<Long>(this.p) : Var.var("p");
+        final IVariable<IV> _sameS = Var.var("sameS");
+        final IVariable<IV> _sameO = Var.var("sameO");
+        final IConstant<IV> sameAs = new Constant<IV>(this.sameAs);
+        final IConstant<IV> s = new Constant<IV>(this.s);
+        final IConstant<IV> o = new Constant<IV>(this.o);
+        final IVariableOrConstant<IV> _p =
+                this.p != null ? new Constant<IV>(this.p) : Var.var("p");
         final SPOPredicate head = new SPOPredicate(SPO, s, _p, o);
         final IRule rule =
                 new Rule("sameAsSPO", head, new IPredicate[] {
@@ -131,13 +131,13 @@ public class OwlSameAsPropertiesExpandingIterator implements
          }
          */
         final String SPO = db.getSPORelation().getNamespace();
-        final IVariable<Long> _sameS = Var.var("sameS");
-        final IVariable<Long> _sameO = Var.var("sameO");
-        final IConstant<Long> sameAs = new Constant<Long>(this.sameAs);
-        final IConstant<Long> s = new Constant<Long>(this.s);
-        final IVariable<Long> _o = Var.var("o");
-        final IVariableOrConstant<Long> _p =
-                this.p != NULL ? new Constant<Long>(this.p) : Var.var("p");
+        final IVariable<IV> _sameS = Var.var("sameS");
+        final IVariable<IV> _sameO = Var.var("sameO");
+        final IConstant<IV> sameAs = new Constant<IV>(this.sameAs);
+        final IConstant<IV> s = new Constant<IV>(this.s);
+        final IVariable<IV> _o = Var.var("o");
+        final IVariableOrConstant<IV> _p =
+                this.p != null ? new Constant<IV>(this.p) : Var.var("p");
         final SPOPredicate head = new SPOPredicate(SPO, s, _p, _sameO);
         final IRule rule =
                 new Rule("sameAsSP", head, new IPredicate[] {
@@ -163,13 +163,13 @@ public class OwlSameAsPropertiesExpandingIterator implements
          }
          */
         final String SPO = db.getSPORelation().getNamespace();
-        final IVariable<Long> _sameS = Var.var("sameS");
-        final IVariable<Long> _sameO = Var.var("sameO");
-        final IConstant<Long> sameAs = new Constant<Long>(this.sameAs);
-        final IVariable<Long> _s = Var.var("s");
-        final IConstant<Long> o = new Constant<Long>(this.o);
-        final IVariableOrConstant<Long> _p =
-                this.p != NULL ? new Constant<Long>(this.p) : Var.var("p");
+        final IVariable<IV> _sameS = Var.var("sameS");
+        final IVariable<IV> _sameO = Var.var("sameO");
+        final IConstant<IV> sameAs = new Constant<IV>(this.sameAs);
+        final IVariable<IV> _s = Var.var("s");
+        final IConstant<IV> o = new Constant<IV>(this.o);
+        final IVariableOrConstant<IV> _p =
+                this.p != null ? new Constant<IV>(this.p) : Var.var("p");
         final SPOPredicate head = new SPOPredicate(SPO, _sameS, _p, o);
         final IRule rule =
                 new Rule("sameAsPO", head, new IPredicate[] {
@@ -195,13 +195,13 @@ public class OwlSameAsPropertiesExpandingIterator implements
          }
          */
         final String SPO = db.getSPORelation().getNamespace();
-        final IVariable<Long> _sameS = Var.var("sameS");
-        final IVariable<Long> _sameO = Var.var("sameO");
-        final IConstant<Long> sameAs = new Constant<Long>(this.sameAs);
-        final IVariable<Long> _s = Var.var("s");
-        final IVariable<Long> _o = Var.var("o");
-        final IVariableOrConstant<Long> _p =
-                this.p != NULL ? new Constant<Long>(this.p) : Var.var("p");
+        final IVariable<IV> _sameS = Var.var("sameS");
+        final IVariable<IV> _sameO = Var.var("sameO");
+        final IConstant<IV> sameAs = new Constant<IV>(this.sameAs);
+        final IVariable<IV> _s = Var.var("s");
+        final IVariable<IV> _o = Var.var("o");
+        final IVariableOrConstant<IV> _p =
+                this.p != null ? new Constant<IV>(this.p) : Var.var("p");
         final SPOPredicate head = new SPOPredicate(SPO, _sameS, _p, _sameO);
         final IRule rule =
                 new Rule("sameAsP", head, new IPredicate[] {
@@ -364,17 +364,17 @@ public class OwlSameAsPropertiesExpandingIterator implements
 
         public SameAsSelfAccessPath(IAccessPath<ISPO> accessPath) {
             this.accessPath = accessPath;
-            final IVariableOrConstant<Long> p =
+            final IVariableOrConstant<IV> p =
                     accessPath.getPredicate().get(1);
-            if (!p.isConstant() || p.get() != sameAs) {
+            if (!p.isConstant() || !IVUtil.equals(p.get(), sameAs)) {
                 throw new UnsupportedOperationException("p must be owl:sameAs");
             }
         }
 
         private IChunkedOrderedIterator<ISPO> getAppender() {
-            final IVariableOrConstant<Long> s =
+            final IVariableOrConstant<IV> s =
                     accessPath.getPredicate().get(0);
-            final IVariableOrConstant<Long> o =
+            final IVariableOrConstant<IV> o =
                     accessPath.getPredicate().get(2);
             if (s.isVar() && o.isVar()) {
                 throw new UnsupportedOperationException(
@@ -389,7 +389,7 @@ public class OwlSameAsPropertiesExpandingIterator implements
                  */
                 this.spo = null;
             } else {
-                final long constant = s.isConstant() ? s.get() : o.get();
+                final IV constant = s.isConstant() ? s.get() : o.get();
                 this.spo =
                         s.isConstant() ? new SPO(s.get(), sameAs, constant)
                                 : new SPO(constant, sameAs, o.get());
@@ -493,24 +493,24 @@ public class OwlSameAsPropertiesExpandingIterator implements
     };
 
     private class RejectSameAsSelf implements IConstraint {
-        private IVariableOrConstant<Long> _s, _p, _o;
+        private IVariableOrConstant<IV> _s, _p, _o;
 
-        public RejectSameAsSelf(IVariableOrConstant<Long> _s,
-                IVariableOrConstant<Long> _p, IVariableOrConstant<Long> _o) {
+        public RejectSameAsSelf(IVariableOrConstant<IV> _s,
+                IVariableOrConstant<IV> _p, IVariableOrConstant<IV> _o) {
             this._s = _s;
             this._p = _p;
             this._o = _o;
         }
 
         public boolean accept(IBindingSet bindings) {
-            long sVal = getValue(_s, bindings);
-            long pVal = getValue(_p, bindings);
-            long oVal = getValue(_o, bindings);
+            IV sVal = getValue(_s, bindings);
+            IV pVal = getValue(_p, bindings);
+            IV oVal = getValue(_o, bindings);
             // not fully bound yet, just ignore for now
-            if (sVal == NULL || pVal == NULL || oVal == NULL) {
+            if (sVal == null || pVal == null || oVal == null) {
                 return true;
             }
-            if (pVal == sameAs && sVal == oVal) {
+            if (IVUtil.equals(pVal, sameAs) && IVUtil.equals(sVal, oVal)) {
                 return false;
             }
             return true;
@@ -537,13 +537,13 @@ public class OwlSameAsPropertiesExpandingIterator implements
             
         }
 
-        public long getValue(IVariableOrConstant<Long> _x, IBindingSet bindings) {
-            long val;
+        public IV getValue(IVariableOrConstant<IV> _x, IBindingSet bindings) {
+            IV val;
             if (_x.isConstant()) {
                 val = _x.get();
             } else {
-                IConstant<Long> bound = bindings.get((IVariable<Long>) _x);
-                val = bound != null ? bound.get() : NULL;
+                IConstant<IV> bound = bindings.get((IVariable<IV>) _x);
+                val = bound != null ? bound.get() : null;
             }
             return val;
         }

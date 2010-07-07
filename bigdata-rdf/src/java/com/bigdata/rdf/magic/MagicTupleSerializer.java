@@ -39,6 +39,8 @@ import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
 
 public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,MagicTuple> {
 
@@ -96,11 +98,11 @@ public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,Magi
          * Decode the key.
          */
         
-        final long[] terms = new long[arity];
+        final IV[] terms = new IV[arity];
         
         for (int i = 0; i < arity; i++) {
             
-            terms[keyMap[i]] = KeyBuilder.decodeLong(key, 8*i);
+            terms[keyMap[i]] = new TermId(KeyBuilder.decodeLong(key, 8*i));
             
         }
         
@@ -154,7 +156,7 @@ public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,Magi
         
         final int[] keyMap = keyOrder.getKeyMap();
         
-        final long[] terms = new long[arity];
+        final IV[] terms = new IV[arity];
         
         for (int i = 0; i < arity; i++) {
             
@@ -176,13 +178,21 @@ public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,Magi
      * 
      * @return The sort key for the magic tuple with those values.
      */
-    public byte[] magicTuple2Key(final long[] terms) {
+    public byte[] magicTuple2Key(final IV[] terms) {
 
         IKeyBuilder keyBuilder = getKeyBuilder().reset();
         
-        for (long term : terms) {
+        for (IV term : terms) {
             
-            keyBuilder.append(term);
+            /*
+             * This is the implementation for backwards
+             * compatibility.  We should not see inline values here.
+             */
+            if (term.isInline()) {
+                throw new RuntimeException();
+            }
+            
+            keyBuilder.append(term.getTermId());
             
         }
                 

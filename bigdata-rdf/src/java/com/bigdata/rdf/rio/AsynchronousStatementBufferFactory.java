@@ -89,6 +89,7 @@ import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.LexiconKeyBuilder;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -2752,9 +2753,9 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
             for (int i = 0; i < chunk.length; i++) {
 
-                final long termId = result.ids[i];
+                final IV iv = result.ivs[i];
 
-                if (termId == IRawTripleStore.NULL) {
+                if (iv == null) {
 
                     if (!readOnly)
                         throw new AssertionError();
@@ -2762,7 +2763,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                 } else {
 
                     // assign the term identifier.
-                    chunk[i].obj.setIV(termId);
+                    chunk[i].obj.setIV(iv);
 
                     if (chunk[i] instanceof KVOList) {
 
@@ -2771,7 +2772,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                         if (!tmp.isDuplicateListEmpty()) {
 
                             // assign the term identifier to the duplicates.
-                            tmp.map(new AssignTermId(termId));
+                            tmp.map(new AssignTermId(iv));
 
                         }
 
@@ -2779,7 +2780,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                     if (log.isDebugEnabled()) {
                         log
-                                .debug("termId=" + termId + ", term="
+                                .debug("termId=" + iv + ", term="
                                         + chunk[i].obj);
                     }
 
@@ -3057,7 +3058,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                         }
 
-                        if (v.getIV() == IRawTripleStore.NULL) {
+                        if (v.getIV() == null) {
 
                             throw new RuntimeException("No TID: " + v);
 

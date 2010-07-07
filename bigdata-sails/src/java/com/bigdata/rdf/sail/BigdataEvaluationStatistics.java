@@ -100,10 +100,10 @@ public class BigdataEvaluationStatistics extends EvaluationStatistics {
             final BigdataResource context = (BigdataResource) getConstantValue(sp
                     .getContextVar());
 
-            if ((subj != null && subj.getIV() == BigdataSail.NULL)
-                    || (pred != null && pred.getIV() == BigdataSail.NULL)
-                    || (obj != null && obj.getIV() == BigdataSail.NULL)
-                    || (context != null && context.getIV() == BigdataSail.NULL)) {
+            if ((subj != null && subj.getIV() == null)
+                    || (pred != null && pred.getIV() == null)
+                    || (obj != null && obj.getIV() == null)
+                    || (context != null && context.getIV() == null)) {
 
                 // non-existent subject, predicate, object or context
 
@@ -126,10 +126,10 @@ public class BigdataEvaluationStatistics extends EvaluationStatistics {
                  */
 
                 final IAccessPath<?> accessPath = conn.database.getSPORelation().getAccessPath(
-                        (subj == null ? BigdataSail.NULL : subj.getIV()),//
-                        (pred == null ? BigdataSail.NULL : pred.getIV()),//
-                        (obj == null ? BigdataSail.NULL : obj.getIV()),//
-                        (context == null ? BigdataSail.NULL : context.getIV())//
+                        (subj == null ? null : subj.getIV()),//
+                        (pred == null ? null : pred.getIV()),//
+                        (obj == null ? null : obj.getIV()),//
+                        (context == null ? null : context.getIV())//
                         );
 
                 /*

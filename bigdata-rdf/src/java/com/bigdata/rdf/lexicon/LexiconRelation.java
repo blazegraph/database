@@ -746,7 +746,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * @return An iterator visiting the term identifiers for the matching
      *         {@link Literal}s.
      */
-    public Iterator<Long> prefixScan(final Literal lit) {
+    public Iterator<IV> prefixScan(final Literal lit) {
 
         if (lit == null)
             throw new IllegalArgumentException();
@@ -1274,8 +1274,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 //                                                        result.ids[j]));
 //                                    }
 
-                                    b[i].setStatementIdentifier(new TermId(
-                                            VTE.STATEMENT, result.ids[j]));
+                                    b[i].setStatementIdentifier(result.ivs[j]);
 
                                 }
 

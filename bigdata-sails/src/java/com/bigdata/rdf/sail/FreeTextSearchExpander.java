@@ -10,6 +10,8 @@ import org.openrdf.query.algebra.StatementPattern;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
@@ -51,8 +53,6 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
     private static final long serialVersionUID = 1L;
     
     private final AbstractTripleStore database;
-    
-    private static final long NULL = IRawTripleStore.NULL;
     
     private final Literal query;
     
@@ -115,8 +115,8 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
         
         public FreeTextSearchAccessPath(IAccessPath<ISPO> accessPath) {
             SPOPredicate pred = (SPOPredicate) accessPath.getPredicate();
-            IVariableOrConstant<Long> p = pred.p();
-            IVariableOrConstant<Long> o = pred.o();
+            IVariableOrConstant<IV> p = pred.p();
+            IVariableOrConstant<IV> o = pred.o();
             if (p.isConstant() == false || o.isConstant() == false) {
                 throw new IllegalArgumentException("query not well formed");
             }
@@ -285,14 +285,14 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
         
         private final boolean isBound;
         
-        private final long boundVal;
+        private final IV boundVal;
         
         public HitConverter(IAccessPath<ISPO> accessPath) {
             SPOPredicate pred = (SPOPredicate) accessPath.getPredicate();
-            IVariableOrConstant<Long> s = pred.s();
+            IVariableOrConstant<IV> s = pred.s();
             this.isBound = s.isConstant();
             if (INFO) log.info("isBound: " + isBound);
-            this.boundVal = isBound ? s.get() : NULL;
+            this.boundVal = isBound ? s.get() : null;
             if (INFO) log.info("boundVal: " + boundVal);
         }
 
@@ -304,9 +304,9 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
             }
             ISPO[] spos = new ISPO[hits.length];
             for (int i = 0; i < hits.length; i++) {
-                long s = hits[i].getDocId();
+                IV s = new TermId(hits[i].getDocId());
                 if (INFO) log.info("hit: " + s);
-                spos[i] = new SPO(s, NULL, NULL);
+                spos[i] = new SPO(s, null, null);
             }
 //            Arrays.sort(spos, SPOKeyOrder.SPO.getComparator());
             return spos;
@@ -315,9 +315,9 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
         private ISPO[] convertWhenBound(IHit[] hits) {
             ISPO[] result = new ISPO[0];
             for (IHit hit : hits) {
-                long s = hit.getDocId();
+                IV s = new TermId(hit.getDocId());
                 if (s == boundVal) {
-                    result = new ISPO[] { new SPO(s, NULL, NULL) };
+                    result = new ISPO[] { new SPO(s, null, null) };
                     break;
                 }
             }

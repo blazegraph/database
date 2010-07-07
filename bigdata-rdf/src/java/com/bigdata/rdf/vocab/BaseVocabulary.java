@@ -36,12 +36,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-
 import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ValueFactoryImpl;
-
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
@@ -49,7 +47,6 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IConstant;
 
@@ -61,11 +58,6 @@ import com.bigdata.relation.rule.IConstant;
  */
 abstract public class BaseVocabulary implements Vocabulary, Externalizable {
 
-    /**
-     * Value used for a "NULL" term identifier.
-     */
-    public final transient long NULL = IRawTripleStore.NULL;
-    
     final static public Logger log = Logger.getLogger(BaseVocabulary.class);
 
     /**
@@ -78,7 +70,7 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
     /**
      * The {@link Value}s together with their assigned term identifiers.
      */
-    private Map<Value, Long> values;
+    private Map<Value, IV> values;
     
     /**
      * De-serialization ctor. 
@@ -123,7 +115,7 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
             throw new IllegalStateException();
         
         // setup [values] collection.
-        values = new HashMap<Value, Long>(200);
+        values = new HashMap<Value, IV>(200);
 
         // obtain collection of values to be used.
         addValues();
@@ -216,7 +208,7 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
         
     }
     
-    final public TermId get(Value value) {
+    final public IV get(Value value) {
 
         if (values == null)
             throw new IllegalStateException();
@@ -224,12 +216,12 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
         if (value == null)
             throw new IllegalArgumentException();
         
-        final Long id = values.get(value);
+        final IV iv = values.get(value);
         
-        if (id == null)
+        if (iv == null)
             throw new IllegalArgumentException("Not defined: " + value);
 
-        return id.longValue();
+        return iv;
 
     }
 
@@ -241,12 +233,12 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
         if (value == null)
             throw new IllegalArgumentException();
 
-        final Long id = values.get(value);
+        final IV iv = values.get(value);
 
-        if (id == null)
+        if (iv == null)
             throw new IllegalArgumentException("Not defined: " + value);
 
-        return new Constant<Long>(id);
+        return new Constant<IV>(iv);
 
     }
 
@@ -275,7 +267,7 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
             throw new IOException();
         
         // allocate the map with sufficient capacity.
-        values = new HashMap<Value,Long>(nvalues);
+        values = new HashMap<Value,IV>(nvalues);
         
         for (int i = 0; i < nvalues; i++) {
             
@@ -293,10 +285,10 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
 
             // the assigned term identifier.
 //            final long id = LongPacker.unpackLong(in);
-            final long id = in.readLong();
+            final TermId tid = new TermId(in.readLong());
 
             // stuff in the map.
-            values.put(value, id);
+            values.put(value, tid);
             
         }
         
@@ -318,19 +310,19 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
         final BigdataValueSerializer<Value> valueSer = new BigdataValueSerializer<Value>(
                 new ValueFactoryImpl());
         
-        final Iterator<Map.Entry<Value,Long>> itr = values.entrySet().iterator();
+        final Iterator<Map.Entry<Value,IV>> itr = values.entrySet().iterator();
 
         while(itr.hasNext()) {
             
-            final Map.Entry<Value, Long> entry = itr.next();
+            final Map.Entry<Value, IV> entry = itr.next();
             
             final Value value = entry.getKey();
             
-            final Long id = entry.getValue();
+            final IV iv = entry.getValue();
 
             assert value != null;
             
-            assert id != NULL;
+            assert iv != null;
 
             // reset the buffer.
             buf.reset();
@@ -349,7 +341,15 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
             
             // pack the term identifier onto the output stream.
 //            LongPacker.packLong(out, id);
-            out.writeLong(id);
+            /*
+             * This is the implementation for backwards
+             * compatibility.  We should not see inline values here.
+             */
+            if (iv.isInline()) {
+                throw new RuntimeException();
+            }
+            
+            out.writeLong(iv.getTermId());
             
         }
         

@@ -47,6 +47,8 @@ import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
 /**
@@ -276,7 +278,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         assert numTerms > 0 : "numTerms="+numTerms;
         
         // used to store the discovered / assigned term identifiers.
-        final long[] ids = new long[numTerms];
+        final IV[] ivs = new IV[numTerms];
         
         // used to assign term identifiers.
         final ICounter counter = ndx.getCounter();
@@ -403,7 +405,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
     
             }
             
-            ids[i] = termId;
+            ivs[i] = new TermId(termId);
 
         }
 
@@ -437,7 +439,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 //            
 //        }
         
-        return new Result(ids);
+        return new Result(ivs);
 
     }
     
@@ -547,11 +549,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
      */
     public static class Result implements Externalizable {
 
-        public long[] ids;
+        public IV[] ivs;
         
-        /**
-         * 
-         */
         private static final long serialVersionUID = -8307927320589290348L;
 
         /**
@@ -561,13 +560,13 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
             
         }
         
-        public Result(long[] ids) {
+        public Result(IV[] ivs) {
 
-            assert ids != null;
+            assert ivs != null;
             
-            assert ids.length > 0;
+            assert ivs.length > 0;
             
-            this.ids = ids;
+            this.ivs = ivs;
             
         }
 
@@ -585,12 +584,12 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
             
             final int n = (int) LongPacker.unpackLong(in);
             
-            ids = new long[n];
+            ivs = new IV[n];
             
             for (int i = 0; i < n; i++) {
                 
 //                ids[i] = LongPacker.unpackLong(in);
-                ids[i] = in.readLong();
+                ivs[i] = new TermId(in.readLong());
                 
             }
             
@@ -598,7 +597,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 
         public void writeExternal(ObjectOutput out) throws IOException {
 
-            final int n = ids.length;
+            final int n = ivs.length;
             
             ShortPacker.packShort(out, VERSION0);
             
@@ -606,8 +605,16 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 
             for (int i = 0; i < n; i++) {
                 
+                /*
+                 * This is the implementation for backwards
+                 * compatibility.  We should not see inline values here.
+                 */
+                if (ivs[i].isInline()) {
+                    throw new RuntimeException();
+                }
+                
 //                LongPacker.packLong(out, ids[i]);
-                out.writeLong(ids[i]);
+                out.writeLong(ivs[i].getTermId());
                 
             }
             

@@ -3760,7 +3760,7 @@ abstract public class AbstractTripleStore extends
          * there is at least one owl:sameAs assertion in the database.
          */
         final boolean isOwlSameAsUsed = getAxioms().isOwlSameAs()
-                && !getAccessPath(NULL, getVocabulary().get(OWL.SAMEAS), NULL)
+                && !getAccessPath(null, getVocabulary().get(OWL.SAMEAS), null)
                         .isEmpty();
 
         final IRuleTaskFactory defaultRuleTaskFactory = isNestedSubquery() //

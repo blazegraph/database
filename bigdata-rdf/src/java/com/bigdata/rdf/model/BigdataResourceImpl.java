@@ -47,6 +47,8 @@ Modifications:
 
 package com.bigdata.rdf.model;
 
+import com.bigdata.rdf.internal.IV;
+
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -57,12 +59,12 @@ public abstract class BigdataResourceImpl extends BigdataValueImpl implements
     /**
      * @param valueFactory
      *            The factory that is creating this object (optional).
-     * @param termId
-     *            The term identifier (optional).
+     * @param iv
+     *            The internal value (optional).
      */
-    protected BigdataResourceImpl(BigdataValueFactory valueFactory, long termId) {
+    protected BigdataResourceImpl(BigdataValueFactory valueFactory, IV iv) {
 
-        super(valueFactory, termId);
+        super(valueFactory, iv);
         
     }
 
