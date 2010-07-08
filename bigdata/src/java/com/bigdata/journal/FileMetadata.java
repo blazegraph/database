@@ -29,6 +29,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.channels.OverlappingFileLockException;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -1182,8 +1183,14 @@ public class FileMetadata {
 				if (INFO)
 					log.info("FileLock not supported: file=" + file, ex);
 
-			}
+			} catch (OverlappingFileLockException ex) {
 
+				if (INFO)
+					log.info("FileLock problem: file=" + file, ex);
+				
+				throw new RuntimeException("FileLock Overlap", ex);
+
+			}
 		}
 
 		return raf.getChannel();
