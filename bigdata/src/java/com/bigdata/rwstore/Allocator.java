@@ -36,8 +36,8 @@ public interface Allocator extends Comparable {
   public boolean addressInRange(int addr);
   public boolean free(int addr, int size);
   public int alloc(RWStore store, int size);
-  public long getDiskAddr();
-  public void setDiskAddr(long addr);
+  public int getDiskAddr();
+  public void setDiskAddr(int addr);
   public long getPhysicalAddress(int offset);
   public int getPhysicalSize(int offset);
   public byte[] write();

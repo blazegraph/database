@@ -28,7 +28,7 @@ import com.bigdata.util.ChecksumUtility;
 public class BlobAllocator implements Allocator {
 	int[] m_hdrs = new int[254];
 	RWStore m_store;
-	private long m_diskAddr;
+	private int m_diskAddr;
 	private int m_index;
 	private int m_sortAddr;
 	
@@ -93,7 +93,7 @@ public class BlobAllocator implements Allocator {
 		return 0;
 	}
 
-	public long getDiskAddr() {
+	public int getDiskAddr() {
 		return m_diskAddr;
 	}
 
@@ -155,13 +155,9 @@ public class BlobAllocator implements Allocator {
 			e.printStackTrace();
 			throw new IllegalStateException(e);
 		}
-		
-		if (m_freeSpots > 0) {
-			m_freeList.add(this);
-		}
 	}
 
-	public void setDiskAddr(long addr) {
+	public void setDiskAddr(int addr) {
 		m_diskAddr = addr;
 	}
 
