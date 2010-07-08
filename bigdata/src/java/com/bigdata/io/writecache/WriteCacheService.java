@@ -525,7 +525,7 @@ abstract public class WriteCacheService implements IWriteCache {
                     }
 
                     if (!cache.isEmpty()) {
-                        
+                    	
                         /*
                          * Only process non-empty cache buffers.
                          */
@@ -1839,7 +1839,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
 			// Take a buffer from the cleanList (guaranteed avail).
 			final WriteCache newBuffer = cleanList.take();
-
+			
 			// Clear state on new buffer and remove from cacheService map
 			newBuffer.resetWith(recordMap, fileExtent.get());
 
@@ -1923,10 +1923,9 @@ abstract public class WriteCacheService implements IWriteCache {
 			final WriteCache cache = recordMap.remove(offset);
 			if (cache == null)
 				return;
-			final WriteCache current = acquireForWriter();
+			acquireForWriter(); // in case current
 			try {
-				if (cache == current)
-					cache.clearAddrMap(offset);
+				cache.clearAddrMap(offset);
 			} finally {
 				release();
 			}
