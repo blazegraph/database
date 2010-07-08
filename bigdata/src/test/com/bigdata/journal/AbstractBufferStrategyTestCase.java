@@ -200,14 +200,13 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
 
             assertEquals("extent", initialExtent, extent);
 
-            final long remaining = (userExtent - nextOffset)
-                    - (bufferStrategy.useChecksums() ? 4 : 0);
+            final long remaining = userExtent - nextOffset;
 
-            writeRandomData(store, remaining);
+            writeRandomData(store, remaining, bufferStrategy.useChecksums());
 
             // no change in extent.
             assertEquals("extent", extent, bufferStrategy.getExtent());
-
+            
             // no change in user extent.
             assertEquals("userExtent", userExtent, bufferStrategy
                     .getUserExtent());
@@ -232,9 +231,11 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
      * 
      * @return The address of the last record written.
      */
-    protected long writeRandomData(final Journal store, final long nbytesToWrite) {
+    protected long writeRandomData(final Journal store, final long nbytesToWrite, final boolean allowChecksum) {
 
         final int maxRecordSize = store.getMaxRecordSize();
+        
+        final int chkAdjust = allowChecksum ? 4 : 0;
         
         assert nbytesToWrite > 0;
         
@@ -250,7 +251,7 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
         while (leftover > 0) {
 
             // this will be an int since maxRecordSize is an int.
-            final int nbytes = (int) Math.min(maxRecordSize, leftover);
+            final int nbytes = (int) Math.min(maxRecordSize, leftover-chkAdjust);
 
             assert nbytes>0;
             
@@ -266,7 +267,7 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
 
             n++;
             
-            leftover -= nbytes;
+            leftover -= nbytes+chkAdjust;
             
             System.err.println("Wrote record#" + n + " with " + nbytes
                     + " bytes: addr=" + store.toString(addr) + ", #leftover="
@@ -315,10 +316,9 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
 
             assertEquals("extent", initialExtent, extent);
 
-            final long remaining = userExtent - nextOffset
-                    - (bufferStrategy.useChecksums() ? 4 : 0);
+            final long remaining = userExtent - nextOffset;
 
-            final long addr = writeRandomData(store, remaining);
+            final long addr = writeRandomData(store, remaining, bufferStrategy.useChecksums());
 
             // no change in extent.
             assertEquals("extent", extent, bufferStrategy.getExtent());
