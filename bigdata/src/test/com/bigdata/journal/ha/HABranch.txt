@@ -354,14 +354,6 @@ Open questions:
 - Can we kill a client's zk connection if it is not reachable or are
   we going to wait until it times out?
 
-I am currently chasing down an issue where the test_voting for a
-singleton quorum occasionally takes too long to complete.  The test
-terminates when the fixture tears down the AbstractQuorum's internal
-watcher action service, which has a hung action.  If the WatcherActionService
-is also single-threaded, then this could clearly lead to a deadlock since
-there would be no thread available to handle new events.  I need to figure
-out what Condition is being awaited.
-
 ============================================================
 
 TODO:

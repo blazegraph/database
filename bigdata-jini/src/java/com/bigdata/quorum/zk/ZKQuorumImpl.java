@@ -27,14 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.quorum.zk;
 
-import java.io.IOException;
 import java.rmi.Remote;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
@@ -895,7 +893,7 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
         }
 
         @Override
-        protected void doSetLastValidToken(final long newToken) {
+        protected void doSetToken(final long newToken) {
             // get a valid zookeeper connection object.
             final ZooKeeper zk;
             try {
@@ -910,7 +908,8 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
              * having a concurrent update. If the token has been cleared, then
              * we are done (it does not matter which service observing a quorum
              * break actually clears the token, only that it is quickly
-             * cleared).
+             * cleared). If the token has been concurrently updated, then we are
+             * done (the lastValidToken must strictly advance).
              * 
              * Note: Conflicts can come from ANY change to the QUORUM znode's
              * state.
@@ -952,9 +951,9 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                             "The quorum token has not been cleared");
                 }
                 try {
-                    // new local state object w/ the current token cleared.
+                    // new local state object.
                     final QuorumTokenState newState = new QuorumTokenState(
-                            newToken, oldState.token());
+                            newToken, newToken);
                     // update data (verifying the version!)
                     zk.setData(logicalServiceId + "/" + QUORUM, SerializerUtil
                             .serialize(newState), stat.getVersion());
@@ -980,96 +979,183 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
                 }
             }
         }
-
-        /**
-         * @todo For zookeeper, we can atomically update both the lastValidToken
-         *       and the currentToken. This might be true in general. [Change
-         *       the quorum dynamics to reflect this.]
-         */
-        @Override
-        protected void doSetToken() {
-            /*
-             * Try in a loop until we can read the data and update it without
-             * having a concurrent update. If the token has been cleared, then
-             * we are done (it does not matter which service observing a quorum
-             * break actually clears the token, only that it is quickly
-             * cleared).
-             * 
-             * Note: Conflicts can come from ANY change to the QUORUM znode's
-             * state.
-             */
-            // get a valid zookeeper connection object.
-            final ZooKeeper zk;
-            try {
-                zk = getZookeeper();
-            } catch (InterruptedException e) {
-                // propagate the interrupt.
-                Thread.currentThread().interrupt();
-                return;
-            }
-            while (true) {
-                /*
-                 * Read the current quorum state.
-                 */
-                final Stat stat = new Stat();
-                final QuorumTokenState oldState;
-                try {
-                    oldState = (QuorumTokenState) SerializerUtil.deserialize(zk
-                            .getData(logicalServiceId + "/" + QUORUM,
-                                    false/* watch */, stat));
-                } catch (KeeperException e) {
-                    throw new RuntimeException(e);
-                } catch (InterruptedException e) {
-                    // propagate the interrupt.
-                    Thread.currentThread().interrupt();
-                    return;
-                }
-                /*
-                 * Check some preconditions.
-                 */
-                if (oldState.token() != Quorum.NO_QUORUM) {
-                    /*
-                     * A new value for lastValidToken should not be assigned
-                     * unless the quorum has broken. The quorum token should
-                     * have been cleared when the quorum broken.
-                     */
-                    throw new QuorumException(
-                            "The quorum token has not been cleared");
-                }
-                try {
-                    /*
-                     * Take the new quorum token from the lastValidToken field
-                     * and create a new local state object w/ the current token
-                     * set.
-                     */
-                    final long newToken = oldState.lastValidToken();
-                    final QuorumTokenState newState = new QuorumTokenState(
-                            oldState.lastValidToken(), newToken);
-                    // update data (verifying the version!)
-                    zk.setData(logicalServiceId + "/" + QUORUM, SerializerUtil
-                            .serialize(newState), stat.getVersion());
-                    // done.
-                    if (log.isInfoEnabled())
-                        log.info("Set: token=" + newToken);
-                    return;
-                } catch (BadVersionException e) {
-                    /*
-                     * If we get a version conflict, then just retry. Either the
-                     * token was cleared by someone else or we will try to clear
-                     * it ourselves.
-                     */
-                    log.warn("Concurrent update (retry): serviceId="
-                            + serviceIdStr);
-                    continue;
-                } catch (KeeperException e) {
-                    throw new RuntimeException(e);
-                } catch (InterruptedException e) {
-                    // propagate the interrupt.
-                    Thread.currentThread().interrupt();
-                    return;
-                }
-            }
-        }
+    
+//        @Override
+//        protected void doSetLastValidToken(final long newToken) {
+//            // get a valid zookeeper connection object.
+//            final ZooKeeper zk;
+//            try {
+//                zk = getZookeeper();
+//            } catch (InterruptedException e) {
+//                // propagate the interrupt.
+//                Thread.currentThread().interrupt();
+//                return;
+//            }
+//            /*
+//             * Try in a loop until we can read the data and update it without
+//             * having a concurrent update. If the token has been cleared, then
+//             * we are done (it does not matter which service observing a quorum
+//             * break actually clears the token, only that it is quickly
+//             * cleared).
+//             * 
+//             * Note: Conflicts can come from ANY change to the QUORUM znode's
+//             * state.
+//             */
+//            while (true) {
+//                /*
+//                 * Read the current quorum state.
+//                 */
+//                final Stat stat = new Stat();
+//                final QuorumTokenState oldState;
+//                try {
+//                    oldState = (QuorumTokenState) SerializerUtil.deserialize(zk
+//                            .getData(logicalServiceId + "/" + QUORUM,
+//                                    false/* watch */, stat));
+//                } catch (KeeperException e) {
+//                    throw new RuntimeException(e);
+//                } catch (InterruptedException e) {
+//                    // propagate the interrupt.
+//                    Thread.currentThread().interrupt();
+//                    return;
+//                }
+//                /*
+//                 * Check some preconditions.
+//                 */
+//                if (oldState.lastValidToken() >= newToken) {
+//                    // the lastValidToken must advance.
+//                    throw new QuorumException(
+//                            "New value must be GT old value: oldValue="
+//                                    + oldState.lastValidToken()
+//                                    + ", but newValue=" + newToken);
+//                }
+//                if (oldState.token() != Quorum.NO_QUORUM) {
+//                    /*
+//                     * A new value for lastValidToken should not be assigned
+//                     * unless the quorum has broken. The quorum token should
+//                     * have been cleared when the quorum broken.
+//                     */
+//                    throw new QuorumException(
+//                            "The quorum token has not been cleared");
+//                }
+//                try {
+//                    // new local state object w/ the current token cleared.
+//                    final QuorumTokenState newState = new QuorumTokenState(
+//                            newToken, oldState.token());
+//                    // update data (verifying the version!)
+//                    zk.setData(logicalServiceId + "/" + QUORUM, SerializerUtil
+//                            .serialize(newState), stat.getVersion());
+//                    // done.
+//                    if (log.isInfoEnabled())
+//                        log.info("Set: lastValidToken=" + newToken);
+//                    return;
+//                } catch (BadVersionException e) {
+//                    /*
+//                     * If we get a version conflict, then just retry. Either the
+//                     * token was cleared by someone else or we will try to clear
+//                     * it ourselves.
+//                     */
+//                    log.warn("Concurrent update (retry): serviceId="
+//                            + serviceIdStr);
+//                    continue;
+//                } catch (KeeperException e) {
+//                    throw new RuntimeException(e);
+//                } catch (InterruptedException e) {
+//                    // propagate the interrupt.
+//                    Thread.currentThread().interrupt();
+//                    return;
+//                }
+//            }
+//        }
+//
+//        /**
+//         * @todo For zookeeper, we can atomically update both the lastValidToken
+//         *       and the currentToken. This might be true in general. [Change
+//         *       the quorum dynamics to reflect this.]
+//         */
+//        @Override
+//        protected void doSetToken() {
+//            /*
+//             * Try in a loop until we can read the data and update it without
+//             * having a concurrent update. If the token has been cleared, then
+//             * we are done (it does not matter which service observing a quorum
+//             * break actually clears the token, only that it is quickly
+//             * cleared).
+//             * 
+//             * Note: Conflicts can come from ANY change to the QUORUM znode's
+//             * state.
+//             */
+//            // get a valid zookeeper connection object.
+//            final ZooKeeper zk;
+//            try {
+//                zk = getZookeeper();
+//            } catch (InterruptedException e) {
+//                // propagate the interrupt.
+//                Thread.currentThread().interrupt();
+//                return;
+//            }
+//            while (true) {
+//                /*
+//                 * Read the current quorum state.
+//                 */
+//                final Stat stat = new Stat();
+//                final QuorumTokenState oldState;
+//                try {
+//                    oldState = (QuorumTokenState) SerializerUtil.deserialize(zk
+//                            .getData(logicalServiceId + "/" + QUORUM,
+//                                    false/* watch */, stat));
+//                } catch (KeeperException e) {
+//                    throw new RuntimeException(e);
+//                } catch (InterruptedException e) {
+//                    // propagate the interrupt.
+//                    Thread.currentThread().interrupt();
+//                    return;
+//                }
+//                /*
+//                 * Check some preconditions.
+//                 */
+//                if (oldState.token() != Quorum.NO_QUORUM) {
+//                    /*
+//                     * A new value for lastValidToken should not be assigned
+//                     * unless the quorum has broken. The quorum token should
+//                     * have been cleared when the quorum broken.
+//                     */
+//                    throw new QuorumException(
+//                            "The quorum token has not been cleared");
+//                }
+//                try {
+//                    /*
+//                     * Take the new quorum token from the lastValidToken field
+//                     * and create a new local state object w/ the current token
+//                     * set.
+//                     */
+//                    final long newToken = oldState.lastValidToken();
+//                    final QuorumTokenState newState = new QuorumTokenState(
+//                            oldState.lastValidToken(), newToken);
+//                    // update data (verifying the version!)
+//                    zk.setData(logicalServiceId + "/" + QUORUM, SerializerUtil
+//                            .serialize(newState), stat.getVersion());
+//                    // done.
+//                    if (log.isInfoEnabled())
+//                        log.info("Set: token=" + newToken);
+//                    return;
+//                } catch (BadVersionException e) {
+//                    /*
+//                     * If we get a version conflict, then just retry. Either the
+//                     * token was cleared by someone else or we will try to clear
+//                     * it ourselves.
+//                     */
+//                    log.warn("Concurrent update (retry): serviceId="
+//                            + serviceIdStr);
+//                    continue;
+//                } catch (KeeperException e) {
+//                    throw new RuntimeException(e);
+//                } catch (InterruptedException e) {
+//                    // propagate the interrupt.
+//                    Thread.currentThread().interrupt();
+//                    return;
+//                }
+//            }
+//        }
     }
 
     /**
@@ -1606,15 +1692,10 @@ public class ZKQuorumImpl<S extends Remote, C extends QuorumClient<S>> extends
 
                 lock.lock();
                 try {
-                    if (lastValidToken() != state.lastValidToken()) {
-                        setLastValidToken(state.lastValidToken());
-                    }
-                    if (token() != state.token()) {
-                        if(state.token()==NO_QUORUM) {
-                            clearToken();
-                        } else {
-                            setToken();
-                        }
+                    if (state.token() == NO_QUORUM && token() != NO_QUORUM) {
+                        clearToken();
+                    } else if (lastValidToken() != state.lastValidToken()) {
+                        setToken(state.lastValidToken());
                     }
                 } finally {
                     lock.unlock();

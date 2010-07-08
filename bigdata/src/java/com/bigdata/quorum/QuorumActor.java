@@ -58,12 +58,9 @@ import java.util.UUID;
  * <dt>{@link #serviceJoin()}</dt>
  * <dd>member, pipeline, consensus around cast vote, predecessor in the vote
  * order is joined</dd>
- * <dt>{@link #setLastValidToken(long)}</dt>
- * <dd>member, pipeline, consensus around cast vote, first in the vote order,
- * new value is GT the lastValidToken.</dd>
  * <dt>{@link #setToken(long)}</dt>
  * <dd>member, pipeline, consensus around cast vote, first in the vote order,
- * new value is EQ to the lastValidToken.</dd>
+ * new value is GT the lastValidToken.</dd>
  * </dl>
  * <p>
  * The post-conditions for remove are:
@@ -167,23 +164,38 @@ public interface QuorumActor<S extends Remote, C extends QuorumClient<S>> {
      */
     void serviceLeave();
 
-    /**
-     * Set the lastValidToken on the quorum equal to the given token. When a new
-     * leader will be elected, this method will be invoked to update the quorum
-     * token, passing in <code>newToken := lastValidToken+1</code>.
-     */
-    void setLastValidToken(final long newToken);
+//    /**
+//     * Set the lastValidToken on the quorum equal to the given token. When a new
+//     * leader will be elected, this method will be invoked to update the quorum
+//     * token, passing in <code>newToken := lastValidToken+1</code>.
+//     */
+//    void setLastValidToken(final long newToken);
+//
+//    /**
+//     * Set the current token on the quorum equal to the lastValidToken. Note that
+//     * {@link #setLastValidToken(long)} will have been invoked as a precondition
+//     * so this has the effect of updating the current token to the recently
+//     * assigned newToken.
+//     */
+//    void setToken();
+
+//    /**
+//     * Set the lastValidToken on the quorum equal to the given token. When a new
+//     * leader will be elected, this method will be invoked to update the quorum
+//     * token, passing in <code>newToken := lastValidToken+1</code>.
+//     */
+//    void setToken(final long newToken);
 
     /**
-     * Set the current token on the quorum equal to the given token. When a new
-     * leader will be elected, this method will be invoked to update the quorum
-     * token, passing in <code>newToken := lastValidToken</code>. Note that
-     * {@link #setLastValidToken(long)} will have been invoked as a precondition
-     * so this has the effect of updating the current token to the recently
-     * assigned newToken.
+     * Atomically set the lastValidToken and the current token on the quorum
+     * equal to the given token. This method is invoked when the leader is
+     * elected, passing in <code>newToken := lastValidToken + 1</code>.
      */
-    void setToken();
+    void setToken(long newToken);
 
+//    /**@deprecated*/
+//    void setLastValidToken(long x);
+    
     /**
      * Clear the quorum token.
      */

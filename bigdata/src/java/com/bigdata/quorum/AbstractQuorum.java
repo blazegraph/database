@@ -127,26 +127,34 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      */
     protected final ReentrantLock lock = new ReentrantLock();
 
+//    /**
+//     * Condition signaled when a quorum is fully met. The preconditions for this
+//     * event are:
+//     * <ul>
+//     * <li>At least (k+1)/2 services agree on the same lastCommitTime.</li>
+//     * <li>At least (k+1)/2 services have joined the quorum in their vote order.
+//     * </li>
+//     * <li>The first service to join the quorum is the leader and it has updated
+//     * the lastValidToken and the current token.</li>
+//     * </ul>
+//     * The condition variable is <code> token != NO_QUORUM </code>. Since the
+//     * {@link #token()} is cleared as soon as the leader fails or the quorum
+//     * breaks, this is sufficient to detect a quorum meet.
+//     */
+//    private final Condition quorumMeet = lock.newCondition();
+//    
+//    /**
+//     * Condition signaled when a quorum breaks.
+//     */
+//  private final Condition quorumBreak = lock.newCondition();
+
     /**
-     * Condition signaled when a quorum is fully met. The preconditions for this
-     * event are:
-     * <ul>
-     * <li>At least (k+1)/2 services agree on the same lastCommitTime.</li>
-     * <li>At least (k+1)/2 services have joined the quorum in their vote order.
-     * </li>
-     * <li>The first service to join the quorum is the leader and it has updated
-     * the lastValidToken and the current token.</li>
-     * </ul>
-     * The condition variable is <code> token != NO_QUORUM </code>. Since the
-     * {@link #token()} is cleared as soon as the leader fails or the quorum
-     * breaks, this is sufficient to detect a quorum meet.
+     * Condition signaled when the {@link #lastValidToken} or the {@link #token}
+     * are modified. You must also inspect the state of those condition
+     * variables in order to distinguish quorum meet versus quorum break and
+     * related states.
      */
-    private final Condition quorumMeet = lock.newCondition();
-    
-    /**
-     * Condition signaled when a quorum breaks.
-     */
-    private final Condition quorumBreak = lock.newCondition();
+    private final Condition quorumChange = lock.newCondition();
 
     /**
      * Condition signaled when a service UUID is added or removed from
@@ -173,14 +181,14 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
      */
     private final Condition joinedChange = lock.newCondition();
 
-    /**
-     * Condition signaled when the {@link #lastValidToken} is set by the
-     * {@link QuorumWatcherBase}.
-     * <p>
-     * See {@link #quorumMeet} and {@link #quorumBreak} for the
-     * {@link Condition}s pertaining to the current {@link #token}.
-     */
-    private final Condition lastValidTokenChange = lock.newCondition();
+//    /**
+//     * Condition signaled when the {@link #lastValidToken} is set by the
+//     * {@link QuorumWatcherBase}.
+//     * <p>
+//     * See {@link #quorumMeet} and {@link #quorumBreak} for the
+//     * {@link Condition}s pertaining to the current {@link #token}.
+//     */
+//    private final Condition lastValidTokenChange = lock.newCondition();
     
     /**
      * The last valid token assigned to this quorum. This is updated by the
@@ -249,9 +257,24 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
     /**
      * A service used by {@link QuorumWatcherBase} to execute actions outside of
      * the thread in which it handles the observed state change.
+     * <p>
+     * Note: {@link ThreadPoolExecutor} is used because it exposes
+     * getActiveCount().
      */
     private ThreadPoolExecutor watcherActionService;
 
+    /*
+     * @todo These fields are being used to explore a problem in test_voting
+     * where there sometimes is a hang until the watcher service is terminated.
+     * 
+     * @todo A single thread watcher can lead to a deadlock if an action stalls
+     * since a second watcher event can not be processed concurrently.
+     */
+    private final boolean singleThreadWatcher = false;
+//    private final long watcherShutdownTimeout = Long.MAX_VALUE; // ms
+    private final long watcherShutdownTimeout = 3000; // ms
+
+    
     /**
      * A single threaded service used to pump events to clients outside of the
      * thread in which those events arise.
@@ -340,16 +363,19 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 this.actor = newActor(client.getLogicalServiceId(),
                         ((QuorumMember<?>) client).getServiceId());
             }
-            // Note: Use because exposes getActiveCount()
-            this.watcherActionService = 
-                new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
+            if (singleThreadWatcher) {
+                this.watcherActionService = new ThreadPoolExecutor(1, 1, 0L,
+                        TimeUnit.MILLISECONDS,
                         new LinkedBlockingQueue<Runnable>(),
-                        new DaemonThreadFactory(
-                        "WatcherActionService"));
-            //this.watcherActionService = Executors.newSingleThreadExecutor(new DaemonThreadFactory("WatcherActionService"));
-//            this.watcherActionService = Executors
-//            .newCachedThreadPool(new DaemonThreadFactory(
-//                    "WatcherActionService"));
+                        new DaemonThreadFactory("WatcherActionService"));
+                // this.watcherActionService =
+                // Executors.newSingleThreadExecutor(new
+                // DaemonThreadFactory("WatcherActionService"));
+            } else {
+                this.watcherActionService = (ThreadPoolExecutor) Executors
+                        .newCachedThreadPool(new DaemonThreadFactory(
+                                "WatcherActionService"));
+            }
             this.watcher = newWatcher(client.getLogicalServiceId());
             this.eventService = (sendSynchronous ? null : Executors
                     .newSingleThreadExecutor(new DaemonThreadFactory(
@@ -402,10 +428,8 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             if (watcherActionService != null) {
                 watcherActionService.shutdown();
                 try {
-                    if (!watcherActionService.awaitTermination(//
-                            // Long.MAX_VALUE,
-                            3000,//
-                            TimeUnit.MILLISECONDS)) {
+                    if (!watcherActionService.awaitTermination(
+                            watcherShutdownTimeout, TimeUnit.MILLISECONDS)) {
                         log
                                 .error("WatcherActionService termination timeout: activeCount="
                                         + ((ThreadPoolExecutor) watcherActionService)
@@ -437,6 +461,15 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                     eventService = null;
                 }
             }
+            /*
+             * Signal all conditions so anyone blocked will wake up.
+             */
+            quorumChange.signalAll();
+            membersChange.signalAll();
+            pipelineChange.signalAll();
+            votesChange.signalAll();
+            joinedChange.signalAll();
+            // discard reference to the client.
             this.client = null;
             // discard listeners.
             listeners.clear();
@@ -889,8 +922,8 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             AsynchronousQuorumCloseException {
         lock.lock();
         try {
-            while (!isQuorumMet() && client != null) {
-                quorumMeet.await();
+            while (token == NO_QUORUM && client != null) {
+                quorumChange.await();
             }
             if (client == null)
                 throw new AsynchronousQuorumCloseException();
@@ -910,8 +943,8 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         try {
             // remaining -= (now - begin) [aka elapsed]
             nanos -= System.nanoTime() - begin;
-            while (!isQuorumMet() && client != null) {
-                if(!quorumMeet.await(nanos,TimeUnit.NANOSECONDS))
+            while (token == NO_QUORUM && client != null) {
+                if(!quorumChange.await(nanos,TimeUnit.NANOSECONDS))
                     throw new TimeoutException();
                 nanos -= System.nanoTime() - begin;
             }
@@ -923,12 +956,23 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         }
     }
 
+    /**
+     * {@inheritDoc}
+     * 
+     * @todo This triggers when it notices that the quorum is currently broken
+     *       rather than when it notices that the quorum on entry had broken. It
+     *       will fail to return if a quorum break is cured before it examines
+     *       [token] again. Regardless, there is no guarantee that the quorum is
+     *       still broken by the time the caller looks at the quorum again.
+     *       <p>
+     *       Are these the desired semantics for this public method?
+     */
     public void awaitBreak() throws InterruptedException,
             AsynchronousQuorumCloseException {
         lock.lock();
         try {
-            while (isQuorumMet() && client != null) {
-                quorumBreak.await();
+            while (token != NO_QUORUM && client != null) {
+                quorumChange.await();
             }
             if (client == null)
                 throw new AsynchronousQuorumCloseException();
@@ -948,8 +992,8 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
         try {
             // remaining -= (now - begin) [aka elapsed]
             nanos -= System.nanoTime() - begin;
-            while (isQuorumMet() && client != null) {
-                if (!quorumBreak.await(nanos, TimeUnit.NANOSECONDS))
+            while (token != NO_QUORUM && client != null) {
+                if (!quorumChange.await(nanos, TimeUnit.NANOSECONDS))
                     throw new TimeoutException();
                 nanos -= System.nanoTime() - begin;
             }
@@ -1164,8 +1208,15 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             try {
                 if (!members.contains(serviceId))
                     throw new QuorumException(ERR_NOT_MEMBER + serviceId);
-                if (!pipeline.contains(serviceId))
-                    throw new QuorumException(ERR_NOT_PIPELINE + serviceId);
+                /*
+                 * FIXME This has been modified to automatically add the service
+                 * back to the pipeline, which we need to do following a service
+                 * leave or quorum break. However, this conflicts with the
+                 * pre-/post- conditions declared in QuorumActor.
+                 */
+//                if (!pipeline.contains(serviceId))
+//                    throw new QuorumException(ERR_NOT_PIPELINE + serviceId);
+                conditionalPipelineAddImpl();
                 conditionalCastVoteImpl(lastCommitTime);
             } catch(InterruptedException e) {
                 // propagate the interrupt.
@@ -1208,7 +1259,43 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             }
         }
 
-        final public void setLastValidToken(final long newToken) {
+//        final public void setLastValidToken(final long newToken) {
+//            lock.lock();
+//            try {
+//                if (joined.size() < ((k + 1) / 2))
+//                    throw new QuorumException(ERR_CAN_NOT_MEET
+//                            + " too few services are joined: #joined="
+//                            + joined.size() + ", k=" + k);
+//                if (newToken <= lastValidToken)
+//                    throw new QuorumException(ERR_BAD_TOKEN + "lastValidToken="
+//                            + lastValidToken + ", but newToken=" + newToken);
+//                if (token != NO_QUORUM)
+//                    throw new QuorumException(ERR_QUORUM_MET);
+//                conditionalSetLastValidToken(newToken);
+//            } catch(InterruptedException e) {
+//                // propagate the interrupt.
+//                Thread.currentThread().interrupt();
+//                return;
+//            } finally {
+//                lock.unlock();
+//            }
+//        }
+//        
+//        final public void setToken() {
+//            lock.lock();
+//            try {
+//                conditionalSetToken();
+//                log.warn("Quorum meet.");
+//            } catch (InterruptedException e) {
+//                // propagate the interrupt.
+//                Thread.currentThread().interrupt();
+//                return;
+//            } finally {
+//                lock.unlock();
+//            }
+//        }
+
+        final public void setToken(final long newToken) {
             lock.lock();
             try {
                 if (joined.size() < ((k + 1) / 2))
@@ -1220,7 +1307,8 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                             + lastValidToken + ", but newToken=" + newToken);
                 if (token != NO_QUORUM)
                     throw new QuorumException(ERR_QUORUM_MET);
-                conditionalSetLastValidToken(newToken);
+                conditionalSetToken(newToken);
+                log.warn("Quorum meet.");
             } catch(InterruptedException e) {
                 // propagate the interrupt.
                 Thread.currentThread().interrupt();
@@ -1230,40 +1318,10 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             }
         }
         
-        final public void setToken() {
-            lock.lock();
-            try {
-                conditionalSetToken();
-            } catch(InterruptedException e) {
-                // propagate the interrupt.
-                Thread.currentThread().interrupt();
-                return;
-            } finally {
-                lock.unlock();
-            }
-        }
-
         final public void clearToken() {
-            /*
-             * I have changed this to only clear the token while holding the
-             * lock in order to make the leader election decidable. Otherwise it
-             * is possible to have the token cleared during a service join which
-             * would not have otherwise triggered an election and the election
-             * would be triggered immediately.
-             */
-//            /*
-//             * Immediately clear our local copy of the quorum token. This will
-//             * cause any asserts which the service may execute currently using
-//             * the old token to immediately fail.
-//             */
-//            token = NO_QUORUM;
             lock.lock();
             try {
-                // Clear the token in the distributed quorum state.
-                doClearToken();
-                while (token != NO_QUORUM) {
-                    quorumBreak.await();
-                }
+                conditionalClearToken();
             } catch (InterruptedException e) {
                 // propagate the interrupt.
                 Thread.currentThread().interrupt();
@@ -1499,28 +1557,129 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             }
         }
 
-        private void conditionalSetLastValidToken(final long newToken)
-                throws InterruptedException {
-            if (lastValidToken == newToken) {
+        private void conditionalClearToken() throws InterruptedException {
+            if (token == NO_QUORUM) {
                 return;
             }
-            doSetLastValidToken(newToken);
-            while (lastValidToken != newToken) {
-                lastValidTokenChange.await();
+            final long oldValue = token;
+            doClearToken();
+            while (token == oldValue && client != null) {
+                quorumChange.await();
+            }
+            if (client == null)
+                throw new AsynchronousQuorumCloseException();
+            if (token != NO_QUORUM) {
+                /*
+                 * The token was concurrently updated so we will not attempt
+                 * to clear it.
+                 */
+                throw new QuorumException(
+                        "Concurrent set of the token: old=" + oldValue
+                                + ", new=" + token);
+            }
+            log.warn("Quorum break.");
+        }
+        
+        private void conditionalSetToken(final long newValue)
+                throws InterruptedException {
+            if (lastValidToken == newValue) {
+                return;
+            }
+            if (lastValidToken > newValue) {
+                /*
+                 * The lastValidToken must advance.
+                 */
+                throw new QuorumException(
+                        "Last valid token must advance: lastValidToken="
+                                + lastValidToken + ", newValue=" + newValue);
+            }
+            if (token != NO_QUORUM) {
+                /*
+                 * Do not change a valid token. It MUST be cleared before it may
+                 * be changed.
+                 */
+                throw new QuorumException("Concurrent set of token: expected="
+                        + NO_QUORUM + ", actual=" + token);
+            }
+            /*
+             * This breaks out of the loop if the lastValidToken is updated.
+             * Since we are not willing to change a valid token (precondition)
+             * and since we update the lastValidToken and the [token]
+             * atomically, all we have to do is watch the lastValidToken for a
+             * change.
+             */
+            final long oldValue = lastValidToken;
+            doSetToken(newValue);
+            while (lastValidToken == oldValue && client != null) {
+                quorumChange.await();
+            }
+            if (client == null)
+                throw new AsynchronousQuorumCloseException();
+            if (lastValidToken != newValue) {
+                throw new QuorumException(
+                        "Concurrent set of lastValidToken: old=" + oldValue
+                                + ", new=" + lastValidToken + ", expected="
+                                + newValue);
+            }
+            if (token != newValue) {
+                throw new QuorumException("Concurrent set of token: expected="
+                        + newValue + ", actual=" + token);
             }
         }
 
-        private void conditionalSetToken() throws InterruptedException {
-            if (token == lastValidToken) {
-                return;
-            }
-            final long tmp = lastValidToken;
-            doSetToken();
-            while (tmp != token) {
-                quorumMeet.await();
-            }
-        }
-        
+//        private void conditionalSetToken(final long newValue)
+//        throws InterruptedException {
+//    if (lastValidToken == newValue) {
+//        return;
+//    }
+//    if (lastValidToken > newValue) {
+//        /*
+//         * The lastValidToken must advance.
+//         */
+//        throw new QuorumException(
+//                "Last valid token must advance: lastValidToken="
+//                        + lastValidToken + ", newValue=" + newValue);
+//    }
+//    final long oldValue = lastValidToken;
+//    doSetLastValidToken(newValue);
+//    while (lastValidToken == oldValue && client != null) {
+//        quorumChange.await();
+//    }
+//    if (client == null)
+//        throw new AsynchronousQuorumCloseException();
+//    if (lastValidToken != newValue) {
+//        throw new QuorumException(
+//                "Concurrent set of lastValidToken: old=" + oldValue
+//                        + ", new=" + lastValidToken + ", expected="
+//                        + newValue);
+//    }
+//}
+//
+//private void conditionalSetToken() throws InterruptedException {
+//    if (token == lastValidToken) {
+//        return;
+//    }
+//    if (token != NO_QUORUM) {
+//        /*
+//         * Do not change a valid token. It MUST be cleared before it may
+//         * be changed.
+//         */
+//        throw new QuorumException("Concurrent set of token: expected="
+//                + lastValidToken + ", actual=" + token);
+//    }
+//    final long expected = lastValidToken;
+//    doSetToken();
+//    while (token != expected && client != null) {
+//        quorumChange.await();
+//    }
+//    if (client == null)
+//        throw new AsynchronousQuorumCloseException();
+//    if (token != expected) {
+//        throw new QuorumException("Concurrent set of token: expected="
+//                + expected + ", actual=" + token);
+//    }
+//}
+
         /*
          * Abstract protected methods implement the atomic state change for just
          * the specific operation without any precondition maintenance.
@@ -1557,15 +1716,43 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
          *       topology.
          */
         protected boolean reorganizePipeline() {
-            final UUID[] pipeline = getPipeline();
-            final UUID[] joined = getJoined();
-            final UUID leaderId = joined[0];
+            if(lock.isHeldByCurrentThread()) {
+                /*
+                 * The lock can not be held across this method because it will
+                 * cause deadlocks when we invoke Future#get() on the Future
+                 * returned by moveToEndOfPipeline().
+                 */
+                throw new IllegalMonitorStateException();
+            }
+            final UUID[] pipeline;
+            final UUID[] joined;
+            final UUID leaderId;
+//            final Long lastCommitTime;
+//            final UUID[] voteOrder;
+            lock.lock();
+            try {
+                /*
+                 * Extract this stuff while holding the lock so we have a
+                 * snapshot of the internal state.
+                 */
+                pipeline = getPipeline();
+                joined = getJoined();
+                leaderId = joined[0];
+//                // last commit time for the leader or null if no consensus.
+//                lastCommitTime = getLastCommitTimeConsensus(leaderId);
+//                voteOrder = getVotes().get(lastCommitTime);
+            } finally {
+                lock.unlock();
+            }
+            // @todo trace should be [false].
             boolean trace = false;
-            if(trace) {// @todo remove trace or convert to logging.
-             System.err.println("pipeline="+Arrays.toString(pipeline));
-             System.err.println("joined  ="+Arrays.toString(pipeline));
-             System.err.println("leader  ="+leaderId);
-             System.err.println("self    ="+serviceId);
+            if (trace) {
+//                System.err.println("lastCommitTimeConsensus = "+lastCommitTime);
+//                System.err.println("vote    =" + Arrays.toString(voteOrder));
+                System.err.println("pipeline=" + Arrays.toString(pipeline));
+                System.err.println("joined  =" + Arrays.toString(joined));
+                System.err.println("leader  = " + leaderId);
+                System.err.println("self    = " + serviceId);
             }
             boolean modified = false;
             for (int i = 0; i < pipeline.length; i++) {
@@ -1611,9 +1798,11 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
 
         abstract protected void doServiceLeave();
 
-        abstract protected void doSetLastValidToken(long newToken);
+        abstract protected void doSetToken(long newToken);
 
-        abstract protected void doSetToken();
+//        abstract protected void doSetLastValidToken(long newToken);
+//
+//        abstract protected void doSetToken();
         
         abstract protected void doClearToken();
 
@@ -1729,6 +1918,11 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 throw new IllegalStateException();
             watcherActionService.execute(new Runnable() {
                 public void run() {
+                    /*
+                     * Note: DO NOT acquire the lock here. It will cause
+                     * reorganizePipeline() to deadlock if it runs with the lock
+                     * held.
+                     */
                     try {
                         r.run();
                     } catch (Throwable t) {
@@ -1736,8 +1930,6 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                     }
                 }
             });
-//            new Thread(r).start();// asynchronous
-//            r.run();// blocking
         }
         
         /**
@@ -2124,88 +2316,46 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
 
         /**
          * Method is invoked by the {@link QuorumWatcher} when the leader
-         * updates the lastValidToken. Note that the lastValidToken is updated
-         * first and then the current token is set from the lastValidToken.
-         * Since the quorum does not meet until the token has been updated, this
-         * allows us to create an atomic protocol from piecewise atomic updates.
+         * updates the (lastValidToken,token) pair atomically. 
          * 
          * @param newToken
          *            The new token.
          */
-        protected void setLastValidToken(final long newToken) {
+        protected void setToken(final long newToken) {
             lock.lock();
             try {
-                awaitEnoughJoinedToMeet();
-                lastValidToken = newToken;
-                lastValidTokenChange.signalAll();
-                if (log.isInfoEnabled())
-                    log.info("newToken=" + newToken);
-                sendEvent(new E(QuorumEventEnum.SET_LAST_VALID_TOKEN, newToken,
-                        token, null/* serviceId */));
-            } finally {
-                lock.unlock();
-            }
-        }
-
-        /**
-         * Method is invoked by the {@link QuorumWatcher} when the leader
-         * publishes out a new quorum token.
-         */
-        protected void setToken() {
-            lock.lock();
-            try {
-                {
-                    /*
-                     * Verify preconditions
-                     */
-                    // This must be updated before the token is set.
-                    if (lastValidToken == NO_QUORUM)
-                        throw new AssertionError(
-                                "Last valid token never set : "
-                                        + AbstractQuorum.this);
+                /*
+                 * @todo think through this again. if the watcher can see events
+                 * out of their proper order then it may need to do things like
+                 * wait for enough joined services before a quorum can meet.
+                 * However, out of order events could also result in overwriting
+                 * a newer token with an older one, which is a Bad Thing.
+                 */
+                if (lastValidToken == newToken) {
+                    // Already met.
+                    return;
+                }
+                if (lastValidToken > newToken) {
+                    log.error("Concurrent update: lastValidToken="
+                            + lastValidToken + ", newToken=" + newToken);
+                    return;
                 }
                 awaitEnoughJoinedToMeet();
-                // Set the token from the lastValidToken.
-                final long token = AbstractQuorum.this.token = lastValidToken;
-                // signal everyone that the quorum has met.
-                quorumMeet.signalAll();
+                token = lastValidToken = newToken;
+                quorumChange.signalAll();
+                if (log.isInfoEnabled())
+                    log.info("newToken=" + newToken);
                 final UUID leaderId = getLeaderId();
                 // must exist when quorum meets.
                 assert leaderId != null : "Leader is null : "
                         + AbstractQuorum.this.toString();
-                final QuorumMember<S> client = getClientAsMember();
-//                if (client != null) {
-//                    /*
-//                     * Since our client is a quorum member, figure out whether
-//                     * or not it is a follower, in which case we will send it
-//                     * the electedFollower() message.
-//                     */
-//                    final UUID clientId = client.getServiceId();
-//                    // Our client was elected the leader?
-//                    if (joined.contains(clientId) && clientId.equals(leaderId)) {
-//                        client.electedLeader();
-//                        sendEvent(new E(QuorumEventEnum.ELECTED_LEADER,
-//                                lastValidToken, token, clientId));
-//                        if (log.isInfoEnabled())
-//                            log.info("leader=" + clientId + ", token="
-//                                    + token + ", leader=" + leaderId);
-//                    }
-//                    // Our client was elected a follower?
-//                    if (joined.contains(clientId) && !clientId.equals(leaderId)) {
-//                        client.electedFollower();
-//                        sendEvent(new E(QuorumEventEnum.ELECTED_FOLLOWER,
-//                                lastValidToken, token, clientId));
-//                        if (log.isInfoEnabled())
-//                            log.info("follower=" + clientId + ", token="
-//                                    + token + ", leader=" + leaderId);
-//                    }
-//                }
                 /*
                  * The quorum has met.
                  */
                 log.warn("leader=" + leaderId + ", newToken=" + token
-//                        + " : " + AbstractQuorum.this
+                // + " : " + AbstractQuorum.this
                         );
+                final QuorumMember<S> client = getClientAsMember();
                 if (client != null) {
                     client.quorumMeet(token, leaderId);
                 }
@@ -2215,6 +2365,100 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 lock.unlock();
             }
         }
+
+//        /**
+//         * Method is invoked by the {@link QuorumWatcher} when the leader
+//         * updates the lastValidToken. Note that the lastValidToken is updated
+//         * first and then the current token is set from the lastValidToken.
+//         * Since the quorum does not meet until the token has been updated, this
+//         * allows us to create an atomic protocol from piecewise atomic updates.
+//         * 
+//         * @param newToken
+//         *            The new token.
+//         */
+//        protected void setLastValidToken(final long newToken) {
+//            lock.lock();
+//            try {
+//                awaitEnoughJoinedToMeet();
+//                lastValidToken = newToken;
+//                quorumChange.signalAll();
+//                if (log.isInfoEnabled())
+//                    log.info("newToken=" + newToken);
+//                sendEvent(new E(QuorumEventEnum.SET_LAST_VALID_TOKEN, newToken,
+//                        token, null/* serviceId */));
+//            } finally {
+//                lock.unlock();
+//            }
+//        }
+//
+//        /**
+//         * Method is invoked by the {@link QuorumWatcher} when the leader
+//         * publishes out a new quorum token.
+//         */
+//        protected void setToken() {
+//            lock.lock();
+//            try {
+//                {
+//                    /*
+//                     * Verify preconditions
+//                     */
+//                    // This must be updated before the token is set.
+//                    if (lastValidToken == NO_QUORUM)
+//                        throw new AssertionError(
+//                                "Last valid token never set : "
+//                                        + AbstractQuorum.this);
+//                }
+//                awaitEnoughJoinedToMeet();
+//                // Set the token from the lastValidToken.
+//                final long token = AbstractQuorum.this.token = lastValidToken;
+//                // signal everyone that the quorum has met.
+//                quorumChange.signalAll();
+//                final UUID leaderId = getLeaderId();
+//                // must exist when quorum meets.
+//                assert leaderId != null : "Leader is null : "
+//                        + AbstractQuorum.this.toString();
+//                final QuorumMember<S> client = getClientAsMember();
+////                if (client != null) {
+////                    /*
+////                     * Since our client is a quorum member, figure out whether
+////                     * or not it is a follower, in which case we will send it
+////                     * the electedFollower() message.
+////                     */
+////                    final UUID clientId = client.getServiceId();
+////                    // Our client was elected the leader?
+////                    if (joined.contains(clientId) && clientId.equals(leaderId)) {
+////                        client.electedLeader();
+////                        sendEvent(new E(QuorumEventEnum.ELECTED_LEADER,
+////                                lastValidToken, token, clientId));
+////                        if (log.isInfoEnabled())
+////                            log.info("leader=" + clientId + ", token="
+////                                    + token + ", leader=" + leaderId);
+////                    }
+////                    // Our client was elected a follower?
+////                    if (joined.contains(clientId) && !clientId.equals(leaderId)) {
+////                        client.electedFollower();
+////                        sendEvent(new E(QuorumEventEnum.ELECTED_FOLLOWER,
+////                                lastValidToken, token, clientId));
+////                        if (log.isInfoEnabled())
+////                            log.info("follower=" + clientId + ", token="
+////                                    + token + ", leader=" + leaderId);
+////                    }
+////                }
+//                /*
+//                 * The quorum has met.
+//                 */
+//                log.warn("leader=" + leaderId + ", newToken=" + token
+////                        + " : " + AbstractQuorum.this
+//                        );
+//                if (client != null) {
+//                    client.quorumMeet(token, leaderId);
+//                }
+//                sendEvent(new E(QuorumEventEnum.QUORUM_MEET, lastValidToken,
+//                        token, leaderId));
+//            } finally {
+//                lock.unlock();
+//            }
+//        }
 
         /**
          * Method is invoked by the {@link QuorumWatcher} when the current
@@ -2226,7 +2470,7 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 final boolean willBreak = token != NO_QUORUM;
                 token = NO_QUORUM;
                 if (willBreak) {
-                    quorumBreak.signalAll();
+                    quorumChange.signalAll();
                     log.warn("Quorum break");
                     final QuorumMember<S> client = getClientAsMember();
                     if (client != null) {
@@ -2352,9 +2596,9 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                                             log.warn("Electing leader: "
                                                     + AbstractQuorum.this
                                                             .toString());
-                                            actor
-                                                    .setLastValidToken(lastValidToken + 1);
-                                            actor.setToken();
+//                                            actor
+//                                                    .setLastValidToken(lastValidToken + 1);
+                                            actor.setToken(lastValidToken + 1);
                                         }
                                     }
                                 });
