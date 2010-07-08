@@ -44,7 +44,7 @@ public class FixedAllocator implements Allocator {
 	volatile private int m_freeBits;
 	volatile private int m_freeTransients;
 
-	private long m_diskAddr;
+	private int m_diskAddr;
 	int m_index;
 
 	protected boolean m_preserveSession = false;
@@ -80,11 +80,11 @@ public class FixedAllocator implements Allocator {
 		}
 	}
 
-	public long getDiskAddr() {
+	public int getDiskAddr() {
 		return m_diskAddr;
 	}
 
-	public void setDiskAddr(long addr) {
+	public void setDiskAddr(int addr) {
 		m_diskAddr = addr;
 	}
 

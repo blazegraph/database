@@ -28,7 +28,7 @@ import java.util.ArrayList;
 
 public class AllocBlock {
   int m_addr;
-  int m_longs;
+  int m_ints;
   int m_commit[];
   int m_bits[];
   int m_transients[];
@@ -36,14 +36,14 @@ public class AllocBlock {
 
   AllocBlock(int addr, int bitSize, RWWriteCacheService cache) {
   	m_writeCache = cache;
-    m_longs = bitSize;
+    m_ints = bitSize;
     m_commit = new int[bitSize];
     m_bits = new int[bitSize];
     m_transients = new int[bitSize];
   }
 
   public boolean verify(int addr, int size) {
-    if (addr < m_addr || addr >= (m_addr + (size * 32 * m_longs))) {
+    if (addr < m_addr || addr >= (m_addr + (size * 32 * m_ints))) {
       return false;
     }
 
@@ -54,11 +54,11 @@ public class AllocBlock {
   }
 
   public boolean addressInRange(int addr, int size) {
-    return (addr >= m_addr && addr <= (m_addr + (size * 32 * m_longs)));
+    return (addr >= m_addr && addr <= (m_addr + (size * 32 * m_ints)));
   }
   	
   public boolean free(int addr, int size) {
-    if (addr < m_addr || addr >= (m_addr + (size * 32 * m_longs))) {
+    if (addr < m_addr || addr >= (m_addr + (size * 32 * m_ints))) {
       return false;
     }
 
@@ -92,7 +92,7 @@ public class AllocBlock {
       throw new Error("Storage allocation error : negative size passed");
     }
 
-    int bit = RWStore.fndBit(m_transients, m_longs);
+    int bit = RWStore.fndBit(m_transients, m_ints);
 
     if (bit != -1) {
       RWStore.setBit(m_bits, bit);
@@ -105,7 +105,7 @@ public class AllocBlock {
   }
 
   public boolean hasFree() {
-    for (int i = 0; i < m_longs; i++) {
+    for (int i = 0; i < m_ints; i++) {
       if (m_bits[i] != 0xFFFFFFFF) {
         return true;
       }
@@ -115,7 +115,7 @@ public class AllocBlock {
   }
 
 	public int getAllocBits() {
-    int total = m_longs * 32;
+    int total = m_ints * 32;
     int allocBits = 0;
     for (int i = 0; i < total; i++) {
       if (RWStore.tstBit(m_bits, i)) {
@@ -127,14 +127,14 @@ public class AllocBlock {
 	}
 
   public String getStats() {
-    int total = m_longs * 32;
+    int total = m_ints * 32;
     int allocBits = getAllocBits();
 
     return "Addr : " + m_addr + " [" + allocBits + "::" + total + "]";
   }
 
   public void addAddresses(ArrayList addrs, int rootAddr) {
-    int total = m_longs * 32;
+    int total = m_ints * 32;
     
     for (int i = 0; i < total; i++) {
       if (RWStore.tstBit(m_bits, i)) {
