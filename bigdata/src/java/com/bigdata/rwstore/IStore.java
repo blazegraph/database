@@ -257,14 +257,6 @@ public interface IStore {
 //	public void restore(InputStream instr) throws IOException;
 
   /*********************************************************************************************
-   * Retrieves files associated with this store.
-   * This supports content management w/o the need to store the files as BLOB objects
-   *	in the database.
-   * @return the File object for the filename provided
-   **/
-	public File getFile(String filename);
-
-  /*********************************************************************************************
    * Retrieves store file.
    * Can be used to delete the store after the IStore has been released
    * @return the File object
