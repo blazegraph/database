@@ -30,7 +30,9 @@ package com.bigdata.rdf.internal;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
+
 import com.bigdata.rdf.lexicon.ITermIdCodes;
+import com.bigdata.rdf.lexicon.TermIdEncoder;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 
 /**
@@ -102,6 +104,31 @@ public enum VTE implements ITermIdCodes {
     }
 
     /**
+     * Return the one character code for this RDF Value type (U, L, B, or S).
+     * This is used in various internal toString() implementations.
+     */
+    public final char getCharCode() {
+        if (v == URI.v)
+            return 'U';
+        else if (v == LITERAL.v)
+            return 'L';
+        else if (v == BNODE.v)
+            return 'B';
+        else if (v == STATEMENT.v)
+            return 'S';
+        throw new AssertionError();
+    }
+
+    /*
+     * FIXME All of this stuff is for backwards compatibility with raw term
+     * identifiers in a system configuration which is NOT using variable length
+     * coding of the RDF Values in the statement indices. For this backward
+     * compatibility mode, we need to use the same bit flag mechanisms which
+     * were used in the original design and we need to decode those bits in the
+     * same manner.
+     */
+    
+    /**
      * Return the {@link VTE} identified by the LOW TWO (2)
      * bits in the caller's value.
      * 
@@ -122,22 +149,6 @@ public enum VTE implements ITermIdCodes {
         throw new AssertionError();
     }
 
-    /**
-     * Return the one character code for this RDF Value type (U, L, B, or S).
-     * This is used in various internal toString() implementations.
-     */
-    public final char getCharCode() {
-        if (v == URI.v)
-            return 'U';
-        else if (v == LITERAL.v)
-            return 'L';
-        else if (v == BNODE.v)
-            return 'B';
-        else if (v == STATEMENT.v)
-            return 'S';
-        throw new AssertionError();
-    }
-    
     /**
      * Return true iff the term identifier is marked as a RDF {@link Literal}.
      * <p>
