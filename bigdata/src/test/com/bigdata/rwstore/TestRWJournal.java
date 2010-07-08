@@ -236,9 +236,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
             properties.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
 
-            properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+            properties.setProperty(Options.CREATE_TEMP_FILE, "false");
             
-            // properties.setProperty(Options.FILE, "/Volumes/SSDData/TestRW/tmp.rw");
+            properties.setProperty(Options.FILE, "/Volumes/SSDData/TestRW/tmp.rw");
 
             properties.setProperty(Options.DELETE_ON_EXIT, "true");
 
@@ -338,9 +338,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 long faddr2 = bs.write(bb);
                 bb.position(0);
                 
-                bs.commit();
+                store.commit();
                 
-                rw.reopen();
+                rw.reset();
                 
                 ByteBuffer inbb1 = bs.read(faddr1);
                 ByteBuffer inbb2 = bs.read(faddr2);
@@ -520,38 +520,42 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
 
 				RWStore rw = bufferStrategy.getRWStore();
+				
+				final int tcount = 1000; // increase to ramp up stress levels
 
 				long numAllocs = rw.getTotalAllocations();
 				long startAllocations = rw.getTotalAllocationsSize();
 				// reallocBatchWithRead(bufferStrategy, 100000, 275, 5);
-				reallocBatchWithRead(store, 1, 250, 500000); 
+				reallocBatchWithRead(store, 1, 100, 250, tcount, true, true); 
 				store.close();
 				
 				// added to try and foce bug
 				System.out.println("Re-open Journal");
 				store = (Journal) getStore();
-				reallocBatchWithRead(store, 1, 1500, 500000);
-				reallocBatchWithRead(store, 1, 250, 500000);
-				reallocBatchWithRead(store, 1, 250, 500000); 
+				reallocBatchWithRead(store, 1, 800, 1500, tcount, true, true);
+				reallocBatchWithRead(store, 1, 50, 250, tcount, true, true);
+				reallocBatchWithRead(store, 1, 50, 250, tcount, true, true); 
 				store.close();
 				// .. end add to force bug
 				
 				System.out.println("Re-open Journal");
 				store = (Journal) getStore();
-				reallocBatchWithRead(store, 1, 10000, 500000);
-				reallocBatchWithRead(store, 1, 500, 500000);
+				reallocBatchWithRead(store, 1, 2000, 10000, tcount, true, true);
+				reallocBatchWithRead(store, 1, 200, 500, tcount, true, true);
 				store.close();
 				System.out.println("Re-open Journal");
 				store = (Journal) getStore();
-				reallocBatchWithRead(store, 1, 1256, 500000);
-				reallocBatchWithRead(store, 1, 250, 500000);
-				reallocBatchWithRead(store, 1, 250, 500000); 
+				reallocBatchWithRead(store, 1, 800, 1256, tcount, true, true);
+				reallocBatchWithRead(store, 1, 50, 250, tcount, true, true);
+				reallocBatchWithRead(store, 1, 50, 250, tcount, true, true); 
+				showStore(store);
 				store.close();
 				System.out.println("Re-open Journal");
 				store = (Journal) getStore();
-				reallocBatchWithRead(store, 1, 1000, 500000);
-				reallocBatchWithRead(store, 1, 2000, 500000);
-				reallocBatchWithRead(store, 1, 1000, 500000);
+				showStore(store);
+				reallocBatchWithRead(store, 1, 400, 1000, tcount, true, true);
+				reallocBatchWithRead(store, 1, 1000, 2000, tcount, true, true);
+				reallocBatchWithRead(store, 1, 400, 1000, tcount, true, true);
 				store.close();
 				System.out.println("Re-open Journal");
 				store = (Journal) getStore();
@@ -571,30 +575,51 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
         	
         }
+        
+        void showStore(Journal store) {
+        	RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
 
-        private long reallocBatchWithRead(Journal store, int tsts, int sze, int grp) {
+			RWStore rw = bufferStrategy.getRWStore();
+
+			System.out.println("Allocations: " + rw.getTotalAllocations()
+					+ ", allocated bytes: " + rw.getTotalAllocationsSize() + ", file length: "
+					+ rw.getStoreFile().length());
+
+        }
+        
+        // Only realloc 1/5
+        byte allocChar = 0;
+        private long reallocBatchWithRead(Journal store, int tsts, int min, int sze, int grp, boolean commit, boolean reopen) {
+        	allocChar = (byte) (allocChar+1);
+        	
             RWStrategy bs = (RWStrategy) store
             .getBufferStrategy();
 
             byte[] buf = new byte[sze+4]; // extra for checksum
-            r.nextBytes(buf);
+            // r.nextBytes(buf);
+            for (int i = 0; i < buf.length; i++) {
+            	buf[i] = allocChar;
+            }
+            
        	                      
             RWStore rw = bs.getRWStore();
             
-        	long[] addr = new long[grp];
+        	long[] addr = new long[grp/5];
         	int[] szes = new int[grp];
         	for (int i = 0; i < grp; i++) {
-        		szes[i] = 50 + r.nextInt(sze-50);
+        		szes[i] = min + r.nextInt(sze-min);
                 ByteBuffer bb = ByteBuffer.wrap(buf, 0, szes[i]);
-        		addr[i] = bs.write(bb);
+                if (i % 5 == 0)
+                	addr[i/5] = bs.write(bb);
         	}
         	
-        	store.commit();
-        	
-        	System.out.println("CommitRecord: " + store.getCommitRecord());
+        	if (commit) {
+        		store.commit();
+        	    System.out.println("CommitRecord: " + store.getCommitRecord());
+        	}
         	
         	for (int t = 0; t < tsts; t++) {
-            	for (int i = 0; i < grp; i++) {
+            	for (int i = 0; i < (grp/5); i++) {
             		long old = addr[i];
             		try {
             			bs.read(old);
@@ -608,14 +633,99 @@ public class TestRWJournal extends AbstractJournalTestCase {
             	}       		
         	}
         	
-        	store.commit();
+        	if (commit) {
+        		store.commit();
         	
-        	rw.reopen();
-        	
-        	System.out.println("CommitRecord after realloc: " + store.getCommitRecord());
-	        
+	        	if (reopen)
+	        		rw.reset();
+	        	
+	        	System.out.println("CommitRecord after realloc: " + store.getCommitRecord());
+        	}
 	        return 0L;
 		}
+
+        public void test_stressReallocationWithRead() {
+            
+            Journal store = (Journal) getStore();
+
+            try {
+
+				final int tcount = 2000; // increase to ramp up stress levels
+
+				RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
+
+				RWStore rw = bufferStrategy.getRWStore();
+
+				long numAllocs = rw.getTotalAllocations();
+				long startAllocations = rw.getTotalAllocationsSize();
+				// reallocBatchWithRead(bufferStrategy, 100000, 275, 5);
+				reallocBatchWithRead(store, 1, 50, 250, tcount, false, false); 
+				
+				reallocBatchWithRead(store, 1, 50, 250, tcount, false, false); 
+				reallocBatchWithRead(store, 1, 50, 250, tcount, false, false); 
+
+				reallocBatchWithRead(store, 1, 5000, 10000, tcount, false, false);
+
+				reallocBatchWithRead(store, 1, 800, 1500, tcount, false, false);
+				reallocBatchWithRead(store, 1, 50, 250, tcount, false, false);
+				reallocBatchWithRead(store, 1, 50, 250, tcount, false, false); 
+
+				// Extend file with sizeable allocations
+				reallocBatchWithRead(store, 1, 5000, 10000, tcount, false, false);
+				reallocBatchWithRead(store, 1, 5000, 10000, tcount, false, false);
+				reallocBatchWithRead(store, 1, 5000, 10000, tcount, false, false);
+				reallocBatchWithRead(store, 1, 5000, 10000, tcount, false, false);
+				reallocBatchWithRead(store, 1, 5000, 10000, tcount, false, false);
+				
+				reallocBatchWithRead(store, 1, 250, 500, tcount, false, false);
+
+				reallocBatchWithRead(store, 1, 5000, 10000, tcount, false, false);
+
+				reallocBatchWithRead(store, 1, 800, 1256, tcount, false, false);
+				reallocBatchWithRead(store, 1, 50, 250, tcount, false, false);
+				reallocBatchWithRead(store, 1, 50, 250, tcount, false, false); 
+
+				reallocBatchWithRead(store, 1, 5000, 10000, tcount, false, false);
+
+				// Extend file with more sizeable allocations
+				reallocBatchWithRead(store, 1, 5000, 10000, tcount, false, false);
+				reallocBatchWithRead(store, 1, 5000, 10000, tcount, false, false);
+				reallocBatchWithRead(store, 1, 5000, 10000, tcount, false, false);
+				reallocBatchWithRead(store, 1, 5000, 10000, tcount, false, false);
+				reallocBatchWithRead(store, 1, 5000, 10000, tcount, false, false);
+				reallocBatchWithRead(store, 1, 5000, 10000, tcount, false, false);
+				reallocBatchWithRead(store, 1, 5000, 10000, tcount, false, false);
+				reallocBatchWithRead(store, 1, 5000, 10000, tcount, false, false);
+				reallocBatchWithRead(store, 1, 5000, 10000, tcount, false, false);
+				reallocBatchWithRead(store, 1, 5000, 10000, tcount, false, false);
+				
+				reallocBatchWithRead(store, 1, 500, 1000, tcount, false, false);
+				reallocBatchWithRead(store, 1, 1000, 2000, tcount, false, false);
+				reallocBatchWithRead(store, 1, 500, 1000, tcount, false, false);
+				
+				store.commit();
+				
+				showStore(store);
+				
+				store.close();
+				System.out.println("Re-open Journal");
+				store = (Journal) getStore();
+
+				bufferStrategy = (RWStrategy) store.getBufferStrategy();
+
+				rw = bufferStrategy.getRWStore();
+
+				System.out.println("Final allocations: " + (rw.getTotalAllocations() - numAllocs)
+						+ ", allocated bytes: " + (rw.getTotalAllocationsSize() - startAllocations) + ", file length: "
+						+ rw.getStoreFile().length());
+			} finally {
+
+				store.destroy();
+            
+            }
+
+        	
+        }
 
         /**
          * Test of blob allocation, does not check on read back, just the allocation
@@ -683,7 +793,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 bs.commit();
                 
                 // Now reset - clears writeCache and reinits from disk
-                rw.reopen();
+                rw.reset();
                 
                 rdBuf = bs.read(faddr);
                 assertEquals(bb, rdBuf);
@@ -726,8 +836,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 System.out.println("Now commit to disk");
                 
                 bs.commit();
-                
-                
+                              
                 // Now reset - clears writeCache and reinits from disk
                 rw.reopen();
                 
@@ -807,9 +916,29 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
         }
 
+        public void test_metaAlloc() {
+            
+            Journal store = (Journal) getStore();
+
+            RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+
+            RWStore rw = bs.getRWStore();
+            long realAddr = 0;
+            try {
+				for(int i = 0; i < 100000; i++) {
+					int allocAddr = rw.metaAlloc();
+					
+					realAddr = rw.metaBit2Addr(allocAddr);
+				}
+				System.out.println("metaAlloc lastAddr: " + realAddr);
+            } finally {
+            	store.destroy();
+            }
+        }
+
     }
     
-    /**
+     /**
      * Test suite integration for {@link AbstractInterruptsTestCase}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
