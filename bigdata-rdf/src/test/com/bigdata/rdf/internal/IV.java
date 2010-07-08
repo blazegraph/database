@@ -30,6 +30,7 @@ package com.bigdata.rdf.internal;
 import java.io.Serializable;
 
 import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.SuccessorUtil;
@@ -41,6 +42,11 @@ import com.bigdata.rdf.store.AbstractTripleStore.Options;
  * Interface for the internal representation of an RDF Value (the representation
  * which is encoded within the statement indices).
  * 
+ * @param <V>
+ *            The generic type for the RDF {@link Value} implementation.
+ * @param <T>
+ *            The generic type for the inline value.
+ *            
  * @todo Consider whether we need the ability to compute the successor of a
  *       value in the value space here. There are implementations of successor()
  *       for most data types in {@link SuccessorUtil}, including fixed length
@@ -51,10 +57,9 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
         Comparable<IV> {
 
     /**
-     * The value of the flags representing the {@link VTE} and
-     * the {@link DTE}. The upper TWO (2) bits code the
-     * {@link VTE} while the lower SIX (6) bits code the
-     * {@link DTE}.
+     * The value of the flags representing the {@link VTE} and the {@link DTE}.
+     * The upper TWO (2) bits code the {@link VTE} while the lower SIX (6) bits
+     * code the {@link DTE}.
      */
     byte flags();
 
