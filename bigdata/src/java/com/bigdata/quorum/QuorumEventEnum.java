@@ -84,12 +84,13 @@ public enum QuorumEventEnum {
 //     * meets.
 //     */
 //    ELECTED_LEADER,
+//    /**
+//     * Event generated when the (lastValidToken,token) are atomically updated.
+//     */
+//    SET_LAST_VALID_TOKEN,
     /**
-     * Event generated when the last valid token is set.
-     */
-    SET_LAST_VALID_TOKEN,
-    /**
-     * Event generated when a quorum meets (aka when the token is set).
+     * Event generated when a quorum meets (aka when the lastValidToken and
+     * token are updated atomically).
      */
     QUORUM_MEET,
     /**

@@ -574,29 +574,13 @@ public class MockQuorumFixture {
         }
     }
 
-    private void setLastValidToken(final long newToken) {
+    private void setToken(final long newToken) {
         lock.lock();
         try {
             if (lastValidToken != newToken) {
-                lastValidToken = newToken;
+                token = lastValidToken = newToken;
                 if (log.isDebugEnabled())
                     log.debug("newToken=" + newToken);
-                accept(new AbstractQuorum.E(
-                        QuorumEventEnum.SET_LAST_VALID_TOKEN, lastValidToken,
-                        token, null/* serviceId */));
-            }
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    private void setToken() {
-        lock.lock();
-        try {
-            if (token != lastValidToken) {
-                token = lastValidToken;
-                if (log.isDebugEnabled())
-                    log.debug("newToken=" + token);
                 accept(new AbstractQuorum.E(QuorumEventEnum.QUORUM_MEET,
                         lastValidToken, token, null/* serviceId */));
             }
@@ -604,6 +588,52 @@ public class MockQuorumFixture {
             lock.unlock();
         }
     }
+
+//    private void setToken() {
+//        lock.lock();
+//        try {
+//            if (token != lastValidToken) {
+//                token = lastValidToken;
+//                if (log.isDebugEnabled())
+//                    log.debug("newToken=" + token);
+//                accept(new AbstractQuorum.E(QuorumEventEnum.QUORUM_MEET,
+//                        lastValidToken, token, null/* serviceId */));
+//            }
+//        } finally {
+//            lock.unlock();
+//        }
+//    }
+
+//    private void setLastValidToken(final long newToken) {
+//        lock.lock();
+//        try {
+//            if (lastValidToken != newToken) {
+//                lastValidToken = newToken;
+//                if (log.isDebugEnabled())
+//                    log.debug("newToken=" + newToken);
+//                accept(new AbstractQuorum.E(
+//                        QuorumEventEnum.SET_LAST_VALID_TOKEN, lastValidToken,
+//                        token, null/* serviceId */));
+//            }
+//        } finally {
+//            lock.unlock();
+//        }
+//    }
+//
+//    private void setToken() {
+//        lock.lock();
+//        try {
+//            if (token != lastValidToken) {
+//                token = lastValidToken;
+//                if (log.isDebugEnabled())
+//                    log.debug("newToken=" + token);
+//                accept(new AbstractQuorum.E(QuorumEventEnum.QUORUM_MEET,
+//                        lastValidToken, token, null/* serviceId */));
+//            }
+//        } finally {
+//            lock.unlock();
+//        }
+//    }
 
     private void clearToken() {
         lock.lock();
@@ -809,13 +839,17 @@ public class MockQuorumFixture {
                 fixture.serviceLeave(serviceId);
             }
 
-            protected void doSetLastValidToken(final long newToken) {
-                fixture.setLastValidToken(newToken);
+            protected void doSetToken(final long newToken) {
+                fixture.setToken(newToken);
             }
 
-            protected void doSetToken() {
-                fixture.setToken();
-            }
+//            protected void doSetLastValidToken(final long newToken) {
+//                fixture.setLastValidToken(newToken);
+//            }
+//
+//            protected void doSetToken() {
+//                fixture.setToken();
+//            }
 
             protected void doClearToken() {
                 fixture.clearToken();
@@ -951,16 +985,16 @@ public class MockQuorumFixture {
                     serviceLeave(e.getServiceId());
                     break;
                 }
-                case SET_LAST_VALID_TOKEN: {
-                    setLastValidToken(e.lastValidToken());
-                    break;
-                }
+//                case SET_LAST_VALID_TOKEN: {
+//                    setLastValidToken(e.lastValidToken());
+//                    break;
+//                }
                     /**
                      * Event generated when a quorum meets (used here to set the
-                     * current token).
+                     * lastValidToken and token).
                      */
                 case QUORUM_MEET: {
-                    setToken();
+                    setToken(e.lastValidToken());
                     break;
                 }
               /**
@@ -1000,8 +1034,9 @@ public class MockQuorumFixture {
 //                     */
 //                case CONSENSUS:
                 default:
-                    if(log.isInfoEnabled())
-                        log.info("Ignoring : " + e);
+//                    if(log.isInfoEnabled())
+//                        log.info
+                        System.err.println("Ignoring : " + e);
                 }
 
             }
@@ -1202,25 +1237,24 @@ public class MockQuorumFixture {
 
                                 if (isPipelineMember()) {
 
-                                    // System.err
-                                    // .println("Will remove self from the pipeline: "
-                                    // + getServiceId());
+                                    System.err
+                                            .println("Will remove self from the pipeline: "
+                                                    + getServiceId());
 
                                     getActor().pipelineRemove();
 
-                                    // System.err
-                                    // .println("Will add self back into the pipeline: "
-                                    // + getServiceId());
+                                    System.err
+                                            .println("Will add self back into the pipeline: "
+                                                    + getServiceId());
 
                                     getActor().pipelineAdd();
 
                                     if (lastCommitTime != null) {
 
-                                        // System.err
-                                        // .println("Will cast our vote again: lastCommitTime="
-                                        // + +lastCommitTime
-                                        // + ", "
-                                        // + getServiceId());
+                                        System.err
+                                                .println("Will cast our vote again: lastCommitTime="
+                                                        + +lastCommitTime
+                                                        + ", " + getServiceId());
 
                                         getActor().castVote(lastCommitTime);
 

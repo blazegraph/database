@@ -28,6 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.quorum;
 
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+import junit.framework.AssertionFailedError;
 
 import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
 
@@ -146,19 +150,92 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
     }
 
     /**
+     * Runs a specific unit test a bunch of times looking for instances where
+     * the test does not run within the target time period.  
+     * 
+     * @see #test_voting()
+     */
+    static public void main(final String[] args) throws Exception {
+        // count anything as a "hang" which takes longer than this to run.
+        final long hangTime = 1000;
+        // #of times to run the test.
+        final int limit = 100;
+        // run the test.
+        int nhang = 0;
+        int nerr = 0;
+        int nrun = 0;
+        for (; nrun < limit; nrun++) {
+            final TestSingletonQuorumSemantics t = new TestSingletonQuorumSemantics(
+                    Integer.toString(nrun));
+            final long begin = System.currentTimeMillis();
+            t.setUp();
+            try {
+                t.test_voting();
+            } catch (AssertionFailedError e) {
+                log.error(e,e);
+                nerr++;
+            } finally {
+                t.tearDown();
+            }
+            final long elapsed = System.currentTimeMillis() - begin;
+            if (elapsed > hangTime) {
+                nhang++;
+//                System.err.print('.');
+//                if (nhang % 50 == 0)
+//                    System.err.println("");
+            }
+            System.err.println("hang=" + (elapsed > hangTime ? "Y" : "N")
+                    + ", nhang=" + nhang + ", nerr=" + nerr + ", nrun=" + nrun
+                    + ", elapsed=" + elapsed + "\n");
+            System.err.flush();
+        }
+//        System.err.println("\nnhang=" + nhang + ", nerr=" + nerr + ", nrun="
+//                + nrun);
+        if (nerr > 0)
+            fail("There were " + nerr + " failures.");
+    }
+
+    /**
      * Unit test for the voting protocol for a singleton quorum.
      * 
-     * @throws InterruptedException
-     * 
-     * @todo For some reason this unit test occasionally takes much longer to
-     *       run than would otherwise be expected (up to a few seconds versus a
-     *       small fraction of a second). You can see this in the timestamps of
-     *       the logger. (This appears to be related to a watcher's action that
-     *       is not terminating but gets interrupted when the unit test shuts
-     *       down after a 5 second shutdown timeout).
+     * FIXME For some reason this unit test occasionally takes much longer to
+     * run than would otherwise be expected (up to a few seconds versus a small
+     * fraction of a second). You can see this in the timestamps of the logger.
+     * <p>
+     * The test terminates when the fixture tears down the AbstractQuorum's
+     * internal watcher action service, which has a hung action. If the
+     * WatcherActionService is also single-threaded, then this could clearly
+     * lead to a deadlock since there would be no thread available to handle new
+     * events.
+     * <p>
+     * It is awaiting the quorumBreak condition in
+     * AbstractQuorumActor.clearToken(). This issue may be that we have two
+     * distinct signals for quorumBreak versus quorumMeet which need to be
+     * combined and then the various methods modified to also test the condition
+     * variable. [I've made that change.]
+     * <p>
+     * It seems likely that either a concurrent watcherActionService -or- a
+     * finite timeout would get the unit tests to pass. However, only the former
+     * would work around a deadlock due to a stuck Condition.
+     * <p>
+     * Look again at what Condition is getting stuck and at the stress test in
+     * {@link #main(String[])} for causes. [nhang=17, nerr=0, nrun=1000]. There
+     * are several different causes, each of which clearly reflects a different
+     * ordering of the events.
+     * <p>
+     * It maybe that we see the problem with a singleton quorum because there
+     * are no other sources of events to kick the quorum into motion again once
+     * it fails to join under the initial impetus.
+     * <p>
+     * The problem appears to stem from withdrawing the cast vote before the
+     * quorum meets.
      */
-	public void test_voting() throws InterruptedException {
+    public void test_voting() throws InterruptedException,
+            AsynchronousQuorumCloseException, TimeoutException {
 
+	    // This is a debug flag.  It should be [false] normally.
+	    final boolean awaitMeetsAndBreaks = true;
+	    
         final Quorum<?, ?> quorum = quorums[0];
         final MockQuorumMember<?> client = clients[0];
         final QuorumActor<?,?> actor = actors[0];
@@ -203,6 +280,27 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
 		// Verify the consensus was updated
 		assertEquals(lastCommitTime1, client.lastConsensusValue);
 
+        if (awaitMeetsAndBreaks)
+            assertEquals(Quorum.NO_QUORUM + 1, quorum.awaitQuorum(100,
+                    TimeUnit.MILLISECONDS));
+
+        if(awaitMeetsAndBreaks) {
+            actor.withdrawVote();
+            quorum.awaitBreak();
+            /*
+             * FIXME I have modified castVote() to automatically add the service
+             * to the pipeline. Otherwise we must do this explicitly after a
+             * quorum break. Maybe the better approach to take is to have each
+             * service self-report its lastCommitTime and have Quorum#start(M)
+             * automatically strive towards a service join while
+             * Quorum#terminate() causes leaves and then halts processing for
+             * the service.  Alternatively, each client could set its target
+             * state in MEMBER, PIPELINE, JOIN.  That would allow clients to
+             * manage resynchronization, which they need to do.
+             */
+//            actor.pipelineAdd();
+        }
+
 		// Cast another vote.
 		actor.castVote(lastCommitTime2);
         fixture.awaitDeque();
@@ -217,14 +315,22 @@ public class TestSingletonQuorumSemantics extends AbstractQuorumTestCase {
 		// Verify the consensus was updated again.
 		assertEquals(lastCommitTime2, client.lastConsensusValue);
 
+        if (awaitMeetsAndBreaks)
+            assertEquals(Quorum.NO_QUORUM + 2, quorum.awaitQuorum(100,
+                    TimeUnit.MILLISECONDS));
+
 		// Remove as a member.
         actor.memberRemove();
         fixture.awaitDeque();
 
         assertFalse(clients[0].isMember());
+
         // The service vote was also removed.
         assertEquals(0,quorum.getVotes().size());
         
+        if (awaitMeetsAndBreaks)
+            quorum.awaitBreak(100, TimeUnit.MILLISECONDS);
+
     }
 
     /**
