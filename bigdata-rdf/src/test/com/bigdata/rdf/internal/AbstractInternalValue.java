@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import org.deri.iris.basics.Literal;
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.model.BigdataValue;
@@ -318,6 +319,12 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
     private final static int EXTENSION_SHIFT = 4;
 
     /**
+     * The bit mask that is bit-wise ANDed with the flags in order to reveal
+     * the <code>inline</code> bit.
+     */
+    private final static int EXTENSION_MASK = 0x10;
+    
+    /**
      * The bit mask that is bit-wise ANDed with the flags in order to reveal the
      * {@link DTE}. The low FOUR (4) bits in the mask are set.
      */
@@ -333,6 +340,21 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
     static public boolean isInline(final byte flags) {
 
         return (flags & INLINE_MASK) != 0;
+        
+    }
+    
+    /**
+     * Return <code>true</code> if the flags byte has its <code>extension</code>
+     * bit set.
+     * 
+     * @param flags
+     *            The flags byte.
+     * 
+     * @todo unit test for this.
+     */
+    static public boolean isExtension(final byte flags) {
+
+        return (flags & EXTENSION_MASK) != 0;
         
     }
     
@@ -418,6 +440,18 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
     /**
      * {@inheritDoc}
      * <p>
+     * This implementation based on the <code>extension</code> bit flag. Since
+     * the extension flag is only used for datatype literals, this method can be
+     * overridden in many derived classes which have compile time knowledge of
+     * whether the value is an RDF {@link Literal} or not.
+     */
+    public boolean isExtension() {
+        return isExtension(flags);
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
      * This implementation based on the <code>inline</code> bit flag. This can
      * be overridden in many derived classes which have compile time knowledge
      * of whether the RDF value is inline or not.
@@ -456,11 +490,78 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
     abstract public boolean equals(Object o);
     
     /**
-     * Imposes an ordering of IVs based on thier natural sort ordering in the 
-     * index.
+     * Imposes an ordering of IVs based on their natural sort ordering in the 
+     * index as unsigned byte[]s.
      */
-    public int compareTo(IV iv) {
-        throw new RuntimeException("implement me!");
+    public int compareTo(final IV o) {
+
+        if (this == o)
+            return 0;
+
+        /*
+         * First order based on the flags byte. This is the first byte of the
+         * key, so it always partitions the key space and hence provides the
+         * initial dimension of the total IV ordering.
+         * 
+         * Note: This comparison will always sort out things such that URIs,
+         * Literals, BNodes, and SIDs will never compare as equals. It will also
+         * sort out extension types and datatype literals with a natural
+         * datatype.
+         */
+        int ret = (int) flags - (int) o.flags();
+
+        if (ret < 0)
+            return -1;
+        
+        if (ret > 0)
+            return 1;
+
+        if(this instanceof TermId) {
+
+            final long tid1 = ((TermId<?>) this).getTermId();
+            final long tid2 = ((TermId<?>) o).getTermId();
+
+            /*
+             * Note: logic avoids possible overflow of [long] by not computing
+             * the difference between two longs.
+             */
+
+            ret = tid1 < tid2 ? -1 : tid1 > tid2 ? 1 : 0;
+
+            return ret;
+
+        }
+
+        if(isExtension()) {
+            /*
+             * @todo we may need to handle extension types here explicitly once
+             * their semantics are firmed up further.
+             */
+            throw new UnsupportedOperationException();
+        }
+
+        /*
+         * At this point we are comparing two IVs of the same intrinsic
+         * datatype. That is, they are both datatype literals expressed using
+         * one of the predefined datatypes. These can be compared by directly
+         * comparing their primitive values. E.g., long to long, int to int,
+         * etc.
+         */
+        return _compareTo(o);
+
     }
-    
+
+    /**
+     * Compare two {@link IV}s having the same intrinsic datatype.
+     * 
+     * @todo This should probably be moved to
+     *       {@link AbstractInlineInternalValue} and implementations provided
+     *       for each concrete instance of that abstract class.
+     */
+    protected int _compareTo(IV o) {
+
+        throw new UnsupportedOperationException();
+
+    }
+
 }
