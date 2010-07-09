@@ -69,7 +69,7 @@ public class KeyBuilder implements IKeyBuilder {
 
     protected static final Logger log = Logger.getLogger(KeyBuilder.class);
     
-    protected static final boolean INFO = log.isInfoEnabled();
+//    protected static final boolean INFO = log.isInfoEnabled();
 
 //    protected static final boolean DEBUG = log.isDebugEnabled();
     
@@ -1615,7 +1615,7 @@ public class KeyBuilder implements IKeyBuilder {
 
             locale = Locale.getDefault();
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("Using default locale: " + locale.getDisplayName());
 
         }
