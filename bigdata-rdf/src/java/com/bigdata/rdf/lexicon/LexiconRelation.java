@@ -2209,7 +2209,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
         if (tmp == null) {
 
-            return new TermId(TermId.NULL);
+            return null;
+//            return new TermId(TermId.NULL);
 
         }
 

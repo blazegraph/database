@@ -961,7 +961,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      * @todo This unit test fails for NaN. I am not convinced that this is a
      *       problem since I do not know what it would mean (in terms of the
      *       natural order of the key) to allow a value which is not a number
-     *       into a key. At a miminum we need to clarify the behavior for NaN
+     *       into a key. At a minimum we need to clarify the behavior for NaN
      *       for the lexicon and the {@link IKeyBuilder}.
      *       <p>
      *       According to the XML Schema Datatypes Recommendation: NaN equals
@@ -990,7 +990,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      * @todo This unit test fails for NaN. I am not convinced that this is a
      *       problem since I do not know what it would mean (in terms of the
      *       natural order of the key) to allow a value which is not a number
-     *       into a key. At a miminum we need to clarify the behavior for NaN
+     *       into a key. At a minimum we need to clarify the behavior for NaN
      *       for the lexicon and the {@link IKeyBuilder}.
      *       <p>
      *       According to the XML Schema Datatypes Recommendation: NaN equals

@@ -114,12 +114,12 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
         private Hiterator<IHit> hiterator;
         
         public FreeTextSearchAccessPath(IAccessPath<ISPO> accessPath) {
-            SPOPredicate pred = (SPOPredicate) accessPath.getPredicate();
-            IVariableOrConstant<IV> p = pred.p();
-            IVariableOrConstant<IV> o = pred.o();
-            if (p.isConstant() == false || o.isConstant() == false) {
-                throw new IllegalArgumentException("query not well formed");
-            }
+//            final SPOPredicate pred = (SPOPredicate) accessPath.getPredicate();
+//            IVariableOrConstant<IV> p = pred.p();
+//            IVariableOrConstant<IV> o = pred.o();
+//            if (p.isConstant() == false || o.isConstant() == false) {
+//                throw new IllegalArgumentException("query not well formed");
+//            }
             this.accessPath = accessPath;
         }
         

@@ -405,7 +405,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
     
             }
             
-            ivs[i] = new TermId(termId);
+            ivs[i] = (termId == TermId.NULL ? null : new TermId(termId));
 
         }
 
