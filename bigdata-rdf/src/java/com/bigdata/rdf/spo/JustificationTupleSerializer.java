@@ -137,7 +137,7 @@ public class JustificationTupleSerializer extends
 
             final long l = KeyBuilder.decodeLong(data, i * Bytes.SIZEOF_LONG);
             
-            ivs[i] = new TermId(l);
+            ivs[i] = l != TermId.NULL ? new TermId(l) : null;
             
         }
 

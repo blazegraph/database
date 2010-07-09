@@ -111,11 +111,11 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
      */
     public String toString() {
 
-        final String datatype = null; // busted --> getInternalDataTypeEnum().getDatatype();
+//        final String datatype = null; // busted --> getInternalDataTypeEnum().getDatatype();
 
-        return "TermId(" + termId
-                + getInternalValueTypeEnum().getCharCode() + ")"
-                + (datatype == null ? "" : datatype);
+        return "TermId(" + termId+")";
+//                + getInternalValueTypeEnum().getCharCode() + ")"
+//                + (datatype == null ? "" : datatype);
 
     }
 
