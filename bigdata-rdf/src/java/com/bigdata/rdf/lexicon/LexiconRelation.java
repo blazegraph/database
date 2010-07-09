@@ -1220,7 +1220,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                             + spo.toString(/*this*/));
 
                 /*
-                 * This is the implementation for backwards
+                 * FIXME This is the implementation for backwards
                  * compatibility.  We should not see inline values here.
                  */
                 if (spo.s().isInline() || spo.p().isInline() || spo.o().isInline()) {

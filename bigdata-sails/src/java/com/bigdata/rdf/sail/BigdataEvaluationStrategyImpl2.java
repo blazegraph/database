@@ -1262,9 +1262,6 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             p = generateVariableOrConstant(stmtPattern.getPredicateVar());
         } else {
             p = new Constant(DummyIV.INSTANCE);
-            //p = com.bigdata.relation.rule.Var.var("__"+s.getName()+"_p");
-            //p = new Constant(new Object());
-            //p = new Constant<IV>(new TermId(TermId.NULL));
         }
         if (p == null) {
             return null;
@@ -1275,9 +1272,6 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             o = generateVariableOrConstant(stmtPattern.getObjectVar());
         } else {
             o = new Constant(DummyIV.INSTANCE);
-            //o = com.bigdata.relation.rule.Var.var("__"+s.getName()+"_o");
-            //o = new Constant(new Object());
-            //o = new Constant<IV>(new TermId(TermId.NULL));
         }
         if (o == null) {
             return null;

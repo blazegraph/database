@@ -78,7 +78,7 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
         this(VTE.valueOf(termId), termId);
         
     }
-
+    
 //    /**
 //     * Constructor for a term identifier for a datatype literal. Do NOT use this
 //     * constructor when the lexicon is configured such that the datatype literal
@@ -110,8 +110,6 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
      * on the flag bits and the term identifier.
      */
     public String toString() {
-
-//        final String datatype = null; // busted --> getInternalDataTypeEnum().getDatatype();
 
         return "TermId(" + termId+")";
 //                + getInternalValueTypeEnum().getCharCode() + ")"
