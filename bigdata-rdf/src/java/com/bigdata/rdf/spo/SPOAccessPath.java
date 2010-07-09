@@ -123,7 +123,7 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
 
         final IVariableOrConstant<IV> t = predicate.get(index);
 
-        return t.isVar() ? null : t.get();
+        return t == null || t.isVar() ? null : t.get();
 
     }
 

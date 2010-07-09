@@ -75,7 +75,7 @@ public class DummyIV extends AbstractInternalValue {
         return false;
     }
 
-    public int compareTo(IV o) {
+    public int compareTo(Object o) {
         return 0;
     }
 

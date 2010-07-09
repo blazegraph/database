@@ -705,17 +705,28 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
         final int keyArity = getKeyArity();
 
         assert key.length >= 8 * keyArity;
+
+        final long __0 = KeyBuilder.decodeLong(key, 0);
         
-        final IV _0 = new TermId(KeyBuilder.decodeLong(key, 0));
+        final long __1 = KeyBuilder.decodeLong(key, 8);
         
-        final IV _1 = new TermId(KeyBuilder.decodeLong(key, 8));
+        final long __2 = KeyBuilder.decodeLong(key, 8+8);
         
-        final IV _2 = new TermId(KeyBuilder.decodeLong(key, 8+8));
+        final IV _0 = __0 == TermId.NULL ? null : new TermId(__0);
+        
+        final IV _1 = __1 == TermId.NULL ? null : new TermId(__1);
+        
+        final IV _2 = __2 == TermId.NULL ? null : new TermId(__2);
         
         // 4th key position exists iff quad keys.
-        IV _3 = null; 
-        if (keyArity == 4)
-            _3 = new TermId(KeyBuilder.decodeLong(key, 8 + 8 + 8));
+        IV _3 = null;
+        if (keyArity == 4) {
+            
+            final long __3 = KeyBuilder.decodeLong(key, 8 + 8 + 8); 
+            
+            _3 = __3 == TermId.NULL ? null : new TermId(__3);
+            
+        }
 /*
         final IV[] ivs = decodeStatementKey(key);
 
@@ -1008,13 +1019,13 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
     static public SPOKeyOrder getKeyOrder(final IPredicate<ISPO> predicate,
             final int keyArity) {
 
-        final IV s = predicate.get(0).isVar() ? null : (IV) predicate
+        final Object s = predicate.get(0).isVar() ? null : predicate
                 .get(0).get();
         
-        final IV p = predicate.get(1).isVar() ? null : (IV) predicate
+        final Object p = predicate.get(1).isVar() ? null : predicate
                 .get(1).get();
         
-        final IV o = predicate.get(2).isVar() ? null : (IV) predicate
+        final Object o = predicate.get(2).isVar() ? null : predicate
                 .get(2).get();
 
         if (keyArity == 3) {

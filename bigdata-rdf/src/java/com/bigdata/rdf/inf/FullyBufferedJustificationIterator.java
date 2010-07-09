@@ -89,7 +89,7 @@ public class FullyBufferedJustificationIterator implements IJustificationIterato
                 * Bytes.SIZEOF_LONG);
 
         /*
-         * This is the implementation for backwards
+         * FIXME This is the implementation for backwards
          * compatibility.  We should not see inline values here.
          */
         if (head.s().isInline() || head.p().isInline() || head.o().isInline()) {
