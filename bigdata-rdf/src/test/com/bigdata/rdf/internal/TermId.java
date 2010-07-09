@@ -1,8 +1,8 @@
 package com.bigdata.rdf.internal;
 
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
  * Implementation for any kind of RDF Value when the values is not being
@@ -21,13 +21,10 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
     /**
      * Value used for a "NULL" term identifier.
      */
-    public static final long NULL = 0L;
-    
+    public static final transient long NULL = 0L;
 
     /** The term identifier. */
     private final long termId;
-    
-
 
 //    /** The datatype term identifier. */
 //    private final long dataTypeId;
@@ -193,8 +190,8 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
         if (this == o)
             return 0;
         
-        if (o == null)
-            return 1;
+//        if (o == null) // already known to be non-null.
+//            return 1;
         
         final long tid1 = ((TermId<?>) this).getTermId();
         final long tid2 = ((TermId<?>) o).getTermId();
@@ -205,6 +202,20 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
          */
 
         return tid1 < tid2 ? -1 : tid1 > tid2 ? 1 : 0;
+        
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * FIXME We are going to need another class with similar semantics if we
+     * also allow raw tids (the historical way of coding a term identifier as
+     * just 8 bytes). I suggest RawTermId for the old way and TermId for the new
+     * way.
+     */
+    public int byteLength() {
+
+        return 1 + Bytes.SIZEOF_LONG;
         
     }
     

@@ -3,6 +3,7 @@ package com.bigdata.rdf.internal;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
@@ -10,6 +11,11 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 public class XSDShortInternalValue<V extends BigdataLiteral> extends
         AbstractDatatypeLiteralInternalValue<V, Short> {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+    
     private final short value;
 
     public XSDShortInternalValue(final short value) {
@@ -83,8 +89,8 @@ public class XSDShortInternalValue<V extends BigdataLiteral> extends
 
     public boolean equals(final Object o) {
         if(this==o) return true;
-        if(o instanceof XSDShortInternalValue) {
-            return this.value == ((XSDShortInternalValue) o).value;
+        if(o instanceof XSDShortInternalValue<?>) {
+            return this.value == ((XSDShortInternalValue<?>) o).value;
         }
         return false;
     }
@@ -98,4 +104,7 @@ public class XSDShortInternalValue<V extends BigdataLiteral> extends
         return (int) value;
     }
 
+    public int byteLength() {
+        return 1 + Bytes.SIZEOF_SHORT;
+    }
 }

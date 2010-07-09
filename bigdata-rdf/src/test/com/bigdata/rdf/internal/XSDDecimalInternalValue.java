@@ -10,6 +10,11 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 public class XSDDecimalInternalValue<V extends BigdataLiteral> extends
         AbstractDatatypeLiteralInternalValue<V, BigDecimal> {
     
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+    
     private final BigDecimal value;
 
     public XSDDecimalInternalValue(final BigDecimal value) {
@@ -89,8 +94,8 @@ public class XSDDecimalInternalValue<V extends BigdataLiteral> extends
     public boolean equals(final Object o) {
         if (this == o)
             return true;
-        if (o instanceof XSDDecimalInternalValue) {
-            return this.value.equals(((XSDDecimalInternalValue) o).value);
+        if (o instanceof XSDDecimalInternalValue<?>) {
+            return this.value.equals(((XSDDecimalInternalValue<?>) o).value);
         }
         return false;
     }
@@ -102,4 +107,9 @@ public class XSDDecimalInternalValue<V extends BigdataLiteral> extends
         return value.hashCode();
     }
 
+    // FIXME byteLength()
+    public int byteLength() {
+        throw new UnsupportedOperationException();
+    }
+    
 }

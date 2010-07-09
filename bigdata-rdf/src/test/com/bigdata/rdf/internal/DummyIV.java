@@ -98,4 +98,8 @@ public class DummyIV extends AbstractInternalValue {
         
     }
 
+    public int byteLength() {
+        return 0;
+    }
+
 }

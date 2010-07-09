@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Random;
 import java.util.UUID;
@@ -239,6 +240,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                             return true;
                         return false;
                     }
+                    
+                    public int byteLength() {
+                        throw new UnsupportedOperationException();
+                    }
 
                     @Override
                     public int hashCode() {
@@ -347,74 +352,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     private void encodeValue(final IKeyBuilder keyBuilder,
             final IV<?, ?> v) {
 
-        // First emit the flags byte.
-        keyBuilder.append(v.flags());
-
-        if (!v.isInline()) {
-            /*
-             * Since the RDF Value is not inline, it will be represented as a
-             * term identifier.
-             */
-            keyBuilder.append(v.getTermId());
-            return;
-        }
-        
-        /*
-         * Append the natural value type representation.
-         * 
-         * Note: We have to handle the unsigned byte, short, int and long values
-         * specially to get the correct total key order.
-         */
-        final DTE dte = v.getInternalDataTypeEnum();
-        
-        final AbstractDatatypeLiteralInternalValue<?, ?> t = (AbstractDatatypeLiteralInternalValue<?, ?>) v;
-        
-        switch (dte) {
-        case XSDBoolean:
-            keyBuilder.append((byte) (t.booleanValue() ? 1 : 0));
-            break;
-        case XSDByte:
-            keyBuilder.append(t.byteValue());
-            break;
-        case XSDShort:
-            keyBuilder.append(t.shortValue());
-            break;
-        case XSDInt:
-            keyBuilder.append(t.intValue());
-            break;
-        case XSDLong:
-            keyBuilder.append(t.longValue());
-            break;
-        case XSDFloat:
-            keyBuilder.append(t.floatValue());
-            break;
-        case XSDDouble:
-            keyBuilder.append(t.doubleValue());
-            break;
-        case XSDInteger:
-            keyBuilder.append(t.integerValue());
-            break;
-        case XSDDecimal:
-            keyBuilder.append(t.decimalValue());
-            break;
-        case UUID:
-            keyBuilder.append((UUID)t.getInlineValue());
-            break;
-//        case XSDUnsignedByte:
-//            keyBuilder.appendUnsigned(t.byteValue());
-//            break;
-//        case XSDUnsignedShort:
-//            keyBuilder.appendUnsigned(t.shortValue());
-//            break;
-//        case XSDUnsignedInt:
-//            keyBuilder.appendUnsigned(t.intValue());
-//            break;
-//        case XSDUnsignedLong:
-//            keyBuilder.appendUnsigned(t.longValue());
-//            break;
-        default:
-            throw new AssertionError(v.toString());
-        }
+        v.encode(keyBuilder);
 
     }
 
@@ -432,11 +370,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      * 
      * @return An ordered array of the {@link IV}s for that key.
      * 
-     *         FIXME handle all of the inline value types.
-     * 
-     *         FIXME Construct the InternalValue objects using factory since we
-     *         will have to scope how the RDF Value is represented to the
-     *         lexicon relation with which it is associated.
+     * FIXME Modify to use {@link IVUtil#decode(byte[], int)}
      */
     public IV<?, ?>[] decodeStatementKey(final byte[] key) {
         
@@ -447,117 +381,121 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         
         for (int i = 0; i < 4; i++) {
 
-            final byte flags = KeyBuilder.decodeByte(key[offset]);
-            offset++;
+//            final byte flags = KeyBuilder.decodeByte(key[offset]);
+//            offset++;
+//
+//            if(!AbstractInternalValue.isInline(flags)) {
+//                
+//                /*
+//                 * Handle a term identifier (versus an inline value).
+//                 */
+//
+//                // decode the term identifier.
+//                final long termId = KeyBuilder.decodeLong(key, offset);
+//                offset += Bytes.SIZEOF_LONG;
+//
+//                a[i] = new TermId(flags, termId);
+//
+//                continue;
+//                
+//            }
+//            
+//            /*
+//             * Handle an inline value.
+//             */
+//            // The value type (URI, Literal, BNode, SID)
+//            final VTE vte = AbstractInternalValue
+//                    .getInternalValueTypeEnum(flags);
+//
+//            // The data type
+//            final DTE dte = AbstractInternalValue
+//                    .getInternalDataTypeEnum(flags);
+//            
+//            final IV<?,?> v;
+//            switch (dte) {
+//            case XSDBoolean: {
+//                final byte x = KeyBuilder.decodeByte(key[offset++]);
+//                if (x == 0) {
+//                    v = XSDBooleanInternalValue.FALSE;
+//                } else {
+//                    v = XSDBooleanInternalValue.TRUE;
+//                }
+//                break;
+//            }
+//            case XSDByte: {
+//                final byte x = KeyBuilder.decodeByte(key[offset++]);
+//                v = new XSDByteInternalValue<BigdataLiteral>(x);
+//                break;
+//            }
+//            case XSDShort: {
+//                final short x = KeyBuilder.decodeShort(key, offset);
+//                offset += Bytes.SIZEOF_SHORT;
+//                v = new XSDShortInternalValue<BigdataLiteral>(x);
+//                break;
+//            }
+//            case XSDInt: {
+//                final int x = KeyBuilder.decodeInt(key, offset);
+//                offset += Bytes.SIZEOF_INT;
+//                v = new XSDIntInternalValue<BigdataLiteral>(x);
+//                break;
+//            }
+//            case XSDLong: {
+//                final long x = KeyBuilder.decodeLong(key, offset);
+//                offset += Bytes.SIZEOF_LONG;
+//                v = new XSDLongInternalValue<BigdataLiteral>(x);
+//                break;
+//            }
+//            case XSDFloat: {
+//                final float x = KeyBuilder.decodeFloat(key, offset);
+//                offset += Bytes.SIZEOF_FLOAT;
+//                v = new XSDFloatInternalValue<BigdataLiteral>(x);
+//                break;
+//            }
+//            case XSDDouble: {
+//                final double x = KeyBuilder.decodeDouble(key, offset);
+//                offset += Bytes.SIZEOF_DOUBLE;
+//                v = new XSDDoubleInternalValue<BigdataLiteral>(x);
+//                break;
+//            }
+//            case UUID: {
+//                final UUID x = KeyBuilder.decodeUUID(key, offset);
+//                offset += Bytes.SIZEOF_UUID;
+//                v = new UUIDInternalValue<BigdataLiteral>(x);
+//                break;
+//            }
+//            case XSDInteger: {
+//                final byte[] b = KeyBuilder.decodeBigInteger2(offset, key);
+//                offset += 2 + b.length;
+//                final BigInteger x = new BigInteger(b);
+//                v = new XSDIntegerInternalValue<BigdataLiteral>(x);
+//                break;
+//            }
+////            case XSDDecimal:
+////                keyBuilder.append(t.decimalValue());
+////                break;
+////            case XSDUnsignedByte:
+////                keyBuilder.appendUnsigned(t.byteValue());
+////                break;
+////            case XSDUnsignedShort:
+////                keyBuilder.appendUnsigned(t.shortValue());
+////                break;
+////            case XSDUnsignedInt:
+////                keyBuilder.appendUnsigned(t.intValue());
+////                break;
+////            case XSDUnsignedLong:
+////                keyBuilder.appendUnsigned(t.longValue());
+////                break;
+//            default:
+//                throw new UnsupportedOperationException("vte=" + vte + ", dte="
+//                        + dte);
+//            }
+//
+//            a[i] = v;
 
-            if(!AbstractInternalValue.isInline(flags)) {
-                
-                /*
-                 * Handle a term identifier (versus an inline value).
-                 */
+            a[i] = IVUtil.decode(key, offset);
 
-                // decode the term identifier.
-                final long termId = KeyBuilder.decodeLong(key, offset);
-                offset += Bytes.SIZEOF_LONG;
-
-                a[i] = new TermId(flags, termId);
-
-                continue;
-                
-            }
+            offset += a[i].byteLength();
             
-            /*
-             * Handle an inline value.
-             */
-            // The value type (URI, Literal, BNode, SID)
-            final VTE vte = AbstractInternalValue
-                    .getInternalValueTypeEnum(flags);
-
-            // The data type
-            final DTE dte = AbstractInternalValue
-                    .getInternalDataTypeEnum(flags);
-            
-            final IV<?,?> v;
-            switch (dte) {
-            case XSDBoolean: {
-                final byte x = KeyBuilder.decodeByte(key[offset++]);
-                if (x == 0) {
-                    v = XSDBooleanInternalValue.FALSE;
-                } else {
-                    v = XSDBooleanInternalValue.TRUE;
-                }
-                break;
-            }
-            case XSDByte: {
-                final byte x = KeyBuilder.decodeByte(key[offset++]);
-                v = new XSDByteInternalValue<BigdataLiteral>(x);
-                break;
-            }
-            case XSDShort: {
-                final short x = KeyBuilder.decodeShort(key, offset);
-                offset += Bytes.SIZEOF_SHORT;
-                v = new XSDShortInternalValue<BigdataLiteral>(x);
-                break;
-            }
-            case XSDInt: {
-                final int x = KeyBuilder.decodeInt(key, offset);
-                offset += Bytes.SIZEOF_INT;
-                v = new XSDIntInternalValue<BigdataLiteral>(x);
-                break;
-            }
-            case XSDLong: {
-                final long x = KeyBuilder.decodeLong(key, offset);
-                offset += Bytes.SIZEOF_LONG;
-                v = new XSDLongInternalValue<BigdataLiteral>(x);
-                break;
-            }
-            case XSDFloat: {
-                final float x = KeyBuilder.decodeFloat(key, offset);
-                offset += Bytes.SIZEOF_FLOAT;
-                v = new XSDFloatInternalValue<BigdataLiteral>(x);
-                break;
-            }
-            case XSDDouble: {
-                final double x = KeyBuilder.decodeDouble(key, offset);
-                offset += Bytes.SIZEOF_DOUBLE;
-                v = new XSDDoubleInternalValue<BigdataLiteral>(x);
-                break;
-            }
-            case UUID: {
-                final UUID x = KeyBuilder.decodeUUID(key, offset);
-                offset += Bytes.SIZEOF_UUID;
-                v = new UUIDInternalValue<BigdataLiteral>(x);
-                break;
-            }
-            case XSDInteger: {
-                final byte[] b = KeyBuilder.decodeBigInteger2(offset, key);
-                offset += 2 + b.length;
-                final BigInteger x = new BigInteger(b);
-                v = new XSDIntegerInternalValue<BigdataLiteral>(x);
-                break;
-            }
-//            case XSDDecimal:
-//                keyBuilder.append(t.decimalValue());
-//                break;
-//            case XSDUnsignedByte:
-//                keyBuilder.appendUnsigned(t.byteValue());
-//                break;
-//            case XSDUnsignedShort:
-//                keyBuilder.appendUnsigned(t.shortValue());
-//                break;
-//            case XSDUnsignedInt:
-//                keyBuilder.appendUnsigned(t.intValue());
-//                break;
-//            case XSDUnsignedLong:
-//                keyBuilder.appendUnsigned(t.longValue());
-//                break;
-            default:
-                throw new UnsupportedOperationException("vte=" + vte + ", dte="
-                        + dte);
-            }
-            
-            a[i] = v;
-
             if (i == 2 && offset == key.length) {
                 // We have three components and the key is exhausted.
                 break;
@@ -631,15 +569,15 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
         keyBuilder.reset();
 
-        encodeValue(keyBuilder, s);
+        s.encode(keyBuilder);
 
-        encodeValue(keyBuilder, p);
+        p.encode(keyBuilder);
 
-        encodeValue(keyBuilder, o);
+        o.encode(keyBuilder);
 
         if (c != null) {
 
-            encodeValue(keyBuilder, c);
+            c.encode(keyBuilder);
 
         }
 
@@ -665,7 +603,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
             for (int i = 0; i < e.length; i++) {
 
-                encodeValue(keyBuilder, e[i]);
+                e[i].encode(keyBuilder);
 
             }
 
@@ -1046,6 +984,23 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                 new TermId<BigdataURI>(VTE.URI, 2L),//
                 new XSDIntegerInternalValue<BigdataLiteral>(BigInteger
                         .valueOf(3L)),//
+                new TermId<BigdataURI>(VTE.URI, 4L) //
+        };
+
+        doEncodeDecodeTest(e);
+        
+    }
+
+    /**
+     * Unit test where the RDF Object position is an xsd:decimal.
+     */
+    public void test_SPO_encodeDecode_XSDDecimal() {
+
+        final IV<?, ?>[] e = {//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
+                new XSDDecimalInternalValue<BigdataLiteral>(BigDecimal
+                        .valueOf(3.3d)),//
                 new TermId<BigdataURI>(VTE.URI, 4L) //
         };
 

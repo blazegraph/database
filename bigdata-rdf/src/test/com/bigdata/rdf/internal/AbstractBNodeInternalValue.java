@@ -2,6 +2,7 @@ package com.bigdata.rdf.internal;
 
 import java.util.UUID;
 
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -70,6 +71,10 @@ public class AbstractBNodeInternalValue<V extends BigdataBNode> extends
 
     public int hashCode() {
         return id.hashCode();
+    }
+ 
+    public int byteLength() {
+        return 1 + Bytes.SIZEOF_UUID;
     }
     
 }

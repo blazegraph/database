@@ -33,6 +33,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -63,6 +64,19 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
      */
     byte flags();
 
+    /**
+     * The byte length of the encoded {@link IV}.
+     */
+    int byteLength();
+
+    /**
+     * Encode the {@link IV} as an unsigned byte[].
+     * 
+     * @param keyBuilder
+     *            The object used to encode the {@link IV}.
+     */
+    void encode(IKeyBuilder keyBuilder);
+    
     /*
      * RDF Value type methods.
      */

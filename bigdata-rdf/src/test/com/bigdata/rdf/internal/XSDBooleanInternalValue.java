@@ -10,6 +10,11 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 public class XSDBooleanInternalValue<V extends BigdataLiteral> extends
         AbstractDatatypeLiteralInternalValue<V, Boolean> {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
     static public transient final XSDBooleanInternalValue<BigdataLiteral> TRUE = new XSDBooleanInternalValue<BigdataLiteral>(
             true);
 
@@ -89,8 +94,8 @@ public class XSDBooleanInternalValue<V extends BigdataLiteral> extends
 
     public boolean equals(final Object o) {
         if(this==o) return true;
-        if(o instanceof XSDBooleanInternalValue) {
-            return this.value == ((XSDBooleanInternalValue) o).value;
+        if(o instanceof XSDBooleanInternalValue<?>) {
+            return this.value == ((XSDBooleanInternalValue<?>) o).value;
         }
         return false;
     }
@@ -102,6 +107,10 @@ public class XSDBooleanInternalValue<V extends BigdataLiteral> extends
      */
     public int hashCode() {
         return value ? Boolean.TRUE.hashCode() : Boolean.FALSE.hashCode();
+    }
+
+    public int byteLength() {
+        return 1 + 1;
     }
 
 }
