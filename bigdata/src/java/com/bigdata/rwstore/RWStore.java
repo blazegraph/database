@@ -238,17 +238,18 @@ public class RWStore implements IStore {
      * {@link #m_extensionLock}.
      */
     final private ReentrantReadWriteLock m_extensionLock = new ReentrantReadWriteLock();
-    
-    /**
-     * An explicit allocation lock allows for reads concurrent with allocation requests.
-     * It is only when an allocation triggers a file extension that the write
-     * extensionLock needs to be taken.
-     * 
-     * TODO: There is scope to take advantage of the different allocator sizes
-     * and provide allocation locks on the fixed allocators.  We will still need
-     * a store-wide allocation lock when creating new allocation areas, but 
-     * significant contention may be avoided.
-     */
+
+	/**
+	 * An explicit allocation lock allows for reads concurrent with allocation
+	 * requests. You must hold the allocation lock while allocating or clearing
+	 * allocations. It is only when an allocation triggers a file extension that
+	 * the write extensionLock needs to be taken.
+	 * 
+	 * TODO: There is scope to take advantage of the different allocator sizes
+	 * and provide allocation locks on the fixed allocators. We will still need
+	 * a store-wide allocation lock when creating new allocation areas, but
+	 * significant contention may be avoided.
+	 */
     final private ReentrantLock m_allocationLock = new ReentrantLock();
 
     private ReopenFileChannel m_reopener = null;
@@ -859,7 +860,7 @@ public class RWStore implements IStore {
 	 * @param sze 
 	 */
 	public void free(final long laddr, final int sze) {
-		int addr = (int) laddr;
+		final int addr = (int) laddr;
 
 		switch (addr) {
 		case 0:
@@ -870,18 +871,14 @@ public class RWStore implements IStore {
 		
 		m_allocationLock.lock();
 		try {
-			while (addr != 0) {
-				final Allocator alloc = getBlockByAddress(addr);
-				final long pa = alloc.getPhysicalAddress(getOffset(addr));
-				m_writeCache.clearWrite(pa);
-				alloc.free(addr, sze);
-				m_frees++;
-	
-				if (!m_commitList.contains(alloc)) {
-					m_commitList.add(alloc);
-				}
-	
-				addr = 0;
+			final Allocator alloc = getBlockByAddress(addr);
+			final long pa = alloc.getPhysicalAddress(getOffset(addr));
+			m_writeCache.clearWrite(pa);
+			alloc.free(addr, sze);
+			m_frees++;
+
+			if (!m_commitList.contains(alloc)) {
+				m_commitList.add(alloc);
 			}
 		} finally {
 			m_allocationLock.unlock();
@@ -1483,7 +1480,16 @@ public class RWStore implements IStore {
 		return 4 * (1 + m_metaBits.length);
 	}
 
-	void metaFree(int bit) {
+	void metaFree(final int bit) {
+		
+		if (!m_allocationLock.isHeldByCurrentThread()) {
+			/*
+			 * Must hold the allocation lock while allocating or clearing
+			 * allocations.
+			 */
+			throw new IllegalMonitorStateException();
+		}
+		
 		if (bit <= 0) {
 			return;
 		}
@@ -1500,11 +1506,11 @@ public class RWStore implements IStore {
 	long metaBit2Addr(final int bit) {
 		final int bitsPerBlock = 9 * 32;
 		
-		int intIndex = bit / 32; // divide 32;
-		int addrIndex = (intIndex/9)*9;
-		long addr = convertAddr(m_metaBits[addrIndex]);
+		final int intIndex = bit / 32; // divide 32;
+		final int addrIndex = (intIndex/9)*9;
+		final long addr = convertAddr(m_metaBits[addrIndex]);
 
-		int intOffset = bit - ((addrIndex+1) * 32);
+		final int intOffset = bit - ((addrIndex+1) * 32);
 
 		long ret =  addr + (ALLOC_BLOCK_SIZE * intOffset);
 		

@@ -1750,7 +1750,7 @@ abstract public class WriteCache implements IWriteCache {
 		}
 		
 		/*
-		 * FIXUP debug flag when last address is cleared
+		 * Fix up the debug flag when last address is cleared.
 		 */
 		if (m_written && recordMap.size() == 0) {
 			m_written = false;
@@ -1782,30 +1782,17 @@ abstract public class WriteCache implements IWriteCache {
 
 			while (entries.hasNext()) {
 				final Long addr = entries.next();
-				
+
 				/*
-				 * Is this a potential concurrency problem? Could we possibly
-				 * end up removing a new write if concurrently we delete and
-				 * then reallocated this address?
-				 * 
-				 * On the keySet() accessed, the folowing javadoc is relevant:
-				 * 
-				 * If the map is modified while an iteration over the set is
-				 * in progress, the results of the iteration are undefined.
-				 * 
-				 * So this is definitely a problem, the serviceRecordMap is
-				 * modified here, in WriteCacheService.write and RWStore.free.
-				 * 
-				 * The problem here is the unguarded collision of free and
-				 * write (new data) being called after the keySet().iterator()
-				 * 
-				 * But the write problem is only an issue because of the free
-				 * and resetWith concurrency, so we just need to lockout
-				 * any call to free during this resetWith call.
+				 * We need to guard against the possibility that the entry in
+				 * the service record map has been updated concurrently such
+				 * that it now points to a different WriteCache instance. This
+				 * is possible (for the RWStore) if a recently freed record has
+				 * been subsequently reallocated on a different WriteCache.
+				 * Using the conditional remove on ConcurrentMap guards against
+				 * this.
 				 */
-				if (serviceRecordMap.remove(addr) != this) {
-					throw new IllegalStateException("Out-of-sync serviceRecordMap");
-				}
+				serviceRecordMap.remove(addr, this);
 			}
 
 		} else {
