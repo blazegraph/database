@@ -28,6 +28,7 @@ import org.openrdf.model.Statement;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtil;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataResource;
@@ -138,7 +139,7 @@ public class SPO implements ISPO {
 
         }
 
-        if (c != null && iv != c)
+        if (c != null && !IVUtil.equals(iv, c))
             throw new IllegalStateException(
                     "Different statement identifier already defined: "
                             + toString() + ", new=" + iv);
@@ -159,7 +160,7 @@ public class SPO implements ISPO {
 
     final public boolean hasStatementIdentifier() {
         
-        return c.isStatement();
+        return c != null && c.isStatement();
         
     }
     
@@ -477,7 +478,7 @@ public class SPO implements ISPO {
         buf.putByte(b);
 
         if (type == StatementEnum.Explicit
-                && c.isStatement()) {
+                && c != null && c.isStatement()) {
 
             buf.putLong(c.getTermId());
 
@@ -545,6 +546,9 @@ public class SPO implements ISPO {
         if (this == o)
             return true;
 
+        if (o == null)
+            return false;
+        
         return equals((ISPO) o);
         
     }
@@ -564,9 +568,9 @@ public class SPO implements ISPO {
             return true;
 
         return
-                this.s.equals(stmt2.s()) && //
-                this.p.equals(stmt2.p()) && //
-                this.o.equals(stmt2.o()) && //
+                IVUtil.equals(this.s, stmt2.s()) && //
+                IVUtil.equals(this.p, stmt2.p()) && //
+                IVUtil.equals(this.o, stmt2.o()) && //
                 this.type == stmt2.getStatementType()
                 ;
 
@@ -601,20 +605,8 @@ public class SPO implements ISPO {
         if (iv == null)
             return IRawTripleStore.NULLSTR;
 
-        if (iv.isLiteral())
-            return iv + "L";
-
-        if (iv.isURI())
-            return iv + "U";
-
-        if (iv.isBNode())
-            return iv + "B";
-
-        if (iv.isStatement())
-            return iv + "S";
-
-        throw new AssertionError("id=" + iv);
-
+        return iv.toString();
+        
     }
 
     /**

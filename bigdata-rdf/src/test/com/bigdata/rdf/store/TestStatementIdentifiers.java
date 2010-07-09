@@ -50,6 +50,7 @@ package com.bigdata.rdf.store;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.Properties;
 import java.util.UUID;
 import org.openrdf.model.Statement;
@@ -689,7 +690,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                 final SPO expected = all[i];
 
                 final ISPO actual = itr.next();
-
+                
                 assertEquals("S @ i=" + i, expected.s, actual.s());
 
                 assertEquals("P @ i=" + i, expected.p, actual.p());

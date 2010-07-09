@@ -39,7 +39,7 @@ import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
-import com.bigdata.rdf.model.TermIdComparator;
+import com.bigdata.rdf.model.TermIVComparator;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -73,7 +73,7 @@ public class TestComparators extends TestCase2 {
 
         final BigdataValue vmin = f.createLiteral("a"); vmin.setIV( lmin);
         final BigdataValue vm1  = f.createLiteral("b"); vm1 .setIV( lm1 );
-        final BigdataValue v0   = f.createLiteral("c"); v0  .clearInternalValue(); // Note: equivilent to setTermId( l0  );
+        final BigdataValue v0   = f.createLiteral("c"); v0  .setIV( l0 );
         final BigdataValue vp1  = f.createLiteral("d"); vp1 .setIV( lp1 );
         final BigdataValue vmax = f.createLiteral("e"); vmax.setIV( lmax);
 
@@ -119,7 +119,7 @@ public class TestComparators extends TestCase2 {
          * Test the term identifier comparator.
          */
         
-        final Comparator<BigdataValue> c = TermIdComparator.INSTANCE;
+        final Comparator<BigdataValue> c = TermIVComparator.INSTANCE;
 
         System.err.println("unsorted terms: "+Arrays.toString(terms));
         Arrays.sort(terms,c);

@@ -58,6 +58,7 @@ import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
 import com.bigdata.BigdataStatics;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.rules.RuleContextEnum;
@@ -1259,7 +1260,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         if (expander == null) {
             p = generateVariableOrConstant(stmtPattern.getPredicateVar());
         } else {
-            p = new Constant<IV>(null);
+            p = new Constant<IV>(new TermId(TermId.NULL));
         }
         if (p == null) {
             return null;
@@ -1269,7 +1270,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         if (expander == null) {
             o = generateVariableOrConstant(stmtPattern.getObjectVar());
         } else {
-            o = new Constant<IV>(null);
+            o = new Constant<IV>(new TermId(TermId.NULL));
         }
         if (o == null) {
             return null;

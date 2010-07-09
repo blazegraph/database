@@ -44,6 +44,7 @@ import com.bigdata.rdf.internal.AbstractDatatypeLiteralInternalValue;
 import com.bigdata.rdf.internal.AbstractInternalValue;
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtil;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.UUIDInternalValue;
 import com.bigdata.rdf.internal.VTE;
@@ -384,7 +385,7 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
                 
                 final IV t2 = o2.get(keyMap[i]);
                 
-                int ret = t1.compareTo(t2);
+                int ret = IVUtil.compareTo(t1, t2);
                 
                 if (ret != 0) {
                 
@@ -544,37 +545,9 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
             
             IV iv = spo.get(a[i]);
 
-            /*
-             * This is the SPOKeyOrder implementation for backwards
-             * compatibility.  We should not see inline values here.
-             */
-            if (iv.isInline()) {
-                throw new IllegalArgumentException();
-            }
-            
-            keyBuilder.append(iv.getTermId());
+            encodeKey(keyBuilder, iv);
             
         }
-        
-        return keyBuilder.getKey();
-
-    }
-    
-    final public byte[] encodeKey(final IKeyBuilder keyBuilder, 
-            final IV iv1, final IV iv2, final IV iv3) {
-
-        /*
-         * This is the SPOKeyOrder implementation for backwards
-         * compatibility.  We should not see inline values here.
-         */
-        if (iv1.isInline() || iv2.isInline() || iv3.isInline()) {
-            throw new IllegalArgumentException();
-        }
-        
-        keyBuilder.reset();
-        keyBuilder.append(iv1.getTermId());
-        keyBuilder.append(iv1.getTermId());
-        keyBuilder.append(iv1.getTermId());
         
         return keyBuilder.getKey();
 
@@ -585,22 +558,68 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
      * 
      * @param keyBuilder
      *            The key builder.
-     * @param v
+     * @param iv
      *            The RDF value.
      * 
      * @return The key builder.
      */
-    private void encodeKey(final IKeyBuilder keyBuilder, final IV v) {
+    private void encodeKey(final IKeyBuilder keyBuilder, final IV iv) {
 
+        if (iv == null) {
+
+            // justifications use null IVs to represent wildcards
+            keyBuilder.append(TermId.NULL);
+            
+            return;
+            
+        } else {
+            
+            /*
+             * FIXME This is the SPOKeyOrder implementation for backwards
+             * compatibility.  We should not see inline values here.
+             */
+            if (iv.isInline()) {
+                throw new IllegalArgumentException();
+            }
+            
+            keyBuilder.append(iv.getTermId());
+            
+        }
+        
+    }
+        
+    /**
+     * Encode an RDF value into a key for one of the statement indices.
+     * <p>
+     * This is the new implementation for the lexicon refactor.  Not in use yet.
+     * 
+     * @param keyBuilder
+     *            The key builder.
+     * @param iv
+     *            The RDF value.
+     * 
+     * @return The key builder.
+     */
+    private void encodeKey2(final IKeyBuilder keyBuilder, final IV iv) {
+
+        if (iv == null) {
+
+            // justifications use null IVs to represent wildcards
+            keyBuilder.append(TermId.NULL);
+            
+            return;
+            
+        }
+            
         // First emit the flags byte.
-        keyBuilder.append(v.flags());
+        keyBuilder.append(iv.flags());
 
-        if (!v.isInline()) {
+        if (!iv.isInline()) {
             /*
              * Since the RDF Value is not inline, it will be represented as a
              * term identifier.
              */
-            keyBuilder.append(v.getTermId());
+            keyBuilder.append(iv.getTermId());
             return;
         }
         
@@ -610,10 +629,10 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
          * Note: We have to handle the unsigned byte, short, int and long values
          * specially to get the correct total key order.
          */
-        final DTE dte = v.getInternalDataTypeEnum();
+        final DTE dte = iv.getInternalDataTypeEnum();
         
         final AbstractDatatypeLiteralInternalValue<?, ?> t = 
-            (AbstractDatatypeLiteralInternalValue<?, ?>) v;
+            (AbstractDatatypeLiteralInternalValue<?, ?>) iv;
         
         switch (dte) {
         case XSDBoolean:
@@ -659,7 +678,7 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
 //            keyBuilder.appendUnsigned(t.longValue());
 //            break;
         default:
-            throw new AssertionError(v.toString());
+            throw new AssertionError(iv.toString());
         }
 
     }
@@ -690,13 +709,13 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
         final IV _0 = new TermId(KeyBuilder.decodeLong(key, 0));
         
         final IV _1 = new TermId(KeyBuilder.decodeLong(key, 8));
-      
+        
         final IV _2 = new TermId(KeyBuilder.decodeLong(key, 8+8));
-
+        
         // 4th key position exists iff quad keys.
-        final IV _3 = keyArity == 4 
-                ? new TermId(KeyBuilder.decodeLong(key, 8 + 8 + 8))
-                : null;
+        IV _3 = null; 
+        if (keyArity == 4)
+            _3 = new TermId(KeyBuilder.decodeLong(key, 8 + 8 + 8));
 /*
         final IV[] ivs = decodeStatementKey(key);
 

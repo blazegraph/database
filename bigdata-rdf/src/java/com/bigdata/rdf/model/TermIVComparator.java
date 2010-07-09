@@ -12,10 +12,10 @@ import com.bigdata.rdf.internal.IV;
  * 
  * @see BigdataValue#getIV()
  */
-public class TermIdComparator implements Comparator<BigdataValue> {
+public class TermIVComparator implements Comparator<BigdataValue> {
 
     public static final transient Comparator<BigdataValue> INSTANCE =
-        new TermIdComparator();
+        new TermIVComparator();
 
     /**
      * Note: comparison avoids possible overflow of <code>long</code> by
@@ -23,10 +23,17 @@ public class TermIdComparator implements Comparator<BigdataValue> {
      */
     public int compare(BigdataValue term1, BigdataValue term2) {
 
-        final IV id1 = term1.getIV();
-        final IV id2 = term2.getIV();
+        final IV iv1 = term1.getIV();
+        final IV iv2 = term2.getIV();
         
-        return id1.compareTo(id2);
+        if (iv1 == null && iv2 == null)
+            return 0;
+        if (iv1 == null)
+            return -1;
+        if (iv2 == null)
+            return 1;
+        
+        return iv1.compareTo(iv2);
 
     }
 

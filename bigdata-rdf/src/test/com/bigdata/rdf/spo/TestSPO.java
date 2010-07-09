@@ -81,16 +81,16 @@ public class TestSPO extends TestCase2 {
                 .isLiteral(ITermIdCodes.TERMID_CODE_LITERAL));
         assertFalse(VTE
                 .isStatement(ITermIdCodes.TERMID_CODE_LITERAL));
-        doValueRoundTripTest(new TermId(VTE.URI, ITermIdCodes.TERMID_CODE_LITERAL));
+        doValueRoundTripTest(new TermId(VTE.LITERAL, ITermIdCodes.TERMID_CODE_LITERAL));
 
         assertTrue(VTE.isBNode(ITermIdCodes.TERMID_CODE_BNODE));
         assertFalse(VTE
                 .isStatement(ITermIdCodes.TERMID_CODE_BNODE));
-        doValueRoundTripTest(new TermId(VTE.URI, ITermIdCodes.TERMID_CODE_BNODE));
+        doValueRoundTripTest(new TermId(VTE.BNODE, ITermIdCodes.TERMID_CODE_BNODE));
 
         assertTrue(VTE
                 .isStatement(ITermIdCodes.TERMID_CODE_STATEMENT));
-        doValueRoundTripTest(new TermId(VTE.URI, ITermIdCodes.TERMID_CODE_STATEMENT));
+        doValueRoundTripTest(new TermId(VTE.STATEMENT, ITermIdCodes.TERMID_CODE_STATEMENT));
 
     }
 

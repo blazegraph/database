@@ -229,9 +229,9 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
             assertFalse(VTE.isLiteral(store.getIV(RDF.TYPE).getTermId()));
 
-            assertFalse(VTE.isLiteral(store.getIV(new BNodeImpl(UUID.randomUUID().toString())).getTermId()));
+//            assertFalse(VTE.isLiteral(store.getIV(new BNodeImpl(UUID.randomUUID().toString())).getTermId()));
             
-            assertFalse(VTE.isLiteral(store.getIV(new BNodeImpl("a12")).getTermId()));
+//            assertFalse(VTE.isLiteral(store.getIV(new BNodeImpl("a12")).getTermId()));
             
         } finally {
             
@@ -327,9 +327,9 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
             assertFalse(VTE.isLiteral(store.getIV(RDF.TYPE).getTermId()));
 
-            assertFalse(VTE.isLiteral(store.getIV(new BNodeImpl(UUID.randomUUID().toString())).getTermId()));
+//            assertFalse(VTE.isLiteral(store.getIV(new BNodeImpl(UUID.randomUUID().toString())).getTermId()));
             
-            assertFalse(VTE.isLiteral(store.getIV(new BNodeImpl("a12")).getTermId()));
+//            assertFalse(VTE.isLiteral(store.getIV(new BNodeImpl("a12")).getTermId()));
 
         } finally {
 

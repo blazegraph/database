@@ -244,32 +244,6 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
 //    }
     
     /**
-     * Encodes a statement represented as three long integers as an unsigned
-     * byte[] sort key.
-     * <p>
-     * Note: while the conversion of long integers into the byte[] is
-     * non-trivial the value identifiers are mapped onto 8 bytes at a time and
-     * the contents of the array could be rearranged into alternative orders
-     * directly. For example, if you provide (s,p,o) then you could form the
-     * (p,o,s) key by copying 8 byte sections of the returned sort key around to
-     * generate the desired permutation.
-     * 
-     * @param id1
-     *            An RDF value identifier from the term index.
-     * @param id2
-     *            An RDF value identifier from the term index.
-     * @param id3
-     *            An RDF value identifier from the term index.
-     * 
-     * @return The sort key for the statement with those values.
-     */
-    public byte[] statement2Key(final IV id1, final IV id2, final IV id3) {
-
-        return keyOrder.encodeKey(getKeyBuilder(), id1, id2, id3);
-        
-    }
-
-    /**
      * Encodes the {@link StatementEnum} and the optional statement identifier.
      */
     public byte[] serializeVal(final SPO spo) {
