@@ -353,7 +353,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                              * @todo clone the bindingSet first?
                              */
 
-                            assert spo.p() == p;
+                            assert spo.p().equals(p) : "spo.p="+spo.p()+", p="+p;
 
                             if(joinNexus.bind(rule, 0, spo, bindingSet)) {
   
