@@ -789,9 +789,6 @@ public class RWStore implements IStore {
 					FileChannelUtility.readAll(m_reopener, bb, paddr);
 					int chk = ChecksumUtility.getCHK().checksum(buf, offset, length-4); // read checksum
 					int tstchk = bb.getInt(offset + length-4);
-					if (m_diskReads == 22000) {
-						System.out.println("Problem Read");
-					}
 					if (chk != tstchk) {
 						log.warn("Invalid data checksum for addr: " + paddr 
 								+ ", chk: " + chk + ", tstchk: " + tstchk + ", length: " + length
