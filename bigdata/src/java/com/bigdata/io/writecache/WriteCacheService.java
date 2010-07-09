@@ -215,6 +215,12 @@ abstract public class WriteCacheService implements IWriteCache {
 	final private ReentrantLock cleanListLock = new ReentrantLock();
 
 	/**
+	 * Lock for the {@link #cleanList} allows us to notice when it becomes empty
+	 * and not-empty.
+	 */
+	final private ReentrantLock recordMapLock = new ReentrantLock();
+
+	/**
 	 * Condition <code>!cleanList.isEmpty()</code>
 	 * <p>
 	 * Note: If you wake up from this condition you MUST also test {@link #halt}.
@@ -1281,7 +1287,12 @@ abstract public class WriteCacheService implements IWriteCache {
 				}
 				// Guaranteed available hence non-blocking.
 				final WriteCache nxt = cleanList.take();
-				nxt.resetWith(recordMap, fileExtent.get());
+				recordMapLock.lock();
+				try {
+					nxt.resetWith(recordMap, fileExtent.get());
+				} finally {
+					recordMapLock.unlock();
+				}
 				current.set(nxt);
 				return true;
 			} finally {
@@ -1431,13 +1442,6 @@ abstract public class WriteCacheService implements IWriteCache {
 					//	write data may still exist in an old WriteCache.
 					// A duplicate may also be indicative of an allocation
 					//	error, which we need to be pretty strict about!
-					// For the RWStore:
-					// Since writes can also be for allocators, there remains
-					//	the possibility that an old allocation write might
-					//	be retained after an extend.
-					// TODO: fix extendFile in the RWStore to ensure writes
-					//	to old allocator space is removed, OR add writeCache
-					//	method to allow adding to cache w/o recording address!
 					if (old == cache) {
 						throw new AssertionError("Record already in cache: offset=" + offset);
 					}
@@ -1561,7 +1565,12 @@ abstract public class WriteCacheService implements IWriteCache {
 
 						// Clear the state on the new buffer and remove from
 						// cacheService map
-						newBuffer.resetWith(recordMap, fileExtent.get());
+						recordMapLock.lock();
+						try {
+							newBuffer.resetWith(recordMap, fileExtent.get());
+						} finally {
+							recordMapLock.unlock();
+						}
 
 						// Set it as the new buffer.
 						current.set(cache = newBuffer);
@@ -1841,7 +1850,12 @@ abstract public class WriteCacheService implements IWriteCache {
 			final WriteCache newBuffer = cleanList.take();
 			
 			// Clear state on new buffer and remove from cacheService map
-			newBuffer.resetWith(recordMap, fileExtent.get());
+			recordMapLock.lock();
+			try {
+				newBuffer.resetWith(recordMap, fileExtent.get());
+			} finally {
+				recordMapLock.unlock();
+			}
 
 			// Set it as the new buffer.
 			current.set(newBuffer);
@@ -1919,7 +1933,10 @@ abstract public class WriteCacheService implements IWriteCache {
      *            the address to check
      */
 	public void clearWrite(final long offset) {
+		// guard recordmap removal - called from RWStore.free
+		recordMapLock.lock();
 		try {
+			
 			final WriteCache cache = recordMap.remove(offset);
 			if (cache == null)
 				return;
@@ -1931,6 +1948,8 @@ abstract public class WriteCacheService implements IWriteCache {
 			}
 		} catch (InterruptedException e) {
 			throw new RuntimeException(e);
+		} finally {
+			recordMapLock.unlock();
 		}
 	}
 
