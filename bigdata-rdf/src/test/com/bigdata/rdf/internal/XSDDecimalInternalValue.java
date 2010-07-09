@@ -48,7 +48,7 @@ public class XSDDecimalInternalValue<V extends BigdataLiteral> extends
 
     @Override
     public boolean booleanValue() {
-        return value.equals(BigInteger.ZERO) ? false : true;
+        return value.equals(BigDecimal.ZERO) ? false : true;
     }
 
     @Override
