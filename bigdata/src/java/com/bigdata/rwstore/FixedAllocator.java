@@ -127,17 +127,17 @@ public class FixedAllocator implements Allocator {
 
 	public byte[] write() {
 		try {
-			AllocBlock fb = (AllocBlock) m_allocBlocks.get(0);
+			final AllocBlock fb = (AllocBlock) m_allocBlocks.get(0);
 			if (log.isDebugEnabled())
 				log.debug("writing allocator " + m_index + " for " + getStartAddr() + " with " + fb.m_bits[0]);
-			byte[] buf = new byte[1024];
-			DataOutputStream str = new DataOutputStream(new FixedOutputStream(buf));
+			final byte[] buf = new byte[1024];
+			final DataOutputStream str = new DataOutputStream(new FixedOutputStream(buf));
 
 			str.writeInt(m_size);
 
-			Iterator iter = m_allocBlocks.iterator();
+			final Iterator iter = m_allocBlocks.iterator();
 			while (iter.hasNext()) {
-				AllocBlock block = (AllocBlock) iter.next();
+				final AllocBlock block = (AllocBlock) iter.next();
 
 				str.writeInt(block.m_addr);
 				for (int i = 0; i < m_bitSize; i++) {
@@ -151,7 +151,7 @@ public class FixedAllocator implements Allocator {
 				block.m_commit = (int[]) block.m_bits.clone();
 			}
 			// add checksum
-			int chk = ChecksumUtility.getCHK().checksum(buf, str.size());
+			final int chk = ChecksumUtility.getCHK().checksum(buf, str.size());
 			str.writeInt(chk);
 
 			if (!m_preserveSession) {
@@ -324,13 +324,13 @@ public class FixedAllocator implements Allocator {
 		return false;
 	}
 
-	public boolean free(int addr, int size) {
+	public boolean free(final int addr, final int size) {
 		if (addr < 0) {
-			int offset = ((-addr) & RWStore.OFFSET_BITS_MASK) - 3; // bit adjust
+			final int offset = ((-addr) & RWStore.OFFSET_BITS_MASK) - 3; // bit adjust
 
-			int nbits = 32 * m_bitSize;
+			final int nbits = 32 * m_bitSize;
 
-			int block = offset/nbits;
+			final int block = offset/nbits;
 			
 			if (((AllocBlock) m_allocBlocks.get(block))
 					.freeBit(offset % nbits, getPhysicalAddress(offset + 3))) { // bit adjust
@@ -344,9 +344,9 @@ public class FixedAllocator implements Allocator {
 			return true;
 		} else if (addr >= m_startAddr && addr < m_endAddr) {
 
-			Iterator iter = m_allocBlocks.iterator();
+			final Iterator iter = m_allocBlocks.iterator();
 			while (iter.hasNext()) {
-				AllocBlock block = (AllocBlock) iter.next();
+				final AllocBlock block = (AllocBlock) iter.next();
 				if (block.free(addr, m_size)) {
 					m_freeTransients++;
 

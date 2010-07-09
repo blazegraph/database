@@ -215,12 +215,6 @@ abstract public class WriteCacheService implements IWriteCache {
 	final private ReentrantLock cleanListLock = new ReentrantLock();
 
 	/**
-	 * Lock for the {@link #cleanList} allows us to notice when it becomes empty
-	 * and not-empty.
-	 */
-	final private ReentrantLock recordMapLock = new ReentrantLock();
-
-	/**
 	 * Condition <code>!cleanList.isEmpty()</code>
 	 * <p>
 	 * Note: If you wake up from this condition you MUST also test {@link #halt}.
@@ -1287,12 +1281,7 @@ abstract public class WriteCacheService implements IWriteCache {
 				}
 				// Guaranteed available hence non-blocking.
 				final WriteCache nxt = cleanList.take();
-				recordMapLock.lock();
-				try {
-					nxt.resetWith(recordMap, fileExtent.get());
-				} finally {
-					recordMapLock.unlock();
-				}
+				nxt.resetWith(recordMap, fileExtent.get());
 				current.set(nxt);
 				return true;
 			} finally {
@@ -1565,12 +1554,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
 						// Clear the state on the new buffer and remove from
 						// cacheService map
-						recordMapLock.lock();
-						try {
-							newBuffer.resetWith(recordMap, fileExtent.get());
-						} finally {
-							recordMapLock.unlock();
-						}
+						newBuffer.resetWith(recordMap, fileExtent.get());
 
 						// Set it as the new buffer.
 						current.set(cache = newBuffer);
@@ -1850,12 +1834,7 @@ abstract public class WriteCacheService implements IWriteCache {
 			final WriteCache newBuffer = cleanList.take();
 			
 			// Clear state on new buffer and remove from cacheService map
-			recordMapLock.lock();
-			try {
-				newBuffer.resetWith(recordMap, fileExtent.get());
-			} finally {
-				recordMapLock.unlock();
-			}
+			newBuffer.resetWith(recordMap, fileExtent.get());
 
 			// Set it as the new buffer.
 			current.set(newBuffer);
@@ -1933,10 +1912,7 @@ abstract public class WriteCacheService implements IWriteCache {
      *            the address to check
      */
 	public void clearWrite(final long offset) {
-		// guard recordmap removal - called from RWStore.free
-		recordMapLock.lock();
 		try {
-			
 			final WriteCache cache = recordMap.remove(offset);
 			if (cache == null)
 				return;
@@ -1948,8 +1924,6 @@ abstract public class WriteCacheService implements IWriteCache {
 			}
 		} catch (InterruptedException e) {
 			throw new RuntimeException(e);
-		} finally {
-			recordMapLock.unlock();
 		}
 	}
 

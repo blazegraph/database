@@ -26,15 +26,51 @@ package com.bigdata.rwstore;
 
 import java.util.ArrayList;
 
-public class AllocBlock {
-  int m_addr;
-  int m_ints;
-  int m_commit[];
-  int m_bits[];
-  int m_transients[];
-  RWWriteCacheService m_writeCache;
+import com.bigdata.io.writecache.WriteCacheService;
 
-  AllocBlock(int addr, int bitSize, RWWriteCacheService cache) {
+/**
+ * Bit maps for an allocator. The allocator is a bit map managed as int[]s.
+ * 
+ * @todo change to make {@link #m_transients}, {@link #m_bits}, and
+ *       {@link #m_commit} final fields and then modify {@link FixedAllocator}
+ *       to use {@link System#arraycopy(Object, int, Object, int, int)} to copy
+ *       the data rather than cloning it.
+ * 
+ * @todo change to use long[]s.
+ */
+public class AllocBlock {
+	/**
+	 * The address of the {@link AllocBlock}.
+	 */
+	int m_addr;
+	/**
+	 * The dimension of the arrays, which is the #of allocation slots divided by
+	 * 32 (sizeof(int)).
+	 */
+	private final int m_ints;
+	/**
+	 * The bits that were allocated in the previous commit. They can be freed in
+	 * the current native transaction but they can not be reallocated until the
+	 * next native transaction.
+	 */
+	int m_commit[];
+	/**
+	 * Just the newly allocated bits. This will be copied onto {@link #m_commit}
+	 * when the current native transaction commits.
+	 */
+	int m_bits[];
+	/**
+	 * All of the bits from the commit point on entry to the current native
+	 * transaction plus any newly allocated bits.
+	 */
+	int m_transients[];
+	/**
+	 * Used to clear an address on the {@link WriteCacheService} if it has been
+	 * freed.
+	 */
+	private final RWWriteCacheService m_writeCache;
+
+  AllocBlock(final int addrIsUnused, final int bitSize, final RWWriteCacheService cache) {
   	m_writeCache = cache;
     m_ints = bitSize;
     m_commit = new int[bitSize];
@@ -42,22 +78,22 @@ public class AllocBlock {
     m_transients = new int[bitSize];
   }
 
-  public boolean verify(int addr, int size) {
+  public boolean verify(final int addr, final int size) {
     if (addr < m_addr || addr >= (m_addr + (size * 32 * m_ints))) {
       return false;
     }
 
 		// Now check to see if it allocated
-    int bit = (addr - m_addr) / size;
+    final int bit = (addr - m_addr) / size;
 
     return RWStore.tstBit(m_bits, bit);
   }
 
-  public boolean addressInRange(int addr, int size) {
+  public boolean addressInRange(final int addr, final int size) {
     return (addr >= m_addr && addr <= (m_addr + (size * 32 * m_ints)));
   }
   	
-  public boolean free(int addr, int size) {
+  public boolean free(final int addr, final int size) {
     if (addr < m_addr || addr >= (m_addr + (size * 32 * m_ints))) {
       return false;
     }
@@ -67,8 +103,8 @@ public class AllocBlock {
     return true;
   }
 
-  public boolean freeBit(int bit, long addr) {
-    // Allocation optimisation - if bit NOT set in committed memory then clear
+  public boolean freeBit(final int bit, final long addr) {
+    // Allocation optimization - if bit NOT set in committed memory then clear
     //  the transient bit to permit reallocation within this transaction.
     //
     // Note that with buffered IO there is also an opportunity to avoid output to
@@ -87,12 +123,12 @@ public class AllocBlock {
     }
   }
 
-  public int alloc(int size) {
+  public int alloc(final int size) {
     if (size < 0) {
       throw new Error("Storage allocation error : negative size passed");
     }
 
-    int bit = RWStore.fndBit(m_transients, m_ints);
+    final int bit = RWStore.fndBit(m_transients, m_ints);
 
     if (bit != -1) {
       RWStore.setBit(m_bits, bit);
@@ -127,14 +163,14 @@ public class AllocBlock {
 	}
 
   public String getStats() {
-    int total = m_ints * 32;
-    int allocBits = getAllocBits();
+    final int total = m_ints * 32;
+    final int allocBits = getAllocBits();
 
     return "Addr : " + m_addr + " [" + allocBits + "::" + total + "]";
   }
 
-  public void addAddresses(ArrayList addrs, int rootAddr) {
-    int total = m_ints * 32;
+  public void addAddresses(final ArrayList addrs, final int rootAddr) {
+    final int total = m_ints * 32;
     
     for (int i = 0; i < total; i++) {
       if (RWStore.tstBit(m_bits, i)) {
