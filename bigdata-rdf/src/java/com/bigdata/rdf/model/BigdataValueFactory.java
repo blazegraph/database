@@ -55,10 +55,10 @@ public interface BigdataValueFactory extends ValueFactory {
      * Returns a factory that will assign its blank node IDs within a globally
      * unique namespace. This factory should be used when processing a document
      * as the generated IDs are clustered and make the ordered writes on the
-     * lexicon more efficent since all blank nodes for the same document tend to
+     * lexicon more efficient since all blank nodes for the same document tend to
      * be directed to the same index partition. All {@link BigdataValue}s are
      * actually created by <i>this</i> factory, it is only the semantics of
-     * blank node ID generation that are overriden.
+     * blank node ID generation that are overridden.
      * 
      * @see BNodeContextFactory
      */

@@ -114,9 +114,17 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
 
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * {@link TermId}s are never inline so this method always throws an
+     * exception.
+     * 
+     * @throws UnsupportedOperationException
+     *             always since {@link TermId}s are never inline.
+     */
     final public V asValue(BigdataValueFactory f)
             throws UnsupportedOperationException {
-        // TODO asValue()
         throw new UnsupportedOperationException();
     }
 
