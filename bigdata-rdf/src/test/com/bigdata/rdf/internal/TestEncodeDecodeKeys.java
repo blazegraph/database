@@ -36,7 +36,6 @@ import junit.framework.TestCase2;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
@@ -369,8 +368,6 @@ public class TestEncodeDecodeKeys extends TestCase2 {
      *            The key.
      * 
      * @return An ordered array of the {@link IV}s for that key.
-     * 
-     * FIXME Modify to use {@link IVUtil#decode(byte[], int)}
      */
     public IV<?, ?>[] decodeStatementKey(final byte[] key) {
         
