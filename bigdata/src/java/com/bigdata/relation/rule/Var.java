@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import com.bigdata.cache.ConcurrentWeakValueCache;
+
 /**
  * A variable.
  * <p>
@@ -114,8 +116,16 @@ final public class Var<E> implements IVariable<E>, Comparable<IVariable<E>>
 
     /**
      * Canonicalizing map for {@link Var}s.
+     * 
+     * @todo This should be a hash map with weak values so we can clear out
+     *       variables which are no longer strongly referenced.
+     * 
+     * @see ConcurrentWeakValueCache
      */
-    static private final Map<String, Var> vars = new HashMap<String, Var>();
+//    static private final Map<String, Var> vars = new HashMap<String, Var>();
+    static private final ConcurrentWeakValueCache<String, Var> vars = new ConcurrentWeakValueCache<String, Var>(
+            0// queue capacity (no hard reference queue).
+            );
 
     /**
      * Generate an anonymous random variable.
@@ -152,15 +162,24 @@ final public class Var<E> implements IVariable<E>, Comparable<IVariable<E>>
 
         if (var == null) {
 
-            synchronized (vars) {
-
-                // Only one thread gets to create the variable for that name.
-
-                var = new Var(name);
-
-                vars.put(name, var);
-
+            final Var tmp = vars.putIfAbsent(name, var = new Var(name));
+             
+            if(tmp != null) {
+                
+                // race condition - someone else inserted first.
+                var = tmp;
+                
             }
+            
+//            synchronized (vars) {
+//
+//                // Only one thread gets to create the variable for that name.
+//
+//                var = new Var(name);
+//
+//                vars.put(name, var);
+//
+//            }
 
         }
 
