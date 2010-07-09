@@ -370,7 +370,7 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
             
         }
 
-        final byte[] key = tupleSer.statement2Key(s, p, o);
+        final byte[] key = tupleSer.serializeKey(new SPO(s, p, o));
         
         if(btree.contains(key)) {
             

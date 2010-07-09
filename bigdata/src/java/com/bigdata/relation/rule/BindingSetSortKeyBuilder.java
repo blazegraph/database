@@ -30,6 +30,7 @@ package com.bigdata.relation.rule;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.ISortKeyBuilder;
+import com.bigdata.rdf.internal.IV;
 
 /**
  * Builds unsigned byte[] sort keys from {@link IBindingSet}s.
@@ -80,8 +81,27 @@ public class BindingSetSortKeyBuilder implements ISortKeyBuilder<IBindingSet> {
             }else if(val instanceof Constant) {
                 val=((Constant)val).get();
             }
-            keyBuilder.append( val );
 
+            if (val instanceof IV) {
+            
+                final IV iv = (IV) val;
+            
+                /*
+                 * FIXME This is the implementation for backwards
+                 * compatibility.  We should not see inline values here.
+                 */
+                if (iv.isInline()) {
+                    throw new IllegalArgumentException();
+                }
+    
+                keyBuilder.append(iv.getTermId());
+
+            } else {
+                
+                keyBuilder.append(val);
+                
+            }
+            
         }
 
         return keyBuilder.getKey();

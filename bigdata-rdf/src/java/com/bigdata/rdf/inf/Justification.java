@@ -36,6 +36,8 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.raba.codec.EmptyRabaValueCoder;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtil;
+import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ISPO;
@@ -439,15 +441,23 @@ public class Justification implements Comparable<Justification> {
 
         for (int i = 0; i < ivs.length; i++) {
 
-            /*
-             * This is the implementation for backwards
-             * compatibility.  We should not see inline values here.
-             */
-            if (ivs[i].isInline()) {
-                throw new RuntimeException();
-            }
+            if (ivs[i] != null) {
             
-            keyBuilder.append(ivs[i]);
+                /*
+                 * This is the implementation for backwards
+                 * compatibility.  We should not see inline values here.
+                 */
+                if (ivs[i].isInline()) {
+                    throw new RuntimeException();
+                }
+                
+                keyBuilder.append(ivs[i].getTermId());
+                
+            } else {
+                
+                keyBuilder.append(TermId.NULL);
+                
+            }
 
         }
 
@@ -501,7 +511,7 @@ public class Justification implements Comparable<Justification> {
              * difference between two longs.
              */
 
-            int ret = ivs[i].compareTo(o.ivs[i]);
+            int ret = IVUtil.compareTo(ivs[i], o.ivs[i]);
 
             if (ret != 0)
                 return ret;

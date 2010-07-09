@@ -29,10 +29,25 @@ public class SPOSortKeyBuilder implements ISortKeyBuilder<ISPO> {
      */
     public byte[] getSortKey(final ISPO spo) {
 
-        keyBuilder.reset().append(spo.s()).append(spo.p()).append(spo.o());
+        /*
+         * FIXME This is the implementation for backwards
+         * compatibility.  We should not see inline values here.
+         */
+        if (spo.s().isInline() || spo.p().isInline() || spo.o().isInline()) {
+            throw new IllegalArgumentException();
+        }
+        
+        keyBuilder.reset().append(spo.s().getTermId())
+                .append(spo.p().getTermId()).append(spo.o().getTermId());
 
-        if (arity == 4)
-            keyBuilder.append(spo.c());
+        if (arity == 4) {
+
+            if (spo.c().isInline())
+                throw new IllegalArgumentException();
+            
+            keyBuilder.append(spo.c().getTermId());
+            
+        }
 
         return keyBuilder.getKey();
 

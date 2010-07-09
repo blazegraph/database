@@ -146,7 +146,13 @@ public enum VTE implements ITermIdCodes {
         if (isStatement(l))
             return STATEMENT;
         
-        throw new AssertionError();
+        /*
+         * FIXME Bryan, we need to talk about this one
+         */
+        if (l == TermId.NULL)
+            return URI;
+        
+        throw new AssertionError(String.valueOf(l));
     }
 
     /**

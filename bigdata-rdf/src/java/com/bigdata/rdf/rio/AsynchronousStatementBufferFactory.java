@@ -3064,7 +3064,15 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                         }
 
-                        final byte[] key = tmp.reset().append(v.getIV())
+                        /*
+                         * FIXME This is the implementation for backwards
+                         * compatibility.  We should not see inline values here.
+                         */
+                        if (v.getIV().isInline()) {
+                            throw new IllegalArgumentException();
+                        }
+                        
+                        final byte[] key = tmp.reset().append(v.getIV().getTermId())
                                 .getKey();
 
                         // Serialize the term.

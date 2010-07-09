@@ -365,6 +365,10 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
 
     }
 
+    /**
+     * FIXME I don't think this method is working right, at least for the
+     * TermId class.  See {@link TermId#toString()}.
+     */
     final public DTE getInternalDataTypeEnum() {
 
         return DTE.valueOf((byte) ((flags & DTE_MASK) & 0xff));
@@ -498,6 +502,9 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
         if (this == o)
             return 0;
 
+        if (o == null)
+            return 1;
+        
         /*
          * First order based on the flags byte. This is the first byte of the
          * key, so it always partitions the key space and hence provides the

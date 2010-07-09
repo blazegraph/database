@@ -1846,7 +1846,7 @@ abstract public class AbstractTripleStore extends
      */
     final public BigdataValue getTerm(final IV iv) {
 
-        return iv.asValue(getValueFactory());
+        return getLexiconRelation().getTerm(iv);
 
     }
 

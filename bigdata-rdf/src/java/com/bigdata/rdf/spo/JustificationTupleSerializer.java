@@ -135,7 +135,9 @@ public class JustificationTupleSerializer extends
         
         for (int i = 0; i < m; i++) {
 
-            ivs[i] = new TermId(KeyBuilder.decodeLong(data, i * Bytes.SIZEOF_LONG));
+            final long l = KeyBuilder.decodeLong(data, i * Bytes.SIZEOF_LONG);
+            
+            ivs[i] = new TermId(l);
             
         }
 

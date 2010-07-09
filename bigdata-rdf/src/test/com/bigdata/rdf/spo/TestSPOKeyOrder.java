@@ -189,11 +189,11 @@ public class TestSPOKeyOrder extends TestCase2 {
 
         final SPOKeyOrder keyOrder = SPOKeyOrder.POCS;
 
-        final byte[] fromKey = keyBuilder.reset().append(P).append(
+        final byte[] fromKey = keyBuilder.reset().append(P.getTermId()).append(
                 Long.MIN_VALUE).append(Long.MIN_VALUE).append(Long.MIN_VALUE)
                 .getKey();
 
-        final byte[] toKey = keyBuilder.reset().append(tid(2)).append(
+        final byte[] toKey = keyBuilder.reset().append(P.getTermId()+1).append(
                 Long.MIN_VALUE).append(Long.MIN_VALUE).append(Long.MIN_VALUE)
                 .getKey();
 
@@ -232,10 +232,10 @@ public class TestSPOKeyOrder extends TestCase2 {
 
         final SPOKeyOrder keyOrder = SPOKeyOrder.POS;
 
-        final byte[] fromKey = keyBuilder.reset().append(P).append(
+        final byte[] fromKey = keyBuilder.reset().append(P.getTermId()).append(
                 Long.MIN_VALUE).append(Long.MIN_VALUE).getKey();
 
-        final byte[] toKey = keyBuilder.reset().append(tid(2)).append(
+        final byte[] toKey = keyBuilder.reset().append(P.getTermId()+1).append(
                 Long.MIN_VALUE).append(Long.MIN_VALUE).getKey();
 
         if (log.isInfoEnabled()) {

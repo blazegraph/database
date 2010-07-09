@@ -1219,9 +1219,18 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                     throw new IllegalArgumentException("Not fully bound: "
                             + spo.toString(/*this*/));
 
+                /*
+                 * This is the implementation for backwards
+                 * compatibility.  We should not see inline values here.
+                 */
+                if (spo.s().isInline() || spo.p().isInline() || spo.o().isInline()) {
+                    throw new RuntimeException();
+                }
+                
                 keys[nexplicit] = keyBuilder.reset() //
                         .append(ITermIndexCodes.TERM_CODE_STMT)//
-                        .append(spo.s()).append(spo.p()).append(spo.o())//
+                        .append(spo.s().getTermId()).append(spo.p().getTermId())
+                        .append(spo.o().getTermId())//
                         .getKey()//
                 ;
 
@@ -2118,6 +2127,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
         }
 
+        /*
+         * This is the implementation for backwards
+         * compatibility.  We should not return inline values here.
+         */
+        if (false)
         if (value instanceof Literal) {
             
             Literal l = (Literal) value;
@@ -2170,7 +2184,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
             }
             
         }
-        
+
         return getTermId(value);
         
     }
@@ -2195,7 +2209,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
         if (tmp == null) {
 
-            return null;
+            return new TermId(TermId.NULL);
 
         }
 

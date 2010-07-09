@@ -50,5 +50,23 @@ public class IVUtil {
         
     }
     
+    public static int compareTo(IV iv1, IV iv2) {
+        
+        // same IV or both null
+        if (iv1 == iv2)
+            return 0;
+        
+        // one of them is null
+        if (iv1 == null)
+            return -1;
+        
+        if (iv2 == null)
+            return 1;
+        
+        // only possibility left if that neither are null
+        return iv1.compareTo(iv2);
+        
+    }
+    
     
 }
