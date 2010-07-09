@@ -20,7 +20,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * 
  * @see AbstractTripleStore.Options
  */
-public class AbstractBNodeInternalValue<V extends BigdataBNode> extends
+public class BNodeInternalValue<V extends BigdataBNode> extends
         AbstractInlineInternalValue<V, UUID> {
 
     /**
@@ -30,7 +30,7 @@ public class AbstractBNodeInternalValue<V extends BigdataBNode> extends
     
     private final UUID id;
     
-    public AbstractBNodeInternalValue(final UUID id) {
+    public BNodeInternalValue(final UUID id) {
 
         super(VTE.BNODE, DTE.UUID);
 
@@ -63,8 +63,8 @@ public class AbstractBNodeInternalValue<V extends BigdataBNode> extends
     public boolean equals(Object o) {
         if (this == o)
             return true;
-        if (o instanceof AbstractBNodeInternalValue<?>) {
-            return this.id.equals(((AbstractBNodeInternalValue<?>) o).id);
+        if (o instanceof BNodeInternalValue<?>) {
+            return this.id.equals(((BNodeInternalValue<?>) o).id);
         }
         return false;
     }
