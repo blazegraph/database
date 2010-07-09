@@ -163,6 +163,15 @@ import com.bigdata.util.ChecksumUtility;
 public class RWStore implements IStore {
 	protected static final Logger log = Logger.getLogger(RWStore.class);
 
+	/**
+	 * The sizes of the slots managed by a {@link FixedAllocator} are 64 times
+	 * the values in this array.
+	 * 
+	 * @todo good to have 4k and 8k boundaries for better efficiency on SSD.
+	 * 
+	 * @todo This array should be configurable and must be written into the
+	 *       store so changing values does not break older stores.
+	 */
 	static final int[] ALLOC_SIZES = { 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181 };
 	// static final int[] ALLOC_SIZES = { 1, 2, 4, 8, 16, 32, 64, 128 };
 
@@ -170,6 +179,14 @@ public class RWStore implements IStore {
 	
 	static final int MAX_FIXED_ALLOC = 64 * 4181;
 	static final int MIN_FIXED_ALLOC = 64;
+	/**
+	 * The fixed size of any allocator on the disk in bytes. The #of allocations
+	 * managed by an allocator is this value times 8 because each slot uses one
+	 * bit in the allocator. When an allocator is allocated, the space on the
+	 * persistent heap is reserved for all slots managed by that allocator.
+	 * However, the {@link FixedAllocator} only incrementally allocates the
+	 * {@link AllocBlock}s.
+	 */
 	static final int ALLOC_BLOCK_SIZE = 1024;
 	
 	// from 32 bits, need 13 to hold max offset of 8 * 1024, leaving 19 for number of blocks: 256K
@@ -1362,13 +1379,20 @@ public class RWStore implements IStore {
 
 	volatile private boolean m_recentAlloc = false;
 
-	protected int allocBlock(int size) {
+	/**
+	 * Return the address of a contiguous region on the persistent heap.
+	 * 
+	 * @param size
+	 *            The size of that region (this is not bytes, but something a
+	 *            bit more complicated).
+	 */
+	protected int allocBlock(final int size) {
 		// minimum 1
 		if (size <= 0) {
 			throw new Error("allocBlock called with zero size request");
 		}
 
-		int allocAddr = m_nextAllocation;
+		final int allocAddr = m_nextAllocation;
 		m_nextAllocation -= size;
 
 		while (convertAddr(m_nextAllocation) >= convertAddr(m_fileSize)) {
@@ -1383,9 +1407,9 @@ public class RWStore implements IStore {
 		return allocAddr;
 	}
 
-	void checkCoreAllocations() {
-		long lfileSize = convertAddr(m_fileSize);
-		long lnextAlloc = convertAddr(m_nextAllocation);
+	private void checkCoreAllocations() {
+		final long lfileSize = convertAddr(m_fileSize);
+		final long lnextAlloc = convertAddr(m_nextAllocation);
 
 		if (lnextAlloc >= lfileSize) {
 			throw new IllegalStateException("Core Allocation Error - file size: " 
@@ -1396,7 +1420,7 @@ public class RWStore implements IStore {
 	/**
 	 * meta allocation/free
 	 * 
-	 * Allocates persistant store for allocation blocks.
+	 * Allocates persistent store for allocation blocks.
 	 * 
 	 * grows data from the top to the file, e.g. bit 0 is 1024 from end-of-file.
 	 * 

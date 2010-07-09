@@ -221,50 +221,68 @@ public class FixedAllocator implements Allocator {
 
 	}
 
-	int m_size;
+	/**The size of the allocation slots in bytes.*/
+	private final int m_size;
 
 	int m_startAddr = 0;
 	int m_endAddr = 0;
 
-	int m_bitSize;
+	/**
+	 * The #of ints in the {@link AllocBlock}'s internal arrays.
+	 */
+	private final int m_bitSize;
 
-	ArrayList m_allocBlocks;
+	private final ArrayList<AllocBlock> m_allocBlocks;
 
 	/**
 	 * Calculating the number of ints (m_bitSize) cannot rely on a power of 2.  Previously this
 	 * assumption was sufficient to guarantee a rounding on to an 64k boundary.  However, now
 	 * nints * 32 * 64 = 64K, so need multiple of 32 ints
-	 * 
+	 * <p>
 	 * So, whatever multiple of 64, if we allocate a multiple of 32 ints we are guaranteed to be 
 	 * on an 64K boundary.
-	 * 
+	 * <p>
 	 * This does mean that for the largest blocks of ~256K, we are allocating 256Mb of space
 	 * 
-	 * @param size
+	 * @param size The size of the allocation slots in bytes.
 	 * @param preserveSessionData
 	 * @param cache
 	 */
-	FixedAllocator(int size, boolean preserveSessionData, RWWriteCacheService cache) {
+	FixedAllocator(final int size, final boolean preserveSessionData, final RWWriteCacheService cache) {
 		m_diskAddr = 0;
 
 		m_size = size;
 
-		m_bitSize = 32;
-		
-		/**
+		/*
 		 * For smaller allocations we'll allocate a larger span, this is needed
 		 * to ensure the minimum allocation is large enough to guarantee 
 		 * a unique address for a BlobAllocator.
 		 */
-		if (m_size < 256) 
+		if (m_size < 256) {
+			/*
+			 * Note: 64 ints is 256 bytes is 2048 bits, so 2048 allocation
+			 * slots.
+			 */ 
 			m_bitSize = 64;
+		} else {
+			/*
+			 * Note: 32 ints is 128 bytes is 1024 bits, so 1024 allocation
+			 * slots.
+			 */ 
+			m_bitSize = 32;
+		}
 
 		m_writeCache = cache;
 
 		// number of blocks in this allocator, bitSize plus 1 for start address
-		int numBlocks = 255 / (m_bitSize + 1);
+		final int numBlocks = 255 / (m_bitSize + 1);
 
-		m_allocBlocks = new ArrayList(numBlocks);
+		/*
+		 * Create AllocBlocks for this FixedAllocator, but do not allocate
+		 * either the AllocBlocks or their managed allocation slots on the
+		 * persistent heap yet.
+		 */
+		m_allocBlocks = new ArrayList<AllocBlock>(numBlocks);
 		for (int i = 0; i < numBlocks; i++) {
 			m_allocBlocks.add(new AllocBlock(0, m_bitSize, m_writeCache));
 		}
@@ -281,9 +299,9 @@ public class FixedAllocator implements Allocator {
                 + " start : " + getStartAddr() + " free : " + m_freeBits
                 + "\r\n");
 
-		Iterator iter = m_allocBlocks.iterator();
+		final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
 		while (iter.hasNext()) {
-			AllocBlock block = (AllocBlock) iter.next();
+			final AllocBlock block = iter.next();
 			if (block.m_addr == 0) {
 				break;
 			}
@@ -297,9 +315,9 @@ public class FixedAllocator implements Allocator {
 	public boolean verify(int addr) {
 		if (addr >= m_startAddr && addr < m_endAddr) {
 
-			Iterator iter = m_allocBlocks.iterator();
+			final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
 			while (iter.hasNext()) {
-				AllocBlock block = (AllocBlock) iter.next();
+				final AllocBlock block = iter.next();
 				if (block.verify(addr, m_size)) {
 					return true;
 				}
@@ -312,9 +330,9 @@ public class FixedAllocator implements Allocator {
 	public boolean addressInRange(int addr) {
 		if (addr >= m_startAddr && addr < m_endAddr) {
 
-			Iterator iter = m_allocBlocks.iterator();
+			final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
 			while (iter.hasNext()) {
-				AllocBlock block = (AllocBlock) iter.next();
+				final AllocBlock block = iter.next();
 				if (block.addressInRange(addr, m_size)) {
 					return true;
 				}
@@ -358,15 +376,15 @@ public class FixedAllocator implements Allocator {
 		return false;
 	}
 
-	public int alloc(RWStore store, int size) {
+	public int alloc(final RWStore store, final int size) {
 		int addr = -1;
 
-		Iterator iter = m_allocBlocks.iterator();
+		final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
 		int count = -1;
 		while (addr == -1 && iter.hasNext()) {
 			count++;
 
-			AllocBlock block = (AllocBlock) iter.next();
+			final AllocBlock block = iter.next();
 			if (block.m_addr == 0) {
 				int blockSize = 32 * m_bitSize * m_size;
 				blockSize >>= RWStore.ALLOCATION_SCALEUP;
@@ -384,7 +402,7 @@ public class FixedAllocator implements Allocator {
 		}
 
 		if (addr != -1) {
-	    	addr += 3; // tweek to ensure non-zero address for offset 0
+	    	addr += 3; // Tweak to ensure non-zero address for offset 0
 
 	    	if (--m_freeBits == 0) {
 	    		if (log.isTraceEnabled())
@@ -394,7 +412,7 @@ public class FixedAllocator implements Allocator {
 
 			addr += (count * 32 * m_bitSize);
 
-			int value = -((m_index << RWStore.OFFSET_BITS) + addr);
+			final int value = -((m_index << RWStore.OFFSET_BITS) + addr);
 
 			return value;
 		} else {
