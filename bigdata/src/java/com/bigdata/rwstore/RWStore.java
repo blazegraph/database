@@ -168,10 +168,15 @@ public class RWStore implements IStore {
 	 * the values in this array.
 	 * 
 	 * @todo good to have 4k and 8k boundaries for better efficiency on SSD.
+	 * 		 NB A 1K boundry is % 16, so 4K % 64
+	 *       - can still use fibonacci base, but from 4K start
 	 * 
 	 * @todo This array should be configurable and must be written into the
 	 *       store so changing values does not break older stores.
+	 *       com.bigdata.rwstore.RWStore.allocSizes=1,2,3,5... 
+	 *       
 	 */
+	// static final int[] ALLOC_SIZES = { 1, 2, 3, 5, 8, 12, 16, 32, 48, 64, 128, 192, 320, 512, 832, 1344, 2176, 3520 };
 	static final int[] ALLOC_SIZES = { 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181 };
 	// static final int[] ALLOC_SIZES = { 1, 2, 4, 8, 16, 32, 64, 128 };
 
@@ -363,7 +368,14 @@ public class RWStore implements IStore {
 
 	volatile private int m_metaBitsAddr;
 
-	// Constructor
+	/**
+	 * The ALLOC_SIZES must be initialised from either the file
+	 * or the properties associaed with the fileMetadataView
+	 * 
+	 * @param fileMetadataView
+	 * @param readOnly
+	 * @param quorum
+	 */
 
 	public RWStore(final FileMetadataView fileMetadataView, final boolean readOnly,
 	        final Quorum<?,?> quorum) {
@@ -593,7 +605,7 @@ public class RWStore implements IStore {
 		 */
 		for (int b = 0; b < m_metaBits.length; b += 9) {
 			long blockStart = convertAddr(m_metaBits[b]);
-			int startBit = (b * 9 * 32) + 32;
+			int startBit = (b * 32) + 32;
 			int endBit = startBit + (8*32);
 			for (int i = startBit; i < endBit; i++) {
 				if (tstBit(m_metaBits, i)) {
