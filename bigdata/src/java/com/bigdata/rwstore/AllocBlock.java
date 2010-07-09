@@ -40,7 +40,10 @@ import com.bigdata.io.writecache.WriteCacheService;
  */
 public class AllocBlock {
 	/**
-	 * The address of the {@link AllocBlock}.
+	 * The address of the {@link AllocBlock} -or- ZERO (0) if {@link AllocBlock}
+	 * has not yet been allocated on the persistent heap. Note that the space
+	 * for the allocation slots managed by an {@link AllocBlock} is not reserved
+	 * until the {@link AllocBlock} is allocated on the persistent heap.
 	 */
 	int m_addr;
 	/**
