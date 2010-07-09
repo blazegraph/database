@@ -27,9 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import java.util.UUID;
+
 import org.deri.iris.basics.Literal;
 import org.openrdf.model.Value;
 
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -571,4 +574,82 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
 
     }
 
+    /**
+     * {@inheritDoc}
+     * 
+     * FIXME Handle extension types, probably in a subclass, and maybe requiring
+     * the caller to pass in an object with the context for the extension types.
+     */
+    public void encode(final IKeyBuilder keyBuilder) {
+
+        // First emit the flags byte.
+        keyBuilder.append(flags);
+
+        if (!isInline()) {
+            /*
+             * Since the RDF Value is not inline, it will be represented as a
+             * term identifier.
+             */
+            keyBuilder.append(getTermId());
+            return;
+        }
+        
+        /*
+         * Append the natural value type representation.
+         * 
+         * Note: We have to handle the unsigned byte, short, int and long values
+         * specially to get the correct total key order.
+         */
+        final DTE dte = getInternalDataTypeEnum();
+        
+        final AbstractDatatypeLiteralInternalValue<?, ?> t = (AbstractDatatypeLiteralInternalValue<?, ?>) this;
+        
+        switch (dte) {
+        case XSDBoolean:
+            keyBuilder.append((byte) (t.booleanValue() ? 1 : 0));
+            break;
+        case XSDByte:
+            keyBuilder.append(t.byteValue());
+            break;
+        case XSDShort:
+            keyBuilder.append(t.shortValue());
+            break;
+        case XSDInt:
+            keyBuilder.append(t.intValue());
+            break;
+        case XSDLong:
+            keyBuilder.append(t.longValue());
+            break;
+        case XSDFloat:
+            keyBuilder.append(t.floatValue());
+            break;
+        case XSDDouble:
+            keyBuilder.append(t.doubleValue());
+            break;
+        case XSDInteger:
+            keyBuilder.append(t.integerValue());
+            break;
+        case XSDDecimal:
+            keyBuilder.append(t.decimalValue());
+            break;
+        case UUID:
+            keyBuilder.append((UUID)t.getInlineValue());
+            break;
+//        case XSDUnsignedByte:
+//            keyBuilder.appendUnsigned(t.byteValue());
+//            break;
+//        case XSDUnsignedShort:
+//            keyBuilder.appendUnsigned(t.shortValue());
+//            break;
+//        case XSDUnsignedInt:
+//            keyBuilder.appendUnsigned(t.intValue());
+//            break;
+//        case XSDUnsignedLong:
+//            keyBuilder.appendUnsigned(t.longValue());
+//            break;
+        default:
+            throw new AssertionError(toString());
+        }
+    }
+    
 }

@@ -10,7 +10,13 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 public class XSDIntegerInternalValue<V extends BigdataLiteral> extends
         AbstractDatatypeLiteralInternalValue<V, BigInteger> {
     
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+    
     private final BigInteger value;
+    private transient int byteLength;
 
     public XSDIntegerInternalValue(final BigInteger value) {
         
@@ -89,8 +95,8 @@ public class XSDIntegerInternalValue<V extends BigdataLiteral> extends
     public boolean equals(final Object o) {
         if (this == o)
             return true;
-        if (o instanceof XSDIntegerInternalValue) {
-            return this.value.equals(((XSDIntegerInternalValue) o).value);
+        if (o instanceof XSDIntegerInternalValue<?>) {
+            return this.value.equals(((XSDIntegerInternalValue<?>) o).value);
         }
         return false;
     }
@@ -102,4 +108,19 @@ public class XSDIntegerInternalValue<V extends BigdataLiteral> extends
         return value.hashCode();
     }
 
+    public int byteLength() {
+
+        if (byteLength == 0) {
+
+            /*
+             * Cache the byteLength if not yet set.
+             */
+
+            byteLength = 1 /* prefix */+ 2/* runLength */+ (value.bitLength() / 8 + 1)/* data */;
+
+        }
+
+        return byteLength;
+
+    }
 }

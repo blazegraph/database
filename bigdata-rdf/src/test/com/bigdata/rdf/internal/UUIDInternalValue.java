@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.UUID;
 
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
@@ -13,6 +14,11 @@ import com.bigdata.rdf.model.BigdataValueFactory;
  */
 public class UUIDInternalValue<V extends BigdataLiteral> extends
         AbstractDatatypeLiteralInternalValue<V, UUID> {
+    
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
     
     private final UUID value;
 
@@ -88,9 +94,10 @@ public class UUIDInternalValue<V extends BigdataLiteral> extends
     }
 
     public boolean equals(final Object o) {
-        if(this==o) return true;
-        if(o instanceof UUIDInternalValue) {
-            return this.value.equals(((UUIDInternalValue) o).value);
+        if (this == o)
+            return true;
+        if (o instanceof UUIDInternalValue<?>) {
+            return this.value.equals(((UUIDInternalValue<?>) o).value);
         }
         return false;
     }
@@ -100,6 +107,10 @@ public class UUIDInternalValue<V extends BigdataLiteral> extends
      */
     public int hashCode() {
         return value.hashCode();
+    }
+
+    public int byteLength() {
+        return 1 + Bytes.SIZEOF_UUID;
     }
 
 }
