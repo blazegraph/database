@@ -149,6 +149,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
             // allow client requests to finish normally.
             new ShutdownHelper(threadPool, 10L/*logTimeout*/, TimeUnit.SECONDS) {
               
+                @Override
                 public void logTimeout() {
                     
                     log.warn("Awaiting thread pool termination: elapsed="
@@ -170,6 +171,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
             new ShutdownHelper(scheduledExecutorService, 10L/* logTimeout */,
                     TimeUnit.SECONDS) {
 
+                @Override
                 public void logTimeout() {
 
                     log.warn("Awaiting sample service termination: elapsed="
@@ -644,12 +646,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                 TimeUnit.MILLISECONDS // unit
                 );                
 
-        addScheduledTask(//
-                new StartDeferredTasksTask(),// task to run.
-                150, // initialDelay (ms)
-                2000, // delay
-                TimeUnit.MILLISECONDS // unit
-                );
+        getExecutorService().execute(new StartDeferredTasksTask());
         
         // Setup locator.
         resourceLocator = new DefaultResourceLocator(this,
@@ -880,12 +877,12 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      */
     public boolean isServiceReady() {
 
-        final AbstractClient<T> client = this.client;
+        final AbstractClient<T> thisClient = this.client;
 
-        if (client == null)
+        if (thisClient == null)
             return false;
 
-        final IFederationDelegate<T> delegate = client.getDelegate();
+        final IFederationDelegate<T> delegate = thisClient.getDelegate();
 
         if (delegate == null)
             return false;
@@ -955,11 +952,11 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
         }
 
         // @todo really, we should test like this everywhere.
-        final AbstractClient client = this.client;
+        final AbstractClient thisClient = this.client;
 
-        if (client != null && client.isConnected()) {
+        if (thisClient != null && thisClient.isConnected()) {
 
-            client.getDelegate().serviceLeave(serviceUUID);
+            thisClient.getDelegate().serviceLeave(serviceUUID);
 
         }
 
@@ -988,7 +985,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     static private String ERR_SERVICE_NOT_READY = "Service is not ready yet.";
     
     /**
-     * This task runs periodically. Once {@link #getServiceUUID()} reports a
+     * This task runs once. Once {@link #getServiceUUID()} reports a
      * non-<code>null</code> value, it will start an (optional)
      * {@link AbstractStatisticsCollector}, an (optional) httpd service, and
      * the (required) {@link ReportTask}.
@@ -998,8 +995,6 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * {@link ILoadBalancerService} know which services exist, which is
      * important for some of its functions.
      * <p>
-     * Once these task(s) have been started, this task will throw an exception
-     * in order to prevent it from being re-executed.
      * 
      * FIXME This should explicitly await jini registrar discovery, zookeeper
      * client connected, and whatever other preconditions must be statisified
@@ -1022,8 +1017,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
          */
         final long begin = System.currentTimeMillis();
         
-        public StartDeferredTasksTask() {
-        
+        private StartDeferredTasksTask() {
         }
 
         /**
@@ -1033,8 +1027,6 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
          */
         public void run() {
 
-            final boolean started;
-            
             try {
                 
 //                /*
@@ -1051,9 +1043,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 //                    return;
 //                    
 //                }
-                    
-                started = startDeferredTasks();
-                
+                startDeferredTasks();
             } catch (Throwable t) {
 
                 log.warn("Problem in report task?", t);
@@ -1062,60 +1052,56 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                 
             }
 
-            if (started) {
-
-                /*
-                 * Note: This exception is thrown once this task has executed
-                 * successfully.
-                 */
-                
-                throw new RuntimeException("Normal completion.");
-                
-            }
-            
         }
 
         /**
          * Starts performance counter collection once the service {@link UUID}
          * is known.
          * 
-         * @return <code>true</code> iff performance counter collection was
-         *         started.
-         * 
          * @throws IOException
          *             if {@link IDataService#getServiceUUID()} throws this
          *             exception (it never should since it is a local method
          *             call).
          */
-        protected boolean startDeferredTasks() throws IOException {
+        protected void startDeferredTasks() throws IOException {
 
             // elapsed time since we started running this task.
             final long elapsed = System.currentTimeMillis() - begin;
             
-            if (getServiceUUID() == null) {
-
+            // Wait for the service ID to become available, trying every
+            // two seconds, while logging failures.
+            while (true) {
+                if (getServiceUUID() != null) {
+                    break;
+                }
                 if (elapsed > 1000 * 10)
                     log.warn(ERR_NO_SERVICE_UUID + " : iface="
                             + getServiceIface() + ", name=" + getServiceName()
                             + ", elapsed=" + elapsed);
                 else if (log.isInfoEnabled())
-                    log.info(ERR_NO_SERVICE_UUID);
-
-                return false;
-
+                     log.info(ERR_NO_SERVICE_UUID);
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                }
             }
 
-            if (!isServiceReady()) {
-
+            // Wait for the service to become ready, trying every
+            // two seconds, while logging failures.
+            while (true) {
+                if (isServiceReady()) {
+                    break;
+                }
                 if (elapsed > 1000 * 10)
                     log.warn(ERR_SERVICE_NOT_READY + " : iface="
                             + getServiceIface() + ", name=" + getServiceName()
                             + ", elapsed=" + elapsed);
                 else if (log.isInfoEnabled())
                     log.info(ERR_SERVICE_NOT_READY + " : " + elapsed);
-
-                return false;
-                
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                }
             }
             
             /*
@@ -1143,9 +1129,6 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
             
             // notify delegates that deferred startup has occurred.
             AbstractFederation.this.didStart();
-
-            return true;
-
         }
 
 
