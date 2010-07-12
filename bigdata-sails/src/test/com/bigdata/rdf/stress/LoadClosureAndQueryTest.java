@@ -98,7 +98,6 @@ import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.LocalDataServiceClient;
 import com.bigdata.service.jini.util.JiniServicesHelper;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.IComparisonTest;
@@ -519,31 +518,31 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
             break;
 
-        case LDS: {
-
-            jiniServicesHelper = null;
-            
-            /*
-             * The name of the data directory (LDS).
-             */
-            properties
-                    .setProperty(
-                            com.bigdata.service.LocalDataServiceClient.Options.DATA_DIR,
-                            file.toString());
-            
-            /*
-             * Delete the temp file before running since LDS will create a
-             * directory by that name.
-             */
-            file.delete();
-
-            fed = new LocalDataServiceClient(properties).connect();
-
-            sail = getSail(fed, namespace, timestamp);
-
-            break;
-        
-        }
+//        case LDS: {
+//
+//            jiniServicesHelper = null;
+//            
+//            /*
+//             * The name of the data directory (LDS).
+//             */
+//            properties
+//                    .setProperty(
+//                            com.bigdata.service.LocalDataServiceClient.Options.DATA_DIR,
+//                            file.toString());
+//            
+//            /*
+//             * Delete the temp file before running since LDS will create a
+//             * directory by that name.
+//             */
+//            file.delete();
+//
+//            fed = new LocalDataServiceClient(properties).connect();
+//
+//            sail = getSail(fed, namespace, timestamp);
+//
+//            break;
+//        
+//        }
             
         case EDS: {
 
@@ -646,7 +645,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
     private static enum DatabaseModel {
         
         LTS,
-        LDS,
+//        LDS,
         EDS,
         JDS;
         
@@ -2511,8 +2510,8 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
             conditions = apply(conditions, new NV[][] {
                     new NV[] { new NV(TestOptions.DATABASE_MODEL,
                             DatabaseModel.LTS.toString()) },
-                    new NV[] { new NV(TestOptions.DATABASE_MODEL,
-                            DatabaseModel.LDS.toString()) },
+//                    new NV[] { new NV(TestOptions.DATABASE_MODEL,
+//                            DatabaseModel.LDS.toString()) },
                     new NV[] { new NV(TestOptions.DATABASE_MODEL,
                             DatabaseModel.EDS.toString()) }
             /*

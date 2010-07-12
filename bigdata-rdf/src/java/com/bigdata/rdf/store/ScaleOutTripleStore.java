@@ -35,7 +35,6 @@ import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.LocalDataServiceFederation;
 import com.bigdata.service.jini.JiniFederation;
 
 /**
@@ -45,8 +44,7 @@ import com.bigdata.service.jini.JiniFederation;
  * <h2>Deployment choices</h2>
  * 
  * You can deploy the {@link ScaleOutTripleStore} using any
- * {@link IBigdataClient}. The {@link LocalDataServiceFederation} preserves
- * full concurrency control and uses monolithic indices. An
+ * {@link IBigdataClient}.  An
  * {@link EmbeddedFederation} can be used if you want key-range partitioned
  * indices but plan to run on a single machine and do not want to incur the
  * overhead for RMI - all services will run in the same JVM. Finally, a

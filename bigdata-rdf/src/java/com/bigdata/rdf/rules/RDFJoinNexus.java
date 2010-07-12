@@ -115,8 +115,6 @@ import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.LocalDataServiceFederation;
-import com.bigdata.service.LocalDataServiceFederation.LocalDataServiceImpl;
 import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedConvertingIterator;
@@ -1744,25 +1742,11 @@ public class RDFJoinNexus implements IJoinNexus {
 
         final IIndexManager indexManager = getIndexManager();
 
-        if (indexManager instanceof IBigdataFederation) {
+        if (indexManager instanceof IBigdataFederation<?>) {
 
-            final IBigdataFederation fed = (IBigdataFederation) indexManager;
-
-            if (fed.isScaleOut()) {
-
-                // distributed program execution.
-                return runDistributedProgram(fed, action, step);
-                
-            } else {
-                
-                // local data service.
-                final DataService dataService = ((LocalDataServiceFederation) fed)
-                        .getDataService();
-
-                // single data service program execution.
-                return runDataServiceProgram(dataService, action, step);
-                
-            }
+            // distributed program execution.
+            return runDistributedProgram((IBigdataFederation<?>) indexManager,
+                    action, step);
 
         } else {
             

@@ -74,7 +74,6 @@ import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.LocalDataServiceClient;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.util.ChecksumUtility;
 
@@ -102,9 +101,6 @@ import com.bigdata.util.ChecksumUtility;
  * for the scale-out architecture. There are several variants of a federation
  * available, including:
  * <dl>
- * <dt>{@link LocalDataServiceClient}</dt>
- * <dd>Purely local operations against a {@link DataService} with full
- * concurrency controls and transaction management</dd>
  * <dt>{@link EmbeddedClient}</dt>
  * <dd>Operations against a collection of services running in the same JVM with
  * full concurrency controls, transaction management, and key-range partitioned
