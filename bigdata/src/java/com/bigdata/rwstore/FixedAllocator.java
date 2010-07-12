@@ -456,4 +456,49 @@ public class FixedAllocator implements Allocator {
 	public void appendShortStats(StringBuffer str) {
 		str.append("Index: " + m_index + ", address: " + getStartAddr() + ", " + m_size + "\n");
 	}
+	
+	public int getAllocatedBlocks() {
+		int allocated = 0;
+		Iterator<AllocBlock> blocks = m_allocBlocks.iterator();
+		while (blocks.hasNext()) {
+			if (blocks.next().m_addr != 0) {
+				allocated++;
+			} else {
+				break;
+			}
+		}
+
+		return allocated;
+	}
+	
+	/**
+	 * @return  the amount of heap storage assigned to this allocator over
+	 * all reserved allocation blocks.
+	 */
+	public long getFileStorage() {
+		final long blockSize = 32 * m_bitSize * m_size;
+		
+		long allocated = getAllocatedBlocks();
+
+		allocated *= blockSize;
+
+		return allocated;
+	}
+	
+	/**
+	 * Computes the amount of staorge allocated using the freeBits count.
+	 * 
+	 * @return the amount of storage to alloted slots in the allocation blocks
+	 */
+	public long getAllocatedSlots() {
+		int allocBlocks = getAllocatedBlocks();
+		int xtraFree = m_allocBlocks.size() - allocBlocks;
+		xtraFree *= 32 * m_bitSize;
+		
+		int freeBits = m_freeBits - xtraFree;
+		
+		long alloted = (allocBlocks * 32 * m_bitSize) - freeBits;
+		
+		return alloted * m_size;		
+	}
 }
