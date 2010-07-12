@@ -236,9 +236,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
             properties.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
 
-            properties.setProperty(Options.CREATE_TEMP_FILE, "false");
+            properties.setProperty(Options.CREATE_TEMP_FILE, "true");
             
-            properties.setProperty(Options.FILE, "/Volumes/SSDData/TestRW/tmp.rw");
+            // properties.setProperty(Options.FILE, "/Volumes/SSDData/TestRW/tmp.rw");
 
             properties.setProperty(Options.DELETE_ON_EXIT, "true");
 
@@ -581,9 +581,10 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			RWStore rw = bufferStrategy.getRWStore();
 
-			System.out.println("Allocations: " + rw.getTotalAllocations()
-					+ ", allocated bytes: " + rw.getTotalAllocationsSize() + ", file length: "
-					+ rw.getStoreFile().length());
+			System.out.println("Fixed Allocators: " + rw.getFixedAllocatorCount()
+					+ ", heap allocated: " + rw.getFileStorage() 
+					+ ", utilised bytes: " + rw.getAllocatedSlots() 
+					+ ", file length: " + rw.getStoreFile().length());
 
         }
         
@@ -709,15 +710,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				
 				store.close();
 				System.out.println("Re-open Journal");
+				
 				store = (Journal) getStore();
-
-				bufferStrategy = (RWStrategy) store.getBufferStrategy();
-
-				rw = bufferStrategy.getRWStore();
-
-				System.out.println("Final allocations: " + (rw.getTotalAllocations() - numAllocs)
-						+ ", allocated bytes: " + (rw.getTotalAllocationsSize() - startAllocations) + ", file length: "
-						+ rw.getStoreFile().length());
+				showStore(store);
 			} finally {
 
 				store.destroy();
@@ -838,7 +833,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 bs.commit();
                               
                 // Now reset - clears writeCache and reinits from disk
-                rw.reopen();
+                rw.reset();
                 
                 rdBuf = bs.read(faddr);
                 assertEquals(bb, rdBuf);
@@ -936,6 +931,48 @@ public class TestRWJournal extends AbstractJournalTestCase {
             }
         }
 
+        public void test_stressAlloc() {
+            
+            Journal store = (Journal) getStore();
+
+            RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+
+            RWStore rw = bs.getRWStore();
+            long realAddr = 0;
+            try {
+            	// allocBatch(store, 1, 32, 650, 10000000);
+            	allocBatch(store, 1, 32, 650, 100000);
+            	store.commit();
+				System.out.println("Final allocations: " + rw.getTotalAllocations()
+						+ ", allocated bytes: " + rw.getTotalAllocationsSize() + ", file length: "
+						+ rw.getStoreFile().length());
+				store.close();
+				System.out.println("Re-open Journal");
+				store = (Journal) getStore();
+
+				showStore(store);
+            } finally {
+            	store.destroy();
+            }
+        }
+
+        private long allocBatch(Journal store, int tsts, int min, int sze, int grp) {
+        	
+            RWStrategy bs = (RWStrategy) store
+            .getBufferStrategy();
+
+            byte[] buf = new byte[sze+4]; // extra for checksum
+            r.nextBytes(buf);
+            
+       	                      
+        	for (int i = 0; i < grp; i++) {
+        		int alloc = min + r.nextInt(sze-min);
+                ByteBuffer bb = ByteBuffer.wrap(buf, 0, alloc);
+                bs.write(bb);
+        	}
+
+        	return 0L;
+    	}
     }
     
      /**
