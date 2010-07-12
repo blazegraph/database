@@ -39,8 +39,6 @@ import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.LocalDataServiceClient;
-import com.bigdata.service.LocalDataServiceFederation;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
 
@@ -474,7 +472,7 @@ public class BigdataSailHelper {
     private static enum FederationEnum {
         
         LTS,
-        LDS,
+//        LDS,
         EDS,
         JDS;
         
@@ -511,7 +509,7 @@ public class BigdataSailHelper {
        
         if (args.length == 0) {
 
-            System.err.println("usage: filename (LTS|LDS|EDS|JDS (namespace (timestamp)))");
+            System.err.println("usage: filename (LTS|EDS|JDS (namespace (timestamp)))");
 
             System.exit(1);
             
@@ -546,7 +544,7 @@ public class BigdataSailHelper {
 
             }
             break;
-        case LDS:
+//        case LDS:
         case EDS:
             if (!file.isDirectory()) {
 
@@ -599,27 +597,27 @@ public class BigdataSailHelper {
 
             break;
 
-        case LDS: {
-
-//            jiniServicesHelper = null;
-
-            final Properties properties = new Properties();
-            
-            properties.setProperty(
-                    com.bigdata.service.LocalDataServiceClient.Options.DATA_DIR,
-                    filename);
-            
-            // disable platform statistics collection.
-            properties.setProperty(
-                    LocalDataServiceClient.Options.COLLECT_PLATFORM_STATISTICS, "false");
-
-            fed = new LocalDataServiceClient(properties).connect();
-
-            sail = helper.getSail(fed, namespace, timestamp);
-
-            break;
-        
-        }
+//        case LDS: {
+//
+////            jiniServicesHelper = null;
+//
+//            final Properties properties = new Properties();
+//            
+//            properties.setProperty(
+//                    com.bigdata.service.LocalDataServiceClient.Options.DATA_DIR,
+//                    filename);
+//            
+//            // disable platform statistics collection.
+//            properties.setProperty(
+//                    LocalDataServiceClient.Options.COLLECT_PLATFORM_STATISTICS, "false");
+//
+//            fed = new LocalDataServiceClient(properties).connect();
+//
+//            sail = helper.getSail(fed, namespace, timestamp);
+//
+//            break;
+//        
+//        }
             
         case EDS: {
 
