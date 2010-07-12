@@ -104,7 +104,7 @@ public class TestAll extends TestCase {
         // Note: rdfs 2, 3, 7, and 9 use the same base class.
         suite.addTestSuite(TestRuleRdfs07.class);
 
-        // Note: rdfs 6, 8, 10, 12, and 13 use the same base clase.
+        // Note: rdfs 6, 8, 10, 12, and 13 use the same base class.
         suite.addTestSuite(TestRuleRdfs10.class);
 
         // Note: rdfs 5 and 11 use the same base class.
