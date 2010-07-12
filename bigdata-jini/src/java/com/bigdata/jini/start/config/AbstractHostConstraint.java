@@ -27,13 +27,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.jini.start.config;
 
+import java.io.IOException;
 import java.net.InetAddress;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.util.config.NicUtil;
 
 /**
  * Core impl.
@@ -60,15 +63,13 @@ abstract public class AbstractHostConstraint implements IServiceConstraint {
         
     }
 
-    public AbstractHostConstraint(final String host)
-            throws UnknownHostException {
+    public AbstractHostConstraint(final String host) {
 
         this(new String[] { host });
 
     }
 
-    public AbstractHostConstraint(final String[] hosts)
-            throws UnknownHostException {
+    public AbstractHostConstraint(final String[] hosts) {
 
         if (hosts == null)
             throw new IllegalArgumentException();
@@ -99,7 +100,7 @@ abstract public class AbstractHostConstraint implements IServiceConstraint {
 
                 }
                 
-            } catch (UnknownHostException ex) {
+            } catch (IOException ex) {//SocketException or UnknownHostException
 
                 log.warn("hostname: " + hostname, ex);
 
@@ -152,18 +153,20 @@ abstract public class AbstractHostConstraint implements IServiceConstraint {
      * 
      * @param hostname A host name.
      * 
+     * @throws SocketException
      * @throws UnknownHostException
      */
     static final public boolean isLocalHost(final String hostname)
-            throws UnknownHostException {
+            throws SocketException, UnknownHostException {
 
-        final InetAddress[] localAddrs = InetAddress.getAllByName(InetAddress
-                .getLocalHost().getCanonicalHostName());
+        InetAddress[] localAddrs = 
+            ((NicUtil.getInetAddressMap()).keySet()).toArray(new InetAddress[1]);
 
         final InetAddress[] hostAddrs = InetAddress.getAllByName(hostname);
 
         if (INFO)
             log.info("Considering: " + hostname + " : localAddrs="
+                    + Arrays.toString(localAddrs) + ", hostAddrs="
                     + Arrays.toString(localAddrs) + ", hostAddrs="
                     + Arrays.toString(hostAddrs));
 

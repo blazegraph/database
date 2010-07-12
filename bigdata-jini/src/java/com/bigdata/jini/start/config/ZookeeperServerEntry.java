@@ -27,11 +27,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.jini.start.config;
 
+import java.io.IOException;
 import java.net.InetAddress;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 
 import org.apache.log4j.Logger;
+
+import com.bigdata.util.config.NicUtil;
 
 /**
  * A description of a zookeeper <code>server</code> entry as found in a
@@ -132,12 +136,13 @@ public class ZookeeperServerEntry {
     /**
      * Return <code>true</code> if this is server entry for the local host.
      * 
+     * @throws SocketException
      * @throws UnknownHostException
      */
-    public boolean isLocalHost() throws UnknownHostException {
+    public boolean isLocalHost() throws SocketException, UnknownHostException {
 
-        final InetAddress[] localAddrs = InetAddress.getAllByName(InetAddress
-                .getLocalHost().getCanonicalHostName());
+        InetAddress[] localAddrs = 
+            ((NicUtil.getInetAddressMap()).keySet()).toArray(new InetAddress[1]);
 
         final InetAddress[] hostAddrs = InetAddress.getAllByName(hostname);
 
