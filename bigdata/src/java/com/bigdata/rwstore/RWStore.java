@@ -2220,5 +2220,70 @@ public class RWStore implements IStore {
 		}
 		
 	}
+	
+	/**
+	 * @return number of FixedAllocators
+	 */
+	public int getFixedAllocatorCount() {
+		int fixed = 0;
+		Iterator<Allocator> allocs = m_allocs.iterator();
+		while (allocs.hasNext()) {
+			if (allocs.next() instanceof FixedAllocator) {
+				fixed++;
+			}
+		}
+		
+		return fixed;
+	}
+	
+	/**
+	 * @return  the number of heap allocations made to the FixedAllocators.
+	 */
+	public int getAllocatedBlocks() {
+		int allocated = 0;
+		Iterator<Allocator> allocs = m_allocs.iterator();
+		while (allocs.hasNext()) {
+			Allocator alloc = allocs.next();
+			if (alloc instanceof FixedAllocator) {
+				allocated += ((FixedAllocator) alloc).getAllocatedBlocks();
+			}
+		}
+
+		return allocated;
+	}
+	
+	/**
+	 * @return  the amount of heap storage assigned to the FixedAllocators.
+	 */
+	public long getFileStorage() {
+		long allocated = 0;
+		Iterator<Allocator> allocs = m_allocs.iterator();
+		while (allocs.hasNext()) {
+			Allocator alloc = allocs.next();
+			if (alloc instanceof FixedAllocator) {
+				allocated += ((FixedAllocator) alloc).getFileStorage();
+			}
+		}
+
+		return allocated;
+	}
+	
+	/**
+	 * Computes the amount of utilised storage
+	 * 
+	 * @return the amount of storage to alloted slots in the allocation blocks
+	 */
+	public long getAllocatedSlots() {
+		long allocated = 0;
+		Iterator<Allocator> allocs = m_allocs.iterator();
+		while (allocs.hasNext()) {
+			Allocator alloc = allocs.next();
+			if (alloc instanceof FixedAllocator) {
+				allocated += ((FixedAllocator) alloc).getAllocatedSlots();
+			}
+		}
+
+		return allocated;
+	}
 
 }
