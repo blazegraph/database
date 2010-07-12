@@ -69,14 +69,15 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.bench.NanoSparqlClient.QueryType;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.AbstractResource;
+import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.httpd.AbstractHTTPD;
@@ -240,17 +241,37 @@ public class NanoSparqlServer extends AbstractHTTPD {
 			 */
 			if (tripleStore.getIndexManager() instanceof IJournal) {
 
-				final AbstractJournal jnl = (AbstractJournal) sail.getDatabase()
-						.getIndexManager();
+                final AbstractJournal jnl = (AbstractJournal) sail
+                        .getDatabase().getIndexManager();
 
-				sb.append("file\t= " + jnl.getFile()+"\n");
+                sb.append("file\t= " + jnl.getFile() + "\n");
 
-				sb.append("BufferMode\t= " + jnl.getBufferStrategy().getBufferMode()+"\n");
+                sb.append("BufferMode\t= "
+                        + jnl.getBufferStrategy().getBufferMode() + "\n");
 
-				sb.append("nextOffset\t= "
-						+ jnl.getRootBlockView().getNextOffset() + "\n");
+                switch (jnl.getBufferStrategy().getBufferMode()) {
+                case Disk:
+                case DiskWORM: {
+                    sb.append("nextOffset\t= "
+                            + jnl.getRootBlockView().getNextOffset() + "\n");
+                    break;
+                }
+                case DiskRW: {
+                    final RWStrategy bufferStrategy = (RWStrategy) jnl
+                            .getBufferStrategy();
+                    final RWStore rw = bufferStrategy.getRWStore();
+                    sb.append("Fixed Allocators\t="
+                            + rw.getFixedAllocatorCount() + "\n");
+                    sb.append("Heap allocated\t=" + rw.getFileStorage() + "\n");
+                    sb.append("Utilised bytes\t=" + rw.getAllocatedSlots()
+                            + "\n");
+                    break;
+                }
+                }
 
-				/*
+                sb.append("File length\t=" + jnl.getFile().length() + "\n");
+                
+	            /*
 				 * @todo The rest of this is all metadata that is only
 				 * interesting after the server has been running for a while.
 				 * It could be issued in response to a STATUS message.
