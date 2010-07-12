@@ -228,16 +228,16 @@ public class RWStore implements IStore {
      *       used by {@link #getStats(boolean)}, and the rest of these lists as
      *       well.
      */
-	private ArrayList<Allocator> m_allocs;
+	private final ArrayList<Allocator> m_allocs;
 
 	// lists of free alloc blocks
-	private ArrayList m_freeFixed[];
+	private final ArrayList m_freeFixed[];
 	
 	// lists of free blob allocators
-	private ArrayList m_freeBlobs;
+	private final ArrayList m_freeBlobs;
 
 	// lists of blocks requiring commitment
-	private ArrayList m_commitList;
+	private final ArrayList m_commitList;
 
 	private WriteBlock m_writes;
 	private final Quorum<?,?> m_quorum;
@@ -276,58 +276,6 @@ public class RWStore implements IStore {
 
     private ReopenFileChannel m_reopener = null;
 
-    private void baseInit() {
-
-		m_metaBitsSize = cDefaultMetaBitsSize;
-
-		m_metaBits = new int[m_metaBitsSize];
-		m_metaTransientBits = new int[m_metaBitsSize];
-
-		m_maxFileSize = 2 * 1024 * 1024; // 1gb max (mult by 128)!!
-
-		m_commitList = new ArrayList();
-		m_allocs = new ArrayList<Allocator>();
-
-		final int numFixed = ALLOC_SIZES.length;
-
-		m_freeFixed = new ArrayList[numFixed];
-
-		for (int i = 0; i < numFixed; i++) {
-			m_freeFixed[i] = new ArrayList();
-		}
-		
-		m_freeBlobs = new ArrayList();
-
-		try {
-			m_reopener = new ReopenFileChannel(m_fd, m_raf, "rw");
-		} catch (IOException e1) {
-			throw new RuntimeException(e1);
-		}
-
-		try {
-			int buffers = m_fmv.getFileMetadata().writeCacheBufferCount;
-			// buffers = 6;
-            m_writeCache = new RWWriteCacheService(
-            		buffers, m_raf
-                            .length(), m_reopener, m_quorum) {
-            	
-		                public WriteCache newWriteCache(final ByteBuffer buf,
-		                        final boolean useChecksum,
-		                        final boolean bufferHasData,
-		                        final IReopenChannel<? extends Channel> opener)
-		                        throws InterruptedException {
-		                    return new WriteCacheImpl(buf,
-		                            useChecksum, bufferHasData,
-		                            (IReopenChannel<FileChannel>) opener);
-		                }
-            	};
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-		} 
-	}
-		
 	class WriteCacheImpl extends WriteCache.FileChannelScatteredWriteCache {
         public WriteCacheImpl(final ByteBuffer buf,
                 final boolean useChecksum,
@@ -358,9 +306,8 @@ public class RWStore implements IStore {
 	};
 	
 	private String m_filename;
-	private LockFile m_lockFile;
 
-	private FileMetadataView m_fmv;
+	private final FileMetadataView m_fmv;
 
 	private IRootBlockView m_rb;
 
@@ -380,44 +327,67 @@ public class RWStore implements IStore {
 	public RWStore(final FileMetadataView fileMetadataView, final boolean readOnly,
 	        final Quorum<?,?> quorum) {
 
-	    if (false && Config.isLockFileNeeded() && !readOnly) {
-			m_lockFile = LockFile.create(m_filename + ".lock");
+		m_metaBitsSize = cDefaultMetaBitsSize;
 
-			if (m_lockFile == null) {
-				throw new OverlappingFileLockException();
-			}
-		}
+		m_metaBits = new int[m_metaBitsSize];
+		m_metaTransientBits = new int[m_metaBitsSize];
 
+		m_maxFileSize = 2 * 1024 * 1024; // 1gb max (mult by 128)!!
+		
         m_quorum = quorum;
 
-        /*
-         * FIXME elevate as much as possible into the constructor and make those
-         * fields final.
-         */
-		reopen(fileMetadataView);
-	}
-
-	/** @deprecated by {@link #reset()}
-	 */
-	public void reopen() {
-		reopen(m_fmv);
-	}
-    /** @deprecated by {@link #reset()}
-     */
-	public void reopen(final FileMetadataView fileMetadataView) {
 		m_fmv = fileMetadataView;
-		m_fd = fileMetadataView.getFile();
-		m_raf = fileMetadataView.getRandomAccessFile();
+		
+		m_fd = m_fmv.getFile();
+		m_raf = m_fmv.getRandomAccessFile();
 
 		m_rb = m_fmv.getRootBlock();
 
 		m_filename = m_fd.getAbsolutePath();
 
-		baseInit();
+		m_commitList = new ArrayList();
+		m_allocs = new ArrayList<Allocator>();
+
+		final int numFixed = ALLOC_SIZES.length;
+
+		m_freeFixed = new ArrayList[numFixed];
+
+		for (int i = 0; i < numFixed; i++) {
+			m_freeFixed[i] = new ArrayList();
+		}
+		
+		m_freeBlobs = new ArrayList();
 
 		try {
-			// m_writes = new WriteBlock(m_raf);
+			m_reopener = new ReopenFileChannel(m_fd, m_raf, "rw");
+		} catch (IOException e1) {
+			throw new RuntimeException(e1);
+		}
 
+		int buffers = m_fmv.getFileMetadata().writeCacheBufferCount;
+		// buffers = 6;
+        try {
+			m_writeCache = new RWWriteCacheService(
+					buffers, m_raf
+			                .length(), m_reopener, m_quorum) {
+				
+			            public WriteCache newWriteCache(final ByteBuffer buf,
+			                    final boolean useChecksum,
+			                    final boolean bufferHasData,
+			                    final IReopenChannel<? extends Channel> opener)
+			                    throws InterruptedException {
+			                return new WriteCacheImpl(buf,
+			                        useChecksum, bufferHasData,
+			                        (IReopenChannel<FileChannel>) opener);
+			            }
+				};
+		} catch (InterruptedException e) {
+			throw new IllegalStateException("Unable to create write cache service", e);
+		} catch (IOException e) {
+			throw new IllegalStateException("Unable to create write cache service", e);
+		}
+		
+		try {
 			if (m_rb.getNextOffset() == 0) { // if zero then new file
 
 				m_fileSize = convertFromAddr(m_fd.length());
@@ -442,14 +412,11 @@ public class RWStore implements IStore {
 			throw new StorageTerminalError("Unable to initialize store", e);
 		}
 	}
-	
+
 	public void close() {
 		try {
 			m_writeCache.close();
 			m_raf.close();
-			if (m_lockFile != null) {
-				m_lockFile.clear();
-			}
 		} catch (IOException e) {
 			// ..oooh err... only trying to help
 		} catch (InterruptedException e) {
@@ -1160,14 +1127,26 @@ public class RWStore implements IStore {
 	public void reset() {
 	    m_allocationLock.lock();
 		try {
-	        baseInit();
-	        
-			m_writeCache.reset(); // dirty writes are discarded
-			m_writeCache.setExtent(convertAddr(m_fileSize)); // notify of current file length.
+			m_commitList.clear();
+			m_allocs.clear();
+			m_freeBlobs.clear();
 			
+			final int numFixed = ALLOC_SIZES.length;
+			for (int i = 0; i < numFixed; i++) {
+				m_freeFixed[i].clear();
+			}
+
+
+			try {
+				m_writeCache.reset();
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+	        			
 			initfromRootBlock();
 
-			// readAllocationBlocks();
+			m_writeCache.setExtent(convertAddr(m_fileSize)); // notify of current file length.
 		} catch (Exception e) {
 			throw new IllegalStateException("Unable reset the store", e);
 		} finally {
@@ -2099,9 +2078,6 @@ public class RWStore implements IStore {
 	 * from that into the passed byte array.
 	 */
 	public int registerBlob(int addr) {
-		if (m_freeBlobs == null) {
-			m_freeBlobs = new ArrayList();
-		}
 		BlobAllocator ba = null;
 		if (m_freeBlobs.size() > 0) {
 			ba = (BlobAllocator) m_freeBlobs.get(0);
