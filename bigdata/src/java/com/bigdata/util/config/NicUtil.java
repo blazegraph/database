@@ -33,7 +33,9 @@ import java.net.MalformedURLException;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Enumeration;
 import java.util.Collections;
 import java.util.logging.LogRecord;
@@ -102,7 +104,6 @@ public class NicUtil {
     {
         NetworkInterface nic = NetworkInterface.getByName(name);
         if (nic == null) {
-
             // try by IP address
             InetAddress targetIp = null;
             try {
@@ -113,6 +114,43 @@ public class NicUtil {
             }
         }
         return nic;
+    }
+
+    /**
+     * Method that returns a <code>Map</code> in which the key component
+     * of each element is one of the addresses of one of the network
+     * interface cards (nics) installed on the current node, and the
+     * corresponding value component is the name of the associated
+     * nic to which that address is assigned.
+     *
+     * @return a <code>Map</code> of key-value pairs in which the key
+     *         is an instance of <code>InetAddress</code> referencing
+     *         the address of one of the network interface cards installed
+     *         on the current node, and the corresponding value is a
+     *         <code>String</code> referencing the name of the associated
+     *         network interface to which the address is assigned.
+     *
+     * @throws SocketException if there is an error in the underlying
+     *         I/O subsystem and/or protocol.
+     */
+    public static Map<InetAddress, String> getInetAddressMap() 
+                                                      throws SocketException
+    {
+        Map<InetAddress, String> retMap = new HashMap<InetAddress, String>();
+
+        //get all nics on the current node
+        Enumeration<NetworkInterface> nics = 
+                                    NetworkInterface.getNetworkInterfaces();
+
+        while( nics.hasMoreElements() ) {
+            NetworkInterface curNic = nics.nextElement();
+            Enumeration<InetAddress> curNicAddrs = curNic.getInetAddresses();
+            String curNicName = curNic.getName();
+            while( curNicAddrs.hasMoreElements() ) {
+                retMap.put( curNicAddrs.nextElement(), curNicName );
+            }
+        }
+        return retMap;
     }
 
     /**
