@@ -1,6 +1,7 @@
 package com.bigdata.jini.start;
 
 import java.io.IOException;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.channels.FileLock;
 import java.rmi.RemoteException;
@@ -672,7 +673,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
 
             }
 
-        } catch (UnknownHostException ex) {
+        } catch (IOException ex) {//SocketException or UnknownHostException
 
             log.warn("className=" + serviceConfig.className
                     + ", physicalServiceZPath=" + physicalServiceZPath, ex);
@@ -1148,10 +1149,11 @@ public class MonitorCreatePhysicalServiceLocksTask implements
      * 
      * @return <code>true</code> if the service lives on this host.
      * 
+     * @throws SocketException
      * @throws UnknownHostException
      */
     protected boolean isLocalService(final Entry[] attributes)
-            throws UnknownHostException {
+            throws SocketException, UnknownHostException {
 
         boolean isLocalHost = false;
 
