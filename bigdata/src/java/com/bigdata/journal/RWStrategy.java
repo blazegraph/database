@@ -187,6 +187,10 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
 			return rbv;
 		}
+
+		public String getProperty(String name, String defvalue) {
+			return m_fileMetadata.getProperty(name, defvalue);
+		}
 	}
 
 	public ByteBuffer readRootBlock(boolean rootBlock0) {

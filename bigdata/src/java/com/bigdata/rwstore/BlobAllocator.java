@@ -47,16 +47,21 @@ public class BlobAllocator implements Allocator {
 	}
 
 	public int alloc(RWStore store, int size) {
-		assert size > RWStore.MAX_FIXED_ALLOC;
+		assert size > m_store.m_maxFixedAlloc;
 		
 		return 0;
 	}
 
 	public boolean free(int addr, int sze) {
-		int blcks = 1 + (sze / RWStore.MAX_FIXED_ALLOC);
+		if (sze < m_store.m_maxFixedAlloc)
+			throw new IllegalArgumentException("Unexpected address size");
+		int alloc = m_store.m_maxFixedAlloc-4;
+		int blcks = (alloc - 1 + sze)/alloc;		
 		
+		int hdr_idx = (-addr) & RWStore.OFFSET_BITS_MASK;
+		if (hdr_idx > m_hdrs.length)
+			throw new IllegalArgumentException("free BlobAllocation problem, hdr offset: " + hdr_idx + ", avail:" + m_hdrs.length);
 		
-		int hdr_idx = addr & RWStore.OFFSET_BITS_MASK;
 		int hdr_addr = m_hdrs[hdr_idx];
 		
 		if (hdr_addr == 0) {
@@ -73,7 +78,7 @@ public class BlobAllocator implements Allocator {
 			int allocs = instr.readInt();
 			for (int i = 0; i < allocs; i++) {
 				int nxt = instr.readInt();
-				m_store.free(nxt, RWStore.MAX_FIXED_ALLOC);
+				m_store.free(nxt, m_store.m_maxFixedAlloc);
 			}
 			m_store.free(hdr_addr, hdr.length);
 			m_hdrs[hdr_idx] = 0;
@@ -233,7 +238,11 @@ public class BlobAllocator implements Allocator {
 					m_freeList.remove(this);
 				}
 				
-				return -((m_index << RWStore.OFFSET_BITS) + i);
+				int ret = -((m_index << RWStore.OFFSET_BITS) + i);
+				if (((-ret) & RWStore.OFFSET_BITS_MASK) > m_hdrs.length)
+					throw new IllegalStateException("Invalid blob offset: " + ((-ret) & RWStore.OFFSET_BITS_MASK));
+				
+				return ret;
 			}
 		}
 
@@ -248,7 +257,7 @@ public class BlobAllocator implements Allocator {
 		return m_index;
 	}
 
-	public long getBlobHdrAddress(int hdrIndex) {
+	public int getBlobHdrAddress(int hdrIndex) {
 		return m_hdrs[hdrIndex];
 	}
 
