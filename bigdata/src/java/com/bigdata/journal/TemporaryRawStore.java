@@ -285,7 +285,8 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
                 false, // validateChecksum (desperation option for restart).
                 createTime,//
                 Quorum.NO_QUORUM,// Temporary stores are not HA.
-                false // alternateRootBlock
+                false, // alternateRootBlock,
+                null // properties
         );
         
         buf = new DiskOnlyStrategy(maximumExtent, //

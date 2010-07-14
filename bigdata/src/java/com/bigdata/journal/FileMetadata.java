@@ -234,6 +234,11 @@ public class FileMetadata {
 	 * existing file it is based on an examination of both root blocks.
 	 */
 	final IRootBlockView rootBlock;
+	
+	/**
+	 * Properties used to initialize this FileMetadata object
+	 */
+	final Properties properties;
 
 	/**
 	 * This constructor handles the case where the file does not exist or exists
@@ -323,7 +328,8 @@ public class FileMetadata {
 			final int offsetBits, final boolean writeCacheEnabled,
 			final int writeCacheBufferCount, final boolean validateChecksum,
 			final long createTime, final long quorumToken,
-			final boolean alternateRootBlock) throws RuntimeException {
+			final boolean alternateRootBlock,
+			final Properties properties) throws RuntimeException {
 
 		if (file == null)
 			throw new IllegalArgumentException();
@@ -377,6 +383,8 @@ public class FileMetadata {
 		this.readOnly = readOnly;
 
 		this.exists = false;
+
+		this.properties = properties;
 
 		// true for a temporary file
 		final boolean temporary = bufferMode.equals(BufferMode.Temporary);
@@ -857,7 +865,8 @@ public class FileMetadata {
 	FileMetadata(final File file, final boolean useDirectBuffers,
 			final boolean readOnly, final ForceEnum forceWrites,
 			final boolean writeCacheEnabled, final int writeCacheBufferCount,
-			final boolean validateChecksum, final boolean alternateRootBlock)
+			final boolean validateChecksum, final boolean alternateRootBlock,
+			final Properties properties)
 			throws RuntimeException {
 
 		if (file == null)
@@ -886,6 +895,8 @@ public class FileMetadata {
 		this.exists = file.exists();
 
 		this.file = file;
+		
+		this.properties = properties;
 
 		try {
 
@@ -1412,7 +1423,7 @@ public class FileMetadata {
 			
 			return new FileMetadata(file, useDirectBuffers, readOnly,
 					forceWrites, writeCacheEnabled, writeCacheBufferCount,
-					validateChecksum, alternateRootBlock);
+					validateChecksum, alternateRootBlock, properties);
 
 		} else {
 
@@ -1456,7 +1467,7 @@ public class FileMetadata {
 					initialExtent, maximumExtent, create, isEmptyFile,
 					deleteOnExit, readOnly, forceWrites, offsetBits,
 					writeCacheEnabled, writeCacheBufferCount, validateChecksum,
-					createTime, quorumToken, alternateRootBlock);
+					createTime, quorumToken, alternateRootBlock, properties);
 		
 		}
 
@@ -1477,6 +1488,14 @@ public class FileMetadata {
 		return Configuration.getProperty(null, properties, ""/* no namespace */,
 				name, defaultValue, validator);
 
+	}
+	
+	/**
+	 * retrieve the property value from the properties object used to
+	 * initialize this object.
+	 */
+	public String getProperty(final String name, final String defaultValue) {
+		return getProperty(properties, name, defaultValue);
 	}
 
 }

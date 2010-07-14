@@ -82,7 +82,7 @@ public class PSOutputStream extends OutputStream {
 	static Integer m_lock = new Integer(42);
 	static int m_streamCount = 0;
 	
-	public static PSOutputStream getNew(IStore store) {
+	public static PSOutputStream getNew(IStore store, int maxAlloc) {
 		synchronized (m_lock) {
 			PSOutputStream ret = m_poolHead;
 			if (ret != null) {
@@ -96,7 +96,7 @@ public class PSOutputStream extends OutputStream {
 				ret = new PSOutputStream();
 			}
 			
-			ret.init(store);
+			ret.init(store, maxAlloc);
 			
 			return ret;
 		}
@@ -129,9 +129,8 @@ public class PSOutputStream extends OutputStream {
 		}
 	}
 	
-	final int cBufsize = RWStore.MAX_FIXED_ALLOC; // must be big enough to atomic writes
 	int[] m_blobHeader = null;
-	byte[] m_buf = new byte[cBufsize];
+	byte[] m_buf = null;
 	boolean m_isSaved = false;
 	long m_headAddr = 0;
 	long m_prevAddr = 0;
@@ -155,9 +154,8 @@ public class PSOutputStream extends OutputStream {
 	/****************************************************************
 	 * resets private state variables for reuse of stream
 	 **/
-	void init(IStore store) {
+	void init(IStore store, int maxAlloc) {
 		m_isSaved = false;
-		flushAttached();
 		
 		m_headAddr = 0;
 		m_prevAddr = 0;
@@ -166,7 +164,12 @@ public class PSOutputStream extends OutputStream {
 		m_store = store;
 		m_isSaved = false;
 		// m_blobThreshold = m_store.bufferChainOffset();
-		m_blobThreshold = cBufsize-4; // allow for checksum
+		m_blobThreshold = maxAlloc-4; // allow for checksum
+		m_buf = new byte[maxAlloc-4];
+		
+		m_blobHeader = null;
+		m_blobHdrIdx = 0;
+
 		
 		// FIXME: if autocommit then we should provide start/commit via init and save
 		// m_store.startTransaction();
@@ -192,7 +195,7 @@ public class PSOutputStream extends OutputStream {
   	
   	if (m_count == m_blobThreshold) {
   		if (m_blobHeader == null) {
-  			m_blobHeader = new int[128];
+  			m_blobHeader = new int[RWStore.BLOB_FIXED_ALLOCS];
   			m_blobHdrIdx = 0;
   		}
   		
@@ -297,6 +300,7 @@ public class PSOutputStream extends OutputStream {
   	
   	if (m_blobHeader != null) {
   		m_blobHeader[m_blobHdrIdx++] = addr;
+  		int precount = m_count;
   		m_count = 0;
 		try {
 	  		writeInt(m_blobHdrIdx);
@@ -304,6 +308,10 @@ public class PSOutputStream extends OutputStream {
 					writeInt(m_blobHeader[i]);
 	 		}
 	  		addr = (int) m_store.alloc(m_buf, m_count);
+	  		
+	  		if (m_blobHdrIdx != ((m_blobThreshold - 1 + m_bytesWritten - m_count)/m_blobThreshold)) {	  		
+	  			throw new IllegalStateException("PSOutputStream.save at : " + addr + ", bytes: "+ m_bytesWritten + ", blocks: " + m_blobHdrIdx + ", last alloc: " + precount);
+	  		}
 	  		
 	  		if (log.isDebugEnabled())
 	  			log.debug("Writing BlobHdrIdx with " + m_blobHdrIdx + " allocations");
@@ -316,9 +324,6 @@ public class PSOutputStream extends OutputStream {
   
   	m_isSaved = true;
   	
-  	// FIXME: if autocommit then we need callback to commitTransaction here
-  	// m_store.commitTransaction();
-  		
   	return addr;
   }
   
@@ -332,52 +337,8 @@ public class PSOutputStream extends OutputStream {
   	}
   }
   
-  /**************************************************************
-   * Support method for storing information in GPOMap,
-   *	returning the current headAddress and clearing
-   *	noting that the stream must be closed
-   **/
-  public long getAddrAndClear() {
-  	if (!m_isSaved) {
-  		throw new IllegalStateException("The stream has not been saved");
-  	}
-  	
-  	if (m_store == null) {
-  		throw new IllegalStateException("The stream must not be closed");
-  	}
-  	
-  	long retval = m_headAddr;
-  	
-  	m_headAddr = 0;
-  	m_bytesWritten = 0;
-  	m_isSaved = false;
-  	
-  	return retval;
-  }
-  
   public int getBytesWritten() {
   	return m_bytesWritten;
-  }
-  
-  ObjectOutputStream m_attachedStream = null;
-  
-  public void attachStream(ObjectOutputStream outstr) {
-  	m_attachedStream = outstr;
-  }
-  
-  public ObjectOutputStream getAttachedStream() {
-  	return m_attachedStream;
-  }
-  
-  protected void flushAttached() {
-  	if (m_attachedStream != null) {
-  		try {
-  			m_attachedStream.flush();
-  			m_attachedStream.reset();
-  		} catch (IOException e) {
-  			throw new Error("Problem with attached stream", e);
-  		}
-  	}
   }
   
   protected void finalize() throws Throwable {

@@ -41,6 +41,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StoreManager.ManagedJournal;
+import com.bigdata.rwstore.RWStore;
 
 /**
  * Options for the {@link Journal}. Options are specified as property values to
@@ -486,6 +487,15 @@ public interface Options {
      * temporary journals, intermediate files from an index merge process, etc.
      */
     String TMP_DIR = AbstractJournal.class.getName()+".tmpDir";
+
+    /**
+     * The property whose value is the name of the directory in which temporary
+     * files will be created. When not specified the default is governed by the
+     * value of the System property named <code>java.io.tmpdir</code>. There
+     * are several kinds of temporary files that can be created, including
+     * temporary journals, intermediate files from an index merge process, etc.
+     */
+    String RW_ALLOCATIONS = RWStore.class.getName()+".allocSizes";
 
     /**
      * When <code>true</code> (default {@value #DEFAULT_FILE_LOCK_ENABLED}) a
