@@ -239,6 +239,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
             properties.setProperty(Options.CREATE_TEMP_FILE, "true");
             
             // properties.setProperty(Options.FILE, "/Volumes/SSDData/TestRW/tmp.rw");
+            properties.setProperty(Options.RW_ALLOCATIONS, "1,2,3,5,8,12,16,32,48,64,128,192,320,512,832,1344,2176,3520");
+            // properties.setProperty(Options.RW_ALLOCATIONS, "1,2,3,5,8,12,16,32,48,64");
 
             properties.setProperty(Options.DELETE_ON_EXIT, "true");
 
@@ -393,7 +395,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 	int a = rw.alloc(s);
                 	long pa = rw.physicalAddress(a);
                 	paddrs.put(pa, a);
-                	System.out.println("Physical Address: " + pa + ", size: " + s);
                 }
                 
             } finally {
@@ -521,7 +522,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				RWStore rw = bufferStrategy.getRWStore();
 				
-				final int tcount = 1000; // increase to ramp up stress levels
+				final int tcount = 2000; // increase to ramp up stress levels
 
 				long numAllocs = rw.getTotalAllocations();
 				long startAllocations = rw.getTotalAllocationsSize();
@@ -616,8 +617,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
         	
         	if (commit) {
         		store.commit();
-        	    System.out.println("CommitRecord: " + store.getCommitRecord());
-        	}
+         	}
         	
         	for (int t = 0; t < tsts; t++) {
             	for (int i = 0; i < (grp/5); i++) {
@@ -640,7 +640,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	        	if (reopen)
 	        		rw.reset();
 	        	
-	        	System.out.println("CommitRecord after realloc: " + store.getCommitRecord());
         	}
 	        return 0L;
 		}
@@ -940,7 +939,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
             RWStore rw = bs.getRWStore();
             long realAddr = 0;
             try {
-            	// allocBatch(store, 1, 32, 650, 10000000);
+            	// allocBatch(store, 1, 32, 650, 100000000);
             	allocBatch(store, 1, 32, 650, 100000);
             	store.commit();
 				System.out.println("Final allocations: " + rw.getTotalAllocations()
