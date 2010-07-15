@@ -74,6 +74,7 @@ import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.compression.IRecordCompressorFactory;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.CompactTask;
@@ -2828,9 +2829,35 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             final Tuple tuple = new Tuple(this, flags);
 
             if (this instanceof IndexSegment) {
+                
+                final IndexSegment seg = (IndexSegment) this;
 
-                src = new IndexSegmentTupleCursor((IndexSegment) this, tuple,
-                        fromKey, toKey);
+                /*
+                 * @todo we could scan the list of pools and chose the best fit
+                 * pool and then allocate a buffer from that pool. Best fit
+                 * would mean either the byte range fits without "too much" slop
+                 * or the #of reads will have to perform is not too large. We
+                 * might also want to limit the maximum size of the reads.
+                 */
+
+                final DirectBufferPool pool = DirectBufferPool.INSTANCE_10M;
+                
+                if (true
+                        && ((flags & REVERSE) == 0)
+                        && ((flags & CURSOR) == 0)
+                        && (seg.getStore().getCheckpoint().maxNodeOrLeafLength <= pool
+                                .getBufferCapacity())
+                        && ((rangeCount(fromKey, toKey) / branchingFactor) > 2)) {
+
+                    src = new IndexSegmentMultiBlockIterator(seg, pool,
+                            fromKey, toKey, flags);
+
+                } else {
+
+                    src = new IndexSegmentTupleCursor(seg, tuple, fromKey,
+                            toKey);
+
+                }
 
             } else if (this instanceof BTree) {
 

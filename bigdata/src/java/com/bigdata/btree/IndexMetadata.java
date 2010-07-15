@@ -1355,7 +1355,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
     /**
      * The name of the {@link Checkpoint} class used by the index. This may be
-     * overriden to store additional state with each {@link Checkpoint} record.
+     * overridden to store additional state with each {@link Checkpoint} record.
      */
     public final String getCheckpointClassName() {
 
@@ -1801,10 +1801,11 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         }
 
     }
-    
+
     /**
      * <strong>De-serialization constructor only</strong> - DO NOT use this ctor
-     * for creating a new instance!
+     * for creating a new instance! It will result in a thrown exception,
+     * typically from {@link #firstCheckpoint()}.
      */
     public IndexMetadata() {
         
@@ -2861,9 +2862,23 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     @SuppressWarnings("unchecked")
     final public Checkpoint firstCheckpoint() {
 
+        final String checkpointClassName = getCheckpointClassName();
+
+        if (checkpointClassName == null) {
+            /*
+             * This exception can be thrown if you originally created the
+             * IndexMetadata object using the zero argument constructor. That
+             * form of the constructor is only for deserialization and as such
+             * it does not set any properties.
+             */
+            throw new RuntimeException(
+                    "checkpointClassName not set: did you use the deserialization constructor by mistake?");
+          
+        }
+        
         try {
             
-            final Class cl = Class.forName(getCheckpointClassName());
+            final Class cl = Class.forName(checkpointClassName);
             
             /*
              * Note: A NoSuchMethodException thrown here means that you did not
