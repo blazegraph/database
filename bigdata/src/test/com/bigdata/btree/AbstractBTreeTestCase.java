@@ -2069,7 +2069,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @see #doRandomLookupTest(String, AbstractBTree, byte[][], Object[])
      * @see #doRandomIndexOfTest(String, AbstractBTree, byte[][], Object[])
      */
-    static private long doEntryIteratorTest(
+    static protected long doEntryIteratorTest(
             final ITupleIterator<?> expectedItr,
             final ITupleIterator<?> actualItr
             ) {
