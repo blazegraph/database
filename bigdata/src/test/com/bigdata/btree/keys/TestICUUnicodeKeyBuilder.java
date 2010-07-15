@@ -31,7 +31,6 @@ import java.util.Arrays;
 import java.util.Locale;
 import java.util.Properties;
 
-import com.bigdata.btree.AbstractUnicodeKeyBuilderTestCase;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.KeyBuilder.Options;
 import com.ibm.icu.text.Collator;
@@ -39,15 +38,16 @@ import com.ibm.icu.text.Collator;
 /**
  * Tests for Unicode support in {@link KeyBuilder}.
  * 
- * @todo test w/ and w/o the ICU integration (can be choosen at run time). Note
- *       that some tests are specific to the ICU libraries at this time.
+ * @todo test w/ and w/o the ICU integration (can be chosen at run time via
+ *       concrete subclasses). Note that some tests are specific to the ICU
+ *       libraries at this time.
  * 
  * @todo write performance test for encoding strings, possibly in the context of
  *       parsed rdf data, and see if there are any easy wins in how the encoding
  *       to a sort key is handled or in alignment of the apis.
  * 
  * @todo compare performance of the ICU and JDK libraries in some application
- *       contexts.  compare performance of the JNI ICU library as well. 
+ *       contexts. compare performance of the JNI ICU library as well.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -69,7 +69,7 @@ public class TestICUUnicodeKeyBuilder extends AbstractUnicodeKeyBuilderTestCase 
 
     public Properties getProperties() {
 
-        Properties properties = new Properties(super.getProperties());
+        final Properties properties = new Properties(super.getProperties());
         
         properties.setProperty(Options.COLLATOR,CollatorEnum.ICU.toString());
         
@@ -79,11 +79,12 @@ public class TestICUUnicodeKeyBuilder extends AbstractUnicodeKeyBuilderTestCase 
     
     public void test_correctCollator() {
         
-        Properties properties = getProperties();
-        
-        log.info("properties="+properties);
-        
-        KeyBuilder keyBuilder = (KeyBuilder) KeyBuilder
+        final Properties properties = getProperties();
+
+        if (log.isInfoEnabled())
+            log.info("properties=" + properties);
+
+        final KeyBuilder keyBuilder = (KeyBuilder) KeyBuilder
                 .newUnicodeInstance(properties);
 
         assertEquals(ICUSortKeyGenerator.class, keyBuilder
@@ -109,13 +110,13 @@ public class TestICUUnicodeKeyBuilder extends AbstractUnicodeKeyBuilderTestCase 
          * Setup for US English.
          */
 
-        Properties properties = new Properties();
+        final Properties properties = new Properties();
         
         properties.setProperty(Options.USER_LANGUAGE, Locale.US.getLanguage());
 
         properties.setProperty(Options.USER_COUNTRY, Locale.US.getCountry());
         
-        int[] strengths = new int[] { 
+        final int[] strengths = new int[] { 
                 Collator.PRIMARY,
                 Collator.SECONDARY,
                 Collator.TERTIARY,
@@ -174,7 +175,7 @@ public class TestICUUnicodeKeyBuilder extends AbstractUnicodeKeyBuilderTestCase 
      * @param collator
      *            The collator.
      *            
-     * @return True iff the collector differenties between the string and its
+     * @return True iff the collector differentiates between the string and its
      *         successor (formed by appending a nul character) in its generated
      *         sort keys.
      */

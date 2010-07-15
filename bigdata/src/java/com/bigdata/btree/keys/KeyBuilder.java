@@ -180,9 +180,9 @@ public class KeyBuilder implements IKeyBuilder {
      *            The buffer reference is used directly rather than making a
      *            copy of the data.
      */
-    protected KeyBuilder(UnicodeSortKeyGenerator sortKeyGenerator, int len,
-            byte[] buf) {
-        
+    protected KeyBuilder(final UnicodeSortKeyGenerator sortKeyGenerator,
+            final int len, final byte[] buf) {
+
         if (len < 0)
             throw new IllegalArgumentException("len");
 
@@ -350,7 +350,7 @@ public class KeyBuilder implements IKeyBuilder {
      * The object responsible for generating sort keys from Unicode strings.
      * 
      * The {@link UnicodeSortKeyGenerator} -or- <code>null</code> if Unicode
-     * is not supported by this {@link KeyBuilder} instance.
+     * is not supported by this {@link IKeyBuilder} instance.
      */
     final public UnicodeSortKeyGenerator getSortKeyGenerator() {
         
@@ -1356,6 +1356,11 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
+    /**
+     * Create an instance for ASCII keys.
+     * 
+     * @return The new instance.
+     */
     public static IKeyBuilder newInstance() {
 
         return newInstance(DEFAULT_INITIAL_CAPACITY);

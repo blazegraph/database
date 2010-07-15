@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.sparse;
 
+import java.text.RuleBasedCollator;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -33,7 +34,9 @@ import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.filter.FilterConstructor;
+import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.ITimestampService;
 
@@ -185,6 +188,17 @@ public class SparseRowStore implements IRowStoreConstants {
      * <pre>
      * md.setSplitHandler(LogicalRowSplitHandler.INSTANCE);
      * </pre>
+     * 
+     * Note: The JDK {@link RuleBasedCollator} embeds <code>nul</code> bytes in
+     * the Unicode sort keys. This makes them unsuitable for the row store which
+     * can not locate the start of the column name if there are embedded
+     * <code>nul</code>s in the primaryKey. Therefore, if you are using the
+     * {@link CollatorEnum#JDK} as your default collator, then you MUST override
+     * the {@link IndexMetadata} for the row store to use either an ASCII
+     * collator or the ICU collator. In general, the ICU collator is superior to
+     * the JDK collator and will be used by default. The ASCII collator is not
+     * ideal since non-ascii distinctions will be lost, but it is better than
+     * being unable to decode the data in the row store.
      * 
      * @param ndx
      *            The index.
@@ -1028,5 +1042,49 @@ public class SparseRowStore implements IRowStoreConstants {
                 });
         
     }
+
+    /**
+     * Options for the {@link SparseRowStore}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     */
+    public interface Options {
+
+        /**
+         * The primary key was originally written using a Unicode sort key.
+         * However, the JDK generates Unicode sort keys with embedded nuls and
+         * that broke the logic to detect the end of the Unicode primary keys.
+         * In order to accommodate this behavior, the Unicode primary key is now
+         * encoded as UTF8 which also has the advantage that we can decode
+         * Unicode primary keys. Standard prefix compression on the B+Tree
+         * should make up for the larger representation of the Unicode primary
+         * key in the B+Tree.
+         * <p>
+         * This change was introduced on 7/15/2010 in the trunk and breaks
+         * compatibility with earlier revisions of the {@link SparseRowStore}.
+         * This flag may be set to <code>false</code> for backward
+         * compatibility.
+         * 
+         * @see Options#DEFAULT_PRIMARY_KEY_UNICODE_CLEAN
+         */
+        String PRIMARY_KEY_UNICODE_CLEAN = Schema.class.getName()
+                + ".primaryKey.unicodeClean";
+
+        String DEFAULT_PRIMARY_KEY_UNICODE_CLEAN = "true";
+
+    }
+
+    /**
+     * This is a global option since it was always <code>false</code> for
+     * historical stores.
+     * 
+     * @see Options#PRIMARY_KEY_UNICODE_CLEAN
+     */
+    final static transient boolean primaryKeyUnicodeClean = Boolean
+            .valueOf(System.getProperty(
+                    SparseRowStore.Options.PRIMARY_KEY_UNICODE_CLEAN,
+                    SparseRowStore.Options.DEFAULT_PRIMARY_KEY_UNICODE_CLEAN));
 
 }
