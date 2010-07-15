@@ -193,7 +193,7 @@ public class TestSPOKeyOrder extends TestCase2 {
         final byte[] fromKey = P.encode(keyBuilder.reset())
                 .getKey();
 
-        final byte[] toKey = SuccessorUtil.successor(fromKey);
+        final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
         if (log.isInfoEnabled()) {
             log.info("fromKey=" + BytesUtil.toString(fromKey));
@@ -232,7 +232,7 @@ public class TestSPOKeyOrder extends TestCase2 {
 
         final byte[] fromKey = P.encode(keyBuilder.reset()).getKey();
 
-        final byte[] toKey = SuccessorUtil.successor(fromKey);
+        final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
         if (log.isInfoEnabled()) {
             log.info("fromKey=" + BytesUtil.toString(fromKey));

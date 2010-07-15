@@ -449,7 +449,9 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
         if (knownTerms == null || knownTerms.length == 0)
             return null;
         
-        return SuccessorUtil.successor(getFromKey(keyBuilder, knownTerms));
+        final byte[] from = getFromKey(keyBuilder, knownTerms);
+        
+        return SuccessorUtil.successor(from);
         
     }
 
@@ -540,7 +542,7 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
              * use a fake TermId object to simulate this since we have no way
              * of encoding null into the byte flags yet.
              */
-            keyBuilder.append(NullIV.INSTANCE);
+            NullIV.INSTANCE.encode(keyBuilder);
             
             return;
             

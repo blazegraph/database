@@ -136,7 +136,7 @@ public abstract class AbstractRuleFastClosure_5_6_7_9 extends
                                 + set.toString());
 
                     }
-
+                    
                     return set;
 
                 }

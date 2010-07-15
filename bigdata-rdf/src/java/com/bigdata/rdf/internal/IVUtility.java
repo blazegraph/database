@@ -127,7 +127,8 @@ public class IVUtility {
             
             ivs[i] = decodeFromOffset(key, offset);
             
-            offset += ivs[i].byteLength();
+            offset += ivs[i] == null 
+                    ? NullIV.INSTANCE.byteLength() : ivs[i].byteLength();
             
         }
         
@@ -160,7 +161,9 @@ public class IVUtility {
             
             ivs.add(iv);
             
-            offset += iv.byteLength();
+            offset += iv == null
+                    ? NullIV.INSTANCE.byteLength() : iv.byteLength();
+            
         }
         
         return ivs.toArray(new IV[ivs.size()]);
