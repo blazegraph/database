@@ -391,11 +391,11 @@ public class KeyBuilder implements IKeyBuilder {
     
     public KeyBuilder appendASCII(final String s) {
         
-        int len = s.length();
+        int tmpLen = s.length();
         
-        ensureFree(len);
+        ensureFree(tmpLen);
         
-        for(int j=0; j<len; j++) {
+        for(int j=0; j<tmpLen; j++) {
             
             char ch = s.charAt(j);
             
@@ -1393,10 +1393,8 @@ public class KeyBuilder implements IKeyBuilder {
        
         /**
          * Optional property specifies the library that will be used to generate
-         * sort keys from Unicode data. The default always supports Unicode, but
-         * the library choice depends on whether or not ICU library is found on
-         * the classpath. When the ICU library is present, it is the default.
-         * Otherwise the JDK library is the default. You may explicitly specify
+         * sort keys from Unicode data. The ICU library is the default.
+         * You may explicitly specify
          * the library choice using one of the {@link CollatorEnum} values. The
          * {@link CollatorEnum#ASCII} value may be used to disable Unicode
          * support entirely, treating the characters as if they were ASCII. If
