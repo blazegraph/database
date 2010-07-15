@@ -140,7 +140,7 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<IV, BigdataVa
      */
     public byte[] id2key(final TermId tid) {
         
-        return getKeyBuilder().reset().append(tid.getTermId()).getKey();
+        return tid.encode(getKeyBuilder().reset()).getKey();
         
     }
     

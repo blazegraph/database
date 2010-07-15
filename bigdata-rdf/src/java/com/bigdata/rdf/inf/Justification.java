@@ -361,6 +361,8 @@ public class Justification implements Comparable<Justification> {
             
         }
         
+        System.err.println(toString());
+        
     }
     
 //    /**
@@ -531,7 +533,7 @@ public class Justification implements Comparable<Justification> {
 
         if (rule != null) {
 
-            sb.append(rule.getClass().getSimpleName());
+            sb.append(rule.getName());
 
             sb.append("\n");
 

@@ -32,6 +32,7 @@ import java.util.concurrent.Callable;
 import org.apache.log4j.Logger;
 
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOPredicate;
@@ -290,7 +291,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
              */
             for (IV p : a) {
 
-                if (p == propertyId.get()) {
+                if (IVUtility.equals(p, propertyId.get())) {
 
                     /*
                      * The rule refuses to consider triple patterns where the

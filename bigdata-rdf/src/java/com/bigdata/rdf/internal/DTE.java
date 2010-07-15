@@ -313,7 +313,7 @@ public enum DTE {
         if (datatype.equals(XSD.UUID))
             return UUID;
 
-        throw new IllegalArgumentException(datatype.stringValue());
+        return null;
     }
 
     /**

@@ -25,12 +25,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.inf;
 
 import java.util.NoSuchElementException;
-
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -56,7 +56,7 @@ public class FullyBufferedJustificationIterator implements IJustificationIterato
      * and 2-3 SPOs in the tail. The capacity will be extended automatically
      * if necessary.
      */
-    private final KeyBuilder keyBuilder;
+    private final IKeyBuilder keyBuilder;
 
     /** the index in which the justifications are stored. */
     private final IIndex ndx;
@@ -85,26 +85,17 @@ public class FullyBufferedJustificationIterator implements IJustificationIterato
         
         this.ndx = db.getSPORelation().getJustificationIndex();
         
-        keyBuilder = new KeyBuilder(db.getSPOKeyArity() * (1 + 3)
-                * Bytes.SIZEOF_LONG);
+        keyBuilder = KeyBuilder.newInstance();
 
-        /*
-         * FIXME This is the implementation for backwards
-         * compatibility.  We should not see inline values here.
-         */
-        if (head.s().isInline() || head.p().isInline() || head.o().isInline()) {
-            throw new RuntimeException();
-        }
+        head.s().encode(keyBuilder);
+        head.p().encode(keyBuilder);
+        head.o().encode(keyBuilder);
         
-        final byte[] fromKey = keyBuilder.reset().append(head.s().getTermId())
-                .append(head.p().getTermId())
-                .append(head.o().getTermId()).getKey();
+        final byte[] fromKey = keyBuilder.getKey();
 
-        final byte[] toKey = keyBuilder.reset().append(head.s().getTermId())
-                .append(head.p().getTermId())
-                .append(head.o().getTermId() + 1).getKey();
+        final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
-        final long rangeCount = ndx.rangeCount(fromKey,toKey);
+        final long rangeCount = ndx.rangeCount(fromKey, toKey);
 
         if (rangeCount > 1000000) {
 

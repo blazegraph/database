@@ -109,7 +109,7 @@ public class DistinctMultiTermAdvancer extends Advancer<SPO> {
         
         final byte[] fromKey = keyBuilder.getKey();
         
-        final byte[] toKey = SuccessorUtil.successor(fromKey);
+        final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
         src.seek(toKey);
 

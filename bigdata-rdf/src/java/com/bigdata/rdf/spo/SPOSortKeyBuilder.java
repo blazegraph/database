@@ -37,15 +37,15 @@ public class SPOSortKeyBuilder implements ISortKeyBuilder<ISPO> {
             throw new IllegalArgumentException();
         }
         
-        keyBuilder.reset().append(spo.s().getTermId())
-                .append(spo.p().getTermId()).append(spo.o().getTermId());
+        keyBuilder.reset();
+        
+        spo.s().encode(keyBuilder);
+        spo.p().encode(keyBuilder);
+        spo.o().encode(keyBuilder);
 
         if (arity == 4) {
 
-            if (spo.c().isInline())
-                throw new IllegalArgumentException();
-            
-            keyBuilder.append(spo.c().getTermId());
+            spo.c().encode(keyBuilder);
             
         }
 

@@ -1481,7 +1481,7 @@ public class SPORelation extends AbstractRelation<ISPO>
                 : keyBuilder.getKey();
         
         final byte[] toKey = fromKey == null ? null 
-                : SuccessorUtil.successor(fromKey);
+                : SuccessorUtil.successor(fromKey.clone());
         
         /*
          * Layer in the logic to advance to the tuple that will have the next

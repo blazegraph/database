@@ -12,6 +12,7 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Justification;
 
@@ -108,17 +109,10 @@ public class JustificationRemover implements Callable<Long> {
 
             final ISPO spo = a[i];
 
-            /*
-             * FIXME This is the implementation for backwards
-             * compatibility.  We should not see inline values here.
-             */
-            if (spo.s().isInline() || spo.p().isInline() || spo.o().isInline()) {
-                throw new RuntimeException();
-            }
-            
-            final long _s = spo.s().getTermId();
-            final long _p = spo.p().getTermId();
-            final long _o = spo.o().getTermId();
+            keyBuilder.reset();
+            spo.s().encode(keyBuilder);
+            spo.p().encode(keyBuilder);
+            spo.o().encode(keyBuilder);
             
             /*
              * Form an iterator that will range scan the justifications having
@@ -127,11 +121,9 @@ public class JustificationRemover implements Callable<Long> {
              * not actually send back the keys or vals to the client.
              */
 
-            final byte[] fromKey = keyBuilder.reset().append(_s).append(
-                    _p).append(_o).getKey();
+            final byte[] fromKey = keyBuilder.getKey();
 
-            final byte[] toKey = keyBuilder.reset().append(_s).append(_p)
-                    .append(_o + 1).getKey();
+            final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
             final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey,
                     0/* capacity */, IRangeQuery.REMOVEALL, null/* filter */);
