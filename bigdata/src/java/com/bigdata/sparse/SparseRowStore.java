@@ -1072,7 +1072,12 @@ public class SparseRowStore implements IRowStoreConstants {
         String PRIMARY_KEY_UNICODE_CLEAN = Schema.class.getName()
                 + ".primaryKey.unicodeClean";
 
-        String DEFAULT_PRIMARY_KEY_UNICODE_CLEAN = "true";
+        /**
+         * FIXME Change over the [true] for the next release.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/107
+         */
+        String DEFAULT_PRIMARY_KEY_UNICODE_CLEAN = "false";
 
     }
 
