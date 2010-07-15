@@ -27,13 +27,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.spo;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.filter.Advancer;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
@@ -70,7 +72,7 @@ public class DistinctTermAdvancer extends Advancer<SPO> {
 
     private final int arity;
 
-    private transient KeyBuilder keyBuilder;
+    private transient IKeyBuilder keyBuilder;
 
     public DistinctTermAdvancer(final int arity) {
         
@@ -92,33 +94,24 @@ public class DistinctTermAdvancer extends Advancer<SPO> {
 
             assert arity == 3 || arity == 4;
             
-            keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG * arity);
+            keyBuilder = KeyBuilder.newInstance();
 
         }
         
-        // old approach
-        
-//        final long id = KeyBuilder
-//                .decodeLong(tuple.getKeyBuffer().array(), 0/* offset */);
-//
-//        // restart scan at the next possible term id.
-//        final long nextId = id + 1;
-//
-//        keyBuilder.reset().append(nextId);
-//
-//        src.seek(keyBuilder.getBuffer());
-
         /*
          * new approach.
-         * 
-         * FIXME We need a method for IV to report byte length of its coded
-         * representation. Use that here in places of SIZEOF_LONG.
          */
         
-        final byte[] key = tuple.getKey();//getKeyBuffer().array();
-        final byte[] successor = SuccessorUtil.successor(key,0,Bytes.SIZEOF_LONG);
+        final byte[] key = tuple.getKey();
+        
+        keyBuilder.reset();
+        IVUtility.decode(key).encode(keyBuilder);
+        
+        final byte[] fromKey = keyBuilder.getKey();
+        
+        final byte[] toKey = SuccessorUtil.successor(fromKey);
 
-        src.seek(successor);
+        src.seek(toKey);
         
     }
 

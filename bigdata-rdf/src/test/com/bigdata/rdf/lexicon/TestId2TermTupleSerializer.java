@@ -31,11 +31,11 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-
 import junit.framework.TestCase2;
-
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
 /**
@@ -64,9 +64,9 @@ public class TestId2TermTupleSerializer extends TestCase2 {
         final Id2TermTupleSerializer fixture = new Id2TermTupleSerializer(
                 namespace, BigdataValueFactoryImpl.getInstance(namespace));
 
-        long id1 = -1;
-        long id2 = 0;
-        long id3 = 1;
+        TermId id1 = new TermId(VTE.URI, -1);
+        TermId id2 = new TermId(VTE.URI, 0);
+        TermId id3 = new TermId(VTE.URI, 1);
 
         byte[] k1 = fixture.id2key(id1);
         byte[] k2 = fixture.id2key(id2);

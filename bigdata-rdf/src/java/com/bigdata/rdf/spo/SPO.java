@@ -24,11 +24,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.spo;
 
 import org.openrdf.model.Statement;
-
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtil;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataResource;
@@ -139,7 +138,7 @@ public class SPO implements ISPO {
 
         }
 
-        if (c != null && !IVUtil.equals(iv, c))
+        if (c != null && !IVUtility.equals(iv, c))
             throw new IllegalStateException(
                     "Different statement identifier already defined: "
                             + toString() + ", new=" + iv);
@@ -419,13 +418,10 @@ public class SPO implements ISPO {
             assert sid != TermId.NULL : "statement identifier is NULL for explicit statement: "
                 + spo.toString();
 
-            assert VTE.isStatement(sid) : "Not a statement identifier: "
-                    + sid;
-
             assert type == StatementEnum.Explicit : "statement identifier for non-explicit statement : "
                     + spo.toString();
 
-            spo.setStatementIdentifier(new TermId(sid));
+            spo.setStatementIdentifier(new TermId(VTE.STATEMENT, sid));
             
         }
 
@@ -568,9 +564,9 @@ public class SPO implements ISPO {
             return true;
 
         return
-                IVUtil.equals(this.s, stmt2.s()) && //
-                IVUtil.equals(this.p, stmt2.p()) && //
-                IVUtil.equals(this.o, stmt2.o()) && //
+                IVUtility.equals(this.s, stmt2.s()) && //
+                IVUtility.equals(this.p, stmt2.p()) && //
+                IVUtility.equals(this.o, stmt2.o()) && //
                 this.type == stmt2.getStatementType()
                 ;
 

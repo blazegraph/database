@@ -26,6 +26,6 @@ public interface ITermIdFilter extends Serializable {
      * @see AbstractTripleStore#isLiteral(long)
      * @see AbstractTripleStore#isStatement(IV)
      */
-    public boolean isValid(TermId termId);
+    public boolean isValid(IV iv);
     
 }

@@ -32,9 +32,7 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-
 import org.openrdf.model.Value;
-
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
@@ -43,6 +41,7 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -67,7 +66,7 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<IV, BigdataVa
      * The namespace of the owning {@link LexiconRelation}.
      */
     private String namespace;
-
+    
     /**
      * A (de-)serialized backed by a {@link BigdataValueFactoryImpl} for the
      * {@link #namespace} of the owning {@link LexiconRelation}.
@@ -99,7 +98,8 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<IV, BigdataVa
      *            A factory that does not support unicode and has an
      *            initialCapacity of {@value Bytes#SIZEOF_LONG}.
      */
-    public Id2TermTupleSerializer(final String namespace,final BigdataValueFactory valueFactory) {
+    public Id2TermTupleSerializer(final String namespace,
+            final BigdataValueFactory valueFactory) {
         
         super(//
                 new ASCIIKeyBuilderFactory(Bytes.SIZEOF_LONG),//
@@ -138,9 +138,9 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<IV, BigdataVa
      * 
      * @see #key2Id()
      */
-    public byte[] id2key(long id) {
+    public byte[] id2key(final TermId tid) {
         
-        return getKeyBuilder().reset().append(id).getKey();
+        return getKeyBuilder().reset().append(tid.getTermId()).getKey();
         
     }
     
@@ -152,13 +152,11 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<IV, BigdataVa
      * 
      * @return The term identifier.
      */
-    public IV deserializeKey(ITuple tuple) {
+    public IV deserializeKey(final ITuple tuple) {
 
         final byte[] key = tuple.getKeyBuffer().array();
 
-        final long id = KeyBuilder.decodeLong(key, 0);
-
-        return new TermId(id);
+        return IVUtility.decode(key);
 
     }
 
@@ -166,11 +164,11 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<IV, BigdataVa
      * Return the unsigned byte[] key for a term identifier.
      * 
      * @param obj
-     *            The term identifier as a {@link Long}.
+     *            The term identifier as a {@link TermId}.
      */
     public byte[] serializeKey(final Object obj) {
 
-        return id2key(((Long) obj).longValue());
+        return id2key((TermId) obj);
         
     }
 

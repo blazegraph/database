@@ -30,7 +30,7 @@ import java.util.Arrays;
 import java.util.Set;
 
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtil;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ISPO;
@@ -162,7 +162,7 @@ public class BackchainOwlSameAsPropertiesPIterator extends
         for (IV s1 : sAndSames) {
             for (IV o1 : oAndSames) {
                 // do not add ( s sameAs s ) inferences
-                if (IVUtil.equals(spo.p(), sameAs) && IVUtil.equals(s1, o1)) {
+                if (IVUtility.equals(spo.p(), sameAs) && IVUtility.equals(s1, o1)) {
                     continue;
                 }
                 if (numSPOs == chunkSize) {

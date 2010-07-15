@@ -32,7 +32,6 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-
 import org.apache.log4j.Logger;
 import org.deri.iris.api.IProgramOptimisation.Result;
 import org.deri.iris.api.basics.ILiteral;
@@ -46,9 +45,7 @@ import org.deri.iris.basics.BasicFactory;
 import org.deri.iris.builtins.BuiltinsFactory;
 import org.deri.iris.optimisations.magicsets.MagicSets;
 import org.deri.iris.terms.TermFactory;
-
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.rules.MappedProgram;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
@@ -585,6 +582,9 @@ type (triple vs. NOT_EQUAL for example).
     
     /**
      * Convert an IRIS term to a bigdata term (IVariableOrConstant).
+     * <p>
+     * 
+     * FIXME this no longer works after the lexicon refactor.
      * 
      * @param term
      *              the IRIS term
@@ -595,7 +595,8 @@ type (triple vs. NOT_EQUAL for example).
      
         String value = (String) term.getValue();
         if (term.isGround()) {
-            return new Constant<IV>(new TermId(Long.valueOf(value)));
+            throw new RuntimeException();
+//            return new Constant<IV>(LegacyTermIdUtility.termId(Long.valueOf(value)));
         } else {
             return Var.var(value);
         }

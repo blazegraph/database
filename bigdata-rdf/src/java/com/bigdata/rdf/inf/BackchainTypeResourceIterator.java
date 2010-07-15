@@ -214,9 +214,9 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
                     db.getSPORelation().distinctTermScan(SPOKeyOrder.OSP,
                             new ITermIdFilter() {
                                 private static final long serialVersionUID = 1L;
-                                public boolean isValid(TermId termId) {
+                                public boolean isValid(IV iv) {
                                     // filter out literals from the OSP scan.
-                                    return !termId.isLiteral();
+                                    return !iv.isLiteral();
                                 }
                             })));
 

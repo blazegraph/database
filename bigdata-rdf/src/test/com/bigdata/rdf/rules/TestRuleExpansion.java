@@ -36,7 +36,7 @@ import org.openrdf.model.vocabulary.OWL;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtil;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
@@ -203,7 +203,7 @@ public class TestRuleExpansion extends AbstractInferenceEngineTestCase {
                         final IVariableOrConstant<IV> p = accessPath.getPredicate().get(1);
                         final IVariableOrConstant<IV> o = accessPath.getPredicate().get(2);
                         boolean isValid = true;
-                        if (!p.isConstant() || !IVUtil.equals(p.get(), termIds.get(OWL.SAMEAS))) {
+                        if (!p.isConstant() || !IVUtility.equals(p.get(), termIds.get(OWL.SAMEAS))) {
                             if (log.isInfoEnabled())
                                 log.info("p must be owl:sameAs");
                             isValid = false;

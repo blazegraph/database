@@ -55,7 +55,9 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.isolation.IConflictResolver;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.btree.proc.LongAggregator;
 import com.bigdata.btree.raba.codec.EmptyRabaValueCoder;
 import com.bigdata.btree.raba.codec.IRabaCoder;
@@ -67,7 +69,11 @@ import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.Justification;
+import com.bigdata.rdf.internal.DTE;
+import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.LexiconConfiguration;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.lexicon.ITermIdFilter;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -121,7 +127,8 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPORelation extends AbstractRelation<ISPO> {
+public class SPORelation extends AbstractRelation<ISPO>
+        implements ILexiconConfiguration {
 
     protected static final transient Logger log = Logger
             .getLogger(SPORelation.class);
@@ -1381,12 +1388,11 @@ public class SPORelation extends AbstractRelation<ISPO> {
                 @Override
                 protected boolean isValid(final ITuple<SPO> tuple) {
 
-                    final long id = KeyBuilder.decodeLong(tuple
-                            .getKeyBuffer().array(), 0);
-
-                    final TermId tid = new TermId(id);
+                    final byte[] key = tuple.getKey();
                     
-                    return termIdFilter.isValid(tid);
+                    final IV iv = IVUtility.decode(key);
+                    
+                    return termIdFilter.isValid(iv);
 
                 }
 
@@ -1399,15 +1405,21 @@ public class SPORelation extends AbstractRelation<ISPO> {
                 .rangeIterator(null/* fromKey */, null/* toKey */,
                         0/* capacity */, IRangeQuery.KEYS | IRangeQuery.CURSOR,
                         filter)).addFilter(new Resolver() {
+                    
                     private static final long serialVersionUID = 1L;
+                    
                     /**
-                     * Resolve SPO key to Long.
+                     * Resolve SPO key to IV.
                      */
                     @Override
                     protected IV resolve(Object obj) {
-                        return new TermId(KeyBuilder.decodeLong(((ITuple) obj)
-                                .getKeyBuffer().array(), 0));
+                        
+                        final byte[] key = ((ITuple) obj).getKey();
+                        
+                        return IVUtility.decode(key);
+                        
                     }
+                    
                 });
 
         return new ChunkedWrappedIterator<IV>(itr);
@@ -1426,7 +1438,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * @return An iterator visiting the distinct term identifiers.
      */
     public IChunkedIterator<IV> distinctMultiTermScan(
-            final IKeyOrder<ISPO> keyOrder, TermId[] knownTerms) {
+            final IKeyOrder<ISPO> keyOrder, IV[] knownTerms) {
 
         return distinctMultiTermScan(keyOrder, knownTerms,/* termIdFilter */null);
 
@@ -1453,25 +1465,23 @@ public class SPORelation extends AbstractRelation<ISPO> {
      *       fast scans across multiple shards when chunk-wise order is Ok.
      */
     public IChunkedIterator<IV> distinctMultiTermScan(
-            final IKeyOrder<ISPO> keyOrder, final TermId[] knownTerms,
+            final IKeyOrder<ISPO> keyOrder, final IV[] knownTerms,
             final ITermIdFilter termIdFilter) {
 
         final FilterConstructor<SPO> filter = new FilterConstructor<SPO>();
         final int nterms = knownTerms.length;
 
-        final KeyBuilder fromKey = new KeyBuilder(getKeyArity() * 8);
-        for (TermId tid : knownTerms) {
-            fromKey.append(tid.getTermId());
+        final IKeyBuilder keyBuilder = KeyBuilder.newInstance();
+        
+        for (int i = 0; i < knownTerms.length; i++) {
+            knownTerms[i].encode(keyBuilder);
         }
-
-        final KeyBuilder toKey = new KeyBuilder(getKeyArity() * 8);
-        for (int i = 0; i < nterms; i++) {
-            if (i == nterms - 1) {
-                toKey.append(knownTerms[i].getTermId() + 1);
-            } else {
-                toKey.append(knownTerms[i].getTermId());
-            }
-        }
+        
+        final byte[] fromKey = knownTerms.length == 0 ? null 
+                : keyBuilder.getKey();
+        
+        final byte[] toKey = fromKey == null ? null 
+                : SuccessorUtil.successor(fromKey);
         
         /*
          * Layer in the logic to advance to the tuple that will have the next
@@ -1492,12 +1502,13 @@ public class SPORelation extends AbstractRelation<ISPO> {
                 @Override
                 protected boolean isValid(final ITuple<SPO> tuple) {
 
-                    final long id = KeyBuilder.decodeLong(tuple
-                            .getKeyBuffer().array(), 0);
+                    final byte[] key = tuple.getKey();
                     
-                    final TermId tid = new TermId(id);
-
-                    return termIdFilter.isValid(tid);
+                    final int pos = knownTerms.length;
+                    
+                    final IV iv = IVUtility.decode(key, pos+1)[pos];
+                    
+                    return termIdFilter.isValid(iv);
 
                 }
 
@@ -1507,20 +1518,26 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         @SuppressWarnings("unchecked")
         final Iterator<IV> itr = new Striterator(getIndex(keyOrder)
-                .rangeIterator(fromKey.getKey(), toKey.getKey(),
+                .rangeIterator(fromKey, toKey,
                         0/* capacity */, IRangeQuery.KEYS | IRangeQuery.CURSOR,
                         filter)).addFilter(new Resolver() {
 
             private static final long serialVersionUID = 1L;
 
             /**
-             * Resolve SPO key to Long.
+             * Resolve SPO key to IV.
              */
             @Override
             protected IV resolve(Object obj) {
-                return new TermId(KeyBuilder.decodeLong(((ITuple) obj)
-                        .getKeyBuffer().array(), (nterms - 1) * 8));
+                
+                final byte[] key = ((ITuple) obj).getKey();
+                
+                final int pos = knownTerms.length;
+                
+                return IVUtility.decode(key, pos+1)[pos];
+                
             }
+            
         });
 
         return new ChunkedWrappedIterator<IV>(itr);
@@ -2309,4 +2326,35 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     }
 
+    /**
+     * The {@link ILexiconConfiguration} instance, which will determine how
+     * terms are encoded and decoded in the key space.
+     */
+    private ILexiconConfiguration lexiconConfiguration = 
+        new LexiconConfiguration();
+
+    /**
+     * See {@link ILexiconConfiguration#isInline(DTE)}.  Delegates to the
+     * {@link #lexiconConfiguration} instance.
+     */
+    public boolean isInline(DTE dte) {
+        return lexiconConfiguration.isInline(dte);
+    }
+
+    /**
+     * See {@link ILexiconConfiguration#isLegacyEncoding()}.  Delegates to the
+     * {@link #lexiconConfiguration} instance.
+    public boolean isLegacyEncoding() {
+        return lexiconConfiguration.isLegacyEncoding();
+    }
+     */
+    
+    /**
+     * Return the {@link #lexiconConfiguration} instance.  Used to determine
+     * how to encode and decode terms in the key space.
+     */
+    public ILexiconConfiguration getLexiconConfiguration() {
+        return lexiconConfiguration;
+    }
+    
 }

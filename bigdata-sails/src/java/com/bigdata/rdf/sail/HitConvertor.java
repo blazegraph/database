@@ -15,6 +15,7 @@ import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataValueIterator;
@@ -82,7 +83,7 @@ public class HitConvertor implements
 
                                 final IHit hit = (IHit) arg0;
 
-                                return new TermId(hit.getDocId());
+                                return new TermId(VTE.LITERAL, hit.getDocId());
                             }
 
                         })));

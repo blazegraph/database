@@ -27,7 +27,6 @@
 
 package com.bigdata.rdf.lexicon;
 
-import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -74,15 +73,16 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBufferHandler
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithBatchedUpdates;
-import com.bigdata.io.FixedByteArrayBuffer;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.DTE;
+import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.LexiconConfiguration;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.UUIDInternalValue;
-import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSDBooleanInternalValue;
 import com.bigdata.rdf.internal.XSDByteInternalValue;
 import com.bigdata.rdf.internal.XSDDecimalInternalValue;
@@ -145,7 +145,8 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class LexiconRelation extends AbstractRelation<BigdataValue> {
+public class LexiconRelation extends AbstractRelation<BigdataValue> 
+        implements ILexiconConfiguration {
 
     final protected static Logger log = Logger.getLogger(LexiconRelation.class);
 
@@ -665,7 +666,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         final IndexMetadata metadata = newIndexMetadata(name);
 
         metadata.setTupleSerializer(new Id2TermTupleSerializer(
-				getNamespace(), getValueFactory()));
+                getNamespace(), getValueFactory()));
 
         return metadata;
 
@@ -849,21 +850,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                     @Override
                     protected Object resolve(final Object arg0) {
 
-                        return new TermId(((ITuple) arg0).getValueBuffer()
-                                .getLong(0/* pos */));
-
-//                        try {
-//
-//                            tid = tuple.getValueStream().readLong();
-////                            tid = LongPacker.unpackLong(tuple.getValueStream());
-//
-//                        } catch (IOException e) {
-//
-//                            throw new RuntimeException(e);
-//
-//                        }
-//
-//                        return tid;
+                        final byte[] bytes = ((ITuple) arg0).getValue(); 
+                        
+                        return IVUtility.decode(bytes);
 
                     }
                 });
@@ -942,6 +931,53 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         if (numTerms == 0)
             return;
 
+        /*
+         * Very strange that we need to pass in the numTerms.  The
+         * semantics are that we should only consider terms from 
+         * terms[0] to terms[numTerms-1] (ignoring terms in the array past
+         * numTerms-1).  The inline method will respect those semantics but
+         * then return a dense array of terms that definitely should be added 
+         * to the lexicon indices - that is, terms in the original array at 
+         * index less than numTerms and not inlinable.
+         */
+        final BigdataValue[] terms2 = addInlineTerms(terms, numTerms);
+        final int numTerms2 = terms2.length;
+        
+//      this code is bad because it modifies the original array
+//      // keep track of how many terms we need to index (non-inline terms)
+//      int numTerms2 = numTerms;
+//      for (int i = 0; i < numTerms; i++) {
+//          // try to get an inline internal value
+//          final IV inline = getInlineIV(terms[i]);
+//          
+//          if (inline != null) {
+//              // take this term out of the terms array
+//              terms[i] = null;
+//              // decrement the number of terms to index
+//              numTerms2--;
+//          }
+//      }
+//
+//      /* 
+//       * We nulled out the inline terms from the original terms array, so
+//       * now we need to shift the remaining terms down to fill in the gaps.
+//       */
+//      if (numTerms2 < numTerms) {
+//          int j = 0;
+//          for (int i = 0; i < numTerms2; i++) {
+//              if (terms[i] != null) {
+//                  j++;
+//              } else {
+//                  while (terms[i] == null) {
+//                      j++;
+//                      terms[i] = terms[j];
+//                      terms[j] = null;
+//                  }
+//              }
+//          }
+//      }
+      
+        
         final long begin = System.currentTimeMillis();
         
         final WriteTaskStats stats = new WriteTaskStats();
@@ -949,7 +985,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         final KVO<BigdataValue>[] a;
         try {
             // write on the forward index (sync RPC)
-            a = new Term2IdWriteTask(this, readOnly, numTerms, terms, stats)
+            a = new Term2IdWriteTask(this, readOnly, numTerms2, terms2, stats)
                     .call();
         } catch (Exception ex) {
             throw new RuntimeException(ex);
@@ -1066,20 +1102,52 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         if (log.isInfoEnabled() && readOnly && stats.nunknown.get() > 0) {
          
             log.info("There are " + stats.nunknown + " unknown terms out of "
-                    + numTerms + " given");
+                    + numTerms2 + " given");
             
         }
         
-        if (numTerms > 1000 || elapsed > 3000) {
+        if (numTerms2 > 1000 || elapsed > 3000) {
 
             if(log.isInfoEnabled())
-            log.info("Processed " + numTerms + " in " + elapsed
+            log.info("Processed " + numTerms2 + " in " + elapsed
                         + "ms; keygen=" + stats.keyGenTime + "ms, sort=" + stats.sortTime
                         + "ms, insert=" + stats.indexTime + "ms" + " {forward="
                         + stats.forwardIndexTime + ", reverse=" + stats.reverseIndexTime
                         + ", fullText=" + stats.fullTextIndexTime + "}");
 
         }
+
+    }
+    
+    /**
+     * Called by the add terms method, this method is meant to filter out
+     * inline terms from the supplied terms array (up to position numTerms-1).
+     * It will return a dense array of values that could not be inlined and thus
+     * need to be written to the indices.
+     * 
+     * @param terms
+     *          the original terms
+     * @param numTerms
+     *          the number of original terms to consider
+     * @return
+     *          the terms that were in consideration but could not be inlined
+     */
+    private BigdataValue[] addInlineTerms(BigdataValue[] terms, int numTerms) {
+     
+        // these are the terms that will need to be indexed (not inline terms)
+        final ArrayList<BigdataValue> terms2 = 
+            new ArrayList<BigdataValue>(numTerms);
+        
+        for (int i = 0; i < numTerms; i++) {
+            
+            // Try to get an inline internal value for the term (sets the IV as 
+            // a side effect if not null)
+            if (getInlineIV(terms[i]) == null)
+                terms2.add(terms[i]);
+            
+        }
+        
+        return terms2.toArray(new BigdataValue[terms2.size()]);
 
     }
 
@@ -1220,19 +1288,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                             + spo.toString(/*this*/));
 
                 /*
-                 * FIXME This is the implementation for backwards
-                 * compatibility.  We should not see inline values here.
+                 * Creating a dummy term for the Term2Id index.
                  */
-                if (spo.s().isInline() || spo.p().isInline() || spo.o().isInline()) {
-                    throw new RuntimeException();
-                }
-                
-                keys[nexplicit] = keyBuilder.reset() //
-                        .append(ITermIndexCodes.TERM_CODE_STMT)//
-                        .append(spo.s().getTermId()).append(spo.p().getTermId())
-                        .append(spo.o().getTermId())//
-                        .getKey()//
-                ;
+                keyBuilder.reset().append(ITermIndexCodes.TERM_CODE_STMT);
+                spo.s().encode(keyBuilder);
+                spo.p().encode(keyBuilder);
+                spo.o().encode(keyBuilder);
+                keys[nexplicit] = keyBuilder.getKey();
 
                 // Note: keeps correlation between key and SPO.
                 b[nexplicit] = spo;
@@ -1387,20 +1449,21 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         final ConcurrentHashMap<IV/* iv */, BigdataValue/* term */> ret = 
             new ConcurrentHashMap<IV, BigdataValue>(n);
 
+        final Collection<TermId> termIds = new LinkedList<TermId>();
+        
         /*
          * Filter out the inline values first.
          */
-        final Iterator<IV> it = ivs.iterator();
-        while (it.hasNext()) {
+        for (IV iv : ivs) {
             
-            final IV iv = it.next();
             if (iv.isInline()) {
-                
-                // take it out of the IVs to resolve against the index
-                it.remove();
                 
                 // translate it into a value directly
                 ret.put(iv, iv.asValue(valueFactory));
+                
+            } else {
+                
+                termIds.add((TermId) iv);
                 
             }
             
@@ -1410,14 +1473,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
          * An array of any term identifiers that were not resolved in this first
          * stage of processing. We will look these up in the index.
          */
-        final TermId[] notFound = new TermId[n];
+        final TermId[] notFound = new TermId[termIds.size()];
 
         int numNotFound = 0;
         
-        for (IV iv : ivs) {
+        for (TermId tid : termIds) {
 
-            final TermId tid = (TermId) iv;
-            
 			final BigdataValue value = _getTermId(tid);
             
             if (value != null) {
@@ -1455,17 +1516,24 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
              * FIXME 10/12ths of the cost of this sort is the TermIdComparator2
              * class and the sort is 1/3 of the cost of this method overall. Try
              * to use a native long[] and see if we can shave some time.
+             * 
+             * FIXME the old TermIdComparator does not use the same sort 
+             * ordering for TermIds, which includes the term type (encoded in 
+             * the byte flags)
              */
-            Arrays.sort(notFound, 0, numNotFound, TermIdComparator2.INSTANCE);
-            
-            final IKeyBuilder keyBuilder = KeyBuilder.newInstance(Bytes.SIZEOF_LONG);
+//            if (isLegacyEncoding())
+//                Arrays.sort(notFound, 0, numNotFound, TermIdComparator2.INSTANCE);
+//            else
+                Arrays.sort(notFound, 0, numNotFound);
+                        
+            final IKeyBuilder keyBuilder = KeyBuilder.newInstance();
 
             final byte[][] keys = new byte[numNotFound][];
 
             for (int i = 0; i < numNotFound; i++) {
 
                 // Note: shortcut for keyBuilder.id2key(id)
-                keys[i] = keyBuilder.reset().append(notFound[i].getTermId()).getKey();
+                keys[i] = notFound[i].encode(keyBuilder.reset()).getKey();
                 
             }
 
@@ -1895,6 +1963,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      *       along with the reverse bnodes mapping?
      */
 	private ConcurrentWeakValueCacheWithBatchedUpdates<IV, BigdataValue> termCache;
+    
+    /**
+     * The {@link ILexiconConfiguration} instance, which will determine how
+     * terms are encoded and decoded in the key space.
+     */
+    private ILexiconConfiguration lexiconConfiguration = new LexiconConfiguration();
 
     /**
      * Constant for the {@link LexiconRelation} namespace component.
@@ -1936,13 +2010,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         if (tid == null)
             throw new IllegalArgumentException();
         
-        final long id = ((TermId) tid).getTermId();
-        
-        if (id == TermId.NULL) {
-            
+        if (tid.getTermId() == TermId.NULL)
             throw new IllegalArgumentException();
-            
-        }
         
         if (tid.isStatement()) {
 
@@ -1956,7 +2025,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
              */
 
 			final BigdataBNode stmt = valueFactory.createBNode("S"
-                    + Long.toString(id));
+                    + Long.toString(tid.getTermId()));
 
             // set the term identifier on the object.
             stmt.setIV(tid);
@@ -1984,7 +2053,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
              */
 
 			final BigdataBNode bnode = valueFactory.createBNode("B"
-                    + Long.toString(id));
+                    + Long.toString(tid.getTermId()));
 
             // set the term identifier on the object.
             bnode.setIV(tid);
@@ -2030,11 +2099,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      */
     final public BigdataValue getTerm(final IV iv) {
         
-        if (iv.isInline()) {
-            
+        if (iv.isInline())
             return iv.asValue(valueFactory);
-            
-        }
         
         TermId tid = (TermId) iv;
         
@@ -2044,23 +2110,17 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         if (value != null)
             return value;
         
-        // Convert to Long object.
-        final Long lid = tid.getTermId();
-        
         final IIndex ndx = getId2TermIndex();
 
         final Id2TermTupleSerializer tupleSer = (Id2TermTupleSerializer) ndx
                 .getIndexMetadata().getTupleSerializer();
         
-        final byte[] key = tupleSer.id2key(lid);
+        final byte[] key = tupleSer.id2key(tid);
 
         final byte[] data = ndx.lookup(key);
 
-        if (data == null) {
-
+        if (data == null)
             return null;
-
-        }
 
         // This also sets the value factory.
         value = valueFactory.getValueSerializer().deserialize(data);
@@ -2087,7 +2147,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 //
 //            }
             
-            // Note: passing the Long object as the key.
+            // Note: passing the IV object as the key.
 			final BigdataValue tmp = termCache.putIfAbsent(iv, value);
 
             if (tmp != null) {
@@ -2108,88 +2168,106 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
     /**
      * Note: If {@link BigdataValue#getIV()} is set, then returns that value
-     * immediately. Otherwise looks up the termId in the index and
+     * immediately. Next, try to get an inline internal value for the value.
+     * Otherwise looks up the termId in the index and 
      * {@link BigdataValue#setIV(IV) sets the term identifier} as a
      * side-effect.
      */
     final public IV getIV(final Value value) {
 
-        if (value == null) {
-
+        if (value == null)
             return null;
 
+        // see if it already has a value
+        if (value instanceof BigdataValue) {
+            final IV iv = ((BigdataValue) value).getIV();
+            if (iv != null)
+                return iv;
         }
 
-        if (value instanceof BigdataValue
-                && ((BigdataValue) value).getIV() != null) {
-
-            return ((BigdataValue) value).getIV();
-
-        }
-
-        /*
-         * This is the implementation for backwards
-         * compatibility.  We should not return inline values here.
-         */
-        if (false)
+        // see if it can be assigned an inline value
+        final IV iv = getInlineIV(value);
+        if (iv != null)
+            return iv;
+        
+        // go to the index
+        return getTermId(value);
+        
+    }
+        
+    /**
+     * Attempt to convert the value to an inline internal value.
+     * 
+     * @param value
+     *          the value to convert
+     * @return
+     *          the inline internal value, or <code>null</code> if it cannot
+     *          be converted
+     */
+    private IV getInlineIV(Value value) {
+        
+        // just literals for now, maybe bnodes too eventually?
         if (value instanceof Literal) {
             
             Literal l = (Literal) value;
             
             URI datatype = l.getDatatype();
             
-            DTE dte = null;
+            DTE dte = datatype == null ? null : DTE.valueOf(datatype); 
             
-            if (datatype != null) {
-                
-                dte = DTE.valueOf(datatype);
-                
-            }
-            
-            if (dte == null) {
-                
-                return getTermId(value);
-                
-            }
+            if (dte == null || !isInline(dte))
+                return null;
             
             final String v = value.stringValue();
             
-            switch(dte) {
+            IV iv = null;
             
-            case XSDBoolean:
-                return new XSDBooleanInternalValue(XMLDatatypeUtil.parseBoolean(v)); 
-            case XSDByte:
-                return new XSDByteInternalValue(XMLDatatypeUtil.parseByte(v));
-            case XSDShort:
-                return new XSDShortInternalValue(XMLDatatypeUtil.parseShort(v));
-            case XSDInt:
-                return new XSDIntInternalValue(XMLDatatypeUtil.parseInt(v));
-            case XSDLong:
-                return new XSDLongInternalValue(XMLDatatypeUtil.parseLong(v));
-
-            case XSDFloat:
-                return new XSDFloatInternalValue(XMLDatatypeUtil.parseFloat(v));
-            case XSDDouble:
-                return new XSDDoubleInternalValue(XMLDatatypeUtil.parseDouble(v));
-            case XSDInteger:
-                return new XSDIntegerInternalValue(XMLDatatypeUtil.parseInteger(v));
-            case XSDDecimal:
-                return new XSDDecimalInternalValue(XMLDatatypeUtil.parseDecimal(v));
-            case UUID:
-                return new UUIDInternalValue(UUID.fromString(v));
-
-            default:
-                return getTermId(value);
-                
+            switch(dte) {
+                case XSDBoolean:
+                    iv = new XSDBooleanInternalValue(XMLDatatypeUtil.parseBoolean(v)); 
+                case XSDByte:
+                    iv = new XSDByteInternalValue(XMLDatatypeUtil.parseByte(v));
+                case XSDShort:
+                    iv = new XSDShortInternalValue(XMLDatatypeUtil.parseShort(v));
+                case XSDInt:
+                    iv = new XSDIntInternalValue(XMLDatatypeUtil.parseInt(v));
+                case XSDLong:
+                    iv = new XSDLongInternalValue(XMLDatatypeUtil.parseLong(v));
+                case XSDFloat:
+                    iv = new XSDFloatInternalValue(XMLDatatypeUtil.parseFloat(v));
+                case XSDDouble:
+                    iv = new XSDDoubleInternalValue(XMLDatatypeUtil.parseDouble(v));
+                case XSDInteger:
+                    iv = new XSDIntegerInternalValue(XMLDatatypeUtil.parseInteger(v));
+                case XSDDecimal:
+                    iv = new XSDDecimalInternalValue(XMLDatatypeUtil.parseDecimal(v));
+                case UUID:
+                    iv = new UUIDInternalValue(UUID.fromString(v));
+                default:
+                    iv = null;
             }
             
+            if (iv != null && value instanceof BigdataValue)
+                ((BigdataValue) value).setIV(iv);
+            
+            return iv;
+            
         }
-
-        return getTermId(value);
         
+        return null;
+
     }
     
-    private IV getTermId(Value value) {
+    /**
+     * This method assumes we've already exhausted all other possibilities
+     * and need to go to the index for the IV.
+     * 
+     * @param value
+     *          the value to lookup
+     * @return
+     *          the term identifier for the value
+     */
+    private TermId getTermId(Value value) {
         
         final IIndex ndx = getTerm2IdIndex();
 
@@ -2207,28 +2285,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         // lookup in the forward index.
         final byte[] tmp = ndx.lookup(key);
 
-        if (tmp == null) {
-
+        if (tmp == null)
             return null;
-//            return new TermId(TermId.NULL);
 
-        }
-
-        // decode the term identifier.
-        final long termId = new FixedByteArrayBuffer(tmp, 0/* off */, 8/* len */)
-                .getLong(0);
-//        final long termId;
-//        try {
-//
-//            termId = new DataInputBuffer(tmp).readLong();
-////            termId = new DataInputBuffer(tmp).unpackLong();
-//
-//        } catch (IOException ex) {
-//
-//            throw new RuntimeException(ex);
-//
-//        }
-        final TermId tid = new TermId(termId);
+        final TermId tid = (TermId) IVUtility.decode(tmp);
 
         if(value instanceof BigdataValue) {
 
@@ -2314,7 +2374,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
             private static final long serialVersionUID = 1L;
 
             /**
-             * Deserialize the term identifier (long integer).
+             * Deserialize the term identifier.
              * 
              * @param val
              *            The serialized term identifier.
@@ -2323,21 +2383,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
                 final ITuple tuple = (ITuple) val;
 
-                final long id;
-
-                try {
-
-//                    id = tuple.getValueStream().unpackLong();
-                    id = tuple.getValueStream().readLong();
-
-                } catch (final IOException ex) {
-
-                    throw new RuntimeException(ex);
-
-                }
-
-                return new TermId(id);
-
+                return IVUtility.decode(tuple.getValue());
+                
             }
 
         });
@@ -2426,22 +2473,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                 final byte[] key = tuple.getKey();
 
                 /*
-                 * deserialize the term identifier (packed long integer).
+                 * deserialize the term identifier.
                  */
-                final long id;
-                
-                try {
+                final IV iv = IVUtility.decode(tuple.getValue());
 
-                    id = tuple.getValueStream().readLong();
-//                    id = tuple.getValueStream().unpackLong();
-
-                } catch (IOException ex) {
-
-                    throw new RuntimeException(ex);
-
-                }
-
-                sb.append(BytesUtil.toString(key) + " : " + id+"\n");
+                sb.append(BytesUtil.toString(key) + " : " + iv +"\n");
 
             }
 
@@ -2508,6 +2544,30 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         
         return sb;
         
+    }
+
+    /**
+     * See {@link ILexiconConfiguration#isInline(DTE)}.  Delegates to the
+     * {@link #lexiconConfiguration} instance.
+     */
+    public boolean isInline(DTE dte) {
+        return lexiconConfiguration.isInline(dte);
+    }
+
+    /**
+     * See {@link ILexiconConfiguration#isLegacyEncoding()}.  Delegates to the
+     * {@link #lexiconConfiguration} instance.
+    public boolean isLegacyEncoding() {
+        return lexiconConfiguration.isLegacyEncoding();
+    }
+     */
+    
+    /**
+     * Return the {@link #lexiconConfiguration} instance.  Used to determine
+     * how to encode and decode terms in the key space.
+     */
+    public ILexiconConfiguration getLexiconConfiguration() {
+        return lexiconConfiguration;
     }
     
 }

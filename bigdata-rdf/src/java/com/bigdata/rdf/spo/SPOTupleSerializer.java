@@ -43,6 +43,7 @@ import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.StatementEnum;
 
 /**
@@ -119,8 +120,7 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
     public SPOTupleSerializer(final SPOKeyOrder keyOrder,
             final IRabaCoder leafKeySer, final IRabaCoder leafValSer) {
 
-        super(new ASCIIKeyBuilderFactory(keyOrder.getKeyArity()
-                * Bytes.SIZEOF_LONG), leafKeySer, leafValSer);
+        super(new ASCIIKeyBuilderFactory(), leafKeySer, leafValSer);
         
 //        if (keyOrder == null)
 //            throw new IllegalArgumentException();
@@ -166,7 +166,7 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
             // SIDs only valid for triples.
             assert keyOrder.getKeyArity() == 3;
 
-            spo.setStatementIdentifier(new TermId(vbuf.getLong(1)));
+            spo.setStatementIdentifier(new TermId(VTE.STATEMENT, vbuf.getLong(1)));
 
         }
 

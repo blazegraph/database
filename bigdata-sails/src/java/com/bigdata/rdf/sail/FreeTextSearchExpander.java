@@ -12,6 +12,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
@@ -304,7 +305,7 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
             }
             ISPO[] spos = new ISPO[hits.length];
             for (int i = 0; i < hits.length; i++) {
-                IV s = new TermId(hits[i].getDocId());
+                IV s = new TermId(VTE.LITERAL, hits[i].getDocId());
                 if (INFO) log.info("hit: " + s);
                 spos[i] = new SPO(s, null, null);
             }
@@ -315,7 +316,7 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
         private ISPO[] convertWhenBound(IHit[] hits) {
             ISPO[] result = new ISPO[0];
             for (IHit hit : hits) {
-                IV s = new TermId(hit.getDocId());
+                IV s = new TermId(VTE.LITERAL, hit.getDocId());
                 if (s == boundVal) {
                     result = new ISPO[] { new SPO(s, null, null) };
                     break;

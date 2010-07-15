@@ -32,6 +32,7 @@ import java.util.Iterator;
 import junit.framework.TestCase2;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
@@ -189,13 +190,10 @@ public class TestSPOKeyOrder extends TestCase2 {
 
         final SPOKeyOrder keyOrder = SPOKeyOrder.POCS;
 
-        final byte[] fromKey = keyBuilder.reset().append(P.getTermId()).append(
-                Long.MIN_VALUE).append(Long.MIN_VALUE).append(Long.MIN_VALUE)
+        final byte[] fromKey = P.encode(keyBuilder.reset())
                 .getKey();
 
-        final byte[] toKey = keyBuilder.reset().append(P.getTermId()+1).append(
-                Long.MIN_VALUE).append(Long.MIN_VALUE).append(Long.MIN_VALUE)
-                .getKey();
+        final byte[] toKey = SuccessorUtil.successor(fromKey);
 
         if (log.isInfoEnabled()) {
             log.info("fromKey=" + BytesUtil.toString(fromKey));
@@ -232,11 +230,9 @@ public class TestSPOKeyOrder extends TestCase2 {
 
         final SPOKeyOrder keyOrder = SPOKeyOrder.POS;
 
-        final byte[] fromKey = keyBuilder.reset().append(P.getTermId()).append(
-                Long.MIN_VALUE).append(Long.MIN_VALUE).getKey();
+        final byte[] fromKey = P.encode(keyBuilder.reset()).getKey();
 
-        final byte[] toKey = keyBuilder.reset().append(P.getTermId()+1).append(
-                Long.MIN_VALUE).append(Long.MIN_VALUE).getKey();
+        final byte[] toKey = SuccessorUtil.successor(fromKey);
 
         if (log.isInfoEnabled()) {
             log.info("fromKey=" + BytesUtil.toString(fromKey));

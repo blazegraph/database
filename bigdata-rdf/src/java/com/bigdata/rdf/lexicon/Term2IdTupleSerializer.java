@@ -49,15 +49,17 @@ package com.bigdata.rdf.lexicon;
 
 import java.io.IOException;
 import java.util.Properties;
-
 import org.openrdf.model.Value;
-
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.TermId;
 
 /**
  * Handles the term:id index (forward mapping for the lexicon). The keys are
@@ -171,15 +173,18 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
      * long integer.
      * 
      * @param obj
-     *            A term identifier expressed as a {@link Long}.
+     *            A term identifier expressed as a {@link TermId}.
      */
     public byte[] serializeVal(Object obj) {
 
         try {
             
-//            idbuf.reset().packLong((Long)obj);
-            idbuf.reset().writeLong((Long)obj);
-      
+            IV iv = (IV) obj;
+
+            final byte[] key = iv.encode(KeyBuilder.newInstance()).getKey();
+            
+            idbuf.reset().write(key);
+            
             return idbuf.toByteArray();
             
         } catch(IOException ex) {
@@ -191,21 +196,12 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
     }
 
     /**
-     * De-serializes the {@link ITuple} as a {@link Long} whose value is the
+     * De-serializes the {@link ITuple} as a {@link IV} whose value is the
      * term identifier associated with the key. The key itself is not decodable.
      */
-    public Long deserialize(ITuple tuple) {
+    public IV deserialize(ITuple tuple) {
 
-        try {
-            
-            return Long.valueOf(tuple.getValueStream().readLong());
-//            return Long.valueOf(tuple.getValueStream().unpackLong());
-            
-        } catch (IOException e) {
-            
-            throw new RuntimeException(e);
-            
-        }
+        return IVUtility.decode(tuple.getValue());
         
     }
 

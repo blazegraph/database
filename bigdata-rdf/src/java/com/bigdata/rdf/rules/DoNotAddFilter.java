@@ -29,7 +29,7 @@ import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtil;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOFilter;
@@ -168,8 +168,8 @@ public class DoNotAddFilter extends SPOFilter {
             
         }
 
-        if (!forwardChainRdfTypeRdfsResource && IVUtil.equals(spo.p(), rdfType)
-                && IVUtil.equals(spo.o(), rdfsResource)) {
+        if (!forwardChainRdfTypeRdfsResource && IVUtility.equals(spo.p(), rdfType)
+                && IVUtility.equals(spo.o(), rdfsResource)) {
             
             // reject (?x, rdf:type, rdfs:Resource ) 
             

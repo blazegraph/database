@@ -66,16 +66,6 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
         
     }
     
-    /**
-     * Constructor for a term identifier.  Uses {@link VTE#valueOf(long)} to
-     * determine VTE.
-     */
-    public TermId(final long termId) {
-        
-        this(VTE.valueOf(termId), termId);
-        
-    }
-    
 //    /**
 //     * Constructor for a term identifier for a datatype literal. Do NOT use this
 //     * constructor when the lexicon is configured such that the datatype literal

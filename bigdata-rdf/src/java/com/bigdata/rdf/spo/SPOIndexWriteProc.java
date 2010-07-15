@@ -386,8 +386,6 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 
                 final long sid = vbuf.readLong();
 
-                assert VTE.isStatement(sid) : "" + sid;
-
                 iv = new TermId(VTE.STATEMENT, sid);
                 
             } catch (IOException ex) {
