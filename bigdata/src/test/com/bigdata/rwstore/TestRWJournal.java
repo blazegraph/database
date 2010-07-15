@@ -644,6 +644,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	        return 0L;
 		}
 
+        /**
+         * Adjust tcount to increase stress levels
+         */
         public void test_stressReallocationWithRead() {
             
             Journal store = (Journal) getStore();
