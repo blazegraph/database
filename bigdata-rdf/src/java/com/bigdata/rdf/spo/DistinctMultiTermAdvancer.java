@@ -29,8 +29,12 @@ package com.bigdata.rdf.spo;
 
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.filter.Advancer;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -67,11 +71,11 @@ public class DistinctMultiTermAdvancer extends Advancer<SPO> {
     private static final long serialVersionUID = -7326621294779476500L;
     
     private final int arity;
-    private final int            boundEntries;
+    private final int boundEntries;
 
-    private transient KeyBuilder keyBuilder;
+    private transient IKeyBuilder keyBuilder;
 
-    public DistinctMultiTermAdvancer(final int arity,final int boundEntries) {
+    public DistinctMultiTermAdvancer(final int arity, final int boundEntries) {
 
         this.arity = arity;
         this.boundEntries = boundEntries;
@@ -89,30 +93,25 @@ public class DistinctMultiTermAdvancer extends Advancer<SPO> {
              * This is Ok since the iterator pattern is single threaded.
              */
 
-            keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG * arity);
+            keyBuilder = KeyBuilder.newInstance();
 
         }
 
-        final long keys[] = new long[4];
+        final byte[] key = tuple.getKey();
         
-        for (int i = 0; i < boundEntries + 1; i++) {
+        final IV[] ivs = IVUtility.decode(key, boundEntries+1);
         
-            keys[i] = KeyBuilder
-                    .decodeLong(tuple.getKeyBuffer().array(), i * 8);
-            
+        keyBuilder.reset();
+        
+        for (int i = 0; i < ivs.length; i++) {
+            ivs[i].encode(keyBuilder);
         }
+        
+        final byte[] fromKey = keyBuilder.getKey();
+        
+        final byte[] toKey = SuccessorUtil.successor(fromKey);
 
-        keys[boundEntries] += 1;
-
-        keyBuilder = (KeyBuilder) keyBuilder.reset();
-
-        for (int i = 0; i < boundEntries + 1; i++) {
-            
-            keyBuilder.append(keys[i]);
-            
-        }
-
-        src.seek(keyBuilder.getBuffer());
+        src.seek(toKey);
 
     }
 

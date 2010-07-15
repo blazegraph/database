@@ -40,8 +40,11 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ValueFactoryImpl;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -272,10 +275,10 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
         for (int i = 0; i < nvalues; i++) {
             
             // #of bytes in the serialized value.
-            final int nbytes = in.readInt();
+            int nbytes = in.readInt();
 
             // allocate array of that many bytes.
-            final byte[] b = new byte[nbytes];
+            byte[] b = new byte[nbytes];
             
             // read the data for the serialized value.
             in.readFully(b);
@@ -283,12 +286,16 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
             // de-serialize value (NOT a BigdataValue!)
             final Value value = valueSer.deserialize(b);
 
-            // the assigned term identifier.
-//            final long id = LongPacker.unpackLong(in);
-            final TermId tid = new TermId(in.readLong());
+            nbytes = in.readInt();
+            
+            b = new byte[nbytes];
+            
+            in.readFully(b);
+            
+            final IV iv = IVUtility.decode(b);
 
             // stuff in the map.
-            values.put(value, tid);
+            values.put(value, iv);
             
         }
         
@@ -309,6 +316,8 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
         
         final BigdataValueSerializer<Value> valueSer = new BigdataValueSerializer<Value>(
                 new ValueFactoryImpl());
+        
+        final IKeyBuilder keyBuilder = KeyBuilder.newInstance();
         
         final Iterator<Map.Entry<Value,IV>> itr = values.entrySet().iterator();
 
@@ -339,17 +348,11 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
             // copy serialized value onto the output stream.
             out.write(buf.array(), 0, buf.limit());
             
-            // pack the term identifier onto the output stream.
-//            LongPacker.packLong(out, id);
-            /*
-             * This is the implementation for backwards
-             * compatibility.  We should not see inline values here.
-             */
-            if (iv.isInline()) {
-                throw new RuntimeException();
-            }
+            final byte[] b = iv.encode(keyBuilder.reset()).getKey(); 
             
-            out.writeLong(iv.getTermId());
+            out.writeInt(b.length);
+            
+            out.write(b);
             
         }
         

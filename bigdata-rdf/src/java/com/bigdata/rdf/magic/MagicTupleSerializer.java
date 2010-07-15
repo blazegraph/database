@@ -31,19 +31,21 @@ package com.bigdata.rdf.magic;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.IVUtility;
 
 public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,MagicTuple> {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 3562172314935293567L;
+    
     /**
      * The natural order for the index.
      */
@@ -64,8 +66,7 @@ public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,Magi
      */
     public MagicTupleSerializer(MagicKeyOrder keyOrder) {
 
-        super(new ASCIIKeyBuilderFactory(
-                keyOrder.getKeyArity() * Bytes.SIZEOF_LONG), 
+        super(new ASCIIKeyBuilderFactory(), 
                 getDefaultLeafKeysCoder(),
                 getDefaultValuesCoder());
         
@@ -89,22 +90,10 @@ public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,Magi
         final int[] keyMap = keyOrder.getKeyMap();
         
         /*
-         * Note: GTE since the key is typically a reused buffer which may be
-         * larger than the #of bytes actually holding valid data.
-         */
-        assert key.length >= 8 * arity;
-
-        /*
          * Decode the key.
          */
         
-        final IV[] terms = new IV[arity];
-        
-        for (int i = 0; i < arity; i++) {
-            
-            terms[keyMap[i]] = new TermId(KeyBuilder.decodeLong(key, 8*i));
-            
-        }
+        final IV[] terms = IVUtility.decode(key, arity);
         
         // Note: No type or statement identifier information.
         final MagicTuple magicTuple = new MagicTuple(terms);
@@ -184,15 +173,7 @@ public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,Magi
         
         for (IV term : terms) {
             
-            /*
-             * This is the implementation for backwards
-             * compatibility.  We should not see inline values here.
-             */
-            if (term.isInline()) {
-                throw new RuntimeException();
-            }
-            
-            keyBuilder.append(term.getTermId());
+            term.encode(keyBuilder);
             
         }
                 

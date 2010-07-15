@@ -194,10 +194,10 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                 
                 assertNotSame(NULL, sid);
                 
-                assertTrue(VTE.isStatement(sid.getTermId()));
-                assertFalse(VTE.isLiteral(sid.getTermId()));
-                assertFalse(VTE.isURI(sid.getTermId()));
-                assertFalse(VTE.isBNode(sid.getTermId()));
+                assertTrue(sid.isStatement());
+                assertFalse(sid.isLiteral());
+                assertFalse(sid.isURI());
+                assertFalse(sid.isBNode());
                 
                 if (log.isInfoEnabled())
                     log.info(stmts[i].toString(store) + " ::: "

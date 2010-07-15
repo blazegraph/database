@@ -3,16 +3,14 @@ package com.bigdata.rdf.lexicon;
 import java.util.Arrays;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.log4j.Logger;
-
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.keys.KVO;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc.Term2IdWriteProcConstructor;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.service.Split;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
 import com.bigdata.service.ndx.pipeline.KVOC;
@@ -200,11 +198,13 @@ public class Term2IdWriteTask implements
                     
                 }
                 
+                AbstractKeyArrayIndexProcedureConstructor ctor =
+                    new Term2IdWriteProcConstructor(
+                            readOnly, r.storeBlankNodes, r.termIdBitsToReverse);
+                
                 // run the procedure.
                 termIdIndex.submit(0/* fromIndex */, ndistinct/* toIndex */,
-                        keys, null/* vals */, new Term2IdWriteProcConstructor(
-                                readOnly, r.storeBlankNodes,
-                                r.termIdBitsToReverse),
+                        keys, null/* vals */, ctor,
                         new Term2IdWriteProcResultHandler(a, readOnly,
                                 stats.nunknown));
 

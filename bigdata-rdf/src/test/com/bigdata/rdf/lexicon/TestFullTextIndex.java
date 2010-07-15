@@ -37,6 +37,7 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.spo.TestSPOKeyOrder;
@@ -144,7 +145,7 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
                             @Override
                             protected Object resolve(Object e) {
-                                return new TermId(((Hit) e).getDocId());
+                                return new TermId(VTE.LITERAL, ((Hit) e).getDocId());
                             }
                         })));
 

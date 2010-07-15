@@ -26,23 +26,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.lexicon;
 
-import java.util.Arrays;
-
-import org.openrdf.model.Value;
-import org.openrdf.model.impl.ValueFactoryImpl;
-
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValueSerializer;
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
 /**
@@ -88,6 +78,13 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
      *             appearance of a conflict if we were to reject any of these
      *             forms when another of the forms was already present under the
      *             key.
+     *             
+     * FIXME Now it's not only deprecated, but the code that relies on it has
+     * been commented out.  This is because it makes assumptions about how
+     * {@link TermId} objects are encoded and decoded.  Under the legacy model
+     * they were simple longs.  After the lexicon refactor we use the byte
+     * flags also.  So if we ever decide to do validation again here, we need
+     * to figure out how to give this class access to an {@link IIVEncoder}. 
      */
     static private transient final boolean validate = false;
     
@@ -165,104 +162,104 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
             // Note: the value is the serialized term (and never a BNode).
             final byte[] val;
 
-            if (validate) {
-
-                // The term identifier.
-                final long id = KeyBuilder.decodeLong(key, 0);
-
-                assert id != TermId.NULL;
-                
-                // Note: BNodes are not allowed in the reverse index.
-                assert ! VTE.isBNode(id);
-                
-                // Note: SIDS are not allowed in the reverse index.
-                assert ! VTE.isStatement(id);
-                
-                /*
-                 * When the term identifier is found in the reverse mapping
-                 * this code path validates that the serialized term is the
-                 * same.
-                 */
-                final byte[] oldval = ndx.lookup(key);
-                
-                val = getValue(i);
-                
-                if( oldval == null ) {
-                    
-                    if (ndx.insert(key, val) != null) {
-
-                        throw new AssertionError();
-
-                    }
-                    
-                } else {
-
-                    /*
-                     * Note: This would fail if the serialization of the term
-                     * was changed for an existing database instance. In order
-                     * to validate when different serialization formats might be
-                     * in use you have to actually deserialize the terms.
-                     * However, I have the validation logic here just as a
-                     * sanity check while getting the basic system running - it
-                     * is not meant to be deployed.
-                     */
-
-                    if (! BytesUtil.bytesEqual(val, oldval)) {
-
-                        final char suffix;
-                        if (VTE.isLiteral(id))
-                            suffix = 'L';
-                        else if (VTE.isURI(id))
-                            suffix = 'U';
-                        else if (VTE.isBNode(id))
-                            suffix = 'B';
-                        else if (VTE.isStatement(id))
-                            suffix = 'S';
-                        else
-                            suffix = '?';
-
-                        /*
-                         * We have to go one step further and compare the
-                         * deserialized value in order to decide if there is
-                         * really an inconsistency in the index. For example,
-                         * "abc@en" and "abc@EN" encode as different byte[]s,
-                         * but they are EQUALS() for RDF since the language code
-                         * comparison is case insensitive. The same problem can
-                         * occur for data type literals, since lexically
-                         * distinct literals are are mapped onto the same point
-                         * in the data type space (the same key). However,
-                         * comparison based on data type equality is not really
-                         * provided for by BigdataLiteral, so we get into
-                         * trouble if we attempt to detect errors based on
-                         * datatype literals.
-                         */
-                        final BigdataValueSerializer valSer = new BigdataValueSerializer(
-                                new ValueFactoryImpl());
-
-                        final Value term = valSer.deserialize(val);
-                        final Value oldterm = valSer.deserialize(oldval);
-                        
-                        if (!term.equals(oldterm)) {
-                            
-                            log.error("term=" + term);
-                            log.error("oldterm=" + oldterm);
-                            log.error("id=" + id + suffix);
-                            log.error("key=" + BytesUtil.toString(key));
-                            log.error("val=" + Arrays.toString(val));
-                            log.error("oldval=" + Arrays.toString(oldval));
-                            if (ndx.getIndexMetadata().getPartitionMetadata() != null)
-                                log.error(ndx.getIndexMetadata()
-                                        .getPartitionMetadata().toString());
-
-                            throw new RuntimeException(
-                                    "Consistency problem: id=" + id);
-                        }
-
-                    }
-                    
-                }
-                
-            } else {
+//            if (validate) {
+//
+//                // The term identifier.
+//                final long id = KeyBuilder.decodeLong(key, 0);
+//
+//                assert id != TermId.NULL;
+//                
+//                // Note: BNodes are not allowed in the reverse index.
+//                assert ! VTE.isBNode(id);
+//                
+//                // Note: SIDS are not allowed in the reverse index.
+//                assert ! VTE.isStatement(id);
+//                
+//                /*
+//                 * When the term identifier is found in the reverse mapping
+//                 * this code path validates that the serialized term is the
+//                 * same.
+//                 */
+//                final byte[] oldval = ndx.lookup(key);
+//                
+//                val = getValue(i);
+//                
+//                if( oldval == null ) {
+//                    
+//                    if (ndx.insert(key, val) != null) {
+//
+//                        throw new AssertionError();
+//
+//                    }
+//                    
+//                } else {
+//
+//                    /*
+//                     * Note: This would fail if the serialization of the term
+//                     * was changed for an existing database instance. In order
+//                     * to validate when different serialization formats might be
+//                     * in use you have to actually deserialize the terms.
+//                     * However, I have the validation logic here just as a
+//                     * sanity check while getting the basic system running - it
+//                     * is not meant to be deployed.
+//                     */
+//
+//                    if (! BytesUtil.bytesEqual(val, oldval)) {
+//
+//                        final char suffix;
+//                        if (VTE.isLiteral(id))
+//                            suffix = 'L';
+//                        else if (VTE.isURI(id))
+//                            suffix = 'U';
+//                        else if (VTE.isBNode(id))
+//                            suffix = 'B';
+//                        else if (VTE.isStatement(id))
+//                            suffix = 'S';
+//                        else
+//                            suffix = '?';
+//
+//                        /*
+//                         * We have to go one step further and compare the
+//                         * deserialized value in order to decide if there is
+//                         * really an inconsistency in the index. For example,
+//                         * "abc@en" and "abc@EN" encode as different byte[]s,
+//                         * but they are EQUALS() for RDF since the language code
+//                         * comparison is case insensitive. The same problem can
+//                         * occur for data type literals, since lexically
+//                         * distinct literals are are mapped onto the same point
+//                         * in the data type space (the same key). However,
+//                         * comparison based on data type equality is not really
+//                         * provided for by BigdataLiteral, so we get into
+//                         * trouble if we attempt to detect errors based on
+//                         * datatype literals.
+//                         */
+//                        final BigdataValueSerializer valSer = new BigdataValueSerializer(
+//                                new ValueFactoryImpl());
+//
+//                        final Value term = valSer.deserialize(val);
+//                        final Value oldterm = valSer.deserialize(oldval);
+//                        
+//                        if (!term.equals(oldterm)) {
+//                            
+//                            log.error("term=" + term);
+//                            log.error("oldterm=" + oldterm);
+//                            log.error("id=" + id + suffix);
+//                            log.error("key=" + BytesUtil.toString(key));
+//                            log.error("val=" + Arrays.toString(val));
+//                            log.error("oldval=" + Arrays.toString(oldval));
+//                            if (ndx.getIndexMetadata().getPartitionMetadata() != null)
+//                                log.error(ndx.getIndexMetadata()
+//                                        .getPartitionMetadata().toString());
+//
+//                            throw new RuntimeException(
+//                                    "Consistency problem: id=" + id);
+//                        }
+//
+//                    }
+//                    
+//                }
+//                
+//            } else {
                 
                 /*
                  * This code path does not validate that the term identifier
@@ -282,7 +279,7 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
 
                 }
 
-            }
+//            }
             
         }
         

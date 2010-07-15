@@ -5,7 +5,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtil;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.rules.RuleContextEnum;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
@@ -366,7 +366,7 @@ public class OwlSameAsPropertiesExpandingIterator implements
             this.accessPath = accessPath;
             final IVariableOrConstant<IV> p =
                     accessPath.getPredicate().get(1);
-            if (!p.isConstant() || !IVUtil.equals(p.get(), sameAs)) {
+            if (!p.isConstant() || !IVUtility.equals(p.get(), sameAs)) {
                 throw new UnsupportedOperationException("p must be owl:sameAs");
             }
         }
@@ -510,7 +510,7 @@ public class OwlSameAsPropertiesExpandingIterator implements
             if (sVal == null || pVal == null || oVal == null) {
                 return true;
             }
-            if (IVUtil.equals(pVal, sameAs) && IVUtil.equals(sVal, oVal)) {
+            if (IVUtility.equals(pVal, sameAs) && IVUtility.equals(sVal, oVal)) {
                 return false;
             }
             return true;

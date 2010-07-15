@@ -27,12 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import java.io.DataOutput;
+import java.io.IOException;
 import java.util.UUID;
-
 import org.deri.iris.basics.Literal;
 import org.openrdf.model.Value;
-
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -347,6 +348,20 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
     }
     
     /**
+     * FIXME I think we really need to be able to say from the flags whether
+     * an IV is null or non-null.  The context position of statements can
+     * often be null.
+     *  
+     * @param flags
+     *            The flags byte.
+     */
+    static public boolean isNull(final byte flags) {
+        
+        return false;
+        
+    }
+    
+    /**
      * Return <code>true</code> if the flags byte has its <code>extension</code>
      * bit set.
      * 
@@ -580,7 +595,7 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
      * FIXME Handle extension types, probably in a subclass, and maybe requiring
      * the caller to pass in an object with the context for the extension types.
      */
-    public void encode(final IKeyBuilder keyBuilder) {
+    public IKeyBuilder encode(final IKeyBuilder keyBuilder) {
 
         // First emit the flags byte.
         keyBuilder.append(flags);
@@ -591,7 +606,7 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
              * term identifier.
              */
             keyBuilder.append(getTermId());
-            return;
+            return keyBuilder;
         }
         
         /*
@@ -629,12 +644,12 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
         case XSDInteger:
             keyBuilder.append(t.integerValue());
             break;
-        case XSDDecimal:
-            keyBuilder.append(t.decimalValue());
-            break;
         case UUID:
             keyBuilder.append((UUID)t.getInlineValue());
             break;
+//        case XSDDecimal:
+//            keyBuilder.append(t.decimalValue());
+//            break;
 //        case XSDUnsignedByte:
 //            keyBuilder.appendUnsigned(t.byteValue());
 //            break;
@@ -650,6 +665,9 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
         default:
             throw new AssertionError(toString());
         }
+        
+        return keyBuilder;
+        
     }
     
 }

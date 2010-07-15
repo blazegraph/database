@@ -101,10 +101,10 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
      */
     public void test_bitFlagsReportFalseForNULL() {
 
-        assertFalse(VTE.isStatement(TermId.NULL));
-        assertFalse(VTE.isLiteral(TermId.NULL));
-        assertFalse(VTE.isURI(TermId.NULL));
-        assertFalse(VTE.isBNode(TermId.NULL));
+//        assertFalse(VTE.isStatement(TermId.NULL));
+//        assertFalse(VTE.isLiteral(TermId.NULL));
+//        assertFalse(VTE.isURI(TermId.NULL));
+//        assertFalse(VTE.isBNode(TermId.NULL));
 
     }
     
@@ -130,24 +130,24 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
         if(term instanceof Literal) {
          
-            assertTrue("isLiteral()",VTE.isLiteral(id.getTermId()));
-            assertFalse("isBNode()",VTE.isBNode(id.getTermId()));
-            assertFalse("isURI()",VTE.isURI(id.getTermId()));
-            assertFalse("isStatement()",VTE.isStatement(id.getTermId()));
+            assertTrue("isLiteral()",id.isLiteral());
+            assertFalse("isBNode()",id.isBNode());
+            assertFalse("isURI()",id.isURI());
+            assertFalse("isStatement()",id.isStatement());
             
         } else if( term instanceof BNode) {
 
-            assertFalse("isLiteral()",VTE.isLiteral(id.getTermId()));
-            assertTrue("isBNode()",VTE.isBNode(id.getTermId()));
-            assertFalse("isURI()",VTE.isURI(id.getTermId()));
-            assertFalse("isStatement()",VTE.isStatement(id.getTermId()));
+            assertFalse("isLiteral()",id.isLiteral());
+            assertTrue("isBNode()",id.isBNode());
+            assertFalse("isURI()",id.isURI());
+            assertFalse("isStatement()",id.isStatement());
 
         } else if( term instanceof URI) {
 
-            assertFalse("isLiteral()",VTE.isLiteral(id.getTermId()));
-            assertFalse("isBNode()",VTE.isBNode(id.getTermId()));
-            assertTrue("isURI()",VTE.isURI(id.getTermId()));
-            assertFalse("isStatement()",VTE.isStatement(id.getTermId()));
+            assertFalse("isLiteral()",id.isLiteral());
+            assertFalse("isBNode()",id.isBNode());
+            assertTrue("isURI()",id.isURI());
+            assertFalse("isStatement()",id.isStatement());
 
         }
 
@@ -219,15 +219,15 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
              * verify that we can detect literals by examining the term identifier.
              */
 
-            assertTrue(VTE.isLiteral(store.getIV(new LiteralImpl("abc")).getTermId()));
+            assertTrue(store.getIV(new LiteralImpl("abc")).isLiteral());
             
-            assertTrue(VTE.isLiteral(store.getIV(new LiteralImpl("abc",XMLSchema.DECIMAL)).getTermId()));
+            assertTrue(store.getIV(new LiteralImpl("abc",XMLSchema.DECIMAL)).isLiteral());
             
-            assertTrue(VTE.isLiteral(store.getIV(new LiteralImpl("abc", "en")).getTermId()));
+            assertTrue(store.getIV(new LiteralImpl("abc", "en")).isLiteral());
 
-            assertFalse(VTE.isLiteral(store.getIV(new URIImpl("http://www.bigdata.com")).getTermId()));
+            assertFalse(store.getIV(new URIImpl("http://www.bigdata.com")).isLiteral());
 
-            assertFalse(VTE.isLiteral(store.getIV(RDF.TYPE).getTermId()));
+            assertFalse(store.getIV(RDF.TYPE).isLiteral());
 
 //            assertFalse(VTE.isLiteral(store.getIV(new BNodeImpl(UUID.randomUUID().toString())).getTermId()));
             
@@ -317,15 +317,15 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
              * identifier.
              */
 
-            assertTrue(VTE.isLiteral(store.getIV(new LiteralImpl("abc")).getTermId()));
+            assertTrue(store.getIV(new LiteralImpl("abc")).isLiteral());
             
-            assertTrue(VTE.isLiteral(store.getIV(new LiteralImpl("abc",XMLSchema.DECIMAL)).getTermId()));
+            assertTrue(store.getIV(new LiteralImpl("abc",XMLSchema.DECIMAL)).isLiteral());
             
-            assertTrue(VTE.isLiteral(store.getIV(new LiteralImpl("abc", "en")).getTermId()));
+            assertTrue(store.getIV(new LiteralImpl("abc", "en")).isLiteral());
 
-            assertFalse(VTE.isLiteral(store.getIV(new URIImpl("http://www.bigdata.com")).getTermId()));
+            assertFalse(store.getIV(new URIImpl("http://www.bigdata.com")).isLiteral());
 
-            assertFalse(VTE.isLiteral(store.getIV(RDF.TYPE).getTermId()));
+            assertFalse(store.getIV(RDF.TYPE).isLiteral());
 
 //            assertFalse(VTE.isLiteral(store.getIV(new BNodeImpl(UUID.randomUUID().toString())).getTermId()));
             
@@ -383,11 +383,11 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             assertNotSame(b.getIV(), c.getIV());
 
             // correct type of term identifier was assigned.
-            assertTrue(VTE.isURI(x.getIV().getTermId()));
-            assertTrue(VTE.isURI(y.getIV().getTermId()));
-            assertTrue(VTE.isLiteral(z.getIV().getTermId()));
-            assertTrue(VTE.isBNode(b.getIV().getTermId()));
-            assertTrue(VTE.isBNode(c.getIV().getTermId()));
+            assertTrue(x.getIV().isURI());
+            assertTrue(y.getIV().isURI());
+            assertTrue(z.getIV().isLiteral());
+            assertTrue(b.getIV().isBNode());
+            assertTrue(c.getIV().isBNode());
             
             // reverse lookup is consistent with the assigned term identifiers.
             assertEquals(x,store.getTerm(x.getIV()));
@@ -445,9 +445,9 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             assertNotSame(y.getIV(), z.getIV());
             
             // correct type of term identifier was assigned.
-            assertTrue(VTE.isURI(x.getIV().getTermId()));
-            assertTrue(VTE.isURI(y.getIV().getTermId()));
-            assertTrue(VTE.isLiteral(z.getIV().getTermId()));
+            assertTrue(x.getIV().isURI());
+            assertTrue(y.getIV().isURI());
+            assertTrue(z.getIV().isLiteral());
             
             // reverse lookup is consistent with the assigned term identifiers.
             assertEquals(x,store.getTerm(x.getIV()));

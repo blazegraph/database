@@ -20,8 +20,7 @@ public class KVOTermIdComparator implements Comparator<KVO<BigdataValue>> {
     public static final transient Comparator<KVO<BigdataValue>> INSTANCE = new KVOTermIdComparator();
 
     /**
-     * Note: comparison avoids possible overflow of <code>long</code> by
-     * not computing the difference directly.
+     * Note: defers to natural ordering for {@link IV} objects.
      */
     public int compare(final KVO<BigdataValue> term1,
             final KVO<BigdataValue> term2) {

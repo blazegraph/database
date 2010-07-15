@@ -30,7 +30,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Set;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtil;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
@@ -315,8 +315,8 @@ public class SPOStarJoin extends SPOPredicate
          */
         final public boolean isMatch(ISPO spo) {
             
-            return ((p.isVar() || IVUtil.equals(p.get(), spo.p())) &&
-                    (o.isVar() || IVUtil.equals(o.get(), spo.o())));    
+            return ((p.isVar() || IVUtility.equals(p.get(), spo.p())) &&
+                    (o.isVar() || IVUtility.equals(o.get(), spo.o())));    
             
         }
         

@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.model;
 
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtil;
+import com.bigdata.rdf.internal.IVUtility;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -107,7 +107,7 @@ public abstract class BigdataValueImpl implements BigdataValue {
 
         }
 
-        if (this.iv != null && !IVUtil.equals(this.iv, iv)) {
+        if (this.iv != null && !IVUtility.equals(this.iv, iv)) {
 
             throw new IllegalStateException("termId already assigned: old="
                     + this.iv + ", new=" + iv);

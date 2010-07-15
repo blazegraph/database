@@ -31,11 +31,9 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.concurrent.ConcurrentHashMap;
-
 import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
-
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IIndex;
@@ -44,11 +42,12 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.btree.raba.codec.IRabaCoder;
-import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
 /**
@@ -189,7 +188,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
     }
 
     private int scaleOutTermIdBitsToReverse;
-
+    
     /**
      * De-serialization constructor.
      */
@@ -236,7 +235,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
             this.storeBlankNodes = storeBlankNodes;
 
             this.scaleOutTermIdBitsToReverse = scaleOutTermIdBitsToReverse;
-
+            
         }
 
         public Term2IdWriteProc newInstance(final IRabaCoder keySer,
@@ -287,7 +286,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 //        final boolean scaleOut = counter instanceof BTree.PartitionedCounter;
         
         // used to serialize term identifiers.
-        final DataOutputBuffer idbuf = new DataOutputBuffer(Bytes.SIZEOF_LONG);
+        final DataOutputBuffer idbuf = new DataOutputBuffer();
         
         final TermIdEncoder encoder = new TermIdEncoder(//scaleOutTermIds,
                 scaleOutTermIdBitsToReverse);
@@ -302,8 +301,6 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
             // this byte encodes the kind of term (URI, Literal, BNode, etc.)
             final byte code = KeyBuilder.decodeByte(key[0]);
             
-            final long termId;
-
             if (!storeBlankNodes && code == ITermIndexCodes.TERM_CODE_BND) {
 
                 /*
@@ -322,13 +319,16 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
                 if (readOnly) {
                 
                     // blank nodes can not be resolved by the index.
-                    termId = 0L;
+                    ivs[i] = null;
 
                 } else {
                     
                     // assign a term identifier.
-                    termId = TermIdEncoder.setFlags(encoder.encode(counter
-                            .incrementAndGet()), code);
+                    final long termId = encoder.encode(
+                            counter.incrementAndGet());
+                    
+                    ivs[i] = new TermId(VTE(code), termId);
+                    
                 }
                 
             } else {
@@ -350,26 +350,29 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
                     if(readOnly) {
                         
                         // not found - will not be assigned.
-                        termId = 0L;
+                        ivs[i] = null;
 
                     } else {
 
                         // assign a term identifier.
-                        termId = TermIdEncoder.setFlags(encoder.encode(counter
-                                .incrementAndGet()), code);
+                        final long termId = encoder.encode(
+                                counter.incrementAndGet());
 
+                        final TermId iv = new TermId(VTE(code), termId);
+                        
                         if (DEBUG && enableGroundTruth) {
 
                             groundTruthTest(key, termId, ndx, counter);
 
                         }
 
-                        // format as packed long integer.
                         try {
 
-//                            idbuf.reset().packLong(termId);
-                            idbuf.reset().writeLong(termId); // may be negative.
-
+                            final byte[] bytes = iv.encode(
+                                    KeyBuilder.newInstance()).getKey();
+                            
+                            idbuf.reset().write(bytes);
+                            
                         } catch (IOException ex) {
 
                             throw new RuntimeException(ex);
@@ -384,29 +387,19 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
                         }
 
                         nnew++;
+                        
+                        ivs[i] = iv;
                     
                     }
                     
                 } else { // found.
     
-                    try {
-
-                        // unpack the existing term identifier.
-//                        termId = new DataInputBuffer(tmp).unpackLong();
-                        termId = new DataInputBuffer(tmp).readLong();
+                    ivs[i] = IVUtility.decode(tmp);
                         
-                    } catch (IOException ex) {
-                        
-                        throw new RuntimeException(ex);
-                        
-                    }
-                       
                 }
     
             }
             
-            ivs[i] = (termId == TermId.NULL ? null : new TermId(termId));
-
         }
 
         /*
@@ -539,6 +532,27 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 
     }
     
+    final public static VTE VTE(byte code) {
+        
+        switch(code) {
+        case ITermIndexCodes.TERM_CODE_URI:
+            return VTE.URI;
+        case ITermIndexCodes.TERM_CODE_BND:
+            return VTE.BNODE;
+        case ITermIndexCodes.TERM_CODE_STMT:
+            return VTE.STATEMENT;
+        case ITermIndexCodes.TERM_CODE_DTL:
+        case ITermIndexCodes.TERM_CODE_DTL2:
+        case ITermIndexCodes.TERM_CODE_LCL:
+        case ITermIndexCodes.TERM_CODE_LIT:
+            return VTE.LITERAL;
+        default:
+            throw new IllegalArgumentException();
+        }
+        
+    }
+
+    
     /**
      * Object encapsulates the discovered / assigned term identifiers and
      * provides efficient serialization for communication of those data to the
@@ -589,7 +603,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
             for (int i = 0; i < n; i++) {
                 
 //                ids[i] = LongPacker.unpackLong(in);
-                ivs[i] = new TermId(in.readLong());
+                ivs[i] = (IV) in.readObject();
                 
             }
             
@@ -614,7 +628,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
                 }
                 
 //                LongPacker.packLong(out, ids[i]);
-                out.writeLong(ivs[i].getTermId());
+                out.writeObject(ivs[i]);
                 
             }
             
