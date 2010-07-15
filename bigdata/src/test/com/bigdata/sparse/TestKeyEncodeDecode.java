@@ -30,8 +30,13 @@ package com.bigdata.sparse;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.btree.keys.CollatorEnum;
+import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.relation.RelationSchema;
+import java.text.Collator;
+import java.util.Properties;
 
 /**
  * Test suite for round trip of keys as encoded by
@@ -89,4 +94,46 @@ public class TestKeyEncodeDecode extends TestCase2 {
         
     }
     
+    /**
+     */
+    public void test_primitive_unicode() {
+
+        IKeyBuilder keyBuilder = KeyBuilder.newUnicodeInstance();
+        Schema schema = new Schema("Employee", "Id", KeyType.Unicode);
+        String primaryKey = "1L";
+        byte[] key = schema.getKey(keyBuilder, primaryKey, "Id", 12L);
+        KeyDecoder decoded = new KeyDecoder(key);
+
+        assertEquals(schema.getPrimaryKeyType(), decoded.getPrimaryKeyType());
+        assertEquals("Id", decoded.getColumnName());
+        assertEquals(12L, decoded.getTimestamp());
+    }
+
+    /**
+     */
+    public void test_primitive_relation_jdk() {
+
+        Properties props = new Properties();
+        props.put("com.bigdata.btree.keys.KeyBuilder.collator", CollatorEnum.JDK);
+        props.put(KeyBuilder.Options.COLLATOR, "JDK");
+        props.put(KeyBuilder.Options.USER_COUNTRY, "US");
+        props.put(KeyBuilder.Options.USER_LANGUAGE, "en");
+        props.put(KeyBuilder.Options.STRENGTH, Collator.TERTIARY);
+        IKeyBuilder keyBuilder =
+            new DefaultKeyBuilderFactory(props).getKeyBuilder();
+
+        Schema schema = new RelationSchema();
+        String primaryKey = "U100.lex";
+        String column = "com.bigdata.btree.keys.KeyBuilder.collator";
+        long writeTime = 1279133923566L;
+
+        byte[] key = schema.getKey(keyBuilder, primaryKey, column, writeTime);
+        assertEquals(key.length, 120);
+
+        KeyDecoder decoded = new KeyDecoder(key);
+        assertEquals(schema.getPrimaryKeyType(), decoded.getPrimaryKeyType());
+        assertEquals("Id", decoded.getColumnName());
+        assertEquals(12L, decoded.getTimestamp());
+
+    }
 }
