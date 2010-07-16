@@ -32,10 +32,9 @@ import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IVariable;
 
 /**
- * Imposes the constraint <code>x == y</code>.
+ * FIXME obviously not implemented correctly right now, but it works
  * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: EQ.java 2982 2010-06-04 18:03:16Z thompsonbry $
+ * @author mike
  */
 public class GT implements IConstraint {
 
@@ -44,14 +43,17 @@ public class GT implements IConstraint {
     public final IVariable v;
     public final double d;
     
-    public GT(final IVariable<IV> v, final double d) {
+    public GT(final IVariable<IV> v, final IV iv) {
         
-        if (v == null)
+        if (v == null || !iv.isInline())
             throw new IllegalArgumentException();
 
+        if (!(iv instanceof AbstractDatatypeLiteralInternalValue))
+            throw new IllegalArgumentException();
+        
         this.v = v;
         
-        this.d = d;
+        this.d = ((AbstractDatatypeLiteralInternalValue) iv).doubleValue();
         
     }
     
@@ -72,7 +74,7 @@ public class GT implements IConstraint {
         }
         
         throw new RuntimeException(
-                "cannot apply to this constraint to this type of internal value: " 
+                "cannot apply this constraint to this type of internal value: " 
                 + term);
 
     }

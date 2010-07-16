@@ -36,14 +36,14 @@ import com.bigdata.relation.rule.IVariable;
  * 
  * @author mike
  */
-public class LT implements IConstraint {
+public class LE implements IConstraint {
 
     private static final long serialVersionUID = 8104692462788944394L;
     
     public final IVariable v;
     public final double d;
     
-    public LT(final IVariable<IV> v, IV iv) {
+    public LE(final IVariable<IV> v, IV iv) {
         
         if (v == null || !iv.isInline())
             throw new IllegalArgumentException();
@@ -69,7 +69,7 @@ public class LT implements IConstraint {
         
         if (term instanceof AbstractDatatypeLiteralInternalValue) {
             
-            return ((AbstractDatatypeLiteralInternalValue) term).doubleValue() < d;
+            return ((AbstractDatatypeLiteralInternalValue) term).doubleValue() <= d;
             
         }
         
