@@ -243,7 +243,7 @@ public interface ITransactionService extends ITimestampService {
     public long getLastCommitTime() throws IOException;
 
     /**
-     * Return the timestamp whose historical data MAY be release. This time is
+     * Return the timestamp whose historical data MAY be released. This time is
      * derived from the timestamp of the earliest running transaction MINUS the
      * minimum release age and is updated whenever the earliest running
      * transaction terminates. This value is monotonically increasing. It will
@@ -257,7 +257,7 @@ public interface ITransactionService extends ITimestampService {
      * operation isolated by a read-write transaction to execute with access to
      * the named resources (this applies only to distributed databases). The
      * declared resources are used in the commit phase of the read-write tx to
-     * impose a partial order on commits. That partial order guarentees that
+     * impose a partial order on commits. That partial order guarantees that
      * commits do not deadlock in contention for the same resources.
      * 
      * @param tx
