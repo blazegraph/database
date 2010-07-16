@@ -37,11 +37,14 @@ import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
+import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.accesspath.ChunkConsumerIterator;
@@ -414,139 +417,136 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
         if (step == null)
             throw new IllegalArgumentException();
 
-        if (!action.isMutation())
-            throw new IllegalArgumentException();
-        
-        long tx = 0L;
-        try {
-        if (indexManager instanceof IBigdataFederation) {
+		if (!action.isMutation())
+			throw new IllegalArgumentException();
 
-            /*
-             * Advance the read-consistent timestamp so that any writes from the
-             * previous rules or the last round are now visible.
-             * 
-             * Note: We can only do this for the federation with its autoCommit
-             * semantics.
-             * 
-             * Note: The Journal (LTS) must both read and write against the
-             * unisolated view for closure operations.
-             * 
-             * @todo clone the joinNexusFactory 1st to avoid possible side
-             * effects?
-             */
-            
-            final long lastCommitTime = indexManager.getLastCommitTime();
+		long tx = 0L;
+		try {
 
-            try {
-                /*
-                 * A read-only tx reading from the lastCommitTime.
-                 * 
-                 * Note: This provides a read-lock on the commit time from which
-                 * the mutation task will read.
-                 * 
-                 * @todo we could use the [tx] as the readTimestamp and we could
-                 * use ITx.READ_COMMITTED rather that explicitly looking up the
-                 * lastCommitTime.
-                 */
-                    tx = ((IBigdataFederation) indexManager)
-                        .getTransactionService().newTx(lastCommitTime);
-            } catch (IOException ex) {
-                throw new RuntimeException(ex);
-            }
-            
-            // the timestamp that we will read on for this step.
-            joinNexusFactory.setReadTimestamp(TimestampUtility
-                  .asHistoricalRead(lastCommitTime));
-            
-//            final long lastCommitTime = indexManager.getLastCommitTime();
-//
-//            // the timestamp that we will read on for this step.
-//            joinNexusFactory.setReadTimestamp(TimestampUtility
-//                    .asHistoricalRead(lastCommitTime));
-//
-//            try {
-//                
-//                /*
-//                 * Allow the data services to release data for older views.
-//                 * 
-//                 * FIXME This is being done in order to prevent the release of
-//                 * data associated with the [readTimestamp] while the rule(s)
-//                 * are reading on those views. In fact, the rules should be
-//                 * using a read-historical transaction and releasing the
-//                 * transaction when they are finished which would allow the
-//                 * transaction manager to take responsibility for globally
-//                 * determining the releaseTime for the federation. In the
-//                 * absence of that facility, this has been hacked so that we can
-//                 * do scale-out closure without having our views disrupted by
-//                 * overflow allowing resources to be purge that are in use by
-//                 * those views. Basically, we are declaring a read lock.
-//                 * 
-//                 * The problem discussed here can be readily observed if you
-//                 * attempt the closure of a large data set (U20 may do it, U50
-//                 * will) or if you reduce the journal extent so that overflow is
-//                 * triggered more frequently, in which case you may be able to
-//                 * demonstrate the problem with a much smaller data set.
-//                 * 
-//                 * Also note that this is globally advancing the release time.
-//                 * This means that you can not compute closure for two different
-//                 * RDF DBs within the same federation at the same time.
-//                 * 
-//                 * Also see the code that resets the release time to 0L after
-//                 * the ProgramTask is finished.
-//                 */
-//                
-//                if (lastCommitTime != 0L) {
-//
-//                    /*
-//                     * There is some committed state, so update the release time
-//                     * such that the timestamp specified by [lastCommitTime]
-//                     * does not get released.
-//                     */
-//                    
-//                    final long releaseTime = lastCommitTime - 1;
-//
-//                    log.warn("readLock: releaseTime="+releaseTime+", step="+step.getName());
-//                    
-//                    ((IBigdataFederation) indexManager).getTransactionService()
-//                            .setReleaseTime(releaseTime);
-//
-//                }
-//
-//            } catch (IOException e) {
-//            
-//                throw new RuntimeException(e);
-//                
-//            }
-            
-        }
+			/*
+			 * Note: The WORM Journal reads and writes against the unisolated
+			 * view for mutation operations. This works because it never
+			 * releases any written storage. For the RWStore we have to do
+			 * something different to ensure that the writes driven by the
+			 * mutation operation do not cause allocation slots to be read
+			 * against which we need to read. For the federation, we need to
+			 * protect against the release of the journal and index segment
+			 * resources against which we need to read. Both of those cases (RW
+			 * and federation) are handled using a read-only transaction to
+			 * protect the historical view against which the mutation rule will
+			 * read.
+			 */
 
-        final MutationTask mutationTask = new MutationTask(action, joinNexusFactory,
-                step, indexManager, isDataService()?getDataService():null);
+			if (indexManager instanceof IBigdataFederation<?>) {
 
-        if (log.isDebugEnabled())
-            log.debug("begin: action=" + action + ", program=" + step.getName()
-                    + ", task=" + mutationTask);
-        
-        /*
-         * Submit task and await completion, returning the result.
-         * 
-         * Note: The task is responsible for computing the aggregate mutation
-         * count.
-         */
-            return mutationTask.submit().get();
-        } finally {
-            if (tx != 0L) {
-                // terminate the read-only tx (releases the read-lock).
-                try {
-                    ((IBigdataFederation) indexManager).getTransactionService()
-                            .abort(tx);
-                } catch (IOException ex) {
-                    throw new RuntimeException(ex);
-                }
-            }
-        }
-        
-    }
+				/*
+				 * Advance the read-consistent timestamp so that any writes from
+				 * the previous rules or the last round are now visible.
+				 * 
+				 * Note: The federation has shard-wise autoCommit semantics
+				 * which ensure that there will be a suitable commit point for
+				 * us to read against (as long as the caller flushed the
+				 * buffered writes before invoking closure, which they do).
+				 */
+
+				final long lastCommitTime = indexManager.getLastCommitTime();
+
+				try {
+					/*
+					 * A read-only tx reading from the lastCommitTime.
+					 * 
+					 * Note: This provides a read-lock on the commit time from
+					 * which the mutation task will read.
+					 * 
+					 * @todo we could use the [tx] as the readTimestamp and we
+					 * could use ITx.READ_COMMITTED rather that explicitly
+					 * looking up the lastCommitTime.
+					 */
+					tx = ((IBigdataFederation<?>) indexManager)
+							.getTransactionService().newTx(lastCommitTime);
+				} catch (IOException ex) {
+					throw new RuntimeException(ex);
+				}
+
+				// the timestamp that we will read on for this step.
+				joinNexusFactory.setReadTimestamp(TimestampUtility
+						.asHistoricalRead(lastCommitTime));
+
+			} else if (indexManager instanceof Journal
+					&& ((Journal) indexManager).getBufferStrategy()
+							.getBufferMode() == BufferMode.DiskRW) {
+
+				/*
+				 * Do a commit and then advance the read-consistent timestamp so
+				 * that any writes from the previous rules or the last round are
+				 * now visible.
+				 * 
+				 * Note: The RWStore needs a commit point and a read-only tx
+				 * against that commit point in order to protect from the reuse
+				 * of allocation slots during unisolated writes on the journal.
+				 * 
+				 * @todo This could be captured with the notion of an checkpoint
+				 * on the journal without introducing a full commit IF the txs
+				 * was able to make sure of that checkpoint.
+				 */
+
+				final Journal jnl = (Journal) indexManager;
+
+				// force a commit before running the mutation rule.
+				final long lastCommitTime = jnl.commit();
+
+				/*
+				 * A read-only tx reading from the commit point we just
+				 * introduced.
+				 * 
+				 * Note: This provides a read-lock on the commit time from which
+				 * the mutation task will read.
+				 */
+				tx = jnl.newTx(lastCommitTime);
+
+				// the timestamp that we will read on for this step.
+				joinNexusFactory.setReadTimestamp(TimestampUtility
+						.asHistoricalRead(lastCommitTime));
+
+			}
+
+			final MutationTask mutationTask = new MutationTask(action,
+					joinNexusFactory, step, indexManager,
+					isDataService() ? getDataService() : null);
+
+			if (log.isDebugEnabled())
+				log.debug("begin: action=" + action + ", program="
+						+ step.getName() + ", task=" + mutationTask);
+
+			/*
+			 * Submit task and await completion, returning the result.
+			 * 
+			 * Note: The task is responsible for computing the aggregate
+			 * mutation count.
+			 */
+			return mutationTask.submit().get();
+
+		} finally {
+
+			if (tx != 0L) {
+				/*
+				 * Terminate the read-only tx (releases the read-lock).
+				 */
+				if (indexManager instanceof IBigdataFederation<?>) {
+					try {
+						((IBigdataFederation<?>) indexManager)
+								.getTransactionService().abort(tx);
+					} catch (IOException ex) {
+						throw new RuntimeException(ex);
+					}
+				} else if (indexManager instanceof Journal) {
+					((Journal) indexManager).abort(tx);
+				}
+			}
+		
+		}
+
+	}
 
     /**
      * Computes the closure of a set of {@link IRule}s until the relation(s) on
