@@ -32,8 +32,6 @@ import java.util.Properties;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.load.ConcurrentDataLoader;
 import com.bigdata.relation.locator.DefaultResourceLocator;
-import com.bigdata.service.EmbeddedFederation;
-import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.JiniFederation;
 
@@ -43,14 +41,9 @@ import com.bigdata.service.jini.JiniFederation;
  * 
  * <h2>Deployment choices</h2>
  * 
- * You can deploy the {@link ScaleOutTripleStore} using any
- * {@link IBigdataClient}.  An
- * {@link EmbeddedFederation} can be used if you want key-range partitioned
- * indices but plan to run on a single machine and do not want to incur the
- * overhead for RMI - all services will run in the same JVM. Finally, a
- * {@link JiniFederation} can be used if you want to use a scale-out deployment.
- * In this case indices will be key-range partitioned and will be automatically
- * re-distributed over the available resources.
+ * The {@link JiniFederation} provides a scale-out deployment. The indices will
+ * be dynamically key-range partitioned and will be automatically re-distributed
+ * over the available nodes in the cluster.
  * 
  * <h2>Architecture</h2>
  * 
@@ -58,7 +51,7 @@ import com.bigdata.service.jini.JiniFederation;
  * and the statement indices. The index writes are automatically broken down
  * into one split per index partition. While each unisolated write on an index
  * partition is ACID, the indices are fully consistent iff the total operation
- * is successfull. For the lexicon, this means that the write on the terms and
+ * is successful. For the lexicon, this means that the write on the terms and
  * the ids index must both succeed. For the statement indices, this means that
  * the write on each access path must succeed. If a client fails while adding
  * terms, then it is possible for the ids index to be incomplete with respect to
@@ -69,7 +62,7 @@ import com.bigdata.service.jini.JiniFederation;
  * other access paths (i.e., some statements are not present in some access
  * paths).
  * <p>
- * Two additional mechanisms are used in order to guarentee reads from only
+ * Two additional mechanisms are used in order to guarantee reads from only
  * fully consistent data. First, clients providing query answering should read
  * from a database state that is known to be consistent (by using a read-only
  * transaction whose start time is the globally agreed upon commit time for that
@@ -90,7 +83,8 @@ import com.bigdata.service.jini.JiniFederation;
  *       scenarios with a distributed {@link ITripleStore}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: ScaleOutTripleStore.java 3186 2010-07-12 17:01:19Z thompsonbry
+ *          $
  */
 public class ScaleOutTripleStore extends AbstractTripleStore {
 
