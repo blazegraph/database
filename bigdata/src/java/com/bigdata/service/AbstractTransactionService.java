@@ -757,13 +757,16 @@ abstract public class AbstractTransactionService extends AbstractService
         
     }
     
-//    /**
-//     * Return the minimum over the absolute values of the active transactions.
-//     * 
-//     * @see #getReleaseTime()
-//     */
-//    public abstract long getEarliestTxStartTime();
-    
+    /**
+     * Return the minimum over the absolute values of the active transactions.
+     */
+    public long getEarliestTxStartTime() {
+    	
+    	return earliestTxStartTime;
+    	
+    }
+    private volatile long earliestTxStartTime = 0L;
+        
     /**
      * @see Options#MIN_RELEASE_AGE
      */
@@ -1010,6 +1013,8 @@ abstract public class AbstractTransactionService extends AbstractService
                 earliestTxStartTime = now;
 
             }
+            
+            this.earliestTxStartTime = earliestTxStartTime;
 
         } // synchronized(startTimeIndex)
 
