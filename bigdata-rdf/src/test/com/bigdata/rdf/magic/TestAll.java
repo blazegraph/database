@@ -21,7 +21,9 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.internal;
+package com.bigdata.rdf.magic;
+
+import com.bigdata.rdf.rio.TestLoadAndVerify;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -54,18 +56,14 @@ public class TestAll extends TestCase {
      */
     public static Test suite()
     {
-
-        /*
-         * @todo might be moved up into core bigdata since really provides "ANY"
-         * support for a DDL.
-         */
-        final TestSuite suite = new TestSuite("RDF Internal Values");
-
-        suite.addTestSuite(TestEncodeDecodeKeys.class);
-
-        suite.addTestSuite(TestIVCompare.class);
         
-        suite.addTestSuite(TestLongLiterals.class);
+        final TestSuite suite = new TestSuite("Magic Sets");
+
+        suite.addTestSuite(TestMagicKeyOrderStrategy.class);
+
+        suite.addTestSuite(TestIRIS.class);
+        
+        suite.addTestSuite(TestMagicStore.class);
 
         return suite;
         
