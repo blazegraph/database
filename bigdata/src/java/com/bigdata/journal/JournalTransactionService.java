@@ -31,6 +31,7 @@ package com.bigdata.journal;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 
 import com.bigdata.service.AbstractFederation;
@@ -496,4 +497,21 @@ public class JournalTransactionService extends AbstractTransactionService {
         
     }
 
+	/**
+	 * Invoke a method with the {@link AbstractTransactionService}'s lock held.
+	 * 
+	 * @param <T>
+	 * @param callable
+	 * @return
+	 * @throws Exception
+	 */
+	public <T> T callWithLock(final Callable<T> callable) throws Exception {
+		lock.lock();
+		try {
+			return callable.call();
+		} finally {
+			lock.unlock();
+		}
+	}
+    
 }
