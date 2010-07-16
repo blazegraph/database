@@ -39,8 +39,10 @@ public class UUIDInternalValue<V extends BigdataLiteral> extends
 
     @SuppressWarnings("unchecked")
     public V asValue(final BigdataValueFactory f) {
-        return (V) f.createLiteral(value.toString(), //
+        final V v = (V) f.createLiteral(value.toString(), //
                 f.createURI(DTE.UUID.getDatatype()));
+        v.setIV(this);
+        return v;
     }
 
     @Override
@@ -113,4 +115,12 @@ public class UUIDInternalValue<V extends BigdataLiteral> extends
         return 1 + Bytes.SIZEOF_UUID;
     }
 
+    @Override
+    protected int _compareTo(IV o) {
+         
+        return value.compareTo(((UUIDInternalValue) o).value);
+        
+    }
+    
+    
 }

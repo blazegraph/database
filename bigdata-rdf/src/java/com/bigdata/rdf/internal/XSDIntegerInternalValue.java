@@ -38,8 +38,10 @@ public class XSDIntegerInternalValue<V extends BigdataLiteral> extends
     @SuppressWarnings("unchecked")
     public V asValue(final BigdataValueFactory f) {
         // @todo factory should cache the XSD URIs.
-        return (V) f.createLiteral(value.toString(),//
+        final V v = (V) f.createLiteral(value.toString(),//
                 f.createURI(DTE.XSDInteger.getDatatype()));
+        v.setIV(this);
+        return v;
     }
 
     @Override
@@ -123,4 +125,12 @@ public class XSDIntegerInternalValue<V extends BigdataLiteral> extends
         return byteLength;
 
     }
+    
+    @Override
+    protected int _compareTo(IV o) {
+        
+        return value.compareTo(((XSDIntegerInternalValue) o).value);
+        
+    }
+    
 }

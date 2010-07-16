@@ -37,8 +37,10 @@ public class XSDDecimalInternalValue<V extends BigdataLiteral> extends
     @SuppressWarnings("unchecked")
     public V asValue(final BigdataValueFactory f) {
         // @todo factory should cache the XSD URIs.
-        return (V) f.createLiteral(value.toString(),//
+        final V v = (V) f.createLiteral(value.toString(),//
                 f.createURI(DTE.XSDInteger.getDatatype()));
+        v.setIV(this);
+        return v;
     }
 
     @Override
@@ -112,4 +114,10 @@ public class XSDDecimalInternalValue<V extends BigdataLiteral> extends
         throw new UnsupportedOperationException();
     }
     
+    @Override
+    protected int _compareTo(IV o) {
+        
+        return value.compareTo(((XSDDecimalInternalValue) o).value);
+        
+    }
 }

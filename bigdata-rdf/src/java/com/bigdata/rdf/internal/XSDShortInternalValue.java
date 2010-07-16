@@ -34,7 +34,9 @@ public class XSDShortInternalValue<V extends BigdataLiteral> extends
 
     @SuppressWarnings("unchecked")
     public V asValue(final BigdataValueFactory f) {
-        return (V) f.createLiteral(value);
+        final V v = (V) f.createLiteral(value);
+        v.setIV(this);
+        return v;
     }
 
     @Override
@@ -107,4 +109,14 @@ public class XSDShortInternalValue<V extends BigdataLiteral> extends
     public int byteLength() {
         return 1 + Bytes.SIZEOF_SHORT;
     }
+    
+    @Override
+    protected int _compareTo(IV o) {
+         
+        final short value2 = ((XSDShortInternalValue) o).value;
+        
+        return value == value2 ? 0 : value < value2 ? -1 : 1;
+        
+    }
+    
 }

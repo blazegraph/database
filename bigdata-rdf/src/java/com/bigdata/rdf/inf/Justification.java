@@ -361,8 +361,6 @@ public class Justification implements Comparable<Justification> {
             
         }
         
-        System.err.println(toString());
-        
     }
     
 //    /**
