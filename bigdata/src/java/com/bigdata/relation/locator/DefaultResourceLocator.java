@@ -273,8 +273,9 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
                     }
 
                 }
-                
-                log.warn("Not found: namespace=" + namespace + ", timestamp="
+
+                if (log.isInfoEnabled())
+                log.info("Not found: namespace=" + namespace + ", timestamp="
                         + timestamp);
 
                 // not found.
