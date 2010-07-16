@@ -314,6 +314,13 @@ abstract public class AbstractTripleStore extends
     final private Class<? extends BaseClosure> closureClass;
     
     /**
+     * Are terms being inlined into the statement indices.
+     * 
+     * @see Options#INLINE_TERMS
+     */
+    final private boolean inlineTerms;
+    
+    /**
      * Return an instance of the class that is used to compute the closure of
      * the database.
      */
@@ -368,6 +375,18 @@ abstract public class AbstractTripleStore extends
     public boolean getStatementIdentifiers() {
         
         return statementIdentifiers;
+        
+    }
+    
+    /**
+     * Returns <code>true</code> when the database is in inline terms mode. In
+     * this mode, certain types of terms (numerics in particular) are inlined
+     * into the statement indices rather than being mapped to and from term
+     * identifiers in the lexicon.
+     */
+    public boolean isInlineTerms() {
+        
+        return inlineTerms;
         
     }
 
@@ -1092,6 +1111,10 @@ abstract public class AbstractTripleStore extends
             closureClass = cls;
             
         }
+        
+        this.inlineTerms = Boolean.parseBoolean(getProperty(
+                Options.INLINE_TERMS,
+                Options.DEFAULT_INLINE_TERMS));
         
         // setup namespace mapping for serialization utility methods.
         addNamespace(RDF.NAMESPACE, "rdf");

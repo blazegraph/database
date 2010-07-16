@@ -93,9 +93,10 @@ public class TestInlineConstraints extends ProxyTestCase {
             final BigdataURI X = vf.createURI("http://www.bigdata.com/X");
             final BigdataURI AGE = vf.createURI("http://www.bigdata.com/AGE");
             final BigdataLiteral _25 = vf.createLiteral(25);
+            final BigdataLiteral _35 = vf.createLiteral(35);
             final BigdataLiteral _45 = vf.createLiteral(45);
             
-            db.addTerms( new BigdataValue[] { A, B, X, AGE, _25, _45 } );
+            db.addTerms( new BigdataValue[] { A, B, X, AGE, _25, _35, _45 } );
             
             {
                 StatementBuffer buffer = new StatementBuffer
@@ -125,14 +126,14 @@ public class TestInlineConstraints extends ProxyTestCase {
                 final IVariable<IV> a = Var.var("a");
                 
                 final IRule rule =
-                        new Rule("test_optional", null, // head
+                        new Rule("test_greater_than", null, // head
                                 new IPredicate[] {
                                     new SPOPredicate(SPO, s, type, x),
                                     new SPOPredicate(SPO, s, age, a) 
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                                    new GT(a, 35)
+                                    new GT(a, _35.getIV())
                                 });
                 
                 try {
@@ -186,9 +187,10 @@ public class TestInlineConstraints extends ProxyTestCase {
             final BigdataURI X = vf.createURI("http://www.bigdata.com/X");
             final BigdataURI AGE = vf.createURI("http://www.bigdata.com/AGE");
             final BigdataLiteral _25 = vf.createLiteral(25);
+            final BigdataLiteral _35 = vf.createLiteral(35);
             final BigdataLiteral _45 = vf.createLiteral(45);
             
-            db.addTerms( new BigdataValue[] { A, B, X, AGE, _25, _45 } );
+            db.addTerms( new BigdataValue[] { A, B, X, AGE, _25, _35, _45 } );
             
             {
                 StatementBuffer buffer = new StatementBuffer
@@ -205,14 +207,6 @@ public class TestInlineConstraints extends ProxyTestCase {
                 
             }
             
-            final IV NULL = null;
-            Iterator<ISPO> it = db.getSPORelation().getAccessPath(NULL, NULL, NULL).iterator();
-            while (it.hasNext()) {
-                ISPO spo = it.next();
-                if (spo.getStatementType() != StatementEnum.Axiom)
-                    System.err.println(spo);
-            }
-            
             if (log.isInfoEnabled())
                 log.info("\n" +db.dumpStore(true, true, false));
   
@@ -226,15 +220,18 @@ public class TestInlineConstraints extends ProxyTestCase {
                 final IVariable<IV> a = Var.var("a");
                 
                 final IRule rule =
-                        new Rule("test_optional", null, // head
+                        new Rule("test_less_than", null, // head
                                 new IPredicate[] {
                                     new SPOPredicate(SPO, s, type, x),
                                     new SPOPredicate(SPO, s, age, a) 
                                 },
                                 // constraints on the rule.
                                 new IConstraint[] {
-                                    new LT(a, 35)
+                                    new LT(a, _35.getIV())
                                 });
+                
+                if (log.isInfoEnabled())
+                    log.info("running rule: " + rule);
                 
                 try {
                 
@@ -247,6 +244,9 @@ public class TestInlineConstraints extends ProxyTestCase {
                         ISolution solution = solutions.next();
                         
                         IBindingSet bs = solution.getBindingSet();
+                        
+                        if (log.isInfoEnabled())
+                            log.info("solution: " + bs);
                         
                         assertEquals(bs.get(s).get(), A.getIV());
                         assertEquals(bs.get(a).get(), _25.getIV());

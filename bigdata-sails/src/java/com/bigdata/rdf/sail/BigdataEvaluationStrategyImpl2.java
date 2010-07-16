@@ -14,38 +14,29 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.algebra.BinaryTupleOperator;
-import org.openrdf.query.algebra.BinaryValueOperator;
 import org.openrdf.query.algebra.Compare;
 import org.openrdf.query.algebra.Filter;
 import org.openrdf.query.algebra.Group;
 import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.LeftJoin;
-import org.openrdf.query.algebra.MathExpr;
 import org.openrdf.query.algebra.MultiProjection;
 import org.openrdf.query.algebra.Or;
-import org.openrdf.query.algebra.Order;
-import org.openrdf.query.algebra.OrderElem;
 import org.openrdf.query.algebra.Projection;
 import org.openrdf.query.algebra.ProjectionElem;
 import org.openrdf.query.algebra.ProjectionElemList;
 import org.openrdf.query.algebra.QueryModelNode;
-import org.openrdf.query.algebra.QueryModelNodeBase;
 import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.UnaryTupleOperator;
-import org.openrdf.query.algebra.UnaryValueOperator;
 import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
@@ -59,16 +50,18 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rdf.internal.DummyIV;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.relation.rule.GE;
+import com.bigdata.rdf.relation.rule.GT;
+import com.bigdata.rdf.relation.rule.LE;
+import com.bigdata.rdf.relation.rule.LT;
 import com.bigdata.rdf.rules.RuleContextEnum;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
-import com.bigdata.rdf.spo.SPOFilter;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.spo.SPOStarJoin;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -82,7 +75,6 @@ import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.EQ;
 import com.bigdata.relation.rule.EQConstant;
 import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IN;
 import com.bigdata.relation.rule.IPredicate;
@@ -97,6 +89,7 @@ import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.NE;
 import com.bigdata.relation.rule.NEConstant;
 import com.bigdata.relation.rule.OR;
+import com.bigdata.relation.rule.Predicate;
 import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.QueryOptions;
 import com.bigdata.relation.rule.Rule;
@@ -270,6 +263,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
     
     private final boolean starJoins;
     
+    private final boolean inlineTerms;
+    
     // private boolean slice = false, distinct = false, union = false;
     //    
     // // Note: defaults are illegal values.
@@ -290,7 +285,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
      */
     public BigdataEvaluationStrategyImpl2(
             final BigdataTripleSource tripleSource, final Dataset dataset,
-            final boolean nativeJoins, final boolean starJoins) {
+            final boolean nativeJoins, final boolean starJoins, 
+            final boolean inlineTerms) {
         
         super(tripleSource, dataset);
         
@@ -299,6 +295,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         this.database = tripleSource.getDatabase();
         this.nativeJoins = nativeJoins;
         this.starJoins = starJoins;
+        this.inlineTerms = inlineTerms;
         
     }
 
@@ -1496,26 +1493,25 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
     private IConstraint generateConstraint(ValueExpr left, ValueExpr right,
             CompareOp operator) {
         IVariable<IV> var = null;
-        IConstant<IV> constant = null;
+        BigdataValue constant = null;
         if (left instanceof Var) {
             var = com.bigdata.relation.rule.Var.var(((Var) left).getName());
         } else if (left instanceof ValueConstant) {
-            BigdataValue value = (BigdataValue) ((ValueConstant) left).getValue();
-            final IV iv = value.getIV();
-            if (iv == null)
-                return null;
-            constant = new Constant<IV>(iv);
+            constant = (BigdataValue) ((ValueConstant) left).getValue();
         } else {
             return null;
         }
         if (right instanceof Var) {
             var = com.bigdata.relation.rule.Var.var(((Var) right).getName());
         } else if (right instanceof ValueConstant) {
+/*            
             BigdataValue value = (BigdataValue) ((ValueConstant) right).getValue();
             final IV iv = value.getIV();
             if (iv == null)
                 return null;
             constant = new Constant<IV>(iv);
+*/            
+            constant = (BigdataValue) ((ValueConstant) right).getValue();
         } else {
             return null;
         }
@@ -1523,7 +1519,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             log.debug("var: " + var);
             log.debug("constant: " + constant);
         }
-        if (var == null || constant == null) {
+        if (var == null || constant == null || constant.getIV() == null) {
             if (log.isDebugEnabled()) {
                 log.debug("left: " + left);
                 log.debug("right: " + right);
@@ -1532,9 +1528,29 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         }
         // we can do equals, not equals
         if (operator == CompareOp.EQ) {
-            return new EQConstant(var, constant);
+            return new EQConstant(var, new Constant(constant.getIV()));
         } else if (operator == CompareOp.NE) {
-            return new NEConstant(var, constant);
+            return new NEConstant(var, new Constant(constant.getIV()));
+        } else if (inlineTerms && constant.getIV().isInline()) {
+            if (log.isInfoEnabled()) {
+                log.debug("inline constant: " + constant.getIV());
+            }
+            try {
+                switch (operator) {
+                case GT:
+                    return new GT(var, constant.getIV());
+                case GE:
+                    return new GE(var, constant.getIV());
+                case LT:
+                    return new LT(var, constant.getIV());
+                case LE:
+                    return new LE(var, constant.getIV());
+                default:
+                    return null;
+                }
+            } catch (Exception ex) {
+                return null;
+            }
         } else {
             return null;
         }
