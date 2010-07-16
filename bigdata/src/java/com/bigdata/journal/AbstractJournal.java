@@ -70,51 +70,24 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.ResourceManager;
-import com.bigdata.service.DataService;
-import com.bigdata.service.EmbeddedClient;
-import com.bigdata.service.IBigdataClient;
-import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.jini.JiniClient;
 import com.bigdata.util.ChecksumUtility;
 
 /**
  * <p>
- * The journal is an append-only persistence capable data structure supporting
- * atomic commit, named indices, and transactions. Writes are logically appended
- * to the journal to minimize disk head movement.
- * </p><p>
+ * The journal is a persistence capable data structure supporting atomic commit,
+ * named indices, and full transactions. The {@link BufferMode#DiskRW} mode
+ * provides an persistence scheme based on reusable allocation slots while the
+ * {@link BufferMode#DiskWORM} mode provides an append only persistence scheme.
+ * Journals may be configured in highly available quorums.
+ * </p>
+ * <p>
  * This class is an abstract implementation of the {@link IJournal} interface
  * that does not implement the {@link IConcurrencyManager},
- * {@link IResourceManager}, or {@link ITransactionService} interfaces. There
- * are several classes which DO support all of these features, relying on the
- * {@link AbstractJournal} for their underlying persistence store. These
- * include:
- * <dl>
- * <dt>{@link Journal}</dt>
- * <dd>A concrete implementation that may be used for a standalone immortal
- * database complete with concurrency control and transaction management.</dd>
- * <dt>{@link DataService}</dt>
- * <dd>A class supporting remote clients, key-range partitioned indices,
- * concurrency, and scale-out.</dd>
- * <dt>{@link IBigdataClient}</dt>
- * <dd>Clients connect to an {@link IBigdataFederation}, which is the basis
- * for the scale-out architecture. There are several variants of a federation
- * available, including:
- * <dl>
- * <dt>{@link EmbeddedClient}</dt>
- * <dd>Operations against a collection of services running in the same JVM with
- * full concurrency controls, transaction management, and key-range partitioned
- * indices.</dd>
- * <dt>{@link JiniClient}</dt>
- * <dd>Operations against a collection of services running on a distributed
- * services framework such as Jini with full concurrency controls, transaction
- * management, and key-range partitioned indices. This is the scale-out
- * solution.</dd>
- * </dl>
- * </dd>
- * </dl>
- * </p>
- * <h2>Limitations</h2>
+ * {@link IResourceManager}, or {@link ITransactionService} interfaces. The
+ * {@link Journal} provides a concrete implementation that may be used for a
+ * standalone database complete with concurrency control and transaction
+ * management.
+ * </p> <h2>Limitations</h2>
  * <p>
  * The {@link IIndexStore} implementation on this class is NOT thread-safe. The
  * basic limitation is that the mutable {@link BTree} is NOT thread-safe. The
@@ -162,12 +135,12 @@ import com.bigdata.util.ChecksumUtility;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo Checksums and/or record compression are currently handled on a per-{@link BTree}
- *       or other persistence capable data structure basis. It is nice to be
- *       able to choose for which indices and when ( {@link Journal} vs
- *       {@link IndexSegment}) to apply these algorithms. However, it might be
- *       nice to factor their application out a bit into a layered api - as long
- *       as the right layering is correctly re-established on load of the
+ * @todo Checksums and/or record compression are currently handled on a per-
+ *       {@link BTree} or other persistence capable data structure basis. It is
+ *       nice to be able to choose for which indices and when ( {@link Journal}
+ *       vs {@link IndexSegment}) to apply these algorithms. However, it might
+ *       be nice to factor their application out a bit into a layered api - as
+ *       long as the right layering is correctly re-established on load of the
  *       persistence data structure. In that view the {@link IRawStore} either
  *       computes checksums or it does not and the checksums is stored in the
  *       record, perhaps in the last 4 bytes. The checksum itself would not be
