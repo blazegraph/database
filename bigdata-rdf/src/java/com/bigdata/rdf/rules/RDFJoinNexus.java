@@ -110,10 +110,8 @@ import com.bigdata.relation.rule.eval.ProgramTask;
 import com.bigdata.relation.rule.eval.RuleStats;
 import com.bigdata.relation.rule.eval.Solution;
 import com.bigdata.relation.rule.eval.SolutionFilter;
-import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
-import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.striterator.ChunkedArrayIterator;
@@ -1776,10 +1774,8 @@ public class RDFJoinNexus implements IJoinNexus {
     }
 
     /**
-     * Runs a distributed {@link IProgram}. This covers both the
-     * {@link EmbeddedFederation} (which uses key-range partitioned indices) and
-     * {@link AbstractDistributedFederation}s that are truly multi-machine and
-     * use RMI.
+     * Runs a distributed {@link IProgram} (key-range partitioned indices, RMI,
+     * and multi-machine).
      */
     protected Object runDistributedProgram(final IBigdataFederation fed,
             final ActionEnum action, final IStep step) throws Exception {
