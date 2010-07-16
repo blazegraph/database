@@ -194,6 +194,9 @@ public class TestAll extends TestCase {
         // test suite for owl:sameAs {2,3} (backward chaining).
         suite.addTestSuite( TestBackchainOwlSameAsPropertiesIterator.class );
         
+        // test suite for RDF specific rule evaluation support.
+        suite.addTest(com.bigdata.rdf.relation.rule.TestAll.suite());
+
         /*
          * Test truth maintenance. This examines the incremental assertion and
          * retraction of statements buffered in a [focusStore] against the
