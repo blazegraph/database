@@ -98,8 +98,8 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
      */
     public String toString() {
 
-        return "TermId(" + termId+")";
-//                + getInternalValueTypeEnum().getCharCode() + ")"
+        return "TermId(" + termId + 
+                String.valueOf(getInternalValueTypeEnum().getCharCode()) + ")";
 //                + (datatype == null ? "" : datatype);
 
     }

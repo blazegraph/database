@@ -39,7 +39,9 @@ public class XSDBooleanInternalValue<V extends BigdataLiteral> extends
 
     @SuppressWarnings("unchecked")
     public V asValue(final BigdataValueFactory f) {
-        return (V) f.createLiteral(value);
+        final V v = (V) f.createLiteral(value);
+        v.setIV(this);
+        return v;
     }
 
     @Override
@@ -112,5 +114,15 @@ public class XSDBooleanInternalValue<V extends BigdataLiteral> extends
     public int byteLength() {
         return 1 + 1;
     }
+
+    @Override
+    protected int _compareTo(IV o) {
+         
+        final boolean v = ((XSDBooleanInternalValue) o).value;
+        
+        return (v == value ? 0 : (value ? 1 : -1));
+        
+    }
+    
 
 }

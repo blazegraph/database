@@ -327,6 +327,16 @@ public class SPORelation extends AbstractRelation<ISPO>
 
         // Note: Do not eagerly resolve the indices.
         
+        {
+            
+            final boolean inlineTerms = Boolean.parseBoolean(getProperty(
+                    AbstractTripleStore.Options.INLINE_TERMS,
+                    AbstractTripleStore.Options.DEFAULT_INLINE_TERMS));
+
+            lexiconConfiguration = new LexiconConfiguration(inlineTerms);
+            
+        }
+        
     }
     
     /**
@@ -2330,8 +2340,7 @@ public class SPORelation extends AbstractRelation<ISPO>
      * The {@link ILexiconConfiguration} instance, which will determine how
      * terms are encoded and decoded in the key space.
      */
-    private ILexiconConfiguration lexiconConfiguration = 
-        new LexiconConfiguration();
+    private ILexiconConfiguration lexiconConfiguration;
 
     /**
      * See {@link ILexiconConfiguration#isInline(DTE)}.  Delegates to the

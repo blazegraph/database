@@ -585,7 +585,7 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
      */
     protected int _compareTo(IV o) {
 
-        throw new UnsupportedOperationException();
+        throw new UnsupportedOperationException(getClass().toString());
 
     }
 

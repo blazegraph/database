@@ -33,14 +33,46 @@ public class LexiconConfiguration implements Serializable,
         ILexiconConfiguration {
     
     private static final long serialVersionUID = -817370708683316807L;
-
+    
+    private boolean inlineTerms;
+    
+    public LexiconConfiguration() {
+    }
+    
+    public LexiconConfiguration(final boolean inlineTerms) {
+        this.inlineTerms = inlineTerms;
+    }
+    
     /**
      * See {@link ILexiconConfiguration#isInline(DTE)}.
      */
     public boolean isInline(DTE dte) {
+
+        return inlineTerms && isSupported(dte);
         
-        return false;
+    }
+    
+    private boolean isSupported(DTE dte) {
         
+        switch (dte) {
+        case XSDBoolean:
+        case XSDByte:
+        case XSDShort:
+        case XSDInt:
+        case XSDLong:
+        case XSDFloat:
+        case XSDDouble:
+        case XSDInteger:
+        case UUID:
+            return true;
+        case XSDUnsignedByte:       // none of the unsigneds are tested yet
+        case XSDUnsignedShort:      // none of the unsigneds are tested yet
+        case XSDUnsignedInt:        // none of the unsigneds are tested yet
+        case XSDUnsignedLong:       // none of the unsigneds are tested yet
+        case XSDDecimal:            // need to implement byteLength() first
+        default:
+            return false;
+        }
     }
 
     /**

@@ -61,7 +61,7 @@ abstract public class AbstractInlineInternalValue<V extends BigdataValue, T>
 
     public String toString() {
         
-        return super.toString() + "[" + stringValue() + "]";
+        return super.getInternalDataTypeEnum() + "(" + stringValue() + ")";
         
     }
     

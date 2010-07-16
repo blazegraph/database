@@ -362,6 +362,16 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             
         }
         
+        {
+            
+            final boolean inlineTerms = Boolean.parseBoolean(getProperty(
+                    AbstractTripleStore.Options.INLINE_TERMS,
+                    AbstractTripleStore.Options.DEFAULT_INLINE_TERMS));
+
+            lexiconConfiguration = new LexiconConfiguration(inlineTerms);
+            
+        }
+        
     }
     
     /**
@@ -1968,7 +1978,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * The {@link ILexiconConfiguration} instance, which will determine how
      * terms are encoded and decoded in the key space.
      */
-    private ILexiconConfiguration lexiconConfiguration = new LexiconConfiguration();
+    private ILexiconConfiguration lexiconConfiguration;
 
     /**
      * Constant for the {@link LexiconRelation} namespace component.
@@ -2224,25 +2234,35 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             
             switch(dte) {
                 case XSDBoolean:
-                    iv = new XSDBooleanInternalValue(XMLDatatypeUtil.parseBoolean(v)); 
+                    iv = new XSDBooleanInternalValue(XMLDatatypeUtil.parseBoolean(v));
+                    break;
                 case XSDByte:
                     iv = new XSDByteInternalValue(XMLDatatypeUtil.parseByte(v));
+                    break;
                 case XSDShort:
                     iv = new XSDShortInternalValue(XMLDatatypeUtil.parseShort(v));
+                    break;
                 case XSDInt:
                     iv = new XSDIntInternalValue(XMLDatatypeUtil.parseInt(v));
+                    break;
                 case XSDLong:
                     iv = new XSDLongInternalValue(XMLDatatypeUtil.parseLong(v));
+                    break;
                 case XSDFloat:
                     iv = new XSDFloatInternalValue(XMLDatatypeUtil.parseFloat(v));
+                    break;
                 case XSDDouble:
                     iv = new XSDDoubleInternalValue(XMLDatatypeUtil.parseDouble(v));
+                    break;
                 case XSDInteger:
                     iv = new XSDIntegerInternalValue(XMLDatatypeUtil.parseInteger(v));
+                    break;
                 case XSDDecimal:
                     iv = new XSDDecimalInternalValue(XMLDatatypeUtil.parseDecimal(v));
+                    break;
                 case UUID:
                     iv = new UUIDInternalValue(UUID.fromString(v));
+                    break;
                 default:
                     iv = null;
             }

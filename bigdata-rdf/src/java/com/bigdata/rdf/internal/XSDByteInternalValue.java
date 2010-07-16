@@ -33,7 +33,9 @@ public class XSDByteInternalValue<V extends BigdataLiteral> extends
 
     @SuppressWarnings("unchecked")
     public V asValue(final BigdataValueFactory f) {
-        return (V) f.createLiteral(value);
+        final V v = (V) f.createLiteral(value);
+        v.setIV(this);
+        return v;
     }
 
     @Override
@@ -107,4 +109,13 @@ public class XSDByteInternalValue<V extends BigdataLiteral> extends
         return 1 + 1;
     }
 
+    @Override
+    protected int _compareTo(IV o) {
+         
+        final byte value2 = ((XSDByteInternalValue) o).value;
+        
+        return value == value2 ? 0 : value < value2 ? -1 : 1;
+        
+    }
+    
 }

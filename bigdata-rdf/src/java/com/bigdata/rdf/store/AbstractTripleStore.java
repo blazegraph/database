@@ -862,6 +862,16 @@ abstract public class AbstractTripleStore extends
         String DEFAULT_TEXT_INDEXER_CLASS = BigdataRDFFullTextIndex.class
                 .getName();
 
+        /**
+         * Set up database to inline numerics directly into the statement
+         * indices rather than using the lexicon to map them to term 
+         * identifiers and back.
+         */
+        String INLINE_TERMS = AbstractTripleStore.class.getName()
+                + ".inlineTerms";
+
+        String DEFAULT_INLINE_TERMS = "true";
+
     }
 
     protected Class determineAxiomClass() {
