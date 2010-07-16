@@ -376,7 +376,7 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
         
     }
     
-    final public VTE getInternalValueTypeEnum() {
+    final public VTE getVTE() {
 
         return VTE
                 .valueOf((byte) (((flags & VTE_MASK) >>> VTE_SHIFT) & 0xff));
@@ -387,7 +387,7 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
      * FIXME I don't think this method is working right, at least for the
      * TermId class.  See {@link TermId#toString()}.
      */
-    final public DTE getInternalDataTypeEnum() {
+    final public DTE getDTE() {
 
         return DTE.valueOf((byte) ((flags & DTE_MASK) & 0xff));
 
@@ -483,19 +483,27 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
     }
     
     final public boolean isNumeric() {
-        return isInline() && getInternalDataTypeEnum().isNumeric();
+        return isInline() && getDTE().isNumeric();
+    }
+
+    final public boolean isSignedNumeric() {
+        return isInline() && getDTE().isSignedNumeric();
     }
 
     final public boolean isUnsignedNumeric() {
-        return isInline() && getInternalDataTypeEnum().isUnsignedNumeric();
+        return isInline() && getDTE().isUnsignedNumeric();
     }
 
-    final public boolean isShortNumeric() {
-        return isInline() && getInternalDataTypeEnum().isShortNumeric();
+    final public boolean isFixedNumeric() {
+        return isInline() && getDTE().isFixedNumeric();
     }
 
     final public boolean isBigNumeric() {
-        return isInline() && getInternalDataTypeEnum().isBigNumeric();
+        return isInline() && getDTE().isBigNumeric();
+    }
+
+    final public boolean isFloatingPointNumeric() {
+        return isInline() && getDTE().isFloatingPointNumeric();
     }
 
     /**
@@ -615,7 +623,7 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
          * Note: We have to handle the unsigned byte, short, int and long values
          * specially to get the correct total key order.
          */
-        final DTE dte = getInternalDataTypeEnum();
+        final DTE dte = getDTE();
         
         final AbstractDatatypeLiteralInternalValue<?, ?> t = (AbstractDatatypeLiteralInternalValue<?, ?>) this;
         

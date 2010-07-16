@@ -1,6 +1,6 @@
-/*
+/**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,40 +20,38 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-
 */
-package com.bigdata.rdf.relation.rule;
 
-import com.bigdata.rdf.internal.AbstractDatatypeLiteralInternalValue;
+package com.bigdata.rdf.internal.constraints;
+
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IVariable;
 
 /**
- * FIXME obviously not implemented correctly right now, but it works
- * 
- * @author mike
+ * Use inline terms to perform numerical comparison operations.
+ * <p>
+ * @see {@link IVUtility#numericalCompare(IV, IV)}. 
  */
-public class LT implements IConstraint {
+public abstract class AbstractInlineConstraint implements IConstraint {
 
-    private static final long serialVersionUID = 8104692462788944394L;
-    
     public final IVariable v;
-    public final double d;
+    public final IV iv;
     
-    public LT(final IVariable<IV> v, IV iv) {
+    public AbstractInlineConstraint(final IVariable<IV> v, final IV iv) {
         
-        if (v == null || !iv.isInline())
+        if (v == null)
             throw new IllegalArgumentException();
 
-        if (!(iv instanceof AbstractDatatypeLiteralInternalValue))
+        if (!IVUtility.canNumericalCompare(iv))
             throw new IllegalArgumentException();
         
         this.v = v;
         
-        this.d = ((AbstractDatatypeLiteralInternalValue) iv).doubleValue();
+        this.iv = iv;
         
     }
     
@@ -66,18 +64,14 @@ public class LT implements IConstraint {
             return true; // not yet bound.
 
         final IV term = c.get();
-        
-        if (term instanceof AbstractDatatypeLiteralInternalValue) {
-            
-            return ((AbstractDatatypeLiteralInternalValue) term).doubleValue() < d;
-            
-        }
-        
-        throw new RuntimeException(
-                "cannot apply this constraint to this type of internal value: " 
-                + term);
 
+        final int compare = IVUtility.numericalCompare(term, iv);
+        
+        return _accept(compare);
+        
     }
+    
+    protected abstract boolean _accept(final int compare);
     
     public IVariable[] getVariables() {
         

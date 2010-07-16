@@ -49,6 +49,7 @@ import org.openrdf.query.resultio.TupleQueryResultParser;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
+import org.openrdf.repository.RepositoryResult;
 import org.openrdf.repository.dataset.DatasetRepository;
 import org.openrdf.repository.sail.SailRepository;
 import org.openrdf.repository.util.RDFInserter;
@@ -287,6 +288,14 @@ public abstract class SPARQLQueryTest extends TestCase {
                 message.append(queryString.trim());
                 message.append("\n===================================\n");
                 message.append(tupleExpr);
+                
+                message.append("\n===================================\n");
+                message.append("database dump:\n");
+                RepositoryResult<Statement> stmts = con.getStatements(null, null, null, false);
+                while (stmts.hasNext()) {
+                    message.append(stmts.next());
+                    message.append("\n");
+                }
             } finally {
                 con.close();
             }

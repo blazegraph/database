@@ -175,7 +175,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                     // ignored.
                 }
                 
-                assertEquals("flags="+v.flags(), vte, v.getInternalValueTypeEnum());
+                assertEquals("flags="+v.flags(), vte, v.getVTE());
 
 //                assertEquals(dte, v.getInternalDataTypeEnum());
 
@@ -299,9 +299,9 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                 v.getInlineValue();
 
                 assertEquals("flags=" + v.flags(), vte, v
-                        .getInternalValueTypeEnum());
+                        .getVTE());
 
-                assertEquals(dte, v.getInternalDataTypeEnum());
+                assertEquals(dte, v.getDTE());
 
                 switch (vte) {
                 case URI:

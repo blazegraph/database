@@ -504,7 +504,7 @@ public class Justification implements Comparable<Justification> {
              * difference between two longs.
              */
 
-            int ret = IVUtility.compareTo(ivs[i], o.ivs[i]);
+            int ret = IVUtility.compare(ivs[i], o.ivs[i]);
 
             if (ret != 0)
                 return ret;

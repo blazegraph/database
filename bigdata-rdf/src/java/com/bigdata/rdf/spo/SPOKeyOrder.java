@@ -387,7 +387,7 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
                 
                 final IV t2 = o2.get(keyMap[i]);
                 
-                int ret = IVUtility.compareTo(t1, t2);
+                int ret = IVUtility.compare(t1, t2);
                 
                 if (ret != 0) {
                 
