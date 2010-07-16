@@ -31,7 +31,8 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.UUID;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.constraints.AbstractInlineConstraint;
+import com.bigdata.rdf.internal.constraints.InlineGT;
 import com.bigdata.rdf.model.BigdataLiteral;
 
 
@@ -57,7 +58,7 @@ public class IVUtility {
         
     }
     
-    public static int compareTo(IV iv1, IV iv2) {
+    public static int compare(IV iv1, IV iv2) {
         
         // same IV or both null
         if (iv1 == iv2)
@@ -72,6 +73,85 @@ public class IVUtility {
         
         // only possibility left if that neither are null
         return iv1.compareTo(iv2);
+        
+    }
+    
+    /**
+     * This method attempts to compare two inline internal values based on
+     * their numerical representation, which is different from the natural
+     * sort ordering of IVs (the natural sort ordering considers the datatype).
+     * <p>
+     * So for example, if we have two IVs representing 2.1d and 1l, this method
+     * will attempt to compare 2.1 to 1 ignoring the datatype. This is useful
+     * for SPARQL filters.
+     */
+    public static int numericalCompare(IV iv1, IV iv2) {
+
+        if (!iv1.isInline() || !iv2.isInline())
+            throw new IllegalArgumentException("not inline terms");
+        
+        final DTE dte1 = iv1.getDTE();
+        final DTE dte2 = iv2.getDTE();
+
+        final int numBooleans = 
+                (dte1 == DTE.XSDBoolean ? 1 : 0) +
+                (dte2 == DTE.XSDBoolean ? 1 : 0);
+        
+        // we can do two booleans
+        if (numBooleans == 1)
+            throw new IllegalArgumentException("only one boolean");
+
+        // we can do two signed numerics
+        if (numBooleans == 0)
+        if (!dte1.isNumeric() || !dte2.isNumeric())
+            throw new IllegalArgumentException("not signed numerics");
+        
+        // we can use the natural ordering if they have the same DTE
+        // this will naturally take care of two booleans or two numerics of the
+        // same datatype
+        if (dte1 == dte2)
+            return iv1.compareTo(iv2);
+        
+        // otherwise we need to try to convert them into comparable numbers
+        final AbstractDatatypeLiteralInternalValue num1 = 
+            (AbstractDatatypeLiteralInternalValue) iv1; 
+        final AbstractDatatypeLiteralInternalValue num2 = 
+            (AbstractDatatypeLiteralInternalValue) iv2; 
+        
+        // if one's a BigDecimal we should use the BigDecimal comparator for both
+        if (dte1 == DTE.XSDDecimal || dte2 == DTE.XSDDecimal) {
+            return num1.decimalValue().compareTo(num2.decimalValue());
+        }
+        
+        // same for BigInteger
+        if (dte1 == DTE.XSDDecimal || dte2 == DTE.XSDDecimal) {
+            return num1.integerValue().compareTo(num2.integerValue());
+        }
+        
+        // fixed length numerics
+        if (dte1.isFloatingPointNumeric() || dte2.isFloatingPointNumeric()) {
+            // non-BigDecimal floating points - use doubles
+            return Double.compare(num1.doubleValue(), num2.doubleValue());
+        } else {
+            // non-BigInteger integers - use longs
+            final long a = num1.longValue();
+            final long b = num2.longValue();
+            return a == b ? 0 : a < b ? -1 : 1;
+        }
+        
+    }
+    
+    /**
+     * Used to test whether a given value constant can be used in an inline
+     * filter or not.  If so, we can use one of the inline constraints
+     * {@link InlineGT}, {@link AbstractInlineConstraint}, {@link LT}, {@link LE}, which in turn defer
+     * to the numerical comparison operator {@link #numericalCompare(IV, IV)}. 
+     */
+    public static final boolean canNumericalCompare(final IV iv) {
+        
+        // inline boolean or inline signed numeric
+        return iv.isInline() && 
+                (iv.getDTE() == DTE.XSDBoolean || iv.isNumeric());
         
     }
 

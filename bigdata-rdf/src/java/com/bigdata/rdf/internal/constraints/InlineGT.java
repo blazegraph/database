@@ -21,32 +21,29 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.internal;
 
-import com.bigdata.rdf.model.BigdataLiteral;
+package com.bigdata.rdf.internal.constraints;
+
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.relation.rule.IVariable;
 
 /**
- * Abstract base class for inline RDF literals.
- * <p>
- * {@inheritDoc}
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
- *         Thompson</a>
- * @version $Id: TestEncodeDecodeKeys.java 2753 2010-05-01 16:36:59Z
- *          thompsonbry $
+ * Use inline numerical comparison techniques to implement the > operator.
  */
-abstract public class AbstractLiteralInternalValue<V extends BigdataLiteral, T>
-        extends AbstractInlineInternalValue<V, T> {
+public class InlineGT extends AbstractInlineConstraint {
 
-    /**
-     * 
-     */
-    private static final long serialVersionUID = -2684528247542410336L;
+    private static final long serialVersionUID = 8104692462788944394L;
+    
+    public InlineGT(final IVariable<IV> v, final IV iv) {
+        
+        super(v, iv);
+        
+    }
+    
+    protected boolean _accept(final int compare) {
 
-    protected AbstractLiteralInternalValue(final DTE dte) {
-
-        super(VTE.LITERAL, dte);
+        return compare > 0;
 
     }
-
+    
 }

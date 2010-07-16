@@ -27,12 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
-import java.io.DataOutput;
 import java.io.Serializable;
-
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
@@ -86,7 +83,7 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
     /**
      * Return the {@link VTE} for the {@link IV}
      */
-    VTE getInternalValueTypeEnum();
+    VTE getVTE();
 
     /**
      * Return <code>true</code> iff this is an RDF Literal. Note that some kinds
@@ -119,7 +116,7 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
      * corresponding to the specific data type which can be decoded from this
      * {@link IV} using {@link #getInlineValue()}.
      */
-    DTE getInternalDataTypeEnum();
+    DTE getDTE();
 
     /**
      * <code>true</code> iff the RDF value is represented by a term identifier.
@@ -183,6 +180,13 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
     boolean isNumeric();
 
     /**
+     * <code>true</code> for an signed numeric datatype ( xsd:byte,
+     * xsd:short, xsd:int, xsd:long, xsd:float, xsd:double, xsd:integer, and
+     * xsd:decimal).
+     */
+    boolean isSignedNumeric();
+
+    /**
      * <code>true</code> for an unsigned numeric datatype ( xsd:unsignedByte,
      * xsd:unsignedShort, xsd:unsignedInt, xsd:unsignedLong).
      */
@@ -194,12 +198,18 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
      * xsd:short, xsd:unsignedShort, xsd:int, xsd:unsignedInt, xsd:long,
      * xsd:unsignedLong, xsd:float, xsd:double).
      */
-    boolean isShortNumeric();
+    boolean isFixedNumeric();
 
     /**
      * <code>true</code> for xsd:integer and xsd:decimal.
      */
     boolean isBigNumeric();
+    
+    /**
+     * <code>true</code> for xsd:float, xsd:double, and xsd:decimal
+     */
+    boolean isFloatingPointNumeric();
+    
 
     /**
      * Inflate an inline RDF value to a {@link BigdataValue}. This method DOES

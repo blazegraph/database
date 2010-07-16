@@ -50,12 +50,15 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rdf.internal.DummyIV;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.constraints.InlineEQ;
+import com.bigdata.rdf.internal.constraints.InlineGE;
+import com.bigdata.rdf.internal.constraints.InlineGT;
+import com.bigdata.rdf.internal.constraints.InlineLE;
+import com.bigdata.rdf.internal.constraints.InlineLT;
+import com.bigdata.rdf.internal.constraints.InlineNE;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.relation.rule.GE;
-import com.bigdata.rdf.relation.rule.GT;
-import com.bigdata.rdf.relation.rule.LE;
-import com.bigdata.rdf.relation.rule.LT;
 import com.bigdata.rdf.rules.RuleContextEnum;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
@@ -1504,13 +1507,6 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         if (right instanceof Var) {
             var = com.bigdata.relation.rule.Var.var(((Var) right).getName());
         } else if (right instanceof ValueConstant) {
-/*            
-            BigdataValue value = (BigdataValue) ((ValueConstant) right).getValue();
-            final IV iv = value.getIV();
-            if (iv == null)
-                return null;
-            constant = new Constant<IV>(iv);
-*/            
             constant = (BigdataValue) ((ValueConstant) right).getValue();
         } else {
             return null;
@@ -1526,34 +1522,41 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             }
             return null;
         }
+        final IV iv = constant.getIV();
         // we can do equals, not equals
-        if (operator == CompareOp.EQ) {
-            return new EQConstant(var, new Constant(constant.getIV()));
-        } else if (operator == CompareOp.NE) {
-            return new NEConstant(var, new Constant(constant.getIV()));
-        } else if (inlineTerms && constant.getIV().isInline()) {
+        if (inlineTerms && IVUtility.canNumericalCompare(iv)) {
             if (log.isInfoEnabled()) {
-                log.debug("inline constant: " + constant.getIV());
+                log.debug("inline constant, using inline numerical comparison: " 
+                        + iv);
             }
             try {
                 switch (operator) {
                 case GT:
-                    return new GT(var, constant.getIV());
+                    return new InlineGT(var, iv);
                 case GE:
-                    return new GE(var, constant.getIV());
+                    return new InlineGE(var, iv);
                 case LT:
-                    return new LT(var, constant.getIV());
+                    return new InlineLT(var, iv);
                 case LE:
-                    return new LE(var, constant.getIV());
+                    return new InlineLE(var, iv);
+                case EQ:
+                    return new InlineEQ(var, iv);
+                case NE:
+                    return new InlineNE(var, iv);
                 default:
                     return null;
                 }
             } catch (Exception ex) {
                 return null;
             }
+        } else if (operator == CompareOp.EQ) {
+            return new EQConstant(var, new Constant(iv));
+        } else if (operator == CompareOp.NE) {
+            return new NEConstant(var, new Constant(iv));
         } else {
             return null;
         }
+        
     }
 
     /**

@@ -2232,39 +2232,48 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             
             IV iv = null;
             
-            switch(dte) {
-                case XSDBoolean:
-                    iv = new XSDBooleanInternalValue(XMLDatatypeUtil.parseBoolean(v));
-                    break;
-                case XSDByte:
-                    iv = new XSDByteInternalValue(XMLDatatypeUtil.parseByte(v));
-                    break;
-                case XSDShort:
-                    iv = new XSDShortInternalValue(XMLDatatypeUtil.parseShort(v));
-                    break;
-                case XSDInt:
-                    iv = new XSDIntInternalValue(XMLDatatypeUtil.parseInt(v));
-                    break;
-                case XSDLong:
-                    iv = new XSDLongInternalValue(XMLDatatypeUtil.parseLong(v));
-                    break;
-                case XSDFloat:
-                    iv = new XSDFloatInternalValue(XMLDatatypeUtil.parseFloat(v));
-                    break;
-                case XSDDouble:
-                    iv = new XSDDoubleInternalValue(XMLDatatypeUtil.parseDouble(v));
-                    break;
-                case XSDInteger:
-                    iv = new XSDIntegerInternalValue(XMLDatatypeUtil.parseInteger(v));
-                    break;
-                case XSDDecimal:
-                    iv = new XSDDecimalInternalValue(XMLDatatypeUtil.parseDecimal(v));
-                    break;
-                case UUID:
-                    iv = new UUIDInternalValue(UUID.fromString(v));
-                    break;
-                default:
-                    iv = null;
+            try {
+                
+                switch(dte) {
+                    case XSDBoolean:
+                        iv = new XSDBooleanInternalValue(XMLDatatypeUtil.parseBoolean(v));
+                        break;
+                    case XSDByte:
+                        iv = new XSDByteInternalValue(XMLDatatypeUtil.parseByte(v));
+                        break;
+                    case XSDShort:
+                        iv = new XSDShortInternalValue(XMLDatatypeUtil.parseShort(v));
+                        break;
+                    case XSDInt:
+                        iv = new XSDIntInternalValue(XMLDatatypeUtil.parseInt(v));
+                        break;
+                    case XSDLong:
+                        iv = new XSDLongInternalValue(XMLDatatypeUtil.parseLong(v));
+                        break;
+                    case XSDFloat:
+                        iv = new XSDFloatInternalValue(XMLDatatypeUtil.parseFloat(v));
+                        break;
+                    case XSDDouble:
+                        iv = new XSDDoubleInternalValue(XMLDatatypeUtil.parseDouble(v));
+                        break;
+                    case XSDInteger:
+                        iv = new XSDIntegerInternalValue(XMLDatatypeUtil.parseInteger(v));
+                        break;
+                    case XSDDecimal:
+                        iv = new XSDDecimalInternalValue(XMLDatatypeUtil.parseDecimal(v));
+                        break;
+                    case UUID:
+                        iv = new UUIDInternalValue(UUID.fromString(v));
+                        break;
+                    default:
+                        iv = null;
+                }
+                
+            } catch (NumberFormatException ex) {
+                
+                // some dummy doesn't know how to format a number
+                // default to term identifier for this term 
+                
             }
             
             if (iv != null && value instanceof BigdataValue)

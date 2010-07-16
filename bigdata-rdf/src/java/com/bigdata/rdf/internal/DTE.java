@@ -406,6 +406,17 @@ public enum DTE {
     }
 
     /**
+     * <code>true</code> for an signed numeric datatype ( xsd:byte,
+     * xsd:short, xsd:int, xsd:long, xsd:float, xsd:double, xsd:integer, and
+     * xsd:decimal).
+     */
+    public boolean isSignedNumeric() {
+        
+        return isNumeric() && !isUnsignedNumeric();
+        
+    }
+    
+    /**
      * <code>true</code> for an unsigned numeric datatype ( xsd:unsignedByte,
      * xsd:unsignedShort, xsd:unsignedInt, xsd:unsignedLong).
      */
@@ -421,7 +432,7 @@ public enum DTE {
      * xsd:short, xsd:unsignedShort, xsd:int, xsd:unsignedInt, xsd:long,
      * xsd:unsignedLong, xsd:float, xsd:double</code>).
      */
-    public boolean isShortNumeric() {
+    public boolean isFixedNumeric() {
         
         return (flags & DTEFlags.NUMERIC) != 0 && len != 0;
         
@@ -433,6 +444,15 @@ public enum DTE {
     public boolean isBigNumeric() {
         
         return (flags & DTEFlags.NUMERIC) != 0 && len == 0;
+        
+    }
+
+    /**
+     * <code>true</code> for xsd:float, xsd:double, and xsd:decimal.
+     */
+    public boolean isFloatingPointNumeric() {
+        
+        return this == XSDFloat || this == XSDDouble || this == XSDDecimal;
         
     }
 
