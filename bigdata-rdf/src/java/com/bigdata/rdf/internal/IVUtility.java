@@ -34,6 +34,7 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.internal.constraints.AbstractInlineConstraint;
 import com.bigdata.rdf.internal.constraints.InlineGT;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.relation.rule.Constant;
 
 
 /**
@@ -351,6 +352,87 @@ public class IVUtility {
                     + dte);
         }
 
+    }
+    
+    /**
+     * Decode an IV from its string representation as encoded by
+     * {@link TermId#toString()} and 
+     * {@link AbstractInlineInternalValue#toString()}.
+     * 
+     * @param s
+     *          the string representation
+     * @return
+     *          the IV
+     */
+    public static final IV fromString(String s) {
+        if (s.startsWith("TermId")) {
+            char type = s.charAt(s.length()-2);
+            long tid = Long.valueOf(s.substring(7, s.length()-2));
+            return new TermId(VTE.valueOf(type), tid);
+        } else {
+            final String type = s.substring(0, s.indexOf('(')); 
+            final String val = s.substring(s.indexOf('('), s.length()-1);
+            final DTE dte = Enum.valueOf(DTE.class, type);
+            switch (dte) {
+            case XSDBoolean: {
+                final boolean b = Boolean.valueOf(val);
+                if (b) {
+                    return XSDBooleanInternalValue.TRUE;
+                } else {
+                    return XSDBooleanInternalValue.FALSE;
+                }
+            }
+            case XSDByte: {
+                final byte x = Byte.valueOf(val);
+                return new XSDByteInternalValue<BigdataLiteral>(x);
+            }
+            case XSDShort: {
+                final short x = Short.valueOf(val);
+                return new XSDShortInternalValue<BigdataLiteral>(x);
+            }
+            case XSDInt: {
+                final int x = Integer.valueOf(val);
+                return new XSDIntInternalValue<BigdataLiteral>(x);
+            }
+            case XSDLong: {
+                final long x = Long.valueOf(val);
+                return new XSDLongInternalValue<BigdataLiteral>(x);
+            }
+            case XSDFloat: {
+                final float x = Float.valueOf(val);
+                return new XSDFloatInternalValue<BigdataLiteral>(x);
+            }
+            case XSDDouble: {
+                final double x = Double.valueOf(val);
+                return new XSDDoubleInternalValue<BigdataLiteral>(x);
+            }
+            case UUID: {
+                final UUID x = UUID.fromString(val);
+                return new UUIDInternalValue<BigdataLiteral>(x);
+            }
+            case XSDInteger: {
+                final BigInteger x = new BigInteger(val);
+                return new XSDIntegerInternalValue<BigdataLiteral>(x);
+            }
+                // case XSDDecimal:
+                // keyBuilder.append(t.decimalValue());
+                // break;
+                // case XSDUnsignedByte:
+                // keyBuilder.appendUnsigned(t.byteValue());
+                // break;
+                // case XSDUnsignedShort:
+                // keyBuilder.appendUnsigned(t.shortValue());
+                // break;
+                // case XSDUnsignedInt:
+                // keyBuilder.appendUnsigned(t.intValue());
+                // break;
+                // case XSDUnsignedLong:
+                // keyBuilder.appendUnsigned(t.longValue());
+                // break;
+            default:
+                throw new UnsupportedOperationException("dte=" + dte);
+            }
+        }
     }
     
 }

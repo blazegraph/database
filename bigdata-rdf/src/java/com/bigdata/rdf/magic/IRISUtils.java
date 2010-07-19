@@ -46,6 +46,7 @@ import org.deri.iris.builtins.BuiltinsFactory;
 import org.deri.iris.optimisations.magicsets.MagicSets;
 import org.deri.iris.terms.TermFactory;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.rules.MappedProgram;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
@@ -267,9 +268,10 @@ public class IRISUtils {
         
         ITerm[] terms = new ITerm[bigdataPred.arity()];
         for (int i = 0; i < terms.length; i++) {
-            IVariableOrConstant<Long> bigdataTerm = bigdataPred.get(i);
+            final IVariableOrConstant<IV> bigdataTerm = bigdataPred.get(i);
             if (bigdataTerm.isConstant()) {
-                terms[i] = TERM.createString(String.valueOf(bigdataTerm.get()));
+                final IV iv = bigdataTerm.get();
+                terms[i] = TERM.createString(iv.toString());
             } else {
                 terms[i] = TERM.createVariable(bigdataTerm.getName());
             }
@@ -595,8 +597,7 @@ type (triple vs. NOT_EQUAL for example).
      
         String value = (String) term.getValue();
         if (term.isGround()) {
-            throw new RuntimeException();
-//            return new Constant<IV>(LegacyTermIdUtility.termId(Long.valueOf(value)));
+            return new Constant<IV>(IVUtility.fromString(value));
         } else {
             return Var.var(value);
         }

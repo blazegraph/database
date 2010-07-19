@@ -53,7 +53,7 @@ public class TestMagicKeyOrderStrategy extends TestCase {
             System.out.println(i + ": " + MagicKeyOrderStrategy.calculateNumIndices(i));
         }
         
-        for (int i = 1; i <= 15; i++) {
+        for (int i = 1; i <= 8; i++) {
             int[][] indices = MagicKeyOrderStrategy.calculateKeyOrderArrays(i);
             System.out.println(i + ": " + MagicKeyOrderStrategy.format(indices, CharFormatter.INSTANCE) + ", " + "num indices = " + indices.length);
             boolean correct = checkIndices(indices, i);

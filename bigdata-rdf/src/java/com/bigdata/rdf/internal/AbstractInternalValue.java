@@ -384,8 +384,7 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
     }
 
     /**
-     * FIXME I don't think this method is working right, at least for the
-     * TermId class.  See {@link TermId#toString()}.
+     * Return the {@link DTE} for this {@link IV}.
      */
     final public DTE getDTE() {
 

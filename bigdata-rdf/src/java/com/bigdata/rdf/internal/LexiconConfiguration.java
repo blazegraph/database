@@ -73,6 +73,7 @@ public class LexiconConfiguration implements Serializable,
         default:
             return false;
         }
+        
     }
 
     /**

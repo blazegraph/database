@@ -62,11 +62,12 @@ import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
  * @version $Id: MagicIndexWriteProc.java 2265 2009-10-26 12:51:06Z thompsonbry
  *          $
  * 
- *          FIXME This does not implement {@link Externalizable} and does not
- *          declare a serialVersionId.
  */
 public class MagicIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
-        IParallelizableIndexProcedure, IMutableRelationIndexWriteProcedure {
+        IParallelizableIndexProcedure, IMutableRelationIndexWriteProcedure, 
+        Externalizable {
+
+    private static final long serialVersionUID = -6213370004972073550L;
 
     protected transient static final Logger log = Logger
             .getLogger(MagicIndexWriteProc.class);
@@ -141,9 +142,6 @@ public class MagicIndexWriteProc extends AbstractKeyArrayIndexProcedure implemen
         long writeCount = 0;
 
         final int n = getKeyCount();
-
-        // used to generate the values that we write on the index.
-        final ByteArrayBuffer tmp = new ByteArrayBuffer(1 + 8/* max size */);
 
         for (int i = 0; i < n; i++) {
 

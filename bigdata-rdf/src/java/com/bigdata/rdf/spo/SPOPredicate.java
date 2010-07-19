@@ -496,8 +496,16 @@ public class SPOPredicate implements IPredicate<ISPO> {
             
         }
 
-        public boolean accept(final ISPO e) {
-
+        public boolean accept(final Object o) {
+            
+            if (!canAccept(o)) {
+                
+                return true;
+                
+            }
+            
+            final ISPO e = (ISPO) o;
+            
             if (a.canAccept(e) && a.accept(e) && b.canAccept(e) && b.accept(e)) {
 
                 return true;
