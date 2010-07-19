@@ -2213,11 +2213,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         // just literals for now, maybe bnodes too eventually?
         if (value instanceof Literal) {
             
-            Literal l = (Literal) value;
+            final Literal l = (Literal) value;
             
-            URI datatype = l.getDatatype();
+            final URI datatype = l.getDatatype();
             
-            DTE dte = datatype == null ? null : DTE.valueOf(datatype); 
+            final DTE dte = datatype == null ? null : DTE.valueOf(datatype); 
             
             if (dte == null || !isInline(dte))
                 return null;
@@ -2274,6 +2274,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 ((BigdataValue) value).setIV(iv);
             
             return iv;
+            
+        } else if (value instanceof BNode) {
+            
+            final BNode b = (BNode) value;
+            
+            final String id = b.getID();
+            
+            // FIXME how do we inline this??
             
         }
         
