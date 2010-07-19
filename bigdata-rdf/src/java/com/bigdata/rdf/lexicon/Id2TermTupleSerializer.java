@@ -36,7 +36,6 @@ import org.openrdf.model.Value;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
-import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;

@@ -29,14 +29,6 @@ public class SPOSortKeyBuilder implements ISortKeyBuilder<ISPO> {
      */
     public byte[] getSortKey(final ISPO spo) {
 
-        /*
-         * FIXME This is the implementation for backwards
-         * compatibility.  We should not see inline values here.
-         */
-        if (spo.s().isInline() || spo.p().isInline() || spo.o().isInline()) {
-            throw new IllegalArgumentException();
-        }
-        
         keyBuilder.reset();
         
         spo.s().encode(keyBuilder);

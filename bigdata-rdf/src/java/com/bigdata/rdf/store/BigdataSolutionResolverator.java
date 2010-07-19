@@ -190,11 +190,6 @@ public class BigdataSolutionResolverator
 
             if (!(boundValue instanceof IV)) {
 
-                /*
-                 * FIXME This assumes that any Long is a term identifier. The
-                 * term identifiers should be strongly typed.
-                 */
-
                 continue;
 
             }

@@ -12,7 +12,7 @@ public class MagicTuple implements IMagicTuple {
     public MagicTuple(int... terms) {
         IV[] ivs = new IV[terms.length];
         for (int i = 0; i < terms.length; i++) {
-            ivs[1] = new TermId(VTE.URI, terms[i]);
+            ivs[i] = new TermId(VTE.URI, terms[i]);
         }
         this.terms = ivs;
     }
@@ -86,19 +86,7 @@ public class MagicTuple implements IMagicTuple {
         if (id == null)
             return "NULL";
 
-        if (id.isLiteral())
-            return id + "L";
-
-        if (id.isURI())
-            return id + "U";
-
-        if (id.isBNode())
-            return id + "B";
-
-        if (id.isStatement())
-            return id + "S";
-
-        throw new AssertionError("id="+id);
+        return id.toString();
         
     }
 

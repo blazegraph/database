@@ -146,12 +146,6 @@ class LegacyTermIdUtility implements ITermIdCodes {
         if (isStatement(l))
             return VTE.STATEMENT;
         
-//        /*
-//         * FIXME Bryan, we need to talk about this one
-//         */
-//        if (l == TermId.NULL)
-//            return URI;
-        
         throw new AssertionError(String.valueOf(l));
     }
 

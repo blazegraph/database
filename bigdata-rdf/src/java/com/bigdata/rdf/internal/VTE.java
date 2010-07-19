@@ -34,6 +34,7 @@ import org.openrdf.model.URI;
 import com.bigdata.rdf.lexicon.ITermIdCodes;
 import com.bigdata.rdf.lexicon.TermIdEncoder;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
+import com.bigdata.relation.rule.Constant;
 
 /**
  * Value Type Enumeration (IVTE) is a class with methods for interpreting and 
@@ -117,6 +118,21 @@ public enum VTE implements ITermIdCodes {
         else if (v == STATEMENT.v)
             return 'S';
         throw new AssertionError();
+    }
+    
+    static public final VTE valueOf(char c) {
+        switch(c) {
+        case 'U':
+            return URI;
+        case 'L':
+            return LITERAL;
+        case 'B':
+            return BNODE;
+        case 'S':
+            return STATEMENT;
+        default:
+            throw new IllegalArgumentException();
+        }
     }
 
 }

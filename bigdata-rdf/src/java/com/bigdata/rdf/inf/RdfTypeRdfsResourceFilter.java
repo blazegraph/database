@@ -46,8 +46,16 @@ public class RdfTypeRdfsResourceFilter extends SPOFilter implements Externalizab
         
     }
 
-    public boolean accept(ISPO spo) {
-
+    public boolean accept(final Object o) {
+        
+        if (!canAccept(o)) {
+            
+            return true;
+            
+        }
+        
+        final ISPO spo = (ISPO) o;
+        
         if (spo.p().equals(rdfType) && spo.o().equals(rdfsResource)) {
             
             // reject (?x, rdf:type, rdfs:Resource )

@@ -1527,14 +1527,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
              * class and the sort is 1/3 of the cost of this method overall. Try
              * to use a native long[] and see if we can shave some time.
              * 
-             * FIXME the old TermIdComparator does not use the same sort 
-             * ordering for TermIds, which includes the term type (encoded in 
-             * the byte flags)
              */
-//            if (isLegacyEncoding())
-//                Arrays.sort(notFound, 0, numNotFound, TermIdComparator2.INSTANCE);
-//            else
-                Arrays.sort(notFound, 0, numNotFound);
+            Arrays.sort(notFound, 0, numNotFound);
                         
             final IKeyBuilder keyBuilder = KeyBuilder.newInstance();
 
