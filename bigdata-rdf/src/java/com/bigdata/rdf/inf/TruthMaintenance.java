@@ -636,7 +636,7 @@ public class TruthMaintenance {
              * inferred then this will NOT write on the statement index.
              */
             final SPOAssertionBuffer downgradeBuffer = new SPOAssertionBuffer(
-                    focusStore, // 
+                    database, //focusStore, // 
                     database, // the persistent db. 
                     null, //filter @todo was inferenceEngine.doNotAddFilter,
                     capacity,//
@@ -855,7 +855,7 @@ public class TruthMaintenance {
         // close the tempStore.
         tempStore.close();
 
-        if (nretracted == 0) {// @todo continue if ndowngraded>0?
+        if (nretracted == 0&&ndowngraded==0) {// @todo continue if ndowngraded>0?
             
             log.info("Done - nothing was retracted from the database");
             

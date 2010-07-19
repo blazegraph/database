@@ -507,7 +507,7 @@ public class TestInlineConstraints extends ProxyTestCase {
                 sb.append(",");
             }
         }
-        System.err.println("order: [" + sb.toString() + "]");
+        if(log.isInfoEnabled())log.info("order: [" + sb.toString() + "]");
         IChunkedOrderedIterator<ISolution> solutions = joinNexus.runQuery(rule);
         return solutions;
     }
