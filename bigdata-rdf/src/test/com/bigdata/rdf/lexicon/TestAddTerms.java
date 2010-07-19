@@ -80,6 +80,9 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
         // test w/o the full text index.
         properties.setProperty(Options.TEXT_INDEX, "false");
 
+        // test w/o inlining
+        properties.setProperty(Options.INLINE_TERMS, "false");
+
         AbstractTripleStore store = getStore(properties);
         
         try {
