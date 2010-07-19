@@ -195,7 +195,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestBackchainOwlSameAsPropertiesIterator.class );
         
         // test suite for RDF specific rule evaluation support.
-        suite.addTest(com.bigdata.rdf.relation.rule.TestAll.suite());
+        suite.addTest(com.bigdata.rdf.internal.constraints.TestAll.suite());
 
         /*
          * Test truth maintenance. This examines the incremental assertion and
