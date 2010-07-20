@@ -26,11 +26,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Sep 15, 2008
  */
 
-package com.bigdata.relation.rule;
+package com.bigdata.rdf.relation.rule;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.ISortKeyBuilder;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.relation.rule.Constant;
+import com.bigdata.relation.rule.IBindingSet;
+import com.bigdata.relation.rule.IVariable;
 
 /**
  * Builds unsigned byte[] sort keys from {@link IBindingSet}s.
@@ -75,6 +78,10 @@ public class BindingSetSortKeyBuilder implements ISortKeyBuilder<IBindingSet> {
             
             final IVariable var = vars[i];
             
+            /*
+             * FIXME Do we ever get unbound values here? This looks suspiciously
+             * like old Long code to me.
+             */
             Object val = bindingSet.get(var);
             if(val==null) {
             	val=Long.valueOf(0);
