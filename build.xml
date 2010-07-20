@@ -1533,7 +1533,7 @@ ${postInstallMessage}</echo>
     </target>
 
     <target name="startLookup">
-      <echo>java -Dapp.home=${app.home} -Djini.lib=${dist.lib} -Djini.lib.dl=${dist.lib.dl} -Djava.security.policy=${java.security.policy} -Djava.security.debug=off -Djava.protocol.handler.pkgs=net.jini.url -Dlog4j.configuration=${log4j.configuration} -Dcodebase.port=${test.codebase.port} -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dbigdata.fedname=${bigdata.fedname} -jar ${bigdata-test.lib}/lookupstarter.jar
+      <echo>java -Dapp.home=${app.home} -Djini.lib=${dist.lib} -Djini.lib.dl=${dist.lib.dl} -Djava.security.policy=${java.security.policy} -Djava.security.debug=off -Djava.protocol.handler.pkgs=net.jini.url -Dlog4j.configuration=${log4j.configuration} -Dcodebase.port=${test.codebase.port} -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dbigdata.fedname=${bigdata.fedname} -Ddefault.nic=${default.nic} -jar ${bigdata-test.lib}/lookupstarter.jar
 </echo>
       <echo>
 </echo>
@@ -1551,11 +1551,12 @@ ${postInstallMessage}</echo>
         <sysproperty key="codebase.port" value="${test.codebase.port}"/>
         <sysproperty key="java.net.preferIPv4Stack" value="${java.net.preferIPv4Stack}"/>
         <sysproperty key="bigdata.fedname" value="${bigdata.fedname}"/>
+        <sysproperty key="default.nic" value="${default.nic}"/>
       </java>
     </target>
 
     <target name="stopLookup">
-      <echo>java -Dapp.home=${app.home} -Djini.lib=${dist.lib} -Djini.lib.dl=${dist.lib.dl} -Djava.security.policy=${java.security.policy} -Dlog4j.configuration=${log4j.configuration} -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dbigdata.fedname=${bigdata.fedname} -jar ${bigdata-test.lib}/lookupstarter.jar -stop
+      <echo>java -Dapp.home=${app.home} -Djini.lib=${dist.lib} -Djini.lib.dl=${dist.lib.dl} -Djava.security.policy=${java.security.policy} -Dlog4j.configuration=${log4j.configuration} -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dbigdata.fedname=${bigdata.fedname} -Ddefault.nic=${default.nic} -jar ${bigdata-test.lib}/lookupstarter.jar -stop
 </echo>
       <echo>
 </echo>
@@ -1569,6 +1570,7 @@ ${postInstallMessage}</echo>
         <sysproperty key="log4j.configuration" value="${log4j.configuration}"/>
         <sysproperty key="java.net.preferIPv4Stack" value="${java.net.preferIPv4Stack}"/>
         <sysproperty key="bigdata.fedname" value="${bigdata.fedname}"/>
+        <sysproperty key="default.nic" value="${default.nic}"/>
         <arg value="-stop" />
       </java>
     </target>
