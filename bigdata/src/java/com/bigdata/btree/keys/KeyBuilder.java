@@ -180,9 +180,9 @@ public class KeyBuilder implements IKeyBuilder {
      *            The buffer reference is used directly rather than making a
      *            copy of the data.
      */
-    protected KeyBuilder(UnicodeSortKeyGenerator sortKeyGenerator, int len,
-            byte[] buf) {
-        
+    protected KeyBuilder(final UnicodeSortKeyGenerator sortKeyGenerator,
+            final int len, final byte[] buf) {
+
         if (len < 0)
             throw new IllegalArgumentException("len");
 
@@ -350,7 +350,7 @@ public class KeyBuilder implements IKeyBuilder {
      * The object responsible for generating sort keys from Unicode strings.
      * 
      * The {@link UnicodeSortKeyGenerator} -or- <code>null</code> if Unicode
-     * is not supported by this {@link KeyBuilder} instance.
+     * is not supported by this {@link IKeyBuilder} instance.
      */
     final public UnicodeSortKeyGenerator getSortKeyGenerator() {
         
@@ -391,11 +391,11 @@ public class KeyBuilder implements IKeyBuilder {
     
     public KeyBuilder appendASCII(final String s) {
         
-        int len = s.length();
+        int tmpLen = s.length();
         
-        ensureFree(len);
+        ensureFree(tmpLen);
         
-        for(int j=0; j<len; j++) {
+        for(int j=0; j<tmpLen; j++) {
             
             char ch = s.charAt(j);
             
@@ -1356,6 +1356,11 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
+    /**
+     * Create an instance for ASCII keys.
+     * 
+     * @return The new instance.
+     */
     public static IKeyBuilder newInstance() {
 
         return newInstance(DEFAULT_INITIAL_CAPACITY);
@@ -1393,10 +1398,8 @@ public class KeyBuilder implements IKeyBuilder {
        
         /**
          * Optional property specifies the library that will be used to generate
-         * sort keys from Unicode data. The default always supports Unicode, but
-         * the library choice depends on whether or not ICU library is found on
-         * the classpath. When the ICU library is present, it is the default.
-         * Otherwise the JDK library is the default. You may explicitly specify
+         * sort keys from Unicode data. The ICU library is the default.
+         * You may explicitly specify
          * the library choice using one of the {@link CollatorEnum} values. The
          * {@link CollatorEnum#ASCII} value may be used to disable Unicode
          * support entirely, treating the characters as if they were ASCII. If

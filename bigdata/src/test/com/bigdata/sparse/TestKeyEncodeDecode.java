@@ -30,8 +30,15 @@ package com.bigdata.sparse;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.btree.keys.CollatorEnum;
+import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.relation.RelationSchema;
+import com.ibm.icu.text.CollationKey;
+
+import java.text.Collator;
+import java.util.Properties;
 
 /**
  * Test suite for round trip of keys as encoded by
@@ -68,6 +75,9 @@ public class TestKeyEncodeDecode extends TestCase2 {
      * FIXME tests for ASCII
      * 
      * FIXME tests for Date
+     * 
+     * FIXME All unit tests in this class should be for all collators (e.g., an
+     * abstract base class).
      */
     public void test_primitive_long() {
 
@@ -88,5 +98,108 @@ public class TestKeyEncodeDecode extends TestCase2 {
         assertEquals(12L, decoded.getTimestamp());
         
     }
+
+    /**
+     * Unit test verifies that we can correctly locate the start of the column
+     * name and decode the key when using {@link CollatorEnum#ASCII}.
+     */
+    public void test_keyDecode_ICU() {
+
+        final Properties props = new Properties();
+        props.put(KeyBuilder.Options.COLLATOR, CollatorEnum.ICU.toString());
+        final IKeyBuilder keyBuilder = new DefaultKeyBuilderFactory(props)
+                .getKeyBuilder();
+        assertTrue(keyBuilder.isUnicodeSupported());
+
+        doKeyDecodeTest(keyBuilder);
+//        final Schema schema = new Schema("Employee", "Id", KeyType.Unicode);
+//        final String primaryKey = "1L";
+//        final String column = "Id";
+//        final long writeTime = 12L;
+//        final byte[] key = schema.getKey(keyBuilder, primaryKey, column,
+//                writeTime);
+//        final KeyDecoder decoded = new KeyDecoder(key);
+//
+//        assertEquals(schema.getPrimaryKeyType(), decoded.getPrimaryKeyType());
+//        assertEquals(column, decoded.getColumnName());
+//        assertEquals(writeTime, decoded.getTimestamp());
+    }
+
+    /**
+     * Unit test verifies that we can correctly locate the start of the column
+     * name and decode the key when using {@link CollatorEnum#ASCII}.
+     */
+    public void test_keyDecode_ASCII() {
+
+        final Properties props = new Properties();
+        props.put(KeyBuilder.Options.COLLATOR,CollatorEnum.ASCII.toString());
+        final IKeyBuilder keyBuilder =
+            new DefaultKeyBuilderFactory(props).getKeyBuilder();
+        assertFalse(keyBuilder.isUnicodeSupported());
+
+        doKeyDecodeTest(keyBuilder);
+
+//        final Schema schema = new RelationSchema();
+//        final String primaryKey = "U100.lex";
+//        final String column = "com.bigdata.btree.keys.KeyBuilder.collator";
+//        final long writeTime = 1279133923566L;
+//
+//        final byte[] key = schema.getKey(keyBuilder, primaryKey, column, writeTime);
+//
+//        final KeyDecoder decoded = new KeyDecoder(key);
+//        assertEquals(schema.getPrimaryKeyType(), decoded.getPrimaryKeyType());
+//        assertEquals(column, decoded.getColumnName());
+//        assertEquals(writeTime, decoded.getTimestamp());
+
+    }
+
+    /**
+     * Unit test verifies that we can correctly locate the start of the column
+     * name and decode the key when using {@link CollatorEnum#JDK}.
+     * <p>
+     * Note: The JDK {@link CollationKey} embeds <code>nul</code> bytes in its
+     * Unicode sort keys.
+     */
+    public void test_keyDecode_JDK() {
+
+        final Properties props = new Properties();
+        props.put(KeyBuilder.Options.COLLATOR,CollatorEnum.JDK.toString());
+        props.put(KeyBuilder.Options.USER_COUNTRY, "US");
+        props.put(KeyBuilder.Options.USER_LANGUAGE, "en");
+        props.put(KeyBuilder.Options.STRENGTH,Collator.TERTIARY);
+        final IKeyBuilder keyBuilder =
+            new DefaultKeyBuilderFactory(props).getKeyBuilder();
+        assertTrue(keyBuilder.isUnicodeSupported());
+
+        doKeyDecodeTest(keyBuilder);
+        
+    }
     
+    /**
+     * Test helper verifies that we can correctly locate the start of the column
+     * name and decode the key when using a given {@link IKeyBuilder}.
+     */
+    protected void doKeyDecodeTest(final IKeyBuilder keyBuilder) {
+
+        final Schema schema = new RelationSchema();
+        final String primaryKey = "U100.lex";
+        final String column = "com.bigdata.btree.keys.KeyBuilder.collator";
+        final long writeTime = 1279133923566L;
+
+        final byte[] key = schema.getKey(keyBuilder, primaryKey, column, writeTime);
+
+        final KeyDecoder decoded = new KeyDecoder(key);
+        assertEquals(schema.getPrimaryKeyType(), decoded.getPrimaryKeyType());
+        if(SparseRowStore.primaryKeyUnicodeClean) {
+            assertEquals(primaryKey,decoded.getPrimaryKey());
+        }
+        /*
+         * Note: While this fails on the column name for the JDK, the problem is
+         * that the JDK collator embeds null bytes into the primaryKey so we are
+         * not able to correctly locate the start of the column name.
+         */
+        assertEquals(column, decoded.getColumnName());
+        assertEquals(writeTime, decoded.getTimestamp());
+
+    }
 }

@@ -636,7 +636,7 @@ public class TruthMaintenance {
              * inferred then this will NOT write on the statement index.
              */
             final SPOAssertionBuffer downgradeBuffer = new SPOAssertionBuffer(
-                    focusStore, // 
+                    database, // focusStore, // 
                     database, // the persistent db. 
                     null, //filter @todo was inferenceEngine.doNotAddFilter,
                     capacity,//

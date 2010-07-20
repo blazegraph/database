@@ -34,7 +34,6 @@ import junit.framework.TestSuite;
 
 import com.bigdata.journal.AbstractIndexManagerTestCase;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.resources.TestSegSplitter;
 import com.bigdata.service.TestJournal;
 import com.bigdata.service.TestLDS;
 

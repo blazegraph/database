@@ -10,7 +10,8 @@ public enum CollatorEnum {
 
     /**
      * The JDK bundles support for generating Unicode sort keys, but that
-     * support does NOT include compressed sort keys.
+     * support does NOT include compressed sort keys and embeds <code>nul</code>
+     * bytes into its Unicode sort keys.
      */
     JDK,
     

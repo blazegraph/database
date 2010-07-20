@@ -154,7 +154,7 @@ public class Schema implements Externalizable {
     /*
      * Key builder stuff.
      */
-    
+
     /**
      * Helper method appends a typed value to the compound key (this is used to
      * get the primary key into the compound key).
@@ -172,8 +172,9 @@ public class Schema implements Externalizable {
      * 
      * @see KeyDecoder
      */
-    final protected IKeyBuilder appendPrimaryKey(IKeyBuilder keyBuilder, Object v, boolean successor) {
-        
+    final protected IKeyBuilder appendPrimaryKey(final IKeyBuilder keyBuilder,
+            final Object v, final boolean successor) {
+
         final KeyType keyType = getPrimaryKeyType();
         
         if (successor) {
@@ -187,9 +188,27 @@ public class Schema implements Externalizable {
             case Float:
                 return keyBuilder.append(successor(keyBuilder,((Number) v).floatValue()));
             case Double:
-                return keyBuilder.append(successor(keyBuilder,((Number) v).doubleValue()));
-            case Unicode:
-                return keyBuilder.appendText(v.toString(), true/*unicode*/, true/*successor*/).appendNul();
+                return keyBuilder.append(successor(keyBuilder, ((Number) v)
+                        .doubleValue()));
+            case Unicode: {
+                final String tmp = v.toString();
+                if (SparseRowStore.primaryKeyUnicodeClean) {
+                    try {
+                        keyBuilder.append(
+                                SuccessorUtil.successor(tmp
+                                        .getBytes(SparseRowStore.UTF8)))
+                                .appendNul();
+                    } catch (UnsupportedEncodingException e) {
+                        throw new RuntimeException(e);
+                    }
+                } else {
+                    // primary key in backwards compatibility mode.
+                    keyBuilder
+                            .appendText(tmp, true/* unicode */, true/* successor */)
+                            .appendNul();
+                }
+                return keyBuilder;
+            }
             case ASCII:
                 return keyBuilder.appendText(v.toString(), false/*unicode*/, true/*successor*/).appendNul();
             case Date:
@@ -212,8 +231,22 @@ public class Schema implements Externalizable {
                 return keyBuilder.append(((Number) v).floatValue());
             case Double:
                 return keyBuilder.append(((Number) v).doubleValue());
-            case Unicode:
-                return keyBuilder.appendText(v.toString(),true/*unicode*/,false/*successor*/).appendNul();
+            case Unicode: {
+                final String tmp = v.toString();
+                if (SparseRowStore.primaryKeyUnicodeClean) {
+                    try {
+                        keyBuilder.append(tmp.getBytes(SparseRowStore.UTF8))
+                                .appendNul();
+                    } catch (UnsupportedEncodingException e) {
+                        throw new RuntimeException(e);
+                    }
+                } else {
+                    // primary key in backwards compatibility mode.
+                    keyBuilder.appendText(v.toString(), true/* unicode */,
+                            false/* successor */).appendNul();
+                }
+                return keyBuilder;
+            }
             case ASCII:
                 return keyBuilder.appendText(v.toString(),false/*unicode*/,false/*successor*/).appendNul();
             case Date:
@@ -243,8 +276,8 @@ public class Schema implements Externalizable {
      *             {@link #toKey(Object)}, which correctly forms the successor
      *             key in all cases.
      */
-    final private Object successor(IKeyBuilder keyBuilder,Object v) {
-        
+    final private Object successor(final IKeyBuilder keyBuilder, final Object v) {
+
         final KeyType keyType = getPrimaryKeyType();
         
         switch(keyType) {
@@ -290,7 +323,8 @@ public class Schema implements Externalizable {
      * 
      * @see KeyDecoder
      */
-    final protected IKeyBuilder fromKey(IKeyBuilder keyBuilder,Object primaryKey) {
+    final protected IKeyBuilder fromKey(final IKeyBuilder keyBuilder,
+            final Object primaryKey) {
         
         keyBuilder.reset();
 
@@ -319,8 +353,9 @@ public class Schema implements Externalizable {
      * 
      * @return
      */
-    final public byte[] getPrefix(IKeyBuilder keyBuilder,Object primaryKey) {
-        
+    final public byte[] getPrefix(final IKeyBuilder keyBuilder,
+            final Object primaryKey) {
+
         return fromKey(keyBuilder, primaryKey).getKey();
         
     }
@@ -384,8 +419,8 @@ public class Schema implements Externalizable {
      * @throws IllegalArgumentException
      *             if <i>col</i> is not valid as the name of a column.
      */
-    public byte[] getKey(IKeyBuilder keyBuilder, Object primaryKey, String col,
-            long timestamp) {
+    public byte[] getKey(final IKeyBuilder keyBuilder, final Object primaryKey,
+            final String col, final long timestamp) {
 
         if (keyBuilder == null)
             throw new IllegalArgumentException();
