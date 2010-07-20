@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
-import java.io.Serializable;
 
 /**
  * An object which describes which kinds of RDF Values are inlined into the
@@ -36,15 +35,10 @@ import java.io.Serializable;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME Version information in serialization format.
- * 
  * @todo large literal size boundary.
  * @todo other configuration options.
  */
-public class LexiconConfiguration implements Serializable,
-        ILexiconConfiguration {
-    
-    private static final long serialVersionUID = -817370708683316807L;
+public class LexiconConfiguration implements ILexiconConfiguration {
     
     private boolean inlineTerms;
     
