@@ -28,7 +28,6 @@ package com.bigdata.btree.keys;
 
 import java.util.Locale;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.ibm.icu.text.Collator;
@@ -90,18 +89,6 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
     protected static final Logger log = Logger.getLogger(ICUSortKeyGenerator.class);
     
     /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
-
-    /**
      * Used to encode unicode strings into compact byte[]s that have the same
      * sort order (aka sort keys).
      */
@@ -128,7 +115,7 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
 
         this.locale = locale;
         
-        if(INFO) log.info("locale="+locale);
+        if(log.isInfoEnabled()) log.info("locale="+locale);
         
         this.collator = (RuleBasedCollator) Collator.getInstance(locale);
 
@@ -138,7 +125,7 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
 
                 final int str = ((Integer) strength).intValue();
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("strength=" + str);
 
                 collator.setStrength(str);
@@ -147,7 +134,7 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
 
                 StrengthEnum str = (StrengthEnum) strength;
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("strength=" + str);
                 
                 switch (str) {
@@ -184,7 +171,7 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
         
         if (mode != null) {
 
-            if(INFO) log.info("mode="+mode);
+            if(log.isInfoEnabled()) log.info("mode="+mode);
 
             switch (mode) {
 
