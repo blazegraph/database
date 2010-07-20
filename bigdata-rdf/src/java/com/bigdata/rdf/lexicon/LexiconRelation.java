@@ -2253,9 +2253,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     case XSDInteger:
                         iv = new XSDIntegerInternalValue(XMLDatatypeUtil.parseInteger(v));
                         break;
-                    case XSDDecimal:
-                        iv = new XSDDecimalInternalValue(XMLDatatypeUtil.parseDecimal(v));
-                        break;
+//                    case XSDDecimal:
+//                        iv = new XSDDecimalInternalValue(XMLDatatypeUtil.parseDecimal(v));
+//                        break;
                     case UUID:
                         iv = new UUIDInternalValue(UUID.fromString(v));
                         break;
