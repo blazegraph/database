@@ -127,8 +127,7 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPORelation extends AbstractRelation<ISPO>
-        implements ILexiconConfiguration {
+public class SPORelation extends AbstractRelation<ISPO> {
 
     protected static final transient Logger log = Logger
             .getLogger(SPORelation.class);
@@ -327,15 +326,15 @@ public class SPORelation extends AbstractRelation<ISPO>
 
         // Note: Do not eagerly resolve the indices.
         
-        {
-            
-            final boolean inlineTerms = Boolean.parseBoolean(getProperty(
-                    AbstractTripleStore.Options.INLINE_TERMS,
-                    AbstractTripleStore.Options.DEFAULT_INLINE_TERMS));
-
-            lexiconConfiguration = new LexiconConfiguration(inlineTerms);
-            
-        }
+//        {
+//            
+//            final boolean inlineTerms = Boolean.parseBoolean(getProperty(
+//                    AbstractTripleStore.Options.INLINE_TERMS,
+//                    AbstractTripleStore.Options.DEFAULT_INLINE_TERMS));
+//
+//            lexiconConfiguration = new LexiconConfiguration(inlineTerms);
+//            
+//        }
         
     }
     
@@ -2339,16 +2338,16 @@ public class SPORelation extends AbstractRelation<ISPO>
     /**
      * The {@link ILexiconConfiguration} instance, which will determine how
      * terms are encoded and decoded in the key space.
-     */
     private ILexiconConfiguration lexiconConfiguration;
+     */
 
     /**
      * See {@link ILexiconConfiguration#isInline(DTE)}.  Delegates to the
      * {@link #lexiconConfiguration} instance.
-     */
     public boolean isInline(DTE dte) {
         return lexiconConfiguration.isInline(dte);
     }
+     */
 
     /**
      * See {@link ILexiconConfiguration#isLegacyEncoding()}.  Delegates to the
@@ -2361,9 +2360,9 @@ public class SPORelation extends AbstractRelation<ISPO>
     /**
      * Return the {@link #lexiconConfiguration} instance.  Used to determine
      * how to encode and decode terms in the key space.
-     */
     public ILexiconConfiguration getLexiconConfiguration() {
         return lexiconConfiguration;
     }
+     */
     
 }
