@@ -146,7 +146,7 @@ import cutthecrap.utils.striterators.Striterator;
  * @version $Id$
  */
 public class LexiconRelation extends AbstractRelation<BigdataValue> 
-        implements ILexiconConfiguration {
+        /*implements ILexiconConfiguration*/ {
 
     final protected static Logger log = Logger.getLogger(LexiconRelation.class);
 
@@ -2219,7 +2219,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             
             final DTE dte = datatype == null ? null : DTE.valueOf(datatype); 
             
-            if (dte == null || !isInline(dte))
+            if (dte == null || !getLexiconConfiguration().isInline(dte))
                 return null;
             
             final String v = value.stringValue();
@@ -2580,10 +2580,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     /**
      * See {@link ILexiconConfiguration#isInline(DTE)}.  Delegates to the
      * {@link #lexiconConfiguration} instance.
-     */
     public boolean isInline(DTE dte) {
         return lexiconConfiguration.isInline(dte);
     }
+     */
 
     /**
      * See {@link ILexiconConfiguration#isLegacyEncoding()}.  Delegates to the
