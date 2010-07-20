@@ -125,7 +125,7 @@ public class IVUtility {
         }
         
         // same for BigInteger
-        if (dte1 == DTE.XSDDecimal || dte2 == DTE.XSDDecimal) {
+        if (dte1 == DTE.XSDInteger || dte2 == DTE.XSDInteger) {
             return num1.integerValue().compareTo(num2.integerValue());
         }
         
