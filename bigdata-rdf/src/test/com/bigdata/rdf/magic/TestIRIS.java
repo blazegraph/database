@@ -138,11 +138,11 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
      * against the normal inference rules using the statement to test as the
      * query.
      * 
-     * @fixme variables for bigdata rules are assigned locally to the rule. will
+     * FIXME variables for bigdata rules are assigned locally to the rule. will
      * this create problems for the iris program, where all the rules are mushed
      * together?
      * 
-     * @fixme what do we do about the IConstraints on bigdata rules?  do they
+     * FIXME what do we do about the IConstraints on bigdata rules?  do they
      * get promoted to full-fledged IRIS rules in the IRIS program?
      */
     public void testMagicSets() {
