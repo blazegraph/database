@@ -27,13 +27,9 @@
 
 package com.bigdata.rdf.store;
 
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -44,14 +40,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
@@ -84,20 +78,7 @@ import com.bigdata.rdf.axioms.OwlAxioms;
 import com.bigdata.rdf.inf.IJustificationIterator;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.JustificationIterator;
-import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.internal.UUIDInternalValue;
-import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.XSDBooleanInternalValue;
-import com.bigdata.rdf.internal.XSDByteInternalValue;
-import com.bigdata.rdf.internal.XSDDecimalInternalValue;
-import com.bigdata.rdf.internal.XSDDoubleInternalValue;
-import com.bigdata.rdf.internal.XSDFloatInternalValue;
-import com.bigdata.rdf.internal.XSDIntInternalValue;
-import com.bigdata.rdf.internal.XSDIntegerInternalValue;
-import com.bigdata.rdf.internal.XSDLongInternalValue;
-import com.bigdata.rdf.internal.XSDShortInternalValue;
 import com.bigdata.rdf.lexicon.BigdataRDFFullTextIndex;
 import com.bigdata.rdf.lexicon.ITermIdCodes;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;

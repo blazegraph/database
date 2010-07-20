@@ -421,7 +421,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * 
      * @return The extent.
      */
-    static long assertNonDiskExtent(long extent) {
+    static long assertNonDiskExtent(final long extent) {
 
         if( extent > Integer.MAX_VALUE ) {
             
@@ -432,8 +432,9 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
              * disk-based strategy.
              */
            
-            throw new RuntimeException("The extent requires the "
-                    + BufferMode.Disk + " mode: extent=" + extent);
+            throw new RuntimeException(
+                    "The extent requires a disk-backed buffer mode: extent="
+                            + extent);
             
         }
 

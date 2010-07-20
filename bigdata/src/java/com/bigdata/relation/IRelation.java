@@ -123,6 +123,8 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
      * relation.
      * 
      * @return An immutable set of the index names for the relation.
+     * 
+     * @todo replace with getKeyOrders()?
      */
     Set<String> getIndexNames();
 
@@ -157,6 +159,8 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
 //    
 //    /**
 //     * Return the primary index for the relation.
+//     * 
+//     * @todo how about getIndex(IKeyOrder) instead?
 //     */
 //    IIndex getPrimaryIndex();
 

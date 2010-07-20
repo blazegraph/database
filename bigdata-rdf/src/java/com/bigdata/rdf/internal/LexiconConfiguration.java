@@ -29,6 +29,18 @@ package com.bigdata.rdf.internal;
 
 import java.io.Serializable;
 
+/**
+ * An object which describes which kinds of RDF Values are inlined into the
+ * statement indices and how other RDF Values are coded into the lexicon.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ * 
+ * FIXME Version information in serialization format.
+ * 
+ * @todo large literal size boundary.
+ * @todo other configuration options.
+ */
 public class LexiconConfiguration implements Serializable,
         ILexiconConfiguration {
     

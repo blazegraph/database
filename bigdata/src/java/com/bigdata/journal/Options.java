@@ -495,7 +495,7 @@ public interface Options {
     /**
      * The default for the {@link #BUFFER_MODE}.
      */
-    String DEFAULT_BUFFER_MODE = BufferMode.Disk.toString();
+    String DEFAULT_BUFFER_MODE = BufferMode.DiskWORM.toString();
     
     /**
      * The default for {@link #USE_DIRECT_BUFFERS}.

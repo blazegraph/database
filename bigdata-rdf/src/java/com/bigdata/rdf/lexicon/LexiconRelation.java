@@ -1522,11 +1522,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
             /*
              * sort term identifiers into index order.
-             * 
-             * FIXME 10/12ths of the cost of this sort is the TermIdComparator2
-             * class and the sort is 1/3 of the cost of this method overall. Try
-             * to use a native long[] and see if we can shave some time.
-             * 
              */
             Arrays.sort(notFound, 0, numNotFound);
                         

@@ -34,7 +34,6 @@ import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
 
 /**
@@ -45,21 +44,21 @@ import com.bigdata.journal.Options;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestLocalTripleStoreWORM extends AbstractTestCase {
+public class TestLocalTripleStoreWithoutInlining extends AbstractTestCase {
 
     /**
      * 
      */
-    public TestLocalTripleStoreWORM() {
+    public TestLocalTripleStoreWithoutInlining() {
     }
 
-    public TestLocalTripleStoreWORM(String name) {
+    public TestLocalTripleStoreWithoutInlining(String name) {
         super(name);
     }
     
     public static Test suite() {
 
-        final TestLocalTripleStoreWORM delegate = new TestLocalTripleStoreWORM(); // !!!! THIS CLASS !!!!
+        final TestLocalTripleStoreWithoutInlining delegate = new TestLocalTripleStoreWithoutInlining(); // !!!! THIS CLASS !!!!
 
         /*
          * Use a proxy test suite and specify the delegate.
@@ -101,10 +100,6 @@ public class TestLocalTripleStoreWORM extends AbstractTestCase {
 
         final Properties properties = super.getProperties();
 
-        // The WORM store.
-        properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
-                BufferMode.DiskWORM.toString());
-
         // turn on statement identifiers.
         properties
                 .setProperty(
@@ -116,6 +111,11 @@ public class TestLocalTripleStoreWORM extends AbstractTestCase {
                 com.bigdata.rdf.store.AbstractTripleStore.Options.QUADS,
                 "false");
 
+        // do not inline anything.
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.INLINE_TERMS,
+                "false");
+        
 //        properties.setProperty(
 //                com.bigdata.rdf.store.AbstractTripleStore.Options.NESTED_SUBQUERY,
 //                "true");
