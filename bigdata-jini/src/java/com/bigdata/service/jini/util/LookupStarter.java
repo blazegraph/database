@@ -70,8 +70,19 @@ public class LookupStarter extends Thread {
     private String jiniLibDl = System.getProperty("jini.lib.dl");
     private String localPolicy = System.getProperty("java.security.policy");
 
-    private static String thisHost = NicUtil.getIpAddress("eth0");
-    private static String defaultGroup = "bigdata.fedname-"+thisHost;
+    private static String thisHost = null;
+    private static String defaultGroup = null;
+    static {
+	try {
+            thisHost = 
+                NicUtil.getIpAddress
+                    ( NicUtil.getDefaultNic
+                          ( NicUtil.getDefaultIpv4Address(true) ) );
+            defaultGroup = 
+                System.getProperty("bigdata.fedname",
+                                   "bigdata.test.group-"+thisHost);
+	} catch (Throwable t) { /* swallow */ }
+    }
     private static String defaultCodebasePort = "23333";
 
     private static String group = 

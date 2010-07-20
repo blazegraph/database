@@ -505,6 +505,185 @@ public class NicUtil {
     }
 
     /**
+     * Examines each address associated with each network interface
+     * card (nic) installed on the current node, and returns the
+     * <code>String</code> value of the first such address that is
+     * determined to be both <i>reachable</i> and an address type
+     * that represents an <i>IPv4</i> address.
+     *
+     * This method will always first examine addresses that are
+     * <i>not</i> the <i>loopback</i> address (<i>local host</i>);
+     * returning a loopback adddress only if <code>true</code>
+     * is input for the <code>loopbackOk</code> parameter, and
+     * none of the non-loopback addresses satisfy this method's
+     * search criteria.
+     *
+     * If this method fails to find any address that satisfies the
+     * above criteria, then this method returns <code>null</code>.
+     *
+     * @param loopbackOk if <code>true</code>, then upon failure
+     *                   find an non-<i>loopback</i> address that
+     *                   satisfies this method's search criteria
+     *                   (an IPv4 type address and reachable), the
+     *                   first loopback address that is found to be
+     *                   reachable is returned.
+     *
+     *                   If <code>false</code> is input for this
+     *                   parameter, then this method will examine
+     *                   only those addresses that do <i>not</i>
+     *                   correspond to the corresponding nic's
+     *                   loopback address.
+     *
+     * @return a <code>String</code> value representing the first
+     *         network interface address installed on the current
+     *         node that is determined to be both <i>reachable</i>
+     *         and an IPv4 type address; where the return value
+     *         corresponds to a <i>loopback</i> address only if 
+     *         <code>true</code> is input for the <code>loopbackOk</code>
+     *         parameter, and no non-loopback address satisfying
+     *         the desired criteria can be found. If this method
+     *         fails to find any address that satisfies the desired
+     *         criteria, then <code>null</code> is returned.
+     *
+     * @throws SocketException if there is an error in the underlying
+     *         I/O subsystem and/or protocol while retrieving the
+     *         the network interfaces currently installed on the
+     *         node.
+     *
+     * @throws IOException if a network error occurs while determining
+     *         if a candidate return address is <i>reachable</i>.
+     */
+    public static String getDefaultIpv4Address(boolean loopbackOk)
+                             throws SocketException, IOException
+    {
+        //get all nics on the current node
+        Enumeration<NetworkInterface> nics = 
+            NetworkInterface.getNetworkInterfaces();
+        while( nics.hasMoreElements() ) {
+            NetworkInterface curNic = nics.nextElement();
+            List<InterfaceAddress> interfaceAddrs = 
+                                       curNic.getInterfaceAddresses();
+            for(InterfaceAddress interfaceAddr : interfaceAddrs) {
+                InetAddress inetAddr = interfaceAddr.getAddress();
+                boolean isIpv4 = inetAddr instanceof Inet4Address;
+                boolean isLoopbackAddress = inetAddr.isLoopbackAddress();
+                if(isIpv4) {
+                    if(isLoopbackAddress) continue;
+                    boolean isReachable = inetAddr.isReachable(3*1000);
+                    Inet4Address inet4Addr = (Inet4Address)inetAddr;
+                    String retVal = inet4Addr.getHostAddress();
+
+                    jiniConfigLogger.log
+                        (CONFIG, "default IPv4 address: "+retVal);
+                    utilLogger.log
+                        (Level.TRACE, "default IPv4 address: "+retVal);
+                    return retVal;
+                }
+            }
+        }
+
+        if(!loopbackOk) return null;
+
+        nics = NetworkInterface.getNetworkInterfaces();
+        while( nics.hasMoreElements() ) {
+            NetworkInterface curNic = nics.nextElement();
+            List<InterfaceAddress> interfaceAddrs = 
+                                       curNic.getInterfaceAddresses();
+            for(InterfaceAddress interfaceAddr : interfaceAddrs) {
+                InetAddress inetAddr = interfaceAddr.getAddress();
+                boolean isIpv4 = inetAddr instanceof Inet4Address;
+                boolean isLoopbackAddress = inetAddr.isLoopbackAddress();
+                if(isIpv4) {
+                    if(!isLoopbackAddress) continue;
+                    boolean isReachable = inetAddr.isReachable(3*1000);
+                    Inet4Address inet4Addr = (Inet4Address)inetAddr;
+                    String retVal = inet4Addr.getHostAddress();
+
+                    jiniConfigLogger.log
+                        (CONFIG, "default IPv4 address: "+retVal);
+                    utilLogger.log
+                        (Level.TRACE, "default IPv4 address: "+retVal);
+                    return retVal;
+                }
+            }
+        }
+        return null;
+    }
+
+    public static String getDefaultIpv4Address()
+                             throws SocketException, IOException
+    {
+        return getDefaultIpv4Address(false);//localhost NOT ok
+    }
+
+    /**
+     * Special-purpose convenience method that will return the
+     * value of the system property named <code>default.nic</code>
+     * if that property has been set on the current VM to any
+     * non-<code>null</code> value other than the value,
+     * <code>${default.nic}</code>; otherwise returns the value
+     * input for the <code>defaultVal</code> parameter.
+     * <p>
+     * This method can be called from within a configuration
+     * as well as from within program control. It is provided
+     * as a way to allow mechanisms that are not able to
+     * conditionally set system properties to always set the
+     * system property named <code>default.nic</code> to some
+     * value -- either valid or invalid -- depending on whether
+     * that property is set as a system property on the command
+     * line. 
+     * <p>
+     * For example, the <code>java</code> ant task used to exec
+     * java based programs does not allow one to set a system
+     * property on that program's VM when that property is set
+     * on the command line used to execute ant, but leave that
+     * property un-set when ant's command line does not specify
+     * a value for that property. That is, although ant allows
+     * one to retrieve the value of a system property that is
+     * specified on ant's command line and substitute that value 
+     * (using Java's '${}' token-substitution mechanism) into 
+     * a system property set on the program's VM, ant does not
+     * allow one to leave that property un-set when the system
+     * property is not specified on ant's command line; the
+     * property must either always be set on the VM, or never
+     * set. If the ant script then is written to always set the
+     * system property on the exec'd program's VM to the
+     * value of the system property expected on ant's command
+     * line, then whenever that system property is not set on
+     * ant's command line, the value that is substituted into
+     * the system property when the program is exec-ed will be
+     * of the form, <code>${default.nic}</code>. If the program
+     * that is exec'd then attempts to call
+     * <code>System.getProperty("default.nic")</code>, that
+     * call will return the non-<code>null</code> value,
+     * <code>${default.nic}</code>; which is typically not
+     * what is desired.
+     *
+     * @param defaultVal <code>String</code> value that this method
+     *                   returns if the system property named
+     *                   <code>default.nic</code> is either not
+     *                   set or is equal to the value
+     *                   <code>${default.nic}</code>.
+     *
+     * @return a <code>String</code> value equal to the value of
+     *         the system property named <code>${default.nic}</code>
+     *         if that system property is set to any value except
+     *         <code>null</code> or the value <code>${default.nic}</code>;
+     *         otherwise, returns the value input for the 
+     *         <code>defaultVal</code> parameter.
+     */
+    public static String getDefaultNic(String defaultVal) {
+        String defaultNic = System.getProperty("default.nic");
+        if( ("${default.nic}").equals(defaultNic) ) defaultNic = null;
+        if(defaultNic == null) defaultNic = defaultVal;
+        return defaultNic;
+    }
+
+    public static String getDefaultNic() {
+        return getDefaultNic(null);
+    }
+
+    /**
      * Intended for use by scripts.
      */
     public static void main(String[] args) {
