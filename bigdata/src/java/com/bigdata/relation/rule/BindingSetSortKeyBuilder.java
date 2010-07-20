@@ -86,15 +86,7 @@ public class BindingSetSortKeyBuilder implements ISortKeyBuilder<IBindingSet> {
             
                 final IV iv = (IV) val;
             
-                /*
-                 * FIXME This is the implementation for backwards
-                 * compatibility.  We should not see inline values here.
-                 */
-                if (iv.isInline()) {
-                    throw new IllegalArgumentException();
-                }
-    
-                keyBuilder.append(iv.getTermId());
+                iv.encode(keyBuilder);
 
             } else {
                 
