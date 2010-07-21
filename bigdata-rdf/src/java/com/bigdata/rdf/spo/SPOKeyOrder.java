@@ -41,23 +41,23 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.internal.AbstractDatatypeLiteralInternalValue;
-import com.bigdata.rdf.internal.AbstractInternalValue;
+import com.bigdata.rdf.internal.AbstractLiteralIV;
+import com.bigdata.rdf.internal.AbstractIV;
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.NullIV;
 import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.internal.UUIDInternalValue;
+import com.bigdata.rdf.internal.UUIDLiteralIV;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.XSDBooleanInternalValue;
-import com.bigdata.rdf.internal.XSDByteInternalValue;
-import com.bigdata.rdf.internal.XSDDoubleInternalValue;
-import com.bigdata.rdf.internal.XSDFloatInternalValue;
-import com.bigdata.rdf.internal.XSDIntInternalValue;
-import com.bigdata.rdf.internal.XSDIntegerInternalValue;
-import com.bigdata.rdf.internal.XSDLongInternalValue;
-import com.bigdata.rdf.internal.XSDShortInternalValue;
+import com.bigdata.rdf.internal.XSDBooleanIV;
+import com.bigdata.rdf.internal.XSDByteIV;
+import com.bigdata.rdf.internal.XSDDoubleIV;
+import com.bigdata.rdf.internal.XSDFloatIV;
+import com.bigdata.rdf.internal.XSDIntIV;
+import com.bigdata.rdf.internal.XSDIntegerIV;
+import com.bigdata.rdf.internal.XSDLongIV;
+import com.bigdata.rdf.internal.XSDShortIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.IRawTripleStore;
@@ -677,159 +677,6 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
         return new SPO(s, p, o, c);
 
     }
-    
-    /**
-     * Decode a key from one of the statement indices. The components of the key
-     * are returned in the order in which they appear in the key. The caller
-     * must reorder those components using their knowledge of which index is
-     * being decoded in order to reconstruct the corresponding RDF statement.
-     * The returned array will always have 4 components. However, the last key
-     * component will be <code>null</code> if there are only three components in
-     * the <i>key</i>.
-     * 
-     * @param key
-     *            The key.
-     * 
-     * @return An ordered array of the {@link IV}s for that key.
-     * 
-     *         FIXME handle all of the inline value types.
-     * 
-     *         FIXME Construct the InternalValue objects using factory since we
-     *         will have to scope how the RDF Value is represented to the
-     *         lexicon relation with which it is associated.
-     */
-    public IV[] decodeStatementKey(final byte[] key) {
-        
-        final IV[] a = new IV[4];
-
-        // The byte offset into the key.
-        int offset = 0;
-        
-        for (int i = 0; i < 4; i++) {
-
-            final byte flags = KeyBuilder.decodeByte(key[offset]);
-            offset++;
-
-            if(!AbstractInternalValue.isInline(flags)) {
-                
-                /*
-                 * Handle a term identifier (versus an inline value).
-                 */
-
-                // decode the term identifier.
-                final long termId = KeyBuilder.decodeLong(key, offset);
-                offset += Bytes.SIZEOF_LONG;
-
-                a[i] = new TermId(flags, termId);
-
-                continue;
-                
-            }
-            
-            /*
-             * Handle an inline value.
-             */
-            // The value type (URI, Literal, BNode, SID)
-            final VTE vte = AbstractInternalValue
-                    .getInternalValueTypeEnum(flags);
-
-            // The data type
-            final DTE dte = AbstractInternalValue
-                    .getInternalDataTypeEnum(flags);
-            
-            final IV<?,?> v;
-            switch (dte) {
-            case XSDBoolean: {
-                final byte x = KeyBuilder.decodeByte(key[offset++]);
-                if (x == 0) {
-                    v = XSDBooleanInternalValue.FALSE;
-                } else {
-                    v = XSDBooleanInternalValue.TRUE;
-                }
-                break;
-            }
-            case XSDByte: {
-                final byte x = KeyBuilder.decodeByte(key[offset++]);
-                v = new XSDByteInternalValue<BigdataLiteral>(x);
-                break;
-            }
-            case XSDShort: {
-                final short x = KeyBuilder.decodeShort(key, offset);
-                offset += Bytes.SIZEOF_SHORT;
-                v = new XSDShortInternalValue<BigdataLiteral>(x);
-                break;
-            }
-            case XSDInt: {
-                final int x = KeyBuilder.decodeInt(key, offset);
-                offset += Bytes.SIZEOF_INT;
-                v = new XSDIntInternalValue<BigdataLiteral>(x);
-                break;
-            }
-            case XSDLong: {
-                final long x = KeyBuilder.decodeLong(key, offset);
-                offset += Bytes.SIZEOF_LONG;
-                v = new XSDLongInternalValue<BigdataLiteral>(x);
-                break;
-            }
-            case XSDFloat: {
-                final float x = KeyBuilder.decodeFloat(key, offset);
-                offset += Bytes.SIZEOF_FLOAT;
-                v = new XSDFloatInternalValue<BigdataLiteral>(x);
-                break;
-            }
-            case XSDDouble: {
-                final double x = KeyBuilder.decodeDouble(key, offset);
-                offset += Bytes.SIZEOF_DOUBLE;
-                v = new XSDDoubleInternalValue<BigdataLiteral>(x);
-                break;
-            }
-            case UUID: {
-                final UUID x = KeyBuilder.decodeUUID(key, offset);
-                offset += Bytes.SIZEOF_UUID;
-                v = new UUIDInternalValue<BigdataLiteral>(x);
-                break;
-            }
-            case XSDInteger: {
-                final byte[] b = KeyBuilder.decodeBigInteger2(offset, key);
-                offset += 2 + b.length;
-                final BigInteger x = new BigInteger(b);
-                v = new XSDIntegerInternalValue<BigdataLiteral>(x);
-                break;
-            }
-//            case XSDDecimal:
-//                keyBuilder.append(t.decimalValue());
-//                break;
-//            case XSDUnsignedByte:
-//                keyBuilder.appendUnsigned(t.byteValue());
-//                break;
-//            case XSDUnsignedShort:
-//                keyBuilder.appendUnsigned(t.shortValue());
-//                break;
-//            case XSDUnsignedInt:
-//                keyBuilder.appendUnsigned(t.intValue());
-//                break;
-//            case XSDUnsignedLong:
-//                keyBuilder.appendUnsigned(t.longValue());
-//                break;
-            default:
-                throw new UnsupportedOperationException("vte=" + vte + ", dte="
-                        + dte);
-            }
-            
-            a[i] = v;
-
-            if (i == 2 && offset == key.length) {
-                // We have three components and the key is exhausted.
-                break;
-            }
-
-        }
-        
-        return a; 
-        
-    }
-
-    
 
     /**
      * Imposes the canonicalizing mapping during object de-serialization.

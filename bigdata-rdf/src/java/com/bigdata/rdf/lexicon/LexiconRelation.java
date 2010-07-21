@@ -81,17 +81,20 @@ import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.LexiconConfiguration;
+import com.bigdata.rdf.internal.NumericBNodeIV;
 import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.internal.UUIDInternalValue;
-import com.bigdata.rdf.internal.XSDBooleanInternalValue;
-import com.bigdata.rdf.internal.XSDByteInternalValue;
-import com.bigdata.rdf.internal.XSDDecimalInternalValue;
-import com.bigdata.rdf.internal.XSDDoubleInternalValue;
-import com.bigdata.rdf.internal.XSDFloatInternalValue;
-import com.bigdata.rdf.internal.XSDIntInternalValue;
-import com.bigdata.rdf.internal.XSDIntegerInternalValue;
-import com.bigdata.rdf.internal.XSDLongInternalValue;
-import com.bigdata.rdf.internal.XSDShortInternalValue;
+import com.bigdata.rdf.internal.UUIDBNodeIV;
+import com.bigdata.rdf.internal.UUIDLiteralIV;
+import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.XSDBooleanIV;
+import com.bigdata.rdf.internal.XSDByteIV;
+import com.bigdata.rdf.internal.XSDDecimalIV;
+import com.bigdata.rdf.internal.XSDDoubleIV;
+import com.bigdata.rdf.internal.XSDFloatIV;
+import com.bigdata.rdf.internal.XSDIntIV;
+import com.bigdata.rdf.internal.XSDIntegerIV;
+import com.bigdata.rdf.internal.XSDLongIV;
+import com.bigdata.rdf.internal.XSDShortIV;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc.Term2IdWriteProcConstructor;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataValue;
@@ -105,6 +108,7 @@ import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOComparator;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -364,11 +368,16 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         
         {
             
-            final boolean inlineTerms = Boolean.parseBoolean(getProperty(
-                    AbstractTripleStore.Options.INLINE_TERMS,
-                    AbstractTripleStore.Options.DEFAULT_INLINE_TERMS));
+            inlineLiterals = Boolean.parseBoolean(getProperty(
+                    AbstractTripleStore.Options.INLINE_LITERALS,
+                    AbstractTripleStore.Options.DEFAULT_INLINE_LITERALS));
 
-            lexiconConfiguration = new LexiconConfiguration(inlineTerms);
+            inlineBNodes = storeBlankNodes && Boolean.parseBoolean(getProperty(
+                    AbstractTripleStore.Options.INLINE_LITERALS,
+                    AbstractTripleStore.Options.DEFAULT_INLINE_LITERALS));
+            
+            lexiconConfiguration = 
+                new LexiconConfiguration(inlineLiterals, inlineBNodes);
             
         }
         
@@ -503,6 +512,32 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     private final boolean textIndex;
     final boolean storeBlankNodes;
     final int termIdBitsToReverse;
+    
+    /**
+     * Are datatyped literals being inlined into the statement indices.
+     * 
+     * {@link AbstractTripleStore.Options#INLINE_LITERALS}
+     */
+    final private boolean inlineLiterals;
+    
+    /**
+     * Are bnodes being inlined into the statement indices.
+     * 
+     * {@link AbstractTripleStore.Options#INLINE_BNODES}
+     */
+    final private boolean inlineBNodes;
+    
+    
+    /**
+     * Return <code>true</code> if datatype literals are being inlined into
+     * the statement indices.
+     */
+    final public boolean isInlineLiterals() {
+        
+        return inlineLiterals;
+        
+    }
+
 
     /**
      * The #of low bits from the term identifier that are reversed and
@@ -2214,7 +2249,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             
             final DTE dte = datatype == null ? null : DTE.valueOf(datatype); 
             
-            if (dte == null || !getLexiconConfiguration().isInline(dte))
+            if (dte == null)
+                return null;
+            
+            if (!getLexiconConfiguration().isInline(VTE.LITERAL, dte))
                 return null;
             
             final String v = value.stringValue();
@@ -2225,34 +2263,34 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 
                 switch(dte) {
                     case XSDBoolean:
-                        iv = new XSDBooleanInternalValue(XMLDatatypeUtil.parseBoolean(v));
+                        iv = new XSDBooleanIV(XMLDatatypeUtil.parseBoolean(v));
                         break;
                     case XSDByte:
-                        iv = new XSDByteInternalValue(XMLDatatypeUtil.parseByte(v));
+                        iv = new XSDByteIV(XMLDatatypeUtil.parseByte(v));
                         break;
                     case XSDShort:
-                        iv = new XSDShortInternalValue(XMLDatatypeUtil.parseShort(v));
+                        iv = new XSDShortIV(XMLDatatypeUtil.parseShort(v));
                         break;
                     case XSDInt:
-                        iv = new XSDIntInternalValue(XMLDatatypeUtil.parseInt(v));
+                        iv = new XSDIntIV(XMLDatatypeUtil.parseInt(v));
                         break;
                     case XSDLong:
-                        iv = new XSDLongInternalValue(XMLDatatypeUtil.parseLong(v));
+                        iv = new XSDLongIV(XMLDatatypeUtil.parseLong(v));
                         break;
                     case XSDFloat:
-                        iv = new XSDFloatInternalValue(XMLDatatypeUtil.parseFloat(v));
+                        iv = new XSDFloatIV(XMLDatatypeUtil.parseFloat(v));
                         break;
                     case XSDDouble:
-                        iv = new XSDDoubleInternalValue(XMLDatatypeUtil.parseDouble(v));
+                        iv = new XSDDoubleIV(XMLDatatypeUtil.parseDouble(v));
                         break;
                     case XSDInteger:
-                        iv = new XSDIntegerInternalValue(XMLDatatypeUtil.parseInteger(v));
+                        iv = new XSDIntegerIV(XMLDatatypeUtil.parseInteger(v));
                         break;
-//                    case XSDDecimal:
-//                        iv = new XSDDecimalInternalValue(XMLDatatypeUtil.parseDecimal(v));
-//                        break;
+                    case XSDDecimal:
+                        iv = new XSDDecimalIV(XMLDatatypeUtil.parseDecimal(v));
+                        break;
                     case UUID:
-                        iv = new UUIDInternalValue(UUID.fromString(v));
+                        iv = new UUIDLiteralIV(UUID.fromString(v));
                         break;
                     default:
                         iv = null;
@@ -2276,7 +2314,54 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             
             final String id = b.getID();
             
-            // FIXME how do we inline this??
+            final char c = id.charAt(0);
+            
+            try {
+
+                final UUID uuid = UUID.fromString(id);
+                
+                if (!uuid.toString().equals(id))
+                    return null;
+                
+                if (!getLexiconConfiguration().isInline(VTE.BNODE, DTE.UUID))
+                    return null;
+                
+                final IV iv = new UUIDBNodeIV(uuid);
+                
+                if (value instanceof BigdataValue)
+                    ((BigdataValue) value).setIV(iv);
+                
+                return iv;
+                
+            } catch (Exception ex) {
+                
+                // string id could not be converted to a UUID
+                
+            }
+            
+            try {
+
+                final Integer i = Integer.valueOf(id);
+                
+                // cannot normalize id, needs to remain syntactically identical
+                if (!i.toString().equals(id))
+                    return null;
+                
+                if (!getLexiconConfiguration().isInline(VTE.BNODE, DTE.XSDInt))
+                    return null;
+                
+                final IV iv = new NumericBNodeIV(i);
+                
+                if (value instanceof BigdataValue)
+                    ((BigdataValue) value).setIV(iv);
+                
+                return iv;
+                
+            } catch (Exception ex) {
+                
+                // string id could not be converted to an Integer
+                
+            }
             
         }
         

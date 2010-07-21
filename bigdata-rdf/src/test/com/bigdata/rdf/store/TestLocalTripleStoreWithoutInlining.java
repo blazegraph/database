@@ -113,7 +113,7 @@ public class TestLocalTripleStoreWithoutInlining extends AbstractTestCase {
 
         // do not inline anything.
         properties.setProperty(
-                com.bigdata.rdf.store.AbstractTripleStore.Options.INLINE_TERMS,
+                com.bigdata.rdf.store.AbstractTripleStore.Options.INLINE_LITERALS,
                 "false");
         
 //        properties.setProperty(

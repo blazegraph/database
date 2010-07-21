@@ -2914,7 +2914,7 @@ public class BigdataSail extends SailBase implements Sail {
 
             final BigdataEvaluationStrategyImpl2 strategy = new BigdataEvaluationStrategyImpl2(
                     (BigdataTripleSource) tripleSource, dataset,
-                    nativeJoins, starJoins, database.isInlineTerms());
+                    nativeJoins, starJoins, database.isInlineLiterals());
 
             final QueryOptimizerList optimizerList = new QueryOptimizerList();
             optimizerList.add(new BindingAssigner());
@@ -2993,7 +2993,7 @@ public class BigdataSail extends SailBase implements Sail {
 
                 final BigdataEvaluationStrategyImpl2 strategy = new BigdataEvaluationStrategyImpl2(
                         (BigdataTripleSource) tripleSource, dataset,
-                        nativeJoins, starJoins, database.isInlineTerms());
+                        nativeJoins, starJoins, database.isInlineLiterals());
 
                 final QueryOptimizerList optimizerList = new QueryOptimizerList();
                 optimizerList.add(new BindingAssigner());

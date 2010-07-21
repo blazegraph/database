@@ -143,7 +143,7 @@ public class TestBigdataSailWithQuadsAndPipelineJoinsWithoutInlining extends Abs
 
         properties.setProperty(AbstractResource.Options.NESTED_SUBQUERY, "false");
 
-        properties.setProperty(Options.INLINE_TERMS, "false");
+        properties.setProperty(Options.INLINE_LITERALS, "false");
 
         return properties;
         
