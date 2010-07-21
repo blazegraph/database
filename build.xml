@@ -849,12 +849,13 @@ ${postInstallMessage}</echo>
 
 	<!--                                                                   -->
 	<!--                    STANDALONE FEDERATION TARGETS                  -->
-	<!--                                                                   -->
+	<!--                         (test/benchamarking)                      -->
 
 <target name="standalone-setup" description="Setup properties used by the standalone federation and LUS start/stop.">
     <property name="app.home" location="${bigdata.dir}" />
     <property name="test.codebase.port" value="23333"/>
-    <property name="test.codebase.dir" location="${bigdata.dir}/bigdata-jini/lib/jini/lib-dl" />
+    <property name="jini.lib" location="${bigdata.dir}/bigdata-jini/lib/jini/lib" />
+    <property name="jini.lib.dl" location="${bigdata.dir}/bigdata-jini/lib/jini/lib-dl" />
     <property name="test.codebase" value="http://${this.hostname}:${test.codebase.port}/jsk-dl.jar"/>
     <property name="java.security.policy" value="${bigdata.dir}/policy.all"/>
 	<property name="log4j.configuration" value="${bigdata.dir}/src/resources/config/standalone/log4j.properties"/>
@@ -864,11 +865,11 @@ ${postInstallMessage}</echo>
 
 <target name="standalone-startLookup" depends="jar,standalone-setup" description="Start the lookup service for the standalone federation.">
   <java classname="com.bigdata.service.jini.util.LookupStarter"
-		fork="true" spawn="true">
+		fork="true" spawn="false">
 		<classpath refid="runtime.classpath" />
     <sysproperty key="app.home" value="${app.home}"/>
-    <sysproperty key="jini.lib" value="${dist.lib}"/>
-    <sysproperty key="jini.lib.dl" value="${dist.lib.dl}"/>
+    <sysproperty key="jini.lib" value="${jini.lib}"/>
+    <sysproperty key="jini.lib.dl" value="${jini.lib.dl}"/>
     <sysproperty key="java.security.policy" value="${java.security.policy}"/>
     <sysproperty key="java.security.debug" value="off"/>
     <sysproperty key="java.protocol.handler.pkgs" value="net.jini.url"/>
@@ -933,25 +934,22 @@ ${postInstallMessage}</echo>
     <antcall target="standalone-stopLookup" />
 </target>
 
-<!-- @todo Add target to stand up a SPARQL endpoint for a KB namespace. Could be
-     Sesame Server or bigdata REST API. -->
-	
-<!-- Note: The source files must be "reasonable" for the bulk loader.  Each file
-     will be fully parsed into memory before writing onto the database.  Very
-     large source files must be split into smaller files.  See the 'split'
-     command under unix, but be aware that it will not generate more than 576
-     output files (24 x 24 = 576) and only 100 if you are using number suffixes.
-     For example, split an NT file into files of 200000 lines each: 
-     
-     mkdir splits; cd splits
-     split -l 200000 ../dataset.nt dataset
-     
-     You will also have to fix up the file extensions.  You can do this using
-     bash as follows:
-     
-     for file in *; do mv $file $file.nt; done
-     
-     -->
+<target name="standalone-start-nano-server" depends="jar" description="Start a small http server fronting for a bigdata database instance.">
+	<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true">
+		<arg line="${standalone.nanoServerPort} ${standalone.namespace} src/resources/config/standalone/bigdataStandalone.config" />
+		<jvmarg line="-server"/>
+		<jvmarg line="-Xmx200M"/>
+		<classpath refid="runtime.classpath" />
+	</java>
+</target>
+
+<target name="standalone-stop-nano-server" depends="jar" description="Stop the small http server running at the configured port.">
+	<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true">
+		<arg line="${standalone.nanoServerPort} -stop" />
+		<classpath refid="runtime.classpath" />
+	</java>
+</target>
+
 <target name="standalone-bulk-load" depends="jar" description="Bulk load RDF data into the standalone federation.">
 	<java classname="com.bigdata.rdf.load.MappedRDFDataLoadMaster"
 		failonerror="true" fork="true" logerror="true">
@@ -967,30 +965,14 @@ ${postInstallMessage}</echo>
 		<!--                    -->
 		<!-- Per job parameters -->
 		<!--                    -->
-		<!-- The KB namespace ("kb" is a common default). -->
-		<jvmarg value="-Dbigdata.rdf.namespace=U10"/>
+		<!-- The namespace of the target KB. -->
+		<jvmarg value="-Dbigdata.rdf.namespace=${standalone.namespace}"/>
 		<!-- The job name (same as the KB namespace is a common default). -->
-		<jvmarg value="-Dbigdata.rdf.job.name=bulk-load-kb"/>
-		<!-- The file or directory containing RDF data to be loaded. 
-		
-		     Possible interesting data:
-		
-		     d:/bigdata-perf-analysis/lubm/U10
-		     d:/bigdata-perf-analysis/bsbm/bsbm_2785/dataset.nt
-		-->
-		<jvmarg value="-Dbigdata.rdf.data=d:/bigdata-perf-analysis/lubm/U10"/>
-		<!-- The file or directory containing zero or more RDF ontology files to be loaded.
-		
-			 Note: If you do not want to load any "ontology" data you can point this at an
-			 empty directory.  "ontology" data is loaded once - when a new KB instance is
-			 created.
-
-			 Possible interesting ontologies:
-		
-			bigdata-rdf/src/resources/data/lehigh/univ-bench.owl
-			d:/bigdata-perf-analysis/emptyDir
-		 -->
-		<jvmarg value="-Dbigdata.rdf.ontology=bigdata-rdf/src/resources/data/lehigh/univ-bench.owl"/>
+		<jvmarg value="-Dbigdata.rdf.job.name=bulk-load-kb-${standalone-namespace}"/>
+		<!-- The file or directory containing zero or more files to be loaded first. -->
+		<jvmarg value="-Dbigdata.rdf.ontology=${standalone.bulkLoad.ontology}"/>
+		<!-- The file or directory containing RDF data to be loaded. --> 
+		<jvmarg value="-Dbigdata.rdf.data=${standalone.bulkLoad.data}"/>
 		<!-- The main configuration file. -->
 		<arg value="src/resources/config/standalone/bigdataStandalone.config" />
 	</java>
