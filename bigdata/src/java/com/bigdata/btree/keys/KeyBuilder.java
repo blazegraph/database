@@ -28,14 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.keys;
 
 import java.io.UnsupportedEncodingException;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.text.Collator;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.UUID;
-
 import org.apache.log4j.Logger;
-
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
@@ -946,6 +945,11 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
+    // FIXME append(BigDecimal)
+    public KeyBuilder append(final BigDecimal d) {
+        throw new UnsupportedOperationException();
+    }
+
     /*
      * static helper methods.
      */
@@ -1377,6 +1381,11 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
+    // FIXME decodeBigDecimal(int, byte[])
+    static public BigDecimal decodeBigDecimal(final int offset, final byte[] key) {
+        throw new UnsupportedOperationException();
+    }
+    
     public static IKeyBuilder newInstance() {
 
         return newInstance(DEFAULT_INITIAL_CAPACITY);
