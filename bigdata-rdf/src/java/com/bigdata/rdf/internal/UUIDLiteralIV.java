@@ -35,8 +35,8 @@ import com.bigdata.rdf.model.BigdataValueFactory;
  * Implementation for inline {@link UUID}s (there is no corresponding XML
  * Schema Datatype).
  */
-public class UUIDInternalValue<V extends BigdataLiteral> extends
-        AbstractDatatypeLiteralInternalValue<V, UUID> {
+public class UUIDLiteralIV<V extends BigdataLiteral> extends
+        AbstractLiteralIV<V, UUID> {
     
     /**
      * 
@@ -45,7 +45,7 @@ public class UUIDInternalValue<V extends BigdataLiteral> extends
     
     private final UUID value;
 
-    public UUIDInternalValue(final UUID value) {
+    public UUIDLiteralIV(final UUID value) {
         
         super(DTE.UUID);
 
@@ -121,8 +121,8 @@ public class UUIDInternalValue<V extends BigdataLiteral> extends
     public boolean equals(final Object o) {
         if (this == o)
             return true;
-        if (o instanceof UUIDInternalValue<?>) {
-            return this.value.equals(((UUIDInternalValue<?>) o).value);
+        if (o instanceof UUIDLiteralIV<?>) {
+            return this.value.equals(((UUIDLiteralIV<?>) o).value);
         }
         return false;
     }
@@ -141,7 +141,7 @@ public class UUIDInternalValue<V extends BigdataLiteral> extends
     @Override
     protected int _compareTo(IV o) {
          
-        return value.compareTo(((UUIDInternalValue) o).value);
+        return value.compareTo(((UUIDLiteralIV) o).value);
         
     }
     

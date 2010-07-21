@@ -38,15 +38,15 @@ import com.bigdata.rdf.model.BigdataValue;
  * @version $Id: TestEncodeDecodeKeys.java 2753 2010-05-01 16:36:59Z
  *          thompsonbry $
  */
-abstract public class AbstractInlineInternalValue<V extends BigdataValue, T>
-        extends AbstractInternalValue<V, T> {
+abstract public class AbstractInlineIV<V extends BigdataValue, T>
+        extends AbstractIV<V, T> {
 
     /**
      * 
      */
     private static final long serialVersionUID = -2847844163772097836L;
 
-    protected AbstractInlineInternalValue(final VTE vte,
+    protected AbstractInlineIV(final VTE vte,
             final DTE dte) {
 
         super(vte, true/* inline */, false/* extension */, dte);

@@ -27,38 +27,33 @@ package com.bigdata.rdf.internal;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
-/** Implementation for inline <code>xsd:boolean</code>. */
-public class XSDBooleanInternalValue<V extends BigdataLiteral> extends
-        AbstractDatatypeLiteralInternalValue<V, Boolean> {
+/** Implementation for inline <code>xsd:short</code>. */
+public class XSDShortIV<V extends BigdataLiteral> extends
+        AbstractLiteralIV<V, Short> {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
-
-    static public transient final XSDBooleanInternalValue<BigdataLiteral> TRUE = new XSDBooleanInternalValue<BigdataLiteral>(
-            true);
-
-    static public transient final XSDBooleanInternalValue<BigdataLiteral> FALSE = new XSDBooleanInternalValue<BigdataLiteral>(
-            false);
     
-    private final boolean value;
+    private final short value;
 
-    public XSDBooleanInternalValue(final boolean value) {
+    public XSDShortIV(final short value) {
         
-        super(DTE.XSDBoolean);
+        super(DTE.XSDShort);
         
         this.value = value;
         
     }
 
-    final public Boolean getInlineValue() {
-
-        return value ? Boolean.TRUE : Boolean.FALSE;
-
+    final public Short getInlineValue() {
+        
+        return value;
+        
     }
 
     @SuppressWarnings("unchecked")
@@ -70,83 +65,82 @@ public class XSDBooleanInternalValue<V extends BigdataLiteral> extends
 
     @Override
     final public long longValue() {
-        throw new UnsupportedOperationException();
+        return (long) value;
     }
 
     @Override
     public boolean booleanValue() {
-        return value;
+        return value == 0 ? false : true;
     }
 
     @Override
     public byte byteValue() {
-        throw new UnsupportedOperationException();
+        return (byte) value;
     }
 
     @Override
     public double doubleValue() {
-        throw new UnsupportedOperationException();
+        return (double) value;
     }
 
     @Override
     public float floatValue() {
-        throw new UnsupportedOperationException();
+        return (float) value;
     }
 
     @Override
     public int intValue() {
-        throw new UnsupportedOperationException();
+        return (int)value;
     }
 
     @Override
     public short shortValue() {
-        throw new UnsupportedOperationException();
+        return value;
     }
     
     @Override
     public String stringValue() {
-        return Boolean.toString(value);
+        return Short.toString(value);
     }
 
     @Override
     public BigDecimal decimalValue() {
-        throw new UnsupportedOperationException();
+        return BigDecimal.valueOf(value);
     }
 
     @Override
     public BigInteger integerValue() {
-        throw new UnsupportedOperationException();
+        return BigInteger.valueOf(value);
     }
 
     public boolean equals(final Object o) {
         if(this==o) return true;
-        if(o instanceof XSDBooleanInternalValue<?>) {
-            return this.value == ((XSDBooleanInternalValue<?>) o).value;
+        if(o instanceof XSDShortIV<?>) {
+            return this.value == ((XSDShortIV<?>) o).value;
         }
         return false;
     }
     
     /**
-     * Return the hash code of the byte value.
+     * Return the hash code of the short value.
      * 
-     * @see Boolean#hashCode()
+     * @see Short#hashCode()
      */
     public int hashCode() {
-        return value ? Boolean.TRUE.hashCode() : Boolean.FALSE.hashCode();
+        return (int) value;
     }
 
     public int byteLength() {
-        return 1 + 1;
+        return 1 + Bytes.SIZEOF_SHORT;
     }
-
+    
     @Override
     protected int _compareTo(IV o) {
          
-        final boolean v = ((XSDBooleanInternalValue) o).value;
+        final short value2 = ((XSDShortIV) o).value;
         
-        return (v == value ? 0 : (value ? 1 : -1));
+        return value == value2 ? 0 : value < value2 ? -1 : 1;
         
     }
     
-
 }

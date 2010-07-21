@@ -27,119 +27,123 @@ package com.bigdata.rdf.internal;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
-/** Implementation for inline <code>xsd:byte</code>. */
-public class XSDByteInternalValue<V extends BigdataLiteral> extends
-        AbstractDatatypeLiteralInternalValue<V, Byte> {
-
+/** Implementation for inline <code>xsd:integer</code>. */
+public class XSDDecimalIV<V extends BigdataLiteral> extends
+        AbstractLiteralIV<V, BigDecimal> {
+    
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
     
-    private final byte value;
+    private final BigDecimal value;
 
-    public XSDByteInternalValue(final byte value) {
+    public XSDDecimalIV(final BigDecimal value) {
         
-        super(DTE.XSDByte);
+        super(DTE.XSDDecimal);
+
+        if (value == null)
+            throw new IllegalArgumentException();
         
         this.value = value;
         
     }
 
-    final public Byte getInlineValue() {
-        
+    final public BigDecimal getInlineValue() {
+
         return value;
         
     }
 
     @SuppressWarnings("unchecked")
     public V asValue(final BigdataValueFactory f) {
-        final V v = (V) f.createLiteral(value);
+        // @todo factory should cache the XSD URIs.
+        final V v = (V) f.createLiteral(value.toString(),//
+                f.createURI(DTE.XSDDecimal.getDatatype()));
         v.setIV(this);
         return v;
     }
 
     @Override
     final public long longValue() {
-        return (long) value;
+        return value.longValue();
     }
 
     @Override
     public boolean booleanValue() {
-        return value == 0 ? false : true;
+        return value.equals(BigDecimal.ZERO) ? false : true;
     }
 
     @Override
     public byte byteValue() {
-        return value;
+        return value.byteValue();
     }
 
     @Override
     public double doubleValue() {
-        return (double) value;
+        return value.doubleValue();
     }
 
     @Override
     public float floatValue() {
-        return (float) value;
+        return value.floatValue();
     }
 
     @Override
     public int intValue() {
-        return (int)value;
+        return value.intValue();
     }
 
     @Override
     public short shortValue() {
-        return (short) value;
+        return value.shortValue();
     }
     
     @Override
     public String stringValue() {
-        return Byte.toString(value);
+        return value.toString();
     }
 
     @Override
     public BigDecimal decimalValue() {
-        return BigDecimal.valueOf(value);
+        return value;
     }
 
     @Override
     public BigInteger integerValue() {
-        return BigInteger.valueOf(value);
+        return value.toBigInteger();
     }
 
     public boolean equals(final Object o) {
-        if(this==o) return true;
-        if(o instanceof XSDByteInternalValue<?>) {
-            return this.value == ((XSDByteInternalValue<?>) o).value;
+        if (this == o)
+            return true;
+        if (o instanceof XSDDecimalIV<?>) {
+            return this.value.equals(((XSDDecimalIV<?>) o).value);
         }
         return false;
     }
-    
+
     /**
-     * Return the hash code of the byte value.
-     * 
-     * @see Byte#hashCode()
+     * Return the hash code of the {@link BigDecimal}.
      */
     public int hashCode() {
-        return (int) value;
+        return value.hashCode();
     }
 
+    // FIXME byteLength()
     public int byteLength() {
-        return 1 + 1;
-    }
-
-    @Override
-    protected int _compareTo(IV o) {
-         
-        final byte value2 = ((XSDByteInternalValue) o).value;
-        
-        return value == value2 ? 0 : value < value2 ? -1 : 1;
-        
+//        throw new UnsupportedOperationException();
+        return 1 + Bytes.SIZEOF_DOUBLE;
     }
     
+    @Override
+    protected int _compareTo(IV o) {
+        
+        return value.compareTo(((XSDDecimalIV) o).value);
+        
+    }
 }

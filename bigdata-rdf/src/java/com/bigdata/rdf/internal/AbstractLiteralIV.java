@@ -52,17 +52,17 @@ import com.bigdata.rdf.model.BigdataLiteral;
  * @version $Id: TestEncodeDecodeKeys.java 2753 2010-05-01 16:36:59Z
  *          thompsonbry $
  */
-abstract public class AbstractDatatypeLiteralInternalValue<V extends BigdataLiteral, T>
-        extends AbstractLiteralInternalValue<V, T> {
+abstract public class AbstractLiteralIV<V extends BigdataLiteral, T>
+        extends AbstractInlineIV<V, T> {
 
     /**
      * 
      */
     private static final long serialVersionUID = 5962615541158537189L;
 
-    protected AbstractDatatypeLiteralInternalValue(final DTE dte) {
+    protected AbstractLiteralIV(final DTE dte) {
 
-        super(dte);
+        super(VTE.LITERAL, dte);
 
     }
 

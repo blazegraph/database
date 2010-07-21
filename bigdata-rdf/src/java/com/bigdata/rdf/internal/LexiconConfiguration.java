@@ -40,21 +40,30 @@ package com.bigdata.rdf.internal;
  */
 public class LexiconConfiguration implements ILexiconConfiguration {
     
-    private boolean inlineTerms;
+    private boolean inlineLiterals, inlineBNodes;
     
     public LexiconConfiguration() {
     }
     
-    public LexiconConfiguration(final boolean inlineTerms) {
-        this.inlineTerms = inlineTerms;
+    public LexiconConfiguration(final boolean inlineLiterals, 
+            final boolean inlineBNodes) {
+        this.inlineLiterals = inlineLiterals;
+        this.inlineBNodes = inlineBNodes;
     }
     
     /**
-     * See {@link ILexiconConfiguration#isInline(DTE)}.
+     * See {@link ILexiconConfiguration#isInline(VTE, DTE)}.
      */
-    public boolean isInline(DTE dte) {
+    public boolean isInline(final VTE vte, final DTE dte) {
 
-        return inlineTerms && isSupported(dte);
+        switch(vte) {
+        case BNODE:
+            return inlineBNodes && isSupported(dte);
+        case LITERAL:
+            return inlineLiterals && isSupported(dte);
+        default:
+            return false;
+        }
         
     }
     
@@ -69,13 +78,13 @@ public class LexiconConfiguration implements ILexiconConfiguration {
         case XSDFloat:
         case XSDDouble:
         case XSDInteger:
+        case XSDDecimal:
         case UUID:
             return true;
         case XSDUnsignedByte:       // none of the unsigneds are tested yet
         case XSDUnsignedShort:      // none of the unsigneds are tested yet
         case XSDUnsignedInt:        // none of the unsigneds are tested yet
         case XSDUnsignedLong:       // none of the unsigneds are tested yet
-        case XSDDecimal:            // need to implement byteLength() first
         default:
             return false;
         }

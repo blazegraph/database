@@ -31,19 +31,20 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
 /** Implementation for inline <code>xsd:integer</code>. */
-public class XSDDecimalInternalValue<V extends BigdataLiteral> extends
-        AbstractDatatypeLiteralInternalValue<V, BigDecimal> {
+public class XSDIntegerIV<V extends BigdataLiteral> extends
+        AbstractLiteralIV<V, BigInteger> {
     
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
     
-    private final BigDecimal value;
+    private final BigInteger value;
+    private transient int byteLength;
 
-    public XSDDecimalInternalValue(final BigDecimal value) {
+    public XSDIntegerIV(final BigInteger value) {
         
-        super(DTE.XSDDecimal);
+        super(DTE.XSDInteger);
 
         if (value == null)
             throw new IllegalArgumentException();
@@ -52,7 +53,7 @@ public class XSDDecimalInternalValue<V extends BigdataLiteral> extends
         
     }
 
-    final public BigDecimal getInlineValue() {
+    final public BigInteger getInlineValue() {
 
         return value;
         
@@ -74,7 +75,7 @@ public class XSDDecimalInternalValue<V extends BigdataLiteral> extends
 
     @Override
     public boolean booleanValue() {
-        return value.equals(BigDecimal.ZERO) ? false : true;
+        return value.equals(BigInteger.ZERO) ? false : true;
     }
 
     @Override
@@ -109,19 +110,19 @@ public class XSDDecimalInternalValue<V extends BigdataLiteral> extends
 
     @Override
     public BigDecimal decimalValue() {
-        return value;
+        return new BigDecimal(value);
     }
 
     @Override
     public BigInteger integerValue() {
-        return value.toBigInteger();
+        return value;
     }
 
     public boolean equals(final Object o) {
         if (this == o)
             return true;
-        if (o instanceof XSDDecimalInternalValue<?>) {
-            return this.value.equals(((XSDDecimalInternalValue<?>) o).value);
+        if (o instanceof XSDIntegerIV<?>) {
+            return this.value.equals(((XSDIntegerIV<?>) o).value);
         }
         return false;
     }
@@ -133,15 +134,27 @@ public class XSDDecimalInternalValue<V extends BigdataLiteral> extends
         return value.hashCode();
     }
 
-    // FIXME byteLength()
     public int byteLength() {
-        throw new UnsupportedOperationException();
+
+        if (byteLength == 0) {
+
+            /*
+             * Cache the byteLength if not yet set.
+             */
+
+            byteLength = 1 /* prefix */+ 2/* runLength */+ (value.bitLength() / 8 + 1)/* data */;
+
+        }
+
+        return byteLength;
+
     }
     
     @Override
     protected int _compareTo(IV o) {
         
-        return value.compareTo(((XSDDecimalInternalValue) o).value);
+        return value.compareTo(((XSDIntegerIV) o).value);
         
     }
+    
 }

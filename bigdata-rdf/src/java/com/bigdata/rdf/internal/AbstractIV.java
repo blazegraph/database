@@ -205,7 +205,7 @@ import com.bigdata.rdf.model.BigdataValue;
  * @param <T>
  *            The generic type for the inline value.
  */
-public abstract class AbstractInternalValue<V extends BigdataValue, T>
+public abstract class AbstractIV<V extends BigdataValue, T>
         implements IV<V, T> {
 
     /**
@@ -258,7 +258,7 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
      * @see VTE
      * @see DTE
      */
-    protected AbstractInternalValue(final VTE vte, final boolean inline,
+    protected AbstractIV(final VTE vte, final boolean inline,
             final boolean extension, final DTE dte) {
 
         // vte << 6 bits (it is in the high 2 bits).
@@ -280,7 +280,7 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
      * @param flags
      *            The flags.
      */
-    protected AbstractInternalValue(final byte flags) {
+    protected AbstractIV(final byte flags) {
         
         this.flags = flags;
         
@@ -587,7 +587,7 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
      * Compare two {@link IV}s having the same intrinsic datatype.
      * 
      * @todo This should probably be moved to
-     *       {@link AbstractInlineInternalValue} and implementations provided
+     *       {@link AbstractInlineIV} and implementations provided
      *       for each concrete instance of that abstract class.
      */
     protected int _compareTo(IV o) {
@@ -624,7 +624,7 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
          */
         final DTE dte = getDTE();
         
-        final AbstractDatatypeLiteralInternalValue<?, ?> t = (AbstractDatatypeLiteralInternalValue<?, ?>) this;
+        final AbstractLiteralIV<?, ?> t = (AbstractLiteralIV<?, ?>) this;
         
         switch (dte) {
         case XSDBoolean:
@@ -651,12 +651,12 @@ public abstract class AbstractInternalValue<V extends BigdataValue, T>
         case XSDInteger:
             keyBuilder.append(t.integerValue());
             break;
+        case XSDDecimal:
+            keyBuilder.append(t.decimalValue());
+            break;
         case UUID:
             keyBuilder.append((UUID)t.getInlineValue());
             break;
-//        case XSDDecimal:
-//            keyBuilder.append(t.decimalValue());
-//            break;
 //        case XSDUnsignedByte:
 //            keyBuilder.appendUnsigned(t.byteValue());
 //            break;

@@ -27,31 +27,32 @@ package com.bigdata.rdf.internal;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
-/** Implementation for inline <code>xsd:float</code>. */
-public class XSDFloatInternalValue<V extends BigdataLiteral> extends
-        AbstractDatatypeLiteralInternalValue<V, Float> {
+/** Implementation for inline <code>xsd:byte</code>. */
+public class XSDByteIV<V extends BigdataLiteral> extends
+        AbstractLiteralIV<V, Byte> {
 
     /**
      * 
      */
-    private static final long serialVersionUID = 2274203835967555711L;
+    private static final long serialVersionUID = 1L;
+    
+    private final byte value;
 
-    private final float value;
-
-    public XSDFloatInternalValue(final float value) {
+    public XSDByteIV(final byte value) {
         
-        super(DTE.XSDFloat);
+        super(DTE.XSDByte);
         
         this.value = value;
         
     }
 
-    final public Float getInlineValue() {
+    final public Byte getInlineValue() {
+        
         return value;
+        
     }
 
     @SuppressWarnings("unchecked")
@@ -62,18 +63,18 @@ public class XSDFloatInternalValue<V extends BigdataLiteral> extends
     }
 
     @Override
-    final public float floatValue() {
-        return value;
+    final public long longValue() {
+        return (long) value;
     }
 
     @Override
     public boolean booleanValue() {
-        throw new UnsupportedOperationException();
+        return value == 0 ? false : true;
     }
 
     @Override
     public byte byteValue() {
-        return (byte) value;
+        return value;
     }
 
     @Override
@@ -82,18 +83,23 @@ public class XSDFloatInternalValue<V extends BigdataLiteral> extends
     }
 
     @Override
-    public int intValue() {
-        return (int) value;
+    public float floatValue() {
+        return (float) value;
     }
 
     @Override
-    public long longValue() {
-        return (long) value;
+    public int intValue() {
+        return (int)value;
     }
 
     @Override
     public short shortValue() {
         return (short) value;
+    }
+    
+    @Override
+    public String stringValue() {
+        return Byte.toString(value);
     }
 
     @Override
@@ -103,45 +109,37 @@ public class XSDFloatInternalValue<V extends BigdataLiteral> extends
 
     @Override
     public BigInteger integerValue() {
-        return BigInteger.valueOf((long) value);
+        return BigInteger.valueOf(value);
     }
 
-    @Override
-    public String stringValue() {
-        return Float.toString(value);
-    }
-    
     public boolean equals(final Object o) {
         if(this==o) return true;
-        if(o instanceof XSDFloatInternalValue<?>) {
-            return this.value == ((XSDFloatInternalValue<?>) o).value;
+        if(o instanceof XSDByteIV<?>) {
+            return this.value == ((XSDByteIV<?>) o).value;
         }
         return false;
     }
     
     /**
-     * Return the hash code of the float value.
+     * Return the hash code of the byte value.
      * 
-     * @see Float#hashCode()
+     * @see Byte#hashCode()
      */
     public int hashCode() {
-
-        return Float.floatToIntBits(value);
-        
+        return (int) value;
     }
 
     public int byteLength() {
-        return 1 + Bytes.SIZEOF_FLOAT;
+        return 1 + 1;
     }
-    
+
     @Override
     protected int _compareTo(IV o) {
          
-        final float value2 = ((XSDFloatInternalValue) o).value;
+        final byte value2 = ((XSDByteIV) o).value;
         
         return value == value2 ? 0 : value < value2 ? -1 : 1;
         
     }
-
-
+    
 }

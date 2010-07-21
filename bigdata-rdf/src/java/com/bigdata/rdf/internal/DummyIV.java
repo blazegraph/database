@@ -41,7 +41,7 @@ import com.bigdata.relation.rule.Var;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DummyIV extends AbstractInternalValue {
+public class DummyIV extends AbstractIV {
 
     private static final long serialVersionUID = 1L;
 

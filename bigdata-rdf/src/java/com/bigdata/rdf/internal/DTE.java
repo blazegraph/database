@@ -31,9 +31,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.UUID;
 import org.openrdf.model.URI;
-
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
 /**
  * Data Type Enumeration (DTE) is a class which declares the known intrinsic
@@ -331,14 +329,14 @@ public enum DTE {
      * The class of the Java object used to represent instances of the coded
      * data type.
      * 
-     * @todo cls extends {@link AbstractInternalValue}? Use {@link TermId} for a
+     * @todo cls extends {@link AbstractIV}? Use {@link TermId} for a
      *       term identifier? If blank nodes are inlined, then use a special
      *       class for that, otherwise use {@link TermId}? Ditto for SIDs. URIs
      *       are never inlined. Datatype literals MAY be inline, depending on
      *       the datatype. The unsigned datatypes need to have special handling
      *       to avoid problems with math on unsigned values. That special
      *       handling could be provided by appropriate subclasses of
-     *       {@link AbstractDatatypeLiteralInternalValue}.
+     *       {@link AbstractLiteralIV}.
      */
     private final Class<?> cls;
 

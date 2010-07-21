@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.UUID;
@@ -34,7 +35,6 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.internal.constraints.AbstractInlineConstraint;
 import com.bigdata.rdf.internal.constraints.InlineGT;
 import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.relation.rule.Constant;
 
 
 /**
@@ -91,6 +91,9 @@ public class IVUtility {
         if (!iv1.isInline() || !iv2.isInline())
             throw new IllegalArgumentException("not inline terms");
         
+        if (!iv1.isLiteral() || !iv2.isLiteral())
+            throw new IllegalArgumentException("not literals");
+        
         final DTE dte1 = iv1.getDTE();
         final DTE dte2 = iv2.getDTE();
 
@@ -114,10 +117,10 @@ public class IVUtility {
             return iv1.compareTo(iv2);
         
         // otherwise we need to try to convert them into comparable numbers
-        final AbstractDatatypeLiteralInternalValue num1 = 
-            (AbstractDatatypeLiteralInternalValue) iv1; 
-        final AbstractDatatypeLiteralInternalValue num2 = 
-            (AbstractDatatypeLiteralInternalValue) iv2; 
+        final AbstractLiteralIV num1 = 
+            (AbstractLiteralIV) iv1; 
+        final AbstractLiteralIV num2 = 
+            (AbstractLiteralIV) iv2; 
         
         // if one's a BigDecimal we should use the BigDecimal comparator for both
         if (dte1 == DTE.XSDDecimal || dte2 == DTE.XSDDecimal) {
@@ -151,7 +154,7 @@ public class IVUtility {
     public static final boolean canNumericalCompare(final IV iv) {
         
         // inline boolean or inline signed numeric
-        return iv.isInline() && 
+        return iv.isInline() && iv.isLiteral() &&
                 (iv.getDTE() == DTE.XSDBoolean || iv.isNumeric());
         
     }
@@ -258,14 +261,14 @@ public class IVUtility {
         /*
          * FIXME iNull does not work yet
          */
-        if (AbstractInternalValue.isNull(flags))
+        if (AbstractIV.isNull(flags))
             return null;
     
         
         /*
          * Handle a term identifier (versus an inline value).
          */
-        if (!AbstractInternalValue.isInline(flags)) {
+        if (!AbstractIV.isInline(flags)) {
     
             // decode the term identifier.
             final long termId = KeyBuilder.decodeLong(key, offset+1);
@@ -285,56 +288,56 @@ public class IVUtility {
          * Handle an inline value.
          */
         // The value type (URI, Literal, BNode, SID)
-        final VTE vte = AbstractInternalValue.getInternalValueTypeEnum(flags);
+        final VTE vte = AbstractIV.getInternalValueTypeEnum(flags);
 
         // The data type
-        final DTE dte = AbstractInternalValue.getInternalDataTypeEnum(flags);
+        final DTE dte = AbstractIV.getInternalDataTypeEnum(flags);
 
         switch (dte) {
         case XSDBoolean: {
             final byte x = KeyBuilder.decodeByte(key[offset+1]);
             if (x == 0) {
-                return XSDBooleanInternalValue.FALSE;
+                return XSDBooleanIV.FALSE;
             } else {
-                return XSDBooleanInternalValue.TRUE;
+                return XSDBooleanIV.TRUE;
             }
         }
         case XSDByte: {
             final byte x = KeyBuilder.decodeByte(key[offset+1]);
-            return new XSDByteInternalValue<BigdataLiteral>(x);
+            return new XSDByteIV<BigdataLiteral>(x);
         }
         case XSDShort: {
             final short x = KeyBuilder.decodeShort(key, offset+1);
-            return new XSDShortInternalValue<BigdataLiteral>(x);
+            return new XSDShortIV<BigdataLiteral>(x);
         }
         case XSDInt: {
             final int x = KeyBuilder.decodeInt(key, offset+1);
-            return new XSDIntInternalValue<BigdataLiteral>(x);
+            return new XSDIntIV<BigdataLiteral>(x);
         }
         case XSDLong: {
             final long x = KeyBuilder.decodeLong(key, offset+1);
-            return new XSDLongInternalValue<BigdataLiteral>(x);
+            return new XSDLongIV<BigdataLiteral>(x);
         }
         case XSDFloat: {
             final float x = KeyBuilder.decodeFloat(key, offset+1);
-            return new XSDFloatInternalValue<BigdataLiteral>(x);
+            return new XSDFloatIV<BigdataLiteral>(x);
         }
         case XSDDouble: {
             final double x = KeyBuilder.decodeDouble(key, offset+1);
-            return new XSDDoubleInternalValue<BigdataLiteral>(x);
+            return new XSDDoubleIV<BigdataLiteral>(x);
         }
         case UUID: {
             final UUID x = KeyBuilder.decodeUUID(key, offset+1);
-            return new UUIDInternalValue<BigdataLiteral>(x);
+            return new UUIDLiteralIV<BigdataLiteral>(x);
         }
         case XSDInteger: {
-            final byte[] b = KeyBuilder.decodeBigInteger2(offset+1, key);
-            final BigInteger x = new BigInteger(b);
-            return new XSDIntegerInternalValue<BigdataLiteral>(x);
+            final BigInteger x = KeyBuilder.decodeBigInteger(offset+1, key);
+            return new XSDIntegerIV<BigdataLiteral>(x);
         }
-            // case XSDDecimal:
-            // keyBuilder.append(t.decimalValue());
-            // break;
+        case XSDDecimal: {
+            final BigDecimal x = KeyBuilder.decodeBigDecimal(offset+1, key);
+            return new XSDDecimalIV<BigdataLiteral>(x);
+        }
             // case XSDUnsignedByte:
             // keyBuilder.appendUnsigned(t.byteValue());
             // break;
@@ -357,7 +360,7 @@ public class IVUtility {
     /**
      * Decode an IV from its string representation as encoded by
      * {@link TermId#toString()} and 
-     * {@link AbstractInlineInternalValue#toString()}.
+     * {@link AbstractInlineIV#toString()}.
      * 
      * @param s
      *          the string representation
@@ -377,46 +380,47 @@ public class IVUtility {
             case XSDBoolean: {
                 final boolean b = Boolean.valueOf(val);
                 if (b) {
-                    return XSDBooleanInternalValue.TRUE;
+                    return XSDBooleanIV.TRUE;
                 } else {
-                    return XSDBooleanInternalValue.FALSE;
+                    return XSDBooleanIV.FALSE;
                 }
             }
             case XSDByte: {
                 final byte x = Byte.valueOf(val);
-                return new XSDByteInternalValue<BigdataLiteral>(x);
+                return new XSDByteIV<BigdataLiteral>(x);
             }
             case XSDShort: {
                 final short x = Short.valueOf(val);
-                return new XSDShortInternalValue<BigdataLiteral>(x);
+                return new XSDShortIV<BigdataLiteral>(x);
             }
             case XSDInt: {
                 final int x = Integer.valueOf(val);
-                return new XSDIntInternalValue<BigdataLiteral>(x);
+                return new XSDIntIV<BigdataLiteral>(x);
             }
             case XSDLong: {
                 final long x = Long.valueOf(val);
-                return new XSDLongInternalValue<BigdataLiteral>(x);
+                return new XSDLongIV<BigdataLiteral>(x);
             }
             case XSDFloat: {
                 final float x = Float.valueOf(val);
-                return new XSDFloatInternalValue<BigdataLiteral>(x);
+                return new XSDFloatIV<BigdataLiteral>(x);
             }
             case XSDDouble: {
                 final double x = Double.valueOf(val);
-                return new XSDDoubleInternalValue<BigdataLiteral>(x);
+                return new XSDDoubleIV<BigdataLiteral>(x);
             }
             case UUID: {
                 final UUID x = UUID.fromString(val);
-                return new UUIDInternalValue<BigdataLiteral>(x);
+                return new UUIDLiteralIV<BigdataLiteral>(x);
             }
             case XSDInteger: {
                 final BigInteger x = new BigInteger(val);
-                return new XSDIntegerInternalValue<BigdataLiteral>(x);
+                return new XSDIntegerIV<BigdataLiteral>(x);
             }
-                // case XSDDecimal:
-                // keyBuilder.append(t.decimalValue());
-                // break;
+            case XSDDecimal: {
+                final BigDecimal x = new BigDecimal(val);
+                return new XSDDecimalIV<BigdataLiteral>(x);
+            }
                 // case XSDUnsignedByte:
                 // keyBuilder.appendUnsigned(t.byteValue());
                 // break;

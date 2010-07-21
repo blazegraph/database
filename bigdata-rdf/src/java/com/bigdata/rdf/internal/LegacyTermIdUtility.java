@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
-import java.math.BigInteger;
-import java.util.UUID;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
@@ -36,7 +34,6 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.lexicon.ITermIdCodes;
-import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 
 class LegacyTermIdUtility implements ITermIdCodes {

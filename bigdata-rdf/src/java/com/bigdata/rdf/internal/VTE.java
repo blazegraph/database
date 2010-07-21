@@ -27,14 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
-import org.openrdf.model.BNode;
-import org.openrdf.model.Literal;
-import org.openrdf.model.URI;
-
 import com.bigdata.rdf.lexicon.ITermIdCodes;
 import com.bigdata.rdf.lexicon.TermIdEncoder;
-import com.bigdata.rdf.store.AbstractTripleStore.Options;
-import com.bigdata.relation.rule.Constant;
 
 /**
  * Value Type Enumeration (IVTE) is a class with methods for interpreting and 
@@ -71,7 +65,7 @@ public enum VTE implements ITermIdCodes {
 
     /**
      * Note: This field is package private so it is visible to
-     * {@link AbstractInternalValue}.
+     * {@link AbstractIV}.
      */
     final byte v;
 
