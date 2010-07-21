@@ -32,9 +32,12 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 import org.openrdf.model.vocabulary.RDF;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -48,12 +51,12 @@ import com.bigdata.rdf.vocab.NoVocabulary;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAddTerms extends AbstractTripleStoreTestCase {
+public class TestInlining extends AbstractTripleStoreTestCase {
 
     /**
      * 
      */
-    public TestAddTerms() {
+    public TestInlining() {
         super();
        
     }
@@ -61,12 +64,15 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
     /**
      * @param name
      */
-    public TestAddTerms(String name) {
+    public TestInlining(String name) {
         super(name);
        
     }
 
-    public void test_addTerms() {
+    /**
+     * Unsigned numerics should not be inlined at this time.
+     */
+    public void test_unsigned() {
 
         final Properties properties = getProperties();
         
@@ -80,9 +86,6 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
         // test w/o the full text index.
         properties.setProperty(Options.TEXT_INDEX, "false");
 
-        // test w/o inlining
-        properties.setProperty(Options.INLINE_LITERALS, "false");
-
         AbstractTripleStore store = getStore(properties);
         
         try {
@@ -92,24 +95,14 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
             // lookup/add some values.
             final BigdataValueFactory f = store.getValueFactory();
 
-            terms.add(f.asValue(RDF.TYPE));
-            terms.add(f.asValue(RDF.PROPERTY));
-            terms.add(f.createLiteral("test"));
-            terms.add(f.createLiteral("test", "en"));
             terms.add(f.createLiteral("10", f
-                    .createURI("http://www.w3.org/2001/XMLSchema#int")));
+                    .createURI(XSD.UNSIGNED_INT.toString())));
 
             terms.add(f.createLiteral("12", f
-                    .createURI("http://www.w3.org/2001/XMLSchema#float")));
+                    .createURI(XSD.UNSIGNED_SHORT.toString())));
 
-            terms.add(f.createLiteral("12.", f
-                    .createURI("http://www.w3.org/2001/XMLSchema#float")));
-
-            terms.add(f.createLiteral("12.0", f
-                    .createURI("http://www.w3.org/2001/XMLSchema#float")));
-
-            terms.add(f.createLiteral("12.00", f
-                    .createURI("http://www.w3.org/2001/XMLSchema#float")));
+            terms.add(f.createLiteral("14", f
+                    .createURI(XSD.UNSIGNED_LONG.toString())));
 
             /*
              * Note: Blank nodes will not round trip through the lexicon unless
@@ -135,6 +128,8 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
                 
                 for (IV id : ids.keySet()) {
 
+                    assertTrue(id.isTermId());
+                    
                     assertEquals("Id mapped to a different term? : termId="
                             + id, ids.get(id), ids2.get(id));
 
@@ -156,7 +151,7 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
      * nodes in the reverse index (T2ID) so we can translate a blank node back
      * to a specific identifier.
      */
-    public void test_toldBNodes() {
+    public void test_inlineBNodes() {
 
         final Properties properties = getProperties();
         
@@ -172,6 +167,9 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
 
         // this is the "told bnodes" mode.
         properties.setProperty(Options.STORE_BLANK_NODES, "true");
+
+        // inline the bnodes
+        properties.setProperty(Options.INLINE_BNODES, "true");
 
         AbstractTripleStore store = getStore(properties);
         
@@ -193,11 +191,26 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
             // lookup/add some values.
             final BigdataValueFactory f = store.getValueFactory();
 
-            terms.add(f.createBNode());
-            terms.add(f.createBNode("a"));
+            final BigdataBNode b1 = f.createBNode("1");
+            final BigdataBNode b01 = f.createBNode("01");
+            final BigdataBNode b2 = f.createBNode(UUID.randomUUID().toString());
+            final BigdataBNode b3 = f.createBNode("foo");
+            final BigdataBNode b4 = f.createBNode("foo12345");
+
+            terms.add(b1);
+            terms.add(b01);
+            terms.add(b2);
+            terms.add(b3);
+            terms.add(b4);
 
             final Map<IV, BigdataValue> ids = doAddTermsTest(store, terms);
 
+            assertTrue(b1.getIV().isInline());
+            assertFalse(b01.getIV().isInline());
+            assertTrue(b2.getIV().isInline());
+            assertFalse(b3.getIV().isInline());
+            assertFalse(b4.getIV().isInline());
+            
             if (store.isStable()) {
                 
                 store.commit();
@@ -211,10 +224,12 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
 
                 assertEquals(ids.size(),ids2.size());
                 
-                for (IV id : ids.keySet()) {
+                for (IV iv : ids.keySet()) {
 
-                    assertEquals("Id mapped to a different term? : termId="
-                            + id, ids.get(id), ids2.get(id));
+                    System.err.println(iv);
+                    
+                    assertEquals("Id mapped to a different term? : iv="
+                            + iv, ids.get(iv), ids2.get(iv));
 
                 }
 
@@ -270,19 +285,19 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
          */
         for(BigdataValue expected : a) {
 
-            assertNotSame("Did not assign term identifier? : " + expected,
+            assertNotSame("Did not assign internal value? : " + expected,
                     null, expected.getIV());
 
             final BigdataValue actual = tmp.get(expected.getIV());
 
             if (actual == null) {
 
-                fail("Lexicon does not have value: termId="
+                fail("Lexicon does not have value: iv="
                         + expected.getIV() + ", term=" + expected);
                 
             }
             
-            assertEquals("Id mapped to a different term? id="
+            assertEquals("IV mapped to a different term? iv="
                     + expected.getIV(), expected, actual);
 
         }

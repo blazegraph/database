@@ -98,7 +98,7 @@ public class TestBigdataSailWithSidsWithoutInlining extends AbstractBigdataSailT
 */
         properties.setProperty(Options.TRIPLES_MODE_WITH_PROVENANCE, "true");
         
-        properties.setProperty(Options.INLINE_TERMS, "false");
+        properties.setProperty(Options.INLINE_LITERALS, "false");
         
         return properties;
         

@@ -308,7 +308,7 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
             final Properties props = getProperties();
             
             if (cannotInlineTests.contains(testURI))
-                props.setProperty(Options.INLINE_TERMS, "false");
+                props.setProperty(Options.INLINE_LITERALS, "false");
             
             final BigdataSail sail = new BigdataSail(props);
             return new DatasetRepository(new BigdataSailRepository(sail));

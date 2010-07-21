@@ -230,7 +230,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 //                // 64 bit random term identifier.
 //                final long termId = r.nextLong();
 
-                final IV<?, ?> v = new AbstractInternalValue(vte,
+                final IV<?, ?> v = new AbstractIV(vte,
                         true/* inline */, false/* extension */, dte) {
 
                     @Override
@@ -655,13 +655,13 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
-                new XSDBooleanInternalValue<BigdataLiteral>(true),//
+                new XSDBooleanIV<BigdataLiteral>(true),//
                 new TermId<BigdataURI>(VTE.URI, 4L) //
         };
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDBooleanInternalValue<BigdataLiteral>(false);
+        e[2] = new XSDBooleanIV<BigdataLiteral>(false);
 
         doEncodeDecodeTest(e);
 
@@ -675,25 +675,25 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
-                new XSDByteInternalValue<BigdataLiteral>((byte)1),//
+                new XSDByteIV<BigdataLiteral>((byte)1),//
                 new TermId<BigdataURI>(VTE.URI, 4L) //
         };
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDByteInternalValue<BigdataLiteral>((byte) -1);
+        e[2] = new XSDByteIV<BigdataLiteral>((byte) -1);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDByteInternalValue<BigdataLiteral>((byte) 0);
+        e[2] = new XSDByteIV<BigdataLiteral>((byte) 0);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDByteInternalValue<BigdataLiteral>(Byte.MAX_VALUE);
+        e[2] = new XSDByteIV<BigdataLiteral>(Byte.MAX_VALUE);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDByteInternalValue<BigdataLiteral>(Byte.MIN_VALUE);
+        e[2] = new XSDByteIV<BigdataLiteral>(Byte.MIN_VALUE);
 
         doEncodeDecodeTest(e);
 
@@ -707,25 +707,25 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
-                new XSDShortInternalValue<BigdataLiteral>((short)1),//
+                new XSDShortIV<BigdataLiteral>((short)1),//
                 new TermId<BigdataURI>(VTE.URI, 4L) //
         };
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDShortInternalValue<BigdataLiteral>((short) -1);
+        e[2] = new XSDShortIV<BigdataLiteral>((short) -1);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDShortInternalValue<BigdataLiteral>((short) 0);
+        e[2] = new XSDShortIV<BigdataLiteral>((short) 0);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDShortInternalValue<BigdataLiteral>(Short.MAX_VALUE);
+        e[2] = new XSDShortIV<BigdataLiteral>(Short.MAX_VALUE);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDShortInternalValue<BigdataLiteral>(Short.MIN_VALUE);
+        e[2] = new XSDShortIV<BigdataLiteral>(Short.MIN_VALUE);
 
         doEncodeDecodeTest(e);
 
@@ -739,25 +739,25 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
-                new XSDIntInternalValue<BigdataLiteral>(1),//
+                new XSDIntIV<BigdataLiteral>(1),//
                 new TermId<BigdataURI>(VTE.URI, 4L) //
         };
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDIntInternalValue<BigdataLiteral>(-1);
+        e[2] = new XSDIntIV<BigdataLiteral>(-1);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDIntInternalValue<BigdataLiteral>(0);
+        e[2] = new XSDIntIV<BigdataLiteral>(0);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDIntInternalValue<BigdataLiteral>(Integer.MAX_VALUE);
+        e[2] = new XSDIntIV<BigdataLiteral>(Integer.MAX_VALUE);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDIntInternalValue<BigdataLiteral>(Integer.MIN_VALUE);
+        e[2] = new XSDIntIV<BigdataLiteral>(Integer.MIN_VALUE);
 
         doEncodeDecodeTest(e);
 
@@ -771,25 +771,25 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
-                new XSDLongInternalValue<BigdataLiteral>(1L),//
+                new XSDLongIV<BigdataLiteral>(1L),//
                 new TermId<BigdataURI>(VTE.URI, 4L) //
         };
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDLongInternalValue<BigdataLiteral>(-1L);
+        e[2] = new XSDLongIV<BigdataLiteral>(-1L);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDLongInternalValue<BigdataLiteral>(0L);
+        e[2] = new XSDLongIV<BigdataLiteral>(0L);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDLongInternalValue<BigdataLiteral>(Long.MAX_VALUE);
+        e[2] = new XSDLongIV<BigdataLiteral>(Long.MAX_VALUE);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDLongInternalValue<BigdataLiteral>(Long.MIN_VALUE);
+        e[2] = new XSDLongIV<BigdataLiteral>(Long.MIN_VALUE);
 
         doEncodeDecodeTest(e);
 
@@ -803,41 +803,41 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
-                new XSDFloatInternalValue<BigdataLiteral>(1f),//
+                new XSDFloatIV<BigdataLiteral>(1f),//
                 new TermId<BigdataURI>(VTE.URI, 4L) //
         };
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDFloatInternalValue<BigdataLiteral>(-1f);
+        e[2] = new XSDFloatIV<BigdataLiteral>(-1f);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDFloatInternalValue<BigdataLiteral>(+0f);
+        e[2] = new XSDFloatIV<BigdataLiteral>(+0f);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDFloatInternalValue<BigdataLiteral>(-0f);
+        e[2] = new XSDFloatIV<BigdataLiteral>(-0f);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDFloatInternalValue<BigdataLiteral>(Float.MAX_VALUE);
+        e[2] = new XSDFloatIV<BigdataLiteral>(Float.MAX_VALUE);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDFloatInternalValue<BigdataLiteral>(Float.MIN_VALUE);
+        e[2] = new XSDFloatIV<BigdataLiteral>(Float.MIN_VALUE);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDFloatInternalValue<BigdataLiteral>(Float.MIN_NORMAL);
+        e[2] = new XSDFloatIV<BigdataLiteral>(Float.MIN_NORMAL);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDFloatInternalValue<BigdataLiteral>(Float.POSITIVE_INFINITY);
+        e[2] = new XSDFloatIV<BigdataLiteral>(Float.POSITIVE_INFINITY);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDFloatInternalValue<BigdataLiteral>(Float.NEGATIVE_INFINITY);
+        e[2] = new XSDFloatIV<BigdataLiteral>(Float.NEGATIVE_INFINITY);
 
         doEncodeDecodeTest(e);
 
@@ -851,41 +851,41 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
-                new XSDDoubleInternalValue<BigdataLiteral>(1d),//
+                new XSDDoubleIV<BigdataLiteral>(1d),//
                 new TermId<BigdataURI>(VTE.URI, 4L) //
         };
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDDoubleInternalValue<BigdataLiteral>(-1d);
+        e[2] = new XSDDoubleIV<BigdataLiteral>(-1d);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDDoubleInternalValue<BigdataLiteral>(-0d);
+        e[2] = new XSDDoubleIV<BigdataLiteral>(-0d);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDDoubleInternalValue<BigdataLiteral>(+0d);
+        e[2] = new XSDDoubleIV<BigdataLiteral>(+0d);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDDoubleInternalValue<BigdataLiteral>(Double.MAX_VALUE);
+        e[2] = new XSDDoubleIV<BigdataLiteral>(Double.MAX_VALUE);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDDoubleInternalValue<BigdataLiteral>(Double.MIN_VALUE);
+        e[2] = new XSDDoubleIV<BigdataLiteral>(Double.MIN_VALUE);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDDoubleInternalValue<BigdataLiteral>(Double.MIN_NORMAL);
+        e[2] = new XSDDoubleIV<BigdataLiteral>(Double.MIN_NORMAL);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDDoubleInternalValue<BigdataLiteral>(Double.POSITIVE_INFINITY);
+        e[2] = new XSDDoubleIV<BigdataLiteral>(Double.POSITIVE_INFINITY);
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDDoubleInternalValue<BigdataLiteral>(Double.NEGATIVE_INFINITY);
+        e[2] = new XSDDoubleIV<BigdataLiteral>(Double.NEGATIVE_INFINITY);
 
         doEncodeDecodeTest(e);
 
@@ -910,7 +910,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
-                new XSDFloatInternalValue<BigdataLiteral>(Float.NaN),//
+                new XSDFloatIV<BigdataLiteral>(Float.NaN),//
                 new TermId<BigdataURI>(VTE.URI, 4L) //
         };
     
@@ -937,11 +937,11 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
-                new XSDDoubleInternalValue<BigdataLiteral>(Double.NaN),//
+                new XSDDoubleIV<BigdataLiteral>(Double.NaN),//
                 new TermId<BigdataURI>(VTE.URI, 4L) //
         };
     
-        e[2] = new XSDDoubleInternalValue<BigdataLiteral>(Double.NaN);
+        e[2] = new XSDDoubleIV<BigdataLiteral>(Double.NaN);
 
         doEncodeDecodeTest(e);
 
@@ -955,7 +955,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
-                new UUIDInternalValue<BigdataLiteral>(UUID.randomUUID()),//
+                new UUIDLiteralIV<BigdataLiteral>(UUID.randomUUID()),//
                 new TermId<BigdataURI>(VTE.URI, 4L) //
         };
 
@@ -963,7 +963,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
         for (int i = 0; i < 1000; i++) {
 
-            e[2] = new UUIDInternalValue<BigdataLiteral>(UUID.randomUUID());
+            e[2] = new UUIDLiteralIV<BigdataLiteral>(UUID.randomUUID());
 
             doEncodeDecodeTest(e);
 
@@ -979,7 +979,7 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
-                new XSDIntegerInternalValue<BigdataLiteral>(BigInteger
+                new XSDIntegerIV<BigdataLiteral>(BigInteger
                         .valueOf(3L)),//
                 new TermId<BigdataURI>(VTE.URI, 4L) //
         };
@@ -990,12 +990,13 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
     /**
      * Unit test where the RDF Object position is an xsd:decimal.
+     */
     public void test_SPO_encodeDecode_XSDDecimal() {
 
         final IV<?, ?>[] e = {//
                 new TermId<BigdataURI>(VTE.URI, 1L),//
                 new TermId<BigdataURI>(VTE.URI, 2L),//
-                new XSDDecimalInternalValue<BigdataLiteral>(BigDecimal
+                new XSDDecimalIV<BigdataLiteral>(BigDecimal
                         .valueOf(3.3d)),//
                 new TermId<BigdataURI>(VTE.URI, 4L) //
         };
@@ -1003,6 +1004,5 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         doEncodeDecodeTest(e);
         
     }
-     */
 
 }
