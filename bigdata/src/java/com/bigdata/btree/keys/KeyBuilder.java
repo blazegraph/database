@@ -947,7 +947,8 @@ public class KeyBuilder implements IKeyBuilder {
 
     // FIXME append(BigDecimal)
     public KeyBuilder append(final BigDecimal d) {
-        throw new UnsupportedOperationException();
+//        throw new UnsupportedOperationException();
+        return append(d.doubleValue());
     }
 
     /*
@@ -1060,6 +1061,10 @@ public class KeyBuilder implements IKeyBuilder {
         } else if (val instanceof BigInteger) {
 
             append((BigInteger) val);
+
+        } else if (val instanceof BigDecimal) {
+
+            append((BigDecimal) val);
 
         } else if (val instanceof Float) {
 
@@ -1383,7 +1388,9 @@ public class KeyBuilder implements IKeyBuilder {
 
     // FIXME decodeBigDecimal(int, byte[])
     static public BigDecimal decodeBigDecimal(final int offset, final byte[] key) {
-        throw new UnsupportedOperationException();
+//        throw new UnsupportedOperationException();
+        final double d = decodeDouble(key, offset);
+        return new BigDecimal(d);
     }
     
     public static IKeyBuilder newInstance() {
