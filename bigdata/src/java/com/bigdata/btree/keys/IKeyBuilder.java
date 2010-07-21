@@ -28,11 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.keys;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.UUID;
-
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.KeyBuilder.Options;
 
@@ -444,6 +444,17 @@ public interface IKeyBuilder extends ISortKeyBuilder {
      * @return The unsigned byte[].
      */
     public IKeyBuilder append(final BigInteger i);
+
+    /**
+     * Encode a {@link BigDecimal} into an unsigned byte[] and append it into
+     * the key buffer.
+     * 
+     * @param The
+     *            {@link BigDecimal} value.
+     * 
+     * @return The unsigned byte[].
+     */
+    public IKeyBuilder append(final BigDecimal d);
 
     /**
      * Append the value to the buffer, encoding it as appropriate based on the

@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.keys;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -37,9 +38,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
-
 import junit.framework.TestCase2;
-
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 
@@ -1527,6 +1526,11 @@ public class TestKeyBuilder extends TestCase2 {
         
     }
 
+    private BigDecimal decodeBigDecimal(final byte[] key) {
+
+        return KeyBuilder.decodeBigDecimal(0/*offset*/, key);
+    }
+    
     /**
      * FIXME The 2 byte run length limits the maximum key length for a
      * BigInteger to ~32k. Write unit tests which verify that we detect and
@@ -1549,6 +1553,12 @@ public class TestKeyBuilder extends TestCase2 {
 //        final byte[] key = keyBuilder.getKey();
 //        
 //        return key;
+        
+    }
+    
+    private byte[] encodeBigDecimal(final BigDecimal d) {
+
+        return new KeyBuilder().append(d).getKey();
         
     }
     
@@ -1599,6 +1609,53 @@ public class TestKeyBuilder extends TestCase2 {
 
     }
 
+    protected void doEncodeDecodeTest(final BigDecimal expected) {
+
+        byte[] encoded = null;
+        BigDecimal actual = null;
+        Throwable cause = null;
+        try {
+
+            encoded = encodeBigDecimal(expected);
+
+            actual = decodeBigDecimal(encoded);
+
+        } catch (Throwable t) {
+
+            cause = t;
+
+        }
+
+        if (cause != null || !expected.equals(actual)) {
+
+            final String msg = "BigDecimal" + //
+                    "\nexpected=" + expected + //
+//                    "\nsigned  =" + Arrays.toString(expected.toByteArray())+//
+//                    "\nunsigned=" + BytesUtil.toString(expected.toByteArray())+//
+                    "\nencoded =" + BytesUtil.toString(encoded) + //
+                    "\nactual  =" + actual//
+//                    +(actual != null ? "\nactualS ="
+//                            + Arrays.toString(actual.toByteArray())
+//                            + //
+//                            "\nactualU ="
+//                            + BytesUtil.toString(actual.toByteArray()) //
+//                    : "")
+                    ;
+
+            if (cause == null) {
+
+                fail(msg);
+                
+            } else {
+                
+                fail(msg, cause);
+                
+            }
+            
+        }
+
+    }
+
     protected void doLTTest(final BigInteger i1, final BigInteger i2) {
         
         final byte[] k1 = encodeBigInteger(i1);
@@ -1625,6 +1682,32 @@ public class TestKeyBuilder extends TestCase2 {
 
     }
 
+    protected void doLTTest(final BigDecimal i1, final BigDecimal i2) {
+        
+        final byte[] k1 = encodeBigDecimal(i1);
+
+        final byte[] k2 = encodeBigDecimal(i2);
+
+        final int ret = BytesUtil.compareBytes(k1, k2);
+
+        if (ret >= 0) {
+
+            fail("BigDecimal" + //
+                    "\ni1=" + i1 + //
+                    "\ni2=" + i2 + //
+//                    "\ns1=" + Arrays.toString(i1.toByteArray())+//
+//                    "\ns2=" + Arrays.toString(i2.toByteArray())+//
+//                    "\nu1=" + BytesUtil.toString(i1.toByteArray())+//
+//                    "\nu2=" + BytesUtil.toString(i2.toByteArray())+//
+                    "\nk1=" + BytesUtil.toString(k1) + //
+                    "\nk2=" + BytesUtil.toString(k2) + //
+                    "\nret=" + (ret == 0 ? "EQ" : (ret < 0 ? "LT" : "GT"))//
+            );
+
+        }
+
+    }
+
     public void test_BigInteger_383() {
 
         final BigInteger v1 = BigInteger.valueOf(383);
@@ -1633,9 +1716,25 @@ public class TestKeyBuilder extends TestCase2 {
 
     }
     
+    public void test_BigDecimal_383() {
+
+        final BigDecimal v1 = BigDecimal.valueOf(383.0000000000000001);
+        final BigDecimal v2 = BigDecimal.valueOf(383.0000000000000002);
+        doLTTest(v1,v2);
+
+    }
+    
     public void test_BigInteger_m1() {
         
         final BigInteger v = BigInteger.valueOf(-1);
+        
+        doEncodeDecodeTest(v);
+
+    }
+    
+    public void test_BigDecimal_m1() {
+        
+        final BigDecimal v = BigDecimal.valueOf(-1.0000000000000001);
         
         doEncodeDecodeTest(v);
 
@@ -1705,6 +1804,65 @@ public class TestKeyBuilder extends TestCase2 {
     }
 
     /**
+     * Unit tests for encoding {@link BigDecimal} keys.
+     */
+    public void test_bigDecimalKey() {
+
+        doEncodeDecodeTest(BigDecimal.valueOf(0));
+        
+        doEncodeDecodeTest(BigDecimal.valueOf(1.00000000001));
+        doEncodeDecodeTest(BigDecimal.valueOf(8.00000000001));
+        doEncodeDecodeTest(BigDecimal.valueOf(255.00000000001));
+        doEncodeDecodeTest(BigDecimal.valueOf(256.00000000001));
+        doEncodeDecodeTest(BigDecimal.valueOf(512.00000000001));
+        doEncodeDecodeTest(BigDecimal.valueOf(1028.00000000001));
+
+        doEncodeDecodeTest(BigDecimal.valueOf(-1.00000000001));
+        doEncodeDecodeTest(BigDecimal.valueOf(-8.00000000001));
+        doEncodeDecodeTest(BigDecimal.valueOf(-255.00000000001));
+        doEncodeDecodeTest(BigDecimal.valueOf(-256.00000000001));
+        doEncodeDecodeTest(BigDecimal.valueOf(-512.00000000001));
+        doEncodeDecodeTest(BigDecimal.valueOf(-1028.00000000001));
+
+        doEncodeDecodeTest(BigDecimal.valueOf(Double.MIN_VALUE));
+        doEncodeDecodeTest(BigDecimal.valueOf(Double.MAX_VALUE));
+        doEncodeDecodeTest(BigDecimal.valueOf(Double.MIN_VALUE - 1));
+        doEncodeDecodeTest(BigDecimal.valueOf(Double.MAX_VALUE + 1));
+
+        doLTTest(BigDecimal.valueOf(1.01), BigDecimal.valueOf(2.01));
+
+        doLTTest(BigDecimal.valueOf(0.01), BigDecimal.valueOf(1.01));
+
+        doLTTest(BigDecimal.valueOf(-1.01), BigDecimal.valueOf(0.01));
+
+        doLTTest(BigDecimal.valueOf(-2.01), BigDecimal.valueOf(-1.01));
+
+        doLTTest(BigDecimal.valueOf(10.01), BigDecimal.valueOf(11.01));
+
+        doLTTest(BigDecimal.valueOf(258.01), BigDecimal.valueOf(259.01));
+
+        doLTTest(BigDecimal.valueOf(3.01), BigDecimal.valueOf(259.01));
+
+        doLTTest(BigDecimal.valueOf(383.01), BigDecimal.valueOf(383.02));
+
+        for (int i = 0; i <= 516; i++) {
+
+            doEncodeDecodeTest(BigDecimal.valueOf(i));
+
+            doLTTest(BigDecimal.valueOf(i), BigDecimal.valueOf(i + 1));
+
+        }
+        for (int i = 0; i >= -516; i--) {
+
+            doEncodeDecodeTest(BigDecimal.valueOf(i));
+
+            doLTTest(BigDecimal.valueOf(i), BigDecimal.valueOf(i + 1));
+
+        }       
+
+    }
+
+    /**
      * Stress test with random <code>long</code> values.
      */
     public void test_BigInteger_stress_long_values() {
@@ -1728,6 +1886,67 @@ public class TestKeyBuilder extends TestCase2 {
             final BigInteger t3 = t1.add(v2);
             final BigInteger t6 = t1.add(BigInteger.valueOf(5));
             final BigInteger t7 = t1.add(BigInteger.valueOf(9));
+            
+            doEncodeDecodeTest(t1);
+            doEncodeDecodeTest(t2);
+            doEncodeDecodeTest(t3);
+            doEncodeDecodeTest(t4);
+            doEncodeDecodeTest(t5);
+            doEncodeDecodeTest(t6);
+            doEncodeDecodeTest(t7);
+
+            doLTTest(t2, t1);
+            doLTTest(t4, t1);
+            doLTTest(t5, t1);
+
+            doLTTest(t1, t3);
+            doLTTest(t1, t6);
+            doLTTest(t1, t7);
+
+            final int ret = t1.compareTo(v4);
+            
+            if (ret < 0) {
+
+                doLTTest(t1, v4);
+                
+            } else if (ret > 0) {
+                
+                doLTTest(v4, t1);
+                
+            } else {
+
+                // equal
+                
+            }
+            
+        }
+
+    }
+    
+    /**
+     * Stress test with random <code>double</code> values.
+     */
+    public void test_BigDecimal_stress_long_values() {
+        
+        final Random r = new Random();
+        
+        for (int i = 0; i < 100000; i++) {
+            
+            final BigDecimal t1 = BigDecimal.valueOf(r.nextDouble());
+            
+            final BigDecimal v2 = BigDecimal.valueOf(Math.abs(r.nextDouble()));
+            
+            final BigDecimal v4 = BigDecimal.valueOf(r.nextDouble());
+            
+            // x LT t1
+            final BigDecimal t2 = t1.subtract(v2);
+            final BigDecimal t4 = t1.subtract(BigDecimal.valueOf(5));
+            final BigDecimal t5 = t1.subtract(BigDecimal.valueOf(9));
+
+            // t1 LT x
+            final BigDecimal t3 = t1.add(v2);
+            final BigDecimal t6 = t1.add(BigDecimal.valueOf(5));
+            final BigDecimal t7 = t1.add(BigDecimal.valueOf(9));
             
             doEncodeDecodeTest(t1);
             doEncodeDecodeTest(t2);
