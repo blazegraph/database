@@ -32,8 +32,8 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
 /** Implementation for inline <code>xsd:double</code>. */
-public class XSDDoubleInternalValue<V extends BigdataLiteral> extends
-        AbstractDatatypeLiteralInternalValue<V, Double> {
+public class XSDDoubleIV<V extends BigdataLiteral> extends
+        AbstractLiteralIV<V, Double> {
 
     /**
      * 
@@ -42,7 +42,7 @@ public class XSDDoubleInternalValue<V extends BigdataLiteral> extends
     
     private final double value;
 
-    public XSDDoubleInternalValue(final double value) {
+    public XSDDoubleIV(final double value) {
         
         super(DTE.XSDDouble);
         
@@ -113,8 +113,8 @@ public class XSDDoubleInternalValue<V extends BigdataLiteral> extends
     
     public boolean equals(final Object o) {
         if(this==o) return true;
-        if(o instanceof XSDDoubleInternalValue<?>) {
-            return this.value == ((XSDDoubleInternalValue<?>) o).value;
+        if(o instanceof XSDDoubleIV<?>) {
+            return this.value == ((XSDDoubleIV<?>) o).value;
         }
         return false;
     }
@@ -139,7 +139,7 @@ public class XSDDoubleInternalValue<V extends BigdataLiteral> extends
     @Override
     protected int _compareTo(IV o) {
          
-        final double value2 = ((XSDDoubleInternalValue) o).value;
+        final double value2 = ((XSDDoubleIV) o).value;
         
         return value == value2 ? 0 : value < value2 ? -1 : 1;
         

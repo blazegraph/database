@@ -24,10 +24,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.internal;
 
 import java.util.UUID;
-
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataBNode;
-import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -43,8 +41,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * 
  * @see AbstractTripleStore.Options
  */
-public class BNodeInternalValue<V extends BigdataBNode> extends
-        AbstractInlineInternalValue<V, UUID> {
+public class UUIDBNodeIV<V extends BigdataBNode> extends
+        AbstractBNodeIV<V, UUID> {
 
     /**
      * 
@@ -53,9 +51,9 @@ public class BNodeInternalValue<V extends BigdataBNode> extends
     
     private final UUID id;
     
-    public BNodeInternalValue(final UUID id) {
+    public UUIDBNodeIV(final UUID id) {
 
-        super(VTE.BNODE, DTE.UUID);
+        super(DTE.UUID);
 
         if (id == null)
             throw new IllegalArgumentException();
@@ -73,21 +71,11 @@ public class BNodeInternalValue<V extends BigdataBNode> extends
         return id;
     }
 
-    final public long getTermId() {
-        throw new UnsupportedOperationException();
-    }
-
-    public V asValue(BigdataValueFactory f)
-            throws UnsupportedOperationException {
-        // TODO asValue()
-        throw new UnsupportedOperationException();
-    }
-
     public boolean equals(Object o) {
         if (this == o)
             return true;
-        if (o instanceof BNodeInternalValue<?>) {
-            return this.id.equals(((BNodeInternalValue<?>) o).id);
+        if (o instanceof UUIDBNodeIV<?>) {
+            return this.id.equals(((UUIDBNodeIV<?>) o).id);
         }
         return false;
     }

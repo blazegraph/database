@@ -34,7 +34,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
  * being inlined) or SIDs (statement identifiers).
  */
 public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
-        extends AbstractInternalValue<V, Void> {
+        extends AbstractIV<V, Void> {
 
     /**
      * 

@@ -26,7 +26,6 @@ package com.bigdata.rdf.internal;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
-import com.bigdata.rdf.model.BigdataURIImpl;
 
 public interface XSD {
     

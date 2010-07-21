@@ -31,27 +31,29 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
-/** Implementation for inline <code>xsd:long</code>. */
-public class XSDLongInternalValue<V extends BigdataLiteral> extends
-        AbstractDatatypeLiteralInternalValue<V, Long> {
+/** Implementation for inline <code>xsd:int</code>. */
+public class XSDIntIV<V extends BigdataLiteral> extends
+        AbstractLiteralIV<V, Integer> {
 
     /**
      * 
      */
-    private static final long serialVersionUID = -6972910330385311194L;
+    private static final long serialVersionUID = 1L;
     
-    private final long value;
+    private final int value;
 
-    public XSDLongInternalValue(final long value) {
+    public XSDIntIV(final int value) {
         
-        super(DTE.XSDLong);
+        super(DTE.XSDInt);
         
         this.value = value;
         
     }
 
-    final public Long getInlineValue() {
+    final public Integer getInlineValue() {
+        
         return value;
+        
     }
 
     @SuppressWarnings("unchecked")
@@ -63,7 +65,7 @@ public class XSDLongInternalValue<V extends BigdataLiteral> extends
 
     @Override
     final public long longValue() {
-        return value;
+        return (long) value;
     }
 
     @Override
@@ -88,7 +90,7 @@ public class XSDLongInternalValue<V extends BigdataLiteral> extends
 
     @Override
     public int intValue() {
-        return (int) value;
+        return value;
     }
 
     @Override
@@ -98,7 +100,7 @@ public class XSDLongInternalValue<V extends BigdataLiteral> extends
     
     @Override
     public String stringValue() {
-        return Long.toString(value);
+        return Integer.toString(value);
     }
 
     @Override
@@ -113,27 +115,29 @@ public class XSDLongInternalValue<V extends BigdataLiteral> extends
 
     public boolean equals(final Object o) {
         if(this==o) return true;
-        if(o instanceof XSDLongInternalValue<?>) {
-            return this.value == ((XSDLongInternalValue<?>) o).value;
+        if(o instanceof XSDIntIV<?>) {
+            return this.value == ((XSDIntIV<?>) o).value;
         }
         return false;
     }
     
     /**
-     * Return the hash code of the long value.
+     * Return the hash code of the int value.
+     * 
+     * @see Integer#hashCode()
      */
     public int hashCode() {
-        return (int) (value ^ (value >>> 32));
+        return value;
     }
 
     public int byteLength() {
-        return 1 + Bytes.SIZEOF_LONG;
+        return 1 + Bytes.SIZEOF_INT;
     }
-    
+
     @Override
     protected int _compareTo(IV o) {
          
-        final long value2 = ((XSDLongInternalValue) o).value;
+        final int value2 = ((XSDIntIV) o).value;
         
         return value == value2 ? 0 : value < value2 ? -1 : 1;
         

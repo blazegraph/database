@@ -39,12 +39,15 @@ public interface ILexiconConfiguration {
      */
     
     /**
-     * <code>true</code> iff <code>dte</code> should be inlined.
+     * <code>true</code> iff the <code>vte</code> and <code>dte</code> should 
+     * be inlined.
      * 
+     * @param vte
+     *          the term type
      * @param dte
      *          the data type
      */
-    public boolean isInline(DTE dte);
+    public boolean isInline(VTE vte, DTE dte);
     
 //    /**
 //     * <code>true</code> iff <code>xsd:boolean</code> should be inlined.

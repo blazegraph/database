@@ -27,133 +27,115 @@ package com.bigdata.rdf.internal;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
-/** Implementation for inline <code>xsd:integer</code>. */
-public class XSDIntegerInternalValue<V extends BigdataLiteral> extends
-        AbstractDatatypeLiteralInternalValue<V, BigInteger> {
-    
+/** Implementation for inline <code>xsd:long</code>. */
+public class XSDLongIV<V extends BigdataLiteral> extends
+        AbstractLiteralIV<V, Long> {
+
     /**
      * 
      */
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = -6972910330385311194L;
     
-    private final BigInteger value;
-    private transient int byteLength;
+    private final long value;
 
-    public XSDIntegerInternalValue(final BigInteger value) {
+    public XSDLongIV(final long value) {
         
-        super(DTE.XSDInteger);
-
-        if (value == null)
-            throw new IllegalArgumentException();
+        super(DTE.XSDLong);
         
         this.value = value;
         
     }
 
-    final public BigInteger getInlineValue() {
-
+    final public Long getInlineValue() {
         return value;
-        
     }
 
     @SuppressWarnings("unchecked")
     public V asValue(final BigdataValueFactory f) {
-        // @todo factory should cache the XSD URIs.
-        final V v = (V) f.createLiteral(value.toString(),//
-                f.createURI(DTE.XSDInteger.getDatatype()));
+        final V v = (V) f.createLiteral(value);
         v.setIV(this);
         return v;
     }
 
     @Override
     final public long longValue() {
-        return value.longValue();
+        return value;
     }
 
     @Override
     public boolean booleanValue() {
-        return value.equals(BigInteger.ZERO) ? false : true;
+        return value == 0 ? false : true;
     }
 
     @Override
     public byte byteValue() {
-        return value.byteValue();
+        return (byte) value;
     }
 
     @Override
     public double doubleValue() {
-        return value.doubleValue();
+        return (double) value;
     }
 
     @Override
     public float floatValue() {
-        return value.floatValue();
+        return (float) value;
     }
 
     @Override
     public int intValue() {
-        return value.intValue();
+        return (int) value;
     }
 
     @Override
     public short shortValue() {
-        return value.shortValue();
+        return (short) value;
     }
     
     @Override
     public String stringValue() {
-        return value.toString();
+        return Long.toString(value);
     }
 
     @Override
     public BigDecimal decimalValue() {
-        return new BigDecimal(value);
+        return BigDecimal.valueOf(value);
     }
 
     @Override
     public BigInteger integerValue() {
-        return value;
+        return BigInteger.valueOf(value);
     }
 
     public boolean equals(final Object o) {
-        if (this == o)
-            return true;
-        if (o instanceof XSDIntegerInternalValue<?>) {
-            return this.value.equals(((XSDIntegerInternalValue<?>) o).value);
+        if(this==o) return true;
+        if(o instanceof XSDLongIV<?>) {
+            return this.value == ((XSDLongIV<?>) o).value;
         }
         return false;
     }
-
+    
     /**
-     * Return the hash code of the {@link BigInteger}.
+     * Return the hash code of the long value.
      */
     public int hashCode() {
-        return value.hashCode();
+        return (int) (value ^ (value >>> 32));
     }
 
     public int byteLength() {
-
-        if (byteLength == 0) {
-
-            /*
-             * Cache the byteLength if not yet set.
-             */
-
-            byteLength = 1 /* prefix */+ 2/* runLength */+ (value.bitLength() / 8 + 1)/* data */;
-
-        }
-
-        return byteLength;
-
+        return 1 + Bytes.SIZEOF_LONG;
     }
     
     @Override
     protected int _compareTo(IV o) {
+         
+        final long value2 = ((XSDLongIV) o).value;
         
-        return value.compareTo(((XSDIntegerInternalValue) o).value);
+        return value == value2 ? 0 : value < value2 ? -1 : 1;
         
     }
     
