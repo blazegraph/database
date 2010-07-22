@@ -493,6 +493,7 @@ an "NOP" bash script or edit your crontab.
 <mkdir dir="${install.lib.dir}" />
 <mkdir dir="${install.bin.dir}" />
 <mkdir dir="${install.log.dir}" />
+<mkdir dir="${install.dist.dir}" />
 <!-- install configuration files. -->
 <copy toDir="${install.config.dir}">
 	<fileset dir="${bigdata.dir}/src/resources/config">
@@ -1064,10 +1065,9 @@ ${postInstallMessage}</echo>
     </java>
 </target>
 
-	<!--                                                                   -->
-	<!--                    UNIT TESTS ONLY BELOW HERE                     -->
-	<!--                                                                   -->
-	
+    <!--                                                    -->
+    <!--                      STAGING                       -->
+    <!--                                                    -->
     <target name="stage"
             description="stages resources (jar, config, policy, logging files) needed to package or execute the bigdata distribution."
             depends="jar">
@@ -1085,7 +1085,6 @@ ${postInstallMessage}</echo>
       <property name="dist.var.config" location="${dist.var}/config" />
       <property name="dist.var.config.policy" location="${dist.var.config}/policy" />
       <property name="dist.var.config.logging" location="${dist.var.config}/logging" />
-      <property name="dist.var.config.zookeeper" location="${dist.var.config}/zookeeper" />
       <property name="dist.var.config.jini" location="${dist.var.config}/jini" />
 
       <delete dir="${dist.dir}" quiet="true"/>
@@ -1098,7 +1097,6 @@ ${postInstallMessage}</echo>
       <mkdir dir="${dist.var.config}"/>
       <mkdir dir="${dist.var.config.policy}"/>
       <mkdir dir="${dist.var.config.logging}"/>
-      <mkdir dir="${dist.var.config.zookeeper}"/>
       <mkdir dir="${dist.var.config.jini}"/>
 
       <!-- Copy build.properties to the top-level config file -->
@@ -1168,10 +1166,6 @@ ${postInstallMessage}</echo>
       <!-- Zookeeper library -->
       <copy file="${bigdata-zookeeper.lib}/zookeeper-3.2.1.jar"
             tofile="${dist.lib}/zookeeper.jar"/>
-<!--
-      <copy file="/home/brmurphy/zookeeper/cdd99c5/build/zookeeper-3.3.0.jar"
-            tofile="${dist.lib}/zookeeper.jar"/>
--->
 
       <!-- Jini library -->
 
@@ -1231,8 +1225,6 @@ ${postInstallMessage}</echo>
             todir="${dist.bin.config}"/>
       <copy file="${src.resources}/bin/config/serviceStarter.config"
             todir="${dist.bin.config}"/>
-      <copy file="${src.resources}/bin/config/zookeeper.config"
-            todir="${dist.bin.config}"/>
 
       <!-- Stage security policy (config) files -->
       <copy file="${src.resources.config}/policy.all"
@@ -1285,6 +1277,329 @@ ${postInstallMessage}</echo>
             todir="${dist.var.config.jini}"/>
     </target>
 
+    <!--                                                    -->
+    <!--                      RELEASE                       -->
+    <!--                                                    -->
+    <target name="deploy-artifact" depends="clean, stage"
+            description="Create compressed tar file for deployment.">
+        <tar destfile="${bigdata.dir}/REL.${version}.tgz" 
+                compression="gzip">
+
+          <tarfileset dir="${bigdata.dir}/dist">
+            <include name="bigdata/**" />
+
+            <exclude name="bigdata/bin/pstart" />
+
+          </tarfileset>
+
+          <!-- Add scripts separately, making them executable -->
+
+          <tarfileset dir="${bigdata.dir}/dist" filemode="755">
+            <include name="bigdata/bin/pstart" />
+
+          </tarfileset>
+        </tar>
+    </target>
+
+    <target name="ant-install-prepare" depends="jar, bundle" 
+            description="Stage all files (src, lib, config, etc.) needed for ant based install.">
+        <copy toDir="${build.dir}/bigdata/src">
+	    <fileset dir="${bigdata.dir}/bigdata/src" />
+        </copy>
+        <copy toDir="${build.dir}/bigdata-jini/src">
+	    <fileset dir="${bigdata.dir}/bigdata-jini/src" />
+        </copy>
+        <copy toDir="${build.dir}/bigdata-rdf/src">
+	    <fileset dir="${bigdata.dir}/bigdata-rdf/src" />
+        </copy>
+        <copy toDir="${build.dir}/bigdata-sails/src">
+	    <fileset dir="${bigdata.dir}/bigdata-sails/src" />
+        </copy>
+        <copy toDir="${build.dir}/lgpl-utils/src">
+	    <fileset dir="${bigdata.dir}/lgpl-utils/src" />
+        </copy>
+
+        <mkdir dir="${build.dir}/bigdata/lib" />
+        <copy toDir="${build.dir}/bigdata/lib">
+	    <fileset dir="${bigdata.dir}/bigdata/lib" />
+        </copy>
+
+        <mkdir dir="${build.dir}/bigdata-jini/lib" />
+        <copy toDir="${build.dir}/bigdata-jini/lib">
+    	    <fileset dir="${bigdata.dir}/bigdata-jini/lib" />
+        </copy>
+        <mkdir dir="${build.dir}/bigdata-rdf/lib" />
+        <copy toDir="${build.dir}/bigdata-rdf/lib">
+	    <fileset dir="${bigdata.dir}/bigdata-rdf/lib" />
+        </copy>
+
+        <mkdir dir="${build.dir}/bigdata-sails/lib" />
+        <copy toDir="${build.dir}/bigdata-sails/lib">
+            <fileset dir="${bigdata.dir}/bigdata-sails/lib" />
+        </copy>
+
+        <mkdir dir="${build.dir}/src" />
+        <mkdir dir="${build.dir}/src/resources" />
+        <mkdir dir="${build.dir}/src/resources/config" />
+        <copy toDir="${build.dir}/src/resources/config">
+            <fileset dir="${bigdata.dir}/src/resources/config" />
+        </copy>
+
+        <mkdir dir="${build.dir}/src/resources/scripts" />
+        <copy toDir="${build.dir}/src/resources/scripts">
+            <fileset dir="${bigdata.dir}/src/resources/scripts" />
+        </copy>
+
+        <copy tofile="${build.dir}/build.properties" file="build.properties" />
+        <copy tofile="${build.dir}/build.xml" file="build.xml" />
+        <copy tofile="${build.dir}/LICENSE.txt" file="LICENSE.txt" />
+        <copy tofile="${build.dir}/overview.html" file="overview.html" />
+        <copy tofile="${build.dir}/README-JINI" file="README-JINI" />
+        <copy toDir="${build.dir}/LEGAL" flatten="true">
+            <fileset dir="${bigdata.dir}">
+                <include name="**/LEGAL/*" />
+            </fileset>
+        </copy>
+    </target>
+
+    <target name="ant-install-artifact" depends="clean, ant-install-prepare, stage"
+            description="Create complete source tar file for ant based install.">
+        <mkdir dir="${release.dir}" />
+        <tar destfile="${bigdata.dir}/DIST.${version}.tgz" compression="gzip">
+            <tarfileset dir="${build.dir}" prefix="${version}">
+                <include name="build.properties" />
+                <include name="build.xml" />
+                <include name="LICENSE.txt" />
+                <include name="overview.html" />
+                <include name="README-JINI" />
+                <include name="LEGAL/*" />
+
+                <include name="bigdata/src/**" />
+                <include name="bigdata-jini/src/**" />
+                <include name="bigdata-rdf/src/**" />
+                <include name="bigdata-sails/src/**" />
+                <include name="lgpl-utils/src/**" />
+                <include name="bigdata/lib/**" />
+                <include name="bigdata-jini/lib/**" />
+                <include name="bigdata-rdf/lib/**" />
+                <include name="bigdata-sails/lib/**" />
+                <include name="src/**" />
+                <exclude name="classes/**" />
+                <exclude name="${version}.jar" />
+                <exclude name="lib/**" />
+                <exclude name="docs/**" />
+
+                <exclude name="dist/bigdata/**" />
+
+            </tarfileset>
+
+            <!-- Add dist files separately, minus scripts -->
+
+            <tarfileset dir="${bigdata.dir}" prefix="${version}">
+                <include name="dist/bigdata/**" />
+
+                <exclude name="dist/bigdata/bin/pstart" />
+            </tarfileset>
+
+            <!-- Add dist scripts separately, making them executable -->
+
+            <tarfileset dir="${bigdata.dir}" prefix="${version}" filemode="755">
+                <include name="dist/bigdata/bin/pstart" />
+            </tarfileset>
+        </tar>
+
+        <tar destfile="${bigdata.dir}/REL.${version}.tgz" 
+                basedir="${bigdata.dir}/dist"
+                compression="gzip">
+        </tar>
+    </target>
+
+    <target name="ant-install" depends="jar, banner, bundle" description="Ant based install on a node.">
+        <mkdir dir="${NAS}" />
+        <mkdir dir="${LAS}" />
+        <chmod perm="ug+rw,o-rw">
+            <fileset dir="${NAS}" />
+        </chmod>
+        <chmod perm="ug+rw,o-rw">
+            <fileset dir="${LAS}" />
+        </chmod>
+        <mkdir dir="${install.config.dir}" />
+        <mkdir dir="${install.doc.dir}" />
+        <mkdir dir="${install.lib.dir}" />
+        <mkdir dir="${install.bin.dir}" />
+        <mkdir dir="${install.log.dir}" />
+        <mkdir dir="${install.dist.dir}" />
+        <copy toDir="${install.config.dir}">
+            <fileset dir="${bigdata.dir}/src/resources/config" />
+        </copy>
+        <copy toDir="${install.doc.dir}">
+            <fileset dir="${bigdata.dir}">
+                <include name="LICENSE.txt" />
+                <include name="overview.html" />
+                <include name="README-JINI" />
+                <include name="bigdata/LEGAL/*" />
+                <include name="bigdata-jini/LEGAL/*" />
+                <include name="bigdata-rdf/LEGAL/*" />
+                <include name="bigdata-sails/LEGAL/*" />
+            </fileset>
+        </copy>
+
+        <copy toDir="${install.lib.dir}">
+            <fileset dir="${build.dir}/lib" />
+            <fileset file="${build.dir}/${version}.jar" />
+        </copy>
+
+        <copy toDir="${install.bin.dir}">
+            <fileset dir="src/resources/scripts" />
+        </copy>
+
+        <copy toDir="${install.dist.dir}">
+            <fileset dir="${bigdata.dir}/dist">
+                <include name="bigdata/**" />
+            </fileset>
+        </copy>
+
+        <!-- parameter substitution. -->
+        <property name="myclasspath" refid="install.classpath" />
+        <replace dir="${install.bin.dir}" summary="true">
+            <replacefilter token="@FED@" value="${FED}" />
+            <replacefilter token="@NAS@" value="${NAS}" />
+            <replacefilter token="@LAS@" value="${LAS}" />
+            <replacefilter token="@JAVA_HOME@" value="${JAVA_HOME}" />
+            <replacefilter token="@JINI_CLASS_SERVER_PORT@" value="${JINI_CLASS_SERVER_PORT}" />
+            <replacefilter token="@LOAD_BALANCER_PORT@" value="${LOAD_BALANCER_PORT}" />
+            <replacefilter token="@SYSSTAT_HOME@" value="${SYSSTAT_HOME}" />
+            <replacefilter token="@USE_NIO@" value="${USE_NIO}" />
+            <replacefilter token="@BIN_DIR@" value="${install.bin.dir}" />
+            <replacefilter token="@LIB_DIR@" value="${install.lib.dir}" />
+            <replacefilter token="@LOG_DIR@" value="${install.log.dir}" />
+            <replacefilter token="@CONFIG_DIR@" value="${install.config.dir}" />
+            <replacefilter token="@INSTALL_USER@" value="${install.user}" />
+            <replacefilter token="@INSTALL_GROUP@" value="${install.group}" />
+            <replacefilter token="@LOCK_FILE@" value="${LOCK_FILE}" />
+            <replacefilter token="@BIGDATA_CONFIG@" value="${bigdata.config}" />
+            <replacefilter token="@JINI_CONFIG@" value="${jini.config}" />
+            <replacefilter token="@POLICY_FILE@" value="${policyFile}" />
+            <replacefilter token="@LOG4J_SOCKET_LOGGER_HOST@" value="${LOG4J_SOCKET_LOGGER_HOST}" />
+            <replacefilter token="@LOG4J_SOCKET_LOGGER_PORT@" value="${LOG4J_SOCKET_LOGGER_PORT}" />
+            <replacefilter token="@LOG4J_SOCKET_LOGGER_CONFIG@" value="${log4jServer.config}" />
+            <replacefilter token="@LOG4J_DATE_PATTERN@" value="${LOG4J_DATE_PATTERN}" />
+            <replacefilter token="@LOG4J_CONFIG@" value="${log4j.config}" />
+            <replacefilter token="@LOGGING_CONFIG@" value="${logging.config}" />
+            <replacefilter token="@ERROR_LOG@" value="${errorLog}" />
+            <replacefilter token="@DETAIL_LOG@" value="${detailLog}" />
+            <replacefilter token="@EVENT_LOG@" value="${eventLog}" />
+            <replacefilter token="@RULE_LOG@" value="${ruleLog}" />
+            <replacefilter token="@STATE_LOG@" value="${stateLog}" />
+            <replacefilter token="@STATE_FILE@" value="${stateFile}" />
+            <replacefilter token="@FORCE_KILL_ALL@" value="${forceKillAll}" />
+            <replacefilter token="@NTP_MASTER@" value="${NTP_MASTER}" />
+            <replacefilter token="@NTP_NETWORK@" value="${NTP_NETWORK}" />
+            <replacefilter token="@NTP_NETMASK@" value="${NTP_NETMASK}" />
+            <replacefilter token="@CLASSPATH@" value="${myclasspath}" />
+            </replace>
+
+        <replace dir="${install.config.dir}" summary="true">
+            <replacefilter token="@FED@" value="${FED}" />
+            <replacefilter token="@NAS@" value="${NAS}" />
+            <replacefilter token="@LAS@" value="${LAS}" />
+            <replacefilter token="@LOG4J_SOCKET_LOGGER_HOST@" value="${LOG4J_SOCKET_LOGGER_HOST}" />
+            <replacefilter token="@JAVA_HOME@" value="${JAVA_HOME}" />
+            <replacefilter token="@JINI_CLASS_SERVER_PORT@" value="${JINI_CLASS_SERVER_PORT}" />
+            <replacefilter token="@LOAD_BALANCER_PORT@" value="${LOAD_BALANCER_PORT}" />
+            <replacefilter token="@SYSSTAT_HOME@" value="${SYSSTAT_HOME}" />
+            <replacefilter token="@USE_NIO@" value="${USE_NIO}" />
+            <replacefilter token="@BIN_DIR@" value="${install.bin.dir}" />
+            <replacefilter token="@LIB_DIR@" value="${install.lib.dir}" />
+            <replacefilter token="@LOG_DIR@" value="${install.log.dir}" />
+            <replacefilter token="@CONFIG_DIR@" value="${install.config.dir}" />
+            <replacefilter token="@INSTALL_USER@" value="${install.user}" />
+            <replacefilter token="@INSTALL_GROUP@" value="${install.group}" />
+            <replacefilter token="@LOCK_FILE@" value="${LOCK_FILE}" />
+            <replacefilter token="@BIGDATA_CONFIG@" value="${bigdata.config}" />
+            <replacefilter token="@JINI_CONFIG@" value="${jini.config}" />
+            <replacefilter token="@POLICY_FILE@" value="${policyFile}" />
+            <replacefilter token="@LOG4J_SOCKET_LOGGER_HOST@" value="${LOG4J_SOCKET_LOGGER_HOST}" />
+            <replacefilter token="@LOG4J_SOCKET_LOGGER_PORT@" value="${LOG4J_SOCKET_LOGGER_PORT}" />
+            <replacefilter token="@LOG4J_SOCKET_LOGGER_CONFIG@" value="${log4jServer.config}" />
+            <replacefilter token="@LOG4J_DATE_PATTERN@" value="${LOG4J_DATE_PATTERN}" />
+            <replacefilter token="@LOG4J_CONFIG@" value="${log4j.config}" />
+            <replacefilter token="@LOGGING_CONFIG@" value="${logging.config}" />
+            <replacefilter token="@ERROR_LOG@" value="${errorLog}" />
+            <replacefilter token="@DETAIL_LOG@" value="${detailLog}" />
+            <replacefilter token="@EVENT_LOG@" value="${eventLog}" />
+            <replacefilter token="@RULE_LOG@" value="${ruleLog}" />
+            <replacefilter token="@STATE_LOG@" value="${stateLog}" />
+            <replacefilter token="@STATE_FILE@" value="${stateFile}" />
+            <replacefilter token="@FORCE_KILL_ALL@" value="${forceKillAll}" />
+            <replacefilter token="@NTP_MASTER@" value="${NTP_MASTER}" />
+            <replacefilter token="@NTP_NETWORK@" value="${NTP_NETWORK}" />
+            <replacefilter token="@NTP_NETMASK@" value="${NTP_NETMASK}" />
+            <replacefilter token="@CLASSPATH@" value="${myclasspath}" />
+            <!-- updates the configuration file to locate the lubm ontology. -->
+            <replacefilter token="@install.lubm.config.dir@" value="${install.lubm.config.dir}" />
+        </replace>
+
+        <!-- fix newlines (otherwise substitutions cause things to break). -->
+        <fixcrlf srcDir="${install.config.dir}" />
+        <fixcrlf srcDir="${install.bin.dir}" />
+
+        <!-- set execute bit for scripts in this directory (must be the last step). -->
+        <chmod perm="u+x,g+rx,o-rwx">
+            <fileset dir="${install.bin.dir}">
+                <exclude name="README"/>
+                <exclude name="POST-INSTALL"/>
+            </fileset>
+        </chmod>
+
+        <!-- Setup the status file which will be read by the bigdata script and
+             the log on which that script will write its output.  This is used
+             if cron, or a similar process, will execute the script on a periodic
+             basis.  The initial state is always 'status'.  The initial stateLog
+             is always empty.  The state file must be readable by the group, but
+             could be restricted to write by a specific user. The stateLog must be
+             read/write for the group. -->
+
+<echo file="${stateFile}">status</echo>
+<echo file="${stateLog}">
+</echo>
+
+        <chmod perm="g+rw,o-rw" file="${stateFile}" />
+        <chmod perm="g+rw,o-rw" file="${stateLog}" />
+
+        <!-- Make sure that the entire shared directory structure is read/write for the group. -->
+        <chmod perm="g+rwx" type="both" dir="${NAS}" verbose="true"/>
+
+<!-- Make sure that it is all accessible to the install group (ant 1.6+ plus extension module required). 
+        <chown file="${NAS}" type="both" owner="${install.user}.${install.group}" verbose="true"/>
+-->
+
+        <!-- Works for earlier versions of ant LT 1.6 which do not bundle "chown". -->
+        <apply executable="chown" description="set owner on NAS files" os="Linux">
+            <arg value="-R"/>
+            <arg value="${install.user}.${install.group}"/>
+            <dirset dir="${NAS}"/>
+        </apply>
+
+        <!-- @todo check the installed configuration file (after parameter substitution). -->
+        <!-- @todo also check the installed jini configuration files. -->
+        <java classname="com.bigdata.jini.util.CheckConfiguration"
+	    failonerror="true" fork="true" logerror="true">
+	    <classpath refid="install.classpath" />
+	    <arg value="${bigdata.config}" />
+        </java>
+
+        <loadfile property="postInstallMessage" srcFile="${install.bin.dir}/POST-INSTALL" />
+
+<echo>
+
+${postInstallMessage}</echo>
+
+    </target>
+
+    <!--                                                    -->
+    <!--                    UNIT TESTS                      -->
+    <!--                                                    -->
     <target name="testCompile"
             description="compiles the test source and generates the appropriate jar files."
             depends="stage">
