@@ -852,48 +852,28 @@ ${postInstallMessage}</echo>
 	<!--                    STANDALONE FEDERATION TARGETS                  -->
 	<!--                         (test/benchamarking)                      -->
 
-<target name="standalone-setup" description="Setup properties used by the standalone federation and LUS start/stop.">
+<target name="generateLookupStarterJar" unless="lookupStarterJarAvailable">
+    <antcall target="testCompile" />
+</target>
+
+<target name="testLookupStarterJarAvailability">
+    <property name="bigdata-test.lib" location="${bigdata.dir}/bigdata-test/lib" />
+    <condition property="lookupStarterJarAvailable">
+        <available file="${bigdata-test.lib}/lookupstarter.jar"/>
+    </condition>
+</target>
+
+<target name="standalone-setup" depends="testLookupStarterJarAvailability,generateLookupStarterJar" description="Setup properties used by standalone federation and LUS start/stop.">
     <property name="app.home" location="${bigdata.dir}" />
     <property name="test.codebase.port" value="23333"/>
-    <property name="jini.lib" location="${bigdata.dir}/bigdata-jini/lib/jini/lib" />
-    <property name="jini.lib.dl" location="${bigdata.dir}/bigdata-jini/lib/jini/lib-dl" />
+    <property name="test.codebase.dir" location="${bigdata.dir}/bigdata-jini/lib/jini/lib-dl"/>
+    <property name="dist.lib" location="${bigdata.dir}/bigdata-jini/lib/jini/lib" />
+    <property name="dist.lib.dl" location="${bigdata.dir}/bigdata-jini/lib/jini/lib-dl" />
     <property name="test.codebase" value="http://${this.hostname}:${test.codebase.port}/jsk-dl.jar"/>
     <property name="java.security.policy" value="${bigdata.dir}/policy.all"/>
-	<property name="log4j.configuration" value="${bigdata.dir}/src/resources/config/standalone/log4j.properties"/>
+    <property name="log4j.configuration" value="resources/logging/log4j.properties"/>
     <property name="java.net.preferIPv4Stack" value="true"/>
     <property name="bigdata.fedname" value="${standalone.fed}"/>
-</target>
-
-<target name="standalone-startLookup" depends="jar,standalone-setup" description="Start the lookup service for the standalone federation.">
-  <java classname="com.bigdata.service.jini.util.LookupStarter"
-		fork="true" spawn="false">
-		<classpath refid="runtime.classpath" />
-    <sysproperty key="app.home" value="${app.home}"/>
-    <sysproperty key="jini.lib" value="${jini.lib}"/>
-    <sysproperty key="jini.lib.dl" value="${jini.lib.dl}"/>
-    <sysproperty key="java.security.policy" value="${java.security.policy}"/>
-    <sysproperty key="java.security.debug" value="off"/>
-    <sysproperty key="java.protocol.handler.pkgs" value="net.jini.url"/>
-    <sysproperty key="log4j.configuration" value="${log4j.configuration}"/>
-    <sysproperty key="codebase.port" value="${test.codebase.port}"/>
-    <sysproperty key="java.net.preferIPv4Stack" value="${java.net.preferIPv4Stack}"/>
-    <sysproperty key="bigdata.fedname" value="${bigdata.fedname}"/>
-  </java>
-</target>
-
-<target name="standalone-stopLookup" depends="jar,standalone-setup" description="Stop the lookup service for the standalone federation.">
-  <java classname="com.bigdata.service.jini.util.LookupStarter"
-	failonerror="true" fork="true" logerror="true">
-	<classpath refid="runtime.classpath" />
-    <sysproperty key="app.home" value="${app.home}"/>
-    <sysproperty key="jini.lib" value="${dist.lib}"/>
-    <sysproperty key="jini.lib.dl" value="${dist.lib.dl}"/>
-    <sysproperty key="java.security.policy" value="${java.security.policy}"/>
-    <sysproperty key="log4j.configuration" value="${log4j.configuration}"/>
-    <sysproperty key="java.net.preferIPv4Stack" value="${java.net.preferIPv4Stack}"/>
-    <sysproperty key="bigdata.fedname" value="${bigdata.fedname}"/>
-    <arg value="-stop" />
-  </java>
 </target>
 
 <!-- Note: You should 'nohup' this, e.g., "nohup ant standalone-start" to 
@@ -901,7 +881,8 @@ ${postInstallMessage}</echo>
      from a terminal. -->
 <target name="standalone-start" depends="jar,standalone-setup" description="Start the standalone federation.">
     <!-- Start the lookup service. -->
-	<antcall target="standalone-startLookup" />
+	<antcall target="startHttpd" />
+	<antcall target="startLookup" />
 	<java classname="com.bigdata.jini.start.ServicesManagerServer"
 		failonerror="true" fork="true" logerror="true">
 		<classpath refid="runtime.classpath" />
@@ -932,7 +913,8 @@ ${postInstallMessage}</echo>
 		<arg value="src/resources/config/standalone/bigdataStandalone.config" />
 	</java>
 	<!-- Then take down the lookup service as well. -->
-    <antcall target="standalone-stopLookup" />
+    <antcall target="stopLookup" />
+    <antcall target="stopHttpd" />
 </target>
 
 <target name="standalone-start-nano-server" depends="jar" description="Start a small http server fronting for a bigdata database instance.">
