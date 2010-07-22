@@ -505,6 +505,141 @@ public class NicUtil {
     }
 
     /**
+     * Special-purpose convenience method that returns a
+     * <code>String</code> value representing the ip address of 
+     * the current node; where the value that is returned is 
+     * determined according to following criteria:
+     * <p>
+     * <ul>
+     *  <li> If a non-<code>null</code> value is input for the
+     *       <code>systemPropertyName</code> parameter, then
+     *       this is viewed as a declaration by the caller that
+     *       that the system property with that given value
+     *       should take precedence over all other means of
+     *       determining the desired ip address. As such, this
+     *       method determines if a system property having the
+     *       given has indeed been set and, if it has, returns
+     *       the ip address of the nic having that name; or 
+     *       <code>null</code> if there is no nic with the 
+     *       desired name installed on the node.
+     *  <li> If a non-<code>null</code> value is input for the
+     *       <code>systemPropertyName</code> parameter, but
+     *       no system property with that name has been set, 
+     *       and <code>true</code> has been passed in for
+     *       the <code>fallbackOk</code> parameter, then this
+     *       method will return the IPV4 based address of the
+     *       first reachable nic that is found on the node.
+     *       Upon failing to find such an address, if the
+     *       <code>loopbackOk</code> parameter is also 
+     *       <code>true</code>, then this method will return
+     *       the <i>loop back</i> address of the node; otherwise
+     *       <code>null</code> is returned.
+     *  <li> If <code>null</code> is input for the 
+     *       <code>systemPropertyName</code> parameter, but
+     *       a non-<code>null</code> value is input for the
+     *       <code>defaultNic</code> parameter, then this
+     *       method returns the ip address of the nic having
+     *       that name; or <code>null</code> if there is no
+     *       nic with the desired default name installed on the
+     *       node.
+     *  <li> If <code>null</code> is input for both the 
+     *       <code>systemPropertyName</code> parameter and the
+     *       <code>defaultNic</code> parameter, and if the
+     *       <code>fallbackOk</code> parameter is <code>true</code>,
+     *       then this method will return the IPV4 based address
+     *       of the first reachable nic that is found on the node.
+     *       Upon failing to find such an address, if the
+     *       <code>loopbackOk</code> parameter is also 
+     *       <code>true</code>, then this method will return
+     *       the <i>loop back</i> address of the node; otherwise
+     *       <code>null</code> is returned.
+     * </ul>
+     * <p>
+     * This method can be called from within a configuration
+     * as well as from within program control.
+     *
+     * @param systemPropertyName <code>String</code> value containing
+     *                           the name of a system property whose
+     *                           value is the network interface name
+     *                           whose ip address should be returned.
+     *                           May be <code>null</code>.
+     *
+     * @param defaultNic         <code>String</code> value containing
+     *                           the name of the network interface
+     *                           whose ip address should be returned
+     *                           if <code>null</code> is input for the
+     *                           <code>systemPropertyName</code> parameter.
+     *
+     * @param fallbackOk         if <code>true</code>, then if either
+     *                           no system property is set having the
+     *                           name referenced by the 
+     *                           <code>systemPropertyName</code> parameter,
+     *                           or if <code>null</code> is input for both
+     *                           the <code>systemPropertyName</code>
+     *                           parameter and the <code>defaultNic</code>
+     *                           parameter, return the IPV4 based address
+     *                           of the first reachable network interface
+     *                           that can be found on the node.
+     *
+     * @param loopbackOk         if <code>true</code>, and if <code>true</code>
+     *                           is also input for the <code>fallbackOk</code>
+     *                           parameter, then if this method attempts,
+     *                           but fails, to find a valid IPV4 fallback
+     *                           address, then the node's <i>loop back</i>
+     *                           address is returned.
+     *
+     * @return a <code>String</code> representing an ip address associated
+     *         with the current node; where the value that is returned is
+     *         determined according to the criteria described above.
+     */
+    public static String getIpAddress(String  systemPropertyName,
+                                      String  defaultNic,
+                                      boolean fallbackOk,
+                                      boolean loopbackOk)
+                             throws SocketException, IOException
+    {
+        if(systemPropertyName != null) {//system property takes precedence
+            String nicName = System.getProperty(systemPropertyName);
+            boolean propSet = true;
+            if(nicName == null) {
+                propSet = false;
+            } else {
+                // handle ant script case where the system property
+                // may not have been set on the command line, but
+                // was still set to "${<systemPropertyName>}" using
+                // ant <sysproperty> tag
+                String rawProp = "${" + systemPropertyName + "}";
+                if( rawProp.equals(nicName) ) propSet = false;
+            }
+            if(propSet) {
+                return getIpAddress(nicName, 0, loopbackOk);
+            } else {//desired system property not set, try fallback
+                if(fallbackOk) {
+                    return getDefaultIpv4Address(loopbackOk);
+                } else {
+                    return null;
+                }
+            }
+        } else {//no system property name provided, try default nic
+            if(defaultNic != null) {
+                return getIpAddress(defaultNic, 0, loopbackOk);
+            } else {//no default nic provided, try fallback
+                if(fallbackOk) {
+                    return getDefaultIpv4Address(loopbackOk);
+                } else {
+                    return null;
+                }
+            }
+        }
+    }
+
+    public static String getIpAddress()
+                             throws SocketException, IOException
+    {
+        return getIpAddress(null, null, true, true);
+    }
+
+    /**
      * Examines each address associated with each network interface
      * card (nic) installed on the current node, and returns the
      * <code>String</code> value of the first such address that is
@@ -614,73 +749,6 @@ public class NicUtil {
                              throws SocketException, IOException
     {
         return getDefaultIpv4Address(false);//localhost NOT ok
-    }
-
-    /**
-     * Special-purpose convenience method that will return the
-     * value of the system property named <code>default.nic</code>
-     * if that property has been set on the current VM to any
-     * non-<code>null</code> value other than the value,
-     * <code>${default.nic}</code>; otherwise returns the value
-     * input for the <code>defaultVal</code> parameter.
-     * <p>
-     * This method can be called from within a configuration
-     * as well as from within program control. It is provided
-     * as a way to allow mechanisms that are not able to
-     * conditionally set system properties to always set the
-     * system property named <code>default.nic</code> to some
-     * value -- either valid or invalid -- depending on whether
-     * that property is set as a system property on the command
-     * line. 
-     * <p>
-     * For example, the <code>java</code> ant task used to exec
-     * java based programs does not allow one to set a system
-     * property on that program's VM when that property is set
-     * on the command line used to execute ant, but leave that
-     * property un-set when ant's command line does not specify
-     * a value for that property. That is, although ant allows
-     * one to retrieve the value of a system property that is
-     * specified on ant's command line and substitute that value 
-     * (using Java's '${}' token-substitution mechanism) into 
-     * a system property set on the program's VM, ant does not
-     * allow one to leave that property un-set when the system
-     * property is not specified on ant's command line; the
-     * property must either always be set on the VM, or never
-     * set. If the ant script then is written to always set the
-     * system property on the exec'd program's VM to the
-     * value of the system property expected on ant's command
-     * line, then whenever that system property is not set on
-     * ant's command line, the value that is substituted into
-     * the system property when the program is exec-ed will be
-     * of the form, <code>${default.nic}</code>. If the program
-     * that is exec'd then attempts to call
-     * <code>System.getProperty("default.nic")</code>, that
-     * call will return the non-<code>null</code> value,
-     * <code>${default.nic}</code>; which is typically not
-     * what is desired.
-     *
-     * @param defaultVal <code>String</code> value that this method
-     *                   returns if the system property named
-     *                   <code>default.nic</code> is either not
-     *                   set or is equal to the value
-     *                   <code>${default.nic}</code>.
-     *
-     * @return a <code>String</code> value equal to the value of
-     *         the system property named <code>${default.nic}</code>
-     *         if that system property is set to any value except
-     *         <code>null</code> or the value <code>${default.nic}</code>;
-     *         otherwise, returns the value input for the 
-     *         <code>defaultVal</code> parameter.
-     */
-    public static String getDefaultNic(String defaultVal) {
-        String defaultNic = System.getProperty("default.nic");
-        if( ("${default.nic}").equals(defaultNic) ) defaultNic = null;
-        if(defaultNic == null) defaultNic = defaultVal;
-        return defaultNic;
-    }
-
-    public static String getDefaultNic() {
-        return getDefaultNic(null);
     }
 
     /**
