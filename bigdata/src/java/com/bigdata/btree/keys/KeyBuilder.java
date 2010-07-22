@@ -945,10 +945,44 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    // FIXME append(BigDecimal)
+    // The encoding ot a BigDecimal requires the expression
+    //	of scale and length
+    // BigDecimal.scale indicates the precision of the number, where
+    //  '3' is three decimal places and '-3' rounded to '000'
+    //  BigDecimal.precision() is the number of unscaled digits
+    //  therefore the precision - scale is an expression of the
+    //  exponent of the normalised number.
+    // This means that the exponent could be zero or negative so the sign of the
+    //	number cannot be indicated by adding to the exponent.
+    // Instead an explicit sign byte,'0' or '1' is used.
+    // The actual BigDecimal serialization uses the String conversions
+    //	supported by BigDecimal, less the '-' sign character if applicable.
+    // The length of this data is terminated by a zero byte.
+    //
+    // The variable encoding of BigNumbers requires this String representation
+    //	and negative representations are further encoded using flipDigits
+    //	for the equivalent of 2s compliment negative representation.
+    
     public KeyBuilder append(final BigDecimal d) {
-//        throw new UnsupportedOperationException();
-        return append(d.doubleValue());
+    	int sign = d.signum(); 
+    	int precision = d.precision();
+    	int scale = d.scale();
+    	int exponent = precision - scale;
+    	if (sign == -1) {
+    		exponent = -exponent;
+    	}
+    	
+    	append((byte) sign);
+    	append(exponent);
+    	
+    	String unscaledStr = d.unscaledValue().toString();
+    	if (sign == -1) {
+    		unscaledStr = flipDigits(unscaledStr);
+    	}
+    	appendASCII(unscaledStr); // the unscaled BigInteger representation
+    	append((byte) 0);
+    	
+        return this;
     }
 
     /*
@@ -1386,11 +1420,53 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
+    static final byte eos = decodeByte(0);
+    static final byte negSign = decodeByte(-1);
+
     // FIXME decodeBigDecimal(int, byte[])
     static public BigDecimal decodeBigDecimal(final int offset, final byte[] key) {
-//        throw new UnsupportedOperationException();
-        final double d = decodeDouble(key, offset);
-        return new BigDecimal(d);
+    	int curs = offset;
+        byte sign = key[curs++];
+        int exponent = decodeInt(key, curs);
+        boolean neg = sign == negSign;
+        if (neg) {
+        	exponent = -exponent;
+        }
+        curs += 4;
+        int len = 0;
+        for (int i = curs; key[i] != eos; i++) len++;
+        String unscaledStr = decodeASCII(key, curs, len);
+        if (neg) {
+        	unscaledStr = flipDigits(unscaledStr);
+        }
+        
+        BigInteger unscaled = new BigInteger(unscaledStr);
+        
+        int precision = len;
+        int scale = precision - exponent - (neg ? 1 : 0);
+        
+        BigDecimal ret = new BigDecimal(unscaled, scale);
+
+        return ret; // relative scale adjustment
+    }
+    
+    static final char[] flipMap = {'0', '1', '2', '3', '4',
+    	'5', '6', '7', '8', '9'
+    };
+    
+    /*
+     * Flip numbers such that 0/9,1/8,2/7,3/6,4/5
+     */
+    static private String flipDigits(String str) {
+    	char[] chrs = str.toCharArray();
+    	for (int i = 0; i < chrs.length; i++) {
+    		int flip = '9' - chrs[i];
+    		if (flip >= 0 && flip < 10) {
+    			chrs[i] = flipMap[flip];
+    		}
+    	}
+    	
+    	return new String(chrs);
     }
     
     public static IKeyBuilder newInstance() {
