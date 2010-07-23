@@ -597,6 +597,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
          * Note: We have to handle the unsigned byte, short, int and long values
          * specially to get the correct total key order.
          */
+        
         final DTE dte = getDTE();
 
         if (isBNode()) {
@@ -613,7 +614,9 @@ public abstract class AbstractIV<V extends BigdataValue, T>
             
         } else {
         
-            final AbstractLiteralIV<?, ?> t = (AbstractLiteralIV<?, ?>) this;
+            final AbstractLiteralIV<?, ?> t = isExtension() ?
+                    ((ExtensionIV) this).getDelegate() :
+                    (AbstractLiteralIV<?, ?>) this;
             
             switch (dte) {
             case XSDBoolean:

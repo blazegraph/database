@@ -31,6 +31,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Random;
 import java.util.UUID;
+import org.openrdf.model.URI;
+import org.openrdf.model.impl.LiteralImpl;
 
 import junit.framework.TestCase2;
 
@@ -41,6 +43,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
 /**
  * Unit tests for encoding and decoding compound keys (such as are used by the
@@ -1018,6 +1021,52 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                 new TermId<BigdataURI>(VTE.URI, 2L),//
                 new UUIDBNodeIV<BigdataBNode>(UUID.randomUUID()),//
                 new NumericBNodeIV<BigdataBNode>(52),//
+        };
+
+        doEncodeDecodeTest(e);
+
+    }
+
+    public void test_SPO_encodeDecodeEpoch() {
+        
+        final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
+        
+        EpochExtension<BigdataValue> ext = new EpochExtension<BigdataValue>();
+        ext.resolveDatatype(new IDatatypeURIResolver() {
+            public BigdataURI resolve(URI uri) {
+                BigdataURI buri = vf.createURI(uri.stringValue());
+                buri.setIV(new TermId(VTE.URI, 1024));
+                return buri;
+            }
+        });
+        
+        final IV<?, ?>[] e = {//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
+                ext.createIV(new LiteralImpl("1234", EpochExtension.EPOCH)),
+        };
+
+        doEncodeDecodeTest(e);
+
+    }
+
+    public void test_SPO_encodeDecodeColor() {
+        
+        final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
+        
+        ColorsEnumExtension<BigdataValue> ext = new ColorsEnumExtension<BigdataValue>();
+        ext.resolveDatatype(new IDatatypeURIResolver() {
+            public BigdataURI resolve(URI uri) {
+                BigdataURI buri = vf.createURI(uri.stringValue());
+                buri.setIV(new TermId(VTE.URI, 1024));
+                return buri;
+            }
+        });
+        
+        final IV<?, ?>[] e = {//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
+                ext.createIV(new LiteralImpl("Blue", ColorsEnumExtension.COLOR)),
         };
 
         doEncodeDecodeTest(e);
