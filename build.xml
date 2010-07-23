@@ -1081,15 +1081,6 @@ ${postInstallMessage}</echo>
       <mkdir dir="${dist.var.config.logging}"/>
       <mkdir dir="${dist.var.config.jini}"/>
 
-      <!-- Copy build.properties to the top-level config file -->
-      <!-- <root>/dist/bigdata/var/config/bigdata.properties  -->
-
-      <property name="build.properties.from.file" location="${bigdata.dir}/build.properties" />
-      <property name="build.properties.to.path" location="${dist.var.config}/build.properties" />
-      <property name="build.properties.to.file" location="${build.properties.to.path}/bigdata.properties" />
-      <copy file="${build.properties.from.file}"
-            tofile="${build.properties.to.file}"/>
-
       <!-- Copy the jar files created by the jar target to        -->
       <!-- an application-specific but non-version-specific       -->
       <!-- jar file to either the lib or lib-dl staging           -->
@@ -1098,6 +1089,7 @@ ${postInstallMessage}</echo>
       <!-- file name should be changed here.                      -->
 
       <property name="bigdata.lib" location="${bigdata.dir}/bigdata/lib" />
+      <property name="bigdata-jini.dir" location="${bigdata.dir}/bigdata-jini" />
       <property name="bigdata-jini.lib" location="${bigdata.dir}/bigdata-jini/lib/jini/lib" />
       <property name="bigdata-rdf.lib" location="${bigdata.dir}/bigdata-rdf/lib" />
       <property name="bigdata-sails.lib" location="${bigdata.dir}/bigdata-sails/lib" />
@@ -1196,10 +1188,22 @@ ${postInstallMessage}</echo>
       <property name="src.resources" location="${bigdata.dir}/src/resources" />
       <property name="src.resources.config" location="${src.resources}/config" />
 
-      <!-- Utility scripts -->
+      <!-- Stage the top-level bigdata deployment configuration files -->
+
+      <property name="build.properties.from.file" location="${bigdata.dir}/build.properties" />
+
+      <copy file="${build.properties.from.file}"
+            todir="${dist.var.config}"/>
+
+      <!-- Stage utility scripts and related resources -->
+
+      <copy file="${src.resources}/bin/disco-tool"
+            todir="${dist.bin}"/>
+      <chmod file="${dist.bin}/disco-tool" perm="755"/>
+
       <copy file="${src.resources}/bin/pstart"
             todir="${dist.bin}"/>
-      <chmod file="${dist.bin}/pstart" perm="ugo+x"/>
+      <chmod file="${dist.bin}/pstart" perm="755"/>
 
       <copy file="${src.resources}/bin/config/browser.config"
             todir="${dist.bin.config}"/>
@@ -1209,12 +1213,14 @@ ${postInstallMessage}</echo>
             todir="${dist.bin.config}"/>
 
       <!-- Stage security policy (config) files -->
+
       <copy file="${src.resources.config}/policy.all"
             todir="${dist.var.config.policy}"/>
       <copy file="${src.resources.config}/service.policy"
             todir="${dist.var.config.policy}"/>
 
-      <!-- Stage logging config files -->
+      <!-- Stage the bigdata logging config files -->
+
       <property name="logging.to.path" location="${dist.var.config.logging}" />
 
       <property name="log4j.from.file" location="${bigdata.dir}/bigdata/src/resources/logging/log4j.properties" />
@@ -1234,6 +1240,16 @@ ${postInstallMessage}</echo>
       <copy file="${server.log4j.from.file}"
             todir="${logging.to.path}"/>
 
+      <!-- Stage service-specific logging config file -->
+
+      <property name="bigdata-jini.root" location="${bigdata-jini.dir}/src/java/com/bigdata" />
+
+      <copy file="${bigdata-jini.root}/disco/config/disco.config"
+            todir="${dist.bin.config}"/>
+
+      <copy file="${bigdata-jini.root}/disco/config/logging.properties"
+            tofile="${dist.bin.config}/disco-logging.properties"/>
+
       <copy file="${src.resources.config}/zookeeper-logging.properties"
             todir="${logging.to.path}"/>
       <copy file="${src.resources.config}/reggie-logging.properties"
@@ -1241,15 +1257,16 @@ ${postInstallMessage}</echo>
       <copy file="${src.resources.config}/browser-logging.properties"
             todir="${logging.to.path}"/>
 
+      <!-- Stage the bigdata Jini config files -->
 
-      <!-- Stage Zookeeper config files -->
-
-
-      <!-- Stage Jini config files -->
       <copy file="${src.resources.config}/bigdataCluster.config"
             todir="${dist.var.config.jini}"/>
       <copy file="${src.resources.config}/bigdataCluster16.config"
             todir="${dist.var.config.jini}"/>
+      <copy file="${src.resources.config}/standalone/bigdataStandalone.config"
+            todir="${dist.var.config.jini}"/>
+
+      <!-- Stage the infrastructure service config files -->
 
       <copy file="${src.resources.config}/jini/reggie.config"
             todir="${dist.var.config.jini}"/>
@@ -1270,6 +1287,7 @@ ${postInstallMessage}</echo>
           <tarfileset dir="${bigdata.dir}/dist">
             <include name="bigdata/**" />
 
+            <exclude name="bigdata/bin/disco-tool" />
             <exclude name="bigdata/bin/pstart" />
 
           </tarfileset>
@@ -1277,6 +1295,7 @@ ${postInstallMessage}</echo>
           <!-- Add scripts separately, making them executable -->
 
           <tarfileset dir="${bigdata.dir}/dist" filemode="755">
+            <include name="bigdata/bin/disco-tool" />
             <include name="bigdata/bin/pstart" />
 
           </tarfileset>
@@ -1373,6 +1392,8 @@ ${postInstallMessage}</echo>
 
                 <exclude name="dist/bigdata/**" />
 
+                <exclude name="dist/bigdata/bin/disco-tool" />
+                <exclude name="dist/bigdata/bin/pstart" />
             </tarfileset>
 
             <!-- Add dist files separately, minus scripts -->
@@ -1380,12 +1401,14 @@ ${postInstallMessage}</echo>
             <tarfileset dir="${bigdata.dir}" prefix="${version}">
                 <include name="dist/bigdata/**" />
 
+                <exclude name="dist/bigdata/bin/disco-tool" />
                 <exclude name="dist/bigdata/bin/pstart" />
             </tarfileset>
 
             <!-- Add dist scripts separately, making them executable -->
 
             <tarfileset dir="${bigdata.dir}" prefix="${version}" filemode="755">
+                <include name="dist/bigdata/bin/disco-tool" />
                 <include name="dist/bigdata/bin/pstart" />
             </tarfileset>
         </tar>
