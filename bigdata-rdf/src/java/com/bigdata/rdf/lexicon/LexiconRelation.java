@@ -391,8 +391,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     AbstractTripleStore.Options.DEFAULT_INLINE_LITERALS));
 
             inlineBNodes = storeBlankNodes && Boolean.parseBoolean(getProperty(
-                    AbstractTripleStore.Options.INLINE_LITERALS,
-                    AbstractTripleStore.Options.DEFAULT_INLINE_LITERALS));
+                    AbstractTripleStore.Options.INLINE_BNODES,
+                    AbstractTripleStore.Options.DEFAULT_INLINE_BNODES));
             
         }
         
