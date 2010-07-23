@@ -35,6 +35,7 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.constraints.AbstractInlineConstraint;
 import com.bigdata.rdf.internal.constraints.InlineGT;
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 
 
@@ -325,8 +326,12 @@ public class IVUtility {
         }
         case XSDInt: {
             final int x = KeyBuilder.decodeInt(key, o);
-            final AbstractLiteralIV iv = new XSDIntIV<BigdataLiteral>(x);
-            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
+            if (vte == VTE.LITERAL) {
+                final AbstractLiteralIV iv = new XSDIntIV<BigdataLiteral>(x);
+                return isExtension ? new ExtensionIV(iv, datatype) : iv;
+            } else {
+                return new NumericBNodeIV<BigdataBNode>(x);
+            }
         }
         case XSDLong: {
             final long x = KeyBuilder.decodeLong(key, o);
@@ -355,8 +360,12 @@ public class IVUtility {
         }
         case UUID: {
             final UUID x = KeyBuilder.decodeUUID(key, o);
-            final AbstractLiteralIV iv = new UUIDLiteralIV<BigdataLiteral>(x);
-            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
+            if (vte == VTE.LITERAL) {
+                final AbstractLiteralIV iv = new UUIDLiteralIV<BigdataLiteral>(x);
+                return isExtension ? new ExtensionIV(iv, datatype) : iv;
+            } else {
+                return new UUIDBNodeIV<BigdataBNode>(x);
+            }
         }
             // case XSDUnsignedByte:
             // keyBuilder.appendUnsigned(t.byteValue());
