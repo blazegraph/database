@@ -33,15 +33,21 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.BD;
 
-
+/**
+ * This implementation of {@link IExtension} implements inlining for literals
+ * that represent time in milliseconds since the epoch.  The milliseconds are
+ * encoded as an inline long.
+ */
 public class EpochExtension implements IExtension {
 
+    /**
+     * The datatype URI for the epoch extension.
+     */
     public static final URI EPOCH = new URIImpl(BD.NAMESPACE + "Epoch");
     
     private BigdataURI epoch;
     
     public EpochExtension() {
-        
     }
         
     public void resolveDatatype(final IDatatypeURIResolver resolver) {
@@ -56,6 +62,13 @@ public class EpochExtension implements IExtension {
         
     }
     
+    /**
+     * Attempts to convert the supplied value into an epoch representation.
+     * Tests for a literal value with the correct datatype that can be converted 
+     * to a positive long integer.  Encodes the long in a delegate 
+     * {@link XSDLongIV}, and returns an {@link ExtensionIV} to wrap the native
+     * type.
+     */
     public ExtensionIV createIV(final Value value) {
         
         if (value instanceof Literal == false)
@@ -63,8 +76,9 @@ public class EpochExtension implements IExtension {
         
         final Literal lit = (Literal) value;
         
-        if (lit.getDatatype() == null || 
-                !EPOCH.stringValue().equals(lit.getDatatype().stringValue()))
+        final URI dt = lit.getDatatype();
+        
+        if (dt == null || !EPOCH.stringValue().equals(dt.stringValue()))
             throw new IllegalArgumentException();
         
         final String s = value.stringValue();
@@ -81,6 +95,11 @@ public class EpochExtension implements IExtension {
         
     }
     
+    /**
+     * Use the string value of the {@link ExtensionIV} (which defers to the
+     * string value of the native type) to create a literal with the epoch
+     * datatype. 
+     */
     public Value asValue(final ExtensionIV iv, final BigdataValueFactory vf) {
         
         return vf.createLiteral(iv.stringValue(), epoch);
