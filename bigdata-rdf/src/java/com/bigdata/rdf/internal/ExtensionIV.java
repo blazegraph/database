@@ -2,7 +2,6 @@ package com.bigdata.rdf.internal;
 
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataLiteral;
-import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
 public class ExtensionIV<V extends BigdataLiteral> 
@@ -19,7 +18,7 @@ public class ExtensionIV<V extends BigdataLiteral>
     
     public ExtensionIV(final AbstractLiteralIV delegate, 
             final TermId datatype) {
-        super(VTE.LITERAL, DTE.Extension);
+        super(VTE.LITERAL, true, delegate.getDTE());
         
         this.delegate = delegate;
         this.datatype = datatype;

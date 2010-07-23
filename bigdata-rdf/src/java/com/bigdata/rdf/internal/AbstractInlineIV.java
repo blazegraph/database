@@ -53,6 +53,13 @@ abstract public class AbstractInlineIV<V extends BigdataValue, T>
 
     }
     
+    protected AbstractInlineIV(final VTE vte, final boolean extension, 
+            final DTE dte) {
+
+        super(vte, true/* inline */, extension, dte);
+
+    }
+    
     /**
      * Returns the String-value of a Value object. This returns either a
      * Literal's label, a URI's URI or a BNode's ID.
