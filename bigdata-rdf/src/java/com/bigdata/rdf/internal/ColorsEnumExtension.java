@@ -32,9 +32,15 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.BD;
 
-
+/**
+ * Example of how to do a custom enum and map that enum over a byte using a 
+ * native inline {@link XSDByteIV}. 
+ */
 public class ColorsEnumExtension implements IExtension {
 
+    /**
+     * The datatype URI for the colors enum extension.
+     */
     public static final URI COLOR = new URIImpl(BD.NAMESPACE + "Color");
     
     private BigdataURI color;
@@ -55,6 +61,15 @@ public class ColorsEnumExtension implements IExtension {
         
     }
     
+    /**
+     * Attempts to convert the supplied RDF value into a colors enum 
+     * representation. Tests for a literal value with the correct datatype
+     * that can be converted to one of the colors in the {@link Color} enum
+     * based on the string value of the literal's label.  Each {@link Color}
+     * in the enum maps to a particular byte. This byte is encoded in a
+     * delegate {@link XSDByteIV}, and an {@link ExtensionIV} is returned that
+     * wraps the native type.
+     */
     public ExtensionIV createIV(final Value value) {
         
         if (value instanceof Literal == false)
@@ -79,11 +94,19 @@ public class ColorsEnumExtension implements IExtension {
         
     }
     
+    /**
+     * Attempt to convert the {@link AbstractLiteralIV#byteValue()} back into
+     * a {@link Color}, and then use the string value of the {@link Color} to
+     * create an RDF literal.
+     */
     public Value asValue(final ExtensionIV iv, final BigdataValueFactory vf) {
         
         final byte b = iv.getDelegate().byteValue();
         
         final Color c = Color.valueOf(b);
+        
+        if (c == null)
+            throw new RuntimeException("bad color got encoded somehow");
         
         return vf.createLiteral(c.toString(), color);
         
@@ -110,13 +133,6 @@ public class ColorsEnumExtension implements IExtension {
         }
         
         static final public Color valueOf(final byte b) {
-            /*
-             * Note: This switch MUST correspond to the declarations above (you can
-             * not made the cases of the switch from [v] since it is not considered
-             * a to be constant by the compiler).
-             * 
-             * Note: This masks off everything but the lower 4 bits.
-             */
             switch (b) {
             case 0:
                 return Red;
