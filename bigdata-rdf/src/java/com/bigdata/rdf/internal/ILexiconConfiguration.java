@@ -24,6 +24,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
+
 
 /**
  * Configuration determines which RDF Values are inlined into the statement
@@ -38,16 +41,20 @@ public interface ILexiconConfiguration {
     public boolean isLegacyEncoding();
      */
     
+    IV createIV(final Value value);
+    
+    IExtension getExtension(final TermId datatype);
+    
     /**
-     * <code>true</code> iff the <code>vte</code> and <code>dte</code> should 
-     * be inlined.
+     * <code>true</code> iff the <code>vte</code> and <code>dte</code> 
+     * should be inlined.
      * 
      * @param vte
      *          the term type
      * @param dte
      *          the data type
-     */
     public boolean isInline(VTE vte, DTE dte);
+     */
     
 //    /**
 //     * <code>true</code> iff <code>xsd:boolean</code> should be inlined.

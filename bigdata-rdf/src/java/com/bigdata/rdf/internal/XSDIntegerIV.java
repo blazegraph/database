@@ -60,7 +60,8 @@ public class XSDIntegerIV<V extends BigdataLiteral> extends
     }
 
     @SuppressWarnings("unchecked")
-    public V asValue(final BigdataValueFactory f) {
+    public V asValue(final BigdataValueFactory f, 
+            final ILexiconConfiguration config) {
         // @todo factory should cache the XSD URIs.
         final V v = (V) f.createLiteral(value.toString(),//
                 f.createURI(DTE.XSDInteger.getDatatype()));

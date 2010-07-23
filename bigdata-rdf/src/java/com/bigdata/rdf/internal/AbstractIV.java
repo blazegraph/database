@@ -548,30 +548,6 @@ public abstract class AbstractIV<V extends BigdataValue, T>
         if (ret > 0)
             return 1;
 
-        if(this instanceof TermId) {
-
-            final long tid1 = ((TermId<?>) this).getTermId();
-            final long tid2 = ((TermId<?>) o).getTermId();
-
-            /*
-             * Note: logic avoids possible overflow of [long] by not computing
-             * the difference between two longs.
-             */
-
-            ret = tid1 < tid2 ? -1 : tid1 > tid2 ? 1 : 0;
-
-            return ret;
-
-        }
-
-        if(isExtension()) {
-            /*
-             * @todo we may need to handle extension types here explicitly once
-             * their semantics are firmed up further.
-             */
-            throw new UnsupportedOperationException();
-        }
-
         /*
          * At this point we are comparing two IVs of the same intrinsic
          * datatype. That is, they are both datatype literals expressed using
@@ -590,17 +566,10 @@ public abstract class AbstractIV<V extends BigdataValue, T>
      *       {@link AbstractInlineIV} and implementations provided
      *       for each concrete instance of that abstract class.
      */
-    protected int _compareTo(IV o) {
-
-        throw new UnsupportedOperationException(getClass().toString());
-
-    }
+    protected abstract int _compareTo(IV o);
 
     /**
      * {@inheritDoc}
-     * 
-     * FIXME Handle extension types, probably in a subclass, and maybe requiring
-     * the caller to pass in an object with the context for the extension types.
      */
     public IKeyBuilder encode(final IKeyBuilder keyBuilder) {
 
@@ -614,6 +583,12 @@ public abstract class AbstractIV<V extends BigdataValue, T>
              */
             keyBuilder.append(getTermId());
             return keyBuilder;
+        }
+        
+        if (isExtension()) {
+            
+            keyBuilder.append(getExtensionDatatype().getTermId());
+            
         }
         
         /*
@@ -675,6 +650,10 @@ public abstract class AbstractIV<V extends BigdataValue, T>
         
         return keyBuilder;
         
+    }
+    
+    protected TermId getExtensionDatatype() {
+        return null;
     }
     
 }

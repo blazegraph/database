@@ -33,11 +33,15 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import org.openrdf.model.vocabulary.RDF;
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.internal.ColorsEnumExtension;
+import com.bigdata.rdf.internal.EpochExtension;
+import com.bigdata.rdf.internal.ExtensionIV;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -210,6 +214,194 @@ public class TestInlining extends AbstractTripleStoreTestCase {
             assertTrue(b2.getIV().isInline());
             assertFalse(b3.getIV().isInline());
             assertFalse(b4.getIV().isInline());
+            
+            if (store.isStable()) {
+                
+                store.commit();
+                
+                store = reopenStore(store);
+
+                // verify same reverse mappings.
+
+                final Map<IV, BigdataValue> ids2 = store.getLexiconRelation()
+                        .getTerms(ids.keySet());
+
+                assertEquals(ids.size(),ids2.size());
+                
+                for (IV iv : ids.keySet()) {
+
+                    System.err.println(iv);
+                    
+                    assertEquals("Id mapped to a different term? : iv="
+                            + iv, ids.get(iv), ids2.get(iv));
+
+                }
+
+            }
+
+        } finally {
+            
+            store.__tearDownUnitTest();
+            
+        }
+
+    }
+
+    public void test_epoch() {
+
+        final Properties properties = getProperties();
+        
+        // test w/o predefined vocab.
+        properties.setProperty(Options.VOCABULARY_CLASS, NoVocabulary.class
+                .getName());
+
+        // test w/o axioms - they imply a predefined vocab.
+        properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        // test w/o the full text index.
+        properties.setProperty(Options.TEXT_INDEX, "false");
+
+        AbstractTripleStore store = getStore(properties);
+        
+        try {
+
+            if (!store.isStable()) {
+
+                /*
+                 * We need a restart safe store to test this since otherwise a
+                 * term cache could give us a false positive.
+                 */
+
+                return;
+                
+            }
+
+            final Collection<BigdataValue> terms = new HashSet<BigdataValue>();
+
+            // lookup/add some values.
+            final BigdataValueFactory f = store.getValueFactory();
+
+            final BigdataLiteral l1 = f.createLiteral("1", EpochExtension.EPOCH);
+            final BigdataLiteral l2 = f.createLiteral(String.valueOf(System.currentTimeMillis()), EpochExtension.EPOCH);
+            final BigdataLiteral l3 = f.createLiteral("-100", EpochExtension.EPOCH);
+            final BigdataURI datatype = f.createURI(EpochExtension.EPOCH.stringValue());
+
+            terms.add(l1);
+            terms.add(l2);
+            terms.add(l3);
+            terms.add(datatype);
+
+            final Map<IV, BigdataValue> ids = doAddTermsTest(store, terms);
+
+            assertTrue(l1.getIV().isInline());
+            assertTrue(l2.getIV().isInline());
+            assertFalse(l3.getIV().isInline());
+            
+            final ExtensionIV iv1 = (ExtensionIV) l1.getIV();
+            final ExtensionIV iv2 = (ExtensionIV) l2.getIV();
+            
+            assertTrue(iv1.getExtensionDatatype().equals(datatype.getIV()));
+            assertTrue(iv2.getExtensionDatatype().equals(datatype.getIV()));
+            
+            if (store.isStable()) {
+                
+                store.commit();
+                
+                store = reopenStore(store);
+
+                // verify same reverse mappings.
+
+                final Map<IV, BigdataValue> ids2 = store.getLexiconRelation()
+                        .getTerms(ids.keySet());
+
+                assertEquals(ids.size(),ids2.size());
+                
+                for (IV iv : ids.keySet()) {
+
+                    System.err.println(iv);
+                    
+                    assertEquals("Id mapped to a different term? : iv="
+                            + iv, ids.get(iv), ids2.get(iv));
+
+                }
+
+            }
+
+        } finally {
+            
+            store.__tearDownUnitTest();
+            
+        }
+
+    }
+
+    public void test_colorsEnum() {
+
+        final Properties properties = getProperties();
+        
+        // test w/o predefined vocab.
+        properties.setProperty(Options.VOCABULARY_CLASS, NoVocabulary.class
+                .getName());
+
+        // test w/o axioms - they imply a predefined vocab.
+        properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        // test w/o the full text index.
+        properties.setProperty(Options.TEXT_INDEX, "false");
+
+        AbstractTripleStore store = getStore(properties);
+        
+        try {
+
+            if (!store.isStable()) {
+
+                /*
+                 * We need a restart safe store to test this since otherwise a
+                 * term cache could give us a false positive.
+                 */
+
+                return;
+                
+            }
+
+            final Collection<BigdataValue> terms = new HashSet<BigdataValue>();
+
+            // lookup/add some values.
+            final BigdataValueFactory f = store.getValueFactory();
+
+            final BigdataLiteral l1 = f.createLiteral("Blue", ColorsEnumExtension.COLOR);
+            final BigdataLiteral l2 = f.createLiteral("Brown", ColorsEnumExtension.COLOR);
+            final BigdataLiteral l3 = f.createLiteral("Yellow", ColorsEnumExtension.COLOR);
+            final BigdataLiteral l4 = f.createLiteral("Dog", ColorsEnumExtension.COLOR);
+            final BigdataLiteral l5 = f.createLiteral("yellow", ColorsEnumExtension.COLOR);
+            final BigdataURI datatype = f.createURI(ColorsEnumExtension.COLOR.stringValue());
+
+            terms.add(l1);
+            terms.add(l2);
+            terms.add(l3);
+            terms.add(l4);
+            terms.add(l5);
+            terms.add(datatype);
+
+            final Map<IV, BigdataValue> ids = doAddTermsTest(store, terms);
+
+            assertTrue(l1.getIV().isInline());
+            assertTrue(l2.getIV().isInline());
+            assertTrue(l3.getIV().isInline());
+            assertFalse(l4.getIV().isInline());
+            assertFalse(l5.getIV().isInline());
+            
+            final ExtensionIV iv1 = (ExtensionIV) l1.getIV();
+            final ExtensionIV iv2 = (ExtensionIV) l2.getIV();
+            final ExtensionIV iv3 = (ExtensionIV) l3.getIV();
+            
+            System.err.println(l1.getLabel() + ": " + iv1.getDelegate().byteValue());
+            System.err.println(l2.getLabel() + ": " + iv2.getDelegate().byteValue());
+            System.err.println(l3.getLabel() + ": " + iv3.getDelegate().byteValue());
+            
+            assertTrue(iv1.getExtensionDatatype().equals(datatype.getIV()));
+            assertTrue(iv2.getExtensionDatatype().equals(datatype.getIV()));
+            assertTrue(iv3.getExtensionDatatype().equals(datatype.getIV()));
             
             if (store.isStable()) {
                 

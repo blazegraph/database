@@ -54,11 +54,8 @@ abstract public class AbstractBNodeIV<V extends BigdataBNode, T> extends
 
     }
 
-    final public long getTermId() {
-        throw new UnsupportedOperationException();
-    }
-    
-    public V asValue(BigdataValueFactory f)
+    public V asValue(final BigdataValueFactory f, 
+            final ILexiconConfiguration config)
             throws UnsupportedOperationException {
         final V bnode = (V) f.createBNode(stringValue());
         bnode.setIV(this);

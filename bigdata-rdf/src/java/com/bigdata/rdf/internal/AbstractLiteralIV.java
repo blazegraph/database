@@ -66,10 +66,6 @@ abstract public class AbstractLiteralIV<V extends BigdataLiteral, T>
 
     }
 
-    final public long getTermId() {
-        throw new UnsupportedOperationException();
-    }
-
     /** Return the <code>boolean</code> value of <i>this</i> value. */
     abstract public boolean booleanValue();
 

@@ -78,6 +78,8 @@ import com.bigdata.rdf.axioms.OwlAxioms;
 import com.bigdata.rdf.inf.IJustificationIterator;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.JustificationIterator;
+import com.bigdata.rdf.internal.DefaultExtensionFactory;
+import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.BigdataRDFFullTextIndex;
 import com.bigdata.rdf.lexicon.ITermIdCodes;
@@ -876,6 +878,21 @@ abstract public class AbstractTripleStore extends
                 + ".inlineBNodes";
 
         String DEFAULT_INLINE_BNODES = "false";
+
+        /**
+         * The name of the {@link IExtensionFactory} class. The implementation 
+         * MUST declare a constructor that accepts an 
+         * {@link IDatatypeURIResolver} as its only argument.  The 
+         * {@link IExtension}s constructed by the factory need a resolver to
+         * resolve datatype URIs to term identifiers in the database.
+         * 
+         * @see #DEFAULT_EXTENSION_FACTORY_CLASS
+         */
+        String EXTENSION_FACTORY_CLASS = AbstractTripleStore.class.getName()
+                + ".extensionFactoryClass";
+
+        String DEFAULT_EXTENSION_FACTORY_CLASS = DefaultExtensionFactory.class
+                .getName();
 
     }
 

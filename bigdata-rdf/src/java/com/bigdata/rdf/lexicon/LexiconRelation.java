@@ -27,6 +27,7 @@
 
 package com.bigdata.rdf.lexicon;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -41,7 +42,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
@@ -53,7 +53,6 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
@@ -76,39 +75,30 @@ import com.bigdata.cache.ConcurrentWeakValueCacheWithBatchedUpdates;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.internal.DTE;
+import com.bigdata.rdf.internal.ColorsEnumExtension;
+import com.bigdata.rdf.internal.DefaultExtensionFactory;
+import com.bigdata.rdf.internal.EpochExtension;
+import com.bigdata.rdf.internal.IExtension;
+import com.bigdata.rdf.internal.IDatatypeURIResolver;
+import com.bigdata.rdf.internal.IExtensionFactory;
 import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.LexiconConfiguration;
-import com.bigdata.rdf.internal.NumericBNodeIV;
 import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.internal.UUIDBNodeIV;
-import com.bigdata.rdf.internal.UUIDLiteralIV;
-import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.XSDBooleanIV;
-import com.bigdata.rdf.internal.XSDByteIV;
-import com.bigdata.rdf.internal.XSDDecimalIV;
-import com.bigdata.rdf.internal.XSDDoubleIV;
-import com.bigdata.rdf.internal.XSDFloatIV;
-import com.bigdata.rdf.internal.XSDIntIV;
-import com.bigdata.rdf.internal.XSDIntegerIV;
-import com.bigdata.rdf.internal.XSDLongIV;
-import com.bigdata.rdf.internal.XSDShortIV;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc.Term2IdWriteProcConstructor;
 import com.bigdata.rdf.model.BigdataBNode;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.model.TermIdComparator2;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOComparator;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -150,7 +140,7 @@ import cutthecrap.utils.striterators.Striterator;
  * @version $Id$
  */
 public class LexiconRelation extends AbstractRelation<BigdataValue> 
-        /*implements ILexiconConfiguration*/ {
+        implements IDatatypeURIResolver {
 
     final protected static Logger log = Logger.getLogger(LexiconRelation.class);
 
@@ -208,6 +198,34 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         return (Class<ITextIndexer>) cls;
 
     }
+    
+    @SuppressWarnings("unchecked")
+    protected Class<IExtensionFactory> determineExtensionFactoryClass() {
+
+        final String className = getProperty(
+                AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS,
+                AbstractTripleStore.Options.DEFAULT_EXTENSION_FACTORY_CLASS);
+        
+        final Class<?> cls;
+        try {
+            cls = Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("Bad option: "
+                    + AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
+        }
+
+        if (!IExtensionFactory.class.isAssignableFrom(cls)) {
+            throw new RuntimeException(
+                    AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS
+                            + ": Must implement: "
+                            + IExtensionFactory.class.getName());
+        }
+
+        return (Class<IExtensionFactory>) cls;
+
+    }
+    
+    
 
     /**
      * Note: The term:id and id:term indices MUST use unisolated write operation
@@ -375,9 +393,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             inlineBNodes = storeBlankNodes && Boolean.parseBoolean(getProperty(
                     AbstractTripleStore.Options.INLINE_LITERALS,
                     AbstractTripleStore.Options.DEFAULT_INLINE_LITERALS));
-            
-            lexiconConfiguration = 
-                new LexiconConfiguration(inlineLiterals, inlineBNodes);
             
         }
         
@@ -943,7 +958,26 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     }
 
+    /**
+     * See {@link IDatatypeURIResolver}.
+     */
+    public BigdataURI resolve(final URI uri) {
+        
+        final BigdataURI buri = valueFactory.asValue(uri);
+        
+        if (buri.getIV() == null) {
+        
+            _addTerms(new BigdataValue[] { buri }, 1, false);
+            
+            if (buri.getIV() == null)
+                throw new RuntimeException();
 
+        }
+        
+        return buri;
+        
+    }
+    
     /**
      * Batch insert of terms into the database.
      * <p>
@@ -969,13 +1003,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     @SuppressWarnings("unchecked")
     public void addTerms(final BigdataValue[] terms, final int numTerms,
             final boolean readOnly) {
-
-        if (log.isDebugEnabled())
-            log.debug("numTerms=" + numTerms + ", readOnly=" + readOnly);
         
-        if (numTerms == 0)
-            return;
-
         /*
          * Very strange that we need to pass in the numTerms.  The
          * semantics are that we should only consider terms from 
@@ -1021,8 +1049,44 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 //              }
 //          }
 //      }
-      
+
+        // write the non-inline terms to the indices
+        _addTerms(terms2, numTerms2, readOnly);
         
+    }
+
+    /**
+     * Batch insert of terms into the database.
+     * <p>
+     * Note: Duplicate {@link BigdataValue} references and {@link BigdataValue}s
+     * that already have an assigned term identifiers are ignored by this
+     * operation.
+     * <p>
+     * Note: This implementation is designed to use unisolated batch writes on
+     * the terms and ids index that guarantee consistency.
+     * <p>
+     * If the full text index is enabled, then the terms will also be inserted
+     * into the full text index.
+     * 
+     * @param terms
+     *            An array whose elements [0:nterms-1] will be inserted.
+     * @param numTerms
+     *            The #of terms to insert.
+     * @param readOnly
+     *            When <code>true</code>, unknown terms will not be inserted
+     *            into the database. Otherwise unknown terms are inserted into
+     *            the database.
+     */
+    @SuppressWarnings("unchecked")
+    private void _addTerms(final BigdataValue[] terms, final int numTerms,
+            final boolean readOnly) {
+
+        if (log.isDebugEnabled())
+            log.debug("numTerms=" + numTerms + ", readOnly=" + readOnly);
+        
+        if (numTerms == 0)
+            return;
+
         final long begin = System.currentTimeMillis();
         
         final WriteTaskStats stats = new WriteTaskStats();
@@ -1030,7 +1094,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         final KVO<BigdataValue>[] a;
         try {
             // write on the forward index (sync RPC)
-            a = new Term2IdWriteTask(this, readOnly, numTerms2, terms2, stats)
+            a = new Term2IdWriteTask(this, readOnly, numTerms, terms, stats)
                     .call();
         } catch (Exception ex) {
             throw new RuntimeException(ex);
@@ -1147,14 +1211,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         if (log.isInfoEnabled() && readOnly && stats.nunknown.get() > 0) {
          
             log.info("There are " + stats.nunknown + " unknown terms out of "
-                    + numTerms2 + " given");
+                    + numTerms + " given");
             
         }
         
-        if (numTerms2 > 1000 || elapsed > 3000) {
+        if (numTerms > 1000 || elapsed > 3000) {
 
             if(log.isInfoEnabled())
-            log.info("Processed " + numTerms2 + " in " + elapsed
+            log.info("Processed " + numTerms + " in " + elapsed
                         + "ms; keygen=" + stats.keyGenTime + "ms, sort=" + stats.sortTime
                         + "ms, insert=" + stats.indexTime + "ms" + " {forward="
                         + stats.forwardIndexTime + ", reverse=" + stats.reverseIndexTime
@@ -1504,7 +1568,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             if (iv.isInline()) {
                 
                 // translate it into a value directly
-                ret.put(iv, iv.asValue(valueFactory));
+                ret.put(iv, iv.asValue(valueFactory, getLexiconConfiguration()));
                 
             } else {
                 
@@ -2134,7 +2198,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     final public BigdataValue getTerm(final IV iv) {
         
         if (iv.isInline())
-            return iv.asValue(valueFactory);
+            return iv.asValue(valueFactory, getLexiconConfiguration());
         
         TermId tid = (TermId) iv;
         
@@ -2240,132 +2304,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      */
     private IV getInlineIV(Value value) {
         
-        // just literals for now, maybe bnodes too eventually?
-        if (value instanceof Literal) {
-            
-            final Literal l = (Literal) value;
-            
-            final URI datatype = l.getDatatype();
-            
-            final DTE dte = datatype == null ? null : DTE.valueOf(datatype); 
-            
-            if (dte == null)
-                return null;
-            
-            if (!getLexiconConfiguration().isInline(VTE.LITERAL, dte))
-                return null;
-            
-            final String v = value.stringValue();
-            
-            IV iv = null;
-            
-            try {
-                
-                switch(dte) {
-                    case XSDBoolean:
-                        iv = new XSDBooleanIV(XMLDatatypeUtil.parseBoolean(v));
-                        break;
-                    case XSDByte:
-                        iv = new XSDByteIV(XMLDatatypeUtil.parseByte(v));
-                        break;
-                    case XSDShort:
-                        iv = new XSDShortIV(XMLDatatypeUtil.parseShort(v));
-                        break;
-                    case XSDInt:
-                        iv = new XSDIntIV(XMLDatatypeUtil.parseInt(v));
-                        break;
-                    case XSDLong:
-                        iv = new XSDLongIV(XMLDatatypeUtil.parseLong(v));
-                        break;
-                    case XSDFloat:
-                        iv = new XSDFloatIV(XMLDatatypeUtil.parseFloat(v));
-                        break;
-                    case XSDDouble:
-                        iv = new XSDDoubleIV(XMLDatatypeUtil.parseDouble(v));
-                        break;
-                    case XSDInteger:
-                        iv = new XSDIntegerIV(XMLDatatypeUtil.parseInteger(v));
-                        break;
-                    case XSDDecimal:
-                        iv = new XSDDecimalIV(XMLDatatypeUtil.parseDecimal(v));
-                        break;
-                    case UUID:
-                        iv = new UUIDLiteralIV(UUID.fromString(v));
-                        break;
-                    default:
-                        iv = null;
-                }
-                
-            } catch (NumberFormatException ex) {
-                
-                // some dummy doesn't know how to format a number
-                // default to term identifier for this term 
-                
-            }
-            
-            if (iv != null && value instanceof BigdataValue)
-                ((BigdataValue) value).setIV(iv);
-            
-            return iv;
-            
-        } else if (value instanceof BNode) {
-            
-            final BNode b = (BNode) value;
-            
-            final String id = b.getID();
-            
-            final char c = id.charAt(0);
-            
-            try {
-
-                final UUID uuid = UUID.fromString(id);
-                
-                if (!uuid.toString().equals(id))
-                    return null;
-                
-                if (!getLexiconConfiguration().isInline(VTE.BNODE, DTE.UUID))
-                    return null;
-                
-                final IV iv = new UUIDBNodeIV(uuid);
-                
-                if (value instanceof BigdataValue)
-                    ((BigdataValue) value).setIV(iv);
-                
-                return iv;
-                
-            } catch (Exception ex) {
-                
-                // string id could not be converted to a UUID
-                
-            }
-            
-            try {
-
-                final Integer i = Integer.valueOf(id);
-                
-                // cannot normalize id, needs to remain syntactically identical
-                if (!i.toString().equals(id))
-                    return null;
-                
-                if (!getLexiconConfiguration().isInline(VTE.BNODE, DTE.XSDInt))
-                    return null;
-                
-                final IV iv = new NumericBNodeIV(i);
-                
-                if (value instanceof BigdataValue)
-                    ((BigdataValue) value).setIV(iv);
-                
-                return iv;
-                
-            } catch (Exception ex) {
-                
-                // string id could not be converted to an Integer
-                
-            }
-            
-        }
-        
-        return null;
+        return getLexiconConfiguration().createIV(value);
 
     }
     
@@ -2678,7 +2617,38 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * how to encode and decode terms in the key space.
      */
     public ILexiconConfiguration getLexiconConfiguration() {
+        
+        if (lexiconConfiguration == null) {
+            
+            try {
+                
+                final Class<IExtensionFactory> xfc = determineExtensionFactoryClass();
+                final Constructor<IExtensionFactory> ctor = xfc.getConstructor(
+                        IDatatypeURIResolver.class);
+                final IExtensionFactory xFactory = ctor.newInstance(
+                        (IDatatypeURIResolver) this);
+                
+                lexiconConfiguration = new LexiconConfiguration(
+                        inlineLiterals, inlineBNodes, xFactory);
+                
+            } catch (InstantiationException e) {
+                throw new IllegalArgumentException(
+                        AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
+            } catch (NoSuchMethodException e) {
+                throw new IllegalArgumentException(
+                        AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
+            } catch (InvocationTargetException e) {
+                throw new IllegalArgumentException(
+                        AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
+            } catch (IllegalAccessException e) {
+                throw new IllegalArgumentException(
+                        AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
+            }
+            
+        }
+        
         return lexiconConfiguration;
+        
     }
     
 }

@@ -217,8 +217,10 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
      * factory. However, implementations are encouraged to cache the inflated
      * {@link BigdataValue} on a transient field.
      * 
-     * @param f
+     * @param vf
      *            The value factory.
+     * @param config
+     *            The lexicon configuration.
      * @return The corresponding {@link BigdataValue}.
      * @throws UnsupportedOperationException
      *             unless the RDF value is inline.
@@ -241,6 +243,7 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
      *             and/or quad stores since the lexicon does not interact with
      *             whether we are using triples or quads (except for SIDs).
      */
-    V asValue(BigdataValueFactory f) throws UnsupportedOperationException;
+    V asValue(final BigdataValueFactory vf, final ILexiconConfiguration config) 
+        throws UnsupportedOperationException;
 
 }
