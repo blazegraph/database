@@ -966,15 +966,29 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         final BigdataURI buri = valueFactory.asValue(uri);
         
         if (buri.getIV() == null) {
-        
-            _addTerms(new BigdataValue[] { buri }, 1, false);
             
-            if (buri.getIV() == null)
-                throw new RuntimeException();
+            // will set tid on buri as a side effect
+            TermId tid = getTermId(buri);
+        
+            if (tid == null) {
+            
+                try {
+                
+                    // will set tid on buri as a side effect
+                    _addTerms(new BigdataValue[] { buri }, 1, false);
+                    
+                } catch (Exception ex) {
+                    
+                    // might be in a read-only transaction view
+                    log.warn("unable to resolve term: " + uri);
+                    
+                }
 
+            }
+            
         }
         
-        return buri;
+        return buri.getIV() != null ? buri : null;
         
     }
     
