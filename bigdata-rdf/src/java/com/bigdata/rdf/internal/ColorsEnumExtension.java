@@ -29,6 +29,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
 import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.BD;
 
@@ -36,7 +37,7 @@ import com.bigdata.rdf.store.BD;
  * Example of how to do a custom enum and map that enum over a byte using a 
  * native inline {@link XSDByteIV}. 
  */
-public class ColorsEnumExtension implements IExtension {
+public class ColorsEnumExtension<V extends BigdataValue> implements IExtension<V> {
 
     /**
      * The datatype URI for the colors enum extension.
@@ -99,7 +100,7 @@ public class ColorsEnumExtension implements IExtension {
      * a {@link Color}, and then use the string value of the {@link Color} to
      * create an RDF literal.
      */
-    public Value asValue(final ExtensionIV iv, final BigdataValueFactory vf) {
+    public V asValue(final ExtensionIV iv, final BigdataValueFactory vf) {
         
         final byte b = iv.getDelegate().byteValue();
         
@@ -108,7 +109,7 @@ public class ColorsEnumExtension implements IExtension {
         if (c == null)
             throw new RuntimeException("bad color got encoded somehow");
         
-        return vf.createLiteral(c.toString(), color);
+        return (V) vf.createLiteral(c.toString(), color);
         
     }
     

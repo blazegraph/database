@@ -30,6 +30,7 @@ import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import org.openrdf.model.impl.URIImpl;
 import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.BD;
 
@@ -38,7 +39,7 @@ import com.bigdata.rdf.store.BD;
  * that represent time in milliseconds since the epoch.  The milliseconds are
  * encoded as an inline long.
  */
-public class EpochExtension implements IExtension {
+public class EpochExtension<V extends BigdataValue> implements IExtension<V> {
 
     /**
      * The datatype URI for the epoch extension.
@@ -100,9 +101,9 @@ public class EpochExtension implements IExtension {
      * string value of the native type) to create a literal with the epoch
      * datatype. 
      */
-    public Value asValue(final ExtensionIV iv, final BigdataValueFactory vf) {
+    public V asValue(final ExtensionIV iv, final BigdataValueFactory vf) {
         
-        return vf.createLiteral(iv.stringValue(), epoch);
+        return (V) vf.createLiteral(iv.stringValue(), epoch);
         
     }
     

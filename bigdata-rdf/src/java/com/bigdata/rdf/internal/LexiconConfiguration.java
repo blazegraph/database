@@ -50,7 +50,8 @@ import com.bigdata.rdf.model.BigdataValueFactory;
  * @todo large literal size boundary.
  * @todo other configuration options.
  */
-public class LexiconConfiguration implements ILexiconConfiguration {
+public class LexiconConfiguration<V extends BigdataValue> 
+        implements ILexiconConfiguration {
     
     private boolean inlineLiterals, inlineBNodes;
     
@@ -76,9 +77,9 @@ public class LexiconConfiguration implements ILexiconConfiguration {
         
     }
     
-    public Value asValue(final ExtensionIV iv, final BigdataValueFactory vf) {
+    public V asValue(final ExtensionIV iv, final BigdataValueFactory vf) {
         final TermId datatype = iv.getExtensionDatatype();
-        return termIds.get(datatype).asValue(iv, vf);
+        return (V) termIds.get(datatype).asValue(iv, vf);
     }
     
     public IV createInlineIV(final Value value) {

@@ -33,7 +33,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
  * Configuration determines which RDF Values are inlined into the statement
  * indices rather than being assigned term identifiers by the lexicon.
  */
-public interface ILexiconConfiguration {
+public interface ILexiconConfiguration<V extends BigdataValue> {
 
     /**
      * Create an inline {@link IV} for the supplied RDF value if inlining is
@@ -61,7 +61,7 @@ public interface ILexiconConfiguration {
      * @return
      *          the RDF value
      */
-    Value asValue(final ExtensionIV iv, final BigdataValueFactory vf);
+    V asValue(final ExtensionIV iv, final BigdataValueFactory vf);
     
     /**
      * <code>true</code> iff the <code>vte</code> and <code>dte</code> 

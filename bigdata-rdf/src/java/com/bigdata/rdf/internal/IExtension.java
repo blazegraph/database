@@ -26,6 +26,7 @@ package com.bigdata.rdf.internal;
 
 import org.openrdf.model.Value;
 import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
@@ -37,7 +38,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
  * the datatype URI it needs resolved and the resolver will lookup (or create)
  * the {@link TermId}.  
  */
-public interface IExtension {
+public interface IExtension<V extends BigdataValue> {
 
     /**
      * This will be called very early in the IExtension lifecycle so that the
@@ -77,6 +78,6 @@ public interface IExtension {
      * @return
      *          the RDF value
      */
-    Value asValue(final ExtensionIV iv, final BigdataValueFactory vf);
+    V asValue(final ExtensionIV iv, final BigdataValueFactory vf);
     
 }
