@@ -78,11 +78,15 @@ public class ExtensionIV<V extends BigdataLiteral>
         return delegate.byteLength() + Bytes.SIZEOF_LONG;
     }
     
+    /**
+     * Defer to the {@link ILexiconConfiguration} which has specific knowledge
+     * of how to generate an RDF value from this general purpose extension IV.
+     */
     @SuppressWarnings("unchecked")
     public V asValue(final BigdataValueFactory f, 
             final ILexiconConfiguration config)
             throws UnsupportedOperationException {
-        return (V) config.getExtension(datatype).asValue(this, f);
+        return (V) config.asValue(this, f);
     }
     
 }

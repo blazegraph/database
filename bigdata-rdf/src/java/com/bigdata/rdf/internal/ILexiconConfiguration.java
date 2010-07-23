@@ -26,7 +26,8 @@ package com.bigdata.rdf.internal;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
  * Configuration determines which RDF Values are inlined into the statement
@@ -35,15 +36,32 @@ import org.openrdf.model.Value;
 public interface ILexiconConfiguration {
 
     /**
-     * <code>true</code> if the data model should use the legacy encoding
-     * for terms - all long term identifiers without byte flags and no inline
-     * values.  This is for backward compatibility.
-    public boolean isLegacyEncoding();
+     * Create an inline {@link IV} for the supplied RDF value if inlining is
+     * supported for the supplied RDF value. 
+     * <p>
+     * If the supplied RDF value is a {@link BigdataValue} then the {@link IV}
+     * will be set as a side-effect.
+     * 
+     * @param value
+     *          the RDF value
+     * @return
+     *          the inline {@link IV}
      */
+    IV createInlineIV(final Value value);
     
-    IV createIV(final Value value);
-    
-    IExtension getExtension(final TermId datatype);
+    /**
+     * Create an RDF value from an {@link ExtensionIV}. Looks through an
+     * internal catalog of {@link IExtension}s to find one that knows how to
+     * handle the extension datatype from the supplied {@link ExtensionIV}.
+     * 
+     * @param iv
+     *          the extension IV
+     * @param vf
+     *          the bigdata value factory
+     * @return
+     *          the RDF value
+     */
+    Value asValue(final ExtensionIV iv, final BigdataValueFactory vf);
     
     /**
      * <code>true</code> iff the <code>vte</code> and <code>dte</code> 

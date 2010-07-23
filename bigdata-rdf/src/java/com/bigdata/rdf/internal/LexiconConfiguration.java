@@ -37,6 +37,7 @@ import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 
 
 /**
@@ -75,11 +76,12 @@ public class LexiconConfiguration implements ILexiconConfiguration {
         
     }
     
-    public IExtension getExtension(final TermId datatype) {
-        return termIds.get(datatype);
+    public Value asValue(final ExtensionIV iv, final BigdataValueFactory vf) {
+        final TermId datatype = iv.getExtensionDatatype();
+        return termIds.get(datatype).asValue(iv, vf);
     }
     
-    public IV createIV(final Value value) {
+    public IV createInlineIV(final Value value) {
 
         // we know right away we can't handle URIs
         if (value instanceof URI)
