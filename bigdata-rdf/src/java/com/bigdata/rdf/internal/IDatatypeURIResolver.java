@@ -34,15 +34,15 @@ public interface IDatatypeURIResolver {
      * Returns a fully resolved datatype URI with the {@link TermId} set.
      * {@link IExtension}s will handle encoding and decoding of inline literals
      * for custom datatypes, however to do so they will need the term identifier
-     * for the custom datatype.  By passing an instance of this interface into
-     * the constructor for the {@link IExtension}, it will be able to resolve
-     * its datatype URI and cache it for future use.
+     * for the custom datatype.  By passing an instance of this interface to
+     * the {@link IExtension}, it will be able to resolve its datatype URI and 
+     * cache it for future use.
      * <p>
      * If the datatype URI is not already in the lexicon this method MUST add
      * it to the lexicon so that it has an assigned term identifier. 
      * <p>
      * This is implemented by the {@link LexiconRelation}. 
-     * 
+     *  
      * @param uri   
      *          the term to resolve
      * @return
