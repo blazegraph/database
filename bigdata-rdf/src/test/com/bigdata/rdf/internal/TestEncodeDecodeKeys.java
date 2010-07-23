@@ -36,6 +36,7 @@ import junit.framework.TestCase2;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
@@ -1008,6 +1009,19 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
         doEncodeDecodeTest(e);
         
+    }
+    
+    public void test_SPO_encodeDecode_BNode() {
+        
+        final IV<?, ?>[] e = {//
+                new TermId<BigdataURI>(VTE.URI, 1L),//
+                new TermId<BigdataURI>(VTE.URI, 2L),//
+                new UUIDBNodeIV<BigdataBNode>(UUID.randomUUID()),//
+                new NumericBNodeIV<BigdataBNode>(52),//
+        };
+
+        doEncodeDecodeTest(e);
+
     }
 
 }

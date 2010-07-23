@@ -598,54 +598,70 @@ public abstract class AbstractIV<V extends BigdataValue, T>
          * specially to get the correct total key order.
          */
         final DTE dte = getDTE();
+
+        if (isBNode()) {
+            
+            switch (dte) {
+            case XSDInt:
+                final int i = ((NumericBNodeIV) this).getInlineValue().intValue();
+                keyBuilder.append(i);
+                break;
+            case UUID:
+                keyBuilder.append((UUID) getInlineValue());
+                break;
+            }
+            
+        } else {
         
-        final AbstractLiteralIV<?, ?> t = (AbstractLiteralIV<?, ?>) this;
-        
-        switch (dte) {
-        case XSDBoolean:
-            keyBuilder.append((byte) (t.booleanValue() ? 1 : 0));
-            break;
-        case XSDByte:
-            keyBuilder.append(t.byteValue());
-            break;
-        case XSDShort:
-            keyBuilder.append(t.shortValue());
-            break;
-        case XSDInt:
-            keyBuilder.append(t.intValue());
-            break;
-        case XSDLong:
-            keyBuilder.append(t.longValue());
-            break;
-        case XSDFloat:
-            keyBuilder.append(t.floatValue());
-            break;
-        case XSDDouble:
-            keyBuilder.append(t.doubleValue());
-            break;
-        case XSDInteger:
-            keyBuilder.append(t.integerValue());
-            break;
-        case XSDDecimal:
-            keyBuilder.append(t.decimalValue());
-            break;
-        case UUID:
-            keyBuilder.append((UUID)t.getInlineValue());
-            break;
-//        case XSDUnsignedByte:
-//            keyBuilder.appendUnsigned(t.byteValue());
-//            break;
-//        case XSDUnsignedShort:
-//            keyBuilder.appendUnsigned(t.shortValue());
-//            break;
-//        case XSDUnsignedInt:
-//            keyBuilder.appendUnsigned(t.intValue());
-//            break;
-//        case XSDUnsignedLong:
-//            keyBuilder.appendUnsigned(t.longValue());
-//            break;
-        default:
-            throw new AssertionError(toString());
+            final AbstractLiteralIV<?, ?> t = (AbstractLiteralIV<?, ?>) this;
+            
+            switch (dte) {
+            case XSDBoolean:
+                keyBuilder.append((byte) (t.booleanValue() ? 1 : 0));
+                break;
+            case XSDByte:
+                keyBuilder.append(t.byteValue());
+                break;
+            case XSDShort:
+                keyBuilder.append(t.shortValue());
+                break;
+            case XSDInt:
+                keyBuilder.append(t.intValue());
+                break;
+            case XSDLong:
+                keyBuilder.append(t.longValue());
+                break;
+            case XSDFloat:
+                keyBuilder.append(t.floatValue());
+                break;
+            case XSDDouble:
+                keyBuilder.append(t.doubleValue());
+                break;
+            case XSDInteger:
+                keyBuilder.append(t.integerValue());
+                break;
+            case XSDDecimal:
+                keyBuilder.append(t.decimalValue());
+                break;
+            case UUID:
+                keyBuilder.append((UUID)t.getInlineValue());
+                break;
+    //        case XSDUnsignedByte:
+    //            keyBuilder.appendUnsigned(t.byteValue());
+    //            break;
+    //        case XSDUnsignedShort:
+    //            keyBuilder.appendUnsigned(t.shortValue());
+    //            break;
+    //        case XSDUnsignedInt:
+    //            keyBuilder.appendUnsigned(t.intValue());
+    //            break;
+    //        case XSDUnsignedLong:
+    //            keyBuilder.appendUnsigned(t.longValue());
+    //            break;
+            default:
+                throw new AssertionError(toString());
+            }
+            
         }
         
         return keyBuilder;
