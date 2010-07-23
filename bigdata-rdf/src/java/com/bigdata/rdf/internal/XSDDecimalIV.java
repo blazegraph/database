@@ -41,6 +41,7 @@ public class XSDDecimalIV<V extends BigdataLiteral> extends
     private static final long serialVersionUID = 1L;
     
     private final BigDecimal value;
+    private transient int byteLength;
 
     public XSDDecimalIV(final BigDecimal value) {
         
@@ -134,12 +135,21 @@ public class XSDDecimalIV<V extends BigdataLiteral> extends
         return value.hashCode();
     }
 
-    // FIXME byteLength()
     public int byteLength() {
-//        throw new UnsupportedOperationException();
-        return 1 + Bytes.SIZEOF_DOUBLE;
+        if (byteLength == 0) {
+
+            /*
+             * Cache the byteLength if not yet set.
+             */
+        	int dataLen = value.unscaledValue().toString().length();
+        	
+            byteLength = 1 /* sign */ + 4 /* exponent */+ dataLen + 1 /* data and null termination */;
+
+        }
+
+        return byteLength;
     }
-    
+        
     @Override
     protected int _compareTo(IV o) {
         
