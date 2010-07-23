@@ -32,6 +32,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.UUID;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.constraints.AbstractInlineConstraint;
 import com.bigdata.rdf.internal.constraints.InlineGT;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -256,7 +257,9 @@ public class IVUtility {
     
     private static IV decodeFromOffset(final byte[] key, final int offset) {
 
-        final byte flags = KeyBuilder.decodeByte(key[offset]);
+        int o = offset;
+        
+        final byte flags = KeyBuilder.decodeByte(key[o++]);
             
         /*
          * FIXME iNull does not work yet
@@ -271,7 +274,7 @@ public class IVUtility {
         if (!AbstractIV.isInline(flags)) {
     
             // decode the term identifier.
-            final long termId = KeyBuilder.decodeLong(key, offset+1);
+            final long termId = KeyBuilder.decodeLong(key, o);
 
             /*
              * FIXME this is here for now until 
@@ -292,51 +295,68 @@ public class IVUtility {
 
         // The data type
         final DTE dte = AbstractIV.getInternalDataTypeEnum(flags);
+        
+        final boolean isExtension = AbstractIV.isExtension(flags);
+        
+        final TermId datatype;
+        if (isExtension) {
+            datatype = new TermId(VTE.URI, KeyBuilder.decodeLong(key, o));
+            o += Bytes.SIZEOF_LONG;
+        } else {
+            datatype = null;
+        }
 
         switch (dte) {
         case XSDBoolean: {
-            final byte x = KeyBuilder.decodeByte(key[offset+1]);
-            if (x == 0) {
-                return XSDBooleanIV.FALSE;
-            } else {
-                return XSDBooleanIV.TRUE;
-            }
+            final byte x = KeyBuilder.decodeByte(key[o]);
+            final AbstractLiteralIV iv = (x == 0) ? 
+                    XSDBooleanIV.FALSE : XSDBooleanIV.TRUE;
+            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
         }
         case XSDByte: {
-            final byte x = KeyBuilder.decodeByte(key[offset+1]);
-            return new XSDByteIV<BigdataLiteral>(x);
+            final byte x = KeyBuilder.decodeByte(key[o]);
+            final AbstractLiteralIV iv = new XSDByteIV<BigdataLiteral>(x);
+            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
         }
         case XSDShort: {
-            final short x = KeyBuilder.decodeShort(key, offset+1);
-            return new XSDShortIV<BigdataLiteral>(x);
+            final short x = KeyBuilder.decodeShort(key, o);
+            final AbstractLiteralIV iv = new XSDShortIV<BigdataLiteral>(x);
+            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
         }
         case XSDInt: {
-            final int x = KeyBuilder.decodeInt(key, offset+1);
-            return new XSDIntIV<BigdataLiteral>(x);
+            final int x = KeyBuilder.decodeInt(key, o);
+            final AbstractLiteralIV iv = new XSDIntIV<BigdataLiteral>(x);
+            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
         }
         case XSDLong: {
-            final long x = KeyBuilder.decodeLong(key, offset+1);
-            return new XSDLongIV<BigdataLiteral>(x);
+            final long x = KeyBuilder.decodeLong(key, o);
+            final AbstractLiteralIV iv = new XSDLongIV<BigdataLiteral>(x);
+            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
         }
         case XSDFloat: {
-            final float x = KeyBuilder.decodeFloat(key, offset+1);
-            return new XSDFloatIV<BigdataLiteral>(x);
+            final float x = KeyBuilder.decodeFloat(key, o);
+            final AbstractLiteralIV iv = new XSDFloatIV<BigdataLiteral>(x);
+            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
         }
         case XSDDouble: {
-            final double x = KeyBuilder.decodeDouble(key, offset+1);
-            return new XSDDoubleIV<BigdataLiteral>(x);
-        }
-        case UUID: {
-            final UUID x = KeyBuilder.decodeUUID(key, offset+1);
-            return new UUIDLiteralIV<BigdataLiteral>(x);
+            final double x = KeyBuilder.decodeDouble(key, o);
+            final AbstractLiteralIV iv = new XSDDoubleIV<BigdataLiteral>(x);
+            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
         }
         case XSDInteger: {
-            final BigInteger x = KeyBuilder.decodeBigInteger(offset+1, key);
-            return new XSDIntegerIV<BigdataLiteral>(x);
+            final BigInteger x = KeyBuilder.decodeBigInteger(o, key);
+            final AbstractLiteralIV iv = new XSDIntegerIV<BigdataLiteral>(x);
+            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
         }
         case XSDDecimal: {
-            final BigDecimal x = KeyBuilder.decodeBigDecimal(offset+1, key);
-            return new XSDDecimalIV<BigdataLiteral>(x);
+            final BigDecimal x = KeyBuilder.decodeBigDecimal(o, key);
+            final AbstractLiteralIV iv = new XSDDecimalIV<BigdataLiteral>(x);
+            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
+        }
+        case UUID: {
+            final UUID x = KeyBuilder.decodeUUID(key, o);
+            final AbstractLiteralIV iv = new UUIDLiteralIV<BigdataLiteral>(x);
+            return isExtension ? new ExtensionIV(iv, datatype) : iv; 
         }
             // case XSDUnsignedByte:
             // keyBuilder.appendUnsigned(t.byteValue());

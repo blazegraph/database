@@ -136,7 +136,8 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
      * @throws UnsupportedOperationException
      *             always since {@link TermId}s are never inline.
      */
-    final public V asValue(BigdataValueFactory f)
+    final public V asValue(final BigdataValueFactory f, 
+            final ILexiconConfiguration config)
             throws UnsupportedOperationException {
         throw new UnsupportedOperationException();
     }
@@ -202,30 +203,6 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
         return (int) (termId ^ (termId >>> 32));
     }
     
-//    @Override
-//    public int compareTo(IV o) {
-//        
-//        if (!(o instanceof TermId)) 
-//            return super.compareTo(o);
-//        
-//        if (this == o)
-//            return 0;
-//        
-////        if (o == null) // already known to be non-null.
-////            return 1;
-//        
-//        final long tid1 = ((TermId<?>) this).getTermId();
-//        final long tid2 = ((TermId<?>) o).getTermId();
-//
-//        /*
-//         * Note: logic avoids possible overflow of [long] by not computing
-//         * the difference between two longs.
-//         */
-//
-//        return tid1 < tid2 ? -1 : tid1 > tid2 ? 1 : 0;
-//        
-//    }
-
     /**
      * {@inheritDoc}
      * 
@@ -237,6 +214,15 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
     public int byteLength() {
 
         return 1 + Bytes.SIZEOF_LONG;
+        
+    }
+
+    @Override
+    protected int _compareTo(IV o) {
+        
+        final long termId2 = ((TermId<?>) o).termId;
+        
+        return termId < termId2 ? -1 : termId > termId2 ? 1 : 0; 
         
     }
     

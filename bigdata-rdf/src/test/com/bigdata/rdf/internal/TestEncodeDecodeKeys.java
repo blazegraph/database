@@ -253,7 +253,12 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                         throw new UnsupportedOperationException();
                     }
 
-                    public BigdataValue asValue(BigdataValueFactory f)
+                    protected int _compareTo(IV o) {
+                        throw new UnsupportedOperationException();
+                    }
+
+                    public BigdataValue asValue(final BigdataValueFactory f, 
+                            final ILexiconConfiguration config)
                             throws UnsupportedOperationException {
                         // TODO Auto-generated method stub
                         return null;

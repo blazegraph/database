@@ -55,7 +55,8 @@ public class DummyIV extends AbstractIV {
         return "DummyIV";
     }
     
-    public BigdataValue asValue(BigdataValueFactory f)
+    public BigdataValue asValue(final BigdataValueFactory f, 
+            final ILexiconConfiguration config)
             throws UnsupportedOperationException {
         throw new UnsupportedOperationException();
     }
@@ -76,6 +77,10 @@ public class DummyIV extends AbstractIV {
     }
 
     public int compareTo(Object o) {
+        return 0;
+    }
+
+    protected int _compareTo(IV o) {
         return 0;
     }
 

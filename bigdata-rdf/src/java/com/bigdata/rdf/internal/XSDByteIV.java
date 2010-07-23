@@ -56,7 +56,8 @@ public class XSDByteIV<V extends BigdataLiteral> extends
     }
 
     @SuppressWarnings("unchecked")
-    public V asValue(final BigdataValueFactory f) {
+    public V asValue(final BigdataValueFactory f, 
+            final ILexiconConfiguration config) {
         final V v = (V) f.createLiteral(value);
         v.setIV(this);
         return v;

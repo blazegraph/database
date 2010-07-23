@@ -61,7 +61,8 @@ public class XSDDecimalIV<V extends BigdataLiteral> extends
     }
 
     @SuppressWarnings("unchecked")
-    public V asValue(final BigdataValueFactory f) {
+    public V asValue(final BigdataValueFactory f, 
+            final ILexiconConfiguration config) {
         // @todo factory should cache the XSD URIs.
         final V v = (V) f.createLiteral(value.toString(),//
                 f.createURI(DTE.XSDDecimal.getDatatype()));
@@ -143,7 +144,12 @@ public class XSDDecimalIV<V extends BigdataLiteral> extends
              */
         	int dataLen = value.unscaledValue().toString().length();
         	
-            byteLength = 1 /* sign */ + 4 /* exponent */+ dataLen + 1 /* data and null termination */;
+            byteLength = 
+                1 /* flags */ 
+                + 1 /* sign */ 
+                + 4 /* exponent */
+                + dataLen 
+                + 1 /* data and null termination */;
 
         }
 

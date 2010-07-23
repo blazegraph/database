@@ -61,7 +61,8 @@ public class UUIDLiteralIV<V extends BigdataLiteral> extends
     }
 
     @SuppressWarnings("unchecked")
-    public V asValue(final BigdataValueFactory f) {
+    public V asValue(final BigdataValueFactory f, 
+            final ILexiconConfiguration config) {
         final V v = (V) f.createLiteral(value.toString(), //
                 f.createURI(DTE.UUID.getDatatype()));
         v.setIV(this);

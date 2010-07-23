@@ -76,6 +76,15 @@ public class NumericBNodeIV<V extends BigdataBNode> extends
         return false;
     }
 
+    @Override
+    protected int _compareTo(IV o) {
+         
+        final int id2 = ((NumericBNodeIV) o).id;
+        
+        return id == id2 ? 0 : id < id2 ? -1 : 1;
+        
+    }
+    
     public int hashCode() {
         return id;
     }

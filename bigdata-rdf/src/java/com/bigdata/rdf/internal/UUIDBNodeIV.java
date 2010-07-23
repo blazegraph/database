@@ -80,6 +80,13 @@ public class UUIDBNodeIV<V extends BigdataBNode> extends
         return false;
     }
 
+    @Override
+    protected int _compareTo(IV o) {
+         
+        return id.compareTo(((UUIDBNodeIV) o).id);
+        
+    }
+    
     public int hashCode() {
         return id.hashCode();
     }
