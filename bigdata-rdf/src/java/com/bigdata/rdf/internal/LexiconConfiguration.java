@@ -35,6 +35,7 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 
 
@@ -56,9 +57,6 @@ public class LexiconConfiguration implements ILexiconConfiguration {
     
     private Map<String, IExtension> datatypes;
     
-    public LexiconConfiguration() {
-    }
-    
     public LexiconConfiguration(final boolean inlineLiterals, 
             final boolean inlineBNodes, 
             final IExtensionFactory xFactory) {
@@ -66,13 +64,13 @@ public class LexiconConfiguration implements ILexiconConfiguration {
         this.inlineBNodes = inlineBNodes;
         
         termIds = new HashMap<TermId, IExtension>();
-        for (IExtension extension : xFactory.getExtensions()) {
-            termIds.put((TermId) extension.getDatatype().getIV(), extension);
-        }
-        
         datatypes = new HashMap<String, IExtension>();
         for (IExtension extension : xFactory.getExtensions()) {
-            datatypes.put(extension.getDatatype().stringValue(), extension);
+            BigdataURI datatype = extension.getDatatype();
+            if (datatype == null)
+                continue;
+            termIds.put((TermId) datatype.getIV(), extension);
+            datatypes.put(datatype.stringValue(), extension);
         }
         
     }
