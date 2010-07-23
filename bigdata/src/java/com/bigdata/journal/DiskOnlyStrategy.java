@@ -472,6 +472,15 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     }
     
     /**
+     * Flushes the write cache (if enabled).
+     */
+    public void commit() {
+
+        flushWriteCache();
+
+    }
+
+    /**
      * Writes the {@link #writeCache} through to the disk and its position is
      * reset to zero.
      * <p>
