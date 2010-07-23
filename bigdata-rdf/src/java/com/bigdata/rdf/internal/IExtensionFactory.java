@@ -24,8 +24,29 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+/**
+ * IExtensionFactories are responsible for enumerating what extensions are
+ * supported for a particular database configuration.  Bigdata comes packaged
+ * with a {@link DefaultExtensionFactory} that supplies two starter extensions -
+ * the {@link EpochExtension} (for representing time since the epoch as a long
+ * integer) and the {@link ColorsEnumExtension} (a sample extension for how to
+ * represent an enumeration via inline literals). 
+ */
 public interface IExtensionFactory {
 
+    /**
+     * This will be called very early in the IExtensionFactory lifecycle so that 
+     * the {@link TermId}s for the {@link IExtension}'s datatype URIs will be on 
+     * hand when needed.
+     * 
+     * @param resolver
+     *          the datatype URI resolver
+     */
+    void resolveDatatypes(final IDatatypeURIResolver resolver);
+    
+    /**
+     * Return the supported extensions.
+     */
     IExtension[] getExtensions();
     
 }

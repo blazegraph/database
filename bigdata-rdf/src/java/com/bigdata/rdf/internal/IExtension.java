@@ -28,13 +28,55 @@ import org.openrdf.model.Value;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
-
+/**
+ * IExtensions are responsible for roundtripping between an RDF value and an
+ * {@link ExtensionIV} for a particular datatype.  Because of how
+ * {@link ExtensionIV}s are encoded and decoded, the IExtension will need to
+ * have on hand the {@link TermId} for its datatype.  This is accomplished
+ * via the {@link IDatatypeURIResolver} - the IExtension will give the resolver
+ * the datatype URI it needs resolved and the resolver will lookup (or create)
+ * the {@link TermId}.  
+ */
 public interface IExtension {
 
+    /**
+     * This will be called very early in the IExtension lifecycle so that the
+     * {@link TermId} for the datatype URI will be on hand when needed.
+     * 
+     * @param resolver
+     *          the datatype URI resolver
+     */
+    void resolveDatatype(final IDatatypeURIResolver resolver);
+    
+    /**
+     * Return the fully resolved datatype in the form of a {@link BigdataURI}
+     * with the {@link TermId} already set.
+     * 
+     * @return
+     *          the datatype
+     */
     BigdataURI getDatatype();
     
+    /**
+     * Create an {@link ExtensionIV} from an RDF value.
+     * 
+     * @param value
+     *          the RDF value
+     * @return
+     *          the extension IV
+     */
     ExtensionIV createIV(final Value value);
     
+    /**
+     * Create an RDF value from an {@link ExtensionIV}.
+     * 
+     * @param iv
+     *          the extension IV
+     * @param vf
+     *          the bigdata value factory
+     * @return
+     *          the RDF value
+     */
     Value asValue(final ExtensionIV iv, final BigdataValueFactory vf);
     
 }

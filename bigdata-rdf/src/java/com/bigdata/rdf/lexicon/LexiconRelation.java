@@ -2318,7 +2318,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      */
     private IV getInlineIV(Value value) {
         
-        return getLexiconConfiguration().createIV(value);
+        return getLexiconConfiguration().createInlineIV(value);
 
     }
     
@@ -2636,22 +2636,20 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             
             try {
                 
-                final Class<IExtensionFactory> xfc = determineExtensionFactoryClass();
-                final Constructor<IExtensionFactory> ctor = xfc.getConstructor(
-                        IDatatypeURIResolver.class);
-                final IExtensionFactory xFactory = ctor.newInstance(
-                        (IDatatypeURIResolver) this);
+                final Class<IExtensionFactory> xfc = 
+                    determineExtensionFactoryClass();
+                final IExtensionFactory xFactory = xfc.newInstance();
+                
+                /* 
+                 * Allow the extensions to resolve their datatype URIs into
+                 * term identifiers. 
+                 */
+                xFactory.resolveDatatypes(this);
                 
                 lexiconConfiguration = new LexiconConfiguration(
                         inlineLiterals, inlineBNodes, xFactory);
                 
             } catch (InstantiationException e) {
-                throw new IllegalArgumentException(
-                        AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
-            } catch (NoSuchMethodException e) {
-                throw new IllegalArgumentException(
-                        AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
-            } catch (InvocationTargetException e) {
                 throw new IllegalArgumentException(
                         AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
             } catch (IllegalAccessException e) {

@@ -37,9 +37,13 @@ public class ColorsEnumExtension implements IExtension {
 
     public static final URI COLOR = new URIImpl(BD.NAMESPACE + "Color");
     
-    private final BigdataURI color;
+    private BigdataURI color;
     
-    public ColorsEnumExtension(final IDatatypeURIResolver resolver) {
+    public ColorsEnumExtension() {
+        
+    }
+        
+    public void resolveDatatype(final IDatatypeURIResolver resolver) {
         
         this.color = resolver.resolve(COLOR);
         

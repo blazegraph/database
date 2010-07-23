@@ -38,9 +38,13 @@ public class EpochExtension implements IExtension {
 
     public static final URI EPOCH = new URIImpl(BD.NAMESPACE + "Epoch");
     
-    private final BigdataURI epoch;
+    private BigdataURI epoch;
     
-    public EpochExtension(final IDatatypeURIResolver resolver) {
+    public EpochExtension() {
+        
+    }
+        
+    public void resolveDatatype(final IDatatypeURIResolver resolver) {
         
         this.epoch = resolver.resolve(EPOCH);
         
