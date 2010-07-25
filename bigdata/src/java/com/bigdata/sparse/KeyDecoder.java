@@ -49,17 +49,22 @@ import com.bigdata.btree.keys.KeyBuilder;
  * prefix.
  * <p>
  * The encoded schema name is followed by the {@link KeyType#getByteCode()} and
- * then by a <code>nul</code> byte. By searching for the <code>nul</code>
- * byte we can identify the end of the encoded schema name and also the data
- * type of the primary key. Most kinds of primary keys have a fixed length
- * encoding, e.g., {@link Long}, {@link Double}, etc. However, Unicode primary
- * keys have a variable length encoding which makes life more ... complex. Since
- * the keys need to reflect the total sort order we can not include the byte
- * count of the primary key in the key itself. The only reasonable approach is
- * to append a byte sequence to the key that never occurs within the generated
- * Unicode sort keys. We use a <code>nul</code> byte for this purpose since it
- * is not emitted by most Unicode collation implementations as it would cause
- * grief for C-language strings.
+ * then by a <code>nul</code> byte. By searching for the <code>nul</code> byte
+ * we can identify the end of the encoded schema name and also the data type of
+ * the primary key. Most kinds of primary keys have a fixed length encoding,
+ * e.g., {@link Long}, {@link Double}, etc.
+ * <p>
+ * Unicode primary keys have a variable length encoding which makes life more
+ * complex. For Unicode primary keys, we break with the collation order and use
+ * the UTF8 encoding of the key. This means that the primary key can be decoded
+ * and preserves hierarchical namespace clustering within the row store but does
+ * not impose a total sort order per Unicode sort key semantics. The only
+ * reasonable approach is to append a byte sequence to the key that never occurs
+ * within the generated Unicode sort keys. Again, we use a <code>nul</code> byte
+ * to mark the end of the Unicode primary key since it is not emitted by most
+ * Unicode collation implementations as it would cause grief for C-language
+ * strings. (However, see SparseRowStore.Options#PRIMARY_KEY_UNICODE_CLEAN} for
+ * information on backward compatibility.)
  * 
  * @see Schema#fromKey(IKeyBuilder, Object)
  * @see KeyType#getKeyType(byte)
@@ -166,15 +171,15 @@ public class KeyDecoder {
      * The decoded primary key.
      * 
      * @throws UnsupportedOperationException
-     *             if the primary key can not be decoded (e.g., for
-     *             {@link KeyType#Unicode} keys).
+     *             if the primary key can not be decoded.
      */
     public Object getPrimaryKey() {
         
         if(primaryKey == null) {
-            
-            throw new UnsupportedOperationException("Can not decode: keyType="+primaryKeyType);
-            
+
+            throw new UnsupportedOperationException("Can not decode: keyType="
+                    + primaryKeyType);
+
         }
         
         return primaryKey;
@@ -220,13 +225,12 @@ public class KeyDecoder {
          * Note: the KeyType byte occurs after the schema name bytes and before
          * the [nul].
          */
+        int primaryKeyOffset = 0;
         {
             
             boolean found = false;
             
             int schemaBytesLength = 0;
-            
-            int primaryKeyOffset = 0;
             
             for (int i = 0; i < key.length; i++) {
 
@@ -256,7 +260,6 @@ public class KeyDecoder {
             
             this.primaryKeyTypeOffset = schemaBytesLength;
             
-            this.primaryKeyOffset = primaryKeyOffset;
             // note: ArrayIndexOutOfBounds with index==-1 means ICU library not on classpath!
             this.primaryKeyType = KeyType.getKeyType(KeyBuilder.decodeByte(key[primaryKeyTypeOffset]));
             
@@ -273,42 +276,48 @@ public class KeyDecoder {
             
                 primaryKeyLength = primaryKeyType.getEncodedLength();
                 
+                this.primaryKeyOffset = primaryKeyOffset;
+
                 columnNameOffset = primaryKeyOffset + primaryKeyLength;
             
             } else {
 
                 /*
-                 * Scan for the next [nul] byte.
+                 * Scan for the next [nul] byte (ASCII).
                  */
                 boolean found = false;
 
                 int primaryKeyLength = 0;
-                
+
                 for (int i = primaryKeyOffset; i < key.length; i++) {
 
                     if (key[i] == (byte) 0) {
 
                         primaryKeyLength = i - primaryKeyOffset;
-                        
+
                         found = true;
-                        
+
                         break;
-                        
+
                     }
 
                 }
-                
-                if(!found) {
+
+                if (!found) {
 
                     throw new RuntimeException(
                             "Could not locate the end of the encoded schema name: keyType="
-                                    + primaryKeyType+", key="+BytesUtil.toString(key));
+                                    + primaryKeyType + ", key="
+                                    + BytesUtil.toString(key));
 
                 }
 
                 this.primaryKeyLength = primaryKeyLength;
 
-                // Note: also skips the [nul] byte terminating the primary key.
+                this.primaryKeyOffset = primaryKeyOffset;
+
+                // Note: also skips the [nul] byte terminating the primary
+                // key.
                 this.columnNameOffset = primaryKeyOffset + primaryKeyLength + 1;
                 
             }
@@ -327,10 +336,26 @@ public class KeyDecoder {
                 primaryKey = KeyBuilder.decodeFloat(key, primaryKeyOffset);
                 break;
             case Unicode:
-                /*
-                 * Note: Decode is not possible for this case.
-                 */
-                primaryKey = null;
+                if (SparseRowStore.primaryKeyUnicodeClean) {
+                    final byte[] bytes = new byte[primaryKeyLength];
+                    System.arraycopy(key, primaryKeyOffset, bytes, 0, primaryKeyLength);
+                    try {
+                        primaryKey = new String(bytes, SparseRowStore.UTF8);
+                    } catch (UnsupportedEncodingException ex) {
+                        throw new RuntimeException(
+                                "Could not decode the primary key"
+                                        + ": primaryKeyOffset="
+                                        + primaryKeyOffset
+                                        + ", primaryKeyLength="
+                                        + primaryKeyLength + ", key="
+                                        + BytesUtil.toString(key));
+                    }
+                } else {
+                    /*
+                     * Note: Decode is not possible for this case.
+                     */
+                    primaryKey = null;
+                }
                 break;
             case ASCII:
                 primaryKey = KeyBuilder.decodeASCII(key, primaryKeyOffset,

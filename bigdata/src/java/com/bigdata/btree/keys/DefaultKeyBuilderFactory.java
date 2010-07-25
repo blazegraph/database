@@ -144,6 +144,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
     /**
      * Representation includes all aspects of the {@link Serializable} state.
      */
+    @Override
     public String toString() {
         
         StringBuilder sb = new StringBuilder(getClass().getName());
@@ -270,14 +271,10 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
         
             /*
              * Figure out which collator to use.
-             * 
-             * Note: The default depends on whether or not the ICU library is on
-             * the class path. When it is, we always default to the ICU library.
              */
 
             collator = CollatorEnum.valueOf(getProperty(properties,
-                    Options.COLLATOR, (icu_avail ? CollatorEnum.ICU.toString()
-                            : CollatorEnum.JDK.toString())));
+                    Options.COLLATOR, CollatorEnum.ICU.toString()));
 
             // true iff the collator was _explicitly_ specified.
             final boolean explicitCollatorChoice = getProperty(properties,
@@ -349,7 +346,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
              * Figure out the collator strength.
              */
 
-            Object strength = null;
+            Object tmpStrength = null;
 
             final String val = getProperty(properties, Options.STRENGTH);
 
@@ -357,24 +354,24 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
 
                 try {
 
-                    strength = StrengthEnum.valueOf(val);
+                    tmpStrength = StrengthEnum.valueOf(val);
 
                 } catch (RuntimeException ex) {
 
-                    strength = Integer.parseInt(val);
+                    tmpStrength = Integer.parseInt(val);
 
                 }
 
             }
             
             if (log.isInfoEnabled())
-                log.info(Options.STRENGTH + "=" + strength);
+                log.info(Options.STRENGTH + "=" + tmpStrength);
 
             /*
              * Note: MAY be null (when null, does not override the collator's
              * default).
              */
-            this.strength = strength;
+            this.strength = tmpStrength;
             
         }
 

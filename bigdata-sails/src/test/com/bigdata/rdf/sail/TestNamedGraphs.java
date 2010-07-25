@@ -1668,4 +1668,118 @@ public class TestNamedGraphs extends QuadsTestCase {
         
     }
 
+    /*
+     * FIXME MRP Please resolve edit conflict between testSearchQuery() above
+     * and this version of that method. 
+     */
+    public void testSearchQuery_version2() throws Exception {
+        
+        final BigdataSail sail = getSail();
+        sail.initialize();
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+        final BigdataSailRepositoryConnection cxn = (BigdataSailRepositoryConnection) repo
+                .getConnection();
+        cxn.setAutoCommit(false);
+
+        try {
+
+            if (!sail.getDatabase().isQuads()) {
+
+                log.warn("test requires quads.");
+
+                return;
+
+            }
+
+            final ValueFactory vf = cxn.getValueFactory();
+    
+            //create context
+            final Resource context1 = vf.createURI( "http://example.org" );
+    
+            //add statement to context1
+            cxn.add( vf.createStatement( 
+                    vf.createURI("http://example.org#Chris"), 
+                    RDFS.LABEL, 
+                    vf.createLiteral("Chris") ),  
+                    context1);
+            cxn.commit();
+    
+            //add statement to default graph
+            cxn.add( vf.createStatement( 
+                    vf.createURI("http://example.org#Christian"), 
+                    RDFS.LABEL, 
+                    vf.createLiteral("Christian") ) );
+            cxn.commit();   
+    
+            {
+                //when running this query, we correctly get bindings for both triples
+                final String query = 
+                    "select ?x ?y " +
+                    "where {  " +
+                    "    ?y <"+ BD.SEARCH+"> \"Chris\" . " +
+                    "    ?x <"+ RDFS.LABEL.stringValue() + "> ?y . " +
+                    "}";
+
+                final TupleQuery tupleQuery = cxn.prepareTupleQuery(
+                        QueryLanguage.SPARQL, query);
+                final TupleQueryResult result = tupleQuery.evaluate();
+                
+//                int i = 1;
+//                while (result.hasNext()) {
+//                    System.err.println(i++ + "#: " + result.next());
+//                }
+                
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                answer.add(createBindingSet(//
+                        new BindingImpl("x", vf.createURI("http://example.org#Christian")),//
+                        new BindingImpl("y", vf.createLiteral("Christian"))//
+                        ));
+                answer.add(createBindingSet(//
+                        new BindingImpl("x", vf.createURI("http://example.org#Chris")),//
+                        new BindingImpl("y", vf.createLiteral("Chris"))//
+                        ));
+
+                compare(result, answer);
+                
+            }
+            
+            {
+                //however, when running this query, we incorrectly get both results as it should only return bindings for the triple added to context 1.  
+                String query = 
+                    "select ?x ?y " +
+                    "where { " +
+                    "    graph <http://example.org> { " +
+                    "        ?y <"+ BD.SEARCH+"> \"Chris\" . " +
+                    "        ?x <"+ RDFS.LABEL.stringValue() + "> ?y ." +
+                    "    } . " +
+                    "}";
+                
+                final TupleQuery tupleQuery = cxn.prepareTupleQuery(
+                        QueryLanguage.SPARQL, query);
+                final TupleQueryResult result = tupleQuery.evaluate();
+                
+//                int i = 1;
+//                while (result.hasNext()) {
+//                    System.err.println(i++ + "#: " + result.next());
+//                }
+                
+                final Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                answer.add(createBindingSet(//
+                        new BindingImpl("x", vf.createURI("http://example.org#Chris")),//
+                        new BindingImpl("y", vf.createLiteral("Chris"))//
+                        ));
+
+                compare(result, answer);
+                
+            }
+            
+        } finally {
+
+            cxn.close();
+            sail.__tearDownUnitTest();
+
+        }
+        
+    }
+
 }
