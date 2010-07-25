@@ -27,13 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
-import java.io.DataOutput;
-import java.io.IOException;
 import java.util.UUID;
+
 import org.deri.iris.basics.Literal;
 import org.openrdf.model.Value;
+
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
@@ -347,19 +346,19 @@ public abstract class AbstractIV<V extends BigdataValue, T>
         
     }
     
-    /**
-     * FIXME I think we really need to be able to say from the flags whether
-     * an IV is null or non-null.  The context position of statements can
-     * often be null.
-     *  
-     * @param flags
-     *            The flags byte.
-     */
-    static public boolean isNull(final byte flags) {
-        
-        return false;
-        
-    }
+//    /**
+//     * FIXME I think we really need to be able to say from the flags whether
+//     * an IV is null or non-null.  The context position of statements can
+//     * often be null.
+//     *  
+//     * @param flags
+//     *            The flags byte.
+//     */
+//    static public boolean isNull(final byte flags) {
+//        
+//        return false;
+//        
+//    }
     
     /**
      * Return <code>true</code> if the flags byte has its <code>extension</code>

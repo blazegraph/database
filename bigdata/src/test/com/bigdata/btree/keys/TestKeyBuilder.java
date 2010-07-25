@@ -722,103 +722,13 @@ public class TestKeyBuilder extends TestCase2 {
     }
 
     /**
-     * Test of the ability to normalize trailing pad characters.
-     */
-    public void test_keyBuilder_normalizeTrailingPadCharacters() {
-        
-        KeyBuilder keyBuilder = (KeyBuilder)KeyBuilder.newInstance();
-        
-        assertEquals(//
-                keyBuilder.normalizeText(""),//
-                keyBuilder.normalizeText(" ")//
-                );
-        assertEquals(//
-                keyBuilder.normalizeText(""),//
-                keyBuilder.normalizeText("  ")//
-                );
-        assertEquals(//
-                keyBuilder.normalizeText(""),//
-                keyBuilder.normalizeText("      ")//
-                );
-        assertEquals(//
-                keyBuilder.normalizeText(" "),//
-                keyBuilder.normalizeText("      ")//
-                );
-        assertEquals(//
-                keyBuilder.normalizeText("abc"),//
-                keyBuilder.normalizeText("abc      ")//
-                );
-        assertEquals(//
-                keyBuilder.normalizeText("   abc"),//
-                keyBuilder.normalizeText("   abc      ")//
-                );
-        assertNotSame(//
-                keyBuilder.normalizeText("abc"),//
-                keyBuilder.normalizeText("   abc      ")//
-                );
-        
-    }
-    
-    /**
-     * Test verifies that very long strings are truncated.
-     * 
-     * @todo verify that trailing whitespace is removed after truncation rather
-     *       than before truncation.
-     */
-    public void test_keyBuilder_normalizeTruncatesVeryLongStrings() {
-
-        KeyBuilder keyBuilder = (KeyBuilder)KeyBuilder.newInstance();
-
-        final String text = getMaximumLengthText();
-
-        assertEquals(//
-                keyBuilder.normalizeText(text),//
-                keyBuilder.normalizeText(text+"abc")//
-                );
-        
-    }
-    
-    
-    /**
-     * Test verifies the order among unicode sort keys, including verifying that
+     * Test verifies the order for ASCII sort keys, including verifying that
      * the pad byte causes a prefix such as "bro" to sort before a term which
      * extends that prefix, such as "brown".
      */
     public void test_keyBuilder_ascii_order() {        
 
         KeyBuilder keyBuilder = (KeyBuilder) KeyBuilder.newInstance();
-        
-        KVO<String>[] a = new KVO[] {
-          
-                new KVO<String>(keyBuilder.asSortKey("bro"),null,"bro"),
-                new KVO<String>(keyBuilder.asSortKey("brown"),null,"brown"),
-                new KVO<String>(keyBuilder.asSortKey("bre"),null,"bre"),
-                new KVO<String>(keyBuilder.asSortKey("break"),null,"break"),
-                
-        };
-        
-        // sort by the assigned sort keys.
-        Arrays.sort(a);
-        
-        /*
-         * verify that "bre(ak)" is before "bro(wn)" and that "bre" is before
-         * "break" and "bro" is before "brown".
-         */
-        assertEquals("bre", a[0].obj);
-        assertEquals("break", a[1].obj);
-        assertEquals("bro", a[2].obj);
-        assertEquals("brown", a[3].obj);
-        
-    }
-    
-    /**
-     * Test verifies the order among unicode sort keys, including verifying that
-     * the pad byte causes a prefix such as "bro" to sort before a term which
-     * extends that prefix, such as "brown".
-     */
-    public void test_keyBuilder_unicode_order() {        
-
-        KeyBuilder keyBuilder = (KeyBuilder) KeyBuilder.newUnicodeInstance();
         
         KVO<String>[] a = new KVO[] {
           
@@ -859,50 +769,144 @@ public class TestKeyBuilder extends TestCase2 {
      */
     public void test_keyBuilder_multiField_ascii_long() {
 
-        doMultiFieldTests(false/*unicode*/);
+        final KeyBuilder keyBuilder = (KeyBuilder) KeyBuilder.newInstance();
+
+        doMultiFieldTests(false/*unicode*/,keyBuilder);
         
     }
     
-    /**
-     * <p>
-     * Test that lexiographic order is maintain when a variable length Unicode
-     * field is followed by another field. This test works by comparing the
-     * original multi-field key with the multi-field key formed from the
-     * successor of the Unicode field followed by the other field:
-     * </p>
-     * 
-     * <pre>
-     *   
-     *   [text][nextValue] LT [successor(text)][nextValue]
-     *   
-     * </pre>
-     */
-    public void test_keyBuilder_multiField_unicode() {
-        
-        doMultiFieldTests(true/*unicode*/);
-
-        /*
-         * Now test some strings that contain code points outside of the 8-bit
-         * range.
-         */
-        
-        final KeyBuilder keyBuilder = (KeyBuilder) KeyBuilder
-                .newUnicodeInstance();
-
-        final boolean unicode = true;
-        {
-            
-            // Note: This is "Japanese" in kanji.
-            String text = "\u65E5\u672C\u8A9E / \u306B\u307B\u3093\u3054";
-            
-            doMultiFieldTest(keyBuilder, unicode, text, (byte) 0);
-            doMultiFieldTest(keyBuilder, unicode, text, (byte) 1);
-            doMultiFieldTest(keyBuilder, unicode, text, (byte) -1);
-            doMultiFieldTest(keyBuilder, unicode, text, Byte.MIN_VALUE);
-            doMultiFieldTest(keyBuilder, unicode, text, Byte.MAX_VALUE);
-        }
-
-    }
+/*
+ * Moved to TestKeyBuilderCollation.  bbt 7/15/2010.
+ */
+//    /**
+//     * Test of the ability to normalize trailing pad characters.
+//     */
+//    public void test_keyBuilder_normalizeTrailingPadCharacters() {
+//        
+//        KeyBuilder keyBuilder = (KeyBuilder)KeyBuilder.newInstance();
+//        
+//        assertEquals(//
+//                keyBuilder.normalizeText(""),//
+//                keyBuilder.normalizeText(" ")//
+//                );
+//        assertEquals(//
+//                keyBuilder.normalizeText(""),//
+//                keyBuilder.normalizeText("  ")//
+//                );
+//        assertEquals(//
+//                keyBuilder.normalizeText(""),//
+//                keyBuilder.normalizeText("      ")//
+//                );
+//        assertEquals(//
+//                keyBuilder.normalizeText(" "),//
+//                keyBuilder.normalizeText("      ")//
+//                );
+//        assertEquals(//
+//                keyBuilder.normalizeText("abc"),//
+//                keyBuilder.normalizeText("abc      ")//
+//                );
+//        assertEquals(//
+//                keyBuilder.normalizeText("   abc"),//
+//                keyBuilder.normalizeText("   abc      ")//
+//                );
+//        assertNotSame(//
+//                keyBuilder.normalizeText("abc"),//
+//                keyBuilder.normalizeText("   abc      ")//
+//                );
+//        
+//    }
+//    
+//    /**
+//     * Test verifies that very long strings are truncated.
+//     * 
+//     * @todo verify that trailing whitespace is removed after truncation rather
+//     *       than before truncation.
+//     */
+//    public void test_keyBuilder_normalizeTruncatesVeryLongStrings() {
+//
+//        KeyBuilder keyBuilder = (KeyBuilder)KeyBuilder.newInstance();
+//
+//        final String text = getMaximumLengthText();
+//
+//        assertEquals(//
+//                keyBuilder.normalizeText(text),//
+//                keyBuilder.normalizeText(text+"abc")//
+//                );
+//        
+//    }
+//    
+//    /**
+//     * Test verifies the order among unicode sort keys, including verifying that
+//     * the pad byte causes a prefix such as "bro" to sort before a term which
+//     * extends that prefix, such as "brown".
+//     */
+//    public void test_keyBuilder_unicode_order() {        
+//
+//        KeyBuilder keyBuilder = (KeyBuilder) KeyBuilder.newUnicodeInstance();
+//        
+//        KVO<String>[] a = new KVO[] {
+//          
+//                new KVO<String>(keyBuilder.asSortKey("bro"),null,"bro"),
+//                new KVO<String>(keyBuilder.asSortKey("brown"),null,"brown"),
+//                new KVO<String>(keyBuilder.asSortKey("bre"),null,"bre"),
+//                new KVO<String>(keyBuilder.asSortKey("break"),null,"break"),
+//                
+//        };
+//        
+//        // sort by the assigned sort keys.
+//        Arrays.sort(a);
+//        
+//        /*
+//         * verify that "bre(ak)" is before "bro(wn)" and that "bre" is before
+//         * "break" and "bro" is before "brown".
+//         */
+//        assertEquals("bre", a[0].obj);
+//        assertEquals("break", a[1].obj);
+//        assertEquals("bro", a[2].obj);
+//        assertEquals("brown", a[3].obj);
+//        
+//    }
+//
+//    /**
+//     * <p>
+//     * Test that lexiographic order is maintain when a variable length Unicode
+//     * field is followed by another field. This test works by comparing the
+//     * original multi-field key with the multi-field key formed from the
+//     * successor of the Unicode field followed by the other field:
+//     * </p>
+//     * 
+//     * <pre>
+//     *   
+//     *   [text][nextValue] LT [successor(text)][nextValue]
+//     *   
+//     * </pre>
+//     */
+//    public void test_keyBuilder_multiField_unicode() {
+//        
+//        doMultiFieldTests(true/*unicode*/);
+//
+//        /*
+//         * Now test some strings that contain code points outside of the 8-bit
+//         * range.
+//         */
+//        
+//        final KeyBuilder keyBuilder = (KeyBuilder) KeyBuilder
+//                .newUnicodeInstance();
+//
+//        final boolean unicode = true;
+//        {
+//            
+//            // Note: This is "Japanese" in kanji.
+//            String text = "\u65E5\u672C\u8A9E / \u306B\u307B\u3093\u3054";
+//            
+//            doMultiFieldTest(keyBuilder, unicode, text, (byte) 0);
+//            doMultiFieldTest(keyBuilder, unicode, text, (byte) 1);
+//            doMultiFieldTest(keyBuilder, unicode, text, (byte) -1);
+//            doMultiFieldTest(keyBuilder, unicode, text, Byte.MIN_VALUE);
+//            doMultiFieldTest(keyBuilder, unicode, text, Byte.MAX_VALUE);
+//        }
+//
+//    }
     
     /**
      * Test helper.
@@ -911,10 +915,14 @@ public class TestKeyBuilder extends TestCase2 {
      *            When <code>true</code> tests Unicode semantics. Otherwise
      *            tests ASCII semantics.
      */
-    private void doMultiFieldTests(boolean unicode) {
-        
-        final KeyBuilder keyBuilder = (KeyBuilder) (unicode ? KeyBuilder
-                .newUnicodeInstance() : KeyBuilder.newInstance());
+    static void doMultiFieldTests(final boolean unicode,
+            final KeyBuilder keyBuilder) {
+
+        if (unicode) {
+          assertTrue(keyBuilder.isUnicodeSupported());
+      }
+//        final KeyBuilder keyBuilder = (KeyBuilder) (unicode ? KeyBuilder
+//                .newUnicodeInstance() : KeyBuilder.newInstance());
 
         /*
          * example: zero length string will be padded.
@@ -1004,7 +1012,7 @@ public class TestKeyBuilder extends TestCase2 {
      * Return a string consisting of a repeating sequence of the digits zero
      * through nine whose length is {@link IKeyBuilder#maxlen}.
      */
-    private String getMaximumLengthText() {
+    static String getMaximumLengthText() {
 
         final int len = IKeyBuilder.maxlen;
 
@@ -1042,9 +1050,9 @@ public class TestKeyBuilder extends TestCase2 {
      * @param nextValue
      *            The value to be encoded into the next field of the key.
      */
-    private void doMultiFieldTest(KeyBuilder keyBuilder, final boolean unicode,
+    static void doMultiFieldTest(KeyBuilder keyBuilder, final boolean unicode,
             final String text, final Object nextValue) {
- 
+
         // form a key from [text][nextValue].
         keyBuilder.reset();
         final byte[] k1 = keyBuilder

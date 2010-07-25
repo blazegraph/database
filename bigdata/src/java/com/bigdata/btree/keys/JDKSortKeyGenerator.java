@@ -56,8 +56,8 @@ class JDKSortKeyGenerator implements UnicodeSortKeyGenerator {
         
     }
     
-    public JDKSortKeyGenerator(Locale locale, Object strength,
-            DecompositionEnum mode) {
+    public JDKSortKeyGenerator(final Locale locale, final Object strength,
+            final DecompositionEnum mode) {
 
         if (locale == null)
             throw new IllegalArgumentException();

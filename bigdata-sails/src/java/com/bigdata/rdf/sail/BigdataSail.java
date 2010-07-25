@@ -58,6 +58,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 package com.bigdata.rdf.sail;
 
 import info.aduna.iteration.CloseableIteration;
+
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -71,8 +72,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
+
 import org.apache.log4j.Logger;
 import org.openrdf.OpenRDFUtil;
 import org.openrdf.model.Namespace;
@@ -83,6 +83,7 @@ import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ContextStatementImpl;
 import org.openrdf.model.impl.NamespaceImpl;
+import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
@@ -101,14 +102,16 @@ import org.openrdf.query.algebra.evaluation.impl.QueryJoinOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 import org.openrdf.query.algebra.evaluation.util.QueryOptimizerList;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
+import org.openrdf.query.impl.BindingImpl;
 import org.openrdf.query.impl.DatasetImpl;
+import org.openrdf.query.impl.MapBindingSet;
 import org.openrdf.sail.NotifyingSailConnection;
 import org.openrdf.sail.Sail;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailConnectionListener;
 import org.openrdf.sail.SailException;
+
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -139,7 +142,6 @@ import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
 import com.bigdata.rdf.store.BigdataValueIterator;
 import com.bigdata.rdf.store.BigdataValueIteratorImpl;
 import com.bigdata.rdf.store.EmptyStatementIterator;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
@@ -152,6 +154,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Striterator;
 
@@ -2883,7 +2886,7 @@ public class BigdataSail extends SailBase implements Sail {
          */
         public synchronized TupleExpr optimize(
                 TupleExpr tupleExpr, Dataset dataset,
-                final BindingSet bindings, final boolean includeInferred,
+                BindingSet bindings, final boolean includeInferred,
                 final Properties queryHints) 
                 throws SailException {
 
@@ -2907,7 +2910,9 @@ public class BigdataSail extends SailBase implements Sail {
              * native joins and the BigdataEvaluationStatistics rely on
              * this.
              */
-                dataset = replaceValues(dataset, tupleExpr);
+                Object[] newVals = replaceValues(dataset, tupleExpr, bindings);
+                dataset = (Dataset) newVals[0];
+                bindings = (BindingSet) newVals[1];
 
             final TripleSource tripleSource = new BigdataTripleSource(this,
                     includeInferred);
@@ -2960,7 +2965,7 @@ public class BigdataSail extends SailBase implements Sail {
          */
         public synchronized CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate(
                 TupleExpr tupleExpr, Dataset dataset,
-                final BindingSet bindings, final boolean includeInferred,
+                BindingSet bindings, final boolean includeInferred,
                 final Properties queryHints)
                 throws SailException {
 
@@ -2986,7 +2991,9 @@ public class BigdataSail extends SailBase implements Sail {
                  * native joins and the BigdataEvaluationStatistics rely on
                  * this.
                  */
-                    dataset = replaceValues(dataset, tupleExpr);
+                Object[] newVals = replaceValues(dataset, tupleExpr, bindings);
+                dataset = (Dataset) newVals[0];
+                bindings = (BindingSet) newVals[1];
 
                 final TripleSource tripleSource = new BigdataTripleSource(this,
                         includeInferred);
@@ -3044,9 +3051,13 @@ public class BigdataSail extends SailBase implements Sail {
          * with term identifiers of ZERO (0L) WILL NOT match anything in the
          * data and MUST NOT be executed since a ZERO (0L) will be interpreted
          * as a variable!
+         * 
+         * @return yucky hack, need to return a new dataset and a new binding
+         *          set.  dataset is [0], binding set is [1]
          */
-        protected Dataset replaceValues(final Dataset dataset,
-                final TupleExpr tupleExpr) throws SailException {
+        protected Object[] replaceValues(Dataset dataset,
+                final TupleExpr tupleExpr, BindingSet bindings) 
+                throws SailException {
 
             /*
              * Resolve the values used by this query.
@@ -3097,6 +3108,23 @@ public class BigdataSail extends SailBase implements Sail {
                 }
                 
             });
+            
+            if (bindings != null) {
+            
+                Iterator<Binding> it = bindings.iterator();
+            
+                while (it.hasNext()) {
+                    
+                    final Binding binding = it.next();
+                    
+                    final Value val = binding.getValue();
+                    
+                    // add BigdataValue variant of the var's Value.
+                    values.put(val, valueFactory.asValue(val));
+                    
+                }
+                
+            }
 
             /*
              * Batch resolve term identifiers for those BigdataValues.
@@ -3189,6 +3217,48 @@ public class BigdataSail extends SailBase implements Sail {
                 
             });
             
+            if (bindings != null) {
+            
+                MapBindingSet bindings2 = new MapBindingSet();
+            
+                Iterator<Binding> it = bindings.iterator();
+            
+                while (it.hasNext()) {
+                    
+                    final BindingImpl binding = (BindingImpl) it.next();
+                    
+                    final Value val = binding.getValue();
+                    
+    //              Lookup the resolve BigdataValue object.
+                    final BigdataValue val2 = values.get(val);
+    
+                    assert val2 != null : "value not found: "+binding.getValue();
+                    
+                    if (log.isDebugEnabled())
+                        log.debug("value: " + val + " : " + val2 + " ("
+                                + val2.getIV() + ")");
+    
+                    if (val2.getIV().isNull()) {
+    
+                        /*
+                         * Since the term identifier is NULL this value is
+                         * not known to the kb.
+                         */
+                        
+                        if(log.isInfoEnabled())
+                            log.info("Not in knowledge base: " + val2);
+                        
+                    }
+                    
+                    // replace the constant in the query.
+                    bindings2.addBinding(binding.getName(), val2);
+                    
+                }
+                
+                bindings = bindings2;
+                
+            }
+
             if (dataset != null) {
                 
                 final DatasetImpl dataset2 = new DatasetImpl();
@@ -3199,11 +3269,11 @@ public class BigdataSail extends SailBase implements Sail {
                 for(URI uri : dataset.getNamedGraphs())
                     dataset2.addNamedGraph((URI)values.get(uri));
                 
-                return dataset2;
+                dataset = dataset2;
                 
             }
             
-            return dataset;
+            return new Object[] { dataset, bindings };
 
         }
 

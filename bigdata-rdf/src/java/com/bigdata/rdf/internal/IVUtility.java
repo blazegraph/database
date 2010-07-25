@@ -262,12 +262,12 @@ public class IVUtility {
         
         final byte flags = KeyBuilder.decodeByte(key[o++]);
             
-        /*
-         * FIXME iNull does not work yet
-         */
-        if (AbstractIV.isNull(flags))
-            return null;
-    
+//        /*
+//         * FIXME iNull does not work yet
+//         */
+//        if (AbstractIV.isNull(flags))
+//            return null;
+//    
         
         /*
          * Handle a term identifier (versus an inline value).
@@ -277,10 +277,10 @@ public class IVUtility {
             // decode the term identifier.
             final long termId = KeyBuilder.decodeLong(key, o);
 
-            /*
-             * FIXME this is here for now until 
-             * {@link AbstractInternalValue#isNull(byte)} works.
-             */
+//            /*
+//             * FIXME this is here for now until 
+//             * {@link AbstractInternalValue#isNull(byte)} works.
+//             */
             if (termId == TermId.NULL)
                 return null;
             else

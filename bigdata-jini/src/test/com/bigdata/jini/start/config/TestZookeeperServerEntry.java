@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.jini.start.config;
 
 import java.net.InetAddress;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 
 import junit.framework.TestCase2;
@@ -93,9 +94,10 @@ public class TestZookeeperServerEntry extends TestCase2 {
      * {@link ZookeeperServerConfiguration#getZookeeperServerEntries(String)}
      * 
      * @throws ConfigurationException
+     * @throws SocketException 
      * @throws UnknownHostException 
      */
-    public void test002() throws ConfigurationException, UnknownHostException {
+    public void test002() throws ConfigurationException, SocketException, UnknownHostException {
 
         final String server = InetAddress.getLocalHost().getCanonicalHostName();
         
