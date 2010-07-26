@@ -340,7 +340,7 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
 
     }
 
-    public void writeExternal(final bjectOutput out) throws IOException {
+    public void writeExternal(final ObjectOutput out) throws IOException {
 
         out.writeShort(VERSION);
         
