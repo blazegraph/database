@@ -1,9 +1,7 @@
 package com.bigdata.rdf.internal;
 
 /**
- * Simple {@link IExtensionFactory} implementation that creates two
- * {@link IExtension}s - the {@link EpochExtension} and the 
- * {@link ColorsEnumExtension}.
+ * Empty {@link IExtensionFactory}.
  */
 public class DefaultExtensionFactory implements IExtensionFactory {
 
@@ -12,8 +10,6 @@ public class DefaultExtensionFactory implements IExtensionFactory {
     public DefaultExtensionFactory() {
         
         extensions = new IExtension[] {
-            new EpochExtension(),
-            new ColorsEnumExtension()
         };
         
     }
