@@ -44,7 +44,7 @@ public class EpochExtension<V extends BigdataValue> implements IExtension<V> {
     /**
      * The datatype URI for the epoch extension.
      */
-    public static final URI EPOCH = new URIImpl(BD.NAMESPACE + "Epoch");
+    public static final transient URI EPOCH = new URIImpl(BD.NAMESPACE + "Epoch");
     
     private BigdataURI epoch;
     
