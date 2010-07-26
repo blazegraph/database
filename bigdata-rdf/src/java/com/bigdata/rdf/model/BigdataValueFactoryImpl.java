@@ -173,7 +173,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
      */
     protected String nextID() {
 
-        return "_"+UUID.randomUUID();
+        return "u"+UUID.randomUUID();
 
     }
     
