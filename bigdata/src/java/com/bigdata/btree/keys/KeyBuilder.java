@@ -986,26 +986,53 @@ public class KeyBuilder implements IKeyBuilder {
      * {@link #flipDigits(String)} for the equivalent of 2s compliment negative
      * representation.
      * 
-     * @todo document the handling of trailing zeros. these are normalized out
-     *       as they reflect a quality of precision which is not preserved by
-     *       the corresponding sort key.
+     * There are two cases where scale and trailing zeros interact.  The
+     * case of "0.000" is represented as precision of 1 and scale of 3, 
+     * indicating the "0" is shifted down 3 decimal places.  While "5.000"
+     * is represented as precision of 4 and scale of 3.  The special case
+     * of zero is allowed because shifting zero to the right leaves a new
+     * zero on the left, so a zero value must be checked for explicitly, while
+     * if we want to compare "5", "5.00" and "5.0000" as equal we must
+     * remove and compensate for trailing zeros. 
      * 
      * @see #decodeBigDecimal(int, byte[])
      */
     public KeyBuilder append(final BigDecimal d) {
     	final int sign = d.signum(); 
-    	final int precision = d.precision();
-    	final int scale = d.scale();
+    	String unscaledStr = d.unscaledValue().toString();
+    	
+    	final int precision;
+    	final int scale;
+    	
+    	if ("0".equals(unscaledStr)) {
+    		precision = 1;
+    		scale = 1;
+    	} else {   	
+	    	int trailingZeros = 0;
+	    	int strLen = unscaledStr.length();
+	    	for (int i = strLen-1; i > 0 && unscaledStr.charAt(i) == '0'; i--) {
+	    		trailingZeros++;
+	    	}
+	    	if (trailingZeros > 0) {
+	    		unscaledStr = unscaledStr.substring(0, strLen-trailingZeros);
+	    	}
+	    	precision = d.precision() - trailingZeros;
+	    	scale =  d.scale() - trailingZeros;
+    	}
+    	
+    	// Special case for zero
+    	boolean isZero = "0".equals(unscaledStr);
+    	
     	int exponent = precision - scale;
     	if (sign == -1) {
     		exponent = -exponent;
     	}
     	
     	append((byte) sign);
-    	append(exponent);
+    	append(exponent);   	
     	
     	// Note: coded as digits 
-    	String unscaledStr = d.unscaledValue().toString();
+    	
     	if (sign == -1) {
     		unscaledStr = flipDigits(unscaledStr);
     	}
