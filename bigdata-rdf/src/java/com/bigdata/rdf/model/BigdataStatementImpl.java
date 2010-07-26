@@ -64,6 +64,7 @@ public class BigdataStatementImpl implements BigdataStatement {
     protected final BigdataValue o;
     protected final BigdataResource c;
     private StatementEnum type;
+    private boolean userFlag;
     private transient boolean override = false;
     private transient boolean modified = false;
     
@@ -72,7 +73,8 @@ public class BigdataStatementImpl implements BigdataStatement {
      */
     public BigdataStatementImpl(final BigdataResource subject,
             final BigdataURI predicate, final BigdataValue object,
-            final BigdataResource context, final StatementEnum type) {
+            final BigdataResource context, final StatementEnum type,
+            final boolean userFlag) {
 
         if (subject == null)
             throw new IllegalArgumentException();
@@ -96,6 +98,8 @@ public class BigdataStatementImpl implements BigdataStatement {
         this.c = context;
 
         this.type = type;
+        
+        this.userFlag=userFlag;
         
     }
 
@@ -152,6 +156,12 @@ public class BigdataStatementImpl implements BigdataStatement {
         this.type = type;
         
     }
+    
+    final public void setUserFlag(boolean userFlag) {
+    
+        this.userFlag = userFlag;
+        
+    }
 
     final public boolean isAxiom() {
         
@@ -168,6 +178,12 @@ public class BigdataStatementImpl implements BigdataStatement {
     final public boolean isExplicit() {
         
         return StatementEnum.Explicit == type;
+        
+    }
+    
+    final public boolean getUserFlag() {
+        
+        return userFlag;
         
     }
 
@@ -320,8 +336,8 @@ public class BigdataStatementImpl implements BigdataStatement {
 
     public byte[] serializeValue(final ByteArrayBuffer buf) {
 
-        return SPO.serializeValue(buf, override, type, c != null ? c
-                .getIV() : null);
+        return SPO.serializeValue(buf, override, userFlag, type, 
+        	c != null ? c.getIV() : null);
 
     }
 

@@ -137,6 +137,29 @@ public interface BigdataValueFactory extends ValueFactory {
             Resource c, StatementEnum type);
     
     /**
+     * Create a statement (core impl). The s,p,o, and the optional c arguments
+     * will be normalized to this {@link BigdataValueFactory} using
+     * {@link #asValue(Value)}.
+     * 
+     * @param s
+     *            The subject.
+     * @param p
+     *            The predicate.
+     * @param o
+     *            The object.
+     * @param c
+     *            The context (optional). Note: When non-<code>null</code>
+     *            and statement identifiers are enabled, then this will be a
+     *            blank node whose term identifier is the statement identifier.
+     * @param type
+     *            The statement type (optional).
+     * @param userFlag
+     *            The user flag
+     */
+    BigdataStatement createStatement(Resource s, URI p, Value o,
+            Resource c, StatementEnum type, boolean userFlag);
+
+    /**
      * Converts a {@link Value} into a {@link BigdataValue}. If the value is
      * already a {@link BigdataValue} and it was allocated by <i>this</i>
      * {@link BigdataValueFactoryImpl} then it is returned unchanged. Otherwise a

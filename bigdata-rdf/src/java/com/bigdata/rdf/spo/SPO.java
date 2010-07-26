@@ -77,7 +77,12 @@ public class SPO implements ISPO {
      * Statement type (inferred, explicit, or axiom).
      */
     private StatementEnum type;
-
+    
+    /**
+     * User flag
+     */
+    private boolean userFlag;
+    
     /**
      * Override flag used for downgrading statements during truth maintenance.
      */
@@ -405,6 +410,8 @@ public class SPO implements ISPO {
         final StatementEnum type = StatementEnum.decode(code);
 
         spo.setStatementType(type);
+        
+        spo.setUserFlag(StatementEnum.isUserFlag(code));
 
         if (val.length == 1 + 8) {
 
@@ -431,7 +438,7 @@ public class SPO implements ISPO {
 
     public byte[] serializeValue(final ByteArrayBuffer buf) {
 
-        return serializeValue(buf, isOverride(), type, c);
+        return serializeValue(buf, isOverride(),getUserFlag(), type, c);
         
     }
 
@@ -463,14 +470,17 @@ public class SPO implements ISPO {
      *         {@link SPO}.
      */
     static public byte[] serializeValue(final ByteArrayBuffer buf,
-            final boolean override, final StatementEnum type, final IV c) {
+            final boolean override, final boolean userFlag, 
+            final StatementEnum type, final IV c) {
 
         buf.reset();
 
         // optionally set the override bit on the value.
-        final byte b = (byte) (override ? (type.code() | StatementEnum.MASK_OVERRIDE)
-                : type.code());
-
+        final byte b = (byte) 
+            (type.code() 
+                    | (override ? StatementEnum.MASK_OVERRIDE : 0x0)
+                    | (userFlag ? StatementEnum.MASK_USER_FLAG : 0x0));
+        
         buf.putByte(b);
 
         if (type == StatementEnum.Explicit
@@ -508,6 +518,26 @@ public class SPO implements ISPO {
     public final boolean isAxiom() {
         
         return type == StatementEnum.Axiom;
+        
+    }
+    
+    /**
+     * Return <code>true</code> IFF the {@link SPO} has the user flag bit set. 
+     */
+    public final boolean getUserFlag() {
+        
+        return userFlag;
+        
+    }
+    
+    /**
+     * Set the user flag bit on this SPO.
+     * 
+     * @parm userFlag boolean flag
+     */
+    public final void setUserFlag(final boolean userFlag) {
+        
+        this.userFlag=userFlag;
         
     }
     
@@ -627,7 +657,6 @@ public class SPO implements ISPO {
                 case Explicit    : t = "Explicit    "; break;
                 case Inferred    : t = "Inferred    "; break;
                 case Axiom       : t = "Axiom       "; break;
-                case Backchained : t = "Backchained "; break;
                 default: throw new AssertionError();
                 }
             } else {

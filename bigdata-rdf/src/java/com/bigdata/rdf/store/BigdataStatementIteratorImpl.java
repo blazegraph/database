@@ -210,13 +210,13 @@ public class BigdataStatementIteratorImpl
             if (spo.hasStatementType() == false) {
 
                 log.error("statement with no type: "
-                        + valueFactory.createStatement(s, p, o, c, null));
+                        + valueFactory.createStatement(s, p, o, c, null, spo.getUserFlag()));
 
             }
 
             // the statement.
             final BigdataStatement stmt = valueFactory.createStatement(s, p, o,
-                    c, spo.getStatementType());
+                    c, spo.getStatementType(), spo.getUserFlag());
 
             // save the reference.
             stmts[i++] = stmt;

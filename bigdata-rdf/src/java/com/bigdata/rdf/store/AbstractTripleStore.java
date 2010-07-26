@@ -2279,8 +2279,8 @@ abstract public class AbstractTripleStore extends
                 (BigdataURI)       terms.get(spo.p()),//
                 (BigdataValue)     terms.get(spo.o()),//
                 (BigdataResource)  (c != null ? terms.get(c) : null),//
-                spo.getStatementType()//
-                );
+                spo.getStatementType(),//
+                spo.getUserFlag());
         
     }
 

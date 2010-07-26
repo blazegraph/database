@@ -155,6 +155,17 @@ public interface ISPO {
     boolean isExplicit();
 
     /**
+     * Return <code>true</code> IFF the {@link SPO} user flag is set
+     */
+    boolean getUserFlag();
+    
+    /**
+     * Set  {@link SPO} user flag
+     * @param userFlag
+     */
+    void setUserFlag(boolean userFlag);
+    
+    /**
      * Return <code>true</code> IFF the {@link SPO} is marked as
      * {@link StatementEnum#Inferred}.
      */

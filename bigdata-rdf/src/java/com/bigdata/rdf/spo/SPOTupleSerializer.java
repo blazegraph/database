@@ -155,6 +155,8 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         final StatementEnum type = StatementEnum.decode(vbuf.array()[0]);
 
         spo.setStatementType(type);
+        
+        spo.setUserFlag(StatementEnum.isUserFlag(vbuf.array()[0]));
 
         if (vbuf.limit() == 1 + 8) {
 
@@ -256,9 +258,9 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         final StatementEnum type = spo.getStatementType();
 
         // optionally set the override bit on the value.
-        final byte b = (byte) (spo.isOverride() ? (type.code() | StatementEnum.MASK_OVERRIDE)
+        byte b = (byte) (spo.isOverride() ? (type.code() | StatementEnum.MASK_OVERRIDE)
                 : type.code());
-
+        b=(byte)(spo.getUserFlag()?b|StatementEnum.MASK_USER_FLAG:b);
         buf.putByte(b);
 
         if (keyOrder.getKeyArity() == 3) {
