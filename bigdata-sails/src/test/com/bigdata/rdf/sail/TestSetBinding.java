@@ -45,6 +45,7 @@ import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.vocab.NoVocabulary;
 
@@ -139,6 +140,9 @@ public class TestSetBinding extends ProxyBigdataSailTestCase {
             Literal snowball = vf.createLiteral("Snowball");
             if (repo instanceof BigdataSailRepository) {
                 // FIXME MRP to reveiew.
+                final IV iv = repo.getDatabase().getIV(snowball);
+                ((BigdataLiteral) snowball).setIV(iv);
+                System.err.println(((BigdataLiteral) snowball).getIV());
 //                long tid = repo.getDatabase().getTermId(snowball);
 //                ((BigdataLiteral) snowball).setTermId(tid);
 //                System.err.println(((BigdataLiteral) snowball).getTermId());
