@@ -38,6 +38,7 @@ import com.bigdata.rdf.internal.ColorsEnumExtension;
 import com.bigdata.rdf.internal.EpochExtension;
 import com.bigdata.rdf.internal.ExtensionIV;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.SampleExtensionFactory;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -195,17 +196,19 @@ public class TestInlining extends AbstractTripleStoreTestCase {
             // lookup/add some values.
             final BigdataValueFactory f = store.getValueFactory();
 
-            final BigdataBNode b1 = f.createBNode("1");
-            final BigdataBNode b01 = f.createBNode("01");
-            final BigdataBNode b2 = f.createBNode(UUID.randomUUID().toString());
+            final BigdataBNode b1 = f.createBNode("i1");
+            final BigdataBNode b01 = f.createBNode("i01");
+            final BigdataBNode b2 = f.createBNode("u"+UUID.randomUUID().toString());
             final BigdataBNode b3 = f.createBNode("foo");
             final BigdataBNode b4 = f.createBNode("foo12345");
+            final BigdataBNode b5 = f.createBNode("12345");
 
             terms.add(b1);
             terms.add(b01);
             terms.add(b2);
             terms.add(b3);
             terms.add(b4);
+            terms.add(b5);
 
             final Map<IV, BigdataValue> ids = doAddTermsTest(store, terms);
 
@@ -214,6 +217,7 @@ public class TestInlining extends AbstractTripleStoreTestCase {
             assertTrue(b2.getIV().isInline());
             assertFalse(b3.getIV().isInline());
             assertFalse(b4.getIV().isInline());
+            assertFalse(b5.getIV().isInline());
             
             if (store.isStable()) {
                 
@@ -260,6 +264,10 @@ public class TestInlining extends AbstractTripleStoreTestCase {
         
         // test w/o the full text index.
         properties.setProperty(Options.TEXT_INDEX, "false");
+
+        // test with the sample extension factory
+        properties.setProperty(Options.EXTENSION_FACTORY_CLASS, 
+                SampleExtensionFactory.class.getName());
 
         AbstractTripleStore store = getStore(properties);
         
@@ -348,6 +356,10 @@ public class TestInlining extends AbstractTripleStoreTestCase {
         
         // test w/o the full text index.
         properties.setProperty(Options.TEXT_INDEX, "false");
+
+        // test with the sample extension factory
+        properties.setProperty(Options.EXTENSION_FACTORY_CLASS, 
+                SampleExtensionFactory.class.getName());
 
         AbstractTripleStore store = getStore(properties);
         

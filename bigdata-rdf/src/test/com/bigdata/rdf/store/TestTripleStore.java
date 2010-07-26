@@ -586,9 +586,12 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
     
             final IV bn1_id = store.addTerm(bn1);
             assertTrue(bn1_id != NULL);
+            System.err.println(bn1_id);
             final IV bn2_id = store.addTerm(bn2);
             assertTrue(bn2_id != NULL);
-    
+            System.err.println(bn2_id);
+            System.err.println(storeBlankNodes);
+
             assertEquals("#terms", 8 + 3 + (store.getLexiconRelation()
                     .isStoreBlankNodes() ? 2 : 0), store.getTermCount());
             assertEquals("#uris", 8, store.getURICount());
