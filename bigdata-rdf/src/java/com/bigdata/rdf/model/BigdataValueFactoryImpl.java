@@ -323,13 +323,21 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     public BigdataStatementImpl createStatement(Resource s, URI p, Value o,
             Resource c, StatementEnum type) {
+        
+        return createStatement(s, p, o, c, type, false/* userFlag */);
+        
+    }
 
+    public BigdataStatementImpl createStatement(Resource s, URI p, Value o,
+            Resource c, StatementEnum type, final boolean userFlag) {
+        
         return new BigdataStatementImpl(//
                 (BigdataResource) asValue(s),//
                 (BigdataURI)      asValue(p),//
                 (BigdataValue)    asValue(o),//
                 (BigdataResource) asValue(c),// optional
-                type // the statement type (optional).
+                type, // the statement type (optional).
+                userFlag // the user flag (optional)
         );
 
     }

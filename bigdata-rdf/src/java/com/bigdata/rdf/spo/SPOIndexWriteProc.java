@@ -211,6 +211,8 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
             // figure out if the override bit is set.
             final boolean override = StatementEnum.isOverride(val[0]);
 
+            final boolean userFlag = StatementEnum.isUserFlag(val[0]);
+            
             /*
              * Decode the new (proposed) statement type (override bit is
              * masked off).
@@ -242,7 +244,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                  * Statement is NOT pre-existing.
                  */
 
-                ndx.insert(key, SPO.serializeValue(tmp, false/* override */,
+                ndx.insert(key, SPO.serializeValue(tmp, false/* override */,userFlag,
                         newType, new_sid/* MAY be NULL */));
 
                 if (isPrimaryIndex && DEBUG) {
@@ -278,7 +280,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                         // Note: No statement identifier since statement is not
                         // explicit.
                         ndx.insert(key, SPO.serializeValue(tmp,
-                                false/* override */, newType, null/* sid */));
+                                false/* override */,userFlag, newType, null/* sid */));
 
                         if (isPrimaryIndex && DEBUG) {
                             log.debug("Downgrading SPO: key="
@@ -323,7 +325,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                         }
 
                         ndx.insert(key, SPO.serializeValue(tmp,
-                                false/* override */, maxType, sid));
+                                false/* override */,userFlag, maxType, sid));
 
                         if (isPrimaryIndex && DEBUG) {
                             log.debug("Changing statement type: key="

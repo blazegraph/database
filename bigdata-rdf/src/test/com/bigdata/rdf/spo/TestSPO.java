@@ -103,23 +103,18 @@ public class TestSPO extends TestCase2 {
         
         // test w/o override flag.
         boolean override = false;
+        boolean userFlag=false;
         for (StatementEnum type : StatementEnum.values()) {
             
-            if (type == StatementEnum.Backchained) {
-
-                // skip this - it is not a real statement type.
-                continue;
-                
-            }
-
             final byte[] val = SPO.serializeValue(new ByteArrayBuffer(),
-                    override, type, c);
+                    override,userFlag, type, c);
 
             final byte b = val[0];
 
             assertEquals(type, StatementEnum.decode(b));
             
             assertEquals(override, StatementEnum.isOverride(b));
+            assertEquals(userFlag, StatementEnum.isUserFlag(b));
 
             final IV iv = new TermId(VTE.URI, 0);
             
@@ -128,6 +123,7 @@ public class TestSPO extends TestCase2 {
                 // Should have (en|de)coded [c] as as statement identifier.
                 assertEquals(9, val.length);
                 assertEquals(c, SPO.decodeValue(new SPO(iv, iv, iv), val).c());
+                assertEquals(userFlag,SPO.decodeValue(new SPO(iv, iv, iv), val).getUserFlag());
             } else {
                 // Should not have (en|de)coded a statement identifier.
                 assertEquals(1, val.length);
@@ -141,28 +137,85 @@ public class TestSPO extends TestCase2 {
         override = true;
         for (StatementEnum type : StatementEnum.values()) {
             
-            if (type == StatementEnum.Backchained) {
-
-                // skip this - it is not a real statement type.
-                continue;
-                
-            }
-
             final byte[] val = SPO.serializeValue(new ByteArrayBuffer(),
-                    override, type, c);
+                    override, userFlag, type, c);
 
             final byte b = val[0];
 
             assertEquals(type, StatementEnum.decode(b));
 
             assertEquals(override, StatementEnum.isOverride(b));
-         
+            assertEquals(userFlag, StatementEnum.isUserFlag(b));
+
             final IV iv = new TermId(VTE.URI, 0);
             
             if (type == StatementEnum.Explicit) {
                 // Should have (en|de)coded [c] as as statement identifier.
                 assertEquals(9, val.length);
                 assertEquals(c, SPO.decodeValue(new SPO(iv, iv, iv), val).c());
+                assertEquals(userFlag,SPO.decodeValue(new SPO(iv, iv, iv), val).getUserFlag());
+            } else {
+                // Should not have (en|de)coded a statement identifier.
+                assertEquals(1, val.length);
+                assertEquals(null, SPO.decodeValue(
+                        new SPO(iv, iv, iv), val).c());
+            }
+
+        }
+        
+        // test w/o override flag && w userFlag
+        override = false;
+        userFlag=true;
+        for (StatementEnum type : StatementEnum.values()) {
+            
+            final byte[] val = SPO.serializeValue(new ByteArrayBuffer(),
+                    override, userFlag, type, c);
+
+            final byte b = val[0];
+
+            assertEquals(type, StatementEnum.decode(b));
+            
+            assertEquals(override, StatementEnum.isOverride(b));
+            assertEquals(userFlag, StatementEnum.isUserFlag(b));
+
+            final IV iv = new TermId(VTE.URI, 0);
+            
+            if (type == StatementEnum.Explicit
+                    && c.isStatement()) {
+                // Should have (en|de)coded [c] as as statement identifier.
+                assertEquals(9, val.length);
+                assertEquals(c, SPO.decodeValue(new SPO(iv, iv, iv), val).c());
+                assertEquals(userFlag,SPO.decodeValue(new SPO(iv, iv, iv), val).getUserFlag());
+            } else {
+                // Should not have (en|de)coded a statement identifier.
+                assertEquals(1, val.length);
+                assertEquals(null, SPO.decodeValue(
+                        new SPO(iv, iv, iv), val).c());
+            }
+
+        }
+
+        // test w/ override flag && w userFlag
+        override = true;
+        for (StatementEnum type : StatementEnum.values()) {
+            
+            final byte[] val = SPO.serializeValue(new ByteArrayBuffer(),
+                    override, userFlag, type, c);
+
+            final byte b = val[0];
+
+            assertEquals(type, StatementEnum.decode(b));
+
+            assertEquals(override, StatementEnum.isOverride(b));
+            assertEquals(userFlag, StatementEnum.isUserFlag(b));
+
+            final IV iv = new TermId(VTE.URI, 0);
+            
+            if (type == StatementEnum.Explicit) {
+                // Should have (en|de)coded [c] as as statement identifier.
+                assertEquals(9, val.length);
+                assertEquals(c, SPO.decodeValue(new SPO(iv, iv, iv), val).c());
+                assertEquals(userFlag, SPO.decodeValue(new SPO(iv, iv, iv), val).getUserFlag());
             } else {
                 // Should not have (en|de)coded a statement identifier.
                 assertEquals(1, val.length);
