@@ -32,7 +32,9 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+
 import org.openrdf.model.Value;
+
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
@@ -202,55 +204,30 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<IV, BigdataVa
         return tmp;
 
     }
-
+    
     /**
-     * Included only the UTF serialization of the namespace field without
-     * explicit version support.
-     * 
      * <pre>
+     * valueFactoryClass:UTF
      * namespace:UTF
      * </pre>
      */
     static final transient short VERSION0 = 0;
 
-    /**
-     * Added the UTF serialization of the class name of the value factory
-     * and an explicit version number in the serialization format. This
-     * version is detected by a read of an empty string from the original
-     * UTF field.
-     * 
-     * <pre>
-     * "":UTF
-     * valueFactoryClass:UTF
-     * namespace:UTF
-     * </pre>
-     * 
-     * Note: THere are unit tests for this backward compatible serialization
-     * change in TestId2TermTupleSerializer.
-     */
-    static final transient short VERSION1 = 1;
+    private static final transient short VERSION = VERSION0;
 
-    private static final transient short VERSION = VERSION1;
-
-    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+    public void readExternal(final ObjectInput in) throws IOException, ClassNotFoundException {
         super.readExternal(in);
-        short version = VERSION0;
-        String s1 = in.readUTF();
-        String s2 = BigdataValueFactoryImpl.class.getName();
-        if (s1.length() == 0) {
-            version = in.readShort();
-            s1 = in.readUTF();
-            s2 = in.readUTF();
-        }
+        final short version = in.readShort();
+        final String namespace;
+        final String valueFactoryClass;
         switch (version) {
         case VERSION0:
-        case VERSION1:
+            namespace = in.readUTF();
+            valueFactoryClass = in.readUTF();
             break;
         default:
             throw new IOException("unknown version=" + version);
         }
-        final String namespace = s1;
-        final String valueFactoryClass = s2;
         // set the namespace field.
         this.namespace = namespace;
         // resolve the valueSerializer from the value factory class.
@@ -275,17 +252,13 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<IV, BigdataVa
         valueSer = this.valueFactory.getValueSerializer();
     }
     
-    public void writeExternal(ObjectOutput out) throws IOException {
+    public void writeExternal(final ObjectOutput out) throws IOException {
         super.writeExternal(out);
         final short version = VERSION;
         final String valueFactoryClass = valueFactory.getClass().getName();
+        out.writeShort(version);
         switch (version) {
         case VERSION0:
-            out.writeUTF(namespace);
-            break;
-        case VERSION1:
-            out.writeUTF("");
-            out.writeShort(version);
             out.writeUTF(namespace);
             out.writeUTF(valueFactoryClass);
             break;
