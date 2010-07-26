@@ -70,7 +70,27 @@ public class RdfTypeRdfsResourceFilter extends SPOFilter implements Externalizab
         
     }
 
+    /**
+     * The initial version.
+     */
+    private static final transient short VERSION0 = 0;
+
+    /**
+     * The current version.
+     */
+    private static final transient short VERSION = VERSION0;
+
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+    
+        final short version = in.readShort();
+        
+        switch (version) {
+        case VERSION0:
+            break;
+        default:
+            throw new UnsupportedOperationException("Unknown version: "
+                    + version);
+        }
         
 //        rdfType = LongPacker.unpackLong(in);
 //
@@ -83,6 +103,8 @@ public class RdfTypeRdfsResourceFilter extends SPOFilter implements Externalizab
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
+
+        out.writeShort(VERSION);
 
 //        LongPacker.packLong(out,rdfType);
 //

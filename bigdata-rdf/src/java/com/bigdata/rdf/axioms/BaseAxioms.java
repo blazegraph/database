@@ -294,8 +294,29 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
 
     }
 
-    public void readExternal(final ObjectInput in) throws IOException, ClassNotFoundException {
-        
+    /**
+     * The initial version.
+     */
+    private static final transient byte VERSION0 = 0;
+
+    /**
+     * The current version.
+     */
+    private static final transient byte VERSION = VERSION0;
+
+    public void readExternal(final ObjectInput in) throws IOException,
+            ClassNotFoundException {
+
+        final byte version = in.readByte();
+
+        switch (version) {
+        case VERSION0:
+            break;
+        default:
+            throw new UnsupportedOperationException("Unknown version: "
+                    + version);
+        }
+
         final long naxioms = LongPacker.unpackLong(in);
         
         if (naxioms < 0 || naxioms > Integer.MAX_VALUE)
@@ -331,6 +352,8 @@ public abstract class BaseAxioms implements Axioms, Externalizable {
 
         if (btree == null)
             throw new IllegalStateException();
+        
+        out.writeByte(VERSION);
         
         final long naxioms = btree.rangeCount();
         

@@ -29,7 +29,9 @@ package com.bigdata.rdf.spo;
 
 import java.io.IOException;
 import java.util.Random;
+
 import junit.framework.TestCase2;
+
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.raba.IRaba;
@@ -40,7 +42,6 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.FixedByteArrayBuffer;
-import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.lexicon.ITermIdCodes;
@@ -186,11 +187,11 @@ public class TestSPOValueCoders extends TestCase2 {
         
     }
 
-    public void test_FastRDFValueCoder() {
-
-        doRoundTripTests(new FastRDFValueCoder(), false/* sids */, true/* inference */);
-
-    }
+//    public void test_FastRDFValueCoder() {
+//
+//        doRoundTripTests(new FastRDFValueCoder(), false/* sids */, true/* inference */);
+//
+//    }
 
     /**
      * Simple tests for {@link FastRDFValueCoder2}.
