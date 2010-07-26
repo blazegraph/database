@@ -3238,7 +3238,7 @@ public class BigdataSail extends SailBase implements Sail {
                         log.debug("value: " + val + " : " + val2 + " ("
                                 + val2.getIV() + ")");
     
-                    if (val2.getIV().isNull()) {
+                    if (val2.getIV() == null) {
     
                         /*
                          * Since the term identifier is NULL this value is
