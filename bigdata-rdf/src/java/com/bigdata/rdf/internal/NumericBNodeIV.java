@@ -60,7 +60,7 @@ public class NumericBNodeIV<V extends BigdataBNode> extends
 
     @Override
     public String stringValue() {
-        return String.valueOf(id);
+        return 'i'+String.valueOf(id);
     }
 
     final public Integer getInlineValue() {

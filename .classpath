@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry path="bigdata-rdf/src/java" kind="src"/>
+	<classpathentry path="bigdata-rdf/src/samples" kind="src"/>
 	<classpathentry path="bigdata-bsbm/src/test" kind="src"/>
 	<classpathentry path="dsi-utils/src/java" kind="src"/>
 	<classpathentry path="bigdata-bsbm/src/java" kind="src"/>
