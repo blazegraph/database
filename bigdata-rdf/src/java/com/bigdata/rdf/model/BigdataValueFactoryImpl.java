@@ -36,12 +36,12 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.datatypes.XMLDatatypeUtil;
 
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
  * An implementation using {@link BigdataValue}s and {@link BigdataStatement}s.
@@ -267,9 +267,14 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     public BigdataLiteralImpl createLiteral(final XMLGregorianCalendar arg0) {
 
+//        return new BigdataLiteralImpl(this, arg0.toString(),
+//                null/* languageCode */, createURI(arg0.getXMLSchemaType()
+//                        .toString()));
+        
         return new BigdataLiteralImpl(this, arg0.toString(),
-                null/* languageCode */, createURI(arg0.getXMLSchemaType()
-                        .toString()));
+                null/* languageCode */, createURI(XMLDatatypeUtil.qnameToURI(
+                        arg0.getXMLSchemaType()).stringValue()));
+
     }
 
     public BigdataLiteralImpl createLiteral(final String label, final String language) {
