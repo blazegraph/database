@@ -1995,7 +1995,51 @@ public class TestKeyBuilder extends TestCase2 {
         }
 
     }
-    
+
+    /**
+     * Test with positive and negative {@link BigInteger}s having a common
+     * prefix with varying digits after the prefix.
+     */
+    public void test_BigInteger_sortOrder() {
+        
+        final BigInteger p1 = new BigInteger("15");
+        final BigInteger p2 = new BigInteger("151");
+        final BigInteger m1 = new BigInteger("-15");
+        final BigInteger m2 = new BigInteger("-151");
+        
+        doEncodeDecodeTest(p1);
+        doEncodeDecodeTest(p2);
+        doEncodeDecodeTest(m1);
+        doEncodeDecodeTest(m2);
+
+        doLTTest(p1, p2); // 15 LT 151
+        doLTTest(m1, p1); // -15 LT 15
+        doLTTest(m2, m1); // -151 LT -15
+
+    }
+
+    /**
+     * Test with positive and negative {@link BigDecimal}s having varying
+     * digits after the decimals. 
+     */
+    public void test_BigDecimal_negativeSortOrder() {
+        
+        final BigDecimal p1 = new BigDecimal("1.5");
+        final BigDecimal p2 = new BigDecimal("1.51");
+        final BigDecimal m1 = new BigDecimal("-1.5");
+        final BigDecimal m2 = new BigDecimal("-1.51");
+        
+        doEncodeDecodeTest(p1);
+        doEncodeDecodeTest(p2);
+        doEncodeDecodeTest(m1);
+        doEncodeDecodeTest(m2);
+
+        doLTTest(p1, p2); // 1.5 LT 1.51
+        doLTTest(m1, p1); // -1.5 LT 1.5
+        doLTTest(m2, m1); // -1.51 LT -1.5
+
+    }
+
     /**
      * Stress test with random byte[]s from which we then construct
      * {@link BigInteger}s.
@@ -2074,12 +2118,8 @@ public class TestKeyBuilder extends TestCase2 {
     /**
      * Stress test with random byte[]s from which we then construct
      * {@link BigDecimal}s.
-     * 
-     * FIXME: At present the comparisons fail proably due to a failure to
-     * understand the limits of the BigDecimal representations - so this 
-     * test has been deactivated by name prefix.
      */
-    public void badTest_BigDecimal_stress_byteArray_values() {
+    public void test_BigDecimal_stress_byteArray_values() {
         
         final Random r = new Random();
         
@@ -2211,48 +2251,48 @@ public class TestKeyBuilder extends TestCase2 {
 //          return key;
 //
 //      }
-//
-//    /**
-//     * Normalize the {@link BigDecimal} by setting the scale such that there are
-//     * no digits before the decimal point.
-//     * 
-//     * FIXME This fails for "0" and "0.0". The trailing .0 is considered a
-//     * significant digit and is not being stripped. We need to also strip
-//     * trailing zeros which are significant.
-//     * 
-//     * <pre>
-//     * i=0   (scale=0,prec=1) : 0,   scale=0, precision=1, unscaled=0, unscaled_byte[]=[0]
-//     * i=0.0 (scale=1,prec=1) : 0.0, scale=1, precision=1, unscaled=0, unscaled_byte[]=[0]
-//     * </pre>
-//     */
-//      private BigDecimal normalizeBigDecimal(final BigDecimal i) {
-//          
-//          return i.stripTrailingZeros();
-//          
-//      }
-//
-//      /**
-//       * Dumps out interesting bits of the {@link BigDecimal} state.
-//       * 
-//       * @return The dump.
-//       */
-//      private String dumpBigDecimal(final BigDecimal i) {
-//
-//        final BigInteger unscaled = i.unscaledValue();
-//
-//        final String msg = i.toString() + ", scale=" + i.scale()
-//                + //
-//                ", precision=" + i.precision()
-//                + //
-//                ", unscaled=" + unscaled
-//                + //
-//                ", unscaled_byte[]="
-//                + BytesUtil.toString(unscaled.toByteArray())//
-//        ;
-//
-//          return msg;
-//
-//      }
+
+    /**
+     * Normalize the {@link BigDecimal} by setting the scale such that there are
+     * no digits before the decimal point.
+     * 
+     * FIXME This fails for "0" and "0.0". The trailing .0 is considered a
+     * significant digit and is not being stripped. We need to also strip
+     * trailing zeros which are significant.
+     * 
+     * <pre>
+     * i=0   (scale=0,prec=1) : 0,   scale=0, precision=1, unscaled=0, unscaled_byte[]=[0]
+     * i=0.0 (scale=1,prec=1) : 0.0, scale=1, precision=1, unscaled=0, unscaled_byte[]=[0]
+     * </pre>
+     */
+      private BigDecimal normalizeBigDecimal(final BigDecimal i) {
+          
+          return i.stripTrailingZeros();
+          
+      }
+
+      /**
+       * Dumps out interesting bits of the {@link BigDecimal} state.
+       * 
+       * @return The dump.
+       */
+      private String dumpBigDecimal(final BigDecimal i) {
+
+        final BigInteger unscaled = i.unscaledValue();
+
+        final String msg = i.toString() + ", scale=" + i.scale()
+                + //
+                ", precision=" + i.precision()
+                + //
+                ", unscaled=" + unscaled
+                + //
+                ", unscaled_byte[]="
+                + BytesUtil.toString(unscaled.toByteArray())//
+        ;
+
+          return msg;
+
+      }
 //      
 //    /**
 //     * Note: must have normalized representation of the BigDecimal to do
@@ -2308,101 +2348,101 @@ public class TestKeyBuilder extends TestCase2 {
 //
 //      }
 //
-//    private enum CompareEnum {
-//
-//        LT(-1), EQ(0), GT(1);
-//        
-//        private CompareEnum(final int ret) {
-//            this.ret = ret;
-//        }
-//
-//        private int ret;
-//        
-//        static public CompareEnum valueOf(final int ret) {
-//            if(ret<0) return LT;
-//            if(ret>0) return GT;
-//            return EQ;
-//        }
-//        
-//    }
-//
-//    protected void doCompareTest(BigDecimal i1, BigDecimal i2, final CompareEnum cmp) {
-//
-//      i1 = normalizeBigDecimal(i1);
-//      i2 = normalizeBigDecimal(i2);
-//
-//      final byte[] k1 = encodeBigDecimal(i1);
-//
-//      final byte[] k2 = encodeBigDecimal(i2);
-//
-//      final int ret = BytesUtil.compareBytes(k1, k2);
-//
-//      final CompareEnum cmp2 = CompareEnum.valueOf(ret);
-//
-//        if (cmp2 != cmp) {
-//
-//              fail("BigDecimal" + //
-//                      "\ni1=" + dumpBigDecimal(i1) + //
-//                      "\ni2=" + dumpBigDecimal(i2) + //
-//                      "\nk1=" + BytesUtil.toString(k1) + //
-//                      "\nk2=" + BytesUtil.toString(k2) + //
-//                      "\nret=" + cmp2 +", but expected="+cmp//
-//              );
-//
-//          }
-//
-//      }
-//
-//    /**
-//     * Test encode/decode for various values of zero.
-//     */
-//    public void test_BigDecimal0() {
-//
-//        final BigDecimal[] a = new BigDecimal[] {
-//                new BigDecimal("0"),    // scale=0, precision=1
-//                new BigDecimal("0."),   // scale=0, precision=1
-//                new BigDecimal("0.0"),  // scale=1, precision=1
-//                new BigDecimal("0.00"), // scale=2, precision=1
-//                new BigDecimal("00.0"), // scale=1, precision=1
-//                new BigDecimal("00.00"),// scale=2, precision=1
-//                new BigDecimal(".0"),   // scale=1, precision=1
-//                // NB: The precision is the #of decimal digits in the unscaled value.
-//                // NB: scaled := unscaled * (10 ^ -scale) 
-//                new BigDecimal(".010"), // scale=3, precision=2
-//                new BigDecimal(".01"),  // scale=2, precision=1
-//                new BigDecimal(".1"),   // scale=1, precision=1
-//                new BigDecimal("1."),   // scale=0, precision=1
-//                new BigDecimal("10."),  // scale=0, precision=2
-//                new BigDecimal("10.0"), // scale=1, precision=3
-//                new BigDecimal("010.0"), // scale=1, precision=3
-//                new BigDecimal("0010.00"), // scale=2, precision=4
-//                // @todo Test with cases where scale is negative (large powers of 10).
-//                };
-//
-//        for (BigDecimal i : a) {
-//            i = i.stripTrailingZeros();
-//            System.err.println("i="
-//                    + i
-//                    + "\t(scale="
-//                    + i.scale()
-//                    + ",prec="
-//                    + i.precision()
-//                    + ") : "
-//                    + dumpBigDecimal(i)
-////                    i.scaleByPowerOfTen(i.scale()- i.precision()))
-//                            );
-//        }
-//
-//        for (BigDecimal i : a) {
-//            doEncodeDecodeTest(i);
-//        }
-//
-//        for (int i = 0; i < a.length; i++) {
-//            for (int j = 0; j < a.length; j++) {
-//                doCompareTest(a[i], a[j], CompareEnum.EQ);
-//            }
-//        }
-//
-//    }
+    private enum CompareEnum {
+
+        LT(-1), EQ(0), GT(1);
+        
+        private CompareEnum(final int ret) {
+            this.ret = ret;
+        }
+
+        private int ret;
+        
+        static public CompareEnum valueOf(final int ret) {
+            if(ret<0) return LT;
+            if(ret>0) return GT;
+            return EQ;
+        }
+        
+    }
+
+    protected void doCompareTest(BigDecimal i1, BigDecimal i2, final CompareEnum cmp) {
+
+      i1 = normalizeBigDecimal(i1);
+      i2 = normalizeBigDecimal(i2);
+
+      final byte[] k1 = encodeBigDecimal(i1);
+
+      final byte[] k2 = encodeBigDecimal(i2);
+
+      final int ret = BytesUtil.compareBytes(k1, k2);
+
+      final CompareEnum cmp2 = CompareEnum.valueOf(ret);
+
+        if (cmp2 != cmp) {
+
+              fail("BigDecimal" + //
+                      "\ni1=" + dumpBigDecimal(i1) + //
+                      "\ni2=" + dumpBigDecimal(i2) + //
+                      "\nk1=" + BytesUtil.toString(k1) + //
+                      "\nk2=" + BytesUtil.toString(k2) + //
+                      "\nret=" + cmp2 +", but expected="+cmp//
+              );
+
+          }
+
+      }
+
+    /**
+     * Test encode/decode for various values of zero.
+     */
+    public void test_BigDecimal0() {
+
+        final BigDecimal[] a = new BigDecimal[] {
+                new BigDecimal("0"),    // scale=0, precision=1
+                new BigDecimal("0."),   // scale=0, precision=1
+                new BigDecimal("0.0"),  // scale=1, precision=1
+                new BigDecimal("0.00"), // scale=2, precision=1
+                new BigDecimal("00.0"), // scale=1, precision=1
+                new BigDecimal("00.00"),// scale=2, precision=1
+                new BigDecimal(".0"),   // scale=1, precision=1
+                // NB: The precision is the #of decimal digits in the unscaled value.
+                // NB: scaled := unscaled * (10 ^ -scale) 
+                new BigDecimal(".010"), // scale=3, precision=2
+                new BigDecimal(".01"),  // scale=2, precision=1
+                new BigDecimal(".1"),   // scale=1, precision=1
+                new BigDecimal("1."),   // scale=0, precision=1
+                new BigDecimal("10."),  // scale=0, precision=2
+                new BigDecimal("10.0"), // scale=1, precision=3
+                new BigDecimal("010.0"), // scale=1, precision=3
+                new BigDecimal("0010.00"), // scale=2, precision=4
+                // @todo Test with cases where scale is negative (large powers of 10).
+                };
+
+        for (BigDecimal i : a) {
+            i = i.stripTrailingZeros();
+            System.err.println("i="
+                    + i
+                    + "\t(scale="
+                    + i.scale()
+                    + ",prec="
+                    + i.precision()
+                    + ") : "
+                    + dumpBigDecimal(i)
+//                    i.scaleByPowerOfTen(i.scale()- i.precision()))
+                            );
+        }
+
+        for (BigDecimal i : a) {
+            doEncodeDecodeTest(i);
+        }
+
+        for (int i = 0; i < a.length; i++) {
+            for (int j = 0; j < a.length; j++) {
+                doCompareTest(a[i], a[j], CompareEnum.EQ);
+            }
+        }
+
+    }
       
 }
