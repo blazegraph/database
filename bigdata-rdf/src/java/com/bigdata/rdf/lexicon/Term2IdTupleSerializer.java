@@ -48,6 +48,8 @@ Modifications:
 package com.bigdata.rdf.lexicon;
 
 import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.Properties;
 import org.openrdf.model.Value;
 import com.bigdata.btree.DefaultTupleSerializer;
@@ -55,6 +57,8 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.ThreadLocalKeyBuilderFactory;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
@@ -205,4 +209,33 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
         
     }
 
+    /**
+     * The initial version (no additional persistent state).
+     */
+    private final static transient int VERSION0 = 0;
+
+    /**
+     * The current version.
+     */
+    private final static transient int VERSION = VERSION0;
+
+    public void readExternal(final ObjectInput in) throws IOException,
+            ClassNotFoundException {
+        super.readExternal(in);
+        final short version = in.readShort();
+        switch (version) {
+        case VERSION0:
+            break;
+        default:
+            throw new UnsupportedOperationException("Unknown version: "
+                    + version);
+        }
+
+    }
+
+    public void writeExternal(final ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeShort(VERSION);
+    }
+    
 }

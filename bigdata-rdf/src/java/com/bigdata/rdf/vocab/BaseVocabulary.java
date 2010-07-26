@@ -36,16 +36,17 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ValueFactoryImpl;
+
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueSerializer;
@@ -246,6 +247,16 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
     }
 
     /**
+     * The initial version.
+     */
+    private static final transient short VERSION0 = 0;
+
+    /**
+     * The current version.
+     */
+    private static final transient short VERSION = VERSION0;
+
+    /**
      * Note: The de-serialized state contains {@link Value}s but not
      * {@link BigdataValue}s since the {@link AbstractTripleStore} reference is
      * not available and we can not obtain the appropriate
@@ -258,6 +269,16 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
         if (values != null)
             throw new IllegalStateException();
         
+        final short version = in.readShort();
+
+        switch (version) {
+        case VERSION0:
+            break;
+        default:
+            throw new UnsupportedOperationException("Unknown version: "
+                    + version);
+        }
+
         final ValueFactory valueFactory = new ValueFactoryImpl();
 
         final BigdataValueSerializer<Value> valueSer = new BigdataValueSerializer<Value>(
@@ -305,6 +326,8 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
 
         if (values == null)
             throw new IllegalStateException();
+
+        out.writeShort(VERSION);
         
         final int nvalues = values.size();
 

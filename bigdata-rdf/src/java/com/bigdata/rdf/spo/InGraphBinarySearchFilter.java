@@ -88,8 +88,28 @@ public final class InGraphBinarySearchFilter extends SPOFilter
         
     }
 
-    public void readExternal(ObjectInput in) throws IOException,
+    /**
+     * The initial version.
+     */
+    private static final transient short VERSION0 = 0;
+
+    /**
+     * The current version.
+     */
+    private static final transient short VERSION = VERSION0;
+
+    public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
+
+        final short version = in.readShort();
+
+        switch (version) {
+        case VERSION0:
+            break;
+        default:
+            throw new UnsupportedOperationException("Unknown version: "
+                    + version);
+        }
         
         final int size = in.readInt();
         
@@ -103,8 +123,10 @@ public final class InGraphBinarySearchFilter extends SPOFilter
         
     }
 
-    public void writeExternal(ObjectOutput out) throws IOException {
+    public void writeExternal(final ObjectOutput out) throws IOException {
 
+        out.writeShort(VERSION);
+        
         out.writeInt(a.length);
         
         for(IV iv : a) {
