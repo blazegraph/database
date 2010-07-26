@@ -83,13 +83,6 @@ abstract public class AbstractInlineIV<V extends BigdataValue, T>
     }
 
     /**
-     * Always returns <code>false</code> since the value is inline.
-     */
-    final public boolean isNull() {
-        return false;
-    }
-
-    /**
      * No term identifier for an inline IV - throws an exception.
      */
     final public long getTermId() {

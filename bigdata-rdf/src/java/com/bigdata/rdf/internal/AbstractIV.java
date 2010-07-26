@@ -603,8 +603,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
             
             switch (dte) {
             case XSDInt:
-                final int i = ((NumericBNodeIV) this).getInlineValue().intValue();
-                keyBuilder.append(i);
+                keyBuilder.append(((Integer) getInlineValue()).intValue());
                 break;
             case UUID:
                 keyBuilder.append((UUID) getInlineValue());

@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal;
 
+import java.util.UUID;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -174,13 +176,6 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
     }
 
     /**
-     * Return <code>true</code> iff the term identifier is null.
-     */
-    final public boolean isNull() {
-        return termId == NULL;
-    }
-
-    /**
      * Note: only the termId matters for equality (unless we also have a
      * transient reference to the value factory which stands in as a proxy for
      * the KB instance).
@@ -225,5 +220,22 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
         return termId < termId2 ? -1 : termId > termId2 ? 1 : 0; 
         
     }
+
     
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public IKeyBuilder encode(final IKeyBuilder keyBuilder) {
+
+        // First emit the flags byte.
+        keyBuilder.append(flags());
+
+        keyBuilder.append(getTermId());
+        
+        return keyBuilder;
+        
+    }
+    
+
 }

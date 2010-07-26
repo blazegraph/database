@@ -46,7 +46,6 @@ import com.bigdata.rdf.internal.AbstractIV;
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.NullIV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.UUIDLiteralIV;
 import com.bigdata.rdf.internal.VTE;
@@ -515,7 +514,7 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
             
             IV iv = spo.get(a[i]);
 
-            encodeKey(keyBuilder, iv);
+            IVUtility.encode(keyBuilder, iv);
             
         }
         
@@ -523,37 +522,6 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
 
     }
     
-    /**
-     * Encode an RDF value into a key for one of the statement indices.
-     * 
-     * @param keyBuilder
-     *            The key builder.
-     * @param iv
-     *            The RDF value.
-     * 
-     * @return The key builder.
-     */
-    private void encodeKey(final IKeyBuilder keyBuilder, final IV iv) {
-
-        if (iv == null) {
-
-            /*
-             * FIXME justifications use null IVs to represent wildcards.  we
-             * use a fake TermId object to simulate this since we have no way
-             * of encoding null into the byte flags yet.
-             */
-            NullIV.INSTANCE.encode(keyBuilder);
-            
-            return;
-            
-        } else {
-            
-            iv.encode(keyBuilder);
-            
-        }
-        
-    }
-        
     /**
      * Decode the key into an {@link SPO}. The {@link StatementEnum} and the
      * optional SID will not be decoded, since it is carried in the B+Tree

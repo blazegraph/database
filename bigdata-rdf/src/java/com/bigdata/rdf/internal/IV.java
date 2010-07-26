@@ -128,14 +128,6 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
     boolean isTermId();
 
     /**
-     * <code>true</code> iff the RDF value is a term identifier whose value is
-     * <code>0L</code>.
-     * 
-     * @see #isTermId()
-     */
-    boolean isNull();
-
-    /**
      * Return the term identifier.
      * 
      * @return The term identifier.

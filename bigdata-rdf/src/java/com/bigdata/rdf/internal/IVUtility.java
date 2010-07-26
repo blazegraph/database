@@ -31,6 +31,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.UUID;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.constraints.AbstractInlineConstraint;
@@ -162,6 +163,33 @@ public class IVUtility {
     }
 
     /**
+     * Encode an RDF value into a key for one of the statement indices.  Handles
+     * null {@link IV} references gracefully.
+     * 
+     * @param keyBuilder
+     *            The key builder.
+     * @param iv
+     *            The internal value (can be <code>null</code>).
+     * 
+     * @return The key builder.
+     */
+    public static IKeyBuilder encode(final IKeyBuilder keyBuilder, final IV iv) {
+
+        if (iv == null) {
+
+            NullIV.INSTANCE.encode(keyBuilder);
+            
+        } else {
+            
+            iv.encode(keyBuilder);
+            
+        }
+
+        return keyBuilder;
+        
+    }
+    
+    /**
      * Decode an {@link IV} from a byte[].
      * 
      * @param key
@@ -262,13 +290,6 @@ public class IVUtility {
         
         final byte flags = KeyBuilder.decodeByte(key[o++]);
             
-//        /*
-//         * FIXME iNull does not work yet
-//         */
-//        if (AbstractIV.isNull(flags))
-//            return null;
-//    
-        
         /*
          * Handle a term identifier (versus an inline value).
          */
@@ -277,10 +298,6 @@ public class IVUtility {
             // decode the term identifier.
             final long termId = KeyBuilder.decodeLong(key, o);
 
-//            /*
-//             * FIXME this is here for now until 
-//             * {@link AbstractInternalValue#isNull(byte)} works.
-//             */
             if (termId == TermId.NULL)
                 return null;
             else

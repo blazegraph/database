@@ -164,12 +164,6 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
                 assertFalse(v.isInline());
                 
-                if (termId == 0L) {
-                    assertTrue(v.toString(), v.isNull());
-                } else {
-                    assertFalse(v.toString(), v.isNull());
-                }
-                
                 assertEquals(termId, v.getTermId());
 
                 try {

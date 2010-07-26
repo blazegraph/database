@@ -37,7 +37,6 @@ import com.bigdata.btree.raba.codec.EmptyRabaValueCoder;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.NullIV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
@@ -442,16 +441,8 @@ public class Justification implements Comparable<Justification> {
 
         for (int i = 0; i < ivs.length; i++) {
 
-            if (ivs[i] != null) {
-
-                ivs[i].encode(keyBuilder);
-
-            } else {
-                
-                NullIV.INSTANCE.encode(keyBuilder);
-                
-            }
-
+            IVUtility.encode(keyBuilder, ivs[i]);
+            
         }
 
         return keyBuilder.getKey();

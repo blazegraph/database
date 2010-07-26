@@ -28,12 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.internal;
 
 
-/**
- * FIXME A null {@link IV} class used in cases where we want to encode and 
- * decode null in the key space.  We really need to have a null option in the 
- * byte flags so we can avoid this class altogether.
- */
-public class NullIV extends TermId {
+class NullIV extends TermId {
 
     private static final long serialVersionUID = -214758033769962923L;
     
