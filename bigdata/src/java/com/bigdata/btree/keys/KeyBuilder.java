@@ -999,29 +999,21 @@ public class KeyBuilder implements IKeyBuilder {
      */
     public KeyBuilder append(final BigDecimal d) {
     	final int sign = d.signum(); 
-    	String unscaledStr = d.unscaledValue().toString();
+    	
+    	BigDecimal nd = d.stripTrailingZeros();
+    	
+    	String unscaledStr = nd.unscaledValue().toString();
     	
     	final int precision;
     	final int scale;
     	
     	if ("0".equals(unscaledStr)) {
     		precision = 1;
-    		scale = 1;
+    		scale = Integer.MAX_VALUE;
     	} else {   	
-	    	int trailingZeros = 0;
-	    	int strLen = unscaledStr.length();
-	    	for (int i = strLen-1; i > 0 && unscaledStr.charAt(i) == '0'; i--) {
-	    		trailingZeros++;
-	    	}
-	    	if (trailingZeros > 0) {
-	    		unscaledStr = unscaledStr.substring(0, strLen-trailingZeros);
-	    	}
-	    	precision = d.precision() - trailingZeros;
-	    	scale =  d.scale() - trailingZeros;
+	    	precision = nd.precision();
+	    	scale =  nd.scale();
     	}
-    	
-    	// Special case for zero
-    	boolean isZero = "0".equals(unscaledStr);
     	
     	int exponent = precision - scale;
     	if (sign == -1) {
