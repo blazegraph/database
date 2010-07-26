@@ -27,6 +27,7 @@ package com.bigdata.rdf.internal;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
@@ -143,7 +144,7 @@ public class XSDIntegerIV<V extends BigdataLiteral> extends
              * Cache the byteLength if not yet set.
              */
 
-            byteLength = 1 /* prefix */+ 2/* runLength */+ (value.bitLength() / 8 + 1)/* data */;
+            byteLength = 1 /* prefix */+ KeyBuilder.byteLength(value);
 
         }
 
