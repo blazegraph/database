@@ -74,8 +74,7 @@ public class LookupStarter extends Thread {
     private static String defaultGroup = null;
     static {
 	try {
-            thisHost = NicUtil.getIpAddress
-                           ("default.nic", null, true, true);
+            thisHost = NicUtil.getIpAddress("default.nic", "default", true);
             defaultGroup = 
                 System.getProperty("bigdata.fedname",
                                    "bigdata.test.group-"+thisHost);
