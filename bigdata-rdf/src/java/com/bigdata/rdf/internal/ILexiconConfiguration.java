@@ -24,8 +24,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
-import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
@@ -97,9 +97,6 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
 //
 //    /**
 //     * <code>true</code> iff <code>xsd:decimal</code> should be inlined.
-//     * 
-//     * @todo This option is not yet supported. Combine with XSDInteger for
-//     *       isBigNumericInline()?
 //     */
 //    public boolean isXSDDecimalInline();
 //
@@ -111,8 +108,6 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
 //     * <p>
 //     * This option is NOT compatible with
 //     * {@link AbstractTripleStore.Options#STORE_BLANK_NODES}.
-//     * 
-//     * @todo Separate option to inlined SIDs?
 //     */
 //    public boolean isBlankNodeInline();
 //
@@ -123,7 +118,7 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
 //    public boolean isUUIDInline();
 //
 //    /**
-//     * @todo Option to enable storing of long literals (over a configured
+//     * Option to enable storing of long literals (over a configured
 //     *       threshold) as blob references. The TERM2ID index would have a
 //     *       hash function (MD5, SHA-1, SHA-2, etc) of the value and assign
 //     *       a termId. The ID2TERM index would map the termId to a blob

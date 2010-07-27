@@ -53,6 +53,7 @@ import org.semanticweb.yars.nx.Node;
 import org.semanticweb.yars.nx.parser.NxParser;
 
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.ILexiconConfiguration;
 
 /**
  * A wrapper for an {@link NxParser} which implements the {@link RDFParser}
@@ -188,9 +189,10 @@ public class NQuadsParser extends RDFParserBase implements RDFParser  {
      * @todo Verify that this does/does not respect the RIO preseveBlankNodes
      *       option.
      * 
-     *       FIXME LEXICON_REFACTOR This is automatically dropping long literals
-     *       and logs an warning when it does so. We should provide an option to
-     *       allow/disallow them and store them appropriately.
+     *       FIXME This is automatically dropping long literals and logs an
+     *       warning when it does so. We should provide an option to
+     *       allow/disallow long literals in the {@link ILexiconConfiguration}
+     *       and store them appropriately.
      */
     public void parse(Reader r, String baseUriIsIgnored) throws IOException,
             RDFParseException, RDFHandlerException {

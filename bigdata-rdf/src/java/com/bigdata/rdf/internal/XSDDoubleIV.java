@@ -115,7 +115,9 @@ public class XSDDoubleIV<V extends BigdataLiteral> extends
     public boolean equals(final Object o) {
         if(this==o) return true;
         if(o instanceof XSDDoubleIV<?>) {
-            return this.value == ((XSDDoubleIV<?>) o).value;
+//            return this.value == ((XSDDoubleIV<?>) o).value;
+            // Note: This handles NaN, etc.
+            return Double.compare(this.value, ((XSDDoubleIV<?>) o).value) == 0;
         }
         return false;
     }

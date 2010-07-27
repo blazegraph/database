@@ -65,7 +65,7 @@ public class TestLocalTripleStoreWithoutInlining extends AbstractTestCase {
          */
 
         final ProxyTestSuite suite = new ProxyTestSuite(delegate,
-                "Local Triple Store With Provenance Test Suite");
+                "Local Triple Store With Provenance Test Suite Without Inlining");
 
         /*
          * List any non-proxied tests (typically bootstrapping tests).

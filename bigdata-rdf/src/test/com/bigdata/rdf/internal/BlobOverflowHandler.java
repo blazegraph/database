@@ -48,35 +48,35 @@ import com.bigdata.rawstore.IRawStore;
  * @version $Id: BlobOverflowHandler.java 2265 2009-10-26 12:51:06Z thompsonbry
  *          $
  * 
- *          FIXME {@link IBlock} reads are not finished so this will not work
- *          yet. It seems that {@link IBlock} is might stand a refactor so that
- *          you get an {@link IByteArrayBuffer} instead of an {@link IBlock}.
- *          The remote iterator methods and remote tuple lookup methods (which
- *          have not yet been defined) would then use a smart proxy to handle
- *          the materialization of the raw record in the caller's JVM. There is
- *          no reason to add a streaming interface here since raw records and
- *          {@link IOverflowHandler}s are not useful once you get more than a
- *          few MB worth of data in the record. At that point you really need to
- *          use a REST-ful repository service which stores the data as chunks in
- *          the file system (ala BFS, but not trying to store the chunks in the
- *          journal or index segment since they are capped at ~200MB each and
- *          the file system chunk size might be closer to 64MB).
+ * @todo {@link IBlock} reads are not finished so this will not work yet. It
+ *       seems that {@link IBlock} is might stand a refactor so that you get an
+ *       {@link IByteArrayBuffer} instead of an {@link IBlock}. The remote
+ *       iterator methods and remote tuple lookup methods (which have not yet
+ *       been defined) would then use a smart proxy to handle the
+ *       materialization of the raw record in the caller's JVM. There is no
+ *       reason to add a streaming interface here since raw records and
+ *       {@link IOverflowHandler}s are not useful once you get more than a few
+ *       MB worth of data in the record. At that point you really need to use a
+ *       REST-ful repository service which stores the data as chunks in the file
+ *       system (ala BFS, but not trying to store the chunks in the journal or
+ *       index segment since they are capped at ~200MB each and the file system
+ *       chunk size might be closer to 64MB).
  * 
- *          FIXME Move this class to the btree package and integrate into its
- *          test suite.
+ *       <p>
+ *       Move this class to the btree package and integrate into its test suite.
  * 
- *          FIXME The class of the same name in the BFS package will need to be
- *          modified. Per above, BFS will need to store its chunks in the local
- *          file system. Therefore the blob reference will have to include the
- *          local file name (UUID_chunkNumber_version?) and the chunk will have
- *          to be replicated on each node having a given shard of chunks. For
- *          BFS, we clearly DO NOT want to move shards around if we can help it
- *          since we will have to move a huge amount of data around as well.
- *          <p>
- *          An alternative is to use a parallel file system to store the chunks,
- *          in which case we do not have to worry about replicating the chunks
- *          and we can move the shards easily enough since the chunks are
- *          elsewhere.
+ *       <p>
+ *       The class of the same name in the BFS package will need to be modified.
+ *       Per above, BFS will need to store its chunks in the local file system.
+ *       Therefore the blob reference will have to include the local file name
+ *       (UUID_chunkNumber_version?) and the chunk will have to be replicated on
+ *       each node having a given shard of chunks. For BFS, we clearly DO NOT
+ *       want to move shards around if we can help it since we will have to move
+ *       a huge amount of data around as well.
+ *       <p>
+ *       An alternative is to use a parallel file system to store the chunks, in
+ *       which case we do not have to worry about replicating the chunks and we
+ *       can move the shards easily enough since the chunks are elsewhere.
  */
 public class BlobOverflowHandler implements IOverflowHandler {
 

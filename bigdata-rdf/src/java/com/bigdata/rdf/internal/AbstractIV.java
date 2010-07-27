@@ -171,30 +171,9 @@ import com.bigdata.rdf.model.BigdataValue;
  *       Datatypes namespaces </a>). I propose that we collapse these by default
  *       onto a canonical datatype URI.
  * 
- * @todo For a extensible data type which is being projected onto an intrinsic
- *       data type we would need both (a) a method to project the RDF Value onto
- *       the appropriate intrinsic data type; and (b) a method to materialize an
- *       RDF Value from the inline representation.
- *       <p>
- *       If we put the registrations into their own index, then we could use a
- *       more compact representation (the term identifier of the datatype URI is
- *       8 bytes, but we could do with 2 or 4 bytes). Alternatively, we could
- *       use the LongPacker to pack an unsigned long integer into as few bytes
- *       as possible. This would break the natural ordering across the
- *       dataTypeIds, but I can not see how that would matter since the term
- *       identifiers are essentially arbitrary anyway so their order has little
- *       value.
- * 
  * @todo Can we inline the language code for a literal? I think that the
  *       language code must be ASCII and might be restricted to two characters.
  *       This might use up our {@link DTE#Reserved1} bit.
- * 
- * @todo One consequences of this refactor is that you must use equals() rather
- *       than == to compare internal values, including term identifiers. This
- *       boils down to verifying that the two internal values are the same type
- *       (same VTE, DTE, etc) and have the same value (termId, long, etc). That
- *       can all be done rather quickly, but it is more overhead than testing a
- *       == b.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestEncodeDecodeKeys.java 2753 2010-05-01 16:36:59Z thompsonbry
@@ -346,28 +325,12 @@ public abstract class AbstractIV<V extends BigdataValue, T>
         
     }
     
-//    /**
-//     * FIXME I think we really need to be able to say from the flags whether
-//     * an IV is null or non-null.  The context position of statements can
-//     * often be null.
-//     *  
-//     * @param flags
-//     *            The flags byte.
-//     */
-//    static public boolean isNull(final byte flags) {
-//        
-//        return false;
-//        
-//    }
-    
     /**
      * Return <code>true</code> if the flags byte has its <code>extension</code>
      * bit set.
      * 
      * @param flags
      *            The flags byte.
-     * 
-     * @todo unit test for this.
      */
     static public boolean isExtension(final byte flags) {
 

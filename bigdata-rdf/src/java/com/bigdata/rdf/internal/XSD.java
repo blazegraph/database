@@ -27,6 +27,12 @@ package com.bigdata.rdf.internal;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
+/**
+ * Collects various XSD URIs as constants.
+ * 
+ * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
+ * @version $Id$
+ */
 public interface XSD {
     
     String NAMESPACE = "http://www.w3.org/2001/XMLSchema#";

@@ -27,9 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.lexicon;
 
-import com.bigdata.rdf.internal.VTE;
-
-
 /**
  * This interface defines the signed byte values indicating the type of a term
  * in the term index. The purpose of this is to partition the term:id index into

@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal;
 
-import java.util.UUID;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataValue;
@@ -50,9 +49,6 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
 
     /** The term identifier. */
     private final long termId;
-
-//    /** The datatype term identifier. */
-//    private final long dataTypeId;
 
     /**
      * Constructor for a term identifier when you are decoding and already have
@@ -87,34 +83,8 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
 
         this.termId = termId;
         
-//        this.dataTypeId = 0L;
-        
     }
     
-//    /**
-//     * Constructor for a term identifier for a datatype literal. Do NOT use this
-//     * constructor when the lexicon is configured such that the datatype literal
-//     * should be inlined.
-//     * 
-//     * @param vte
-//     * @param dte
-//     * @param termId
-//     * @param dataTypeId
-//     */
-//    public TermId(final VTE vte, final DTE dte, final long termId,
-//            final long dataTypeId) {
-//
-//        super(vte, false/* inline */, true/* extension */, dte);
-//
-//        if (dataTypeId == IRawTripleStore.NULL)
-//            throw new IllegalArgumentException();
-//        
-//        this.termId = termId;
-//        
-//        this.dataTypeId = dataTypeId;
-//
-//    }
-
     /**
      * Human readable representation includes the term identifier, whether
      * this is a URI, Literal, Blank node, or Statement identifier and the
@@ -152,13 +122,6 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
         return termId;
     }
     
-//    /**
-//     * Return the term identifier for the datatype associated with the term.
-//     */
-//    final public long getDataTypeID() {
-//        return dataTypeId;
-//    }
-
     /**
      * Always returns <code>false</code> since the RDF value is not inline.
      */
@@ -176,6 +139,8 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
     }
 
     /**
+     * {@inheritDoc
+     * 
      * Note: only the termId matters for equality (unless we also have a
      * transient reference to the value factory which stands in as a proxy for
      * the KB instance).
@@ -198,14 +163,6 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
         return (int) (termId ^ (termId >>> 32));
     }
     
-    /**
-     * {@inheritDoc}
-     * 
-     * FIXME We are going to need another class with similar semantics if we
-     * also allow raw tids (the historical way of coding a term identifier as
-     * just 8 bytes). I suggest RawTermId for the old way and TermId for the new
-     * way.
-     */
     public int byteLength() {
 
         return 1 + Bytes.SIZEOF_LONG;
@@ -220,11 +177,7 @@ public class TermId<V extends BigdataValue/* URI,BNode,Literal,SID */>
         return termId < termId2 ? -1 : termId > termId2 ? 1 : 0; 
         
     }
-
     
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public IKeyBuilder encode(final IKeyBuilder keyBuilder) {
 

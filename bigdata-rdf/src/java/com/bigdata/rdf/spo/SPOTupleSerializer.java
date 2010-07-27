@@ -40,7 +40,6 @@ import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.ByteArrayBuffer;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
@@ -282,20 +281,41 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         
     }
 
+    /**
+     * The initial version.
+     */
+    private final static transient byte VERSION0 = 0;
+
+    /**
+     * The current version.
+     */
+    private final static transient byte VERSION = VERSION0;
+
     public void readExternal(ObjectInput in) throws IOException,
             ClassNotFoundException {
 
         super.readExternal(in);
         
+        final byte version = in.readByte();
+        
+        switch (version) {
+        case VERSION0:
+            break;
+        default:
+            throw new UnsupportedOperationException("Unknown version: "
+                    + version);
+        }
+
         keyOrder = SPOKeyOrder.valueOf(in.readByte());
 
     }
 
-    // FIXME VERSION: Not explicitly versioned.
     public void writeExternal(ObjectOutput out) throws IOException {
 
         super.writeExternal(out);
-        
+
+        out.writeByte(VERSION);
+
         out.writeByte(keyOrder.index());
 
     }

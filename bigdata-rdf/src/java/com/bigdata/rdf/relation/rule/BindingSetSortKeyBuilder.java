@@ -78,15 +78,11 @@ public class BindingSetSortKeyBuilder implements ISortKeyBuilder<IBindingSet> {
             
             final IVariable var = vars[i];
             
-            /*
-             * FIXME Do we ever get unbound values here? This looks suspiciously
-             * like old Long code to me.
-             */
             Object val = bindingSet.get(var);
-            if(val==null) {
-            	val=Long.valueOf(0);
-            }else if(val instanceof Constant) {
-                val=((Constant)val).get();
+            if (val == null) {
+                val = Long.valueOf(0);
+            } else if (val instanceof Constant) {
+                val = ((Constant) val).get();
             }
 
             if (val instanceof IV) {

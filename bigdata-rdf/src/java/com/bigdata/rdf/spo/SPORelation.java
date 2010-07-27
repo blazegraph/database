@@ -69,12 +69,8 @@ import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.Justification;
-import com.bigdata.rdf.internal.DTE;
-import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.LexiconConfiguration;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.lexicon.ITermIdFilter;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.StatementEnum;
@@ -366,79 +362,6 @@ public class SPORelation extends AbstractRelation<ISPO> {
         return true;
         
     }
-
-//    /**
-//     * Attempt to resolve each index for the {@link SPORelation} and cache a
-//     * hard reference to that index.
-//     * 
-//     * FIXME The LDS unit tests are failing when attempting to resolve the JUST
-//     * index from the SPORelation when it was not declared for the AbstractTask.
-//     * The eager resolution of indices is going to break all of the LDS
-//     * execution.
-//     * 
-//     * @todo Optimization. When materializing a relation, such as the
-//     *       {@link SPORelation} or the {@link LexiconRelation}, on a
-//     *       {@link DataService} we may not want to have all indices resolved
-//     *       eager. The {@link AbstractTask} will actually return
-//     *       <code>null</code> rather than throwing an exception, but eager
-//     *       resolution of the indices will force {@link IClientIndex}s to
-//     *       spring into existence when we might only want a single index for
-//     *       the relation.
-//     */
-//    private void lookupIndices() {
-//
-//        /*
-//         * Note: if full transactions are to be used then the statement indices
-//         * and the justification indices should be assigned the transaction
-//         * identifier.
-//         */
-//
-//        if (keyArity == 3) {
-//
-//            if (oneAccessPath) {
-//
-//                // attempt to resolve the index and set the index reference.
-//                indices[SPOKeyOrder._SPO] = super.getIndex(SPOKeyOrder.SPO);
-//
-//            } else {
-//
-//                // attempt to resolve the index and set the index reference.
-//                indices[SPOKeyOrder._SPO] = super.getIndex(SPOKeyOrder.SPO);
-//                indices[SPOKeyOrder._POS] = super.getIndex(SPOKeyOrder.POS);
-//                indices[SPOKeyOrder._OSP] = super.getIndex(SPOKeyOrder.OSP);
-//
-//            }
-//
-//        } else {
-//
-//            if(oneAccessPath) {
-//            
-//                indices[SPOKeyOrder._SPOC] = super.getIndex(SPOKeyOrder.SPOC);
-//                
-//            } else {
-//
-//                for (int i = SPOKeyOrder.FIRST_QUAD_INDEX; i <= SPOKeyOrder.LAST_QUAD_INDEX; i++) {
-//
-//                    indices[i] = super.getIndex(SPOKeyOrder.valueOf(i));
-//
-//                }
-//
-//            }
-//            
-//        }
-//
-//        if (justify) {
-//
-//            // attempt to resolve the index and set the index reference.
-//            just = super.getIndex(getNamespace() + "." + NAME_JUST);
-//
-//        } else {
-//
-//            just = null;
-//
-//        }
-//
-//    }
 
     public void create() {
       

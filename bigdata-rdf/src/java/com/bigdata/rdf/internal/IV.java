@@ -28,11 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.internal;
 
 import java.io.Serializable;
+
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import com.bigdata.btree.BytesUtil;
+
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
@@ -45,12 +45,6 @@ import com.bigdata.rdf.store.AbstractTripleStore.Options;
  *            The generic type for the RDF {@link Value} implementation.
  * @param <T>
  *            The generic type for the inline value.
- *            
- * @todo Consider whether we need the ability to compute the successor of a
- *       value in the value space here. There are implementations of successor()
- *       for most data types in {@link SuccessorUtil}, including fixed length
- *       unsigned byte[]s, and also {@link BytesUtil#successor(byte[])}, which
- *       handles variable length unsigned byte[]s.
  */
 public interface IV<V extends BigdataValue, T> extends Serializable, 
         Comparable<IV> {
@@ -201,7 +195,6 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
      * <code>true</code> for xsd:float, xsd:double, and xsd:decimal
      */
     boolean isFloatingPointNumeric();
-    
 
     /**
      * Inflate an inline RDF value to a {@link BigdataValue}. This method DOES
@@ -213,27 +206,11 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
      *            The value factory.
      * @param config
      *            The lexicon configuration.
+     * 
      * @return The corresponding {@link BigdataValue}.
+     * 
      * @throws UnsupportedOperationException
      *             unless the RDF value is inline.
-     * 
-     *             FIXME Reconcile with BigdataValueImpl and BigdataValue. The
-     *             role of the valueFactory reference on BigdataValueImpl was to
-     *             detect when an instance was created by another value factory.
-     *             The choice of whether or not to inline the value is
-     *             determined by the lexicon configuration, and that choice is
-     *             probably captured by a BigdataValueFactory configuration
-     *             object. Therefore we do need to convert to a different
-     *             instance when the {@link IV} will be used in a
-     *             different lexicon configuration context.
-     *             <P>
-     *             It would be nice to support shared lexicons for a collection
-     *             of triple / quad stores. The lexicon would be in the
-     *             container namespace for that federation of KBs. The
-     *             individual triple/quad stores would be in the per-KB instance
-     *             namespace. The collection could have a mixture of triple
-     *             and/or quad stores since the lexicon does not interact with
-     *             whether we are using triples or quads (except for SIDs).
      */
     V asValue(final BigdataValueFactory vf, final ILexiconConfiguration config) 
         throws UnsupportedOperationException;

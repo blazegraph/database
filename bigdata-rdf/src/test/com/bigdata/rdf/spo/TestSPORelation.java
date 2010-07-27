@@ -90,7 +90,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
     }
 
     /**
-     * This methods was introduced to make the assigned identifiers conform with
+     * This method was introduced to make the assigned identifiers conform with
      * the expectations for identifiers as assigned by the lexicon. This was
      * necessitated by the change to {@link ISPO#hasStatementIdentifier()} to
      * test the term id bits.

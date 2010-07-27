@@ -115,7 +115,9 @@ public class XSDFloatIV<V extends BigdataLiteral> extends
     public boolean equals(final Object o) {
         if(this==o) return true;
         if(o instanceof XSDFloatIV<?>) {
-            return this.value == ((XSDFloatIV<?>) o).value;
+//            return this.value == ((XSDFloatIV<?>) o).value;
+            // Note: This handles NaN, etc.
+            return Float.compare(this.value, ((XSDFloatIV<?>) o).value) == 0;
         }
         return false;
     }
