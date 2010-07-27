@@ -211,13 +211,13 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<IV, BigdataVa
      * namespace:UTF
      * </pre>
      */
-    static final transient short VERSION0 = 0;
+    private static final transient byte VERSION0 = 0;
 
-    private static final transient short VERSION = VERSION0;
+    private static final transient byte VERSION = VERSION0;
 
     public void readExternal(final ObjectInput in) throws IOException, ClassNotFoundException {
         super.readExternal(in);
-        final short version = in.readShort();
+        final byte version = in.readByte();
         final String namespace;
         final String valueFactoryClass;
         switch (version) {
@@ -254,17 +254,9 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<IV, BigdataVa
     
     public void writeExternal(final ObjectOutput out) throws IOException {
         super.writeExternal(out);
-        final short version = VERSION;
-        final String valueFactoryClass = valueFactory.getClass().getName();
-        out.writeShort(version);
-        switch (version) {
-        case VERSION0:
-            out.writeUTF(namespace);
-            out.writeUTF(valueFactoryClass);
-            break;
-        default:
-            throw new AssertionError();
-        }
+        out.writeByte(VERSION);
+        out.writeUTF(namespace);
+        out.writeUTF(valueFactory.getClass().getName());
     }
 
 }

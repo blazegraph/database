@@ -132,15 +132,38 @@ public class NOPTupleSerializer extends DefaultTupleSerializer {
         
     }
 
-    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+    /**
+     * The initial version (no additional persistent state).
+     */
+    private final static transient byte VERSION0 = 0;
+
+    /**
+     * The current version.
+     */
+    private final static transient byte VERSION = VERSION0;
+
+    public void readExternal(final ObjectInput in) throws IOException,
+            ClassNotFoundException {
 
         super.readExternal(in);
         
+        final byte version = in.readByte();
+        
+        switch (version) {
+        case VERSION0:
+            break;
+        default:
+            throw new UnsupportedOperationException("Unknown version: "
+                    + version);
+        }
+
     }
 
-    public void writeExternal(ObjectOutput out) throws IOException {
+    public void writeExternal(final ObjectOutput out) throws IOException {
 
         super.writeExternal(out);
+        
+        out.writeByte(VERSION);
         
     }
 
