@@ -108,7 +108,8 @@ public class TestAll extends TestCase {
 
 //        }
 
-//        suite.addTest( TestDiskJournal.suite() );
+        // @todo remove when we remove the DiskOnlyStrategy impl.
+        suite.addTest( TestDiskJournal.suite() );
 
         suite.addTest( TestWORMStrategy.suite() );
 
