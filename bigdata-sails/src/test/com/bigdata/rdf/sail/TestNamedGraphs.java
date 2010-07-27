@@ -28,9 +28,7 @@ package com.bigdata.rdf.sail;
 
 import java.io.IOException;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.LinkedList;
-
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Resource;
@@ -41,14 +39,12 @@ import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
-import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
-import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.impl.BindingImpl;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.sail.SailException;
@@ -1205,7 +1201,7 @@ public class TestNamedGraphs extends QuadsTestCase {
     /**
      * Unit test focusing on queries against a default graph comprised of the
      * RDF merge of zero or more graphs where the query involves joins and hence
-     * is routed through the {@link BigdataEvaluationStrategyImpl}.
+     * is routed through the {@link BigdataEvaluationStrategyImpl2}.
      * 
      * @throws RepositoryException
      * @throws SailException
@@ -1561,7 +1557,7 @@ public class TestNamedGraphs extends QuadsTestCase {
         }
 
     }
-
+    
     public void testSearchQuery() throws Exception {
         
         final BigdataSail sail = getSail();
@@ -1671,5 +1667,6 @@ public class TestNamedGraphs extends QuadsTestCase {
         }
         
     }
+
 
 }

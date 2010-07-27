@@ -14,38 +14,29 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.algebra.BinaryTupleOperator;
-import org.openrdf.query.algebra.BinaryValueOperator;
 import org.openrdf.query.algebra.Compare;
 import org.openrdf.query.algebra.Filter;
 import org.openrdf.query.algebra.Group;
 import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.LeftJoin;
-import org.openrdf.query.algebra.MathExpr;
 import org.openrdf.query.algebra.MultiProjection;
 import org.openrdf.query.algebra.Or;
-import org.openrdf.query.algebra.Order;
-import org.openrdf.query.algebra.OrderElem;
 import org.openrdf.query.algebra.Projection;
 import org.openrdf.query.algebra.ProjectionElem;
 import org.openrdf.query.algebra.ProjectionElemList;
 import org.openrdf.query.algebra.QueryModelNode;
-import org.openrdf.query.algebra.QueryModelNodeBase;
 import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.UnaryTupleOperator;
-import org.openrdf.query.algebra.UnaryValueOperator;
 import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
@@ -57,6 +48,15 @@ import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
 import com.bigdata.BigdataStatics;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
+import com.bigdata.rdf.internal.DummyIV;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.constraints.InlineEQ;
+import com.bigdata.rdf.internal.constraints.InlineGE;
+import com.bigdata.rdf.internal.constraints.InlineGT;
+import com.bigdata.rdf.internal.constraints.InlineLE;
+import com.bigdata.rdf.internal.constraints.InlineLT;
+import com.bigdata.rdf.internal.constraints.InlineNE;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.rules.RuleContextEnum;
@@ -65,7 +65,6 @@ import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
-import com.bigdata.rdf.spo.SPOFilter;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.spo.SPOStarJoin;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -79,7 +78,6 @@ import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.EQ;
 import com.bigdata.relation.rule.EQConstant;
 import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IN;
 import com.bigdata.relation.rule.IPredicate;
@@ -94,6 +92,7 @@ import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.NE;
 import com.bigdata.relation.rule.NEConstant;
 import com.bigdata.relation.rule.OR;
+import com.bigdata.relation.rule.Predicate;
 import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.QueryOptions;
 import com.bigdata.relation.rule.Rule;
@@ -253,11 +252,9 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
     protected static final Logger log = 
         Logger.getLogger(BigdataEvaluationStrategyImpl2.class);
 
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
-
-    private final long NULL = IRawTripleStore.NULL;
+//    protected static final boolean INFO = log.isInfoEnabled();
+//
+//    protected static final boolean DEBUG = log.isDebugEnabled();
 
     protected final BigdataTripleSource tripleSource;
 
@@ -268,6 +265,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
     private final boolean nativeJoins;
     
     private final boolean starJoins;
+    
+    private final boolean inlineTerms;
     
     // private boolean slice = false, distinct = false, union = false;
     //    
@@ -289,7 +288,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
      */
     public BigdataEvaluationStrategyImpl2(
             final BigdataTripleSource tripleSource, final Dataset dataset,
-            final boolean nativeJoins, final boolean starJoins) {
+            final boolean nativeJoins, final boolean starJoins, 
+            final boolean inlineTerms) {
         
         super(tripleSource, dataset);
         
@@ -298,6 +298,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         this.database = tripleSource.getDatabase();
         this.nativeJoins = nativeJoins;
         this.starJoins = starJoins;
+        this.inlineTerms = inlineTerms;
         
     }
 
@@ -363,13 +364,13 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             throws QueryEvaluationException {
         
         // spit out the whole operator tree
-        if (INFO) {
+        if (log.isInfoEnabled()) {
             log.info("operator tree:\n" + expr);
         }
 
         this.queryHints = queryHints;
 
-        if (INFO) {
+        if (log.isInfoEnabled()) {
             log.info("queryHints:\n" + queryHints);
         }
         
@@ -388,7 +389,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             TupleExpr expr, BindingSet bindings)
             throws QueryEvaluationException {
         
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
             log.debug("tuple expr:\n" + expr);
         }
         
@@ -422,7 +423,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             return super.evaluate(union, bindings);
         }
 
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
             log.debug("union:\n" + union);
         }
         
@@ -435,10 +436,10 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             if (operator instanceof LeftJoin || operator instanceof Join) {
                 // Use Sesame 2 evaluation
                 
-                if (INFO) {
+                if (log.isInfoEnabled()) {
                     log.info("could not evaluate natively, punting to Sesame"); 
                 }
-                if (DEBUG) {
+                if (log.isDebugEnabled()) {
                     log.debug(operator);
                 }
                 
@@ -461,10 +462,10 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             
             // Use Sesame 2 evaluation
             
-            if (INFO) {
+            if (log.isInfoEnabled()) {
                 log.info("could not evaluate natively, punting to Sesame"); 
             }
-            if (DEBUG) {
+            if (log.isDebugEnabled()) {
                 log.debug(ex.getOperator());
             }
 
@@ -485,7 +486,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         // no check against the nativeJoins property here because we are simply
         // using the native execution model to take care of magic searches.
         
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
             log.debug("evaluating statement pattern:\n" + sp);
         }
         
@@ -518,7 +519,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             return super.evaluate(join, bindings);
         }
 
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
             log.debug("join:\n" + join);
         }
         
@@ -553,10 +554,10 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
 
                 // Use Sesame 2 evaluation
                 
-                if (INFO) {
+                if (log.isInfoEnabled()) {
                     log.info("could not evaluate natively, punting to Sesame"); 
                 }
-                if (DEBUG) {
+                if (log.isDebugEnabled()) {
                     log.debug(operator);
                 }
                 
@@ -578,10 +579,10 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             
             // Use Sesame 2 evaluation
             
-            if (INFO) {
+            if (log.isInfoEnabled()) {
                 log.info("could not evaluate natively, punting to Sesame"); 
             }
-            if (DEBUG) {
+            if (log.isDebugEnabled()) {
                 log.debug(ex.getOperator());
             }
 
@@ -609,7 +610,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             return super.evaluate(join, bindings);
         }
 
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
             log.debug("left join:\n" + join);
         }
         
@@ -645,10 +646,10 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
 
                 // Use Sesame 2 evaluation
                 
-                if (INFO) {
+                if (log.isInfoEnabled()) {
                     log.info("could not evaluate natively, punting to Sesame"); 
                 }
-                if (DEBUG) {
+                if (log.isDebugEnabled()) {
                     log.debug(operator);
                 }
 
@@ -670,10 +671,10 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             
             // Use Sesame 2 evaluation
             
-            if (INFO) {
+            if (log.isInfoEnabled()) {
                 log.info("could not evaluate natively, punting to Sesame"); 
             }
-            if (DEBUG) {
+            if (log.isDebugEnabled()) {
                 log.debug(ex.getOperator());
             }
 
@@ -755,7 +756,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             IPredicate tail = generateTail(sp, optional);
             // encountered a value not in the database lexicon
             if (tail == null) {
-                if (DEBUG) {
+                if (log.isDebugEnabled()) {
                     log.debug("could not generate tail for: " + sp);
                 }
                 if (optional) {
@@ -815,7 +816,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                 // get ahold of the search variable
                 com.bigdata.relation.rule.Var searchVar = 
                     (com.bigdata.relation.rule.Var) search.get(0);
-                if (DEBUG) {
+                if (log.isDebugEnabled()) {
                     log.debug(searchVar);
                 }
                 // start by assuming it needs filtering, guilty until proven
@@ -835,7 +836,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                     boolean appears = false;
                     for (int i = 0; i < tail.arity(); i++) {
                         IVariableOrConstant term = tail.get(i);
-                        if (DEBUG) {
+                        if (log.isDebugEnabled()) {
                             log.debug(term);
                         }
                         if (term.equals(searchVar)) {
@@ -851,7 +852,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                 }
                 // if it needs a filter, add it to the expander
                 if (needsFilter) {
-                    if (DEBUG) {
+                    if (log.isDebugEnabled()) {
                         log.debug("needs filter: " + searchVar);
                     }
                     FreeTextSearchExpander expander = (FreeTextSearchExpander) 
@@ -870,7 +871,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             final IConstraint constraint = generateConstraint(filter);
             if (constraint != null) {
                 // remove if we are able to generate a native constraint for it
-                if (DEBUG) {
+                if (log.isDebugEnabled()) {
                     log.debug("able to generate a constraint: " + constraint);
                 }
                 filterIt.remove();
@@ -897,7 +898,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         // }
         // }
         
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
             for (IPredicate<ISPO> tail : tails) {
                 ISolutionExpander<ISPO> expander = tail.getSolutionExpander();
                 if (expander != null) {
@@ -923,7 +924,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             QueryModelNode p = join;
             while (true) {
                 p = p.getParentNode();
-                if (DEBUG) {
+                if (log.isDebugEnabled()) {
                     log.debug(p.getClass());
                 }
                 if (p instanceof UnaryTupleOperator) {
@@ -950,12 +951,12 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             requiredVars[i++] = com.bigdata.relation.rule.Var.var(v);
         }
         
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
             log.debug("required binding names: " + Arrays.toString(requiredVars));
         }
         
         if (starJoins) { // database.isQuads() == false) {
-            if (DEBUG) {
+            if (log.isDebugEnabled()) {
                 log.debug("generating star joins");
             }
             tails = generateStarJoins(tails);
@@ -978,7 +979,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
 
         // we have filters that we could not translate natively
         if (filters.size() > 0) {
-            if (DEBUG) {
+            if (log.isDebugEnabled()) {
                 log.debug("could not translate " + filters.size()
                         + " filters into native constraints:");
                 for (Filter filter : filters) {
@@ -1063,7 +1064,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                     // unfortunately I think we just have to punt to be super safe
                     Collection<Filter> filters = 
                         ((ProxyRuleWithSesameFilters) rule).getSesameFilters();
-                    if (DEBUG) {
+                    if (log.isDebugEnabled()) {
                         log.debug("could not translate " + filters.size()
                                 + " filters into native constraints:");
                         for (Filter filter : filters) {
@@ -1096,7 +1097,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                     // unfortunately I think we just have to punt to be super safe
                     Collection<Filter> filters = 
                         ((ProxyRuleWithSesameFilters) rule).getSesameFilters();
-                    if (DEBUG) {
+                    if (log.isDebugEnabled()) {
                         log.debug("could not translate " + filters.size()
                                 + " filters into native constraints:");
                         for (Filter filter : filters) {
@@ -1233,12 +1234,12 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         // create a solution expander for free text search if necessary
         ISolutionExpander<ISPO> expander = null;
         final Value predValue = stmtPattern.getPredicateVar().getValue();
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
             log.debug(predValue);
         }
         if (predValue != null && BD.SEARCH.equals(predValue)) {
             final Value objValue = stmtPattern.getObjectVar().getValue();
-            if (DEBUG) {
+            if (log.isDebugEnabled()) {
                 log.debug(objValue);
             }
             if (objValue != null && objValue instanceof Literal) {
@@ -1250,33 +1251,33 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         // @todo why is [s] handled differently?
         // because [s] is the variable in free text searches, no need to test
         // to see if the free text search expander is in place
-        final IVariableOrConstant<Long> s = generateVariableOrConstant(
+        final IVariableOrConstant<IV> s = generateVariableOrConstant(
                 stmtPattern.getSubjectVar());
         if (s == null) {
             return null;
         }
         
-        final IVariableOrConstant<Long> p;
+        final IVariableOrConstant<IV> p;
         if (expander == null) {
             p = generateVariableOrConstant(stmtPattern.getPredicateVar());
         } else {
-            p = new Constant<Long>(IRawTripleStore.NULL);
+            p = new Constant(DummyIV.INSTANCE);
         }
         if (p == null) {
             return null;
         }
         
-        final IVariableOrConstant<Long> o;
+        final IVariableOrConstant<IV> o;
         if (expander == null) {
             o = generateVariableOrConstant(stmtPattern.getObjectVar());
         } else {
-            o = new Constant<Long>(IRawTripleStore.NULL);
+            o = new Constant(DummyIV.INSTANCE);
         }
         if (o == null) {
             return null;
         }
         
-        final IVariableOrConstant<Long> c;
+        final IVariableOrConstant<IV> c;
         if (!database.isQuads()) {
             /*
              * Either triple store mode or provenance mode.
@@ -1443,17 +1444,17 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
      * @param var
      * @return
      */
-    private IVariableOrConstant<Long> generateVariableOrConstant(final Var var) {
-        final IVariableOrConstant<Long> result;
+    private IVariableOrConstant<IV> generateVariableOrConstant(final Var var) {
+        final IVariableOrConstant<IV> result;
         final BigdataValue val = (BigdataValue) var.getValue();
         final String name = var.getName();
         if (val == null) {
             result = com.bigdata.relation.rule.Var.var(name);
         } else {
-            final Long id = val.getTermId();
-            if (id.longValue() == NULL)
+            final IV iv = val.getIV();
+            if (iv == null)
                 return null;
-            result = new Constant<Long>(id);
+            result = new Constant<IV>(iv);
         }
         return result;
     }
@@ -1494,49 +1495,68 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
 
     private IConstraint generateConstraint(ValueExpr left, ValueExpr right,
             CompareOp operator) {
-        IVariable<Long> var = null;
-        IConstant<Long> constant = null;
+        IVariable<IV> var = null;
+        BigdataValue constant = null;
         if (left instanceof Var) {
             var = com.bigdata.relation.rule.Var.var(((Var) left).getName());
         } else if (left instanceof ValueConstant) {
-            BigdataValue value = (BigdataValue) ((ValueConstant) left).getValue();
-            final Long id = value.getTermId();
-            if (id.longValue() == NULL)
-                return null;
-            constant = new Constant<Long>(id);
+            constant = (BigdataValue) ((ValueConstant) left).getValue();
         } else {
             return null;
         }
         if (right instanceof Var) {
             var = com.bigdata.relation.rule.Var.var(((Var) right).getName());
         } else if (right instanceof ValueConstant) {
-            BigdataValue value = (BigdataValue) ((ValueConstant) right).getValue();
-            final Long id = value.getTermId();
-            if (id.longValue() == NULL)
-                return null;
-            constant = new Constant<Long>(id);
+            constant = (BigdataValue) ((ValueConstant) right).getValue();
         } else {
             return null;
         }
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
             log.debug("var: " + var);
             log.debug("constant: " + constant);
         }
-        if (var == null || constant == null) {
-            if (DEBUG) {
+        if (var == null || constant == null || constant.getIV() == null) {
+            if (log.isDebugEnabled()) {
                 log.debug("left: " + left);
                 log.debug("right: " + right);
             }
             return null;
         }
+        final IV iv = constant.getIV();
         // we can do equals, not equals
-        if (operator == CompareOp.EQ) {
-            return new EQConstant(var, constant);
+        if (inlineTerms && IVUtility.canNumericalCompare(iv)) {
+            if (log.isInfoEnabled()) {
+                log.debug("inline constant, using inline numerical comparison: " 
+                        + iv);
+            }
+            try {
+                switch (operator) {
+                case GT:
+                    return new InlineGT(var, iv);
+                case GE:
+                    return new InlineGE(var, iv);
+                case LT:
+                    return new InlineLT(var, iv);
+                case LE:
+                    return new InlineLE(var, iv);
+                case EQ:
+                    return new InlineEQ(var, iv);
+                case NE:
+                    return new InlineNE(var, iv);
+                default:
+                    return null;
+                }
+            } catch (Exception ex) {
+                return null;
+            }
+        } else if (operator == CompareOp.EQ) {
+            return new EQConstant(var, new Constant(iv));
         } else if (operator == CompareOp.NE) {
-            return new NEConstant(var, constant);
+            return new NEConstant(var, new Constant(iv));
         } else {
             return null;
         }
+        
     }
 
     /**
@@ -1559,7 +1579,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                 && tripleSource.includeInferred
                 && tripleSource.conn.isQueryTimeExpander();
         
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
             log.debug("Running tupleExpr as native rule:\n" + step);
             log.debug("backchain: " + backchain);
         }
@@ -1614,12 +1634,12 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         if (step instanceof ProxyRuleWithSesameFilters) {
             Collection<Filter> filters = 
                 ((ProxyRuleWithSesameFilters) step).getSesameFilters();
-            if (INFO && filters.size() > 0) {
+            if (log.isInfoEnabled() && filters.size() > 0) {
                 log.info("could not translate " + filters.size()
                         + " filters into native constraints:");
             }
             for (Filter filter : filters) {
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("\n" + filter.getCondition());
                 result = new FilterIterator(filter, result, this);
             }
@@ -1651,7 +1671,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             final StatementPattern sp, final BindingSet bindings)
             throws QueryEvaluationException {
         
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
             log.debug("evaluating statement pattern:\n" + sp);
         }
         
@@ -1735,7 +1755,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             final BindingSet bindings, final Scope scope)
             throws QueryEvaluationException {
         
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
             log.debug("languageCode=" + languageCode + ", label=" + label);
         }
         
@@ -1792,7 +1812,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                     subjects.put(v, preds);
                 }
                 preds.add(pred);
-                if (DEBUG) {
+                if (log.isDebugEnabled()) {
                     log.debug("found a star joinable tail: " + pred);
                 }
             } else {
@@ -1871,7 +1891,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             }
         }
         
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
             log.debug("number of new tails: " + newTails.size());
             for (IPredicate tail : newTails) {
                 log.debug(tail);

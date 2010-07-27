@@ -41,6 +41,9 @@ import com.bigdata.btree.raba.codec.EmptyRabaValueCoder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Justification;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.TermId;
 
 /**
  * (De-)serializes {@link Justification}s.
@@ -94,7 +97,7 @@ public class JustificationTupleSerializer extends
      */
     public JustificationTupleSerializer(int N) {
         
-        super(new ASCIIKeyBuilderFactory(N * Bytes.SIZEOF_LONG),
+        super(new ASCIIKeyBuilderFactory(),
                 getDefaultLeafKeysCoder(), //
                 EmptyRabaValueCoder.INSTANCE // no values
         );
@@ -114,30 +117,9 @@ public class JustificationTupleSerializer extends
         if (tuple == null)
             throw new IllegalArgumentException();
 
-        final ByteArrayBuffer kbuf = tuple.getKeyBuffer();
+        final IV[] ivs = IVUtility.decodeAll(tuple.getKey());
         
-        final int keyLen = kbuf.limit();
-        
-        final byte[] data = kbuf.array();
-        
-        // verify key is even multiple of (N*sizeof(long)).
-        assert keyLen % (N * Bytes.SIZEOF_LONG) == 0;
-
-        // #of term identifiers in the key.
-        final int m = keyLen / Bytes.SIZEOF_LONG;
-
-        // A justification must include at least a head and one tuple in the tail.
-        assert m >= N * 2 : "keyLen="+keyLen+", N="+N+", m="+m;
-        
-        final long[] ids = new long[m];
-        
-        for (int i = 0; i < m; i++) {
-
-            ids[i] = KeyBuilder.decodeLong(data, i * Bytes.SIZEOF_LONG);
-            
-        }
-
-        return new Justification(N,ids);
+        return new Justification(N,ivs);
         
     }
 

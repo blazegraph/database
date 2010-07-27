@@ -17,11 +17,9 @@ import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IRuleState;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.RuleState;
-import com.bigdata.service.LocalDataServiceFederation;
 
 /**
- * {@link JoinTask} implementation for a {@link Journal} or
- * {@link LocalDataServiceFederation}.
+ * {@link JoinTask} implementation for a {@link Journal}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

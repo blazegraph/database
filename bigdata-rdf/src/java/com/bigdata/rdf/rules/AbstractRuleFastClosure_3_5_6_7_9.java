@@ -31,6 +31,8 @@ import java.util.concurrent.Callable;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOPredicate;
@@ -82,11 +84,11 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  */
 public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
-    // private final Set<Long> P;
+    // private final Set<IV> P;
 
-//    private final IConstant<Long> rdfsSubPropertyOf;
+//    private final IConstant<IV> rdfsSubPropertyOf;
     
-//    private final IConstant<Long> propertyId;
+//    private final IConstant<IV> propertyId;
 
     // private final Var x, y, SetP;
     
@@ -99,10 +101,10 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
     public AbstractRuleFastClosure_3_5_6_7_9(//
             final String name,
             final String relationName,
-            final IConstant<Long> rdfsSubPropertyOf,
-            final IConstant<Long> propertyId,
+            final IConstant<IV> rdfsSubPropertyOf,
+            final IConstant<IV> propertyId,
             final IRuleTaskFactory taskFactory
-    // , Set<Long> P
+    // , Set<IV> P
     ) {
 
         super(name, new SPOPredicate(relationName, var("x"), propertyId,
@@ -152,19 +154,17 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 
         private final IBuffer<ISolution[]> buffer; // Note: Not serializable.
 
-        // private final Set<Long> P;
+        // private final Set<IV> P;
 
-        protected final IConstant<Long> rdfsSubPropertyOf;
+        protected final IConstant<IV> rdfsSubPropertyOf;
 
-        protected final IConstant<Long> propertyId;
+        protected final IConstant<IV> propertyId;
 
         /**
          * @see #getView()
          */
         private transient IRelation<ISPO> view = null;
         
-        private final static transient long NULL = IRawTripleStore.NULL;
-
         /**
          * <code>(?x, {P}, ?y) -> (?x, propertyId, ?y)</code>
          * 
@@ -198,9 +198,9 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                 IRule rule,
                 IJoinNexus joinNexus,
                 IBuffer<ISolution[]> buffer,
-                // Set<Long> P,
-                IConstant<Long> rdfsSubPropertyOf,
-                IConstant<Long> propertyId) {
+                // Set<IV> P,
+                IConstant<IV> rdfsSubPropertyOf,
+                IConstant<IV> propertyId) {
 
             if (database == null)
                 throw new IllegalArgumentException();
@@ -282,16 +282,16 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
              * to be a backing BigdataLongSet and that will be less efficient
              * unless the property hierarchy scale is very large.
              */
-            final long[] a = getSortedArray(getSet());
+            final IV[] a = getSortedArray(getSet());
 
             /*
              * For each p in the chunk.
              * 
              * @todo execute subqueries in parallel against shared thread pool.
              */
-            for (long p : a) {
+            for (IV p : a) {
 
-                if (p == propertyId.get()) {
+                if (IVUtility.equals(p, propertyId.get())) {
 
                     /*
                      * The rule refuses to consider triple patterns where the
@@ -307,7 +307,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                 stats.subqueryCount[0]++;
 
                 final IAccessPath<ISPO> accessPath = relation.getAccessPath(
-                        NULL, p, NULL);
+                        null, p, null);
 
                 final IChunkedOrderedIterator<ISPO> itr2 = accessPath.iterator();
 
@@ -354,7 +354,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                              * @todo clone the bindingSet first?
                              */
 
-                            assert spo.p() == p;
+                            assert spo.p().equals(p) : "spo.p="+spo.p()+", p="+p;
 
                             if(joinNexus.bind(rule, 0, spo, bindingSet)) {
   
@@ -400,17 +400,17 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
          * 
          * @return The sorted term identifiers.
          */
-        protected long[] getSortedArray(Set<Long> ids) {
+        protected IV[] getSortedArray(Set<IV> ivs) {
 
-            final int n = ids.size();
+            final int n = ivs.size();
 
-            final long[] a = new long[n];
+            final IV[] a = new IV[n];
 
             int i = 0;
 
-            for (Long id : ids) {
+            for (IV iv : ivs) {
 
-                a[i++] = id;
+                a[i++] = iv;
 
             }
 
@@ -478,14 +478,14 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
          * 
          * @return The set.
          */
-        abstract protected Set<Long> getSet();
+        abstract protected Set<IV> getSet();
         
         /**
          * Delegates to {@link SubPropertyClosureTask}
          * 
          * @return The closure.
          */
-        protected Set<Long> getSubProperties() {
+        protected Set<IV> getSubProperties() {
 
             return new SubPropertyClosureTask(getView(), rdfsSubPropertyOf).call();
 
@@ -499,7 +499,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
          * 
          * @return The closure.
          */
-        protected Set<Long> getSubPropertiesOf(IConstant<Long> propertyId) {
+        protected Set<IV> getSubPropertiesOf(IConstant<IV> propertyId) {
 
             return new SubPropertiesOfClosureTask(getView(), rdfsSubPropertyOf,
                     propertyId).call();
@@ -516,15 +516,15 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class SubPropertyClosureTask implements Callable<Set<Long>> {
+    public static class SubPropertyClosureTask implements Callable<Set<IV>> {
         
         final static protected Logger log = Logger.getLogger(SubPropertyClosureTask.class);
 
         private final IRelation<ISPO> view; // Note: Not serializable.
-        private final IConstant<Long> rdfsSubPropertyOf;
+        private final IConstant<IV> rdfsSubPropertyOf;
         
         public SubPropertyClosureTask(IRelation<ISPO> view,
-                IConstant<Long> rdfsSubPropertyOf) {
+                IConstant<IV> rdfsSubPropertyOf) {
 
             if (view == null)
                 throw new IllegalArgumentException();
@@ -538,7 +538,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
             
         }
         
-        public Set<Long> call() {
+        public Set<IV> call() {
             
             return getSubProperties();
             
@@ -549,9 +549,9 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
          * 
          * @return A set containing the term identifiers for the members of P.
          */
-        public Set<Long> getSubProperties() {
+        public Set<IV> getSubProperties() {
 
-            final Set<Long> P = new HashSet<Long>();
+            final Set<IV> P = new HashSet<IV>();
 
             P.add(rdfsSubPropertyOf.get());
 
@@ -565,7 +565,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                 int nafter = 0;
                 int nrounds = 0;
 
-                final Set<Long> tmp = new HashSet<Long>();
+                final Set<IV> tmp = new HashSet<IV>();
 
                 do {
 
@@ -578,11 +578,11 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                      * of P.
                      */
 
-                    for (Long p : P) {
+                    for (IV p : P) {
 
                         final SPOPredicate pred = new SPOPredicate(//
                                 "view",// @todo the label here is ignored, but should be the ordered names of the relations in the view. 
-                                Var.var("x"), new Constant<Long>(p), Var.var("y")//
+                                Var.var("x"), new Constant<IV>(p), Var.var("y")//
                                 );
                         
                         final IAccessPath<ISPO> accessPath = view
@@ -669,16 +669,16 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class SubPropertiesOfClosureTask implements Callable<Set<Long>> {
+    public static class SubPropertiesOfClosureTask implements Callable<Set<IV>> {
 
         final static protected Logger log = Logger.getLogger(SubPropertyClosureTask.class);
 
         private final IRelation<ISPO> view; // Note: Not serializable.
-        private final IConstant<Long> rdfsSubPropertyOf;
-        private final IConstant<Long> p;
+        private final IConstant<IV> rdfsSubPropertyOf;
+        private final IConstant<IV> p;
         
         public SubPropertiesOfClosureTask(IRelation<ISPO> view,
-                IConstant<Long> rdfsSubPropertyOf, IConstant<Long> p) {
+                IConstant<IV> rdfsSubPropertyOf, IConstant<IV> p) {
             
             if (view == null)
                 throw new IllegalArgumentException();
@@ -697,7 +697,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
             
         }
 
-        public Set<Long> call() {
+        public Set<IV> call() {
             
             return getSubPropertiesOf(p);
             
@@ -711,7 +711,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
          *            
          * @return The closure.
          */
-        public Set<Long> getSubPropertiesOf(IConstant<Long> p) {
+        public Set<IV> getSubPropertiesOf(IConstant<IV> p) {
 
             final SPOPredicate pred = new SPOPredicate(//
                     "view", //
@@ -736,7 +736,7 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
 //
 //            }
 
-            final Set<Long> tmp = new HashSet<Long>();
+            final Set<IV> tmp = new HashSet<IV>();
 
             /*
              * query := (?x, rdfs:subPropertyOf, p).

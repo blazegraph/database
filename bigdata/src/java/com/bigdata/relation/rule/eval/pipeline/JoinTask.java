@@ -1948,8 +1948,24 @@ abstract public class JoinTask implements Callable<Void> {
                         if (joinNexus.bind(rule, tailIndex, e, bset)) {
 
                             bset = bset.copy(variablesToKeep);
-                            
-                            // Accept this binding set.
+
+                            /*
+                             * Accept this binding set.
+                             * 
+                             * @todo This is the place to intervene for
+                             * scale-out default graph queries. Instead of
+                             * directly accepting the bset, place the (bset,e)
+                             * pair on a queue which targets a distributed hash
+                             * map imposing distinct on [e] and only insert into
+                             * the unsyncBuffer those [bset]s which pass the
+                             * filter.
+                             * 
+                             * The life cycle of that filter needs to be
+                             * protected with a latch or zlock. Each JoinTask
+                             * must wait until the filter has answered each of
+                             * its queued (bset,e) pairs, which could be done
+                             * using a latch.
+                             */
                             unsyncBuffer.add(bset);
 
                             naccepted++;

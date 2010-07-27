@@ -33,6 +33,7 @@ import org.openrdf.model.Value;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.TruthMaintenance;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
@@ -70,25 +71,18 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
 public interface ISPO {
 
     /**
-     * The constant that indicates an unassigned term identifier.
-     * 
-     * @see IRawTripleStore#NULL
-     */
-    long NULL = IRawTripleStore.NULL;
-
-    /**
      * The term identifier for the subject position (slot 0) -or- {@link #NULL}.
      */
-    long s();
+    IV s();
 
     /**
      * The term identifier for the predicate position (slot 1) -or-
      * {@link #NULL}.
      */
-    long p();
+    IV p();
 
     /** The term identifier for the object position (slot 2) -or- {@link #NULL}. */
-    long o();
+    IV o();
 
     /**
      * The term identifier for the SID/context position (slot 3) -or-
@@ -100,7 +94,7 @@ public interface ISPO {
      * @see AbstractTripleStore.Options#STATEMENT_IDENTIFIERS
      * @see AbstractTripleStore.Options#QUADS
      */
-    long c();
+    IV c();
 
     /**
      * Return the s,p,o, or c value corresponding to the given index.
@@ -108,7 +102,7 @@ public interface ISPO {
      * @param index
      *            The legal values are: s=0, p=1, o=2, c=3.
      */
-    long get(int index);
+    IV get(int index);
 
     /**
      * Return true iff all position (s,p,o) are non-{@link #NULL}.
@@ -161,6 +155,17 @@ public interface ISPO {
     boolean isExplicit();
 
     /**
+     * Return <code>true</code> IFF the {@link SPO} user flag is set
+     */
+    boolean getUserFlag();
+    
+    /**
+     * Set  {@link SPO} user flag
+     * @param userFlag
+     */
+    void setUserFlag(boolean userFlag);
+    
+    /**
      * Return <code>true</code> IFF the {@link SPO} is marked as
      * {@link StatementEnum#Inferred}.
      */
@@ -184,7 +189,7 @@ public interface ISPO {
      * @throws IllegalStateException
      *             if the statement identifier is already set.
      */
-    void setStatementIdentifier(final long sid);
+    void setStatementIdentifier(final IV sid);
 
     /**
      * The statement identifier (optional). This has nearly identical semantics
@@ -199,10 +204,10 @@ public interface ISPO {
      *             unless a statement identifier is assigned to this
      *             {@link ISPO}.
      */
-    long getStatementIdentifier();
+    IV getStatementIdentifier();
 
     /**
-     * <code>true</code> IFF {@link AbstractTripleStore#isStatement(long)}
+     * <code>true</code> IFF {@link AbstractTripleStore#isStatement(IV)}
      * returns <code>true</code> for {@link #c()}.
      */
     boolean hasStatementIdentifier();

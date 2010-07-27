@@ -40,6 +40,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rio.AbstractStatementBuffer.StatementBuffer2;
@@ -62,8 +63,6 @@ public class TripleStoreUtility {
     
     protected static final Logger log = Logger.getLogger(TripleStoreUtility.class);
 
-    private static final long NULL = IRawTripleStore.NULL;
-    
     /**
      * Compares two RDF graphs for equality (same statements).
      * <p>
@@ -235,7 +234,7 @@ public class TripleStoreUtility {
          * The source access path is a full scan of the SPO index.
          */
         final IAccessPath<ISPO> expectedAccessPath = expected.getAccessPath(
-                NULL, NULL, NULL);
+                (IV) null, (IV) null, (IV) null);
 
         /*
          * Efficiently convert SPOs to BigdataStatements (externalizes
@@ -387,6 +386,8 @@ public class TripleStoreUtility {
     
         final StatementBuffer<Statement> sb = new StatementBuffer<Statement>(tmp, 100000/* capacity */);
     
+        final IV NULL = null;
+        
         final IChunkedOrderedIterator<ISPO> itr1 = new BackchainAccessPath(db,
                 db.getAccessPath(NULL, NULL, NULL)).iterator();
     

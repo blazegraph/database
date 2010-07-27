@@ -50,15 +50,16 @@ package com.bigdata.rdf.store;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.Properties;
 import java.util.UUID;
-
 import org.openrdf.model.Statement;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
-
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -161,19 +162,19 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             
             final SPO[] stmts = new SPO[] {
 
-                new SPO(x.getTermId(), rdfType.getTermId(), C.getTermId(), StatementEnum.Explicit),
-                new SPO(y.getTermId(), rdfType.getTermId(), B.getTermId(), StatementEnum.Explicit),
-                new SPO(z.getTermId(), rdfType.getTermId(), A.getTermId(), StatementEnum.Explicit),
+                new SPO(x.getIV(), rdfType.getIV(), C.getIV(), StatementEnum.Explicit),
+                new SPO(y.getIV(), rdfType.getIV(), B.getIV(), StatementEnum.Explicit),
+                new SPO(z.getIV(), rdfType.getIV(), A.getIV(), StatementEnum.Explicit),
                 
-                new SPO(A.getTermId(), rdfsLabel.getTermId(), lit1.getTermId(), StatementEnum.Explicit),
-                new SPO(B.getTermId(), rdfsLabel.getTermId(), lit2.getTermId(), StatementEnum.Explicit),
-                new SPO(C.getTermId(), rdfsLabel.getTermId(), lit3.getTermId(), StatementEnum.Explicit),
+                new SPO(A.getIV(), rdfsLabel.getIV(), lit1.getIV(), StatementEnum.Explicit),
+                new SPO(B.getIV(), rdfsLabel.getIV(), lit2.getIV(), StatementEnum.Explicit),
+                new SPO(C.getIV(), rdfsLabel.getIV(), lit3.getIV(), StatementEnum.Explicit),
                 
-                new SPO(B.getTermId(), rdfsSubClassOf.getTermId(), A.getTermId(), StatementEnum.Explicit),
-                new SPO(C.getTermId(), rdfsSubClassOf.getTermId(), B.getTermId(), StatementEnum.Explicit),
+                new SPO(B.getIV(), rdfsSubClassOf.getIV(), A.getIV(), StatementEnum.Explicit),
+                new SPO(C.getIV(), rdfsSubClassOf.getIV(), B.getIV(), StatementEnum.Explicit),
                     
-                new SPO(bn1.getTermId(), rdfsLabel.getTermId(), lit1.getTermId(), StatementEnum.Explicit),
-                new SPO(bn2.getTermId(), rdfsLabel.getTermId(), lit2.getTermId(), StatementEnum.Explicit),
+                new SPO(bn1.getIV(), rdfsLabel.getIV(), lit1.getIV(), StatementEnum.Explicit),
+                new SPO(bn2.getIV(), rdfsLabel.getIV(), lit2.getIV(), StatementEnum.Explicit),
 
             };
 
@@ -189,14 +190,14 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
              */
             for(int i=0; i<stmts.length; i++) {
                 
-                final long sid = stmts[i].getStatementIdentifier();
+                final IV sid = stmts[i].getStatementIdentifier();
                 
                 assertNotSame(NULL, sid);
                 
-                assertTrue(AbstractTripleStore.isStatement(sid));
-                assertFalse(AbstractTripleStore.isLiteral(sid));
-                assertFalse(AbstractTripleStore.isURI(sid));
-                assertFalse(AbstractTripleStore.isBNode(sid));
+                assertTrue(sid.isStatement());
+                assertFalse(sid.isLiteral());
+                assertFalse(sid.isURI());
+                assertFalse(sid.isBNode());
                 
                 if (log.isInfoEnabled())
                     log.info(stmts[i].toString(store) + " ::: "
@@ -460,17 +461,17 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             
             final SPO[] stmts1 = new SPO[] {
 
-                new SPO(x.getTermId(), rdfType.getTermId(), A.getTermId(), StatementEnum.Explicit),
+                new SPO(x.getIV(), rdfType.getIV(), A.getIV(), StatementEnum.Explicit),
                 
             };
             
             assertEquals(1,store.addStatements(stmts1, stmts1.length));
 
-            final long sid1 = stmts1[0].getStatementIdentifier();
+            final IV sid1 = stmts1[0].getStatementIdentifier();
             
             final SPO[] stmts2 = new SPO[] {
               
-                    new SPO(sid1, dcCreator.getTermId(), lit1.getTermId(), StatementEnum.Explicit),
+                    new SPO(sid1, dcCreator.getIV(), lit1.getIV(), StatementEnum.Explicit),
                     
             };
 
@@ -576,7 +577,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
              */
             SPO[] stmts1 = new SPO[] {
 
-                new SPO(x.getTermId(), rdfType.getTermId(), A.getTermId(), StatementEnum.Explicit),
+                new SPO(x.getIV(), rdfType.getIV(), A.getIV(), StatementEnum.Explicit),
                 
             };
             
@@ -584,7 +585,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             assertEquals(1,store.addStatements(stmts1, stmts1.length));
             
             // the statement identifier for the original stmt. 
-            final long sid1 = stmts1[0].getStatementIdentifier();
+            final IV sid1 = stmts1[0].getStatementIdentifier();
             
             /*
              * create a statement about that statement.
@@ -592,7 +593,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             
             SPO[] stmts2 = new SPO[] {
                     
-                    new SPO(sid1, dcCreator.getTermId(), lit1.getTermId(), StatementEnum.Explicit),
+                    new SPO(sid1, dcCreator.getIV(), lit1.getIV(), StatementEnum.Explicit),
                     
             };
 
@@ -602,7 +603,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             assertEquals(2,store.getStatementCount(true/*exact*/));
 
             // the stmt identifier for the statement about the original stmt.
-            final long sid2 = stmts2[0].getStatementIdentifier();
+            final IV sid2 = stmts2[0].getStatementIdentifier();
 
             /*
              * create a statement about the statement about the original statement.
@@ -610,7 +611,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
             SPO[] stmts3 = new SPO[] {
                     
-                    new SPO(sid2, dcCreator.getTermId(), lit2.getTermId(),
+                    new SPO(sid2, dcCreator.getIV(), lit2.getIV(),
                     StatementEnum.Explicit),
                     
             };
@@ -689,7 +690,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                 final SPO expected = all[i];
 
                 final ISPO actual = itr.next();
-
+                
                 assertEquals("S @ i=" + i, expected.s, actual.s());
 
                 assertEquals("P @ i=" + i, expected.p, actual.p());

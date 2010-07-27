@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation;
 
+import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
@@ -42,6 +43,7 @@ import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * An abstraction corresponding to a set of elements using some schema (think a
@@ -121,8 +123,50 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
      * relation.
      * 
      * @return An immutable set of the index names for the relation.
+     * 
+     * @todo replace with getKeyOrders()?
      */
     Set<String> getIndexNames();
+
+    /*
+     * New methods.
+     */
+    
+//    /**
+//     * Return the {@link IKeyOrder}s corresponding to the registered indices for
+//     * this relation.
+//     */
+//    Iterator<IKeyOrder<E>> getKeyOrders();
+//
+//    /**
+//     * Return the {@link IKeyOrder} for the predicate corresponding to the
+//     * perfect access path. A perfect access path is one where the bound values
+//     * in the predicate form a prefix in the key space of the corresponding
+//     * index.
+//     * 
+//     * @param p
+//     *            The predicate.
+//     * @return The {@link IKeyOrder} for the perfect access path -or-
+//     *         <code>null</code> if there is no index which provides a perfect
+//     *         access path for that predicate.
+//     */
+//    IKeyOrder<E> getKeyOrder(IPredicate<E> p);
+//    
+//    /**
+//     * Return the {@link IKeyOrder} for the primary index for the relation.
+//     */
+//    IKeyOrder<E> getPrimaryKeyOrder();
+//    
+//    /**
+//     * Return the primary index for the relation.
+//     * 
+//     * @todo how about getIndex(IKeyOrder) instead?
+//     */
+//    IIndex getPrimaryIndex();
+
+    /*
+     * End new methods.
+     */
     
     /**
      * Create and return a new element. The element is constructed from the

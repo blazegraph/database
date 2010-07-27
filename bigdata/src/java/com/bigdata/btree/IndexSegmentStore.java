@@ -1068,6 +1068,29 @@ public class IndexSegmentStore extends AbstractRawStore {
         }
 
     }
+
+    /**
+     * Read from the file into the caller's buffer.
+     * <p>
+     * Note: This is package private in order to expose it to the
+     * {@link IndexSegmentMultiBlockIterator}.
+     * 
+     * @param offset
+     *            The offset of the first byte to be read.
+     * @param dst
+     *            The buffer into which the data will be read. Bytes will be
+     *            read into the buffer starting at the current position and up
+     *            to the limit.
+     * 
+     * @throws IOException
+     */
+    final void readFromFile(final long offset, final ByteBuffer dst)
+            throws IOException {
+
+        // read into [dst] - does not modify the channel's position().
+        FileChannelUtility.readAll(opener, dst, offset);
+
+    }
     
     private final IReopenChannel<FileChannel> opener = new IReopenChannel<FileChannel>() {
 

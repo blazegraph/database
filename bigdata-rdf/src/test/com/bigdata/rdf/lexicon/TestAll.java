@@ -83,6 +83,9 @@ public class TestAll extends TestCase {
         // test suite for the full-text indexer integration.
         suite.addTestSuite(TestFullTextIndex.class);
 
+        // test suite for inlining
+        suite.addTestSuite(TestInlining.class);
+
         return suite;
         
     }

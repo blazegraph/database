@@ -55,10 +55,14 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rdf.inf.Justification;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.magic.IMagicTuple;
 import com.bigdata.rdf.magic.MagicTuple;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.relation.rule.BindingSetSortKeyBuilder;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPORelation;
@@ -78,7 +82,6 @@ import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.ArrayBindingSet;
-import com.bigdata.relation.rule.BindingSetSortKeyBuilder;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
@@ -107,13 +110,9 @@ import com.bigdata.relation.rule.eval.ProgramTask;
 import com.bigdata.relation.rule.eval.RuleStats;
 import com.bigdata.relation.rule.eval.Solution;
 import com.bigdata.relation.rule.eval.SolutionFilter;
-import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
-import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.LocalDataServiceFederation;
-import com.bigdata.service.LocalDataServiceFederation.LocalDataServiceImpl;
 import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedConvertingIterator;
@@ -367,7 +366,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
                 {
 
-                    final IVariableOrConstant<Long> t = pred.get(0);
+                    final IVariableOrConstant<IV> t = pred.get(0);
 
                     if (t.isVar())
                         s = t.getName();
@@ -378,7 +377,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
                 {
 
-                    final IVariableOrConstant<Long> t = pred.get(1);
+                    final IVariableOrConstant<IV> t = pred.get(1);
 
                     if (t.isVar())
                         p = t.getName();
@@ -389,7 +388,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
                 {
 
-                    final IVariableOrConstant<Long> t = pred.get(2);
+                    final IVariableOrConstant<IV> t = pred.get(2);
 
                     if (t.isVar())
                         o = t.getName();
@@ -1036,13 +1035,13 @@ public class RDFJoinNexus implements IJoinNexus {
     
         {
 
-            final IVariableOrConstant<Long> t = predicate.get(0);
+            final IVariableOrConstant<IV> t = predicate.get(0);
             
             if(t.isVar()) {
 
-                final IVariable<Long> var = (IVariable<Long>)t;
+                final IVariable<IV> var = (IVariable<IV>)t;
                 
-                final Constant newval = new Constant<Long>(spo.s);
+                final Constant newval = new Constant<IV>(spo.s);
 
                 bindingSet.set(var, newval);
                 
@@ -1052,13 +1051,13 @@ public class RDFJoinNexus implements IJoinNexus {
 
         {
 
-            final IVariableOrConstant<Long> t = predicate.get(1);
+            final IVariableOrConstant<IV> t = predicate.get(1);
             
             if(t.isVar()) {
 
-                final IVariable<Long> var = (IVariable<Long>)t;
+                final IVariable<IV> var = (IVariable<IV>)t;
 
-                final Constant newval = new Constant<Long>(spo.p);
+                final Constant newval = new Constant<IV>(spo.p);
 
                 bindingSet.set(var, newval);
                 
@@ -1068,13 +1067,13 @@ public class RDFJoinNexus implements IJoinNexus {
 
         {
 
-            final IVariableOrConstant<Long> t = predicate.get(2);
+            final IVariableOrConstant<IV> t = predicate.get(2);
             
             if(t.isVar()) {
 
-                final IVariable<Long> var = (IVariable<Long>)t;
+                final IVariable<IV> var = (IVariable<IV>)t;
 
-                final Constant newval = new Constant<Long>(spo.o);
+                final Constant newval = new Constant<IV>(spo.o);
 
                 bindingSet.set(var, newval);
                 
@@ -1086,13 +1085,13 @@ public class RDFJoinNexus implements IJoinNexus {
 
             // context position / statement identifier.
 
-            final IVariableOrConstant<Long> t = predicate.get(3);
+            final IVariableOrConstant<IV> t = predicate.get(3);
             
             if (t != null && t.isVar()) {
 
-                final IVariable<Long> var = (IVariable<Long>) t;
+                final IVariable<IV> var = (IVariable<IV>) t;
 
-                final Constant newval = new Constant<Long>(spo.c());
+                final Constant newval = new Constant<IV>(spo.c());
 
                 bindingSet.set(var, newval);
 
@@ -1108,13 +1107,13 @@ public class RDFJoinNexus implements IJoinNexus {
     
         for (int i = 0; i < pred.arity(); i++) {
             
-            final IVariableOrConstant<Long> t = pred.get(i);
+            final IVariableOrConstant<IV> t = pred.get(i);
             
             if(t.isVar()) {
 
-                final IVariable<Long> var = (IVariable<Long>)t;
+                final IVariable<IV> var = (IVariable<IV>)t;
                 
-                final Constant newval = new Constant<Long>(tuple.getTerm(i));
+                final Constant newval = new Constant<IV>(tuple.getTerm(i));
 
                 bindingSet.set(var, newval);
                 
@@ -1130,7 +1129,8 @@ public class RDFJoinNexus implements IJoinNexus {
 
     }
 
-    final private static transient IConstant<Long> fakeTermId = new Constant<Long>(-1L);
+    final private static transient IConstant<IV> fakeTermId = 
+        new Constant<IV>(new TermId(VTE.URI, -1L));
 
     public ISolution newSolution(final IRule rule, final IBindingSet bindingSet) {
 
@@ -1740,25 +1740,11 @@ public class RDFJoinNexus implements IJoinNexus {
 
         final IIndexManager indexManager = getIndexManager();
 
-        if (indexManager instanceof IBigdataFederation) {
+        if (indexManager instanceof IBigdataFederation<?>) {
 
-            final IBigdataFederation fed = (IBigdataFederation) indexManager;
-
-            if (fed.isScaleOut()) {
-
-                // distributed program execution.
-                return runDistributedProgram(fed, action, step);
-                
-            } else {
-                
-                // local data service.
-                final DataService dataService = ((LocalDataServiceFederation) fed)
-                        .getDataService();
-
-                // single data service program execution.
-                return runDataServiceProgram(dataService, action, step);
-                
-            }
+            // distributed program execution.
+            return runDistributedProgram((IBigdataFederation<?>) indexManager,
+                    action, step);
 
         } else {
             
@@ -1788,10 +1774,8 @@ public class RDFJoinNexus implements IJoinNexus {
     }
 
     /**
-     * Runs a distributed {@link IProgram}. This covers both the
-     * {@link EmbeddedFederation} (which uses key-range partitioned indices) and
-     * {@link AbstractDistributedFederation}s that are truly multi-machine and
-     * use RMI.
+     * Runs a distributed {@link IProgram} (key-range partitioned indices, RMI,
+     * and multi-machine).
      */
     protected Object runDistributedProgram(final IBigdataFederation fed,
             final ActionEnum action, final IStep step) throws Exception {

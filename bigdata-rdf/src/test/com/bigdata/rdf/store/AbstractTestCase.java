@@ -39,16 +39,13 @@ import java.util.TreeMap;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
 import junit.framework.TestCase2;
-
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.helpers.RDFHandlerBase;
-
 import com.bigdata.LRUNexus;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
@@ -60,6 +57,8 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
 import com.bigdata.btree.proc.BatchContains.BatchContainsConstructor;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataURI;
@@ -97,6 +96,8 @@ abstract public class AbstractTestCase
     extends TestCase2
 {
 
+    protected final IV NULL = null;
+    
     //
     // Constructors.
     //
@@ -248,8 +249,6 @@ abstract public class AbstractTestCase
 
 //    protected static final long N = IRawTripleStore.N;
 
-    protected static final long NULL = IRawTripleStore.NULL;
-    
     abstract protected AbstractTripleStore getStore(Properties properties);
     
     abstract protected AbstractTripleStore reopenStore(AbstractTripleStore store);
@@ -418,7 +417,7 @@ abstract public class AbstractTestCase
                 
                 final BigdataValue term = tuple.getObject();
                 
-                System.err.println(term.getTermId()+ ":" + term);
+                System.err.println(term.getIV()+ ":" + term);
 
             }
 
@@ -427,7 +426,7 @@ abstract public class AbstractTestCase
         /**
          * Dumps the term:id index.
          */
-        for( Iterator<Long> itr = store.getLexiconRelation().termIdIndexScan(); itr.hasNext(); ) {
+        for( Iterator<TermId> itr = store.getLexiconRelation().termIdIndexScan(); itr.hasNext(); ) {
             
             System.err.println("term->id : "+itr.next());
             
@@ -1021,7 +1020,7 @@ abstract public class AbstractTestCase
                 int nunknown = 0;
                 for (BigdataValue term : terms) {
 
-                    if (term.getTermId() == NULL) {
+                    if (term.getIV() == null) {
 
                         error("Unknown term: " + term);
                         
@@ -1049,43 +1048,43 @@ abstract public class AbstractTestCase
              */
             {
                 
-                final HashSet<Long> ids  = new HashSet<Long>(termSet.size());
+                final HashSet<IV> ivs  = new HashSet<IV>(termSet.size());
                 
                 for(BigdataValue term : termSet.values()) {
                     
-                    final long id = term.getTermId();
+                    final IV iv = term.getIV();
                     
-                    if (id == NULL) {
+                    if (iv == null) {
 
                         // ignore terms that we know were not found.
                         continue;
                         
                     }
                     
-                    ids.add(id);
+                    ivs.add(iv);
                     
                 }
 
                 // batch resolve ids to terms.
-                final Map<Long,BigdataValue> reverseMap = db.getLexiconRelation().getTerms(ids);
+                final Map<IV,BigdataValue> reverseMap = db.getLexiconRelation().getTerms(ivs);
                 
                 for(BigdataValue expectedTerm : termSet.values()) {
                     
-                    final long id = expectedTerm.getTermId();
+                    final IV iv = expectedTerm.getIV();
                     
-                    if (id == NULL) {
+                    if (iv == null) {
 
                         // ignore terms that we know were not found.
                         continue;
                         
                     }
 
-                    final BigdataValue actualTerm = reverseMap.get(id);
+                    final BigdataValue actualTerm = reverseMap.get(iv);
 
                     if (actualTerm == null || !actualTerm.equals(expectedTerm)) {
 
                         error("expectedTerm=" + expectedTerm
-                                        + ", assigned termId=" + id
+                                        + ", assigned termId=" + iv
                                         + ", but reverse lookup reports: "
                                         + actualTerm);
                         
@@ -1146,8 +1145,8 @@ abstract public class AbstractTestCase
                     } else {
 
                         // Leave the StatementType blank for bulk complete.
-                        b[n2++] = new SPO(s.getTermId(), p.getTermId(), o
-                                .getTermId() /*, StatementType */);
+                        b[n2++] = new SPO(s.getIV(), p.getIV(), o
+                                .getIV() /*, StatementType */);
 
                     }
                     

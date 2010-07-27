@@ -2,14 +2,15 @@ package com.bigdata.rdf.store;
 
 import java.io.IOException;
 import java.util.Properties;
-
 import org.openrdf.model.Statement;
-
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -52,7 +53,9 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
             // read-committed view of the same database.
             final AbstractTripleStore view = store.asReadCommittedView();
 
-            final long s = 1, p = 2, o = 3;
+            final IV s = new TermId(VTE.URI, 1);
+            final IV p = new TermId(VTE.URI, 2);
+            final IV o = new TermId(VTE.URI, 3);
 
             // add the statement.
             store.addStatements(new SPO[] { //
@@ -110,7 +113,9 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
         // Should be a nop.
         store.abort();
         
-        final long s = 1, p = 2, o = 3;
+        final IV s = new TermId(VTE.URI, 1);
+        final IV p = new TermId(VTE.URI, 2);
+        final IV o = new TermId(VTE.URI, 3);
 
         try {
 

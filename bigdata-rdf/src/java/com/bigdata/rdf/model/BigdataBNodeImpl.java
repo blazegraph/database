@@ -95,7 +95,7 @@ public class BigdataBNodeImpl extends BigdataResourceImpl implements
      */
     BigdataBNodeImpl(BigdataValueFactory valueFactory, String id) {
 
-        super(valueFactory, NULL);
+        super(valueFactory, null);
 
         if (id == null)
             throw new IllegalArgumentException();

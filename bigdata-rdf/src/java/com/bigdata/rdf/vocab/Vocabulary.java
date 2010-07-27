@@ -28,9 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.vocab;
 
 import java.util.Iterator;
-
 import org.openrdf.model.Value;
-
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.rule.IConstant;
 
 /**
@@ -51,7 +50,7 @@ public interface Vocabulary {
      * @throws IllegalArgumentException
      *             if that {@link Value} is not defined for this vocabulary.
      */
-    public long get(Value value);
+    public IV get(Value value);
     
     /**
      * Returns the {@link IConstant} for the {@link Value}.
@@ -64,7 +63,7 @@ public interface Vocabulary {
      * @throws IllegalArgumentException
      *             if that {@link Value} is not defined for this vocabulary.
      */
-    public IConstant<Long> getConstant(Value value);
+    public IConstant<IV> getConstant(Value value);
     
     /**
      * The #of defined {@link Value}s.

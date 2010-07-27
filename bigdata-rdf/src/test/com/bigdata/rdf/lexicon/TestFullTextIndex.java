@@ -31,13 +31,13 @@ import java.util.Arrays;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-
 import junit.framework.AssertionFailedError;
-
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
-
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.spo.TestSPOKeyOrder;
@@ -103,13 +103,13 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
     protected void doAddTermTest(final AbstractTripleStore store,
             final BigdataValue term) {
 
-        assertEquals(NULL, store.getTermId(term));
+        assertEquals(NULL, store.getIV(term));
 
-        final long id = store.addTerm(term);
+        final IV id = store.addTerm(term);
 
         assertNotSame(NULL, id);
 
-        assertEquals(id, store.getTermId(term));
+        assertEquals(id, store.getIV(term));
 
         assertEquals(term, store.getTerm(id));
 
@@ -139,13 +139,13 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
         // assertEquals("#hits", (long) expected.length, itr.size());
 
         final ICloseableIterator<BigdataValue> itr2 = new BigdataValueIteratorImpl(
-                store, new ChunkedWrappedIterator<Long>(new Striterator(hitr)
+                store, new ChunkedWrappedIterator<IV>(new Striterator(hitr)
                         .addFilter(new Resolver() {
                             private static final long serialVersionUID = 1L;
 
                             @Override
                             protected Object resolve(Object e) {
-                                return ((Hit) e).getDocId();
+                                return new TermId(VTE.LITERAL, ((Hit) e).getDocId());
                             }
                         })));
 

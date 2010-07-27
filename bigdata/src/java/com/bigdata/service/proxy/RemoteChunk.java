@@ -89,7 +89,27 @@ public class RemoteChunk<E> implements IRemoteChunk<E>, Externalizable {
 
     }
 
+    /**
+     * The initial version.
+     */
+    private static final transient byte VERSION0 = 0;
+
+    /**
+     * The current version.
+     */
+    private static final transient byte VERSION = VERSION0;
+
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        
+       final byte version = in.readByte();
+
+        switch (version) {
+        case VERSION0:
+            break;
+        default:
+            throw new UnsupportedOperationException("Unknown version: "
+                    + version);
+        }
         
         // true iff exhausted.
         exhausted = in.readBoolean();
@@ -114,6 +134,8 @@ public class RemoteChunk<E> implements IRemoteChunk<E>, Externalizable {
 
     public void writeExternal(ObjectOutput out) throws IOException {
 
+        out.writeByte(VERSION);
+        
         out.writeBoolean(exhausted);
 
         // true iff there are any elements in this chunk.

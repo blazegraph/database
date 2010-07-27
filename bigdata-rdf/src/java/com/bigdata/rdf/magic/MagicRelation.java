@@ -26,6 +26,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOAccessPath;
 import com.bigdata.rdf.spo.SPOKeyOrder;
@@ -49,8 +50,6 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
     
     protected static final boolean INFO = log.isInfoEnabled();
 
-    private static transient final long NULL = IRawTripleStore.NULL;
-    
     private final int arity;
     
     private final Set<String> indexNames;
@@ -401,7 +400,7 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
     public MagicAccessPath getAccessPath(
             final IKeyOrder<IMagicTuple> keyOrder) {
         
-        final IVariableOrConstant<Long>[] terms = 
+        final IVariableOrConstant<IV>[] terms = 
             new IVariableOrConstant[arity];
         
         for (int i = 0; i < terms.length; i++) {
@@ -564,7 +563,7 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
         if (bindingSet == null)
             throw new IllegalArgumentException();
         
-        final long[] terms = new long[arity];
+        final IV[] terms = new IV[arity];
         for (int i = 0; i < arity; i++) {
             terms[i] = asBound(predicate, i, bindingSet);
         }
@@ -594,19 +593,18 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
      *            
      * @return The bound value.
      */
-    @SuppressWarnings("unchecked")
-    private long asBound(final IPredicate<IMagicTuple> predicate, 
+    private IV asBound(final IPredicate<IMagicTuple> predicate, 
             final int index, final IBindingSet bindingSet) {
 
-        final IVariableOrConstant<Long> t = predicate.get(index);
-        final IConstant<Long> c;
+        final IVariableOrConstant<IV> t = predicate.get(index);
+        final IConstant<IV> c;
         if (t.isVar()) {
             c = bindingSet.get((IVariable) t);
         } else {
-            c = (IConstant<Long>) t;
+            c = (IConstant<IV>) t;
         }
 
-        return c.get().longValue();
+        return c.get();
 
     }
 

@@ -38,8 +38,6 @@ import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
-import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.rdf.lexicon.LexiconKeyBuilder.XSDBooleanCoder;
 
 /**
  * Test suite for construction of variable length unsigned byte[] keys from RDF
@@ -202,17 +200,6 @@ public class TestTerm2IdTupleSerializer extends TestCase2 {
          */
         assertTrue(BytesUtil.compareBytes(k1, k3) != 0); // true != 1
         assertTrue(BytesUtil.compareBytes(k2, k4) != 0); // false != 0
-
-        // verify decode.
-        final KeyBuilder keyBuilder = new KeyBuilder();
-        // decode(encode(true))
-        XSDBooleanCoder.INSTANCE.encode(keyBuilder.reset(), "true");
-        assertEquals("true", XSDBooleanCoder.INSTANCE.decode(keyBuilder
-                .getBuffer(), 0, 1));
-        // decode(encode(false))
-        XSDBooleanCoder.INSTANCE.encode(keyBuilder.reset(), "false");
-        assertEquals("false", XSDBooleanCoder.INSTANCE.decode(keyBuilder
-                .getBuffer(), 0, 1));
 
     }
     

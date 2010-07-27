@@ -8,6 +8,7 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -227,7 +228,7 @@ public class DistinctSPOIterator implements ICloseableIterator<ISPO> {
             ISPO tmp = src.next(); nscanned++;
 
             // strip off the context (and statement type).
-            tmp = new SPO(tmp.s(), tmp.p(), tmp.o(), IRawTripleStore.NULL/* c */);
+            tmp = new SPO(tmp.s(), tmp.p(), tmp.o(), (IV) null/* c */);
 
             if (btreeSet == null) {
 

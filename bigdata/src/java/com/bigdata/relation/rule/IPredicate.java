@@ -171,6 +171,8 @@ public interface IPredicate<E> extends Cloneable, Serializable {
     
     /**
      * An optional constraint on the visitable elements.
+     * 
+     * @todo rename as get(Element)Filter().
      */
     public IElementFilter<E> getConstraint();
 

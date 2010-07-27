@@ -677,6 +677,16 @@ abstract public class AbstractKeyArrayIndexProcedure extends
         public void readExternal(final ObjectInput in) throws IOException,
                 ClassNotFoundException {
 
+            final byte version = in.readByte();
+
+            switch (version) {
+            case VERSION0:
+                break;
+            default:
+                throw new UnsupportedOperationException("Unknown version: "
+                        + version);
+            }
+
             final InputBitStream ibs = new InputBitStream((InputStream) in,
                     0/* unbuffered */, false/* reflectionTest */);
 
@@ -699,6 +709,8 @@ abstract public class AbstractKeyArrayIndexProcedure extends
 
         public void writeExternal(final ObjectOutput out) throws IOException {
 
+            out.writeByte(VERSION);
+            
             final OutputBitStream obs = new OutputBitStream((OutputStream) out,
                     0/* unbuffered! */, false/*reflectionTest*/);
 
@@ -715,6 +727,16 @@ abstract public class AbstractKeyArrayIndexProcedure extends
             obs.flush();
             
         }
+
+        /**
+         * The initial version.
+         */
+        private static final transient byte VERSION0 = 0;
+
+        /**
+         * The current version.
+         */
+        private static final transient byte VERSION = VERSION0;
 
     }
 

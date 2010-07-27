@@ -1,16 +1,20 @@
 package com.bigdata.io;
 
 import java.nio.ByteBuffer;
+import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
@@ -59,7 +63,12 @@ public class DirectBufferPool {
             .getLogger(DirectBufferPool.class);
 
     /**
-     * Note: This is NOT a weak reference colletion since the JVM will leak
+     * The name of the buffer pool.
+     */
+    final private String name;
+    
+    /**
+     * Note: This is NOT a weak reference collection since the JVM will leak
      * native memory.
      */
     final private BlockingQueue<ByteBuffer> pool;
@@ -105,6 +114,13 @@ public class DirectBufferPool {
      */
     private final Condition bufferRelease = lock.newCondition();
 
+    /**
+     * The name of this buffer pool instance.
+     */
+    public String getName() {
+        return name;
+    }
+    
     /**
      * The capacity of the buffer as specified to the ctor.
      */
@@ -191,16 +207,30 @@ public class DirectBufferPool {
         String DEFAULT_BUFFER_CAPACITY = "" + Bytes.megabyte32 * 1;
         
     }
-    
+
     /**
      * A JVM-wide pool of direct {@link ByteBuffer}s used for a variety of
-     * purposes.
+     * purposes with a default {@link Options#BUFFER_CAPACITY} of
+     * <code>1 MB</code>.
      * <p>
      * Note: {@link #acquire()} requests will block once the pool capacity has
      * been reached until a buffer is {@link #release(ByteBuffer)}ed.
      */
     public final static DirectBufferPool INSTANCE;
 
+    /**
+     * A JVM-wide pool of direct {@link ByteBuffer}s with a default
+     * {@link Options#BUFFER_CAPACITY} of <code>10 MB</code>. The main use case
+     * for the 10M buffers are multi-block IOs for the {@link IndexSegment}s.
+     */
+    public final static DirectBufferPool INSTANCE_10M;
+
+    /**
+     * An unbounded list of all {@link DirectBufferPool} instances.
+     */
+    static private List<DirectBufferPool> pools = Collections
+            .synchronizedList(new LinkedList<DirectBufferPool>()); 
+    
     static {
         
         final int poolCapacity = Integer.parseInt(System.getProperty(
@@ -215,9 +245,16 @@ public class DirectBufferPool {
         if (log.isInfoEnabled())
             log.info(Options.BUFFER_CAPACITY + "=" + bufferCapacity);
 
-        INSTANCE = new DirectBufferPool(
-                poolCapacity,
-                bufferCapacity
+        INSTANCE = new DirectBufferPool(//
+                "default",//
+                poolCapacity,//
+                bufferCapacity//
+                );
+
+        INSTANCE_10M = new DirectBufferPool(//
+                "10M",//
+                Integer.MAX_VALUE, // poolCapacity
+                10 * Bytes.megabyte32 // bufferCapacity
                 );
             
             /*
@@ -261,14 +298,20 @@ public class DirectBufferPool {
      * 
      * @see #INSTANCE
      */
-    protected DirectBufferPool(final int poolCapacity, final int bufferCapacity) {
+    protected DirectBufferPool(final String name, final int poolCapacity,
+            final int bufferCapacity) {
 
+        if (name == null)
+            throw new IllegalArgumentException();
+        
         if (poolCapacity <= 0)
             throw new IllegalArgumentException();
 
         if (bufferCapacity <= 0)
             throw new IllegalArgumentException();
 
+        this.name = name;
+        
         this.poolCapacity = poolCapacity;
 
         this.bufferCapacity = bufferCapacity;
@@ -278,6 +321,8 @@ public class DirectBufferPool {
 
         this.pool = new LinkedBlockingQueue<ByteBuffer>(poolCapacity);
 
+        pools.add(this);
+        
     }
 
     /**
@@ -574,28 +619,69 @@ public class DirectBufferPool {
      * 
      * @return The counters.
      */
-    public synchronized CounterSet getCounters() {
+    static public CounterSet getCounters() {
 
         final CounterSet tmp = new CounterSet();
 
-        tmp.addCounter("poolCapacity", new OneShotInstrument<Integer>(
-                getPoolCapacity()));
+        // #of buffer pools.
+        int bufferPoolCount = 0;
+        // #of buffers currently allocated across all buffer pools.
+        int bufferInUseCount = 0;
+        // #of bytes currently allocated across all buffer pools.
+        final AtomicLong totalBytesUsed = new AtomicLong(0L);
+        // For each buffer pool.
+        for (DirectBufferPool p : pools) {
+            
+            final CounterSet c = tmp.makePath(p.getName());
+            
+            final int poolSize = p.getPoolSize();
+            
+            final int poolCapacity = p.getPoolCapacity();
+            
+            final int bufferCapacity = p.getBufferCapacity();
+            
+            final long bytesUsed = poolSize * bufferCapacity;
+            
+            bufferPoolCount++;
+            bufferInUseCount += poolSize;
+            totalBytesUsed.addAndGet(bytesUsed);
 
-        tmp.addCounter("bufferCapacity", new OneShotInstrument<Integer>(
-                getBufferCapacity()));
+            c.addCounter("poolCapacity", new OneShotInstrument<Integer>(
+                    poolCapacity));
 
-        tmp.addCounter("poolSize", new Instrument<Integer>() {
-            public void sample() {
-                setValue(getPoolSize());
-            }
-        });
+            c.addCounter("bufferCapacity", new OneShotInstrument<Integer>(
+                    bufferCapacity));
+
+            c.addCounter("poolSize", new Instrument<Integer>() {
+                public void sample() {
+                    setValue(poolSize);
+                }
+            });
+
+            /*
+             * #of bytes allocated and held by the DirectBufferPool.
+             */
+            c.addCounter("bytesUsed", new Instrument<Long>() {
+                public void sample() {
+                    setValue(bytesUsed);
+                }
+            });
+        
+        } // next DirectBufferPool
 
         /*
-         * #of bytes allocated and held by the DirectBufferPool.
+         * Totals.
          */
-        tmp.addCounter("bytesUsed", new Instrument<Integer>() {
+        
+        tmp.addCounter("bufferPoolCount", new OneShotInstrument<Integer>(
+                bufferPoolCount));
+
+        tmp.addCounter("bufferInUseCount", new OneShotInstrument<Integer>(
+                bufferInUseCount));
+
+        tmp.addCounter("totalBytesUsed", new Instrument<Long>() {
             public void sample() {
-                setValue(getPoolSize() * getBufferCapacity());
+                setValue(totalBytesUsed.get());
             }
         });
 

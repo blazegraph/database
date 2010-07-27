@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.model;
 
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
+
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -35,7 +38,7 @@ public abstract class BigdataValueImpl implements BigdataValue {
 
     private transient BigdataValueFactory valueFactory;
 
-    private long termId;
+    private IV iv;
 
     public final BigdataValueFactory getValueFactory() {
         
@@ -68,50 +71,50 @@ public abstract class BigdataValueImpl implements BigdataValue {
     /**
      * @param valueFactory
      *            The value factory that created this object (optional).
-     * @param termId
-     *            The term identifier (optional).
+     * @param iv
+     *            The internal value (optional).
      */
     protected BigdataValueImpl(final BigdataValueFactory valueFactory,
-            final long termId) {
+            final IV iv) {
         
 //        if (valueFactory == null)
 //            throw new IllegalArgumentException();
         
         this.valueFactory = valueFactory;
         
-        this.termId = termId;
+        this.iv = iv;
         
     }
 
-    final public void clearTermId() {
+    final public void clearInternalValue() {
 
-        termId = NULL;
+        iv = null;
         
     }
 
-    final public long getTermId() {
+    final public IV getIV() {
 
-        return termId;
+        return iv;
         
     }
 
-    final public void setTermId(final long termId) {
+    final public void setIV(final IV iv) {
 
-        if (termId == NULL) {
+        if (iv == null) {
 
             throw new IllegalArgumentException(
-                    "Can not set termId to NULL: term=" + this);
+                    "Can not set termId to null: term=" + this);
 
         }
 
-        if (this.termId != NULL && this.termId != termId) {
+        if (this.iv != null && !IVUtility.equals(this.iv, iv)) {
 
             throw new IllegalStateException("termId already assigned: old="
-                    + this.termId + ", new=" + termId);
+                    + this.iv + ", new=" + iv);
 
         }
         
-        this.termId = termId;
+        this.iv = iv;
         
     }
 

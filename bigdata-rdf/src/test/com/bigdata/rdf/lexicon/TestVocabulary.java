@@ -189,9 +189,9 @@ public class TestVocabulary extends AbstractTripleStoreTestCase {
 
             // point tests for known values.
             
-            assertEquals(rdfType.getTermId(), vocab.get(RDF.TYPE));
+            assertEquals(rdfType.getIV(), vocab.get(RDF.TYPE));
             
-            assertEquals(rdfProperty.getTermId(), vocab.get(RDF.PROPERTY));
+            assertEquals(rdfProperty.getIV(), vocab.get(RDF.PROPERTY));
 
             // point test for an unknown value.
             try {

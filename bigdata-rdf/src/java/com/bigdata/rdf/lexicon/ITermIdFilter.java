@@ -2,6 +2,8 @@ package com.bigdata.rdf.lexicon;
 
 import java.io.Serializable;
 
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -22,8 +24,8 @@ public interface ITermIdFilter extends Serializable {
      * @see AbstractTripleStore#isURI(long)
      * @see AbstractTripleStore#isBNode(long)
      * @see AbstractTripleStore#isLiteral(long)
-     * @see AbstractTripleStore#isStatement(long)
+     * @see AbstractTripleStore#isStatement(IV)
      */
-    public boolean isValid(long termId);
+    public boolean isValid(IV iv);
     
 }

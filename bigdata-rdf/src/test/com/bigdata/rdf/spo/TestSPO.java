@@ -28,11 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.spo;
 
 import junit.framework.TestCase2;
-
 import com.bigdata.io.ByteArrayBuffer;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.lexicon.ITermIdCodes;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
@@ -65,31 +66,31 @@ public class TestSPO extends TestCase2 {
      */
     public void test_valueEncodingRoundTrip() {
 
-        assertFalse(AbstractTripleStore.isStatement(IRawTripleStore.NULL));
-        doValueRoundTripTest(IRawTripleStore.NULL);
-
-        // Note: isURI() reports false for 0L so we must set a bit above the
-        // mask to a non-zero value.
-        assertTrue(AbstractTripleStore.isURI(1 << 2
-                | ITermIdCodes.TERMID_CODE_URI));
-        assertFalse(AbstractTripleStore
-                .isStatement(ITermIdCodes.TERMID_CODE_URI));
-        doValueRoundTripTest(ITermIdCodes.TERMID_CODE_URI);
-
-        assertTrue(AbstractTripleStore
-                .isLiteral(ITermIdCodes.TERMID_CODE_LITERAL));
-        assertFalse(AbstractTripleStore
-                .isStatement(ITermIdCodes.TERMID_CODE_LITERAL));
-        doValueRoundTripTest(ITermIdCodes.TERMID_CODE_LITERAL);
-
-        assertTrue(AbstractTripleStore.isBNode(ITermIdCodes.TERMID_CODE_BNODE));
-        assertFalse(AbstractTripleStore
-                .isStatement(ITermIdCodes.TERMID_CODE_BNODE));
-        doValueRoundTripTest(ITermIdCodes.TERMID_CODE_BNODE);
-
-        assertTrue(AbstractTripleStore
-                .isStatement(ITermIdCodes.TERMID_CODE_STATEMENT));
-        doValueRoundTripTest(ITermIdCodes.TERMID_CODE_STATEMENT);
+//        assertFalse(VTE.isStatement(TermId.NULL));
+//        doValueRoundTripTest(new TermId(VTE.URI, TermId.NULL));
+//
+//        // Note: isURI() reports false for 0L so we must set a bit above the
+//        // mask to a non-zero value.
+//        assertTrue(VTE.isURI(1 << 2
+//                | ITermIdCodes.TERMID_CODE_URI));
+//        assertFalse(VTE
+//                .isStatement(ITermIdCodes.TERMID_CODE_URI));
+//        doValueRoundTripTest(new TermId(VTE.URI, ITermIdCodes.TERMID_CODE_URI));
+//
+//        assertTrue(VTE
+//                .isLiteral(ITermIdCodes.TERMID_CODE_LITERAL));
+//        assertFalse(VTE
+//                .isStatement(ITermIdCodes.TERMID_CODE_LITERAL));
+//        doValueRoundTripTest(new TermId(VTE.LITERAL, ITermIdCodes.TERMID_CODE_LITERAL));
+//
+//        assertTrue(VTE.isBNode(ITermIdCodes.TERMID_CODE_BNODE));
+//        assertFalse(VTE
+//                .isStatement(ITermIdCodes.TERMID_CODE_BNODE));
+//        doValueRoundTripTest(new TermId(VTE.BNODE, ITermIdCodes.TERMID_CODE_BNODE));
+//
+//        assertTrue(VTE
+//                .isStatement(ITermIdCodes.TERMID_CODE_STATEMENT));
+//        doValueRoundTripTest(new TermId(VTE.STATEMENT, ITermIdCodes.TERMID_CODE_STATEMENT));
 
     }
 
@@ -98,38 +99,36 @@ public class TestSPO extends TestCase2 {
      * the override flag using {@link SPO#serializeValue(ByteArrayBuffer)} and
      * {@link SPO#decodeValue(ISPO, byte[])}.
      */
-    protected void doValueRoundTripTest(final long c) {
+    protected void doValueRoundTripTest(final IV c) {
         
         // test w/o override flag.
         boolean override = false;
+        boolean userFlag=false;
         for (StatementEnum type : StatementEnum.values()) {
             
-            if (type == StatementEnum.Backchained) {
-
-                // skip this - it is not a real statement type.
-                continue;
-                
-            }
-
             final byte[] val = SPO.serializeValue(new ByteArrayBuffer(),
-                    override, type, c);
+                    override,userFlag, type, c);
 
             final byte b = val[0];
 
             assertEquals(type, StatementEnum.decode(b));
             
             assertEquals(override, StatementEnum.isOverride(b));
+            assertEquals(userFlag, StatementEnum.isUserFlag(b));
 
+            final IV iv = new TermId(VTE.URI, 0);
+            
             if (type == StatementEnum.Explicit
-                    && AbstractTripleStore.isStatement(c)) {
+                    && c.isStatement()) {
                 // Should have (en|de)coded [c] as as statement identifier.
                 assertEquals(9, val.length);
-                assertEquals(c, SPO.decodeValue(new SPO(0, 0, 0), val).c());
+                assertEquals(c, SPO.decodeValue(new SPO(iv, iv, iv), val).c());
+                assertEquals(userFlag,SPO.decodeValue(new SPO(iv, iv, iv), val).getUserFlag());
             } else {
                 // Should not have (en|de)coded a statement identifier.
                 assertEquals(1, val.length);
-                assertEquals(IRawTripleStore.NULL, SPO.decodeValue(
-                        new SPO(0, 0, 0), val).c());
+                assertEquals(null, SPO.decodeValue(
+                        new SPO(iv, iv, iv), val).c());
             }
 
         }
@@ -138,32 +137,90 @@ public class TestSPO extends TestCase2 {
         override = true;
         for (StatementEnum type : StatementEnum.values()) {
             
-            if (type == StatementEnum.Backchained) {
-
-                // skip this - it is not a real statement type.
-                continue;
-                
-            }
-
             final byte[] val = SPO.serializeValue(new ByteArrayBuffer(),
-                    override, type, c);
+                    override, userFlag, type, c);
 
             final byte b = val[0];
 
             assertEquals(type, StatementEnum.decode(b));
 
             assertEquals(override, StatementEnum.isOverride(b));
-         
-            if (type == StatementEnum.Explicit
-                    && AbstractTripleStore.isStatement(c)) {
+            assertEquals(userFlag, StatementEnum.isUserFlag(b));
+
+            final IV iv = new TermId(VTE.URI, 0);
+            
+            if (type == StatementEnum.Explicit) {
                 // Should have (en|de)coded [c] as as statement identifier.
                 assertEquals(9, val.length);
-                assertEquals(c, SPO.decodeValue(new SPO(0, 0, 0), val).c());
+                assertEquals(c, SPO.decodeValue(new SPO(iv, iv, iv), val).c());
+                assertEquals(userFlag,SPO.decodeValue(new SPO(iv, iv, iv), val).getUserFlag());
             } else {
                 // Should not have (en|de)coded a statement identifier.
                 assertEquals(1, val.length);
-                assertEquals(IRawTripleStore.NULL, SPO.decodeValue(
-                        new SPO(0, 0, 0), val).c());
+                assertEquals(null, SPO.decodeValue(
+                        new SPO(iv, iv, iv), val).c());
+            }
+
+        }
+        
+        // test w/o override flag && w userFlag
+        override = false;
+        userFlag=true;
+        for (StatementEnum type : StatementEnum.values()) {
+            
+            final byte[] val = SPO.serializeValue(new ByteArrayBuffer(),
+                    override, userFlag, type, c);
+
+            final byte b = val[0];
+
+            assertEquals(type, StatementEnum.decode(b));
+            
+            assertEquals(override, StatementEnum.isOverride(b));
+            assertEquals(userFlag, StatementEnum.isUserFlag(b));
+
+            final IV iv = new TermId(VTE.URI, 0);
+            
+            if (type == StatementEnum.Explicit
+                    && c.isStatement()) {
+                // Should have (en|de)coded [c] as as statement identifier.
+                assertEquals(9, val.length);
+                assertEquals(c, SPO.decodeValue(new SPO(iv, iv, iv), val).c());
+                assertEquals(userFlag,SPO.decodeValue(new SPO(iv, iv, iv), val).getUserFlag());
+            } else {
+                // Should not have (en|de)coded a statement identifier.
+                assertEquals(1, val.length);
+                assertEquals(null, SPO.decodeValue(
+                        new SPO(iv, iv, iv), val).c());
+            }
+
+        }
+
+        // test w/ override flag && w userFlag
+        override = true;
+        for (StatementEnum type : StatementEnum.values()) {
+            
+            final byte[] val = SPO.serializeValue(new ByteArrayBuffer(),
+                    override, userFlag, type, c);
+
+            final byte b = val[0];
+
+            assertEquals(type, StatementEnum.decode(b));
+
+            assertEquals(override, StatementEnum.isOverride(b));
+            assertEquals(userFlag, StatementEnum.isUserFlag(b));
+
+            final IV iv = new TermId(VTE.URI, 0);
+            
+            if (type == StatementEnum.Explicit) {
+                // Should have (en|de)coded [c] as as statement identifier.
+                assertEquals(9, val.length);
+                assertEquals(c, SPO.decodeValue(new SPO(iv, iv, iv), val).c());
+                assertEquals(userFlag, SPO.decodeValue(new SPO(iv, iv, iv), val).getUserFlag());
+            } else {
+                // Should not have (en|de)coded a statement identifier.
+                assertEquals(1, val.length);
+                assertEquals(null, SPO.decodeValue(
+                        new SPO(iv, iv, iv), val).c());
             }
 
         }

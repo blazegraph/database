@@ -31,12 +31,11 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.UUID;
-
 import org.openrdf.model.BNode;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
-
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -106,33 +105,33 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
             store.addStatement(B, rdfsSubClassOf, A);
             store.addStatement(C, rdfsSubClassOf, B);
 
-            final long x_id = store.getTermId(x);
+            final IV x_id = store.getIV(x);
             assertTrue(x_id != NULL);
-            final long y_id = store.getTermId(y);
+            final IV y_id = store.getIV(y);
             assertTrue(y_id != NULL);
-            final long z_id = store.getTermId(z);
+            final IV z_id = store.getIV(z);
             assertTrue(z_id != NULL);
-            final long A_id = store.getTermId(A);
+            final IV A_id = store.getIV(A);
             assertTrue(A_id != NULL);
-            final long B_id = store.getTermId(B);
+            final IV B_id = store.getIV(B);
             assertTrue(B_id != NULL);
-            final long C_id = store.getTermId(C);
+            final IV C_id = store.getIV(C);
             assertTrue(C_id != NULL);
-            final long rdfType_id = store.getTermId(rdfType);
+            final IV rdfType_id = store.getIV(rdfType);
             assertTrue(rdfType_id != NULL);
-            final long rdfsSubClassOf_id = store.getTermId(rdfsSubClassOf);
+            final IV rdfsSubClassOf_id = store.getIV(rdfsSubClassOf);
             assertTrue(rdfsSubClassOf_id != NULL);
 
-            final long lit1_id = store.addTerm(lit1);
+            final IV lit1_id = store.addTerm(lit1);
             assertTrue(lit1_id != NULL);
-            final long lit2_id = store.addTerm(lit2);
+            final IV lit2_id = store.addTerm(lit2);
             assertTrue(lit2_id != NULL);
-            final long lit3_id = store.addTerm(lit3);
+            final IV lit3_id = store.addTerm(lit3);
             assertTrue(lit3_id != NULL);
 
-            final long bn1_id = store.addTerm(bn1);
+            final IV bn1_id = store.addTerm(bn1);
             assertTrue(bn1_id != NULL);
-            final long bn2_id = store.addTerm(bn2);
+            final IV bn2_id = store.addTerm(bn2);
             assertTrue(bn2_id != NULL);
 
             final boolean storeBlankNodes = store.getLexiconRelation()
@@ -150,14 +149,14 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
 
             store.commit();
 
-            assertEquals(x_id, store.getTermId(x));
-            assertEquals(y_id, store.getTermId(y));
-            assertEquals(z_id, store.getTermId(z));
-            assertEquals(A_id, store.getTermId(A));
-            assertEquals(B_id, store.getTermId(B));
-            assertEquals(C_id, store.getTermId(C));
-            assertEquals(rdfType_id, store.getTermId(rdfType));
-            assertEquals(rdfsSubClassOf_id, store.getTermId(rdfsSubClassOf));
+            assertEquals(x_id, store.getIV(x));
+            assertEquals(y_id, store.getIV(y));
+            assertEquals(z_id, store.getIV(z));
+            assertEquals(A_id, store.getIV(A));
+            assertEquals(B_id, store.getIV(B));
+            assertEquals(C_id, store.getIV(C));
+            assertEquals(rdfType_id, store.getIV(rdfType));
+            assertEquals(rdfsSubClassOf_id, store.getIV(rdfsSubClassOf));
 
             {
                 final Iterator<SPOKeyOrder> itr = store.getSPORelation()
@@ -195,14 +194,14 @@ public class TestRestartSafe extends AbstractTripleStoreTestCase {
                 if (log.isInfoEnabled())
                     log.info("\n" + store.dumpStore());
 
-                assertEquals(x_id, store.getTermId(x));
-                assertEquals(y_id, store.getTermId(y));
-                assertEquals(z_id, store.getTermId(z));
-                assertEquals(A_id, store.getTermId(A));
-                assertEquals(B_id, store.getTermId(B));
-                assertEquals(C_id, store.getTermId(C));
-                assertEquals(rdfType_id, store.getTermId(rdfType));
-                assertEquals(rdfsSubClassOf_id, store.getTermId(rdfsSubClassOf));
+                assertEquals(x_id, store.getIV(x));
+                assertEquals(y_id, store.getIV(y));
+                assertEquals(z_id, store.getIV(z));
+                assertEquals(A_id, store.getIV(A));
+                assertEquals(B_id, store.getIV(B));
+                assertEquals(C_id, store.getIV(C));
+                assertEquals(rdfType_id, store.getIV(rdfType));
+                assertEquals(rdfsSubClassOf_id, store.getIV(rdfsSubClassOf));
 
                 {
                     final Iterator<SPOKeyOrder> itr = store.getSPORelation()
