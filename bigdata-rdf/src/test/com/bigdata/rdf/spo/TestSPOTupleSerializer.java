@@ -52,9 +52,9 @@ import com.bigdata.btree.AbstractTuple;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleSerializer;
+import com.bigdata.rdf.internal.ITermIdCodes;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.lexicon.ITermIdCodes;
 import com.bigdata.rdf.model.StatementEnum;
 
 /**
@@ -123,7 +123,7 @@ public class TestSPOTupleSerializer extends TestCase2 {
          * 
          * Note: Only explicit statements may have statement identifiers.
          */
-        final TermId sid = new TermId(VTE.STATEMENT, 1 << 2 | ITermIdCodes.TERMID_CODE_STATEMENT);
+        final TermId sid = new TermId(VTE.STATEMENT, 1);
 
         {
 

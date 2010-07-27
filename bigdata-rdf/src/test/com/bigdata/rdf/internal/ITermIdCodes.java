@@ -25,11 +25,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 6, 2008
  */
 
-package com.bigdata.rdf.lexicon;
+package com.bigdata.rdf.internal;
 
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
+import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 
 /**
  * An interface that defines bit masks that are applied to the low bits of the
@@ -38,6 +39,7 @@ import org.openrdf.model.URI;
  * used to quickly test the type of a term identifier without requiring the term
  * value to be materialized from the {@link LexiconKeyOrder#ID2TERM} index.
  * 
+ * @deprecated completely superseded by the new {@link IV} lexicon refactor
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

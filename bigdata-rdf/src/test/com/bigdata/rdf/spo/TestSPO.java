@@ -29,10 +29,10 @@ package com.bigdata.rdf.spo;
 
 import junit.framework.TestCase2;
 import com.bigdata.io.ByteArrayBuffer;
+import com.bigdata.rdf.internal.ITermIdCodes;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.lexicon.ITermIdCodes;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.IRawTripleStore;
 

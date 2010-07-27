@@ -29,8 +29,8 @@ package com.bigdata.rdf.store;
 
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.internal.ITermIdCodes;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.lexicon.ITermIdCodes;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;

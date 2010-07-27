@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
-import com.bigdata.rdf.lexicon.ITermIdCodes;
 import com.bigdata.rdf.lexicon.TermIdEncoder;
 
 /**
@@ -35,15 +34,13 @@ import com.bigdata.rdf.lexicon.TermIdEncoder;
  * setting the bit flags used to identify the type of an RDF Value (URI, 
  * Literal, Blank Node, SID, etc).
  * 
- * @todo This replaces {@link ITermIdCodes}.
- * 
  * @todo update {@link TermIdEncoder}. This encodes term identifiers for
  *       scale-out but moving some bits around. It will be simpler now that the
  *       term identifier is all bits in the long integer with an additional byte
  *       prefix to differentiate URI vs Literal vs BNode vs SID and to indicate
  *       the inline value type (termId vs everything else).
  */
-public enum VTE implements ITermIdCodes {
+public enum VTE {
 
     /** A URI. */
     URI((byte) 0x00),

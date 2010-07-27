@@ -80,9 +80,9 @@ import com.bigdata.rdf.internal.DefaultExtensionFactory;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtension;
 import com.bigdata.rdf.internal.IExtensionFactory;
+import com.bigdata.rdf.internal.ITermIdCodes;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.BigdataRDFFullTextIndex;
-import com.bigdata.rdf.lexicon.ITermIdCodes;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.lexicon.ITextIndexer;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -192,7 +192,7 @@ import com.bigdata.striterator.IKeyOrder;
  */
 abstract public class AbstractTripleStore extends
         AbstractResource<IDatabase<AbstractTripleStore>> implements ITripleStore,
-        IRawTripleStore, IMutableDatabase<AbstractTripleStore>, ITermIdCodes {
+        IRawTripleStore, IMutableDatabase<AbstractTripleStore> {
 
     final static protected Logger log = Logger.getLogger(ITripleStore.class);
 
