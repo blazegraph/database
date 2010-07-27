@@ -507,53 +507,41 @@ public class NicUtil {
     /**
      * Special-purpose convenience method that returns a
      * <code>String</code> value representing the ip address of 
-     * the current node; where the value that is returned is 
-     * determined according to following criteria:
+     * the current node.
      * <p>
-     * <ul>
-     *  <li> If a non-<code>null</code> value is input for the
-     *       <code>systemPropertyName</code> parameter, then
-     *       this is viewed as a declaration by the caller that
-     *       that the system property with that given value
-     *       should take precedence over all other means of
-     *       determining the desired ip address. As such, this
-     *       method determines if a system property having the
-     *       given has indeed been set and, if it has, returns
-     *       the ip address of the nic having that name; or 
-     *       <code>null</code> if there is no nic with the 
-     *       desired name installed on the node.
-     *  <li> If a non-<code>null</code> value is input for the
-     *       <code>systemPropertyName</code> parameter, but
-     *       no system property with that name has been set, 
-     *       and <code>true</code> has been passed in for
-     *       the <code>fallbackOk</code> parameter, then this
-     *       method will return the IPV4 based address of the
-     *       first reachable nic that is found on the node.
-     *       Upon failing to find such an address, if the
-     *       <code>loopbackOk</code> parameter is also 
-     *       <code>true</code>, then this method will return
-     *       the <i>loop back</i> address of the node; otherwise
-     *       <code>null</code> is returned.
-     *  <li> If <code>null</code> is input for the 
-     *       <code>systemPropertyName</code> parameter, but
-     *       a non-<code>null</code> value is input for the
-     *       <code>defaultNic</code> parameter, then this
-     *       method returns the ip address of the nic having
-     *       that name; or <code>null</code> if there is no
-     *       nic with the desired default name installed on the
-     *       node.
-     *  <li> If <code>null</code> is input for both the 
-     *       <code>systemPropertyName</code> parameter and the
-     *       <code>defaultNic</code> parameter, and if the
-     *       <code>fallbackOk</code> parameter is <code>true</code>,
-     *       then this method will return the IPV4 based address
-     *       of the first reachable nic that is found on the node.
-     *       Upon failing to find such an address, if the
-     *       <code>loopbackOk</code> parameter is also 
-     *       <code>true</code>, then this method will return
-     *       the <i>loop back</i> address of the node; otherwise
-     *       <code>null</code> is returned.
-     * </ul>
+     * If a non-<code>null</code> value is input for the
+     * <code>systemPropertyName</code> parameter, then this
+     * method first determines if a system property with
+     * name equivalent to the given value has been set and,
+     * if it has, returns the ip address of the nic whose name
+     * is equivalent to that system property value; or
+     * <code>null</code> if there is no nic with the desired
+     * name installed on the node.
+     * <p>
+     * If there is no system property whose name is the value
+     * of the <code>systemPropertyName</code> parameter, and
+     * if the value "default" is input for the 
+     * <code>defaultNic</code> parameter, then this method
+     * will return the IPV4 based address of the first reachable
+     * nic that can be found on the node; otherwise, if a
+     * non-<code>null</code> value not equal to "default" is
+     * input for the the <code>defaultNic</code> parameter, 
+     * then this method returns the ip address of the nic 
+     * corresponding to that given name; or <code>null</code>
+     * if there is no such nic name installed on the node.
+     * <p>
+     * If, on the other hand, <code>null</code> is input for
+     * the <code>systemPropertyName</code> parameter, then 
+     * this method will attempt to find the desired ip address
+     * using only the value of the <code>defaultNic</code>,
+     * and applying the same search criteria as described
+     * above.
+     * <p>
+     * Note that in all cases, if <code>true</code> is input
+     * for the <code>loopOk</code> parameter, then upon failing
+     * to find a valid ip address using the specified search
+     * mechanism, this method will return the <i>loop back</i>
+     * address; otherwise, <code>null</code> is returned.
      * <p>
      * This method can be called from within a configuration
      * as well as from within program control.
@@ -568,25 +556,17 @@ public class NicUtil {
      *                           the name of the network interface
      *                           whose ip address should be returned
      *                           if <code>null</code> is input for the
+     *                           <code>systemPropertyName</code> parameter,
+     *                           or if there is no system property with
+     *                           name equivalent the value of the
      *                           <code>systemPropertyName</code> parameter.
      *
-     * @param fallbackOk         if <code>true</code>, then if either
-     *                           no system property is set having the
-     *                           name referenced by the 
-     *                           <code>systemPropertyName</code> parameter,
-     *                           or if <code>null</code> is input for both
-     *                           the <code>systemPropertyName</code>
-     *                           parameter and the <code>defaultNic</code>
-     *                           parameter, return the IPV4 based address
-     *                           of the first reachable network interface
-     *                           that can be found on the node.
-     *
-     * @param loopbackOk         if <code>true</code>, and if <code>true</code>
-     *                           is also input for the <code>fallbackOk</code>
-     *                           parameter, then if this method attempts,
-     *                           but fails, to find a valid IPV4 fallback
-     *                           address, then the node's <i>loop back</i>
-     *                           address is returned.
+     * @param loopbackOk         if <code>true</code>, then return the
+     *                           <i>loop back</i> address upon failure
+     *                           to find a valid ip address using the 
+     *                           search criteria specified through the
+     *                           <code>systemPropertyName</code> and
+     *                           <code>defaultNic</code> parameters.
      *
      * @return a <code>String</code> representing an ip address associated
      *         with the current node; where the value that is returned is
@@ -594,7 +574,6 @@ public class NicUtil {
      */
     public static String getIpAddress(String  systemPropertyName,
                                       String  defaultNic,
-                                      boolean fallbackOk,
                                       boolean loopbackOk)
                              throws SocketException, IOException
     {
@@ -613,30 +592,28 @@ public class NicUtil {
             }
             if(propSet) {
                 return getIpAddress(nicName, 0, loopbackOk);
-            } else {//desired system property not set, try fallback
-                if(fallbackOk) {
-                    return getDefaultIpv4Address(loopbackOk);
+            } else {//system property not set, try default and/or fallback
+                if(defaultNic != null) {
+                    if( defaultNic.equals("default") ) {
+                        return getDefaultIpv4Address(loopbackOk);
+                    } else {
+                        return getIpAddress(defaultNic, 0, loopbackOk);
+                    }
                 } else {
                     return null;
                 }
             }
-        } else {//no system property name provided, try default nic
+        } else {//no system property name provided, try default
             if(defaultNic != null) {
-                return getIpAddress(defaultNic, 0, loopbackOk);
-            } else {//no default nic provided, try fallback
-                if(fallbackOk) {
+                if( defaultNic.equals("default") ) {
                     return getDefaultIpv4Address(loopbackOk);
                 } else {
-                    return null;
+                    return getIpAddress(defaultNic, 0, loopbackOk);
                 }
+            } else {
+                return getIpAddress(null, loopbackOk);
             }
         }
-    }
-
-    public static String getIpAddress()
-                             throws SocketException, IOException
-    {
-        return getIpAddress(null, null, true, true);
     }
 
     /**
