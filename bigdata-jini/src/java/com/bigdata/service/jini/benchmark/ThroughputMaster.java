@@ -40,7 +40,7 @@ import org.apache.zookeeper.KeeperException;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ISplitHandler;
+import com.bigdata.btree.ISimpleSplitHandler;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
@@ -93,11 +93,11 @@ import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
  * validation should ensure that row reads and row writes are never split across
  * index partition boundaries. That can be done by a read on the metadata index
  * in which we examine the separator keys or by asserts in the code for read,
- * write and scan. It is the responsibility of the {@link ISplitHandler} to
- * ensure that separator keys are choosen for index partitions that fall on
+ * write and scan. It is the responsibility of the {@link ISimpleSplitHandler}
+ * to ensure that separator keys are chosen for index partitions that fall on
  * logical row boundaries.</dd>
  * <dt> bigdata file system performance tests</dt>
- * <dd>These tests should excercise block append, read, and update and stream
+ * <dd>These tests should exercise block append, read, and update and stream
  * oriented read and write. the workload can be shaped by the #of clients, by
  * the #of and distribution of files read and written, by the #of blocks in a
  * file, etc.</dd>

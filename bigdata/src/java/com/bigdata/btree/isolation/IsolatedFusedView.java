@@ -137,7 +137,7 @@ public class IsolatedFusedView extends FusedView {
      * <p>
      * Reads will read through the <i>writeSet</i> and then the resource(s) in
      * the <i>groundState</i> in the order in which they are given. A read is
-     * satisified by the first resource containing an index entry for the search
+     * satisfied by the first resource containing an index entry for the search
      * key.
      * <p>
      * Writes will first read through looking for a @todo javadoc
