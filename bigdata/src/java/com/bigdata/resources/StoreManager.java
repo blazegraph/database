@@ -2446,7 +2446,8 @@ abstract public class StoreManager extends ResourceEvents implements
              * the "historical" journals managed by this data service.
              * 
              * FIXME Must also roll the counters forward for the other journal
-             * buffer strategies!
+             * buffer strategies! (The implementation class is different for the
+             * WORMStrategy, which is causing complications right now.)
              */
             if (getBufferStrategy() instanceof DiskOnlyStrategy) {
 
