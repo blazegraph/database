@@ -334,8 +334,8 @@ public class NodeSerializer {
      */
     public IAbstractNodeData decode(final ByteBuffer buf) {
 
-        assert buf != null;
-        assert buf.position() == 0;
+        if (buf == null)
+            throw new IllegalArgumentException();
 
         final boolean isNode = AbstractReadOnlyNodeData.isNode(buf
                 .get(AbstractReadOnlyNodeData.O_TYPE));
@@ -344,7 +344,7 @@ public class NodeSerializer {
         final AbstractFixedByteArrayBuffer slice;
         if (!buf.hasArray()) {
             // backing array is not accessible, so copy into new byte[].
-            final byte[] tmp = new byte[buf.capacity()];
+            final byte[] tmp = new byte[buf.remaining()];
             buf.get(tmp);
             slice = FixedByteArrayBuffer.wrap(tmp);
             if(BigdataStatics.debug)

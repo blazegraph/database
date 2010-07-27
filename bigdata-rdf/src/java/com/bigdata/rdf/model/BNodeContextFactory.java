@@ -138,9 +138,14 @@ public class BNodeContextFactory implements BigdataValueFactory {
 
 	public BigdataStatement createStatement(Resource s, URI p, Value o,
             Resource c, StatementEnum type) {
-        return valueFactory.createStatement(s, p, o, c, type);
+        return valueFactory.createStatement(s, p, o, c, type, false);
     }
-
+	
+	public BigdataStatement createStatement(Resource s, URI p, Value o,
+            Resource c, StatementEnum type, boolean userFlag) {
+        return valueFactory.createStatement(s, p, o, c, type, userFlag);
+    }
+	
 	public BigdataURI createURI(String namespace, String localName) {
         return valueFactory.createURI(namespace, localName);
     }

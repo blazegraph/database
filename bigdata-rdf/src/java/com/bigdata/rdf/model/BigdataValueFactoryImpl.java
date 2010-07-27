@@ -36,12 +36,12 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.datatypes.XMLDatatypeUtil;
 
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
  * An implementation using {@link BigdataValue}s and {@link BigdataStatement}s.
@@ -59,11 +59,6 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * @version $Id$
  */
 public class BigdataValueFactoryImpl implements BigdataValueFactory {
-
-    /**
-     * @see IRawTripleStore#NULL
-     */
-    protected final long NULL = IRawTripleStore.NULL;
 
     /**
      * WARNING: Use {@link #getInstance(String)} NOT this constructor.
@@ -178,7 +173,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
      */
     protected String nextID() {
 
-        return "_"+UUID.randomUUID();
+        return "u"+UUID.randomUUID();
 
     }
     
@@ -197,9 +192,9 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     /*
      * XSD support. 
      */
-    private static final transient String NAMESPACE_XSD = "http://www.w3.org/2001/XMLSchema";
+    public static final transient String NAMESPACE_XSD = "http://www.w3.org/2001/XMLSchema";
     
-    private static final transient String xsd = NAMESPACE_XSD + "#";
+    public static final transient String xsd = NAMESPACE_XSD + "#";
 
     private final BigdataURIImpl xsd_long = new BigdataURIImpl(this, xsd
             + "long");
@@ -272,9 +267,14 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     public BigdataLiteralImpl createLiteral(final XMLGregorianCalendar arg0) {
 
+//        return new BigdataLiteralImpl(this, arg0.toString(),
+//                null/* languageCode */, createURI(arg0.getXMLSchemaType()
+//                        .toString()));
+        
         return new BigdataLiteralImpl(this, arg0.toString(),
-                null/* languageCode */, createURI(arg0.getXMLSchemaType()
-                        .toString()));
+                null/* languageCode */, createURI(XMLDatatypeUtil.qnameToURI(
+                        arg0.getXMLSchemaType()).stringValue()));
+
     }
 
     public BigdataLiteralImpl createLiteral(final String label, final String language) {
@@ -323,13 +323,21 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     public BigdataStatementImpl createStatement(Resource s, URI p, Value o,
             Resource c, StatementEnum type) {
+        
+        return createStatement(s, p, o, c, type, false/* userFlag */);
+        
+    }
 
+    public BigdataStatementImpl createStatement(Resource s, URI p, Value o,
+            Resource c, StatementEnum type, final boolean userFlag) {
+        
         return new BigdataStatementImpl(//
                 (BigdataResource) asValue(s),//
                 (BigdataURI)      asValue(p),//
                 (BigdataValue)    asValue(o),//
                 (BigdataResource) asValue(c),// optional
-                type // the statement type (optional).
+                type, // the statement type (optional).
+                userFlag // the user flag (optional)
         );
 
     }

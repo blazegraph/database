@@ -228,7 +228,7 @@ public class Rule<E> implements IRule<E> {
         
     }
     
-    public String toString(IBindingSet bindingSet) {
+    public String toString(final IBindingSet bindingSet) {
 
         final StringBuilder sb = new StringBuilder();
         
@@ -287,7 +287,7 @@ public class Rule<E> implements IRule<E> {
      * @param tail
      *            The tail (aka body) of the rule.
      * @param constraints
-     *            An array of constaints on the legal states of the bindings
+     *            An array of constraints on the legal states of the bindings
      *            materialized for the rule.
      * 
      * @throws IllegalArgumentException
@@ -331,7 +331,7 @@ public class Rule<E> implements IRule<E> {
      * @param queryOptions
      *            Options that effect evaluation of the rule as a query.
      * @param constraints
-     *            An array of constaints on the legal states of the bindings
+     *            An array of constraints on the legal states of the bindings
      *            materialized for the rule.
      * 
      * @throws IllegalArgumentException

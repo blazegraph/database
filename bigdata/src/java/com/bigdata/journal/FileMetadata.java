@@ -582,8 +582,8 @@ public class FileMetadata {
                     break;
                 }
                 case Disk:
-                    buffer = null;
-                    break;
+//                    buffer = null;
+//                    break;
                 case DiskWORM:
                     buffer = null;
                     break;
@@ -757,8 +757,8 @@ public class FileMetadata {
                     buffer = null;
                     break;
                 case Disk:
-                    buffer = null;
-                    break;
+//                    buffer = null;
+//                    break;
                 case DiskWORM:
                     buffer = null;
                     break;

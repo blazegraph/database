@@ -36,11 +36,7 @@ import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.relation.RelationSchema;
 import com.bigdata.service.AbstractFederation;
-import com.bigdata.service.EmbeddedClient;
-import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.LocalDataServiceClient;
-import com.bigdata.service.LocalDataServiceFederation;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
 
@@ -474,8 +470,8 @@ public class BigdataSailHelper {
     private static enum FederationEnum {
         
         LTS,
-        LDS,
-        EDS,
+//        LDS,
+//        EDS,
         JDS;
         
     }
@@ -484,10 +480,10 @@ public class BigdataSailHelper {
      * Utility class.
      * <p>
      * Note: The LTS (local triple store) mode is inferred when the filename is
-     * a plain file rather than a directory. However, when the filename
-     * identifies a directory then you must specify whether the directory should
-     * be interpreted as a {@link LocalDataServiceFederation} (LDS), an
-     * {@link EmbeddedFederation} (EDS), or a {@link JiniFederation} (JDS).
+     * a <code>.properties</code> file. The {@link JiniFederation} (JDS) mode is
+     * inferred when the filename is a <code>.config</code> file. If neither of
+     * those file extensions is used, then you must specify the either LTS or
+     * JDS explicitly.
      * <p>
      * Note: The <i>namespace</i> identifies which triple store you are
      * accessing and defaults to <code>kb</code>.
@@ -500,18 +496,19 @@ public class BigdataSailHelper {
      * applied to the kb.
      * 
      * @param args
-     *            <i>filename</i> ((LTS|LDS|EDS|JDS ((<i>namespace</i>
+     *            <i>filename</i> ((LTS|JDS ((<i>namespace</i>
      *            (<i>timestamp</i>)))properties)
      * 
      * @throws SailException
      * @throws ConfigurationException
      * @throws IOException
      */
-    public static void main(String[] args) throws SailException, ConfigurationException, IOException {
-       
+    public static void main(final String[] args) throws SailException,
+            ConfigurationException, IOException {
+
         if (args.length == 0) {
 
-            System.err.println("usage: filename (LTS|LDS|EDS|JDS (namespace (timestamp)))");
+            System.err.println("usage: filename (LTS|JDS (namespace (timestamp)))");
 
             System.exit(1);
             
@@ -520,17 +517,18 @@ public class BigdataSailHelper {
         final String filename = args[0];
         
         final File file = new File(filename);
-        
-        final FederationEnum fedType = args.length > 1 ? FederationEnum
-                .valueOf(args[1]) : (!file.isDirectory() ? FederationEnum.LTS
-                : null);
-                
-        if (fedType == null) {
 
-            System.err.println("Must specify the federation type: dir=" + filename);
-
+        final FederationEnum fedType;
+        if (args.length > 1) {
+            fedType = FederationEnum.valueOf(args[1]);
+        } else if (filename.endsWith(".properties")) {
+            fedType = FederationEnum.LTS;
+        } else if (filename.endsWith(".config")) {
+            fedType = FederationEnum.JDS;
+        } else {
+            fedType = null;
+            System.err.println("Must specify the federation type: " + filename);
             System.exit(1);
-            
         }
 
         switch(fedType) {
@@ -546,18 +544,18 @@ public class BigdataSailHelper {
 
             }
             break;
-        case LDS:
-        case EDS:
-            if (!file.isDirectory()) {
-
-                System.err.println(fedType
-                        + " requires a directory, not a plain file: file="
-                        + filename);
-
-                System.exit(1);
-
-            }
-            break;
+//        case LDS:
+//        case EDS:
+//            if (!file.isDirectory()) {
+//
+//                System.err.println(fedType
+//                        + " requires a directory, not a plain file: file="
+//                        + filename);
+//
+//                System.exit(1);
+//
+//            }
+//            break;
         default:
             throw new AssertionError();
         }
@@ -599,49 +597,49 @@ public class BigdataSailHelper {
 
             break;
 
-        case LDS: {
-
-//            jiniServicesHelper = null;
-
-            final Properties properties = new Properties();
+//        case LDS: {
+//
+////            jiniServicesHelper = null;
+//
+//            final Properties properties = new Properties();
+//            
+//            properties.setProperty(
+//                    com.bigdata.service.LocalDataServiceClient.Options.DATA_DIR,
+//                    filename);
+//            
+//            // disable platform statistics collection.
+//            properties.setProperty(
+//                    LocalDataServiceClient.Options.COLLECT_PLATFORM_STATISTICS, "false");
+//
+//            fed = new LocalDataServiceClient(properties).connect();
+//
+//            sail = helper.getSail(fed, namespace, timestamp);
+//
+//            break;
+//        
+//        }
             
-            properties.setProperty(
-                    com.bigdata.service.LocalDataServiceClient.Options.DATA_DIR,
-                    filename);
-            
-            // disable platform statistics collection.
-            properties.setProperty(
-                    LocalDataServiceClient.Options.COLLECT_PLATFORM_STATISTICS, "false");
-
-            fed = new LocalDataServiceClient(properties).connect();
-
-            sail = helper.getSail(fed, namespace, timestamp);
-
-            break;
-        
-        }
-            
-        case EDS: {
-
-//            jiniServicesHelper = null;
-
-            final Properties properties = new Properties();
-            
-            properties.setProperty(
-                    com.bigdata.service.EmbeddedClient.Options.DATA_DIR,
-                    filename);
-            
-            // disable platform statistics collection.
-            properties.setProperty(
-                    EmbeddedClient.Options.COLLECT_PLATFORM_STATISTICS, "false");
-
-            fed = new EmbeddedClient(properties).connect();
-
-            sail = helper.getSail(fed, namespace, timestamp);
-
-            break;
-            
-        }
+//        case EDS: {
+//
+////            jiniServicesHelper = null;
+//
+//            final Properties properties = new Properties();
+//            
+//            properties.setProperty(
+//                    com.bigdata.service.EmbeddedClient.Options.DATA_DIR,
+//                    filename);
+//            
+//            // disable platform statistics collection.
+//            properties.setProperty(
+//                    EmbeddedClient.Options.COLLECT_PLATFORM_STATISTICS, "false");
+//
+//            fed = new EmbeddedClient(properties).connect();
+//
+//            sail = helper.getSail(fed, namespace, timestamp);
+//
+//            break;
+//            
+//        }
             
         case JDS:
 

@@ -28,7 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation.rule;
 
 import java.util.Set;
-
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 
 /**
@@ -60,7 +62,7 @@ public class TestRule extends AbstractRuleTestCase {
      */
     public void test_ctor() {
 
-        final Var<Long> u = Var.var("u");
+        final Var<IV> u = Var.var("u");
 
         final IRule r = new MyRule(
                 // head
@@ -114,7 +116,7 @@ public class TestRule extends AbstractRuleTestCase {
     
     public void test_ctor_noHead() {
 
-        final Var<Long> u = Var.var("u");
+        final Var<IV> u = Var.var("u");
 
         final IRule r = new MyRule(
                 // NO head
@@ -184,7 +186,7 @@ public class TestRule extends AbstractRuleTestCase {
      */
     public void test_ruleBindings() {
 
-        final Var<Long> u = Var.var("u");
+        final Var<IV> u = Var.var("u");
 
         final IPredicate head = new P(relation, u, rdfsSubClassOf, rdfsResource);
 
@@ -202,7 +204,7 @@ public class TestRule extends AbstractRuleTestCase {
         assertFalse(r.isFullyBound(0,bindingSet));
 
         // verify you can overwrite a variable in the tail.
-        bindingSet.set(u, new Constant<Long>(1L));
+        bindingSet.set(u, new Constant<IV>(new TermId(VTE.URI, 1L)));
 
         assertTrue(r.isFullyBound(0,bindingSet)); // is fully bound.
         
@@ -279,10 +281,10 @@ public class TestRule extends AbstractRuleTestCase {
          */
 
         // spot check equals() for the Constant.
-        assertTrue(rdfsClass.equals(new Constant<Long>(rdfsClass.get())));
+        assertTrue(rdfsClass.equals(new Constant<IV>(rdfsClass.get())));
         
         // re-bind [x].
-        bindingSet.set(x, new Constant<Long>(rdfsClass.get()));
+        bindingSet.set(x, new Constant<IV>(rdfsClass.get()));
         
         if (log.isInfoEnabled()) {
             log.info(bindingSet.toString());

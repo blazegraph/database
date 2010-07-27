@@ -52,8 +52,6 @@ public class AbstractEmbeddedTripleStoreTestCase extends
         super(arg0);
     }
 
-    protected final long NULL = IRawTripleStore.NULL;
-
     /**
      * The triple store under test.
      */

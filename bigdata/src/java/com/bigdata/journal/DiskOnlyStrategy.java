@@ -155,6 +155,8 @@ import com.bigdata.resources.StoreManager.ManagedJournal;
  * 
  * @see BufferMode#Disk
  * @see BufferMode#Temporary
+ * 
+ * @deprecated This has been replaced by {@link WORMStrategy}.
  */
 public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         IDiskBasedStrategy {

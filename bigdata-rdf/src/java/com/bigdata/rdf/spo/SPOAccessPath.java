@@ -26,6 +26,7 @@ package com.bigdata.rdf.spo;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.AbstractAccessPath;
@@ -46,8 +47,6 @@ import com.bigdata.striterator.IKeyOrder;
  * @version $Id$
  */
 public class SPOAccessPath extends AbstractAccessPath<ISPO> {
-
-    private static transient final long NULL = IRawTripleStore.NULL;
 
     private SPOTupleSerializer          tupleSer;
 
@@ -120,11 +119,11 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
      *         unbound for the predicate for this access path.
      */
     @SuppressWarnings("unchecked")
-    public long get(final int index) {
+    public IV get(final int index) {
 
-        final IVariableOrConstant<Long> t = predicate.get(index);
+        final IVariableOrConstant<IV> t = predicate.get(index);
 
-        return t.isVar() ? NULL : t.get();
+        return t == null || t.isVar() ? null : t.get();
 
     }
 
@@ -274,7 +273,7 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
      * 
      * @return The constrained {@link IAccessPath}.
      */
-    public SPOAccessPath bindContext(final long c) {
+    public SPOAccessPath bindContext(final IV c) {
 
         return bindPosition(3, c);
 
@@ -294,16 +293,16 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
      * 
      * @return The constrained {@link IAccessPath}.
      */
-    public SPOAccessPath bindPosition(int position, final long v) {
+    public SPOAccessPath bindPosition(int position, final IV v) {
 
-        if (v == IRawTripleStore.NULL) {
+        if (v == null) {
 
             // or return EmptyAccessPath.
             throw new IllegalArgumentException();
 
         }
 
-        final IVariableOrConstant<Long> var = getPredicate().get(position);
+        final IVariableOrConstant<IV> var = getPredicate().get(position);
 
         /*
          * Constrain the access path by setting the given position on its
@@ -323,7 +322,7 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
              * the context position to the desired constant.
              */
 
-            p = getPredicate().setC(new Constant<Long>(v));
+            p = getPredicate().setC(new Constant<IV>(v));
 
         } else if (var.isVar()) {
 
@@ -333,8 +332,8 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
              */
 
             p = getPredicate().asBound(new ArrayBindingSet(//
-                    new IVariable[] { (IVariable<Long>) var },//
-                    new IConstant[] { new Constant<Long>(v) }//
+                    new IVariable[] { (IVariable<IV>) var },//
+                    new IConstant[] { new Constant<IV>(v) }//
                     ));
         } else {
 
@@ -342,7 +341,7 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
              * The context position is already bound to a constant.
              */
 
-            if (var.get().longValue() == v) {
+            if (var.get().equals(v)) {
 
                 /*
                  * The desired constant is already specified for the context
@@ -384,32 +383,32 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
      * 
      * @return The constrained {@link IAccessPath}.
      */
-    public SPOAccessPath bindPosition(final long values[]) {
-        IVariableOrConstant<Long> s = null, p = null, o = null, c = null;
+    public SPOAccessPath bindPosition(final IV[] values) {
+        IVariableOrConstant<IV> s = null, p = null, o = null, c = null;
 
         s = getPredicate().get(0);
-        if (values[0] != 0) {
+        if (values[0] != null) {
             if (s.isVar()) {
-                s = new Constant<Long>(values[0]);
+                s = new Constant<IV>(values[0]);
             }
         }
 
         p = getPredicate().get(1);
-        if (values[1] != 0) {
+        if (values[1] != null) {
             if (p.isVar()) {
-                p = new Constant<Long>(values[1]);
+                p = new Constant<IV>(values[1]);
             }
         }
         o = getPredicate().get(2);
-        if (values[2] != 0) {
+        if (values[2] != null) {
             if (o.isVar()) {
-                o = new Constant<Long>(values[2]);
+                o = new Constant<IV>(values[2]);
             }
         }
         c = getPredicate().get(3);
-        if (values[3] != 0) {
+        if (values[3] != null) {
             if (c == null || c.isVar()) {
-                c = new Constant<Long>(values[3]);
+                c = new Constant<IV>(values[3]);
             }
         }
         /*

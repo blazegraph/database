@@ -34,13 +34,12 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
-
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.store.IRawTripleStore;
@@ -70,9 +69,6 @@ import com.bigdata.util.concurrent.MappedTaskExecutor;
  */
 public class NamedGraphSolutionExpander implements ISolutionExpander<ISPO> {
 
-    /**
-     * 
-     */
     private static final long serialVersionUID = 2399492655063411719L;
 
     protected static transient Logger log = Logger
@@ -110,7 +106,7 @@ public class NamedGraphSolutionExpander implements ISolutionExpander<ISPO> {
      * if no graphs were specified having a term identifier.
      */
     // note: not 'final' due to bizarre compiler error under linux for JDK 1.6.0_16
-    private /*final*/ long firstContext;
+    private /*final*/ IV firstContext;
 
     /**
      * Filter iff we will leave [c] unbound and filter for graphs which are in
@@ -135,7 +131,7 @@ public class NamedGraphSolutionExpander implements ISolutionExpander<ISPO> {
 
         this.namedGraphs = namedGraphs;
 
-        long firstContext = IRawTripleStore.NULL;
+        IV firstContext = null;
         
         if(namedGraphs == null) {
             
@@ -151,11 +147,11 @@ public class NamedGraphSolutionExpander implements ISolutionExpander<ISPO> {
 
                 final BigdataURI uri = (BigdataURI) itr.next();
 
-                if (uri.getTermId() != IRawTripleStore.NULL) {
+                if (uri.getIV() != null) {
 
                     if (++nknown == 1) {
 
-                        firstContext = uri.getTermId();
+                        firstContext = uri.getIV();
 
                     }
 
@@ -204,7 +200,7 @@ public class NamedGraphSolutionExpander implements ISolutionExpander<ISPO> {
 
         final SPOAccessPath accessPath = (SPOAccessPath) accessPath1;
         
-        final IVariableOrConstant<Long> c = accessPath.getPredicate().get(3);
+        final IVariableOrConstant<IV> c = accessPath.getPredicate().get(3);
 
         if (c != null && c.isConstant()) {
 
@@ -602,9 +598,9 @@ public class NamedGraphSolutionExpander implements ISolutionExpander<ISPO> {
 
                         for (URI g : namedGraphs) {
 
-                            final long termId = ((BigdataURI)g).getTermId();
+                            final IV termId = ((BigdataURI)g).getIV();
 
-                            if (termId == IRawTripleStore.NULL) {
+                            if (termId == null) {
 
                                 // unknown URI means no data for that graph.
                                 continue;
@@ -648,9 +644,9 @@ public class NamedGraphSolutionExpander implements ISolutionExpander<ISPO> {
              */
             private final class DrainIteratorTask implements Callable<Void> {
 
-                final long termId;
+                final IV termId;
 
-                public DrainIteratorTask(final long termId) {
+                public DrainIteratorTask(final IV termId) {
 
                     this.termId = termId;
 
@@ -709,9 +705,9 @@ public class NamedGraphSolutionExpander implements ISolutionExpander<ISPO> {
 
             for (URI g : namedGraphs) {
 
-                final long termId = ((BigdataURI) g).getTermId();
+                final IV termId = ((BigdataURI) g).getIV();
 
-                if (termId == IRawTripleStore.NULL) {
+                if (termId == null) {
 
                     // unknown URI means no data for that graph.
                     continue;
@@ -756,14 +752,14 @@ public class NamedGraphSolutionExpander implements ISolutionExpander<ISPO> {
 
             private final boolean exact;
 
-            private final long c;
+            private final IV c;
 
             /**
              * 
              * @param c
              *            The graph identifier.
              */
-            public RangeCountTask(final boolean exact, final long c) {
+            public RangeCountTask(final boolean exact, final IV c) {
 
                 this.exact = exact;
 

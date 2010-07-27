@@ -42,7 +42,6 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.LocalDataServiceFederation;
 
 /**
  * Class supports range query across against an unpartitioned index on an
@@ -50,8 +49,7 @@ import com.bigdata.service.LocalDataServiceFederation;
  * joins.
  * <p>
  * Note: This class supports caching of the remote metadata index, which does
- * not use index partitions, by the {@link AbstractDistributedFederation} and also
- * supports the {@link LocalDataServiceFederation}.
+ * not use index partitions, by the {@link AbstractDistributedFederation}.
  * 
  * @todo write tests for read-consistent.
  * 

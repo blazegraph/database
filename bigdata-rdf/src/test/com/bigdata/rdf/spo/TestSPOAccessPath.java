@@ -28,9 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.spo;
 
 import org.openrdf.model.Statement;
-
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
@@ -82,7 +82,11 @@ public class TestSPOAccessPath extends AbstractTripleStoreTestCase {
         final AbstractTripleStore store = getStore();
 
         // constants used for s,p,o,c when bound. 0L used when unbound.
-        final long S = 1, P = 2, O = 3, C = 4, _ = 0;
+        final IV S = new TermId(VTE.URI, 1);
+        final IV P = new TermId(VTE.URI, 2);
+        final IV O = new TermId(VTE.URI, 3);
+        final IV C = new TermId(VTE.URI, 4);
+        final IV _ = new TermId(VTE.URI, 0);
 
         try {
 
@@ -132,25 +136,25 @@ public class TestSPOAccessPath extends AbstractTripleStoreTestCase {
                 assertEquals(SPOKeyOrder.SPO, r.getAccessPath(NULL, NULL, NULL,
                         NULL).getKeyOrder());
 
-                assertEquals(SPOKeyOrder.SPO, r.getAccessPath(1, NULL, NULL,
+                assertEquals(SPOKeyOrder.SPO, r.getAccessPath(S, NULL, NULL,
                         NULL).getKeyOrder());
 
-                assertEquals(SPOKeyOrder.SPO, r.getAccessPath(1, 1, NULL, NULL)
+                assertEquals(SPOKeyOrder.SPO, r.getAccessPath(S, S, NULL, NULL)
                         .getKeyOrder());
 
-                assertEquals(SPOKeyOrder.SPO, r.getAccessPath(1, 1, 1, NULL)
+                assertEquals(SPOKeyOrder.SPO, r.getAccessPath(S, S, S, NULL)
                         .getKeyOrder());
 
-                assertEquals(SPOKeyOrder.POS, r.getAccessPath(NULL, 1, NULL,
+                assertEquals(SPOKeyOrder.POS, r.getAccessPath(NULL, S, NULL,
                         NULL).getKeyOrder());
 
-                assertEquals(SPOKeyOrder.POS, r.getAccessPath(NULL, 1, 1, NULL)
+                assertEquals(SPOKeyOrder.POS, r.getAccessPath(NULL, S, S, NULL)
                         .getKeyOrder());
 
-                assertEquals(SPOKeyOrder.OSP, r.getAccessPath(NULL, NULL, 1,
+                assertEquals(SPOKeyOrder.OSP, r.getAccessPath(NULL, NULL, S,
                         NULL).getKeyOrder());
 
-                assertEquals(SPOKeyOrder.OSP, r.getAccessPath(1, NULL, 1, NULL)
+                assertEquals(SPOKeyOrder.OSP, r.getAccessPath(S, NULL, S, NULL)
                         .getKeyOrder());
 
             }
@@ -211,17 +215,17 @@ public class TestSPOAccessPath extends AbstractTripleStoreTestCase {
                         store.getSPORelation().getNamespace(),//
                         Var.var("g"), // s
                         Var.var("h"), // p
-                        new Constant<Long>(o1.getTermId()) // o
+                        new Constant<IV>(o1.getIV()) // o
                 );
 
                 final IAccessPath<ISPO> accessPath = store.getSPORelation()
                         .getAccessPath(predicate);
 
                 assertSameSPOs(new ISPO[] { //
-                                new SPO(s1.getTermId(), p1.getTermId(), o1
-                                        .getTermId(), StatementEnum.Explicit),//
-                                new SPO(s1.getTermId(), s1.getTermId(), o1
-                                        .getTermId(), StatementEnum.Explicit),//
+                                new SPO(s1.getIV(), p1.getIV(), o1
+                                        .getIV(), StatementEnum.Explicit),//
+                                new SPO(s1.getIV(), s1.getIV(), o1
+                                        .getIV(), StatementEnum.Explicit),//
                         }, accessPath.iterator());
             }
 
@@ -231,14 +235,14 @@ public class TestSPOAccessPath extends AbstractTripleStoreTestCase {
                         store.getSPORelation().getNamespace(),//
                         Var.var("g"), // s
                         Var.var("g"), // s
-                        new Constant<Long>(o1.getTermId()) // o
+                        new Constant<IV>(o1.getIV()) // o
                 );
 
                 final IAccessPath<ISPO> accessPath = store.getSPORelation()
                         .getAccessPath(predicate);
 
                 assertSameSPOs(new ISPO[] { //
-                        new SPO(s1.getTermId(), s1.getTermId(), o1.getTermId(),
+                        new SPO(s1.getIV(), s1.getIV(), o1.getIV(),
                                 StatementEnum.Explicit),//
                         }, accessPath.iterator());
             }
@@ -318,8 +322,8 @@ public class TestSPOAccessPath extends AbstractTripleStoreTestCase {
                 final SPOPredicate predicate = new SPOPredicate(//
                         store.getSPORelation().getNamespace(),//
                         Var.var("g"), // s
-                        new Constant<Long>(p1.getTermId()), // p
-                        new Constant<Long>(o1.getTermId()), // o
+                        new Constant<IV>(p1.getIV()), // p
+                        new Constant<IV>(o1.getIV()), // o
                         Var.var("h") // c
                 );
 
@@ -327,11 +331,11 @@ public class TestSPOAccessPath extends AbstractTripleStoreTestCase {
                         .getAccessPath(predicate);
 
                 assertSameSPOs(new ISPO[] { //
-                                new SPO(graphA.getTermId(), p1.getTermId(), o1
-                                        .getTermId(), graphA.getTermId(),
+                                new SPO(graphA.getIV(), p1.getIV(), o1
+                                        .getIV(), graphA.getIV(),
                                         StatementEnum.Explicit),//
-                                new SPO(s.getTermId(), p1.getTermId(), o1
-                                        .getTermId(), graphA.getTermId(),
+                                new SPO(s.getIV(), p1.getIV(), o1
+                                        .getIV(), graphA.getIV(),
                                         StatementEnum.Explicit),//
                         }, accessPath.iterator());
             }
@@ -341,8 +345,8 @@ public class TestSPOAccessPath extends AbstractTripleStoreTestCase {
                 final SPOPredicate predicate = new SPOPredicate(//
                         store.getSPORelation().getNamespace(),//
                         Var.var("g"), // s
-                        new Constant<Long>(p1.getTermId()), // p
-                        new Constant<Long>(o1.getTermId()), // o
+                        new Constant<IV>(p1.getIV()), // p
+                        new Constant<IV>(o1.getIV()), // o
                         Var.var("g") // c
                 );
 
@@ -350,8 +354,8 @@ public class TestSPOAccessPath extends AbstractTripleStoreTestCase {
                         .getAccessPath(predicate);
 
                 assertSameSPOs(new ISPO[] { //
-                        new SPO(graphA.getTermId(), p1.getTermId(), o1
-                                .getTermId(), graphA.getTermId(),
+                        new SPO(graphA.getIV(), p1.getIV(), o1
+                                .getIV(), graphA.getIV(),
                                 StatementEnum.Explicit),//
                         }, accessPath.iterator());
             }

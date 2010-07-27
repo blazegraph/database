@@ -29,9 +29,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.spo;
 
 import java.util.HashMap;
-
 import junit.framework.TestCase2;
-
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IVariableOrConstant;
@@ -61,23 +62,23 @@ public class TestSPOPredicate extends TestCase2 {
     
     final String relation  = "test";
 
-    final static Constant<Long> rdfsSubClassOf = new Constant<Long>(
-            1L);
+    final static Constant<IV> rdfsSubClassOf = new Constant<IV>(
+            new TermId(VTE.URI, 1L));
     
-    final static Constant<Long> rdfsResource = new Constant<Long>(
-            2L);
+    final static Constant<IV> rdfsResource = new Constant<IV>(
+            new TermId(VTE.URI, 2L));
     
-    final static Constant<Long> rdfType = new Constant<Long>(
-            3L);
+    final static Constant<IV> rdfType = new Constant<IV>(
+            new TermId(VTE.URI, 3L));
     
-    final static Constant<Long> rdfsClass = new Constant<Long>(
-            4L);
+    final static Constant<IV> rdfsClass = new Constant<IV>(
+            new TermId(VTE.URI, 4L));
     
     public void test_ctor() {
 
         {
 
-            final Var<Long> u = Var.var("u");
+            final Var<IV> u = Var.var("u");
 
             final SPOPredicate p1 = new SPOPredicate(relation,u, rdfsSubClassOf,
  rdfsResource);
@@ -103,9 +104,9 @@ public class TestSPOPredicate extends TestCase2 {
 
         {
 
-            final Var<Long> u = Var.var("u");
+            final Var<IV> u = Var.var("u");
 
-            final Var<Long> v = Var.var("v");
+            final Var<IV> v = Var.var("v");
 
             final SPOPredicate p1 = new SPOPredicate(relation, u,
                     rdfsSubClassOf, v);
@@ -136,7 +137,7 @@ public class TestSPOPredicate extends TestCase2 {
      */
     public void test_equalsSameImpl() {
 
-        final Var<Long> u = Var.var("u");
+        final Var<IV> u = Var.var("u");
 
         final SPOPredicate p1 = new SPOPredicate(relation,u, rdfsSubClassOf, rdfsResource);
 
@@ -158,7 +159,7 @@ public class TestSPOPredicate extends TestCase2 {
     
     public void test_equalsDifferentImpl() {
         
-        final Var<Long> u = Var.var("u");
+        final Var<IV> u = Var.var("u");
 
         final SPOPredicate p1 = new SPOPredicate(relation, u, rdfType, rdfsClass);
 
@@ -183,7 +184,7 @@ public class TestSPOPredicate extends TestCase2 {
      */
     public void test_hashMapSameImpl() {
 
-        final Var<Long> u = Var.var("u");
+        final Var<IV> u = Var.var("u");
         
         final SPOPredicate p1 = new SPOPredicate(relation, u, rdfsSubClassOf, rdfsResource);
 

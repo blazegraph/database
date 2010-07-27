@@ -48,7 +48,9 @@ Modifications:
 package com.bigdata.relation.accesspath;
 
 import junit.framework.TestCase2;
-
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.relation.rule.Constant;
@@ -78,13 +80,13 @@ public class TestSameVariableConstraint extends TestCase2 {
 
     private final String relationName = "r";
     
-    protected final static Constant<Long> a = new Constant<Long>(1L);
+    protected final static Constant<IV> a = new Constant<IV>(new TermId(VTE.URI, 1L));
     
-    protected final static Constant<Long> b = new Constant<Long>(1L);
+    protected final static Constant<IV> b = new Constant<IV>(new TermId(VTE.URI, 1L));
     
-    protected final static Constant<Long> c = new Constant<Long>(1L);
+    protected final static Constant<IV> c = new Constant<IV>(new TermId(VTE.URI, 1L));;
     
-    protected final static Constant<Long> d = new Constant<Long>(1L);
+    protected final static Constant<IV> d = new Constant<IV>(new TermId(VTE.URI, 1L));
 
     public void test_no_dups1() {
 

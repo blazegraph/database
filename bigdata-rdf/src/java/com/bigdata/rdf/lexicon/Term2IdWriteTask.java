@@ -3,15 +3,14 @@ package com.bigdata.rdf.lexicon;
 import java.util.Arrays;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.log4j.Logger;
-
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.keys.KVO;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IResultHandler;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc.Term2IdWriteProcConstructor;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.service.Split;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
 import com.bigdata.service.ndx.pipeline.KVOC;
@@ -155,7 +154,7 @@ public class Term2IdWriteTask implements
 
                     for (int i = 0; i < numTerms; i++) {
 
-                        if (b[i].obj.getTermId() != IRawTripleStore.NULL) {
+                        if (b[i].obj.getIV() != null) {
                             
                             if (log.isDebugEnabled())
                                 log.debug("term identifier already assigned: "
@@ -199,11 +198,13 @@ public class Term2IdWriteTask implements
                     
                 }
                 
+                AbstractKeyArrayIndexProcedureConstructor ctor =
+                    new Term2IdWriteProcConstructor(
+                            readOnly, r.storeBlankNodes, r.termIdBitsToReverse);
+                
                 // run the procedure.
                 termIdIndex.submit(0/* fromIndex */, ndistinct/* toIndex */,
-                        keys, null/* vals */, new Term2IdWriteProcConstructor(
-                                readOnly, r.storeBlankNodes,
-                                r.termIdBitsToReverse),
+                        keys, null/* vals */, ctor,
                         new Term2IdWriteProcResultHandler(a, readOnly,
                                 stats.nunknown));
 
@@ -283,9 +284,9 @@ public class Term2IdWriteTask implements
 
             for (int i = split.fromIndex, j = 0; i < split.toIndex; i++, j++) {
 
-                final long termId = result.ids[j];
+                final IV termId = result.ivs[j];
 
-                if (termId == IRawTripleStore.NULL) {
+                if (termId == null) {
 
                     if (!readOnly)
                         throw new AssertionError();
@@ -295,7 +296,7 @@ public class Term2IdWriteTask implements
                 } else {
 
                     // assign the term identifier.
-                    a[i].obj.setTermId(termId);
+                    a[i].obj.setIV(termId);
 
                     if(a[i] instanceof KVOList) {
                         
@@ -348,17 +349,17 @@ public class Term2IdWriteTask implements
      */
     static public class AssignTermId implements KVOList.Op<BigdataValue> {
         
-        private final long tid;
+        private final IV iv;
 
-        public AssignTermId(final long tid) {
+        public AssignTermId(final IV iv) {
 
-            this.tid = tid;
+            this.iv = iv;
             
         }
 
         public void apply(final KVO<BigdataValue> t) {
 
-            t.obj.setTermId(tid);
+            t.obj.setIV(iv);
             
 //            System.err.println("Assigned term identifier to duplicate: "+tid+" : "+t.obj);
             

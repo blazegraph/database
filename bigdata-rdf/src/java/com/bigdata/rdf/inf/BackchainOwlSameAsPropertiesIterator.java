@@ -31,6 +31,7 @@ import java.io.StringWriter;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -55,8 +56,6 @@ import com.bigdata.striterator.IKeyOrder;
  *          04:05:51 mrpersonick Exp $
  */
 public class BackchainOwlSameAsPropertiesIterator implements IChunkedOrderedIterator<ISPO> {
-    
-    protected final static transient long NULL = IRawTripleStore.NULL;
     
     /**
      * Enables record of stack traces for callers and verification that the
@@ -111,28 +110,28 @@ public class BackchainOwlSameAsPropertiesIterator implements IChunkedOrderedIter
      *            database.
      */
     public BackchainOwlSameAsPropertiesIterator(
-            IChunkedOrderedIterator<ISPO> src, long s, long p, long o,
-            AbstractTripleStore db, final long sameAs) {
+            IChunkedOrderedIterator<ISPO> src, IV s, IV p, IV o,
+            AbstractTripleStore db, final IV sameAs) {
 
-        if (s != NULL && o != NULL) {
+        if (s != null && o != null) {
             
             this.delegate =
                     new BackchainOwlSameAsPropertiesSPOIterator(
                             src, s, p, o, db, sameAs);
             
-        } else if (s != NULL && o == NULL) {
+        } else if (s != null && o == null) {
             
             this.delegate =
                     new BackchainOwlSameAsPropertiesSPIterator(
                             src, s, p, db, sameAs);
             
-        } else if (s == NULL && o != NULL) {
+        } else if (s == null && o != null) {
             
             this.delegate =
                     new BackchainOwlSameAsPropertiesPOIterator(
                             src, p, o, db, sameAs);
             
-        } else if (s == NULL && o == NULL) {
+        } else if (s == null && o == null) {
             
             this.delegate =
                     new BackchainOwlSameAsPropertiesPIterator(

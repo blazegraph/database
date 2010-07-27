@@ -29,15 +29,14 @@ package com.bigdata.rdf.rules;
 
 import java.util.Arrays;
 import java.util.Properties;
-
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
-
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.FullyBufferedJustificationIterator;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.Justification.VisitedSPOSet;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -125,9 +124,9 @@ public class TestJustifications extends AbstractRuleTestCase {
              * the explicit statement that is the support for the rule.
              */
 
-            long U = store.addTerm(new URIImpl("http://www.bigdata.com/U"));
-            long A = store.addTerm(new URIImpl("http://www.bigdata.com/A"));
-            long Y = store.addTerm(new URIImpl("http://www.bigdata.com/Y"));
+            IV U = store.addTerm(new URIImpl("http://www.bigdata.com/U"));
+            IV A = store.addTerm(new URIImpl("http://www.bigdata.com/A"));
+            IV Y = store.addTerm(new URIImpl("http://www.bigdata.com/Y"));
 
             store.addStatements(new SPO[] {//
                     new SPO(U, A, Y, StatementEnum.Explicit) //
@@ -177,9 +176,9 @@ public class TestJustifications extends AbstractRuleTestCase {
                  * as ZERO (0L) in the justifications index and interpreted as
                  * wildcards.
                  */
-//                bindingSet.set(Var.var("u"), new Constant<Long>(U));
-                bindingSet.set(Var.var("a"), new Constant<Long>(A));
-//                bindingSet.set(Var.var("y"), new Constant<Long>(Y));
+//                bindingSet.set(Var.var("u"), new Constant<IV>(U));
+                bindingSet.set(Var.var("a"), new Constant<IV>(A));
+//                bindingSet.set(Var.var("y"), new Constant<IV>(Y));
                 
                 final ISolution solution = new Solution(joinNexus, rule,
                         bindingSet);

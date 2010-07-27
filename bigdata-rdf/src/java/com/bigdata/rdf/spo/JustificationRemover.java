@@ -12,6 +12,7 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Justification;
 
@@ -108,6 +109,11 @@ public class JustificationRemover implements Callable<Long> {
 
             final ISPO spo = a[i];
 
+            keyBuilder.reset();
+            spo.s().encode(keyBuilder);
+            spo.p().encode(keyBuilder);
+            spo.o().encode(keyBuilder);
+            
             /*
              * Form an iterator that will range scan the justifications having
              * that statement as their 'head'. The iterator uses the REMOVEALL
@@ -115,11 +121,9 @@ public class JustificationRemover implements Callable<Long> {
              * not actually send back the keys or vals to the client.
              */
 
-            final byte[] fromKey = keyBuilder.reset().append(spo.s()).append(
-                    spo.p()).append(spo.o()).getKey();
+            final byte[] fromKey = keyBuilder.getKey();
 
-            final byte[] toKey = keyBuilder.reset().append(spo.s()).append(spo.p())
-                    .append(spo.o() + 1).getKey();
+            final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
             final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey,
                     0/* capacity */, IRangeQuery.REMOVEALL, null/* filter */);

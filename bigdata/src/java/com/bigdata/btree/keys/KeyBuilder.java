@@ -28,14 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.keys;
 
 import java.io.UnsupportedEncodingException;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.text.Collator;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.UUID;
-
 import org.apache.log4j.Logger;
-
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
@@ -69,7 +68,7 @@ public class KeyBuilder implements IKeyBuilder {
 
     protected static final Logger log = Logger.getLogger(KeyBuilder.class);
     
-    protected static final boolean INFO = log.isInfoEnabled();
+//    protected static final boolean INFO = log.isInfoEnabled();
 
 //    protected static final boolean DEBUG = log.isDebugEnabled();
     
@@ -248,7 +247,7 @@ public class KeyBuilder implements IKeyBuilder {
      * {@link #buf buffer} may be grown by this operation but it will not be
      * truncated.
      * <p>
-     * This operation is equivilent to
+     * This operation is equivalent to
      * 
      * <pre>
      * ensureCapacity(this.len + len)
@@ -946,6 +945,126 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
+    /**
+     * Return the #of bytes in the unsigned byte[] representation of the
+     * {@link BigInteger} value.
+     * 
+     * @param value
+     *            The {@link BigInteger} value.
+     *            
+     * @return The byte length of its unsigned byte[] representation.
+     */
+    static public int byteLength(final BigInteger value) {
+        
+        return 2/* runLength */+ (value.bitLength() / 8 + 1)/* data */;
+        
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: Precision is NOT preserved by this encoding.
+     * <h2>Implementation details</h2>
+     * The encoding to a BigDecimal requires the expression of scale and length
+     * {@link BigDecimal#scale()} indicates the precision of the number, where
+     * '3' is three decimal places and '-3' rounded to '000'
+     * {@link BigDecimal#precision()} is the number of unscaled digits therefore
+     * <code>precision - scale</code> is an expression of the exponent of the
+     * normalized number. This means that the exponent could be zero or negative
+     * so the sign of the number cannot be indicated by adding to the exponent.
+     * Instead an explicit sign byte,'0' or '1' is used. The actual
+     * {@link BigDecimal} serialization uses the {@link String} conversions
+     * supported by {@link BigDecimal}, less the '-' sign character if
+     * applicable. The length of this data is terminated by a trailing byte. The
+     * value of that byte depends on the sign of the original {@link BigDecimal}
+     * and is used to impose the correct sort order on negative
+     * {@link BigDecimal} values which differ only in the digits in the decimal
+     * portion.
+     *<p>
+     * The variable encoding of BigNumbers requires this String representation
+     * and negative representations are further encoded using
+     * {@link #flipDigits(String)} for the equivalent of 2s compliment negative
+     * representation.
+     * 
+     * There are two cases where scale and trailing zeros interact.  The
+     * case of "0.000" is represented as precision of 1 and scale of 3, 
+     * indicating the "0" is shifted down 3 decimal places.  While "5.000"
+     * is represented as precision of 4 and scale of 3.  The special case
+     * of zero is allowed because shifting zero to the right leaves a new
+     * zero on the left, so a zero value must be checked for explicitly, while
+     * if we want to compare "5", "5.00" and "5.0000" as equal we must
+     * remove and compensate for trailing zeros. 
+     * 
+     * @see #decodeBigDecimal(int, byte[])
+     */
+    public KeyBuilder append(final BigDecimal d) {
+    	final int sign = d.signum(); 
+    	
+    	if (sign == 0) {
+    		append((byte) 0);
+    		
+    		return this;
+    	}
+    	
+    	BigDecimal nd = d.stripTrailingZeros();
+    	
+    	String unscaledStr = nd.unscaledValue().toString();
+    	
+    	final int precision = nd.precision();
+    	final int scale =  nd.scale();
+    	
+    	int exponent = precision - scale;
+    	if (sign == -1) {
+    		exponent = -exponent;
+    	}
+    	
+    	append((byte) sign);
+    	append(exponent);   	
+    	
+    	// Note: coded as digits 
+    	
+    	if (sign == -1) {
+    		unscaledStr = flipDigits(unscaledStr);
+    	}
+    	appendASCII(unscaledStr); // the unscaled BigInteger representation
+    	// Note: uses unsigned 255 if negative and unsigned 0 if positive. 
+        append(sign == -1 ? (byte) Byte.MAX_VALUE: (byte) 0);
+    	
+        return this;
+    }
+
+    /**
+     * Return the #of bytes in the unsigned byte[] representation of the
+     * {@link BigDecimal} value.
+     * 
+     * @param value
+     *            The {@link BigDecimal} value.
+     *            
+     * @return The byte length of its unsigned byte[] representation.
+     */
+    static public int byteLength(final BigDecimal value) {
+        
+        final int byteLength;
+        
+    	if (value.signum() == 0) {
+    		byteLength = 1;
+    	} else {
+    		final BigDecimal nbd = value.stripTrailingZeros();
+    		
+    		final int dataLen = nbd.unscaledValue().toString().length();
+        
+    		byteLength = 
+            + 1 /* sign */ 
+            + 4 /* exponent */
+            + dataLen /* data */
+            + 1 /* termination byte */
+            ;
+    	} 
+    	
+        return byteLength;
+       
+    }
+
     /*
      * static helper methods.
      */
@@ -1056,6 +1175,10 @@ public class KeyBuilder implements IKeyBuilder {
         } else if (val instanceof BigInteger) {
 
             append((BigInteger) val);
+
+        } else if (val instanceof BigDecimal) {
+
+            append((BigDecimal) val);
 
         } else if (val instanceof Float) {
 
@@ -1337,6 +1460,27 @@ public class KeyBuilder implements IKeyBuilder {
      */
     static public BigInteger decodeBigInteger(final int offset, final byte[] key) {
 
+        return new BigInteger(decodeBigInteger2(offset, key));
+        
+    }
+
+    /**
+     * Decodes a {@link BigInteger} key, returning a byte[] which may be used to
+     * construct a {@link BigInteger} having the decoded value. The number of
+     * bytes consumed by the key component is <code>2 + runLength</2>. The
+     * <code>2</code> is a fixed length field coding the signum of the value and
+     * its runLength. The length of the returned array is the runLength of the
+     * variable length portion of the value. This method may be used to scan
+     * through a key containing {@link BigInteger} components.
+     * 
+     * @param offset
+     *            The offset of the start of the {@link BigInteger} in the key.
+     * @param key
+     *            The key.
+     * @return The byte[] to be passed to {@link BigInteger#BigInteger(byte[])}.
+     */
+    static public byte[] decodeBigInteger2(final int offset, final byte[] key) {
+
         final int tmp = KeyBuilder.decodeShort(key, offset);
 
         /*
@@ -1352,10 +1496,91 @@ public class KeyBuilder implements IKeyBuilder {
         System.arraycopy(key/* src */, offset + 2/* srcpos */, b/* dst */,
                 0/* destPos */, runLength);
         
-        return new BigInteger(b);
+        return b;
         
     }
 
+    /**
+     * Decodes a {@link BigDecimal} key, returning a byte[] which may be used to
+     * construct a {@link BigDecimal} having the decoded value.
+     * 
+     * The number of bytes consumed by the key component is
+     * <code>2 + runLength</2>. The
+     * <code>2</code> is a fixed length field coding the signum of the value and
+     * its runLength. The length of the returned array is the runLength of the
+     * variable length portion of the value.
+     * 
+     * This method may be used to scan through a key containing
+     * {@link BigDecimal} components.
+     * 
+     * @param offset
+     *            The offset of the start of the {@link BigDecimal} in the key.
+     * @param key
+     *            The key.
+     * @return The byte[] to be passed to {@link BigDecimal#BigInteger(byte[])}.
+     * 
+     * @todo update javadoc
+     * 
+     * FIXME We need a version which has all the metadata to support scanning
+     *       through a key as well as one that does a simple decode.
+     */
+    static public BigDecimal decodeBigDecimal(final int offset, final byte[] key) {
+    	int curs = offset;
+        final byte sign = key[curs++];
+        
+        if (sign == decodeZero) {
+        	return new BigDecimal(0);
+        }
+        
+        int exponent = decodeInt(key, curs);
+        final boolean neg = sign == negSign;
+        if (neg) {
+        	exponent = -exponent;
+        }
+        curs += 4;
+        int len = 0;
+        for (int i = curs; key[i] != (neg ? eos2 : eos); i++) len++;
+        String unscaledStr = decodeASCII(key, curs, len);
+        if (neg) {
+        	unscaledStr = flipDigits(unscaledStr);
+        }
+        
+        final BigInteger unscaled = new BigInteger(unscaledStr);
+        
+        final int precision = len;
+        final int scale  = precision - exponent - (neg ? 1 : 0);
+        
+        final BigDecimal ret = new BigDecimal(unscaled, scale);
+
+        return ret; // relative scale adjustment
+    }
+    
+    private static final byte decodeZero = decodeByte(0);
+    private static final byte eos = decodeZero;
+    private static final byte eos2 = decodeByte(Byte.MAX_VALUE);
+    private static final byte negSign = decodeByte(-1);
+
+    private static final char[] flipMap = {'0', '1', '2', '3', '4',
+    	'5', '6', '7', '8', '9'
+    };
+
+    /**
+     * Flip numbers such that <code>0/9,1/8,2/7,3/6,4/5</code> - this is the
+     * equivalent of a two-complement representation for the base 10 character
+     * digits.
+     */
+    static private String flipDigits(final String str) {
+    	final char[] chrs = str.toCharArray();
+    	for (int i = 0; i < chrs.length; i++) {
+    		final int flip = '9' - chrs[i];
+    		if (flip >= 0 && flip < 10) {
+    			chrs[i] = flipMap[flip];
+    		}
+    	}
+    	
+    	return new String(chrs);
+    }
+    
     /**
      * Create an instance for ASCII keys.
      * 
@@ -1597,7 +1822,7 @@ public class KeyBuilder implements IKeyBuilder {
 
             locale = Locale.getDefault();
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("Using default locale: " + locale.getDisplayName());
 
         }

@@ -34,11 +34,9 @@ import java.util.Properties;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.ProxyTestCase;
-import com.bigdata.service.LocalDataServiceFederation;
 
 /**
- * Simple test verifies that the {@link FullTextIndex} data are restart safe
- * when written on a {@link LocalDataServiceFederation}.
+ * Simple test verifies that the {@link FullTextIndex} data are restart safe.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -130,7 +128,7 @@ public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
                 final FullTextIndex ndx = new FullTextIndex(indexManager,
                         NAMESPACE, ITx.UNISOLATED, properties);
 
-                final Hiterator itr = ndx.search(text, languageCode);
+                final Hiterator<?> itr = ndx.search(text, languageCode);
 
                 assertEquals(2, itr.size());
 
@@ -159,7 +157,7 @@ public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
                 final FullTextIndex ndx = new FullTextIndex(indexManager,
                         NAMESPACE, ITx.UNISOLATED, properties);
 
-                final Hiterator itr = ndx.search(text, languageCode);
+                final Hiterator<?> itr = ndx.search(text, languageCode);
 
                 assertEquals(2, itr.size());
 

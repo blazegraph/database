@@ -339,6 +339,9 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
      * of the supported build mechanisms and validates the generated
      * {@link IndexSegment} against the source {@link BTree}.
      * 
+     * @param prefix
+     *            A file name prefix. The actual file name is formed using the
+     *            branching factor and {@link BuildEnum} as well.
      * @param btree
      *            The source {@link BTree}.
      * @param m
@@ -388,13 +391,15 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
      * rather than the records as placed into the cache.
      * 
      * @param prefix
+     *            A file name prefix. The actual file name is formed using the
+     *            branching factor and {@link BuildEnum} as well.
      * @param btree
      * @param m
      * @param buildEnum
      * @return
      * @throws Exception
      */
-    static private IndexSegmentBuilder doBuildIndexSegment(final String prefix,
+    static IndexSegmentBuilder doBuildIndexSegment(final String prefix,
             final BTree btree, final int m, final BuildEnum buildEnum,
             final boolean bufferNodes) throws Exception {
 
@@ -469,6 +474,9 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
             // verify fast reverse leaf scan.
             testReverseScan(seg);
 
+            // test the multi-block iterator.
+            testMultiBlockIterator(btree, seg);
+            
             /*
              * Verify the total index order.
              */

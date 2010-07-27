@@ -37,6 +37,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.inf.BackchainTypeResourceIterator;
 import com.bigdata.rdf.inf.OwlSameAsPropertiesExpandingIterator;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPORelation;
@@ -70,8 +71,6 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
     protected final static boolean INFO = log.isInfoEnabled();
 
     protected final static boolean DEBUG = log.isDebugEnabled();
-
-    private final static transient long NULL = IRawTripleStore.NULL;
 
     final private AbstractTripleStore database;
     final private IAccessPath<ISPO> accessPath;
@@ -269,7 +268,7 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
 
             } else {
             
-                final long owlSameAs = vocab.get(OWL.SAMEAS);
+                final IV owlSameAs = vocab.get(OWL.SAMEAS);
 
                 if (isOwlSameAsUsed == null) {
 
@@ -279,8 +278,8 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
                      * data ourselves.
                      */
                     
-                    isOwlSameAsUsed = database.getAccessPath(NULL, owlSameAs,
-                            NULL).isEmpty();
+                    isOwlSameAsUsed = database.getAccessPath(null, owlSameAs,
+                            null).isEmpty();
 
                 }
 
@@ -337,9 +336,9 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
 
         if (axioms.isRdfSchema() && !inf.forwardChainRdfTypeRdfsResource) {
             
-            final long rdfType = vocab.get(RDF.TYPE);
+            final IV rdfType = vocab.get(RDF.TYPE);
 
-            final long rdfsResource = vocab.get(RDFS.RESOURCE);
+            final IV rdfsResource = vocab.get(RDFS.RESOURCE);
             
             /*
              * Backchain (x rdf:type rdfs:Resource ), which is an entailment

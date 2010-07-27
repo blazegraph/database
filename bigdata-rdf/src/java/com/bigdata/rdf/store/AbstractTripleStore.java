@@ -27,8 +27,6 @@
 
 package com.bigdata.rdf.store;
 
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
@@ -36,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -45,9 +44,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.apache.log4j.Logger;
-import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
@@ -58,7 +55,6 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.rio.rdfxml.RDFXMLParser;
-
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
@@ -80,7 +76,13 @@ import com.bigdata.rdf.axioms.OwlAxioms;
 import com.bigdata.rdf.inf.IJustificationIterator;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.JustificationIterator;
+import com.bigdata.rdf.internal.DefaultExtensionFactory;
+import com.bigdata.rdf.internal.IDatatypeURIResolver;
+import com.bigdata.rdf.internal.IExtension;
+import com.bigdata.rdf.internal.IExtensionFactory;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.BigdataRDFFullTextIndex;
+import com.bigdata.rdf.lexicon.ITermIdCodes;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
 import com.bigdata.rdf.lexicon.ITextIndexer;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -190,7 +192,7 @@ import com.bigdata.striterator.IKeyOrder;
  */
 abstract public class AbstractTripleStore extends
         AbstractResource<IDatabase<AbstractTripleStore>> implements ITripleStore,
-        IRawTripleStore, IMutableDatabase<AbstractTripleStore> {
+        IRawTripleStore, IMutableDatabase<AbstractTripleStore>, ITermIdCodes {
 
     final static protected Logger log = Logger.getLogger(ITripleStore.class);
 
@@ -221,7 +223,7 @@ abstract public class AbstractTripleStore extends
     final protected boolean lexicon;
 
     /**
-     * The #of term identifiers in the key for a statement index (3 is a triple
+     * The #of internal values in the key for a statement index (3 is a triple
      * store, 4 is a quad store).
      * 
      * @see Options#QUADS
@@ -319,13 +321,13 @@ abstract public class AbstractTripleStore extends
      * Return <code>true</code> iff the fully bound statement is an axiom.
      * 
      * @param s
-     *            The term identifier for the subject position.
+     *            The internal value ({@link IV}) for the subject position.
      * @param p
-     *            The term identifier for the predicate position.
+     *            The internal value ({@link IV}) for the predicate position.
      * @param o
-     *            The term identifier for the object position.
+     *            The internal value ({@link IV}) for the object position.
      */
-    public boolean isAxiom(final long s, final long p, final long o) {
+    public boolean isAxiom(final IV s, final IV p, final IV o) {
         
         return getAxioms().isAxiom(s, p, o);
         
@@ -349,6 +351,18 @@ abstract public class AbstractTripleStore extends
     public boolean getStatementIdentifiers() {
         
         return statementIdentifiers;
+        
+    }
+    
+    /**
+     * Returns <code>true</code> when the database is in inline terms mode. In
+     * this mode, certain types of terms (numerics in particular) are inlined
+     * into the statement indices rather than being mapped to and from term
+     * identifiers in the lexicon.
+     */
+    public boolean isInlineLiterals() {
+        
+        return getLexiconRelation().isInlineLiterals();
         
     }
 
@@ -841,6 +855,43 @@ abstract public class AbstractTripleStore extends
                 + ".textIndexerClass";
 
         String DEFAULT_TEXT_INDEXER_CLASS = BigdataRDFFullTextIndex.class
+                .getName();
+
+        /**
+         * Set up database to inline certain datatype literals directly into the 
+         * statement indices rather than using the lexicon to map them to term 
+         * identifiers and back.
+         */
+        String INLINE_LITERALS = AbstractTripleStore.class.getName()
+                + ".inlineLiterals";
+
+        String DEFAULT_INLINE_LITERALS = "true";
+
+        /**
+         * Set up database to inline bnodes directly into the statement indices 
+         * rather than using the lexicon to map them to term identifiers and 
+         * back.  This is only compatible with told bnodes mode.
+         * <p>
+         * See {@link Options#STORE_BLANK_NODES}.
+         */
+        String INLINE_BNODES = AbstractTripleStore.class.getName()
+                + ".inlineBNodes";
+
+        String DEFAULT_INLINE_BNODES = "false";
+
+        /**
+         * The name of the {@link IExtensionFactory} class. The implementation 
+         * MUST declare a constructor that accepts an 
+         * {@link IDatatypeURIResolver} as its only argument.  The 
+         * {@link IExtension}s constructed by the factory need a resolver to
+         * resolve datatype URIs to term identifiers in the database.
+         * 
+         * @see #DEFAULT_EXTENSION_FACTORY_CLASS
+         */
+        String EXTENSION_FACTORY_CLASS = AbstractTripleStore.class.getName()
+                + ".extensionFactoryClass";
+
+        String DEFAULT_EXTENSION_FACTORY_CLASS = DefaultExtensionFactory.class
                 .getName();
 
     }
@@ -1807,7 +1858,7 @@ abstract public class AbstractTripleStore extends
      * This method delegates to the batch API, but it is extremely inefficient
      * for scale-out as it does one RMI per request!
      */
-    public long addTerm(final Value value) {
+    public IV addTerm(final Value value) {
 
         final BigdataValue[] terms = new BigdataValue[] {//
 
@@ -1817,7 +1868,7 @@ abstract public class AbstractTripleStore extends
 
         getLexiconRelation().addTerms(terms, 1, false/* readOnly */);
 
-        return terms[0].getTermId();
+        return terms[0].getIV();
 
     }
 
@@ -1825,9 +1876,9 @@ abstract public class AbstractTripleStore extends
      * This method is extremely inefficient for scale-out as it does one RMI per
      * request!
      */
-    final public BigdataValue getTerm(final long id) {
+    final public BigdataValue getTerm(final IV iv) {
 
-        return getLexiconRelation().getTerm(id);
+        return getLexiconRelation().getTerm(iv);
 
     }
 
@@ -1835,12 +1886,12 @@ abstract public class AbstractTripleStore extends
      * This method is extremely inefficient for scale-out as it does one RMI per
      * request!
      */
-    final public long getTermId(final Value value) {
+    final public IV getIV(final Value value) {
 
-        return getLexiconRelation().getTermId(value);
+        return getLexiconRelation().getIV(value);
         
     }
-
+        
     public void addTerms(final BigdataValue[] terms) {
 
         getLexiconRelation().addTerms( terms, terms.length, false/*readOnly*/);
@@ -1928,17 +1979,17 @@ abstract public class AbstractTripleStore extends
 
     }
 
-    final public ISPO getStatement(final long s, final long p, final long o) {
+    final public ISPO getStatement(final IV s, final IV p, final IV o) {
         
-        return getStatement(s, p, o, NULL/* c */);
+        return getStatement(s, p, o, null/* c */);
 
     }
     
-    final public ISPO getStatement(final long s, final long p, final long o,
-            final long c) {
+    final public ISPO getStatement(final IV s, final IV p, final IV o,
+            final IV c) {
 
-        if (s == NULL || p == NULL || o == NULL
-                || (c == NULL && spoKeyArity == 4)) {
+        if (s == null || p == null || o == null
+                || (c == null && spoKeyArity == 4)) {
 
             throw new IllegalArgumentException();
 
@@ -1986,11 +2037,11 @@ abstract public class AbstractTripleStore extends
      * @param p
      * @param o
      * 
-     * @deprecated by {@link #hasStatement(long, long, long, long)}
+     * @deprecated by {@link #hasStatement(IV, IV, IV, IV)}
      */
-    final public boolean hasStatement(final long s, final long p, final long o) {
+    final public boolean hasStatement(final IV s, final IV p, final IV o) {
 
-        return hasStatement(s, p, o, NULL/* c */);
+        return hasStatement(s, p, o, null/* c */);
 
     }
 
@@ -2006,10 +2057,10 @@ abstract public class AbstractTripleStore extends
      * @param o
      * @param c
      */
-    final public boolean hasStatement(final long s, final long p, final long o,
-            final long c) {
+    final public boolean hasStatement(final IV s, final IV p, final IV o,
+            final IV c) {
 
-        if (s != NULL && p != NULL && o != NULL && (!quads || c != NULL)) {
+        if (s != null && p != null && o != null && (!quads || c != null)) {
 
             /*
              * Point test.
@@ -2081,33 +2132,33 @@ abstract public class AbstractTripleStore extends
          * the statement can not exist in the KB.
          */
 
-        final long _s = getTermId(s);
+        final IV _s = getIV(s);
 
-        if (_s == NULL && s != null) {
+        if (_s == null && s != null) {
             
             return false;
             
         }
 
-        final long _p = getTermId(p);
+        final IV _p = getIV(p);
 
-        if (_p == NULL && p != null) {
+        if (_p == null && p != null) {
             
             return false;
             
         }
         
-        final long _o = getTermId(o);
+        final IV _o = getIV(o);
 
-        if (_o == NULL && o != null) {
+        if (_o == null && o != null) {
             
             return false;
             
         }
 
-        final long _c = getTermId(c);
+        final IV _c = getIV(c);
 
-        if (_c == NULL && c != null) {
+        if (_c == null && c != null) {
             
             return false;
             
@@ -2200,24 +2251,24 @@ abstract public class AbstractTripleStore extends
         /*
          * Use batch API to resolve the term identifiers.
          */
-        final List<Long> ids = new ArrayList<Long>(4);
+        final List<IV> ivs = new ArrayList<IV>(4);
         
-        ids.add(spo.s());
+        ivs.add(spo.s());
         
-        ids.add(spo.p());
+        ivs.add(spo.p());
         
-        ids.add(spo.o());
+        ivs.add(spo.o());
 
-        final long c = spo.c();
+        final IV c = spo.c();
         
-        if (c != NULL) {
+        if (c != null) {
 
-            ids.add(c);
+            ivs.add(c);
 
         }
 
-        final Map<Long, BigdataValue> terms = getLexiconRelation()
-                .getTerms(ids);
+        final Map<IV, BigdataValue> terms = getLexiconRelation()
+                .getTerms(ivs);
 
         /*
          * Expose as a Sesame compatible Statement object.
@@ -2227,9 +2278,9 @@ abstract public class AbstractTripleStore extends
                 (BigdataResource)  terms.get(spo.s()),//
                 (BigdataURI)       terms.get(spo.p()),//
                 (BigdataValue)     terms.get(spo.o()),//
-                (BigdataResource)  (c != NULL ? terms.get(c) : null),//
-                spo.getStatementType()//
-                );
+                (BigdataResource)  (c != null ? terms.get(c) : null),//
+                spo.getStatementType(),//
+                spo.getUserFlag());
         
     }
 
@@ -2322,16 +2373,16 @@ abstract public class AbstractTripleStore extends
          * statement pattern.
          */
 
-        if (s != null && _s.getTermId() == NULL)
+        if (s != null && _s.getIV() == null)
             return new EmptyAccessPath<ISPO>();
 
-        if (p != null && _p.getTermId() == NULL)
+        if (p != null && _p.getIV() == null)
             return new EmptyAccessPath<ISPO>();
 
-        if (o != null && _o.getTermId() == NULL)
+        if (o != null && _o.getIV() == null)
             return new EmptyAccessPath<ISPO>();
 
-        if (quads && c != null && _c.getTermId() == NULL)
+        if (quads && c != null && _c.getIV() == null)
             return new EmptyAccessPath<ISPO>();
 
 //        /*
@@ -2360,39 +2411,39 @@ abstract public class AbstractTripleStore extends
          */
 
         return getSPORelation().getAccessPath(//
-                s == null ? NULL : _s.getTermId(), //
-                p == null ? NULL : _p.getTermId(),//
-                o == null ? NULL : _o.getTermId(),//
-                (c == null || !quads) ? NULL : _c.getTermId(),//
+                s == null ? null : _s.getIV(), //
+                p == null ? null : _p.getIV(),//
+                o == null ? null : _o.getIV(),//
+                (c == null || !quads) ? null : _c.getIV(),//
                 filter//
         );
 
     }
 
-    final public IAccessPath<ISPO> getAccessPath(final long s, final long p,
-            final long o) {
+    final public IAccessPath<ISPO> getAccessPath(final IV s, final IV p,
+            final IV o) {
 
         return getSPORelation()
-                .getAccessPath(s, p, o, NULL/* c */, null/* filter */);
+                .getAccessPath(s, p, o, null/* c */, null/* filter */);
 
     }
 
-    final public IAccessPath<ISPO> getAccessPath(final long s, final long p,
-            final long o, final IElementFilter<ISPO> filter) {
+    final public IAccessPath<ISPO> getAccessPath(final IV s, final IV p,
+            final IV o, final IElementFilter<ISPO> filter) {
 
-        return getSPORelation().getAccessPath(s, p, o, NULL/* c */, filter);
+        return getSPORelation().getAccessPath(s, p, o, null/* c */, filter);
 
     }
-	final public IAccessPath<ISPO> getAccessPath(final long s, final long p,
-            final long o,final long c) {
+	final public IAccessPath<ISPO> getAccessPath(final IV s, final IV p,
+            final IV o,final IV c) {
 
         return getSPORelation()
                 .getAccessPath(s, p, o, c, null/* filter */);
 
     }
 
-    final public IAccessPath<ISPO> getAccessPath(final long s, final long p,
-            final long o,final long c, final IElementFilter<ISPO> filter) {
+    final public IAccessPath<ISPO> getAccessPath(final IV s, final IV p,
+            final IV o, final IV c, final IElementFilter<ISPO> filter) {
 
         return getSPORelation().getAccessPath(s, p, o, c, filter);
 
@@ -2459,7 +2510,7 @@ abstract public class AbstractTripleStore extends
      * Return an unmodifiable view of the mapping from namespaces to namespace
      * prefixes.
      * <p>
-     * Note: this is NOT a persistent map. It is used by {@link #toString(long)}
+     * Note: this is NOT a persistent map. It is used by {@link #toString(IV)}
      * when externalizing URIs.
      */
     final public Map<String, String> getNamespaces() {
@@ -2541,14 +2592,14 @@ abstract public class AbstractTripleStore extends
 
     }
 
-    final public String toString(final long s, final long p, final long o) {
+    final public String toString(final IV s, final IV p, final IV o) {
 
-        return toString(s, p, o, NULL);
+        return toString(s, p, o, null);
 
     }
 
-    final public String toString(final long s, final long p, final long o,
-            final long c) {
+    final public String toString(final IV s, final IV p, final IV o,
+            final IV c) {
 
         return ("< " + toString(s) + ", " + toString(p) + ", " + toString(o)
                 + ", " + toString(c) + " >");
@@ -2561,113 +2612,26 @@ abstract public class AbstractTripleStore extends
 
     }
 
-    /**
-     * Return true iff the term identifier is marked as a RDF {@link Literal}.
-     * <p>
-     * Note: This simply examines the low bits of the term identifier, which
-     * marks whether or not the term identifier is a {@link Literal}.
-     * <p>
-     * Note: Some entailments require the ability to filter based on whether or
-     * not a term is a literal. For example, literals may not be entailed into
-     * the subject position. This method makes it possible to determine whether
-     * or not a term is a literal without materializing the term, thereby
-     * allowing the entailments to be computed purely within the term identifier
-     * space.
-     * 
-     * @param termId
-     *            The term identifier.
-     * 
-     * @return <code>true</code> iff the term identifier is marked as an RDF
-     *         {@link Literal}.
-     */
-    static final public boolean isLiteral(final long termId) {
+    final public String toString(final IV iv) {
 
-        return (termId & TERMID_CODE_MASK) == TERMID_CODE_LITERAL;
-
-    }
-
-    /**
-     * Return true iff the term identifier is marked as a RDF {@link BNode}.
-     * <p>
-     * Note: This simply examines the low bits of the term identifier, which
-     * marks whether or not the term identifier is a {@link BNode}.
-     * 
-     * @param termId
-     *            The term identifier.
-     * 
-     * @return <code>true</code> iff the term identifier is marked as an RDF
-     *         {@link BNode}.
-     */
-    static final public boolean isBNode(final long termId) {
-
-        return (termId & TERMID_CODE_MASK) == TERMID_CODE_BNODE;
-
-    }
-
-    /**
-     * Return true iff the term identifier is marked as a RDF {@link URI}.
-     * <p>
-     * Note: This simply examines the low bits of the term identifier, which
-     * marks whether or not the term identifier is a {@link URI}.
-     * 
-     * @param termId
-     *            The term identifier.
-     * 
-     * @return <code>true</code> iff the term identifier is marked as an RDF
-     *         {@link URI}.
-     */
-    static final public boolean isURI(final long termId) {
-
-        /*
-         * Note: The additional != NULL test is necessary for a URI term
-         * identifier so that it will not report 'true' for 0L since the two low
-         * order bits used to mark a URI are both zero.
-         */
-        
-        return (termId & TERMID_CODE_MASK) == TERMID_CODE_URI && termId != NULL;
-
-    }
-
-    /**
-     * Return true iff the term identifier identifies a statement (this feature
-     * is enabled with {@link Options#STATEMENT_IDENTIFIERS}).
-     * <p>
-     * Note: This simply examines the low bits of the term identifier, which
-     * marks whether or not the term identifier is actually a statement
-     * identifier.
-     * 
-     * @param termId
-     *            The term identifier.
-     * 
-     * @return <code>true</code> iff the term identifier identifies a
-     *         statement.
-     */
-    static final public boolean isStatement(final long termId) {
-
-        return (termId & TERMID_CODE_MASK) == TERMID_CODE_STATEMENT;
-
-    }
-
-    final public String toString(final long termId) {
-
-        if (termId == NULL)
+        if (iv == null)
             return IRawTripleStore.NULLSTR;
 
-        if(isStatement(termId)){
+        if(iv.isStatement()){
 
             // Note: SIDs are not stored in the reverse lexicon.
-            return Long.toString(termId) + "S";
+            return Long.toString(iv.getTermId()) + "S";
         
         }
 
-        final BigdataValue v = getTerm(termId);
+        final BigdataValue v = getTerm(iv);
 
         if (v == null)
-            return "<NOT_FOUND#" + termId + ">";
+            return "<NOT_FOUND#" + iv + ">";
 
         final String s = (v instanceof URI ? abbrev((URI) v) : v.toString());
 
-        return s + ("(" + termId + ")");
+        return s + ("(" + iv + ")");
 
     }
 
@@ -2726,7 +2690,7 @@ abstract public class AbstractTripleStore extends
         }
         
         // visit distinct term identifiers for the predicate position.
-        final IChunkedIterator<Long> itr = getSPORelation().distinctTermScan(
+        final IChunkedIterator<IV> itr = getSPORelation().distinctTermScan(
                 quads ? SPOKeyOrder.POCS : SPOKeyOrder.POS);
 
         // resolve term identifiers to terms efficiently during iteration.
@@ -2741,10 +2705,10 @@ abstract public class AbstractTripleStore extends
 
                 final BigdataValue term = itr2.next();
 
-                final long p = term.getTermId();
+                final IV p = term.getIV();
                 
-                final long n = getSPORelation().getAccessPath(NULL, p, NULL,
-                        NULL, null/* filter */).rangeCount(false/* exact */);
+                final long n = getSPORelation().getAccessPath(null, p, null,
+                        null, null/* filter */).rangeCount(false/* exact */);
 
                 /*
                  * FIXME do efficient term resolution for scale-out. This will
@@ -3540,8 +3504,8 @@ abstract public class AbstractTripleStore extends
          */
         long statementCount0;
         long statementCount1;
-//        final HashSet<Long> sids = new HashSet<Long>();
-        final LongOpenHashSet sids = new LongOpenHashSet();
+        final HashSet<IV> sids = new HashSet<IV>();
+//        final LongOpenHashSet sids = new LongOpenHashSet();
         int nrounds = 0;
         do {
 
@@ -3565,13 +3529,13 @@ abstract public class AbstractTripleStore extends
                 
                 while(itr.hasNext()) {
                     
-                    final long sid = itr.next().getStatementIdentifier();
+                    final IV sid = itr.next().getStatementIdentifier();
                     
                     if(sids.contains(sid)) continue;
                     
                     // sid in the subject position.
                     tempStore.addStatements(tempStore, true/* copyOnly */, db
-                                    .getAccessPath(sid, NULL, NULL).iterator(),
+                                    .getAccessPath(sid, null, null).iterator(),
                                     null/* filter */);
 
                     /*
@@ -3581,12 +3545,12 @@ abstract public class AbstractTripleStore extends
                      * might use it.
                      */
                     tempStore.addStatements(tempStore, true/* copyOnly */, db
-                                    .getAccessPath(NULL, sid, NULL).iterator(),
+                                    .getAccessPath(null, sid, null).iterator(),
                                     null/* filter */);
 
                     // sid in the object position.
                     tempStore.addStatements(tempStore, true/*copyOnly*/, db
-                                    .getAccessPath(NULL, NULL, sid).iterator(),
+                                    .getAccessPath(null, null, sid).iterator(),
                                     null/* filter */);
 
                     // finished with this sid.
@@ -3828,7 +3792,7 @@ abstract public class AbstractTripleStore extends
          * there is at least one owl:sameAs assertion in the database.
          */
         final boolean isOwlSameAsUsed = getAxioms().isOwlSameAs()
-                && !getAccessPath(NULL, getVocabulary().get(OWL.SAMEAS), NULL)
+                && !getAccessPath(null, getVocabulary().get(OWL.SAMEAS), null)
                         .isEmpty();
 
         final IRuleTaskFactory defaultRuleTaskFactory = isNestedSubquery() //
@@ -3957,19 +3921,19 @@ abstract public class AbstractTripleStore extends
         /*
          * Translate the predicates into term identifiers.
          */
-        final IConstant<Long>[] _preds = new IConstant[preds.length];
+        final IConstant<IV>[] _preds = new IConstant[preds.length];
         {
 
             int nknown = 0;
 
             for (int i = 0; i < preds.length; i++) {
 
-                final long tid = terms[i].getTermId();
+                final IV iv = terms[i].getIV();
 
-                if (tid != NULL)
+                if (iv != null)
                     nknown++;
 
-                _preds[i] = new Constant<Long>(tid);
+                _preds[i] = new Constant<IV>(iv);
 
             }
 
@@ -3986,9 +3950,9 @@ abstract public class AbstractTripleStore extends
         /*
          * Translate the class constraint into a term identifier.
          */
-        final long _cls = terms[preds.length].getTermId();
+        final IV _cls = terms[preds.length].getIV();
 
-        if (_cls == NULL) {
+        if (_cls == null) {
 
             log.warn("Unknown class: class=" + cls);
 
@@ -4052,17 +4016,17 @@ abstract public class AbstractTripleStore extends
      *         {@link MatchRule}.
      */
     protected Program getMatchProgram(final Literal[] lits,
-            final IConstant<Long>[] _preds, final long _cls) {
+            final IConstant<IV>[] _preds, final IV _cls) {
         
-        final Iterator<Long> termIdIterator = getLexiconRelation().prefixScan(
+        final Iterator<IV> ivIterator = getLexiconRelation().prefixScan(
                 lits);
 
         // the term identifier for the completed literal.
-        final IVariable<Long> lit = Var.var("lit");
+        final IVariable<IV> lit = Var.var("lit");
 
         // instantiate the rule.
         final Rule r = new MatchRule(getSPORelation().getNamespace(),
-                getVocabulary(), lit, _preds, new Constant<Long>(_cls));
+                getVocabulary(), lit, _preds, new Constant<IV>(_cls));
 
 //        // bindings used to specialize the rule for each completed literal.
 //        final IBindingSet bindings = new ArrayBindingSet(r.getVariableCount());
@@ -4070,13 +4034,13 @@ abstract public class AbstractTripleStore extends
         final Program program = new Program("match", true/* parallel */);
         
         // specialize and apply to each completed literal.
-        while (termIdIterator.hasNext()) {
+        while (ivIterator.hasNext()) {
 
-            final Long tid = termIdIterator.next();
+            final IV iv = ivIterator.next();
 
             final IBindingSet constants = new ArrayBindingSet(1);
 
-            constants.set(lit, new Constant<Long>(tid));
+            constants.set(lit, new Constant<IV>(iv));
 
             final IRule tmp = r.specialize(constants, null/* constraints */);
 

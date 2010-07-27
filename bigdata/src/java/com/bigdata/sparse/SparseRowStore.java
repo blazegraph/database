@@ -155,15 +155,15 @@ public class SparseRowStore implements IRowStoreConstants {
 
     protected static final Logger log = Logger.getLogger(SparseRowStore.class);
 
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected boolean DEBUG = log.isDebugEnabled();
+//    /**
+//     * True iff the {@link #log} level is INFO or less.
+//     */
+//    final protected boolean INFO = log.isInfoEnabled();
+//
+//    /**
+//     * True iff the {@link #log} level is DEBUG or less.
+//     */
+//    final protected boolean DEBUG = log.isDebugEnabled();
 
     static final String UTF8 = "UTF-8";
     
@@ -504,7 +504,7 @@ public class SparseRowStore implements IRowStoreConstants {
 
         assertArgs(schema, primaryKey, fromTime, toTime);
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("schema=" + schema.getName() + ", primaryKey="
                     + primaryKey + ", fromTime=" + fromTime + ", toTime="
                     + toTime + ", filter="
@@ -767,7 +767,7 @@ public class SparseRowStore implements IRowStoreConstants {
         // verify args.
         assertArgs(schema, primaryKey, fromTime, toTime);
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("schema=" + schema.getName() + ", primaryKey="
                     + primaryKey + ", timestamp=" + writeTime + ", filter="
                     + (filter == null ? "N/A" : filter.getClass().getName())+
@@ -848,7 +848,7 @@ public class SparseRowStore implements IRowStoreConstants {
 
         assertArgs(schema, primaryKey, fromTime, toTime);
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("schema=" + schema + ", primaryKey=" + primaryKey
                     + ", timestamp=" + writeTime + ", filter="
                     + (filter == null ? "N/A" : filter.getClass().getName()));
@@ -969,7 +969,7 @@ public class SparseRowStore implements IRowStoreConstants {
 
         assertArgs(schema, Boolean.TRUE/* fake */, fromTime, toTime);
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("schema="
                     + schema
                     + ", fromKey="
@@ -1034,7 +1034,7 @@ public class SparseRowStore implements IRowStoreConstants {
                     protected Object resolve(Object obj) {
                         // resolve visited TPS from tuple.
                         final ITuple<TPS> tuple = (ITuple<TPS>) obj;
-                        if (INFO) {
+                        if (log.isInfoEnabled()) {
                             log.info("resolving TPS: " + tuple.getVisitCount());
                         }
                         return tuple.getObject();
@@ -1073,11 +1073,9 @@ public class SparseRowStore implements IRowStoreConstants {
                 + ".primaryKey.unicodeClean";
 
         /**
-         * FIXME Change over the [true] for the next release.
-         * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/107
          */
-        String DEFAULT_PRIMARY_KEY_UNICODE_CLEAN = "false";
+        String DEFAULT_PRIMARY_KEY_UNICODE_CLEAN = "true";
 
     }
 

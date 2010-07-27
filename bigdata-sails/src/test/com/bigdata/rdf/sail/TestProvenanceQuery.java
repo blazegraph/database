@@ -43,6 +43,9 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.Join;
+import org.openrdf.query.algebra.Projection;
+import org.openrdf.query.algebra.ProjectionElem;
+import org.openrdf.query.algebra.ProjectionElemList;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.Var;
@@ -177,7 +180,9 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
              * context and the context is always a blank node.
              */
 
-            final TupleExpr tupleExpr = new Join(//
+            final TupleExpr tupleExpr = 
+                new Projection(
+                new Join(//
                     new StatementPattern(//
                             new Var("X", y),//
                             new Var("1", RDF.TYPE),//
@@ -186,7 +191,8 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
                     new StatementPattern(//
                             new Var("SID"),//
                             new Var("3", dcCreator),//
-                            new Var("Y")));
+                            new Var("Y"))),
+                new ProjectionElemList(new ProjectionElem[] { new ProjectionElem( "Y" )}));
 
             /*
              * Create a data set consisting of the contexts to be queried.

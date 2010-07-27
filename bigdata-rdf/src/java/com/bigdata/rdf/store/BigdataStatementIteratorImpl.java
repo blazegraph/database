@@ -8,6 +8,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataResource;
@@ -39,7 +40,7 @@ public class BigdataStatementIteratorImpl
      * resolve term identifiers to the corresponding blank node objects across a
      * "connection" context.
      */
-    private final Map<Long, BigdataBNode> bnodes;
+    private final Map<IV, BigdataBNode> bnodes;
 
     /**
      * 
@@ -70,7 +71,7 @@ public class BigdataStatementIteratorImpl
      *            closed).
      */
     public BigdataStatementIteratorImpl(final AbstractTripleStore db,
-            final Map<Long, BigdataBNode> bnodes,
+            final Map<IV, BigdataBNode> bnodes,
                 final IChunkedOrderedIterator<ISPO> src) {
         
         super(db, src, new BlockingBuffer<BigdataStatement[]>(
@@ -114,52 +115,52 @@ public class BigdataStatementIteratorImpl
 
 //        final LongOpenHashSet ids = new LongOpenHashSet(chunk.length*4);
         
-        final Collection<Long> ids = new LinkedHashSet<Long>(chunk.length
+        final Collection<IV> ivs = new LinkedHashSet<IV>(chunk.length
                 * state.getSPOKeyArity());
 
         for (ISPO spo : chunk) {
 
             {
                 
-                final long s = spo.s();
+                final IV s = spo.s();
 
                 if (bnodes == null || !bnodes.containsKey(s))
-                    ids.add(s);
+                    ivs.add(s);
             
             }
 
-            ids.add(spo.p());
+            ivs.add(spo.p());
 
             {
 
-                final long o = spo.o();
+                final IV o = spo.o();
 
                 if (bnodes == null || !bnodes.containsKey(o))
-                    ids.add(o);
+                    ivs.add(o);
 
             }
 
             {
              
-                final long c = spo.c();
+                final IV c = spo.c();
 
-                if (c != IRawTripleStore.NULL
+                if (c != null
                         && (bnodes == null || !bnodes.containsKey(c)))
-                    ids.add(c);
+                    ivs.add(c);
 
             }
 
         }
 
         if (DEBUG)
-            log.debug("Resolving " + ids.size() + " term identifiers");
+            log.debug("Resolving " + ivs.size() + " term identifiers");
         
         /*
          * Batch resolve term identifiers to BigdataValues, obtaining the
          * map that will be used to resolve term identifiers to terms for
          * this chunk.
          */
-        final Map<Long, BigdataValue> terms = state.getLexiconRelation().getTerms(ids);
+        final Map<IV, BigdataValue> terms = state.getLexiconRelation().getTerms(ivs);
 
         final BigdataValueFactory valueFactory = state.getValueFactory();
         
@@ -184,9 +185,9 @@ public class BigdataStatementIteratorImpl
 //                throw ex;
 //            }
             final BigdataValue o = resolve(terms, spo.o());
-            final long _c = spo.c();
+            final IV _c = spo.c();
             final BigdataResource c;
-            if (_c != IRawTripleStore.NULL) {
+            if (_c != null) {
                 /*
                  * FIXME This kludge to strip off the null graph should be
                  * isolated to the BigdataSail's package. Our own code should be
@@ -209,13 +210,13 @@ public class BigdataStatementIteratorImpl
             if (spo.hasStatementType() == false) {
 
                 log.error("statement with no type: "
-                        + valueFactory.createStatement(s, p, o, c, null));
+                        + valueFactory.createStatement(s, p, o, c, null, spo.getUserFlag()));
 
             }
 
             // the statement.
             final BigdataStatement stmt = valueFactory.createStatement(s, p, o,
-                    c, spo.getStatementType());
+                    c, spo.getStatementType(), spo.getUserFlag());
 
             // save the reference.
             stmts[i++] = stmt;
@@ -232,25 +233,25 @@ public class BigdataStatementIteratorImpl
      * 
      * @param terms
      *            The terms mapping obtained from the lexicon.
-     * @param termId
+     * @param iv
      *            The term identifier.
      *            
      * @return The {@link BigdataValue}.
      */
-    private BigdataValue resolve(final Map<Long, BigdataValue> terms,
-            final long termId) {
+    private BigdataValue resolve(final Map<IV, BigdataValue> terms,
+            final IV iv) {
 
         BigdataValue v = null;
 
         if (bnodes != null) {
 
-            v = bnodes.get(termId);
+            v = bnodes.get(iv);
 
         }
 
         if (v == null) {
 
-            v = terms.get(termId);
+            v = terms.get(iv);
 
         }
 
