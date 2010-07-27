@@ -1,5 +1,9 @@
 package com.bigdata.sparse;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
+
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
@@ -77,4 +81,39 @@ public class TPSTupleSerializer extends DefaultTupleSerializer<Void,TPS> {
         
     }
     
+    /**
+     * The initial version (no additional persistent state).
+     */
+    private final static transient byte VERSION0 = 0;
+
+    /**
+     * The current version.
+     */
+    private final static transient byte VERSION = VERSION0;
+
+    public void readExternal(final ObjectInput in) throws IOException,
+            ClassNotFoundException {
+
+        super.readExternal(in);
+        
+        final byte version = in.readByte();
+        
+        switch (version) {
+        case VERSION0:
+            break;
+        default:
+            throw new UnsupportedOperationException("Unknown version: "
+                    + version);
+        }
+
+    }
+
+    public void writeExternal(final ObjectOutput out) throws IOException {
+
+        super.writeExternal(out);
+        
+        out.writeByte(VERSION);
+        
+    }
+
 }

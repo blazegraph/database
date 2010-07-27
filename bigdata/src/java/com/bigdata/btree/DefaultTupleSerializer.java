@@ -314,17 +314,17 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
      * Note: Explicit versioning for the {@link DefaultTupleSerializer} was
      * introduced with inlining of datatype literals for the RDF database.
      */
-    private final static transient int VERSION0 = 0;
+    private final static transient byte VERSION0 = 0;
 
     /**
      * The current version.
      */
-    private final static transient int VERSION = VERSION0;
+    private final static transient byte VERSION = VERSION0;
 
     public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
 
-        final short version = in.readShort();
+        final byte version = in.readByte();
         switch (version) {
         case VERSION0:
             delegateKeyBuilderFactory = (IKeyBuilderFactory) in.readObject();
@@ -342,7 +342,7 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
 
     public void writeExternal(final ObjectOutput out) throws IOException {
 
-        out.writeShort(VERSION);
+        out.writeByte(VERSION);
         
         out.writeObject(delegateKeyBuilderFactory);
         
