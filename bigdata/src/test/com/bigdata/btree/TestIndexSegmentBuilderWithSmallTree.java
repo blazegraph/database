@@ -268,10 +268,14 @@ public class TestIndexSegmentBuilderWithSmallTree extends
          
             final ImmutableLeafCursor itr = seg.newLeafCursor(SeekEnum.First);
             
+            if(LRUNexus.INSTANCE!=null)
             assertTrue(firstLeaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache!
             assertNull(itr.prior());
 
+            if(LRUNexus.INSTANCE!=null)
             assertTrue(lastLeaf.getDelegate() == itr.next().getDelegate()); // Note: test depends on cache!
+
+            if(LRUNexus.INSTANCE!=null)
             assertTrue(lastLeaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache!
             
         }
@@ -286,10 +290,13 @@ public class TestIndexSegmentBuilderWithSmallTree extends
             
             final ImmutableLeafCursor itr = seg.newLeafCursor(SeekEnum.Last);
             
+            if(LRUNexus.INSTANCE!=null)
             assertTrue(lastLeaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache!
             assertNull(itr.next());
 
+            if(LRUNexus.INSTANCE!=null)
             assertTrue(firstLeaf.getDelegate() == itr.prior().getDelegate()); // Note: test depends on cache!
+            if(LRUNexus.INSTANCE!=null)
             assertTrue(firstLeaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache!
 
         }
@@ -373,6 +380,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends
         assertEquals("nextAddr", 0L, leaf.getNextAddr());
 
         final ImmutableLeafCursor itr = seg.newLeafCursor(SeekEnum.First);
+        if(LRUNexus.INSTANCE!=null)
         assertTrue(leaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache.
         assertNull(itr.prior());
         assertNull(itr.next());
