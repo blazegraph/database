@@ -182,28 +182,32 @@ abstract public class AbstractUnicodeKeyBuilderTestCase extends TestCase2 {
         
     }
 
-    /**
-     * Test verifies that the <code>nul</code> byte is not part of the key when
-     * a unicode string is appended to an {@link IKeyBuilder}.
-     * <p>
-     * Note: The {@link SparseRowStore} assumes that Unicode sort keys do not
-     * contain embedded <code>nul</code>s.
+    /*
+     * Note: This test has been disabled.  The SparseRowStore no longer makes
+     * this assumption in order to be compatible with the JDK collator.
      */
-    public void test_keyBuilder_unicode_String_noEmbeddedNuls() {
-
-        final IKeyBuilder keyBuilder = KeyBuilder
-                .newUnicodeInstance(getProperties());
-
-        keyBuilder.append("Hello World!");
-
-        final byte[] key = keyBuilder.getKey();
-
-        for (int i = 0; i < key.length; i++) {
-            if (key[i] == 0)
-                fail("Embedded nuls: key=" + BytesUtil.toString(key));
-        }
-        
-    }
+//    /**
+//     * Test verifies that the <code>nul</code> byte is not part of the key when
+//     * a unicode string is appended to an {@link IKeyBuilder}.
+//     * <p>
+//     * Note: The {@link SparseRowStore} assumes that Unicode sort keys do not
+//     * contain embedded <code>nul</code>s.
+//     */
+//    public void test_keyBuilder_unicode_String_noEmbeddedNuls() {
+//
+//        final IKeyBuilder keyBuilder = KeyBuilder
+//                .newUnicodeInstance(getProperties());
+//
+//        keyBuilder.append("Hello World!");
+//
+//        final byte[] key = keyBuilder.getKey();
+//
+//        for (int i = 0; i < key.length; i++) {
+//            if (key[i] == 0)
+//                fail("Embedded nuls: key=" + BytesUtil.toString(key));
+//        }
+//        
+//    }
 
     /**
      * Test of the ability to normalize trailing pad characters.
