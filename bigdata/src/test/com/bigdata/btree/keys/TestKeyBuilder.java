@@ -1789,17 +1789,18 @@ public class TestKeyBuilder extends TestCase2 {
         final BigDecimal m500 = new BigDecimal("00500");
         final BigDecimal m5003 = new BigDecimal("500.000");
         
-        doLTTest(z1, p1);
-        doLTTest(negp1, z1);
-        doLTTest(negp1, p1);
-        doEQTest(z1, negz1);
-
         doEncodeDecodeTest(m5);
+        doEncodeDecodeTest(negz1);
         doEncodeDecodeTest(z1);
         doEncodeDecodeTest(z2);
         doEncodeDecodeTest(z3);
         doEncodeDecodeTest(m1);
         doEncodeDecodeTest(m2);
+
+        doLTTest(z1, p1);
+        doLTTest(negp1, z1);
+        doLTTest(negp1, p1);
+        doEQTest(z1, negz1);
 
         doEQTest(m5, m53);
         doEQTest(m500, m5003);

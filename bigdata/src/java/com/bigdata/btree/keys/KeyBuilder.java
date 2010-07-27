@@ -1000,20 +1000,18 @@ public class KeyBuilder implements IKeyBuilder {
     public KeyBuilder append(final BigDecimal d) {
     	final int sign = d.signum(); 
     	
+    	if (sign == 0) {
+    		append((byte) 0);
+    		
+    		return this;
+    	}
+    	
     	BigDecimal nd = d.stripTrailingZeros();
     	
     	String unscaledStr = nd.unscaledValue().toString();
     	
-    	final int precision;
-    	final int scale;
-    	
-    	if ("0".equals(unscaledStr)) {
-    		precision = 1;
-    		scale = Integer.MAX_VALUE;
-    	} else {   	
-	    	precision = nd.precision();
-	    	scale =  nd.scale();
-    	}
+    	final int precision = nd.precision();
+    	final int scale =  nd.scale();
     	
     	int exponent = precision - scale;
     	if (sign == -1) {
@@ -1046,18 +1044,25 @@ public class KeyBuilder implements IKeyBuilder {
      */
     static public int byteLength(final BigDecimal value) {
         
-        // FIXME Make sure to normalize trailing zeros first if necessary.
-        final int dataLen = value.unscaledValue().toString().length();
+        final int byteLength;
         
-        final int byteLength = 
+    	if (value.signum() == 0) {
+    		byteLength = 1;
+    	} else {
+    		final BigDecimal nbd = value.stripTrailingZeros();
+    		
+    		final int dataLen = nbd.unscaledValue().toString().length();
+        
+    		byteLength = 
             + 1 /* sign */ 
             + 4 /* exponent */
             + dataLen /* data */
             + 1 /* termination byte */
             ;
-        
+    	} 
+    	
         return byteLength;
-        
+       
     }
 
     /*
@@ -1522,6 +1527,11 @@ public class KeyBuilder implements IKeyBuilder {
     static public BigDecimal decodeBigDecimal(final int offset, final byte[] key) {
     	int curs = offset;
         final byte sign = key[curs++];
+        
+        if (sign == decodeZero) {
+        	return new BigDecimal(0);
+        }
+        
         int exponent = decodeInt(key, curs);
         final boolean neg = sign == negSign;
         if (neg) {
@@ -1538,14 +1548,15 @@ public class KeyBuilder implements IKeyBuilder {
         final BigInteger unscaled = new BigInteger(unscaledStr);
         
         final int precision = len;
-        final int scale = precision - exponent - (neg ? 1 : 0);
+        final int scale  = precision - exponent - (neg ? 1 : 0);
         
         final BigDecimal ret = new BigDecimal(unscaled, scale);
 
         return ret; // relative scale adjustment
     }
     
-    private static final byte eos = decodeByte(0);
+    private static final byte decodeZero = decodeByte(0);
+    private static final byte eos = decodeZero;
     private static final byte eos2 = decodeByte(Byte.MAX_VALUE);
     private static final byte negSign = decodeByte(-1);
 
