@@ -65,7 +65,6 @@ import com.bigdata.counters.ICounterSet;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.relation.accesspath.AbstractAccessPath;
-import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.Split;
 
@@ -86,10 +85,9 @@ import com.bigdata.service.Split;
  *       {@link ILocalBTreeView} and {@link IAutoboxBTree}.
  * 
  * @todo Can I implement {@link ILinearList} here? That would make it possible
- *       to use keyAt() and indexOf() and might pave the way for a faster
- *       {@link DefaultSplitHandler} and also for a {@link MetadataService} that
- *       supports overflow since the index segments could be transparent at that
- *       point.
+ *       to use keyAt() and indexOf() and might pave the way for a
+ *       {@link MetadataService} that supports overflow since the index segments
+ *       could be transparent at that point.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

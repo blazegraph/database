@@ -7,7 +7,7 @@ import java.util.Map;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.ILocalBTreeView;
-import com.bigdata.btree.ISplitHandler;
+import com.bigdata.btree.ISimpleSplitHandler;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.service.Event;
@@ -16,7 +16,7 @@ import com.bigdata.util.InnerCause;
 
 /**
  * Adds additional metadata to a {@link BTreeMetadata} that deals with the index
- * partition view, including its fast rangeCount, its {@link ISplitHandler},
+ * partition view, including its fast rangeCount, its {@link ISimpleSplitHandler},
  * etc.
  * <p>
  * Note: There is overhead in opening a view comprised of more than just the

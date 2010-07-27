@@ -2377,86 +2377,87 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      */
     private static transient final int VERSION0 = 0x0;
 
-    /**
-     * This version introduced the {@link #asynchronousIndexWriteConfiguration}.
-     * Reads of an earlier version create a instance of that field based on a
-     * default configuration.
-     */
-    private static transient final int VERSION1 = 0x1;
-    
-    /**
-     * This version introduced the {@link #scatterSplitConfiguration}. Reads of
-     * an earlier version create a instance of that field based on a default
-     * configuration.
-     */
-    private static transient final int VERSION2 = 0x2;
-
-    /**
-     * This version introduced {@link #indexSegmentLeafCacheTimeout}. Reads of
-     * an earlier version use the
-     * {@link Options#DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT} for this field.
-     */
-    private static transient final int VERSION3 = 0x3;
-
-    /**
-     * This version introduced {@link #btreeRecordCompressorFactory} and
-     * {@link #indexSegmentRecordCompressorFactory}. Both of these fields are
-     * optional, which implies no compression provider. Reads of prior versions
-     * set these fields to <code>null</code>.
-     * 
-     * @see Options#BTREE_RECORD_COMPRESSOR_FACTORY
-     * @see Options#INDEX_SEGMENT_RECORD_COMPRESSOR_FACTORY
-     */
-    private static transient final int VERSION4 = 0x04;
-
-    /**
-     * This version introduced {@link #childLocks}. Reads of prior versions set
-     * this field to <code>true</code>.
-     * 
-     * @see Options#CHILD_LOCKS
-     */
-    private static transient final int VERSION5 = 0x05;
-    
-    /**
-     * This version introduced {@link #versionTimestampFilters}.  Reads of prior
-     * versions set this field to <code>false</code>.
-     */
-    private static transient final int VERSION6 = 0x06;
-
-    /**
-     * This version gets rid of the read-retention queue capacity and nscan
-     * properties and the index segment leaf cache capacity and timeout
-     * properties.
-     */
-    private static transient final int VERSION7 = 0x07;
-    
-    /**
-     * This version gets rid of the IAddressSerializer interface used by the
-     * older {@link NodeSerializer} class to (de-)serialize the child addresses
-     * for a {@link Node}.
-     */
-    private static transient final int VERSION8 = 0x08;
-    
-    /**
-     * The childLocks feature was dropped in this version.
-     */
-    private static transient final int VERSION9 = 0x09;
-
-    /**
-     * The split handler was changed from an implementation based on the #of
-     * tuples to one based on the size on disk of an index segment after a
-     * compacting merge. The old split handlers are replaced by a
-     * <code>null</code> reference when they are de-serialized.
-     * 
-     * @see ISplitHandler
-     * @see ISimpleSplitHandler
-     */
-    private static transient final int VERSION10 = 0x10;
+//    /**
+//     * This version introduced the {@link #asynchronousIndexWriteConfiguration}.
+//     * Reads of an earlier version create a instance of that field based on a
+//     * default configuration.
+//     */
+//    private static transient final int VERSION1 = 0x1;
+//    
+//    /**
+//     * This version introduced the {@link #scatterSplitConfiguration}. Reads of
+//     * an earlier version create a instance of that field based on a default
+//     * configuration.
+//     */
+//    private static transient final int VERSION2 = 0x2;
+//
+//    /**
+//     * This version introduced {@link #indexSegmentLeafCacheTimeout}. Reads of
+//     * an earlier version use the
+//     * {@link Options#DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT} for this field.
+//     */
+//    private static transient final int VERSION3 = 0x3;
+//
+//    /**
+//     * This version introduced {@link #btreeRecordCompressorFactory} and
+//     * {@link #indexSegmentRecordCompressorFactory}. Both of these fields are
+//     * optional, which implies no compression provider. Reads of prior versions
+//     * set these fields to <code>null</code>.
+//     * 
+//     * @see Options#BTREE_RECORD_COMPRESSOR_FACTORY
+//     * @see Options#INDEX_SEGMENT_RECORD_COMPRESSOR_FACTORY
+//     */
+//    private static transient final int VERSION4 = 0x04;
+//
+//    /**
+//     * This version introduced {@link #childLocks}. Reads of prior versions set
+//     * this field to <code>true</code>.
+//     * 
+//     * @see Options#CHILD_LOCKS
+//     */
+//    private static transient final int VERSION5 = 0x05;
+//    
+//    /**
+//     * This version introduced {@link #versionTimestampFilters}.  Reads of prior
+//     * versions set this field to <code>false</code>.
+//     */
+//    private static transient final int VERSION6 = 0x06;
+//
+//    /**
+//     * This version gets rid of the read-retention queue capacity and nscan
+//     * properties and the index segment leaf cache capacity and timeout
+//     * properties.
+//     */
+//    private static transient final int VERSION7 = 0x07;
+//    
+//    /**
+//     * This version gets rid of the IAddressSerializer interface used by the
+//     * older {@link NodeSerializer} class to (de-)serialize the child addresses
+//     * for a {@link Node}.
+//     */
+//    private static transient final int VERSION8 = 0x08;
+//    
+//    /**
+//     * The childLocks feature was dropped in this version.
+//     */
+//    private static transient final int VERSION9 = 0x09;
+//
+//    /**
+//     * The split handler was changed from an implementation based on the #of
+//     * tuples to one based on the size on disk of an index segment after a
+//     * compacting merge. The old split handlers are replaced by a
+//     * <code>null</code> reference when they are de-serialized.
+//     * 
+//     * @see ISplitHandler
+//     * @see ISimpleSplitHandler
+//     */
+//    private static transient final int VERSION10 = 0x10;
 
     /**
      * The version that will be serialized by this class.
      */
-    private static transient final int CURRENT_VERSION = VERSION10;
+    private static transient final int CURRENT_VERSION = VERSION0;
+//    private static transient final int CURRENT_VERSION = VERSION10;
     
     /**
      * @todo review generated record for compactness.
@@ -2468,16 +2469,16 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         switch (version) {
         case VERSION0:
-        case VERSION1:
-        case VERSION2:
-        case VERSION3:
-        case VERSION4:
-        case VERSION5:
-        case VERSION6:
-        case VERSION7:
-        case VERSION8:
-        case VERSION9:
-        case VERSION10:
+//        case VERSION1:
+//        case VERSION2:
+//        case VERSION3:
+//        case VERSION4:
+//        case VERSION5:
+//        case VERSION6:
+//        case VERSION7:
+//        case VERSION8:
+//        case VERSION9:
+//        case VERSION10:
             break;
         default:
             throw new IOException("Unknown version: version=" + version);
@@ -2499,14 +2500,14 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         writeRetentionQueueScan = (int)LongPacker.unpackLong(in);
         
-        if (version < VERSION7) {
-        
-            /* btreeReadRetentionQueueCapacity = (int) */LongPacker
-                    .unpackLong(in);
-
-            /* btreeReadRetentionQueueScan = (int) */LongPacker.unpackLong(in);
-
-        }
+//        if (version < VERSION7) {
+//        
+//            /* btreeReadRetentionQueueCapacity = (int) */LongPacker
+//                    .unpackLong(in);
+//
+//            /* btreeReadRetentionQueueScan = (int) */LongPacker.unpackLong(in);
+//
+//        }
 
         pmd = (LocalPartitionMetadata)in.readObject();
         
@@ -2514,79 +2515,79 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         checkpointClassName = in.readUTF();
 
-        if (version < VERSION8) {
-
-            // Read and discard the IAddressSerializer object.
-            in.readObject();
-            
-        }
+//        if (version < VERSION8) {
+//
+//            // Read and discard the IAddressSerializer object.
+//            in.readObject();
+//            
+//        }
 
         nodeKeysCoder = (IRabaCoder) in.readObject();
 
         tupleSer = (ITupleSerializer) in.readObject();
         
-        if (version < VERSION4) {
-
-            btreeRecordCompressorFactory = null;
-
-        } else {
+//        if (version < VERSION4) {
+//
+//            btreeRecordCompressorFactory = null;
+//
+//        } else {
 
             btreeRecordCompressorFactory = (IRecordCompressorFactory) in
                     .readObject();
 
-        }
+//        }
         
         conflictResolver = (IConflictResolver)in.readObject();
 
-        if (version < VERSION5 || version >= VERSION9) {
-
-//            childLocks = true;
-            
-        } else {
-            
-//            childLocks = 
-                in.readBoolean();
-            
-        }
+//        if (version < VERSION5 || version >= VERSION9) {
+//
+////            childLocks = true;
+//            
+//        } else {
+//            
+////            childLocks = 
+//                in.readBoolean();
+//            
+//        }
         
         deleteMarkers = in.readBoolean();
         
         versionTimestamps = in.readBoolean();
 
-        if (version < VERSION6) {
-
-            versionTimestampFilters = false;
-
-        } else {
+//        if (version < VERSION6) {
+//
+//            versionTimestampFilters = false;
+//
+//        } else {
 
             versionTimestampFilters = in.readBoolean();
-            
-        }
+//            
+//        }
 
         bloomFilterFactory = (BloomFilterFactory) in.readObject();
 
         overflowHandler = (IOverflowHandler)in.readObject();
 
-        if (version < VERSION10) {
-
-            /*
-             * The old style of split handler is discarded. The default behavior
-             * for the new style of split handler covers all known uses of the
-             * old style split handler. While some indices (the sparse row store
-             * for example) will have to register a new split handler for
-             * safety, those indices were not safe for splits historically.
-             */
-
-            // read and discard the old split handler.
-            in.readObject();
-
-            splitHandler2 = null;
-            
-        } else {
+//        if (version < VERSION10) {
+//
+//            /*
+//             * The old style of split handler is discarded. The default behavior
+//             * for the new style of split handler covers all known uses of the
+//             * old style split handler. While some indices (the sparse row store
+//             * for example) will have to register a new split handler for
+//             * safety, those indices were not safe for splits historically.
+//             */
+//
+//            // read and discard the old split handler.
+//            in.readObject();
+//
+//            splitHandler2 = null;
+//            
+//        } else {
 
             splitHandler2 = (ISimpleSplitHandler) in.readObject();
             
-        }
+//        }
 
         /*
          * IndexSegment.
@@ -2594,118 +2595,118 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         indexSegmentBranchingFactor = (int) LongPacker.unpackLong(in);
 
-        if (version < VERSION7) {
-
-            /* indexSegmentLeafCacheCapacity = (int) */LongPacker
-                    .unpackLong(in);
-
-            if (version < VERSION3) {
-
-                /*
-                 * indexSegmentLeafCacheTimeout = Long
-                 * .parseLong(Options.DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT);
-                 */
-
-            } else {
-
-                /* indexSegmentLeafCacheTimeout = (long) */LongPacker
-                        .unpackLong(in);
-
-            }
-
-        }
+//        if (version < VERSION7) {
+//
+//            /* indexSegmentLeafCacheCapacity = (int) */LongPacker
+//                    .unpackLong(in);
+//
+//            if (version < VERSION3) {
+//
+//                /*
+//                 * indexSegmentLeafCacheTimeout = Long
+//                 * .parseLong(Options.DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT);
+//                 */
+//
+//            } else {
+//
+//                /* indexSegmentLeafCacheTimeout = (long) */LongPacker
+//                        .unpackLong(in);
+//
+//            }
+//
+//        }
 
         indexSegmentBufferNodes = in.readBoolean();
 
-        if (version < VERSION4) {
-
-            indexSegmentRecordCompressorFactory = null;
-
-        } else {
+//        if (version < VERSION4) {
+//
+//            indexSegmentRecordCompressorFactory = null;
+//
+//        } else {
 
             indexSegmentRecordCompressorFactory = (IRecordCompressorFactory) in
                     .readObject();
 
-        }
+//        }
         
-        if (version < VERSION1) {
-
-            /*
-             * Use the default configuration since not present in the serialized
-             * form before VERSION1.
-             */
-
-            final int masterQueueCapacity = Integer
-                    .parseInt(Options.DEFAULT_MASTER_QUEUE_CAPACITY);
-
-            final int masterChunkSize = Integer
-                    .parseInt(Options.DEFAULT_MASTER_CHUNK_SIZE);
-
-            final long masterChunkTimeoutNanos = Long
-                    .parseLong(Options.DEFAULT_MASTER_CHUNK_TIMEOUT_NANOS);
-
-            final long sinkIdleTimeoutNanos = Long
-                    .parseLong(Options.DEFAULT_SINK_IDLE_TIMEOUT_NANOS);
-
-            final long sinkPollTimeoutNanos = Long
-                    .parseLong(Options.DEFAULT_SINK_POLL_TIMEOUT_NANOS);
-
-            final int sinkQueueCapacity = Integer
-                    .parseInt(Options.DEFAULT_SINK_QUEUE_CAPACITY);
-
-            final int sinkChunkSize = Integer
-                    .parseInt(Options.DEFAULT_SINK_CHUNK_SIZE);
-
-            final long sinkChunkTimeoutNanos = Long
-                    .parseLong(Options.DEFAULT_SINK_CHUNK_TIMEOUT_NANOS);
-
-            asynchronousIndexWriteConfiguration = new AsynchronousIndexWriteConfiguration(
-                    masterQueueCapacity,//
-                    masterChunkSize,//
-                    masterChunkTimeoutNanos,//
-                    sinkIdleTimeoutNanos,//
-                    sinkPollTimeoutNanos,//
-                    sinkQueueCapacity,//
-                    sinkChunkSize,//
-                    sinkChunkTimeoutNanos//
-                    );
-            
-        } else {
+//        if (version < VERSION1) {
+//
+//            /*
+//             * Use the default configuration since not present in the serialized
+//             * form before VERSION1.
+//             */
+//
+//            final int masterQueueCapacity = Integer
+//                    .parseInt(Options.DEFAULT_MASTER_QUEUE_CAPACITY);
+//
+//            final int masterChunkSize = Integer
+//                    .parseInt(Options.DEFAULT_MASTER_CHUNK_SIZE);
+//
+//            final long masterChunkTimeoutNanos = Long
+//                    .parseLong(Options.DEFAULT_MASTER_CHUNK_TIMEOUT_NANOS);
+//
+//            final long sinkIdleTimeoutNanos = Long
+//                    .parseLong(Options.DEFAULT_SINK_IDLE_TIMEOUT_NANOS);
+//
+//            final long sinkPollTimeoutNanos = Long
+//                    .parseLong(Options.DEFAULT_SINK_POLL_TIMEOUT_NANOS);
+//
+//            final int sinkQueueCapacity = Integer
+//                    .parseInt(Options.DEFAULT_SINK_QUEUE_CAPACITY);
+//
+//            final int sinkChunkSize = Integer
+//                    .parseInt(Options.DEFAULT_SINK_CHUNK_SIZE);
+//
+//            final long sinkChunkTimeoutNanos = Long
+//                    .parseLong(Options.DEFAULT_SINK_CHUNK_TIMEOUT_NANOS);
+//
+//            asynchronousIndexWriteConfiguration = new AsynchronousIndexWriteConfiguration(
+//                    masterQueueCapacity,//
+//                    masterChunkSize,//
+//                    masterChunkTimeoutNanos,//
+//                    sinkIdleTimeoutNanos,//
+//                    sinkPollTimeoutNanos,//
+//                    sinkQueueCapacity,//
+//                    sinkChunkSize,//
+//                    sinkChunkTimeoutNanos//
+//                    );
+//            
+//        } else {
         
             asynchronousIndexWriteConfiguration = (AsynchronousIndexWriteConfiguration) in
                     .readObject();
             
-        }
+//        }
 
-        if (version < VERSION2) {
-
-            /*
-             * Use the default configuration since not present in the serialized
-             * form before VERSION2.
-             */
-
-            final boolean scatterSplitEnabled = Boolean
-                    .parseBoolean(Options.DEFAULT_SCATTER_SPLIT_ENABLED);
-
-            final double scatterSplitPercentOfSplitThreshold = Double
-                    .parseDouble(Options.DEFAULT_SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD);
-
-            final int scatterSplitDataServicesCount = Integer
-                    .parseInt(Options.DEFAULT_SCATTER_SPLIT_DATA_SERVICE_COUNT);
-
-            final int scatterSplitIndexPartitionsCount = Integer
-                    .parseInt(Options.DEFAULT_SCATTER_SPLIT_INDEX_PARTITION_COUNT);
-
-            this.scatterSplitConfiguration = new ScatterSplitConfiguration(
-                    scatterSplitEnabled, scatterSplitPercentOfSplitThreshold,
-                    scatterSplitDataServicesCount,
-                    scatterSplitIndexPartitionsCount);
-
-        } else {
+//        if (version < VERSION2) {
+//
+//            /*
+//             * Use the default configuration since not present in the serialized
+//             * form before VERSION2.
+//             */
+//
+//            final boolean scatterSplitEnabled = Boolean
+//                    .parseBoolean(Options.DEFAULT_SCATTER_SPLIT_ENABLED);
+//
+//            final double scatterSplitPercentOfSplitThreshold = Double
+//                    .parseDouble(Options.DEFAULT_SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD);
+//
+//            final int scatterSplitDataServicesCount = Integer
+//                    .parseInt(Options.DEFAULT_SCATTER_SPLIT_DATA_SERVICE_COUNT);
+//
+//            final int scatterSplitIndexPartitionsCount = Integer
+//                    .parseInt(Options.DEFAULT_SCATTER_SPLIT_INDEX_PARTITION_COUNT);
+//
+//            this.scatterSplitConfiguration = new ScatterSplitConfiguration(
+//                    scatterSplitEnabled, scatterSplitPercentOfSplitThreshold,
+//                    scatterSplitDataServicesCount,
+//                    scatterSplitIndexPartitionsCount);
+//
+//        } else {
 
             scatterSplitConfiguration = (ScatterSplitConfiguration) in.readObject();
             
-        }
+//        }
         
     }
 
@@ -2752,30 +2753,30 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         out.writeObject(tupleSer);
         
-        if (version >= VERSION4) {
+//        if (version >= VERSION4) {
             
             out.writeObject(btreeRecordCompressorFactory);
             
-        }
+//        }
 
         out.writeObject(conflictResolver);
 
-        if (version >= VERSION5 && version < VERSION9 ) {
-
-//            out.writeBoolean(childLocks);
-            out.writeBoolean(false/* childLocks */);
-            
-        }
+//        if (version >= VERSION5 && version < VERSION9 ) {
+//
+////            out.writeBoolean(childLocks);
+//            out.writeBoolean(false/* childLocks */);
+//            
+//        }
 
         out.writeBoolean(deleteMarkers);
         
         out.writeBoolean(versionTimestamps);
         
-        if (version >= VERSION6) {
+//        if (version >= VERSION6) {
 
             out.writeBoolean(versionTimestampFilters);
             
-        }
+//        }
 
         out.writeObject(bloomFilterFactory);
         
@@ -2800,25 +2801,25 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         out.writeBoolean(indexSegmentBufferNodes);
 
-        if (version >= VERSION4) {
+//        if (version >= VERSION4) {
             
             out.writeObject(btreeRecordCompressorFactory);
             
-        }
-
-        if (version >= VERSION1) {
+//        }
+//
+//        if (version >= VERSION1) {
 
             // introduced in VERSION1
             out.writeObject(asynchronousIndexWriteConfiguration);
 
-        }
-
-        if (version >= VERSION2) {
+//        }
+//
+//        if (version >= VERSION2) {
 
             // introduced in VERSION2
             out.writeObject(scatterSplitConfiguration);
 
-        }
+//        }
 
     }
 
