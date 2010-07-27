@@ -11,9 +11,9 @@ this release.  The code will build automatically under eclipse.  You can also
 build the code using the ant script.  The cluster installer requires the use of
 the ant script.  You can checkout this release from the following URL:
 
-	https://bigdata.svn.sourceforge.net/svnroot/bigdata/tags/RELEASE_0.83.0
+	https://bigdata.svn.sourceforge.net/svnroot/bigdata/branches/BIGDATA_RELEASE_0_83_0
 
-This tag corresponds to revision XXXX.
+This corresponds to revision 3326.
 
 New features:
 
