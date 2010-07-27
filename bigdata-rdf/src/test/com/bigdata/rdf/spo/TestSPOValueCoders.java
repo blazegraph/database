@@ -42,9 +42,9 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.FixedByteArrayBuffer;
+import com.bigdata.rdf.internal.ITermIdCodes;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.lexicon.ITermIdCodes;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.StatementEnum;
 
@@ -99,8 +99,7 @@ public class TestSPOValueCoders extends TestCase2 {
 
     protected TermId getSID() {
         
-        return new TermId(VTE.STATEMENT, (r.nextInt(Integer.MAX_VALUE - 1) + 1) << 2
-                | ITermIdCodes.TERMID_CODE_STATEMENT);
+        return new TermId(VTE.STATEMENT, (r.nextInt(Integer.MAX_VALUE - 1) + 1));
 
     }
     

@@ -30,10 +30,10 @@ package com.bigdata.rdf.spo;
 
 import java.util.Properties;
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.internal.ITermIdCodes;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.lexicon.ITermIdCodes;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.RuleContextEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -96,8 +96,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
      * test the term id bits.
      */
     private static TermId uriId(long in) {
-        return new TermId(VTE.URI, in << ITermIdCodes.TERMID_CODE_MASK_BITS
-                | ITermIdCodes.TERMID_CODE_URI);
+        return new TermId(VTE.URI, in);
     }
 
 //    private static long literalId(long in) {

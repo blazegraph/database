@@ -35,7 +35,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.lexicon.ITermIdFilter;
+import com.bigdata.rdf.lexicon.ITermIVFilter;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -212,7 +212,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
             resourceIds = new PushbackIterator<IV>(new MergedOrderedIterator(//
                     db.getSPORelation().distinctTermScan(SPOKeyOrder.SPO), //
                     db.getSPORelation().distinctTermScan(SPOKeyOrder.OSP,
-                            new ITermIdFilter() {
+                            new ITermIVFilter() {
                                 private static final long serialVersionUID = 1L;
                                 public boolean isValid(IV iv) {
                                     // filter out literals from the OSP scan.

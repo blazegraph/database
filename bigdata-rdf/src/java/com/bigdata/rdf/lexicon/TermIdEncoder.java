@@ -287,58 +287,58 @@ public class TermIdEncoder {
 
     }
 
-    /**
-     * Set the bit flags for the Value type on the 2 low order bits.
-     * 
-     * @param id
-     *            The encoded term identifier.
-     * @param code
-     *            The term code, which is one of the values defined by
-     *            {@link ITermIndexCodes}.
-     * 
-     * @return The term identifier with the 2 low order bits set to reflect
-     *         the term code using the bit flags defined by
-     *         {@link ITermIdCodes} which correspond to the specified term
-     *         code.
-     */
-    public static long setFlags(long id, final byte code) {
-
-        switch (code) {
-
-        case ITermIndexCodes.TERM_CODE_URI:
-
-            id |= ITermIdCodes.TERMID_CODE_URI;
-
-            break;
-
-        case ITermIndexCodes.TERM_CODE_LIT:
-        case ITermIndexCodes.TERM_CODE_DTL:
-        case ITermIndexCodes.TERM_CODE_LCL:
-
-            id |= ITermIdCodes.TERMID_CODE_LITERAL;
-
-            break;
-
-        case ITermIndexCodes.TERM_CODE_BND:
-
-            id |= ITermIdCodes.TERMID_CODE_BNODE;
-
-            break;
-
-        case ITermIndexCodes.TERM_CODE_STMT:
-
-            id |= ITermIdCodes.TERMID_CODE_STATEMENT;
-
-            break;
-
-        default:
-
-            throw new AssertionError("Unknown term type: code=" + code);
-
-        }
-
-        return id;
-
-    }
+//    /**
+//     * Set the bit flags for the Value type on the 2 low order bits.
+//     * 
+//     * @param id
+//     *            The encoded term identifier.
+//     * @param code
+//     *            The term code, which is one of the values defined by
+//     *            {@link ITermIndexCodes}.
+//     * 
+//     * @return The term identifier with the 2 low order bits set to reflect
+//     *         the term code using the bit flags defined by
+//     *         {@link ITermIdCodes} which correspond to the specified term
+//     *         code.
+//     */
+//    public static long setFlags(long id, final byte code) {
+//
+//        switch (code) {
+//
+//        case ITermIndexCodes.TERM_CODE_URI:
+//
+//            id |= ITermIdCodes.TERMID_CODE_URI;
+//
+//            break;
+//
+//        case ITermIndexCodes.TERM_CODE_LIT:
+//        case ITermIndexCodes.TERM_CODE_DTL:
+//        case ITermIndexCodes.TERM_CODE_LCL:
+//
+//            id |= ITermIdCodes.TERMID_CODE_LITERAL;
+//
+//            break;
+//
+//        case ITermIndexCodes.TERM_CODE_BND:
+//
+//            id |= ITermIdCodes.TERMID_CODE_BNODE;
+//
+//            break;
+//
+//        case ITermIndexCodes.TERM_CODE_STMT:
+//
+//            id |= ITermIdCodes.TERMID_CODE_STATEMENT;
+//
+//            break;
+//
+//        default:
+//
+//            throw new AssertionError("Unknown term type: code=" + code);
+//
+//        }
+//
+//        return id;
+//
+//    }
 
 }

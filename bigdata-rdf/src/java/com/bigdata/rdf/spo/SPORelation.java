@@ -71,7 +71,7 @@ import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.lexicon.ITermIdFilter;
+import com.bigdata.rdf.lexicon.ITermIVFilter;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.JustIndexWriteProc.WriteJustificationsProcConstructor;
@@ -1297,7 +1297,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      *       fast scans across multiple shards when chunk-wise order is Ok.
      */
     public IChunkedIterator<IV> distinctTermScan(
-            final IKeyOrder<ISPO> keyOrder, final ITermIdFilter termIdFilter) {
+            final IKeyOrder<ISPO> keyOrder, final ITermIVFilter termIdFilter) {
 
         final FilterConstructor<SPO> filter = new FilterConstructor<SPO>();
         
@@ -1398,7 +1398,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      */
     public IChunkedIterator<IV> distinctMultiTermScan(
             final IKeyOrder<ISPO> keyOrder, final IV[] knownTerms,
-            final ITermIdFilter termIdFilter) {
+            final ITermIVFilter termIdFilter) {
 
         final FilterConstructor<SPO> filter = new FilterConstructor<SPO>();
         final int nterms = knownTerms.length;

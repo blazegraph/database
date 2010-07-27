@@ -33,7 +33,6 @@ import org.openrdf.model.URI;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.lexicon.ITermIdCodes;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 
 class LegacyTermIdUtility implements ITermIdCodes {
