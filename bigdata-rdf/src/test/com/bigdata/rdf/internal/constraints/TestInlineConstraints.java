@@ -27,19 +27,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.constraints;
 
-import java.util.Iterator;
+import java.util.Properties;
 import org.openrdf.model.vocabulary.RDF;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.constraints.InlineGT;
-import com.bigdata.rdf.internal.constraints.InlineLT;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.RuleContextEnum;
-import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ProxyTestCase;
@@ -85,6 +81,11 @@ public class TestInlineConstraints extends ProxyTestCase {
         
         // store with no owl:sameAs closure
         AbstractTripleStore db = getStore();
+
+        // do not run if we are not inlining
+        if (!db.getLexiconRelation().isInlineLiterals()) {
+            return;
+        }
         
         try {
 
@@ -182,6 +183,11 @@ public class TestInlineConstraints extends ProxyTestCase {
         
         // store with no owl:sameAs closure
         AbstractTripleStore db = getStore();
+        
+        // do not run if we are not inlining
+        if (!db.getLexiconRelation().isInlineLiterals()) {
+            return;
+        }
         
         try {
 
@@ -281,6 +287,11 @@ public class TestInlineConstraints extends ProxyTestCase {
         
         // store with no owl:sameAs closure
         AbstractTripleStore db = getStore();
+        
+        // do not run if we are not inlining
+        if (!db.getLexiconRelation().isInlineLiterals()) {
+            return;
+        }
         
         try {
 
@@ -384,6 +395,11 @@ public class TestInlineConstraints extends ProxyTestCase {
         
         // store with no owl:sameAs closure
         AbstractTripleStore db = getStore();
+        
+        // do not run if we are not inlining
+        if (!db.getLexiconRelation().isInlineLiterals()) {
+            return;
+        }
         
         try {
 
