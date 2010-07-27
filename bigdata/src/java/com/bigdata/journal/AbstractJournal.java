@@ -1027,33 +1027,33 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         }
 
-//        case Disk: {
-//
-//            /*
-//             * Setup the buffer strategy.
-//             */
-//
-//            fileMetadata = new FileMetadata(file, BufferMode.Disk,
-//                    useDirectBuffers, initialExtent, maximumExtent, create,
-//                    isEmptyFile, deleteOnExit, readOnly, forceWrites,
-//                    offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
-//                    //readOnly ? null : writeCache,
-//                    writeCacheEnabled,
-//                    validateChecksum,
-//                    createTime, checker, alternateRootBlock);
-//
-//            _bufferStrategy = new DiskOnlyStrategy(
-//                    0L/* soft limit for maximumExtent */,
-////                    minimumExtension,
-//                    fileMetadata);
-//
-//            this._rootBlock = fileMetadata.rootBlock;
-//
-//            break;
-//
-//        }
+        case Disk: {
 
-        case Disk:
+            /*
+             * Setup the buffer strategy.
+             */
+
+            fileMetadata = new FileMetadata(file, BufferMode.Disk,
+                    useDirectBuffers, initialExtent, maximumExtent, create,
+                    isEmptyFile, deleteOnExit, readOnly, forceWrites,
+                    offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
+                    //readOnly ? null : writeCache,
+                    writeCacheEnabled,
+                    validateChecksum,
+                    createTime, checker, alternateRootBlock);
+
+            _bufferStrategy = new DiskOnlyStrategy(
+                    0L/* soft limit for maximumExtent */,
+//                    minimumExtension,
+                    fileMetadata);
+
+            this._rootBlock = fileMetadata.rootBlock;
+
+            break;
+
+        }
+
+//        case Disk:
         case DiskWORM: {
 
             /*
