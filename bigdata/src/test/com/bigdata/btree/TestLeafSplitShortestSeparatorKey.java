@@ -117,7 +117,6 @@ public class TestLeafSplitShortestSeparatorKey extends TestCase2 {
         
         final BTree btree = BTree.create(new SimpleMemoryRawStore(), metadata);
 
-
         btree.insert(new byte[] { 1 }, (byte[]) null);
         // System.out.println("----------------------");
         // assert btree.dump(Level.DEBUG,System.out);
@@ -133,21 +132,19 @@ public class TestLeafSplitShortestSeparatorKey extends TestCase2 {
         // causes split.
         btree.insert(new byte[] { 20 }, (byte[]) null);
         System.out.println("----------------------");
-        assert btree.dump(Level.DEBUG,System.out);
+        assertTrue( btree.dump(Level.DEBUG,System.out) );
         
         // add to right edge of right sibling
         btree.insert(new byte[] { 20, 20 }, (byte[]) null);
         // remove left edge of right sibling (EQ to separator key).
         btree.remove(new byte[] { 20});
         System.out.println("----------------------");
-        assert btree.dump(Level.DEBUG,System.out);
+        assertTrue( btree.dump(Level.DEBUG,System.out));
 
         // insert deleted key -- causes split for existing separator key.
         btree.insert(new byte[] { 20 }, (byte[]) null);
         System.out.println("----------------------");
-        assert btree.dump(Level.DEBUG,System.out);
-
-        fail("write test");
+        assertTrue( btree.dump(Level.DEBUG,System.out) );
         
     }
     
