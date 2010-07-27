@@ -33,8 +33,7 @@ import com.bigdata.rdf.model.StatementEnum;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME quads : quad aware SPOC comparator.  Either this impl conditionally or
- * caller chooses between {@link SPOComparator} and an SPOCComparator impl.
+ * @todo quads : Implement a quads aware SPOC comparator?  E.g., SPOCComparator?
  */
 public class SPOComparator<T extends ISPO> implements Comparator<T> {
 

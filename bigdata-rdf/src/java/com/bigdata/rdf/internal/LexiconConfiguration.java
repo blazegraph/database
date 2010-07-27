@@ -44,17 +44,14 @@ import com.bigdata.rdf.model.BigdataValueFactory;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo large literal size boundary.
- * @todo other configuration options.
  */
-public class LexiconConfiguration<V extends BigdataValue> implements ILexiconConfiguration {
+public class LexiconConfiguration<V extends BigdataValue> implements ILexiconConfiguration<V> {
 
-    private boolean inlineLiterals, inlineBNodes;
+    private final boolean inlineLiterals, inlineBNodes;
 
-    private Map<TermId, IExtension> termIds;
+    private final Map<TermId, IExtension> termIds;
 
-    private Map<String, IExtension> datatypes;
+    private final Map<String, IExtension> datatypes;
 
     public LexiconConfiguration(final boolean inlineLiterals, final boolean inlineBNodes, final IExtensionFactory xFactory) {
         this.inlineLiterals = inlineLiterals;
@@ -265,7 +262,7 @@ public class LexiconConfiguration<V extends BigdataValue> implements ILexiconCon
 
     }
 
-    private boolean isSupported(DTE dte) {
+    private boolean isSupported(final DTE dte) {
 
         switch (dte) {
             case XSDBoolean:

@@ -34,16 +34,6 @@ import com.bigdata.rdf.model.BigdataLiteral;
  * <p>
  * {@inheritDoc}
  * 
- * @todo What are the SPARQL semantics for casting among these datatypes?
- *       They should probably be reflected here since that is the real use
- *       case. I believe that those casts also require failing a solution if
- *       the cast is not legal, in which case these methods might not be all
- *       that useful.
- *       <p>
- *       Also see BigdataLiteralImpl and XMLDatatypeUtil. It handles the
- *       conversions by reparsing, but there is no reason to do that here
- *       since we have the canonical point in the value space.
- * 
  * @see http://www.w3.org/TR/rdf-sparql-query/#FunctionMapping, The casting
  *      rules for SPARQL
  * 

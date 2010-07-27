@@ -79,7 +79,7 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
      *             forms when another of the forms was already present under the
      *             key.
      *             
-     * FIXME Now it's not only deprecated, but the code that relies on it has
+     * Note: Now it's not only deprecated, but the code that relies on it has
      * been commented out.  This is because it makes assumptions about how
      * {@link TermId} objects are encoded and decoded.  Under the legacy model
      * they were simple longs.  After the lexicon refactor we use the byte

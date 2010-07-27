@@ -200,7 +200,7 @@ class LegacyTermIdUtility implements ITermIdCodes {
         return termId(tid);
         
     }
-    
+
     /**
      * Decode a set of {@link IV}s from a byte[].
      * 
@@ -208,11 +208,11 @@ class LegacyTermIdUtility implements ITermIdCodes {
      *            The byte[].
      * @return The set of {@link IV}s.
      * 
-     *         FIXME handle all of the inline value types.
+     * @todo handle all of the inline value types.
      * 
-     *         FIXME Construct the InternalValue objects using factory if we
-     *         will have to scope how the RDF Value is represented to the
-     *         lexicon relation with which it is associated?
+     * @todo Construct the InternalValue objects using factory if we will have
+     *       to scope how the RDF Value is represented to the lexicon relation
+     *       with which it is associated?
      */
     public static IV[] decode(final byte[] key, final IV[] ivs) {
 
@@ -224,12 +224,9 @@ class LegacyTermIdUtility implements ITermIdCodes {
         
             // decode the term identifier.
             final long termId = KeyBuilder.decodeLong(key, offset);
+
             offset += Bytes.SIZEOF_LONG;
 
-            /*
-             * FIXME this is here for now until 
-             * {@link AbstractInternalValue#isNull(byte)} works.
-             */
             if (termId == TermId.NULL) {
                 
                 ivs[i] = null;

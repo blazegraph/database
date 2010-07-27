@@ -53,31 +53,6 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestEncodeDecodeKeys.java 2756 2010-05-03 22:26:18Z thompsonbry
  *          $
- * 
- * @todo Code SIDs using a term identifier, UUID, or secure hash function? The
- *       latter two choices are inline options. The former is not.
- * 
- * @todo support xsd:decimal coding in KeyBuilder by discarding the precision
- *       and only retaining the scale information. We need to record both the
- *       signum and the scale, and the scale needs to be adjusted to normalize
- *       for either zero or one digits before the decimal. This is nearly the
- *       same coding as {@link BigInteger} except that scale is not quite the
- *       same as runLength (it is runLength base 10, not base 256) so there
- *       might be fence posts there too.
- * 
- *       FIXME Finish these unit tests for all data types [xsd:decimal], and
- *       unsigned byte, short, int and long. For the unsigned values, I need to
- *       figure out whether you pass in a data type with more bits (e.g., long
- *       for an unsigned int) or if you manage the bits as if they were
- *       unsigned. Consider adding unsigned support and xsd:decimal support
- *       afterwards since they are both a PITA.
- * 
- *       FIXME Unit tests for inline of blank nodes (this is based on a UUID, so
- *       there is not much to that).
- * 
- *       FIXME Refactor to pull the inline bit and dataTypeId bit out of the
- *       dataTypeCode and then test extensible projection of types derived by
- *       restriction onto the intrinsic data types.
  */
 public class TestEncodeDecodeKeys extends TestCase2 {
 
@@ -142,8 +117,6 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
     /**
      * Unit tests for {@link TermId}
-     * 
-     * @todo test asValue(BigdataFactory)
      */
     public void test_TermId() {
 
@@ -258,13 +231,11 @@ public class TestEncodeDecodeKeys extends TestCase2 {
                     public BigdataValue asValue(final BigdataValueFactory f, 
                             final ILexiconConfiguration config)
                             throws UnsupportedOperationException {
-                        // TODO Auto-generated method stub
                         return null;
                     }
 
                     public Object getInlineValue()
                             throws UnsupportedOperationException {
-                        // TODO Auto-generated method stub
                         return null;
                     }
 
@@ -274,10 +245,6 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
                     public boolean isInline() {
                         return true;
-                    }
-
-                    public boolean isNull() {
-                        return false;
                     }
 
                     public boolean isTermId() {
@@ -342,23 +309,6 @@ public class TestEncodeDecodeKeys extends TestCase2 {
     }
 
     /**
-     * Encode an RDF value into a key for one of the statement indices.
-     * 
-     * @param keyBuilder
-     *            The key builder.
-     * @param v
-     *            The RDF value.
-     * 
-     * @return The key builder.
-     */
-    private void encodeValue(final IKeyBuilder keyBuilder,
-            final IV<?, ?> v) {
-
-        v.encode(keyBuilder);
-
-    }
-
-    /**
      * Decode a key from one of the statement indices. The components of the key
      * are returned in the order in which they appear in the key. The caller
      * must reorder those components using their knowledge of which index is
@@ -376,215 +326,6 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
         return IVUtility.decode(key, arity);
         
-//        final IV[] a = new IV[4];
-//
-//        // The byte offset into the key.
-//        int offset = 0;
-//        
-//        for (int i = 0; i < 4; i++) {
-//
-//            final byte flags = KeyBuilder.decodeByte(key[offset]);
-//            offset++;
-//
-//            if(!AbstractInternalValue.isInline(flags)) {
-//                
-//                /*
-//                 * Handle a term identifier (versus an inline value).
-//                 */
-//
-//                // decode the term identifier.
-//                final long termId = KeyBuilder.decodeLong(key, offset);
-//                offset += Bytes.SIZEOF_LONG;
-//
-//                a[i] = new TermId(flags, termId);
-//
-//                continue;
-//                
-//            }
-//            
-//            /*
-//             * Handle an inline value.
-//             */
-//            // The value type (URI, Literal, BNode, SID)
-//            final VTE vte = AbstractInternalValue
-//                    .getInternalValueTypeEnum(flags);
-//
-//            // The data type
-//            final DTE dte = AbstractInternalValue
-//                    .getInternalDataTypeEnum(flags);
-//            
-//            final IV<?,?> v;
-//            switch (dte) {
-//            case XSDBoolean: {
-//                final byte x = KeyBuilder.decodeByte(key[offset++]);
-//                if (x == 0) {
-//                    v = XSDBooleanInternalValue.FALSE;
-//                } else {
-//                    v = XSDBooleanInternalValue.TRUE;
-//                }
-//                break;
-//            }
-//            case XSDByte: {
-//                final byte x = KeyBuilder.decodeByte(key[offset++]);
-//                v = new XSDByteInternalValue<BigdataLiteral>(x);
-//                break;
-//            }
-//            case XSDShort: {
-//                final short x = KeyBuilder.decodeShort(key, offset);
-//                offset += Bytes.SIZEOF_SHORT;
-//                v = new XSDShortInternalValue<BigdataLiteral>(x);
-//                break;
-//            }
-//            case XSDInt: {
-//                final int x = KeyBuilder.decodeInt(key, offset);
-//                offset += Bytes.SIZEOF_INT;
-//                v = new XSDIntInternalValue<BigdataLiteral>(x);
-//                break;
-//            }
-//            case XSDLong: {
-//                final long x = KeyBuilder.decodeLong(key, offset);
-//                offset += Bytes.SIZEOF_LONG;
-//                v = new XSDLongInternalValue<BigdataLiteral>(x);
-//                break;
-//            }
-//            case XSDFloat: {
-//                final float x = KeyBuilder.decodeFloat(key, offset);
-//                offset += Bytes.SIZEOF_FLOAT;
-//                v = new XSDFloatInternalValue<BigdataLiteral>(x);
-//                break;
-//            }
-//            case XSDDouble: {
-//                final double x = KeyBuilder.decodeDouble(key, offset);
-//                offset += Bytes.SIZEOF_DOUBLE;
-//                v = new XSDDoubleInternalValue<BigdataLiteral>(x);
-//                break;
-//            }
-//            case UUID: {
-//                final UUID x = KeyBuilder.decodeUUID(key, offset);
-//                offset += Bytes.SIZEOF_UUID;
-//                v = new UUIDInternalValue<BigdataLiteral>(x);
-//                break;
-//            }
-//            case XSDInteger: {
-//                final byte[] b = KeyBuilder.decodeBigInteger2(offset, key);
-//                offset += 2 + b.length;
-//                final BigInteger x = new BigInteger(b);
-//                v = new XSDIntegerInternalValue<BigdataLiteral>(x);
-//                break;
-//            }
-////            case XSDDecimal:
-////                keyBuilder.append(t.decimalValue());
-////                break;
-////            case XSDUnsignedByte:
-////                keyBuilder.appendUnsigned(t.byteValue());
-////                break;
-////            case XSDUnsignedShort:
-////                keyBuilder.appendUnsigned(t.shortValue());
-////                break;
-////            case XSDUnsignedInt:
-////                keyBuilder.appendUnsigned(t.intValue());
-////                break;
-////            case XSDUnsignedLong:
-////                keyBuilder.appendUnsigned(t.longValue());
-////                break;
-//            default:
-//                throw new UnsupportedOperationException("vte=" + vte + ", dte="
-//                        + dte);
-//            }
-//
-//            a[i] = v;
-//
-//            a[i] = IVUtility.decode(key, offset);
-//
-//            offset += a[i].byteLength();
-//            
-//            if (i == 2 && offset == key.length) {
-//                // We have three components and the key is exhausted.
-//                break;
-//            }
-//
-//        }
-//        
-//        return a; 
-        
-    }
-
-//    /**
-//     * A factory for {@link InternalValue} objects.
-//     * <p>
-//     * Note: The behavior of the factory is informed by a
-//     * {@link LexiconConfiguration}. The factory will produce different
-//     * representations
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-//     *         Thompson</a>
-//     * @version $Id: TestEncodeDecodeKeys.java 2760 2010-05-04 16:48:47Z
-//     *          thompsonbry $
-//     */
-//    public static class InternalValueTypeFactory {
-//
-//        public static InternalValueTypeFactory INSTANCE = new InternalValueTypeFactory();
-//        
-//        private InternalValueTypeFactory() {
-//            
-//        }
-//        
-//        public InternalValue<?, ?> newTermId(final VTE vte,
-//                final DTE dte, final long termId) {
-//
-//            if (vte == null)
-//                throw new IllegalArgumentException();
-//            
-//            if (dte == null)
-//                throw new IllegalArgumentException();
-//
-//            /*
-//             * FIXME If the DTE is independent of whether or not we are inlining
-//             * the value the we need to take one bit for (termId | inline). On
-//             * the other hand, if we only preserve the DTE when we are inlining
-//             * the value, then we are throwing away the datatype information for
-//             * term identifiers.
-//             */
-//            assert dte == DTE.TermId;
-//
-//            return new TermId(vte, dte, termId);
-//            
-//        }
-//        
-//    }
-
-    /**
-     * Encode a key for an RDF Statement index.
-     * 
-     * @param keyBuilder
-     * @param s
-     * @param p
-     * @param o
-     * @param c
-     *            The context position (used iff the key order has 4 components
-     *            in the key (quads)).
-     * @return
-     */
-    private byte[] encodeStatement(final IKeyBuilder keyBuilder,
-            final IV<?, ?> s, final IV<?, ?> p,
-            final IV<?, ?> o, final IV<?, ?> c) {
-
-        keyBuilder.reset();
-
-        s.encode(keyBuilder);
-
-        p.encode(keyBuilder);
-
-        o.encode(keyBuilder);
-
-        if (c != null) {
-
-            c.encode(keyBuilder);
-
-        }
-
-        return keyBuilder.getKey();
-
     }
 
     /**
@@ -820,9 +561,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDFloatIV<BigdataLiteral>(-0f);
-
-        doEncodeDecodeTest(e);
+        // Note: -0f and +0f are converted to the same point in the value space. 
+//        e[2] = new XSDFloatIV<BigdataLiteral>(-0f);
+//
+//        doEncodeDecodeTest(e);
 
         e[2] = new XSDFloatIV<BigdataLiteral>(Float.MAX_VALUE);
 
@@ -841,6 +583,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         doEncodeDecodeTest(e);
 
         e[2] = new XSDFloatIV<BigdataLiteral>(Float.NEGATIVE_INFINITY);
+
+        doEncodeDecodeTest(e);
+
+        e[2] = new XSDFloatIV<BigdataLiteral>(Float.NaN);
 
         doEncodeDecodeTest(e);
 
@@ -864,9 +610,10 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
         doEncodeDecodeTest(e);
 
-        e[2] = new XSDDoubleIV<BigdataLiteral>(-0d);
-
-        doEncodeDecodeTest(e);
+        // Note: -0d and +0d are converted to the same point in the value space. 
+//        e[2] = new XSDDoubleIV<BigdataLiteral>(-0d);
+//
+//        doEncodeDecodeTest(e);
 
         e[2] = new XSDDoubleIV<BigdataLiteral>(+0d);
 
@@ -892,56 +639,6 @@ public class TestEncodeDecodeKeys extends TestCase2 {
 
         doEncodeDecodeTest(e);
 
-    }
-
-    /**
-     * Unit test where the RDF Object position is an xsd:float whose value is
-     * {@link Float#NaN}.
-     * 
-     * @todo This unit test fails for NaN because {@link XSDFloatIV} does not
-     *       compare as equals for two instances with NaN values. We should
-     *       clarify the behavior for NaN, Infinity, -Infinity, and -0.0 for the
-     *       lexicon and the {@link IKeyBuilder}.
-     *       <p>
-     *       According to the XML Schema Datatypes Recommendation: NaN equals
-     *       itself but is ·incomparable· with (neither greater than nor less
-     *       than) any other value in the ·value space·.
-     */
-    public void test_SPO_encodeDecode_XSDFloat_NaN() {
-
-        final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
-                new XSDFloatIV<BigdataLiteral>(Float.NaN),//
-                new TermId<BigdataURI>(VTE.URI, 4L) //
-        };
-    
-        doEncodeDecodeTest(e);
-
-    }
-
-    /**
-     * Unit test where the RDF Object position is an xsd:double whose value is
-     * {@link Double#NaN}.
-     * 
-     * @todo This unit test fails for NaN. because {@link XSDFloatIV} does not
-     *       compare as equals for two instances with NaN values. We should
-     *       clarify the behavior for NaN, Infinity, -Infinity, and -0.0 for the
-     *       lexicon and the {@link IKeyBuilder}.
-     *       <p>
-     *       According to the XML Schema Datatypes Recommendation: NaN equals
-     *       itself but is ·incomparable· with (neither greater than nor less
-     *       than) any other value in the ·value space·.
-     */
-    public void test_SPO_encodeDecode_XSDDouble_NaN() {
-
-        final IV<?, ?>[] e = {//
-                new TermId<BigdataURI>(VTE.URI, 1L),//
-                new TermId<BigdataURI>(VTE.URI, 2L),//
-                new XSDDoubleIV<BigdataLiteral>(Double.NaN),//
-                new TermId<BigdataURI>(VTE.URI, 4L) //
-        };
-    
         e[2] = new XSDDoubleIV<BigdataLiteral>(Double.NaN);
 
         doEncodeDecodeTest(e);

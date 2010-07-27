@@ -112,13 +112,10 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
      * The three perfect natural orders for triples.
      */
 
-    // FIXME quads : review ALL use of the SPO index (92 refs)
     public static final transient SPOKeyOrder SPO = new SPOKeyOrder(_SPO);
     
-    // FIXME quads : review ALL use of the POS index (39 refs)
     public static final transient SPOKeyOrder POS = new SPOKeyOrder(_POS);
 
-    // FIXME quads : review ALL use of the OSP index (31 refs)
     public static final transient SPOKeyOrder OSP = new SPOKeyOrder(_OSP);
 
     /*

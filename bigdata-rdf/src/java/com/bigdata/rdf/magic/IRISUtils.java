@@ -586,8 +586,6 @@ type (triple vs. NOT_EQUAL for example).
      * Convert an IRIS term to a bigdata term (IVariableOrConstant).
      * <p>
      * 
-     * FIXME this no longer works after the lexicon refactor.
-     * 
      * @param term
      *              the IRIS term
      * @return

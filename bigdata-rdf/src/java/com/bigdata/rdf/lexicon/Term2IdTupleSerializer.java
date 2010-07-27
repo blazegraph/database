@@ -212,17 +212,20 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
     /**
      * The initial version (no additional persistent state).
      */
-    private final static transient int VERSION0 = 0;
+    private final static transient byte VERSION0 = 0;
 
     /**
      * The current version.
      */
-    private final static transient int VERSION = VERSION0;
+    private final static transient byte VERSION = VERSION0;
 
     public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
+
         super.readExternal(in);
-        final short version = in.readShort();
+        
+        final byte version = in.readByte();
+        
         switch (version) {
         case VERSION0:
             break;
@@ -234,8 +237,11 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
     }
 
     public void writeExternal(final ObjectOutput out) throws IOException {
+
         super.writeExternal(out);
-        out.writeShort(VERSION);
+        
+        out.writeByte(VERSION);
+        
     }
     
 }

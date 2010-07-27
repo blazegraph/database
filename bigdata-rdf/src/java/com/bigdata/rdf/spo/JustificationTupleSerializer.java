@@ -138,7 +138,6 @@ public class JustificationTupleSerializer extends
         if (obj instanceof Justification)
             return Justification.getKey(getKeyBuilder(), (Justification) obj);
 
-        //@todo could allow long[].
         throw new UnsupportedOperationException();
         
     }

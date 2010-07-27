@@ -194,13 +194,8 @@ public class IVUtility {
      * 
      * @param key
      *            The byte[].
+     *            
      * @return The {@link IV}.
-     * 
-     *         FIXME handle all of the inline value types.
-     * 
-     *         FIXME Construct the InternalValue objects using factory if we
-     *         will have to scope how the RDF Value is represented to the
-     *         lexicon relation with which it is associated?
      */
     public static IV decode(final byte[] key) {
 
@@ -215,13 +210,8 @@ public class IVUtility {
      *            The byte[].
      * @param numTerms
      *            The number of terms to decode.
+     *            
      * @return The set of {@link IV}s.
-     * 
-     *         FIXME handle all of the inline value types.
-     * 
-     *         FIXME Construct the InternalValue objects using factory if we
-     *         will have to scope how the RDF Value is represented to the
-     *         lexicon relation with which it is associated?
      */
     public static IV[] decode(final byte[] key, final int numTerms) {
 
@@ -255,13 +245,8 @@ public class IVUtility {
      * 
      * @param key
      *            The byte[].
+     *            
      * @return The set of {@link IV}s.
-     * 
-     *         FIXME handle all of the inline value types.
-     * 
-     *         FIXME Construct the InternalValue objects using factory if we
-     *         will have to scope how the RDF Value is represented to the
-     *         lexicon relation with which it is associated?
      */
     public static IV[] decodeAll(final byte[] key) {
 

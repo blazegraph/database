@@ -30,7 +30,9 @@ package com.bigdata.rdf.internal;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.UUID;
+
 import org.openrdf.model.URI;
+
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -75,16 +77,6 @@ import com.bigdata.rawstore.Bytes;
  * @see http://www.w3.org/TR/xmlschema-2/
  */
 public enum DTE {
-
-//    /**
-//     * The "inline" value is a term identifier which must be resolved against
-//     * the ID2TERM index in the lexicon in order to materialize the
-//     * corresponding RDF Value.
-//     * 
-//     * @todo URI for internal term identifiers? (probably not).
-//     */
-//    TermId((byte) 0, Bytes.SIZEOF_LONG, Long.class, null/* N/A */,
-//            DTEFlags.NOFLAGS), //
 
     /**
      * The "inline" value is a boolean (xsd:boolean). Only the distinct points
@@ -183,8 +175,6 @@ public enum DTE {
      * The "inline" value is a {@link UUID}.
      * 
      * @see http://lists.xml.org/archives/xml-dev/201003/msg00027.html
-     * 
-     * @todo What is the datatype URI for UUID data types? (bd:UUID)
      */
     UUID((byte) 13, Bytes.SIZEOF_UUID, UUID.class, XSD.UUID.stringValue(),
             DTEFlags.NOFLAGS), //
@@ -235,8 +225,6 @@ public enum DTE {
          * Note: This masks off everything but the lower 4 bits.
          */
         switch (b & 0x0f) {
-//        case 0:
-//            return TermId;
         case 0:
             return XSDBoolean;
         case 1:
@@ -328,15 +316,6 @@ public enum DTE {
     /**
      * The class of the Java object used to represent instances of the coded
      * data type.
-     * 
-     * @todo cls extends {@link AbstractIV}? Use {@link TermId} for a
-     *       term identifier? If blank nodes are inlined, then use a special
-     *       class for that, otherwise use {@link TermId}? Ditto for SIDs. URIs
-     *       are never inlined. Datatype literals MAY be inline, depending on
-     *       the datatype. The unsigned datatypes need to have special handling
-     *       to avoid problems with math on unsigned values. That special
-     *       handling could be provided by appropriate subclasses of
-     *       {@link AbstractLiteralIV}.
      */
     private final Class<?> cls;
 
