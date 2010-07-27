@@ -44,6 +44,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
@@ -55,6 +56,7 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.rio.rdfxml.RDFXMLParser;
+
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
@@ -80,7 +82,6 @@ import com.bigdata.rdf.internal.DefaultExtensionFactory;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtension;
 import com.bigdata.rdf.internal.IExtensionFactory;
-import com.bigdata.rdf.internal.ITermIdCodes;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.BigdataRDFFullTextIndex;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
