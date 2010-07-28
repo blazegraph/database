@@ -42,8 +42,15 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
         
     }
     
+    @Override
+    public BigdataSailRepository getRepository() {
+        return (BigdataSailRepository)super.getRepository();
+    }
+    
     /**
-     * Overriden to capture query hints from SPARQL queries. Query hints are
+     * {@inheritDoc}
+     * <p>
+     * Overridden to capture query hints from SPARQL queries. Query hints are
      * embedded in query strings as namespaces.  
      * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
      */
@@ -61,7 +68,9 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
     }
 
     /**
-     * Overriden to capture query hints from SPARQL queries. Query hints are
+     * {@inheritDoc}
+     * <p>
+     * Overridden to capture query hints from SPARQL queries. Query hints are
      * embedded in query strings as namespaces.  
      * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
      */
@@ -76,9 +85,11 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
     }
 
     /**
-     * Overriden to capture query hints from SPARQL queries. Query hints are
-     * embedded in query strings as namespaces.  
-     * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
+     * {@inheritDoc}
+     * <p>
+     * Overridden to capture query hints from SPARQL queries. Query hints are
+     * embedded in query strings as namespaces. See
+     * {@link BD#QUERY_HINTS_NAMESPACE} for more information.
      */
     @Override
     public SailBooleanQuery prepareBooleanQuery(final QueryLanguage ql,
@@ -91,7 +102,9 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
     }
 
     /**
-     * Overriden to capture query hints from SPARQL queries. Query hints are
+     * {@inheritDoc}
+     * <p>
+     * Overridden to capture query hints from SPARQL queries. Query hints are
      * embedded in query strings as namespaces.  
      * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
      */
@@ -121,6 +134,8 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
      * Note: auto-commit is an EXTREMELY bad idea. Performance will be terrible.
      * The database will swell to an outrageous size. TURN OFF AUTO COMMIT.
      * 
