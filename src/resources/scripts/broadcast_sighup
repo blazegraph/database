@@ -1,0 +1,63 @@
+#!/bin/bash
+
+##
+# Script sends equivalent of sighup to a services manager or load balancer.
+#
+
+usage() {
+    echo "Usage: $0  ( local | all )  ( servicesManager | loadBalancer )" 1>&2
+    exit 1
+}
+
+if [ $# -ne 2 ] ; then
+    usage
+fi
+if [ X"$1" != "Xlocal" -a X"$1" != "Xall" ] ; then
+    usage
+fi
+local_or_all=$1
+if [ X"$2" != "XservicesManager" -a X"$2" != "XloadBalancer" ] ; then
+    usage
+fi
+target=$2
+
+# Setup the environment.
+cd `dirname $0`
+source ./bigdataenv
+
+# Verify critical environment variables.
+if [ -z "$JAVA_OPTS" ]; then
+    echo $"`date` : hostname : environment not setup."
+    exit 1;
+fi
+if [ -z "$CLASSPATH" ]; then
+    echo $"`date` : hostname : environment not setup."
+    exit 1;
+fi
+if [ -z "$BIGDATA_CONFIG" ]; then
+    echo $"`date` : hostname : environment not setup."
+    exit 1;
+fi
+
+# Start the services manager on this host.
+#
+# Note: This explicitly specifies a small heap for the services manager since
+# it uses very little heap space and we can avoid problems with contention for
+# virtual memory by not permitting JVM defaults to grant this a large maximum
+# heap on machines with lots of RAM.
+#
+# Allow JVM to be available for debugger to attach.
+#NIC="lo"
+#IP_ADDR=`ifconfig ${NIC} | sed -n -e s'/.*inet addr:\([0-9.]*\).*/\1/p'`
+#JDWP_OPTS="transport=dt_socket,server=y,address=${IP_ADDR}:33340,suspend=y"
+#JAVA_OPTS="-ea -Xdebug -Xrunjdwp:${JDWP_OPTS} ${JAVA_OPTS}"
+java ${JAVA_OPTS} \
+     -cp ${CLASSPATH} \
+     com.bigdata.service.jini.util.BroadcastSighup \
+     ${BIGDATA_CONFIG} \
+     "com.bigdata.service.jini.util.BroadcastSighup.signalTarget=\"$target\"" \
+     "com.bigdata.service.jini.util.BroadcastSighup.localOrAll=\"$local_or_all\"" \
+     "com.bigdata.service.jini.util.BroadcastSighup.pushConfig=true" \
+     "com.bigdata.service.jini.util.BroadcastSighup.restartServices=true" \
+     ${BIGDATA_CONFIG_OVERRIDES}
+exit 0

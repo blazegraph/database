@@ -46,7 +46,7 @@ import com.bigdata.counters.CounterSet;
  */
 abstract public class AbstractService implements IService {
 
-    protected static final Logger log = Logger.getLogger(AbstractService.class);
+    private static final Logger log = Logger.getLogger(AbstractService.class);
     
     private String serviceName;
     private UUID serviceUUID;
