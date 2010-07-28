@@ -48,6 +48,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
+import com.bigdata.util.config.NicUtil;
 
 /**
  * Test harness for loading randomly generated files into a repository.
@@ -588,7 +589,7 @@ public class TestMetrics extends AbstractMetricsTestCase {
          * Write out the repositoryClass and all defined properties.
          */
 //        metricsWriter.write("repositoryClass, "+m_repo.getClass().getName()+"\n");
-        metricsWriter.write("host, "+InetAddress.getLocalHost().getHostName()+"\n");
+        metricsWriter.write("host, "+NicUtil.getIpAddress("default.nic", "default", true)+"\n");
         if(true) {
             Map props = new TreeMap(PropertyUtil.flatten(getProperties()));
             Iterator itr = props.entrySet().iterator();

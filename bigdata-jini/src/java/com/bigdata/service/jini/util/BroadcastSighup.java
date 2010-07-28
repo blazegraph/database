@@ -39,6 +39,7 @@ import com.bigdata.jini.start.IServicesManagerService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.util.config.NicUtil;
 import java.net.InetAddress;
 import net.jini.config.Configuration;
 import net.jini.core.entry.Entry;
@@ -158,8 +159,8 @@ public class BroadcastSighup {
 
         // Set up the service template and filter used to identify the service.
 
-        final String hostname = InetAddress.getLocalHost()
-                    .getCanonicalHostName().toString();
+        final String hostname = 
+            NicUtil.getIpAddress("default.nic", "default", false);
         ServiceTemplate template = new ServiceTemplate(null,
                 new Class[] { iface }, null);
         ServiceItemFilter thisHostFilter = null;

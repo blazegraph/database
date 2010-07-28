@@ -36,6 +36,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.config.NicUtil;
 
 import edu.lehigh.swat.bench.ubt.api.QueryResult;
 import edu.lehigh.swat.bench.ubt.api.Repository;
@@ -81,9 +82,10 @@ public class Test extends RepositoryCreator {
          */
         String hostname;
         try {
-            hostname = InetAddress.getLocalHost().getHostName();
-        } catch (UnknownHostException ex) {
-            hostname = "localhost";
+            hostname = NicUtil.getIpAddress("default.nic", "default", false);
+        } catch(Throwable t) {//for now, maintain same failure logic as used previously
+            t.printStackTrace();
+            s = NicUtil.getIpAddressByLocalHost();
         }
         QUERY_TEST_RESULT_FILE = hostname + "-result.txt";
     	} else {

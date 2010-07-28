@@ -27,12 +27,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.jini.start.config;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 
 import junit.framework.TestCase2;
 import net.jini.config.ConfigurationException;
+
+import com.bigdata.util.config.NicUtil;
 
 /**
  * Unit tests for the {@link ZookeeperServerEntry}.
@@ -97,9 +100,9 @@ public class TestZookeeperServerEntry extends TestCase2 {
      * @throws SocketException 
      * @throws UnknownHostException 
      */
-    public void test002() throws ConfigurationException, SocketException, UnknownHostException {
+    public void test002() throws ConfigurationException, SocketException, UnknownHostException, IOException {
 
-        final String server = InetAddress.getLocalHost().getCanonicalHostName();
+        final String server = NicUtil.getIpAddress("default.nic", "default", true);
         
         final String[] hosts = new String[] {
                 "127.0.0.1",

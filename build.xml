@@ -1927,6 +1927,8 @@ ${postInstallMessage}</echo>
 </echo>
       <echo>    policy:       ${java.security.policy}
 </echo>
+      <echo>    default.nic:  ${default.nic}
+</echo>
       <echo>    hostname:     ${this.hostname}
 </echo>
       <echo>    preferIPv4:   ${java.net.preferIPv4Stack}
@@ -1989,6 +1991,7 @@ ${postInstallMessage}</echo>
         <sysproperty key="log4j.path" value="${bigdata.test.log4j.abs.path}"/>
 
         <sysproperty key="app.home" value="${app.home}"/>
+        <sysproperty key="default.nic" value="${default.nic}"/>
 
         <sysproperty key="classserver.jar" value="${dist.lib}/classserver.jar" />
         <sysproperty key="colt.jar" value="${dist.lib}/colt.jar" />

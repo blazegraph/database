@@ -78,6 +78,7 @@ import com.bigdata.service.jini.AbstractServer;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.util.config.NicUtil;
 import com.bigdata.zookeeper.ZNodeCreatedWatcher;
 
 /**
@@ -130,6 +131,8 @@ abstract public class JiniServiceConfiguration extends
     public final Properties properties;
     public final String[] jiniOptions;
     
+    private final String serviceIpAddr;
+    
     protected void toString(StringBuilder sb) {
 
         super.toString(sb);
@@ -174,6 +177,12 @@ abstract public class JiniServiceConfiguration extends
             log.warn("groups = NO_GROUPS");
         } else {
             log.warn("groups = " + Arrays.toString(this.groups));
+        }
+
+        try {
+            this.serviceIpAddr = NicUtil.getIpAddress("default.nic", "default", false);
+        } catch(IOException e) {
+            throw new ConfigurationException(e.getMessage(), e);
         }
     }
 
@@ -471,8 +480,7 @@ abstract public class JiniServiceConfiguration extends
 
             final ServiceDir serviceDir = new ServiceDir(this.serviceDir);
 
-            final Hostname hostName = new Hostname(InetAddress.getLocalHost()
-                    .getCanonicalHostName().toString());
+            final Hostname hostName = new Hostname(serviceIpAddr);
 
             final ServiceUUID serviceUUID = new ServiceUUID(this.serviceUUID);
 

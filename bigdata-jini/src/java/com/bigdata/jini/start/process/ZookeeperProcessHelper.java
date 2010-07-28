@@ -16,6 +16,7 @@ import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.config.ZookeeperServerConfiguration;
 import com.bigdata.jini.start.config.ZookeeperServerEntry;
 import com.bigdata.jini.start.config.ZookeeperServerConfiguration.ZookeeperRunningException;
+import com.bigdata.util.config.NicUtil;
 import com.bigdata.zookeeper.ZooHelper;
 
 /**
@@ -39,6 +40,14 @@ import com.bigdata.zookeeper.ZooHelper;
 public class ZookeeperProcessHelper extends ProcessHelper {
 
     protected final int clientPort;
+    
+    protected static InetAddress thisInetAddr = null;
+    static {
+	try {
+            thisInetAddr = InetAddress.getByName
+                    (NicUtil.getIpAddress("default.nic", "default", false));
+	} catch (Throwable t) { /* swallow */ }
+    }
     
     /**
      * @param name
@@ -144,11 +153,11 @@ public class ZookeeperProcessHelper extends ProcessHelper {
         final ZookeeperServerConfiguration serverConfig = new ZookeeperServerConfiguration(
                 config);
 
-        if (ZooHelper.isRunning(InetAddress.getLocalHost(), serverConfig.clientPort)) {
+        if (ZooHelper.isRunning(thisInetAddr, serverConfig.clientPort)) {
 
             if (log.isInfoEnabled())
                 log.info("Zookeeper already running: "
-                        + InetAddress.getLocalHost().getCanonicalHostName()
+                        + thisInetAddr.getCanonicalHostName()
                         + ":" + serverConfig.clientPort);
 
             // will not consider start.

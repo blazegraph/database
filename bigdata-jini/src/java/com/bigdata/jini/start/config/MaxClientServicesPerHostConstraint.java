@@ -10,6 +10,7 @@ import com.bigdata.jini.lookup.entry.HostnameFilter;
 import com.bigdata.jini.lookup.entry.ServiceItemFilterChain;
 import com.bigdata.service.IClientService;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.util.config.NicUtil;
 
 /**
  * Constraint on the #of {@link IClientService}s on the same host.
@@ -51,10 +52,8 @@ public class MaxClientServicesPerHostConstraint extends
 //		 */
 //        filter.add(ClientServiceFilter.INSTANCE);
 
-        final String hostname = InetAddress.getLocalHost().getHostName();
-
-        final String canonicalHostname = InetAddress.getLocalHost()
-                .getCanonicalHostName();
+        final String hostname = NicUtil.getIpAddress("default.nic", "default", false);
+        final String canonicalHostname = hostname;
 
         // filters for _this_ host.
         filter.add(new HostnameFilter(new Hostname[] {//

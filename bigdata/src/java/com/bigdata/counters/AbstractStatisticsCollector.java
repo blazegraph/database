@@ -48,6 +48,7 @@ import com.bigdata.counters.linux.StatisticsCollectorForLinux;
 import com.bigdata.counters.win.StatisticsCollectorForWindows;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.config.NicUtil;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
@@ -64,7 +65,6 @@ import com.bigdata.util.httpd.AbstractHTTPD;
  * and Un*x platforms so as to support the declared counters on all platforms.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class AbstractStatisticsCollector implements IStatisticsCollector {
 
@@ -83,32 +83,10 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
     
     	String s;
         try {
-
-//            hostname = InetAddress.getLocalHost().getHostName();
-            
-            s = InetAddress.getLocalHost().getCanonicalHostName();
-            
-        } catch (UnknownHostException e) {
-        
-        	try {
-        	
-        		s = InetAddress.getLocalHost().getHostName();
-        		
-        	} catch(UnknownHostException e2) {
-
-				final String msg = "Could not resolve hostname";
-				try {
-					log.error(msg);
-        		} catch(Throwable t) {
-        			System.err.println(msg);
-        		}
-        		
-        		s = "localhost";
-
-        		//throw new AssertionError(e);
-        		
-        	}
-            
+            s = NicUtil.getIpAddress("default.nic", "default", false);
+        } catch(Throwable t) {//for now, maintain same failure logic as used previously
+            t.printStackTrace();
+            s = NicUtil.getIpAddressByLocalHost();
         }
         
         fullyQualifiedHostName = s;
@@ -520,7 +498,6 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      * Options for {@link AbstractStatisticsCollector}
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public interface Options {
         
