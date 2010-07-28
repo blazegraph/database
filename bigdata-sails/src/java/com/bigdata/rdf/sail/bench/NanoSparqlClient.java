@@ -275,7 +275,8 @@ public class NanoSparqlClient {
 
 				final int rc = conn.getResponseCode();
 					if(rc < 200 || rc >= 300) {
-					throw new IOException(conn.getResponseMessage());
+                    throw new IOException(rc + " : "
+                            + conn.getResponseMessage()+" : "+url);
 				}
 
 				if (log.isDebugEnabled()) {

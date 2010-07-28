@@ -21,12 +21,17 @@ public class BigdataSailRepository extends SailRepository {
         return ((BigdataSail) getSail()).getDatabase();
         
     }
-    
-    private BigdataSail getBigdataSail() {
-        
-        return (BigdataSail) getSail();
-        
+
+    @Override
+    public BigdataSail getSail() {
+        return (BigdataSail)super.getSail();
     }
+    
+//    private BigdataSail getBigdataSail() {
+//        
+//        return (BigdataSail) getSail();
+//        
+//    }
 
     @Override
     public SailRepositoryConnection getConnection() throws RepositoryException {
@@ -55,7 +60,7 @@ public class BigdataSailRepository extends SailRepository {
         throws RepositoryException {
         
         return new BigdataSailRepositoryConnection(this, 
-            getBigdataSail().getReadOnlyConnection());
+            getSail().getReadOnlyConnection());
     }
     
     /**
@@ -69,7 +74,7 @@ public class BigdataSailRepository extends SailRepository {
         throws RepositoryException {
         
         return new BigdataSailRepositoryConnection(this, 
-            getBigdataSail().getReadOnlyConnection(timestamp));
+            getSail().getReadOnlyConnection(timestamp));
         
     }
     
@@ -79,7 +84,7 @@ public class BigdataSailRepository extends SailRepository {
         try {
             
             return new BigdataSailRepositoryConnection(this, 
-                getBigdataSail().getReadWriteConnection());
+                getSail().getReadWriteConnection());
             
         } catch (IOException e) {
             
@@ -95,7 +100,7 @@ public class BigdataSailRepository extends SailRepository {
         try {
             
             return new BigdataSailRepositoryConnection(this, 
-                getBigdataSail().getUnisolatedConnection());
+                getSail().getUnisolatedConnection());
             
         } catch (InterruptedException e) {
             
