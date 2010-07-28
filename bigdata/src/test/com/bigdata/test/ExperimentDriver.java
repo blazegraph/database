@@ -68,6 +68,7 @@ import org.xml.sax.ext.EntityResolver2;
 
 import com.bigdata.journal.ProxyTestCase;
 import com.bigdata.util.NV;
+import com.bigdata.util.config.NicUtil;
 
 /**
  * A harness for running comparison of different configurations.
@@ -1364,13 +1365,9 @@ public class ExperimentDriver {
         props.setProperty("os.arch.cpus", ""+SystemUtil.numProcessors());
         
         try {
-            
-            props.setProperty("host",InetAddress.getLocalHost().getHostName());
-            
-        } catch(UnknownHostException ex) {
-            /*
-             * ignore.
-             */
+            props.setProperty( "host", NicUtil.getIpAddress("default.nic", "default", true) );
+        } catch(Throwable t) {
+            t.printStackTrace();
         }
         
         return props;

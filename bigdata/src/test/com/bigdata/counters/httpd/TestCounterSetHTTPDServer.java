@@ -39,6 +39,7 @@ import com.bigdata.counters.HistoryInstrument;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.counters.PeriodEnum;
+import com.bigdata.util.config.NicUtil;
 
 /**
  * Utility class for testing {@link CounterSetHTTPD} or
@@ -62,11 +63,9 @@ public class TestCounterSetHTTPDServer extends TestCase {
 
             CounterSet cset = root.makePath("localhost");
 
-            cset.addCounter("hostname", new OneShotInstrument<String>(
-                    InetAddress.getLocalHost().getHostName()));
-
-            cset.addCounter("ipaddr", new OneShotInstrument<String>(InetAddress
-                    .getLocalHost().getHostAddress()));
+            String localIpAddr = NicUtil.getIpAddress("default.nic", "default", true);
+            cset.addCounter("hostname", new OneShotInstrument<String>(localIpAddr));
+            cset.addCounter("ipaddr", new OneShotInstrument<String>(localIpAddr));
 
             // 60 minutes of data : @todo replace with CounterSetBTree (no fixed limit).
             final HistoryInstrument<Double> history1 = new HistoryInstrument<Double>(
