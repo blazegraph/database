@@ -158,7 +158,7 @@ import com.sun.jini.start.ServiceStarter;
 abstract public class AbstractServer implements Runnable, LeaseListener,
         ServiceIDListener {
     
-    final static protected Logger log = Logger.getLogger(AbstractServer.class);
+    final static private Logger log = Logger.getLogger(AbstractServer.class);
 
 //    /**
 //     * True iff the {@link #log} level is log.isInfoEnabled() or less.
@@ -474,6 +474,13 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         this.lifeCycle = lifeCycle;
 
         setSecurityManager();
+
+        Thread.setDefaultUncaughtExceptionHandler(
+                new Thread.UncaughtExceptionHandler() {
+                    public void uncaughtException(Thread t, Throwable e) {
+                        log.warn("Uncaught exception in thread", e);
+                    }
+                });
 
         /*
          * Read jini configuration & service properties 
@@ -1757,7 +1764,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
             try {
 
-                ((IService) tmp).destroy();
+                tmp.destroy();
 
             } catch (Throwable ex) {
 

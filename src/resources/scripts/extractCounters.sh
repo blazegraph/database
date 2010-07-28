@@ -18,7 +18,8 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-source `dirname $0`/bigdataenv
+BINDIR=`dirname $0`
+source $BINDIR/bigdataenv
 
 targetDir=$1
 
@@ -41,11 +42,8 @@ if [ -z "$lbsDir" ]; then
     exit 1
 fi
 
-#
-# Look for the load balancer service directory on the local host. If
-# we find it, then we read the pid for the LBS and send it a HUP signal
-# so it will write a snapshot of its performance counters.
-#
+# Broadcast a HUP request to the load balancer in the federation so 
+# that it will write a snapshot of its performance counters.
 
 # How long to wait for the LBS to dump a current snapshot.
 waitDur=60
@@ -54,13 +52,8 @@ waitDur=60
 tarball=$targetDir-output.tgz
 
 if [ -f "$lockFile" ]; then
-    read pid < "$lbsDir/pid"
-    if [ -z "$pid" ]; then
-        echo "Could not find LoadBalancer process: `hostname` lbsDir=$lbsDir"
-        exit 1
-    fi
     echo "Sending HUP to the LoadBalancer: $pid"
-    kill -hup $pid
+    $BINDIR/broadcast_sighup local loadBalancer
     echo "Waiting $waitDur seconds for the performance counter dump."
     sleep $waitDur
     ant "-Danalysis.counters.dir=$lbsDir"\

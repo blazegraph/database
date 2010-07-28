@@ -45,9 +45,6 @@ import net.jini.lookup.entry.Name;
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
-import sun.misc.Signal;
-import sun.misc.SignalHandler;
-
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.jini.start.config.IServiceConstraint;
 import com.bigdata.jini.start.config.JiniCoreServicesConfiguration;
@@ -357,98 +354,6 @@ public class ServicesManagerServer extends AbstractServer {
         super(args, lifeCycle);
     
         this.args = args;
-        
-        try {
-
-            /*
-             * Note: This signal is not supported under Windows. You can use the
-             * sighup() method to accomplish the same ends via RMI.
-             */
-            new SigHUPHandler("HUP");
-
-        } catch (IllegalArgumentException ex) {
-
-            log.warn("Signal handler not installed: " + ex);
-            
-        }
-
-    }
-
-    /**
-     * SIGHUP Handler.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private class SigHUPHandler implements SignalHandler {
-
-        private final SignalHandler oldHandler;
-
-        /**
-         * Install handler.
-         * 
-         * @param signalName
-         *            The signal name.
-         * @param args
-         *            The command line arguments (these identify the
-         *            configuration and any overrides).
-         * 
-         * @see http://www-128.ibm.com/developerworks/java/library/i-signalhandling/
-         * 
-         * @see http://forum.java.sun.com/thread.jspa?threadID=514860&messageID=2451429
-         *      for the use of {@link Runtime#addShutdownHook(Thread)}.
-         * 
-         * @see http://twit88.com/blog/2008/02/06/java-signal-handling/
-         */
-        @SuppressWarnings("all") // Signal is in the sun namespace
-        protected SigHUPHandler(final String signalName) {
-
-            final Signal signal = new Signal(signalName);
-
-            this.oldHandler = Signal.handle(signal, this);
-            
-            if (log.isInfoEnabled())
-                log.info("Installed handler: " + signal + ", oldHandler="
-                        + this.oldHandler);
-
-        }
-
-        @SuppressWarnings("all") // Signal is in the sun namespace
-        public void handle(final Signal sig) {
-
-            log.warn("Processing signal: " + sig);
-
-            try {
-                
-                final AbstractServicesManagerService service = (AbstractServicesManagerService) impl;
-
-                if (service != null) {
-
-                    service
-                            .sighup(true/* pushConfig */, true/*restartServices*/);
-                    
-                }
-
-                /*
-                 * This appears willing to halt the server so I am not chaining
-                 * back to the previous handler!
-                 */
-                
-//                // Chain back to previous handler, if one exists
-//                if (oldHandler != SIG_DFL && oldHandler != SIG_IGN) {
-//
-//                    oldHandler.handle(sig);
-//
-//                }
-
-            } catch (Throwable t) {
-
-                log.error("Signal handler failed : " + t, t);
-
-            }
-
-        }
-
     }
 
     /**

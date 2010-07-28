@@ -173,6 +173,11 @@ public interface ILoadBalancerService extends IService, IEventReceivingService {
      */
     public boolean isUnderUtilizedDataService(UUID serviceUUID) throws IOException;
 
+    /**
+     * Logs counters to a temp file. Replacement for sighup mechanism.
+     */
+    public void sighup() throws IOException;
+
 //    /**
 //     * Return the identifier(s) of under-utilized service(s).
 //     * 

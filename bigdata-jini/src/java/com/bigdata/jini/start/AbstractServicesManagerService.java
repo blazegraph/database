@@ -13,6 +13,7 @@ import com.bigdata.service.AbstractService;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
+import org.apache.log4j.Logger;
 
 /**
  * Core impl.
@@ -23,6 +24,7 @@ import com.bigdata.service.jini.RemoteDestroyAdmin;
 public abstract class AbstractServicesManagerService extends AbstractService
         implements IServicesManagerService, IServiceListener, IServiceShutdown {
 
+    private static final Logger log = Logger.getLogger(AbstractServicesManagerService.class);
     private final Properties properties;
 
     /**

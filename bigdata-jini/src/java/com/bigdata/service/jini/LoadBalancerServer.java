@@ -1,12 +1,10 @@
 package com.bigdata.service.jini;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.ServerNotActiveException;
 import java.util.Collection;
@@ -22,9 +20,6 @@ import net.jini.io.context.ClientSubject;
 import net.jini.lookup.entry.Name;
 
 import org.apache.log4j.MDC;
-
-import sun.misc.Signal;
-import sun.misc.SignalHandler;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
@@ -84,19 +79,6 @@ public class LoadBalancerServer extends AbstractServer {
     public LoadBalancerServer(final String[] args, final LifeCycle lifeCycle) {
 
         super(args, lifeCycle);
-        
-        try {
-
-            /*
-             * Note: This signal is not supported under Windows.
-             */
-            new SigHUPHandler("HUP");
-
-        } catch (IllegalArgumentException ex) {
-
-            log.warn("Signal handler not installed: " + ex);
-            
-        }
     }
 
     /**
@@ -153,79 +135,6 @@ public class LoadBalancerServer extends AbstractServer {
         return service;
         
     }
-    
-    /**
-     * SIGHUP Handler.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private class SigHUPHandler implements SignalHandler {
-
-        private final SignalHandler oldHandler;
-
-        /**
-         * Install handler.
-         * 
-         * @param signalName
-         *            The signal name.
-         * 
-         * @see http://www-128.ibm.com/developerworks/java/library/i-signalhandling/
-         * 
-         * @see http://forum.java.sun.com/thread.jspa?threadID=514860&messageID=2451429
-         *      for the use of {@link Runtime#addShutdownHook(Thread)}.
-         * 
-         * @see http://twit88.com/blog/2008/02/06/java-signal-handling/
-         */
-        @SuppressWarnings("all") // Signal is in the sun namespace
-        protected SigHUPHandler(final String signalName) {
-
-            final Signal signal = new Signal(signalName);
-
-            this.oldHandler = Signal.handle(signal, this);
-            
-            if (log.isInfoEnabled())
-                log.info("Installed handler: " + signal + ", oldHandler="
-                        + this.oldHandler);
-
-        }
-
-        @SuppressWarnings("all") // Signal is in the sun namespace
-        public void handle(final Signal sig) {
-
-            log.warn("Processing signal: " + sig);
-
-            try {
-                
-                final AdministrableLoadBalancer service = (AdministrableLoadBalancer) impl;
-
-                if (service != null) {
-
-                    service.logCounters();
-                    
-                }
-
-                /*
-                 * This appears willing to halt the server so I am not chaining
-                 * back to the previous handler!
-                 */
-                
-//                // Chain back to previous handler, if one exists
-//                if (oldHandler != SIG_DFL && oldHandler != SIG_IGN) {
-//
-//                    oldHandler.handle(sig);
-//
-//                }
-
-            } catch (Throwable t) {
-
-                log.error("Signal handler failed : " + t, t);
-
-            }
-
-        }
-
-    }
 
     /**
      * Overrides the {@link IFederationDelegate} leave/join behavior to notify
@@ -250,6 +159,7 @@ public class LoadBalancerServer extends AbstractServer {
         /**
          * Notifies the {@link LoadBalancerService}.
          */
+        @Override
         public void serviceJoin(IService service, UUID serviceUUID) {
 
             try {
@@ -279,6 +189,7 @@ public class LoadBalancerServer extends AbstractServer {
         /**
          * Notifies the {@link LoadBalancerService}.
          */
+        @Override
         public void serviceLeave(UUID serviceUUID) {
 
             if (log.isInfoEnabled())
@@ -334,6 +245,7 @@ public class LoadBalancerServer extends AbstractServer {
          * root path), dump of the indices in the federation (/indices), and
          * events (/events).
          */
+        @Override
         public AbstractHTTPD newHttpd(final int httpdPort,
                 final CounterSet counterSet) throws IOException {
             
@@ -451,6 +363,7 @@ public class LoadBalancerServer extends AbstractServer {
 
                 final IndicesHandler indicesHandler = new IndicesHandler();
                 
+                @Override
                 public Response doGet(String uri, String method, Properties header,
                         LinkedHashMap<String, Vector<String>> parms)
                         throws Exception {
@@ -668,33 +581,5 @@ public class LoadBalancerServer extends AbstractServer {
             return s;
 
         }
-
-        /**
-         * Logs the counters on a file created using
-         * {@link File#createTempFile(String, String, File)} in the log
-         * directory.
-         * 
-         * @throws IOException
-         * 
-         * @todo this method is not exposed to RMI (it is not on any
-         *       {@link Remote} interface) but it could be.
-         */
-        public void logCounters() throws IOException {
-
-            if (isTransient) {
-
-                log.warn("LBS is transient - request ignored.");
-                
-                return;
-                
-            }
-            
-            final File file = File.createTempFile("counters-hup", ".xml", logDir);
-
-            super.logCounters(file);
-
-        }
-
     }
-
 }

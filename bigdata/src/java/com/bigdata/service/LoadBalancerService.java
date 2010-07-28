@@ -676,6 +676,7 @@ abstract public class LoadBalancerService extends AbstractService
         
     }
     
+    @Override
     synchronized public void shutdown() {
 
         if(!isOpen()) return;
@@ -692,7 +693,7 @@ abstract public class LoadBalancerService extends AbstractService
          * Obtain the exclusive write lock for the event BTree before flushing
          * writes.
          */
-        final Lock lock = eventReceiver.getWriteLock();
+        final Lock tmpLock = eventReceiver.getWriteLock();
         try {
 
             // Flush any buffered writes to the event store.
@@ -707,7 +708,7 @@ abstract public class LoadBalancerService extends AbstractService
             
         } finally {
             
-            lock.unlock();
+            tmpLock.unlock();
             
         }
         
@@ -718,6 +719,7 @@ abstract public class LoadBalancerService extends AbstractService
 
     }
 
+    @Override
     synchronized public void shutdownNow() {
 
         if(!isOpen()) return;
@@ -740,6 +742,7 @@ abstract public class LoadBalancerService extends AbstractService
 
     }
 
+    @Override
     synchronized public void destroy() {
         
         super.destroy();
@@ -2017,7 +2020,37 @@ abstract public class LoadBalancerService extends AbstractService
         }
         
     }
-    
+
+    /**
+     * Logs the counters on a file created using
+     * {@link File#createTempFile(String, String, File)} in the log
+     * directory.
+     *
+     * @throws IOException
+     *
+     * @todo this method is not exposed to RMI (it is not on any
+     *       {@link Remote} interface) but it could be.
+     */
+    public void logCounters() throws IOException {
+
+        if (isTransient) {
+
+            log.warn("LBS is transient - request ignored.");
+
+            return;
+
+        }
+
+        final File file = File.createTempFile("counters-hup", ".xml", logDir);
+
+        logCounters(file);
+
+    }
+
+    public void sighup() throws IOException {
+        logCounters();
+    }
+
     /**
      * Notify the {@link LoadBalancerService} that a new service is available.
      * <p>
