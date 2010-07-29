@@ -63,59 +63,77 @@ public class TestBasicIndexStuff extends
         super(arg0);
     }
 
-    /**
-     * Test verifies the behavior of the {@link IDataService} when requesting an
-     * operation for an index that is not registered on that data service.
-     * <p>
-     * Note: This test is very important. Clients depends on
-     * {@link StaleLocatorException} being thrown when an index partition has
-     * been split, joined or moved in order to automatically refresh their cache
-     * information and reissue their request.
-     * 
-     * @throws Exception
-     * 
-     * FIXME Revisit this test. The {@link StaleLocatorException} should be
-     * thrown only if a registered index has been split, joined or moved. If an
-     * index simply does not exist or was dropped then
-     * {@link NoSuchIndexException} should be thrown. This means that this test
-     * will have to be written either directly in terms of states where a split,
-     * join or move has occurred or using the {@link ResourceManager} to fake
-     * the condition.
-     */
-    public void test_noSuchIndex() throws Exception {
-       
-        final String name = "testIndex";
-
-        assertNull(fed.getIndex(name,ITx.UNISOLATED));
-        
-        /*
-         * Try various operations and make sure that they all throw the expected
-         * exception.
-         */
-
-        // obtaining index metadata
-        try {
-
-            dataService0.getIndexMetadata(name, ITx.UNISOLATED);
-            
-        } catch (Exception ex) {
-
-            if (!isInnerCause(ex, StaleLocatorException.class)) {
-
-                fail("Expecting: " + StaleLocatorException.class + ", not "
-                        + ex, ex);
-
-            }
-
-            System.err.print("Ignoring expected exception: ");
-            getInnerCause(ex, StaleLocatorException.class).printStackTrace(System.err);
-            
-        }
-        
-//        // obtaining index statistics
+//    /**
+//     * Test verifies the behavior of the {@link IDataService} when requesting an
+//     * operation for an index that is not registered on that data service.
+//     * <p>
+//     * Note: This test is very important. Clients depends on
+//     * {@link StaleLocatorException} being thrown when an index partition has
+//     * been split, joined or moved in order to automatically refresh their cache
+//     * information and reissue their request.
+//     * 
+//     * @throws Exception
+//     * 
+//     * FIXME Revisit this test. The {@link StaleLocatorException} should be
+//     * thrown only if a registered index has been split, joined or moved. If an
+//     * index simply does not exist or was dropped then
+//     * {@link NoSuchIndexException} should be thrown. This means that this test
+//     * will have to be written either directly in terms of states where a split,
+//     * join or move has occurred or using the {@link ResourceManager} to fake
+//     * the condition.
+//     */
+//    public void test_noSuchIndex() throws Exception {
+//       
+//        final String name = "testIndex";
+//
+//        assertNull(fed.getIndex(name,ITx.UNISOLATED));
+//        
+//        /*
+//         * Try various operations and make sure that they all throw the expected
+//         * exception.
+//         */
+//
+//        // obtaining index metadata
 //        try {
 //
-//            dataService0.getStatistics(name);
+//            dataService0.getIndexMetadata(name, ITx.UNISOLATED);
+//            
+//        } catch (Exception ex) {
+//
+//            if (!isInnerCause(ex, StaleLocatorException.class)) {
+//
+//                fail("Expecting: " + StaleLocatorException.class + ", not "
+//                        + ex, ex);
+//
+//            }
+//
+//            System.err.print("Ignoring expected exception: ");
+//            getInnerCause(ex, StaleLocatorException.class).printStackTrace(System.err);
+//            
+//        }
+//        
+////        // obtaining index statistics
+////        try {
+////
+////            dataService0.getStatistics(name);
+////            
+////        } catch (Exception ex) {
+////
+////            assertTrue( isInnerCause(ex, StaleLocatorException.class));
+////
+////            System.err.print("Ignoring expected exception: ");
+////            getInnerCause(ex, StaleLocatorException.class).printStackTrace(System.err);
+////            
+////        }
+//        
+//        // running a procedure
+//        try {
+//
+//            dataService0.submit(
+//                    ITx.UNISOLATED,
+//                    name,
+//                    new RangeCountProcedure(false/* exact */,
+//                            false/*deleted*/, null, null)).get();
 //            
 //        } catch (Exception ex) {
 //
@@ -125,43 +143,25 @@ public class TestBasicIndexStuff extends
 //            getInnerCause(ex, StaleLocatorException.class).printStackTrace(System.err);
 //            
 //        }
-        
-        // running a procedure
-        try {
-
-            dataService0.submit(
-                    ITx.UNISOLATED,
-                    name,
-                    new RangeCountProcedure(false/* exact */,
-                            false/*deleted*/, null, null)).get();
-            
-        } catch (Exception ex) {
-
-            assertTrue( isInnerCause(ex, StaleLocatorException.class));
-
-            System.err.print("Ignoring expected exception: ");
-            getInnerCause(ex, StaleLocatorException.class).printStackTrace(System.err);
-            
-        }
-        
-        // range iterator
-        try {
-
-            dataService0
-                    .rangeIterator(ITx.UNISOLATED, name, null/* fromKey */,
-                            null/* toKey */, 0/* capacity */,
-                            IRangeQuery.DEFAULT, null/*filter*/);
-            
-        } catch (Exception ex) {
-
-            assertTrue( isInnerCause(ex, StaleLocatorException.class) );
-
-            System.err.print("Ignoring expected exception: ");
-            getInnerCause(ex, StaleLocatorException.class).printStackTrace(System.err);
-            
-        }
-        
-    }
+//        
+//        // range iterator
+//        try {
+//
+//            dataService0
+//                    .rangeIterator(ITx.UNISOLATED, name, null/* fromKey */,
+//                            null/* toKey */, 0/* capacity */,
+//                            IRangeQuery.DEFAULT, null/*filter*/);
+//            
+//        } catch (Exception ex) {
+//
+//            assertTrue( isInnerCause(ex, StaleLocatorException.class) );
+//
+//            System.err.print("Ignoring expected exception: ");
+//            getInnerCause(ex, StaleLocatorException.class).printStackTrace(System.err);
+//            
+//        }
+//        
+//    }
     
     /**
      * Tests basics with a single scale-out index having a single partition.
