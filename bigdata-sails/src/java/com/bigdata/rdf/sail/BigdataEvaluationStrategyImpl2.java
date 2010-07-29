@@ -28,6 +28,8 @@ import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.LeftJoin;
 import org.openrdf.query.algebra.MultiProjection;
 import org.openrdf.query.algebra.Or;
+import org.openrdf.query.algebra.Order;
+import org.openrdf.query.algebra.OrderElem;
 import org.openrdf.query.algebra.Projection;
 import org.openrdf.query.algebra.ProjectionElem;
 import org.openrdf.query.algebra.ProjectionElemList;
@@ -994,6 +996,16 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         
     }
 
+    /**
+     * Collect the variables used by this <code>UnaryTupleOperator</code> so
+     * they can be added to the list of required variables in the query for
+     * correct binding set pruning.
+     * 
+     * @param uto
+     *          the <code>UnaryTupleOperator</code>
+     * @return
+     *          the variables it uses
+     */
     protected Set<String> collectVariables(UnaryTupleOperator uto) 
         throws Exception {
 
@@ -1024,6 +1036,20 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             });
         } else if (uto instanceof Group) {
             Group g = (Group) uto;
+            g.visit(new QueryModelVisitorBase<Exception>() {
+                @Override
+                public void meet(Var v) {
+                    vars.add(v.getName());
+                }
+            });
+        } else if (uto instanceof Order) {
+            Order o = (Order) uto;
+            o.visit(new QueryModelVisitorBase<Exception>() {
+                @Override
+                public void meet(Var v) {
+                    vars.add(v.getName());
+                }
+            });
         }
         return vars;
 

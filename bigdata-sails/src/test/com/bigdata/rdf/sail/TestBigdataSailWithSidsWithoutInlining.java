@@ -77,6 +77,8 @@ public class TestBigdataSailWithSidsWithoutInlining extends AbstractBigdataSailT
         
         suite.addTestSuite(TestReadWriteTransactions.class);
         
+        suite.addTestSuite(TestOrderBy.class);
+        
         return suite;
         
     }

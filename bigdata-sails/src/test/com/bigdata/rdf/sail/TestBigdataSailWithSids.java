@@ -77,6 +77,8 @@ public class TestBigdataSailWithSids extends AbstractBigdataSailTestCase {
         
         suite.addTestSuite(TestReadWriteTransactions.class);
         
+        suite.addTestSuite(TestOrderBy.class);
+        
         return suite;
         
     }
