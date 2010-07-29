@@ -46,16 +46,20 @@ Useful properties:
     java.util.logging.config.file=/path/to/jini.logging
         The path to the java.util.logging configuration file
 
-    exportNic=<interfacename>
+    default.nic=<interfacename>
         Specifies the name of the network interface to use by default
         for service export and remote communication. This property
-        takes precedence over exportHost. The default value for this
-        property is "eth0".
+        takes precedence over exportHost. The default behavior
+        regarding this property (in conjunction with configuration
+        files that use NicUtil to retrieve the interface's associated
+        ip address) is to direct the configuration file to use the
+        IPv4 address of the first active network inteface that can
+        be found on the system.
 
     exportHost=<ipaddress|hostname>
         Specifies the IP address or host name to use when exporting
         services for remote communication. This property will be
-        employed only when the value of the exportNic property
+        employed only when the value of the default.nic property
         is set to the empty string ("") or a value that does not
         correspond to any of the network interfaces on the system.
 
@@ -63,11 +67,15 @@ Useful properties:
         Specifies the network address of the codebase HTTP server. If the
         value is an interface name, the IP address assigned to that interface
         will be used. If the value is an IP address or hostname, that value
-        will be used directly. The default value is "eth0".
+        will be used directly. The default behavior regarding this property
+        (in conjunction with configuration files that use NicUtil to
+        retrieve the interface's associated ip address) is to direct the
+        configuration file to use the IPv4 address of the first active
+        network inteface that can be found on the system.
 
     bigdata.codebase.port=<n>
         The port number on <bigdata.codebase.host> on which the HTTP class
-        server is running.
+        server is listening.
 
 """
     serviceNames = bigdataServiceMap.keys()
@@ -131,10 +139,10 @@ class BigdataServiceBase:
         self.properties['java.security.debug'] = "off"
 
     def setEntityProperties(self):
-        self.properties['exportNic'] = "eth0"
+        self.properties['default.nic'] = "${default.nic}"
         self.properties['exportHost'] = socket.gethostname()
         self.properties['exportPort'] = "0"
-        self.properties['bigdata.codebase.host'] = "eth0"
+        self.properties['bigdata.codebase.host'] = "${bigdata.codebase.host}"
         self.properties['bigdata.codebase.port'] = "8081"
 
         self.properties['log4j.configuration'] = os.path.join( \
@@ -459,8 +467,6 @@ if __name__ == '__main__':
 
     if params.appHome == "NOT_SET":
         params.appHome = dirname(dirname( os.path.abspath(sys.argv[0])) )
-
-    # BTM - params.appHome = dirname(dirname( os.path.abspath(sys.argv[0])) )
 
     # print "appHome=" + params.appHome
 
