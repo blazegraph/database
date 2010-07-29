@@ -513,7 +513,7 @@ public class DumpFederation {
                             + "\tRightSeparator"//
                             + "\tView"//
                             + "\tCause"//
-                            + "\tHistory"//
+//                            + "\tHistory"//
                             + "\tIndexMetadata"//
                             ;
 
@@ -610,8 +610,8 @@ public class DumpFederation {
                         + rec.detailRec.pmd.getIndexPartitionCause()
                         + "\"");
 
-                // history
-                sb.append("\t\"" + rec.detailRec.pmd.getHistory() + "\"");
+//                // history
+//                sb.append("\t\"" + rec.detailRec.pmd.getHistory() + "\"");
 
                 // indexMetadata
                 sb.append("\t\"" + rec.detailRec.indexMetadata + "\"");
@@ -620,7 +620,7 @@ public class DumpFederation {
 
                 sb.append("\tN/A");
                 sb.append("\tN/A");
-                sb.append("\tN/A");
+//                sb.append("\tN/A");
                 sb.append("\tN/A");
 
             }

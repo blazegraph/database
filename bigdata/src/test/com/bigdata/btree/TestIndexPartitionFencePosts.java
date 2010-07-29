@@ -78,8 +78,8 @@ public class TestIndexPartitionFencePosts extends AbstractBTreeTestCase {
                 new byte[]{}, // leftSeparator
                 null, // rightSeparator
                 null, // no resource descriptions.
-                null, // no cause.
-                "" // history
+                null // no cause.
+//                , "" // history
                 ));
         
         BTree ndx = BTree.create(new SimpleMemoryRawStore(),metadata);

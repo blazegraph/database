@@ -35,13 +35,13 @@ import com.bigdata.btree.BTree.PartitionedCounter;
  * available for bit flags in the low two-bits of the resulting long value
  * (they will be ZERO(0) and may be overwritten by the caller).
  * <p>
- * The purpose of this encoding is to cause the N high bits to vary rapily
+ * The purpose of this encoding is to cause the N high bits to vary rapidly
  * as the local counter is driven up by writes on the index partition. This
  * has the effect of scattering writes on dependent indices (those using the
  * resulting long value as the sole or leading component of their key).
  * <p>
  * Given a source RDF/XML document with M "terms" distributed uniformly over
- * K TERM2ID index partitions, each term has a uniform likelyhood of setting
+ * K TERM2ID index partitions, each term has a uniform likelihood of setting
  * any of the low bits of the local counter. After encoding, this means that
  * the N high-bits of encoded term identifier are uniformly distributed.
  * Assuming that the separator keys for the ID2TERM index divide the key
@@ -49,7 +49,7 @@ import com.bigdata.btree.BTree.PartitionedCounter;
  * ID2TERM index partitions will be uniformly distributed as well.
  * <p>
  * The next bits in the encoded values are derived from the partition
- * identifer followed by the term identifier and therefore have a strong
+ * identifier followed by the term identifier and therefore have a strong
  * bias for the index partition and the sequential assignment of local
  * counter values within an index partition respectively. This means that
  * read / write access within an index partition tends to have some

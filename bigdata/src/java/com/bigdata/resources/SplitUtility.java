@@ -400,11 +400,12 @@ public class SplitUtility {
                     /*
                      * Note: cause will be set by the atomic update task.
                      */
-                    null,//
-                    oldpmd.getHistory()
-                            + "chooseTailSplitPoint(oldPartitionId="
-                            + oldpmd.getPartitionId() + ",nsplits=" + 2
-                            + ",newPartitionId=" + partitionId + ") ");
+                    null//
+//                    , oldpmd.getHistory()
+//                            + "chooseTailSplitPoint(oldPartitionId="
+//                            + oldpmd.getPartitionId() + ",nsplits=" + 2
+//                            + ",newPartitionId=" + partitionId + ") "
+                            );
 
             final int fromIndex = 0;
 
@@ -437,11 +438,12 @@ public class SplitUtility {
                      * Note: Cause will be set by the atomic update for the
                      * split task.
                      */
-                    null,//
-                    oldpmd.getHistory()
-                            + "chooseTailSplitPoint(oldPartitionId="
-                            + oldpmd.getPartitionId() + ",nsplits=" + 2
-                            + ",newPartitionId=" + partitionId + ") ");
+                    null//
+//                    , oldpmd.getHistory()
+//                            + "chooseTailSplitPoint(oldPartitionId="
+//                            + oldpmd.getPartitionId() + ",nsplits=" + 2
+//                            + ",newPartitionId=" + partitionId + ") "
+                    );
 
             /*
              * Note: The index of the last tuple in the btree will be the
@@ -1050,11 +1052,12 @@ public class SplitUtility {
                         /*
                          * Note: cause will be set by the atomic update task.
                          */
-                        null,//
-                        oldpmd.getHistory()
-                                + "chooseSplitPoint(oldPartitionId="
-                                + oldpmd.getPartitionId() + ",nsplits=" + N
-                                + ",newPartitionId=" + partitionId + ") ");
+                        null //
+//                        , oldpmd.getHistory()
+//                                + "chooseSplitPoint(oldPartitionId="
+//                                + oldpmd.getPartitionId() + ",nsplits=" + N
+//                                + ",newPartitionId=" + partitionId + ") "
+                        );
 
                 final Split split = new Split(newpmd, fromIndex, toIndex);
 

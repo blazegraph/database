@@ -2486,16 +2486,18 @@ abstract public class OverflowManager extends IndexManager {
                                     oldpmd.getLeftSeparatorKey(),//
                                     oldpmd.getRightSeparatorKey(),//
                                     newResources, //
-                                    oldpmd.getIndexPartitionCause(), oldpmd
-                                            .getHistory()
-                                            + OverflowActionEnum.Copy
-                                            + "(lastCommitTime="
-                                            + lastCommitTime
-                                            + ",entryCount="
-                                            + entryCount
-                                            + ",counter="
-                                            + oldBTree.getCounter().get()
-                                            + ") "));
+                                    oldpmd.getIndexPartitionCause()//
+//                                    , oldpmd
+//                                            .getHistory()
+//                                            + OverflowActionEnum.Copy
+//                                            + "(lastCommitTime="
+//                                            + lastCommitTime
+//                                            + ",entryCount="
+//                                            + entryCount
+//                                            + ",counter="
+//                                            + oldBTree.getCounter().get()
+//                                            + ") "
+                                    ));
 
                 } else {
 
@@ -2535,15 +2537,17 @@ abstract public class OverflowManager extends IndexManager {
                                     oldpmd.getLeftSeparatorKey(),//
                                     oldpmd.getRightSeparatorKey(),//
                                     newResources, //
-                                    oldpmd.getIndexPartitionCause(), oldpmd
-                                            .getHistory()
-                                            + "overflow(lastCommitTime="
-                                            + lastCommitTime
-                                            + ",entryCount="
-                                            + entryCount
-                                            + ",counter="
-                                            + oldBTree.getCounter().get()
-                                            + ") "));
+                                    oldpmd.getIndexPartitionCause()//
+//                                    , oldpmd
+//                                            .getHistory()
+//                                            + "overflow(lastCommitTime="
+//                                            + lastCommitTime
+//                                            + ",entryCount="
+//                                            + entryCount
+//                                            + ",counter="
+//                                            + oldBTree.getCounter().get()
+//                                            + ") "
+                                    ));
 
                 }
 

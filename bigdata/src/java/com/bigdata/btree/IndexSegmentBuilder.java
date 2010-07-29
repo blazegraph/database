@@ -1227,9 +1227,9 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                                 pmd.getLeftSeparatorKey(),//
                                 pmd.getRightSeparatorKey(),//
                                 null, // No resource metadata for indexSegment.
-                                pmd.getIndexPartitionCause(),
-                                pmd.getHistory()+
-                                "build("+pmd.getPartitionId()+",compactingMerge="+compactingMerge+") "
+                                pmd.getIndexPartitionCause()
+//                                ,pmd.getHistory()+
+//                                "build("+pmd.getPartitionId()+",compactingMerge="+compactingMerge+") "
                         )
                         );
                 

@@ -2603,14 +2603,15 @@ abstract public class StoreManager extends ResourceEvents implements
                                 getResourceMetadata() //
                                 },
                                 // cause
-                                IndexPartitionCause.register(resourceManager),
-                                /*
-                                 * Note: Retains whatever history given by the
-                                 * caller.
-                                 */
-                                pmd.getHistory() + "register(name=" + name
-                                        + ",partitionId="
-                                        + pmd.getPartitionId() + ") "));
+                                IndexPartitionCause.register(resourceManager)
+//                                /*
+//                                 * Note: Retains whatever history given by the
+//                                 * caller.
+//                                 */
+//                                , pmd.getHistory() + "register(name=" + name
+//                                        + ",partitionId="
+//                                        + pmd.getPartitionId() + ") "
+                        ));
 
             } else {
 

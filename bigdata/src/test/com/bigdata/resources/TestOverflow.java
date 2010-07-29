@@ -121,8 +121,8 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
                     new IResourceMetadata[]{
                             journal.getResourceMetadata()
                     },//
-                    IndexPartitionCause.register(resourceManager),
-                    ""//history
+                    IndexPartitionCause.register(resourceManager)
+//                    ,""//history
                     ));
             
             // create index and register on the journal.

@@ -844,12 +844,12 @@ public class SplitIndexPartitionTask extends
                                             resourceManager.getLiveJournal()
                                                     .getResourceMetadata(),
                                             splitResult.buildResults[i].segmentMetadata },
-                                    IndexPartitionCause.split(resourceManager),
-                                    /*
-                                     * Note: history is record of the split.
-                                     */
-                                    pmd.getHistory() + summary + " ")//
-                            );
+                                    IndexPartitionCause.split(resourceManager)
+//                                    /*
+//                                     * Note: history is record of the split.
+//                                     */
+//                                    , pmd.getHistory() + summary + " "//
+                            ));
 
                     /*
                      * create new btree.
