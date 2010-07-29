@@ -57,7 +57,8 @@ import com.bigdata.rawstore.IRawStore;
  * iterator. When compared to the {@link HardReferenceGlobalLRURecycler}, this
  * implementation has approximately 10% higher throughput.
  * 
- * @version $Id$
+ * @version $Id: HardReferenceGlobalLRU.java 2799 2010-05-11 21:04:43Z
+ *          thompsonbry $
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson
  *         </a>
  * @param <K>
@@ -69,6 +70,8 @@ import com.bigdata.rawstore.IRawStore;
  *       {@link IDataRecordAccess} since we can not measure the bytesInMemory
  *       for those objects and hence the LRU eviction policy will not account
  *       for their memory footprint?
+ * 
+ * @deprecated This implementation is not used.
  */
 public class HardReferenceGlobalLRU<K, V> implements
         IHardReferenceGlobalLRU<K, V> {
