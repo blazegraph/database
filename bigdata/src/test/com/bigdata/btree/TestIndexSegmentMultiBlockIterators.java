@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.File;
+import java.util.Random;
 import java.util.UUID;
 
 import com.bigdata.btree.IndexSegmentBuilder.BuildEnum;
@@ -271,6 +272,8 @@ public class TestIndexSegmentMultiBlockIterators extends
             // verify that the iterator is exhausted.
             assertFalse(itr.hasNext());
             
+            doRandomScanTest(btree, seg, 10/* ntests */);
+            
         } finally {
 
             seg.getStore().destroy();
@@ -280,6 +283,43 @@ public class TestIndexSegmentMultiBlockIterators extends
     }
 
     /**
+     * Unit test builds an empty index segment and then verifies the behavior of
+     * the {@link IndexSegmentMultiBlockIterator}.
+     * 
+     * @throws Exception 
+     */
+    public void test_emptyIndexSegment() throws Exception {
+
+        final BTree btree = BTree.createTransient(new IndexMetadata(UUID
+                .randomUUID()));
+
+        final IndexSegmentBuilder builder = TestIndexSegmentBuilderWithLargeTrees
+                .doBuildIndexSegment(getName(), btree, 32/* m */,
+                        BuildEnum.TwoPass, bufferNodes);
+
+        final IndexSegment seg = new IndexSegmentStore(builder.outFile)
+                .loadIndexSegment();
+
+        try {
+
+            final IndexSegmentMultiBlockIterator<?> itr = new IndexSegmentMultiBlockIterator(
+                    seg, DirectBufferPool.INSTANCE_10M, null/* fromKey */,
+                    null/* toKey */, IRangeQuery.DEFAULT);
+
+            assertFalse(itr.hasNext());
+            
+            // verify the data.
+            testMultiBlockIterator(btree, seg);
+            
+        } finally {
+
+            seg.getStore().destroy();
+
+        }
+
+    }
+    
+    /**
      * Test build around an {@link IndexSegment} having a default branching
      * factor and a bunch of leaves totally more than 1M in size on the disk.
      */
@@ -288,8 +328,13 @@ public class TestIndexSegmentMultiBlockIterators extends
         final BTree btree = BTree.createTransient(new IndexMetadata(UUID
                 .randomUUID()));
 
-        for (int i = 0; i < 1000000; i++) {
+        final int LIMIT = 1000000;
+
+        // populate the index.
+        for (int i = 0; i < LIMIT; i++) {
+
             btree.insert(i, i);
+            
         }
 
         final IndexSegmentBuilder builder = TestIndexSegmentBuilderWithLargeTrees
@@ -336,10 +381,121 @@ public class TestIndexSegmentMultiBlockIterators extends
 
             // verify the data.
             testMultiBlockIterator(btree, seg);
+
+            // random iterator scan tests.
+            doRandomScanTest(btree, seg, 1000/* ntests */);
             
         } finally {
 
             seg.getStore().destroy();
+
+        }
+
+    }
+
+    /**
+     * Do a bunch of random iterator scans. Each scan will start at a random key
+     * and run to a random key.
+     * 
+     * @param groundTruth
+     *            The ground truth B+Tree.
+     * @param actual
+     *            The index segment built from that B+Tree.
+     * @param ntests
+     *            The #of scans to run.
+     */
+    private void doRandomScanTest(final BTree groundTruth,
+            final IndexSegment actual, final int ntests) {
+
+        final Random r = new Random();
+        
+        final int n = groundTruth.getEntryCount();
+
+        // point query beyond the last tuple in the index segment.
+        {
+            
+            final int fromIndex = n - 1;
+
+            final byte[] fromKey = groundTruth.keyAt(fromIndex);
+
+            final byte[] toKey = BytesUtil.successor(fromKey.clone());
+
+            final ITupleIterator<?> expectedItr = groundTruth
+                    .rangeIterator(fromKey, toKey, 0/* capacity */,
+                            IRangeQuery.DEFAULT, null/* filter */);
+
+            final IndexSegmentMultiBlockIterator<?> actualItr = new IndexSegmentMultiBlockIterator(
+                    actual, DirectBufferPool.INSTANCE_10M, fromKey, toKey,
+                    IRangeQuery.DEFAULT);
+            
+            assertSameEntryIterator(expectedItr, actualItr);
+
+        }
+        
+        // random point queries.
+        for (int i = 0; i < ntests; i++) {
+
+            final int fromIndex = r.nextInt(n);
+
+            final byte[] fromKey = groundTruth.keyAt(fromIndex);
+
+            final byte[] toKey = BytesUtil.successor(fromKey.clone());
+
+            final ITupleIterator<?> expectedItr = groundTruth
+                    .rangeIterator(fromKey, toKey, 0/* capacity */,
+                            IRangeQuery.DEFAULT, null/* filter */);
+
+            final IndexSegmentMultiBlockIterator<?> actualItr = new IndexSegmentMultiBlockIterator(
+                    actual, DirectBufferPool.INSTANCE_10M, fromKey, toKey,
+                    IRangeQuery.DEFAULT);
+            
+            assertSameEntryIterator(expectedItr, actualItr);
+
+        }
+        
+        // random range queries with small range of spanned keys (0 to 10).
+        for (int i = 0; i < ntests; i++) {
+
+            final int fromIndex = r.nextInt(n);
+
+            final byte[] fromKey = groundTruth.keyAt(fromIndex);
+
+            final byte[] toKey = groundTruth.keyAt(Math.min(fromIndex
+                    + r.nextInt(10), n - 1));
+
+            final ITupleIterator<?> expectedItr = groundTruth
+                    .rangeIterator(fromKey, toKey, 0/* capacity */,
+                            IRangeQuery.DEFAULT, null/* filter */);
+
+            final IndexSegmentMultiBlockIterator<?> actualItr = new IndexSegmentMultiBlockIterator(
+                    actual, DirectBufferPool.INSTANCE_10M, fromKey, toKey,
+                    IRangeQuery.DEFAULT);
+
+            assertSameEntryIterator(expectedItr, actualItr);
+
+        }
+
+        // random range queries with random #of spanned keys.
+        for (int i = 0; i < ntests; i++) {
+
+            final int fromIndex = r.nextInt(n);
+
+            final int toIndex = fromIndex + r.nextInt(n - fromIndex + 1);
+
+            final byte[] fromKey = groundTruth.keyAt(fromIndex);
+
+            final byte[] toKey = toIndex >= n ? null : groundTruth
+                    .keyAt(toIndex);
+
+            final ITupleIterator<?> expectedItr = groundTruth
+                    .rangeIterator(fromKey, toKey, 0/* capacity */,
+                            IRangeQuery.DEFAULT, null/* filter */);
+
+            final IndexSegmentMultiBlockIterator<?> actualItr = new IndexSegmentMultiBlockIterator(
+                    actual, DirectBufferPool.INSTANCE_10M, fromKey, toKey,
+                    IRangeQuery.DEFAULT);
+
+            assertSameEntryIterator(expectedItr, actualItr);
 
         }
 

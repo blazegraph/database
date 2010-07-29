@@ -151,6 +151,16 @@ public class IndexSegmentMultiBlockIterator<E> implements ITupleIterator<E> {
      */
     private int blockLength = 0;
 
+    /*
+     * Counters
+     */
+
+    /** The #of leaves read so far. */
+    private long leafReadCount = 0;
+
+    /** The #of blocks read so far. */
+    private long blockReadCount = 0;
+    
     /**
      * 
      * @param seg
@@ -209,11 +219,25 @@ public class IndexSegmentMultiBlockIterator<E> implements ITupleIterator<E> {
                 : seg.findLeafAddr(toKey));
 
         if (pool.getBufferCapacity() < store.getCheckpoint().maxNodeOrLeafLength) {
+
             /*
-             * Leaves are invariably larger than nodes. If the buffers in the
-             * pool are too small to hold the largest record in the index
-             * segment then you can not use this iterator.
+             * If the buffers in the pool are too small to hold the largest
+             * record in the index segment then you can not use this iterator.
+             * 
+             * Note: We presume that the largest record is therefore a leaf. In
+             * practice this will nearly always be true as nodes have relatively
+             * little metadata per tuple while leaves store the value associated
+             * with the tuple.
+             * 
+             * Note: AbstractBTree checks for this condition before choosing
+             * this iterator.
              */
+            
+            throw new UnsupportedOperationException(
+                    "Record is larger than buffer: maxNodeOrLeafLength="
+                            + store.getCheckpoint().maxNodeOrLeafLength
+                            + ", bufferCapacity=" + pool.getBufferCapacity());
+
         }
         
         if (firstLeafAddr == 0L) {
@@ -345,7 +369,7 @@ public class IndexSegmentMultiBlockIterator<E> implements ITupleIterator<E> {
             throw new IllegalStateException();
         if (currentLeaf == null) {
             if (log.isTraceEnabled())
-                log.trace("Reading first leaf");
+                log.trace("Reading initial leaf");
             // acquire the buffer from the pool.
             acquireBuffer();
             // Read the first block.
@@ -355,6 +379,12 @@ public class IndexSegmentMultiBlockIterator<E> implements ITupleIterator<E> {
             // Return the first leaf.
             return leaf;
         }
+        if (currentLeaf.identity == lastLeafAddr) {
+            // No more leaves.
+            if (log.isTraceEnabled())
+                log.trace("No more leaves (end of key range)");
+            return null;
+        }
         /*
          * We need to return the next leaf. We get the address of the next leaf
          * from the nextAddr field of the current leaf.
@@ -363,7 +393,7 @@ public class IndexSegmentMultiBlockIterator<E> implements ITupleIterator<E> {
         if (nextLeafAddr == 0L) {
             // No more leaves.
             if (log.isTraceEnabled())
-                log.trace("No more leaves");
+                log.trace("No more leaves (end of segment)");
             return null;
         }
         /*
@@ -411,20 +441,25 @@ public class IndexSegmentMultiBlockIterator<E> implements ITupleIterator<E> {
             throw new IllegalArgumentException();
         
         // offset into the buffer.
-        final int toff = (int)(offset - blockOffset);
+        final int offsetWithinBuffer = (int)(offset - blockOffset);
 
-        if (log.isTraceEnabled())
-            log.trace("addr=" + addr + "(" + store.toString(addr)
-                    + "), blockOffset=" + blockOffset+" toff="+toff);
-        
         // read only view of the leaf in the buffer.
         final ByteBuffer tmp = buffer.asReadOnlyBuffer();
-        tmp.limit(toff + nbytes);
-        tmp.position(toff);
+        tmp.limit(offsetWithinBuffer + nbytes);
+        tmp.position(offsetWithinBuffer);
 
         // decode byte[] as ILeafData.
         final ILeafData data = (ILeafData) seg.nodeSer.decode(tmp);
-        
+
+        leafReadCount++;
+
+        if (log.isTraceEnabled())
+            log
+                    .trace("read leaf: leafReadCount=" + leafReadCount
+                            + ", addr=" + addr + "(" + store.toString(addr)
+                            + "), blockOffset=" + blockOffset
+                            + " offsetWithinBuffer=" + offsetWithinBuffer);
+
         // return as Leaf.
         return new ImmutableLeaf(seg, addr, data);
         
@@ -470,6 +505,14 @@ public class IndexSegmentMultiBlockIterator<E> implements ITupleIterator<E> {
         // the #of bytes that we will actually read.
         final int nbytes = (int) Math.min(lastOffset - startOffset, b
                 .capacity());
+        if(log.isTraceEnabled())
+            log.trace("leafAddr=" + store.toString(leafAddr) + ", startOffset="
+                    + startOffset + ", lastOffset=" + lastOffset + ", nbytes="
+                    + nbytes);
+        if (nbytes == 0) {
+            throw new AssertionError("nbytes=0 : leafAddr"
+                    + store.toString(leafAddr) + " : " + this);
+        }
         // set the position to zero.
         b.position(0);
         // set the limit to the #of bytes to be read.
@@ -483,9 +526,29 @@ public class IndexSegmentMultiBlockIterator<E> implements ITupleIterator<E> {
         // update the offset/length in the store for the in memory block
         blockOffset = startOffset;
         blockLength = nbytes;
+        blockReadCount++;
         if (log.isTraceEnabled())
-            log.trace("leafAddr=" + leafAddr + ", blockOffset=" + blockOffset
-                    + ", blockLength=" + blockLength);
+            log.trace("read block: blockReadCount=" + blockReadCount
+                    + ", leafAddr=" + store.toString(leafAddr)
+                    + ", blockOffset=" + blockOffset + ", blockLength="
+                    + blockLength);
     }
+
+    public String toString() {
+        return super.toString() + //
+                "{file=" + store.getFile() + //
+                ",checkpoint="+store.getCheckpoint()+//
+                ",fromKey="+BytesUtil.toString(fromKey)+//
+                ",toKey="+BytesUtil.toString(toKey)+//
+                ",firstLeafAddr=" + store.toString(firstLeafAddr) + //
+                ",lastLeafAddr=" + store.toString(lastLeafAddr) + //
+                ",currentLeaf=" + (currentLeaf!=null?store.toString(currentLeaf.identity):"N/A") + //
+                ",blockOffset="+blockOffset+//
+                ",blockLength="+blockLength+//
+                ",bufferCapacity="+pool.getBufferCapacity()+//
+                ",leafReadCount="+leafReadCount+//
+                ",blockReadCount="+blockReadCount+//
+                "}";
+        }
 
 }
