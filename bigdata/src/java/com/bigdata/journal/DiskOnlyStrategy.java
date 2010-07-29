@@ -470,16 +470,16 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         }
         
     }
-    
+
     /**
-     * Need to overide commit to ensure the writeCache is flushed prior to
-     * writing the rootblock.
+     * Need to override commit to ensure the writeCache is flushed prior to
+     * writing the root block.
      * 
-     * For the DiskOnlyStrategy flushing the writeCache also ensures the
-     * backing file is created if the file is temporary.
+     * For the DiskOnlyStrategy flushing the writeCache also ensures the backing
+     * file is created if the file is temporary.
      * 
-     * Note that the call must be syncronized or concurrent writers to the
-     * cache will cause problems.
+     * Note that the internal call to flush the writeCache must be synchronized
+     * or concurrent writers to the cache will cause problems.
      */
     public void commit() {
     	if (writeCache != null) {
