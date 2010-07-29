@@ -116,10 +116,22 @@ public class TestDescribe extends ProxyBigdataSailTestCase {
             {
                 
                 String query = 
-                    "describe ?x " +
-                    "WHERE { " +
-                    "  ?x <"+RDF.TYPE+"> <"+person+"> . " +
-                    "}";
+//                    "describe ?x " +
+//                    "WHERE { " +
+//                    "  ?x <"+RDF.TYPE+"> <"+person+"> . " +
+//                    "}";
+                   "describe <"+mike+">";
+//                    "construct { " +
+//                    "  <"+mike+"> ?p1 ?o . " +
+//                    "  ?s ?p2 <"+mike+"> . " +
+//                    "} " +
+//                    "where { " +
+//                    "  { <"+mike+"> ?p1 ?o . } " +
+//                    "  UNION " +
+//                    "  { ?s ?p2 <"+mike+"> . } " +
+//                    "}";
+                    
+                    
                 
 /*                
                 construct {
