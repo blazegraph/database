@@ -86,6 +86,8 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/distinct/manifest#distinct-9",
     });
     
+    private static String datasetTests = "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/dataset"; 
+    
     /**
      * Use the {@link #suiteLTSWithPipelineJoins()} test suite by default.
      * <p>
@@ -96,7 +98,7 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
      */
     public static Test suite() throws Exception {
         
-        return suite(false /*hideDatasetTests*/);
+        return suite(true /*hideDatasetTests*/);
         
     }
     
