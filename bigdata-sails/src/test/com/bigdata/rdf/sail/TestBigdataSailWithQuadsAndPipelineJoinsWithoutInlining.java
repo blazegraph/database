@@ -67,7 +67,7 @@ public class TestBigdataSailWithQuadsAndPipelineJoinsWithoutInlining extends Abs
          * Use a proxy test suite and specify the delegate.
          */
 
-        final ProxyTestSuite suite = new ProxyTestSuite(delegate, "SAIL with Quads (pipline joins, no inlining)");
+        final ProxyTestSuite suite = new ProxyTestSuite(delegate, "SAIL with Quads (pipeline joins, no inlining)");
 
         // test pruning of variables not required for downstream processing.
         suite.addTestSuite(TestPruneBindingSets.class);
@@ -93,6 +93,10 @@ public class TestBigdataSailWithQuadsAndPipelineJoinsWithoutInlining extends Abs
         // unit tests for custom evaluation of high-level query
         suite.addTestSuite(TestBigdataSailEvaluationStrategyImpl.class);
 
+        suite.addTestSuite(TestUnions.class);
+        
+        suite.addTestSuite(TestDescribe.class);
+        
         // The Sesame TCK, including the SPARQL test suite.
         {
 

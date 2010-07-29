@@ -28,10 +28,12 @@ package com.bigdata.rdf.sail;
 
 import java.util.Collection;
 import java.util.LinkedList;
+import java.util.Properties;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.BNodeImpl;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
@@ -126,10 +128,6 @@ public class TestOptionals extends QuadsTestCase {
         
         try {
     
-            assertEquals(0, sail.database.getNamedGraphCount());
-            
-            assertFalse(cxn.getContextIDs().hasNext());
-            
             final URI book1 = new URIImpl("http://www.bigdata.com/rdf#book1");
             final URI book2 = new URIImpl("http://www.bigdata.com/rdf#book2");
             final URI book3 = new URIImpl("http://www.bigdata.com/rdf#book3");
@@ -197,6 +195,51 @@ public class TestOptionals extends QuadsTestCase {
             
             compare(result, answer);
             
+            
+        } finally {
+            cxn.close();
+            sail.__tearDownUnitTest();
+        }
+
+    }
+    
+    public void testOptional() throws Exception {
+
+        Properties properties = getProperties();
+        properties.put("com.bigdata.rdf.sail.isolatableIndices", "true");
+        properties.put("com.bigdata.rdf.store.AbstractTripleStore.axiomsClass", "com.bigdata.rdf.axioms.NoAxioms");
+        properties.put("com.bigdata.rdf.sail.truthMaintenance", "false");
+        properties.put("com.bigdata.rdf.store.AbstractTripleStore.vocabularyClass", "com.bigdata.rdf.vocab.NoVocabulary");
+        properties.put("com.bigdata.rdf.store.AbstractTripleStore.justify", "false");
+        
+        final BigdataSail sail = getSail(properties);
+        sail.initialize();
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+        final BigdataSailRepositoryConnection cxn = 
+            (BigdataSailRepositoryConnection) repo.getConnection();
+        cxn.setAutoCommit(false);
+        
+        try {
+    
+            final ValueFactory vf = sail.getValueFactory();
+            
+            cxn.add(vf.createURI("u:1"), 
+                    vf.createURI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"), 
+                    vf.createURI("u:2"));
+            
+            String query = 
+                "SELECT REDUCED ?subj ?subj_class ?subj_label " +
+                "WHERE { " +
+                "  ?subj a ?subj_class . " +
+                "  OPTIONAL { ?subj <http://www.w3.org/2000/01/rdf-schema#label> ?subj_label } " +
+                "}";
+            
+            TupleQuery q = cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+            q.setBinding("subj", vf.createURI("u:1"));
+            TupleQueryResult tqr = q.evaluate();
+            assertTrue(tqr.hasNext());
+            System.err.println(tqr.next());
+            tqr.close();
             
         } finally {
             cxn.close();
