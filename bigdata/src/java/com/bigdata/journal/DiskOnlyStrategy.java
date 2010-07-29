@@ -470,6 +470,24 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     }
     
     /**
+     * Need to overide commit to ensure the writeCache is flushed prior to
+     * writing the rootblock.
+     * 
+     * For the DiskOnlyStrategy flushing the writeCache also ensures the
+     * backing file is created if the file is temporary.
+     * 
+     * Note that the call must be syncronized or concurrent writers to the
+     * cache will cause problems.
+     */
+    public void commit() {
+    	if (writeCache != null) {
+	    	synchronized(this) {
+	    		flushWriteCache();
+	    	}
+    	}
+    }
+    
+    /**
      * Writes the {@link #writeCache} through to the disk and its position is
      * reset to zero.
      * <p>
