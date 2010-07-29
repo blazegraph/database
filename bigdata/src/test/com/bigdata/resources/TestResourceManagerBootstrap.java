@@ -652,8 +652,8 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
                         new IndexPartitionCause(
                                         IndexPartitionCause.CauseEnum.Register,
                                         0/*overflowCounter*/, System
-                                                .currentTimeMillis()/*lastCommitTime*/),
-                        "bootstrap() "// history
+                                                .currentTimeMillis()/*lastCommitTime*/)
+//                        ,"bootstrap() "// history
                         ));
 
                 /*

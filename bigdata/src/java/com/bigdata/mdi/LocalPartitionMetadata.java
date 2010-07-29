@@ -41,7 +41,6 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.journal.Journal;
 import com.bigdata.service.DataService;
-import com.bigdata.service.Event;
 
 /**
  * An immutable object providing metadata about a local index partition,
@@ -80,6 +79,9 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
     /**
      * 
      * @see #getSourcePartitionId()
+     * 
+     * @deprecated MoveTask manages without this field (it was required by the
+     *             previous MOVE implementation).
      */
     private int sourcePartitionId;
     
@@ -111,51 +113,51 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
      */
     private IndexPartitionCause cause;
     
-    /**
-     * A history of operations giving rise to the current partition metadata.
-     * E.g., register(timestamp), copyOnOverflow(timestamp), split(timestamp),
-     * join(partitionId,partitionId,timestamp), etc. This is truncated when
-     * serialized to keep it from growing without bound.
-     * 
-     * @deprecated See {@link #getHistory()}
-     */
-    private String history;
-    
-    /**
-     * If the history string exceeds {@link #MAX_HISTORY_LENGTH} characters then
-     * truncates it to the last {@link #MAX_HISTORY_LENGTH}-3 characters,
-     * prepends "...", and returns the result. Otherwise returns the entire
-     * history string.
-     * 
-     * @deprecated See {@link #history}
-     */
-    protected String getTruncatedHistory() {
-        
-        if (MAX_HISTORY_LENGTH == 0)
-            return "";
-        
-        String history = this.history;
-        
-        if(history.length() > MAX_HISTORY_LENGTH) {
-
-            /*
-             * Truncate the history.
-             */
-
-            final int len = history.length();
-            
-            final int fromIndex = len - (MAX_HISTORY_LENGTH - 3);
-
-            assert fromIndex > 0 : "len=" + len + ", fromIndex=" + fromIndex
-                    + ", maxHistoryLength=" + MAX_HISTORY_LENGTH;
-            
-            history = "..." + history.substring(fromIndex, len);
-            
-        }
-
-        return history;
-        
-    }
+//    /**
+//     * A history of operations giving rise to the current partition metadata.
+//     * E.g., register(timestamp), copyOnOverflow(timestamp), split(timestamp),
+//     * join(partitionId,partitionId,timestamp), etc. This is truncated when
+//     * serialized to keep it from growing without bound.
+//     * 
+//     * @deprecated See {@link #getHistory()}
+//     */
+//    private String history;
+//    
+//    /**
+//     * If the history string exceeds {@link #MAX_HISTORY_LENGTH} characters then
+//     * truncates it to the last {@link #MAX_HISTORY_LENGTH}-3 characters,
+//     * prepends "...", and returns the result. Otherwise returns the entire
+//     * history string.
+//     * 
+//     * @deprecated See {@link #history}
+//     */
+//    protected String getTruncatedHistory() {
+//        
+//        if (MAX_HISTORY_LENGTH == 0)
+//            return "";
+//        
+//        String history = this.history;
+//        
+//        if(history.length() > MAX_HISTORY_LENGTH) {
+//
+//            /*
+//             * Truncate the history.
+//             */
+//
+//            final int len = history.length();
+//            
+//            final int fromIndex = len - (MAX_HISTORY_LENGTH - 3);
+//
+//            assert fromIndex > 0 : "len=" + len + ", fromIndex=" + fromIndex
+//                    + ", maxHistoryLength=" + MAX_HISTORY_LENGTH;
+//            
+//            history = "..." + history.substring(fromIndex, len);
+//            
+//        }
+//
+//        return history;
+//        
+//    }
     
     /**
      * De-serialization constructor.
@@ -199,21 +201,21 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
      *            the remote {@link DataService} will fill it in on arrival.
      * @param cause
      *            The underlying cause for the creation of the index partition.
-     * @param history
-     *            A human interpretable history of the index partition. The
-     *            history is a series of whitespace delimited records each of
-     *            more or less the form <code>foo(x,y,z)</code>. The history
-     *            gets truncated when the {@link LocalPartitionMetadata} is
-     *            serialized in order to prevent it from growing without bound.
      */
+//    * @param history
+//    *            A human interpretable history of the index partition. The
+//    *            history is a series of whitespace delimited records each of
+//    *            more or less the form <code>foo(x,y,z)</code>. The history
+//    *            gets truncated when the {@link LocalPartitionMetadata} is
+//    *            serialized in order to prevent it from growing without bound.
     public LocalPartitionMetadata(//
             final int partitionId,//
             final int sourcePartitionId,//
             final byte[] leftSeparatorKey,//
             final byte[] rightSeparatorKey,// 
             final IResourceMetadata[] resources,//
-            final IndexPartitionCause cause,
-            final String history
+            final IndexPartitionCause cause
+//            final String history
             ) {
 
         /*
@@ -232,7 +234,7 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
         this.cause = cause;
         
-        this.history = history;
+//        this.history = history;
         
         /*
          * Test arguments.
@@ -440,23 +442,23 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
         
     }
     
-    /**
-     * A history of the changes to the index partition.
-     * 
-     * @deprecated I've essentially disabled the history (it is always empty
-     *             when it is persisted). I found it nearly impossible to read.
-     *             There are much saner ways to track what is going on in the
-     *             federation. An analysis of the {@link Event} log is much more
-     *             useful. If nothing else, you could examine the index
-     *             partition in the metadata index by scanning the commit points
-     *             and reading its state in each commit and reporting all state
-     *             changes.
-     */
-    final public String getHistory() {
-        
-        return history;
-        
-    }
+//    /**
+//     * A history of the changes to the index partition.
+//     * 
+//     * @deprecated I've essentially disabled the history (it is always empty
+//     *             when it is persisted). I found it nearly impossible to read.
+//     *             There are much saner ways to track what is going on in the
+//     *             federation. An analysis of the {@link Event} log is much more
+//     *             useful. If nothing else, you could examine the index
+//     *             partition in the metadata index by scanning the commit points
+//     *             and reading its state in each commit and reporting all state
+//     *             changes.
+//     */
+//    final public String getHistory() {
+//        
+//        return history;
+//        
+//    }
     
     final public int hashCode() {
 
@@ -466,7 +468,7 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
     }
     
     // Note: used by assertEquals in the test cases.
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
 
         if (this == o)
             return true;
@@ -520,7 +522,7 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
         ", rightSeparator="+BytesUtil.toString(rightSeparatorKey)+
         ", resourceMetadata="+Arrays.toString(resources)+
         ", cause="+cause+
-        ", history="+history+
+//        ", history="+history+
         "}"
         ;
 
@@ -537,6 +539,17 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
      * but that field is only serialized for a journal.
      */
     private static final transient short VERSION1 = 0x1;
+
+    /**
+     * This version serializes the {@link #partitionId} as 32-bits clean and
+     * gets rid of the <code>history</code> field.
+     */
+    private static final transient short VERSION2 = 0x2;
+
+    /**
+     * The current version.
+     */
+    private static final transient short VERSION = VERSION2;
     
     public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
@@ -546,12 +559,17 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
         switch (version) {
         case VERSION0:
         case VERSION1:
+        case VERSION2:
             break;
         default:
             throw new IOException("Unknown version: " + version);
         }
-        
-        partitionId = (int) LongPacker.unpackLong(in);
+
+        if (version < VERSION2) {
+            partitionId = (int) LongPacker.unpackLong(in);
+        } else {
+            partitionId = in.readInt();
+        }
 
         sourcePartitionId = in.readInt(); // MAY be -1.
         
@@ -579,7 +597,9 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
         cause = (IndexPartitionCause)in.readObject();
         
-        history = in.readUTF();
+        if (version < VERSION2) {
+            /* history = */in.readUTF();
+        }
         
         resources = nresources>0 ? new IResourceMetadata[nresources] : null;
 
@@ -613,9 +633,13 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
     public void writeExternal(final ObjectOutput out) throws IOException {
 
-        ShortPacker.packShort(out, VERSION1);
+        ShortPacker.packShort(out, VERSION);
 
-        LongPacker.packLong(out, partitionId);
+        if (VERSION < VERSION2) {
+            LongPacker.packLong(out, partitionId);
+        } else {
+            out.writeInt(partitionId);
+        }
         
         out.writeInt(sourcePartitionId); // MAY be -1.
         
@@ -640,7 +664,9 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
         out.writeObject(cause);
         
-        out.writeUTF(getTruncatedHistory());
+        if (VERSION < VERSION2) {
+            out.writeUTF("");// getTruncatedHistory()
+        }
                 
         /*
          * Note: we serialize using the IResourceMetadata interface so that we

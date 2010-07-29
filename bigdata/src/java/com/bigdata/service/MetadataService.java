@@ -1123,11 +1123,11 @@ abstract public class MetadataService extends DataService implements
                          * service.
                          */
                          null, // [resources] Signal to the RegisterIndexTask.
-                         null, // [cause] Signal to RegisterIndexTask
-                         /*
-                          * History.
-                          */
-                         "createScaleOutIndex(name="+scaleOutIndexName+") "
+                         null // [cause] Signal to RegisterIndexTask
+//                         /*
+//                          * History.
+//                          */
+//                         ,"createScaleOutIndex(name="+scaleOutIndexName+") "
                     ));
                 
                 dataServices[i].registerIndex(DataService

@@ -289,9 +289,10 @@ public class JoinIndexPartitionTask extends AbstractPrepareTask<JoinResult> {
                         // Note: the live journal.
                         getJournal().getResourceMetadata() //
                         },//
-                        IndexPartitionCause.join(resourceManager),
-                        // new history line.
-                        summary+" "));
+                        IndexPartitionCause.join(resourceManager)
+//                        // new history line.
+//                        , summary+" "
+                ));
 
                 /*
                  * Set the updated index metadata on the btree (required for it

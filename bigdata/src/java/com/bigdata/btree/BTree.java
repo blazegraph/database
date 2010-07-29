@@ -1339,8 +1339,8 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
                     oldPmd.getLeftSeparatorKey(), //
                     oldPmd.getRightSeparatorKey(),//
                     newResources,//
-                    oldPmd.getIndexPartitionCause(),//
-                    "" // history is deprecated.
+                    oldPmd.getIndexPartitionCause()//
+//                    "" // history is deprecated.
             );
 
             // update the local partition metadata on our cloned IndexMetadata.
