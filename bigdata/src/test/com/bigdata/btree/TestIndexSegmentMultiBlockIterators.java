@@ -383,7 +383,7 @@ public class TestIndexSegmentMultiBlockIterators extends
             testMultiBlockIterator(btree, seg);
 
             // random iterator scan tests.
-            doRandomScanTest(btree, seg, 1000/* ntests */);
+            doRandomScanTest(btree, seg, 100/* ntests */);
             
         } finally {
 
