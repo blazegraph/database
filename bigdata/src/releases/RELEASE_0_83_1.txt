@@ -11,9 +11,12 @@ this release.  The code will build automatically under eclipse.  You can also
 build the code using the ant script.  The cluster installer requires the use of
 the ant script.  You can checkout this release from the following URL:
 
-	https://bigdata.svn.sourceforge.net/svnroot/bigdata/branches/BIGDATA_RELEASE_0_83_1
+	https://bigdata.svn.sourceforge.net/svnroot/bigdata/branches/BIGDATA_RELEASE_0_83_2
 
 New features:
+
+- This release provides a bug fix for issue#118.  Upgrade to this release is
+  advised.  See https://sourceforge.net/apps/trac/bigdata/ticket/118 for details.
 
 - Inlining XSD numerics, xsd:boolean, or custom datatype extensions
   into the statement indices.  Inlining provides a smaller footprint
