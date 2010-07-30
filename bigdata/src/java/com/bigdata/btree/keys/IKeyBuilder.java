@@ -33,6 +33,7 @@ import java.math.BigInteger;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.UUID;
+
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.KeyBuilder.Options;
 
@@ -88,7 +89,6 @@ import com.bigdata.btree.keys.KeyBuilder.Options;
  * {@link #appendText(String, boolean, boolean)}.
  * </p>
  * 
- * @see TestKeyBuilder#asSortKey(Object)
  * @see KeyBuilder#newInstance()
  * @see KeyBuilder#newUnicodeInstance()
  * @see KeyBuilder#newUnicodeInstance(Properties)
