@@ -71,7 +71,7 @@ public class SPOStarJoin extends SPOPredicate
     public SPOStarJoin(final SPOPredicate pred) {
         
         this(pred.relationName, pred.partitionId, pred.s(), Var.var(), 
-                Var.var(), pred.c(), pred.isOptional(), 
+                Var.var(), pred.c(), pred.getOptionalGoto(), 
                 pred.getConstraint(), pred.getSolutionExpander());
         
     }
@@ -89,7 +89,7 @@ public class SPOStarJoin extends SPOPredicate
 
         this(new String[] { relationName }, -1/* partitionId */, s, 
                 Var.var(), Var.var(),
-                null/* c */, false/* optional */, null/* constraint */, 
+                null/* c */, -1/* optional */, null/* constraint */, 
                 null/* expander */);
 
     }
@@ -116,12 +116,12 @@ public class SPOStarJoin extends SPOPredicate
             final IVariableOrConstant<IV> p,//
             final IVariableOrConstant<IV> o,//
             final IVariableOrConstant<IV> c,//
-            final boolean optional, //
+            final int optionalGoto, //
             final IElementFilter<ISPO> constraint,//
             final ISolutionExpander<ISPO> expander//
             ) {
         
-        super(relationName, partitionId, s, p, o, c, optional, constraint, 
+        super(relationName, partitionId, s, p, o, c, optionalGoto, constraint, 
                 expander);
     
         this.starConstraints = new LinkedList<IStarConstraint<ISPO>>();
@@ -188,7 +188,7 @@ public class SPOStarJoin extends SPOPredicate
         SPOPredicate pred = super.asBound(bindingSet);
         
         SPOStarJoin starJoin = new SPOStarJoin(pred.relationName, 
-                pred.partitionId, pred.s, pred.p, pred.o, pred.c, pred.optional, 
+                pred.partitionId, pred.s, pred.p, pred.o, pred.c, pred.optionalGoto, 
                 pred.constraint, pred.expander);
         
         for (IStarConstraint starConstraint : starConstraints) {
