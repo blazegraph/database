@@ -40,7 +40,6 @@ import java.util.SortedMap;
 import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.journal.ConcurrencyManager;
 
 /**
@@ -59,21 +58,21 @@ import com.bigdata.journal.ConcurrencyManager;
  * Note: The total order of the {@link BigdataMap} is completely determined by
  * {@link ITupleSerializer#serializeKey(Object)}. There is NO concept of a
  * {@link Comparator}. The {@link ITupleSerializer} is responsible for coercing
- * application keys into variable length <strong>unsigned</strong> byte[]s
- * which are the keys for the underlying B+Tree. The order for the B+Tree is the
+ * application keys into variable length <strong>unsigned</strong> byte[]s which
+ * are the keys for the underlying B+Tree. The order for the B+Tree is the
  * natural order for the <strong>unsigned byte[]</strong>s. {@link KeyBuilder}
  * supports the generation of unsigned byte[]s from various kinds of Java
  * primitives and Unicode {@link String}s and is typically used to write the
  * {@link ITupleSerializer#serializeKey(Object)} method.
  * <p>
- * Note: The coercion of the application keys into unsigned byte[]s is not
- * typesafe unless you either consistently use a strongly typed instance of this
+ * Note: The coercion of the application keys into unsigned byte[]s is not type
+ * safe unless you either consistently use a strongly typed instance of this
  * class or specify an {@link ITupleSerializer} for the backing B+Tree that only
  * allows application keys that are instances of acceptable classes. This issue
  * is more critical for keys than for values since the keys define the total
  * index order and the default coercion rules for keys are provided by
- * {@link TestKeyBuilder#asSortKey(Object)} which does not attenpt to partition the
- * key space by the application key type (keys are not safely polymorphic by
+ * {@link KeyBuilder#append(Object)} which does not attempt to partition the key
+ * space by the application key type (keys are not safely polymorphic by
  * default).
  * <p>
  * Note: When storing Java objects in the tuple value, the value MUST be treated
