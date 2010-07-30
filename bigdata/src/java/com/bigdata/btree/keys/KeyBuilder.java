@@ -1081,17 +1081,25 @@ public class KeyBuilder implements IKeyBuilder {
      * Note: This method is thread-safe.
      * <p>
      * Note: Strings are Unicode safe for the default locale. See
-     * {@link Locale#getDefault()}. If you require a specific local or
-     * different locals at different times or for different indices then you
-     * MUST provision and apply your own {@link KeyBuilder}.
+     * {@link Locale#getDefault()}. If you require a specific local or different
+     * locals at different times or for different indices then you MUST
+     * provision and apply your own {@link KeyBuilder}.
      * 
      * @param val
      *            An application key.
      * 
-     * @return The unsigned byte[] equivilent of that key. This will be
-     *         <code>null</code> iff the <i>key</i> is <code>null</code>.
-     *         If the <i>key</i> is a byte[], then the byte[] itself will be
-     *         returned.
+     * @return The unsigned byte[] equivalent of that key. This will be
+     *         <code>null</code> iff the <i>key</i> is <code>null</code>. If the
+     *         <i>key</i> is a byte[], then the byte[] itself will be returned.
+     * 
+     * @deprecated This method circumvents explicit configuration of the
+     *             {@link KeyBuilder} and is used nearly exclusively by unit
+     *             tests. While explicit configuration is not required for keys
+     *             which do not include Unicode sort key components, this method
+     *             also relies on a single global {@link KeyBuilder} instance
+     *             protected by a lock. That lock is therefore a bottleneck. The
+     *             correct practice is to use thread-local or per task
+     *             {@link IKeyBuilder}s to avoid lock contention.
      */
     @SuppressWarnings("unchecked")
     public static final byte[] asSortKey(Object val) {

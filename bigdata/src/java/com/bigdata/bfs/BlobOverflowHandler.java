@@ -6,8 +6,10 @@ import java.io.InputStream;
 
 import com.bigdata.btree.IOverflowHandler;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
 
@@ -33,7 +35,7 @@ public class BlobOverflowHandler implements IOverflowHandler {
 
     }
 
-    DataOutputBuffer buf;
+    private transient DataOutputBuffer buf;
 
     public void close() {
 
@@ -62,6 +64,8 @@ public class BlobOverflowHandler implements IOverflowHandler {
 
         }
 
+        final IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG);
+        
         if (addr == 0L) {
 
             /*
@@ -69,7 +73,7 @@ public class BlobOverflowHandler implements IOverflowHandler {
              * their address.
              */
 
-            return KeyBuilder.asSortKey(0L);
+            return keyBuilder.append(0L).getKey();
 
         }
 
@@ -143,7 +147,7 @@ public class BlobOverflowHandler implements IOverflowHandler {
         }
 
         // the address of the block on the target store.
-        return KeyBuilder.asSortKey(addr2);
+        return keyBuilder.append(addr2).getKey();
 
     }
 
