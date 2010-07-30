@@ -35,7 +35,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.bigdata.btree.AbstractBTree.HardReference;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
@@ -239,8 +239,8 @@ public class TestTransientBTree extends AbstractBTreeTestCase {
          */  
         {
             
-            final ITupleIterator itr = btree.rangeIterator(KeyBuilder
-                    .asSortKey(10000L), KeyBuilder.asSortKey(20000L),
+            final ITupleIterator itr = btree.rangeIterator(TestKeyBuilder
+                    .asSortKey(10000L), TestKeyBuilder.asSortKey(20000L),
                     0/* capacity */, IRangeQuery.DEFAULT | IRangeQuery.CURSOR,
                     null/* filter */);
             
@@ -418,8 +418,8 @@ public class TestTransientBTree extends AbstractBTreeTestCase {
          */  
         {
             
-            final ITupleIterator itr = btree.rangeIterator(KeyBuilder
-                    .asSortKey(10000L), KeyBuilder.asSortKey(20000L),
+            final ITupleIterator itr = btree.rangeIterator(TestKeyBuilder
+                    .asSortKey(10000L), TestKeyBuilder.asSortKey(20000L),
                     0/* capacity */, IRangeQuery.DEFAULT | IRangeQuery.CURSOR,
                     null/* filter */);
             

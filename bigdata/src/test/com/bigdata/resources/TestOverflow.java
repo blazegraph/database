@@ -36,7 +36,7 @@ import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IJournal;
@@ -138,7 +138,7 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
                 buf.reset().putInt(j);
 
                 // insert values.
-                ndx.insert(KeyBuilder.asSortKey(j), buf.toByteArray());
+                ndx.insert(TestKeyBuilder.asSortKey(j), buf.toByteArray());
 
                 // bump the counter. 
                 ndx.getCounter().incrementAndGet();

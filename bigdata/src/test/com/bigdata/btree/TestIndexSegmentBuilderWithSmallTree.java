@@ -31,7 +31,7 @@ import org.apache.log4j.Level;
 import com.bigdata.LRUNexus;
 import com.bigdata.btree.IndexSegment.ImmutableLeafCursor;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 
 /**
  * Test suite based on a small btree with known keys and values.
@@ -102,7 +102,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends
 
         for (int i = 1; i <= 10; i++) {
 
-            btree.insert(KeyBuilder.asSortKey(i), new SimpleEntry(i));
+            btree.insert(TestKeyBuilder.asSortKey(i), new SimpleEntry(i));
 
         }
         
@@ -432,7 +432,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends
 
         for (int i = 1; i <= 9; i++) {
 
-            btree.insert(KeyBuilder.asSortKey(i), new SimpleEntry(i));
+            btree.insert(TestKeyBuilder.asSortKey(i), new SimpleEntry(i));
 
         }
         
@@ -535,7 +535,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends
 
         for (int i = 1; i <= 20; i++) {
 
-            btree.insert(KeyBuilder.asSortKey(i), new SimpleEntry(i));
+            btree.insert(TestKeyBuilder.asSortKey(i), new SimpleEntry(i));
 
         }
         

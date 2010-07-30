@@ -141,7 +141,7 @@ public class Schema implements Externalizable {
                 /*
                  * One time encoding of the schema name as a Unicode sort key.
                  */
-                schemaBytes = KeyBuilder.asSortKey(name);
+                schemaBytes = asSortKey(name);
             }
             
         }
@@ -501,5 +501,52 @@ public class Schema implements Externalizable {
                 + ",primaryKeyType=" + getPrimaryKeyType() + "}";
         
     }
+
+    /**
+     * Used for historical compatibility to unbox an application key (convert it
+     * to an unsigned byte[]).
+     */
+    static private final IKeyBuilder _keyBuilder = KeyBuilder.newUnicodeInstance();
+
+    /**
+     * Utility method for historical compatibility converts an application key
+     * to a sort key (an unsigned byte[] that imposes the same sort order).
+     * <p>
+     * Note: This method is thread-safe.
+     * 
+     * @param val
+     *            An application key.
+     * 
+     * @return The unsigned byte[] equivalent of that key. This will be
+     *         <code>null</code> iff the <i>key</i> is <code>null</code>. If the
+     *         <i>key</i> is a byte[], then the byte[] itself will be returned.
+     */
+    @SuppressWarnings("unchecked")
+    private static final byte[] asSortKey(Object val) {
+        
+        if (val == null) {
+
+            return null;
+            
+        }
+
+        if (val instanceof byte[]) {
+
+            return (byte[]) val;
+            
+        }
+
+        /*
+         * Synchronize on the keyBuilder to avoid concurrent modification of its
+         * state.
+         */
+
+        synchronized (_keyBuilder) {
+
+            return _keyBuilder.getSortKey(val);
+            
+        }
     
+    }
+
 }

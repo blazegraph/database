@@ -39,7 +39,7 @@ import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
@@ -236,11 +236,11 @@ public class TestBuildTask2 extends AbstractResourceManagerTestCase {
 
                         if (randomKeys) {
                             // strictly increasing but random ordered keys.
-                            keys[i] = KeyBuilder.asSortKey(base
+                            keys[i] = TestKeyBuilder.asSortKey(base
                                     + r.nextInt(maxKeyInc) + 1);
                         } else {
                             // strictly increasing non-random ordered keys.
-                            keys[i] = KeyBuilder.asSortKey(i + npasses
+                            keys[i] = TestKeyBuilder.asSortKey(i + npasses
                                     * nentries);
                         }
 

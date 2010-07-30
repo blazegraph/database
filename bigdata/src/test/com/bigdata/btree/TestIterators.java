@@ -31,7 +31,7 @@ import org.apache.log4j.Level;
 
 import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.TupleFilter;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 
 /**
  * Test suite for iterators. The tests are presented from the least dependencies
@@ -165,12 +165,12 @@ public class TestIterators extends AbstractBTreeTestCase {
         SimpleEntry v9 = new SimpleEntry(9);
 
         // fill up the root leaf.
-        btree.insert(KeyBuilder.asSortKey(3), v3);
-        btree.insert(KeyBuilder.asSortKey(5), v5);
-        btree.insert(KeyBuilder.asSortKey(7), v7);
+        btree.insert(TestKeyBuilder.asSortKey(3), v3);
+        btree.insert(TestKeyBuilder.asSortKey(5), v5);
+        btree.insert(TestKeyBuilder.asSortKey(7), v7);
 
         // split the root leaf.
-        btree.insert(KeyBuilder.asSortKey(9), v9);
+        btree.insert(TestKeyBuilder.asSortKey(9), v9);
         final Node c = (Node) btree.root;
         assertKeys(new int[]{7},c);
         assertEquals(a,c.getChild(0));
@@ -228,8 +228,8 @@ public class TestIterators extends AbstractBTreeTestCase {
          * split another leaf so that there are now three children to visit. at
          * this point the root is full.
          */
-        btree.insert(KeyBuilder.asSortKey(1), v1);
-        btree.insert(KeyBuilder.asSortKey(2), v2);
+        btree.insert(TestKeyBuilder.asSortKey(1), v1);
+        btree.insert(TestKeyBuilder.asSortKey(2), v2);
         assertKeys(new int[]{3,7},c);
         assertEquals(a,c.getChild(0));
         Leaf d = (Leaf)c.getChild(1);
@@ -271,7 +271,7 @@ public class TestIterators extends AbstractBTreeTestCase {
          * remove a key from a leaf forcing two leaves to join and verify the
          * visitation order.
          */
-        assertEquals(v1,btree.remove(KeyBuilder.asSortKey(1)));
+        assertEquals(v1,btree.remove(TestKeyBuilder.asSortKey(1)));
         assertKeys(new int[]{7},c);
         assertEquals(a,c.getChild(0));
         assertEquals(b,c.getChild(1));
@@ -316,12 +316,12 @@ public class TestIterators extends AbstractBTreeTestCase {
                 .postOrderNodeIterator());
         
         // fill up the root leaf.
-        btree.insert(KeyBuilder.asSortKey(3), v3);
-        btree.insert(KeyBuilder.asSortKey(5), v5);
-        btree.insert(KeyBuilder.asSortKey(7), v7);
+        btree.insert(TestKeyBuilder.asSortKey(3), v3);
+        btree.insert(TestKeyBuilder.asSortKey(5), v5);
+        btree.insert(TestKeyBuilder.asSortKey(7), v7);
 
         // split the root leaf.
-        btree.insert(KeyBuilder.asSortKey(9), v9);
+        btree.insert(TestKeyBuilder.asSortKey(9), v9);
         final Node c = (Node) btree.root;
         assertKeys(new int[]{7},c);
         assertEquals(a,c.getChild(0));
@@ -339,8 +339,8 @@ public class TestIterators extends AbstractBTreeTestCase {
          * split another leaf so that there are now three children to visit. at
          * this point the root is full.
          */
-        btree.insert(KeyBuilder.asSortKey(1), v1);
-        btree.insert(KeyBuilder.asSortKey(2), v2);
+        btree.insert(TestKeyBuilder.asSortKey(1), v1);
+        btree.insert(TestKeyBuilder.asSortKey(2), v2);
         assertKeys(new int[]{3,7},c);
         assertEquals(a,c.getChild(0));
         Leaf d = (Leaf)c.getChild(1);
@@ -360,8 +360,8 @@ public class TestIterators extends AbstractBTreeTestCase {
          * cause another leaf (d) to split, forcing the split to propagate to and
          * split the root and the tree to increase in height.
          */
-        btree.insert(KeyBuilder.asSortKey(4), v4);
-        btree.insert(KeyBuilder.asSortKey(6), v6);
+        btree.insert(TestKeyBuilder.asSortKey(4), v4);
+        btree.insert(TestKeyBuilder.asSortKey(6), v6);
 //        btree.dump(Level.DEBUG,System.err);
         assertNotSame(c,btree.root);
         final Node g = (Node)btree.root;
@@ -392,7 +392,7 @@ public class TestIterators extends AbstractBTreeTestCase {
          * be deleted. this causes (c,f) to merge as well, which in turn forces
          * the root to be replaced by (c).
          */
-        assertEquals(v4,btree.remove(KeyBuilder.asSortKey(4)));
+        assertEquals(v4,btree.remove(TestKeyBuilder.asSortKey(4)));
 //        btree.dump(Level.DEBUG,System.err);
         assertKeys(new int[]{5,7},c);
         assertEquals(d,c.getChild(0));
@@ -414,7 +414,7 @@ public class TestIterators extends AbstractBTreeTestCase {
          * remove a key (7) from a leaf (b) forcing two leaves to join and
          * verify the visitation order.
          */
-        assertEquals(v7,btree.remove(KeyBuilder.asSortKey(7)));
+        assertEquals(v7,btree.remove(TestKeyBuilder.asSortKey(7)));
         btree.dump(Level.DEBUG,System.err);
         assertKeys(new int[]{5},c);
         assertEquals(d,c.getChild(0));
@@ -433,9 +433,9 @@ public class TestIterators extends AbstractBTreeTestCase {
          * remove keys from a leaf forcing the remaining two leaves to join and
          * verify the visitation order.
          */
-        assertEquals(v3,btree.remove(KeyBuilder.asSortKey(3)));
-        assertEquals(v5,btree.remove(KeyBuilder.asSortKey(5)));
-        assertEquals(v6,btree.remove(KeyBuilder.asSortKey(6)));
+        assertEquals(v3,btree.remove(TestKeyBuilder.asSortKey(3)));
+        assertEquals(v5,btree.remove(TestKeyBuilder.asSortKey(5)));
+        assertEquals(v6,btree.remove(TestKeyBuilder.asSortKey(6)));
         assertKeys(new int[]{1,2,9},b);
         assertValues(new Object[]{v1,v2,v9}, b);
         assertTrue(d.isDeleted());

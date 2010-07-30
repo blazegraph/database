@@ -1065,77 +1065,7 @@ public class KeyBuilder implements IKeyBuilder {
        
     }
 
-    /*
-     * static helper methods.
-     */
-    
-    /**
-     * Used to unbox an application key (convert it to an unsigned byte[]).
-     */
-    static private final IKeyBuilder _keyBuilder = newUnicodeInstance();
-
-    /**
-     * Utility method converts an application key to a sort key (an unsigned
-     * byte[] that imposes the same sort order).
-     * <p>
-     * Note: This method is thread-safe.
-     * <p>
-     * Note: Strings are Unicode safe for the default locale. See
-     * {@link Locale#getDefault()}. If you require a specific local or different
-     * locals at different times or for different indices then you MUST
-     * provision and apply your own {@link KeyBuilder}.
-     * 
-     * @param val
-     *            An application key.
-     * 
-     * @return The unsigned byte[] equivalent of that key. This will be
-     *         <code>null</code> iff the <i>key</i> is <code>null</code>. If the
-     *         <i>key</i> is a byte[], then the byte[] itself will be returned.
-     * 
-     * @deprecated This method circumvents explicit configuration of the
-     *             {@link KeyBuilder} and is used nearly exclusively by unit
-     *             tests. While explicit configuration is not required for keys
-     *             which do not include Unicode sort key components, this method
-     *             also relies on a single global {@link KeyBuilder} instance
-     *             protected by a lock. That lock is therefore a bottleneck. The
-     *             correct practice is to use thread-local or per task
-     *             {@link IKeyBuilder}s to avoid lock contention.
-     */
-    @SuppressWarnings("unchecked")
-    public static final byte[] asSortKey(Object val) {
-        
-        if (val == null) {
-
-            return null;
-            
-        }
-
-        if (val instanceof byte[]) {
-
-            return (byte[]) val;
-            
-        }
-
-        /*
-         * Synchronize on the keyBuilder to avoid concurrent modification of its
-         * state.
-         */
-
-        synchronized (_keyBuilder) {
-
-            return _keyBuilder.getSortKey(val);
-            
-//            _keyBuilder.reset();
-//
-//            _keyBuilder.append( key );
-//
-//            return _keyBuilder.getKey();
-    
-        }
-    
-    }
-
-    public byte[] getSortKey(Object val) {
+    public byte[] getSortKey(final Object val) {
         
         reset();
         

@@ -49,6 +49,7 @@ import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KV;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.RandomKeysGenerator;
 import com.bigdata.cache.HardReferenceQueue;
@@ -1097,7 +1098,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
             assertEquals("#entries",i,btree.nentries);
             
-            final byte[] key = KeyBuilder.asSortKey(ikey);
+            final byte[] key = TestKeyBuilder.asSortKey(ikey);
             
             assertNull(btree.lookup(key));
             
@@ -1133,7 +1134,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
             for( int i=0; i<keys.length; i++ ) {
                 
-                byte[] key = KeyBuilder.asSortKey(keys[i]);
+                byte[] key = TestKeyBuilder.asSortKey(keys[i]);
                 
                 assertEquals(entries[i],btree.lookup(key));
                 assertEquals(entries[i],btree.remove(key));
@@ -1216,7 +1217,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
             assertEquals("#entries",i,btree.nentries);
             
-            final byte[] key = KeyBuilder.asSortKey(ikey);
+            final byte[] key = TestKeyBuilder.asSortKey(ikey);
             
             assertNull(btree.lookup(key));
             
@@ -1252,7 +1253,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
             for( int i=0; i<keys.length; i++ ) {
                 
-                final byte[] key = KeyBuilder.asSortKey(keys[i]);
+                final byte[] key = TestKeyBuilder.asSortKey(keys[i]);
                 
                 assertEquals(entries[i],btree.lookup(key));
                 assertEquals(entries[i],btree.remove(key));
@@ -1497,7 +1498,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
                 assertEquals("#entries", i, btree.nentries);
 
-                final byte[] key = KeyBuilder.asSortKey(ikey);
+                final byte[] key = TestKeyBuilder.asSortKey(ikey);
                 
                 assertNull(btree.lookup(key));
 
@@ -1687,7 +1688,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
             assertEquals("#entries",i,btree.nentries);
 
-            final byte[] key = KeyBuilder.asSortKey(ikey);
+            final byte[] key = TestKeyBuilder.asSortKey(ikey);
             
             assertNull(btree.lookup(key));
             
@@ -1774,7 +1775,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
             final Integer ikey = keys[index];
             
-            final byte[] key = KeyBuilder.asSortKey(ikey);
+            final byte[] key = TestKeyBuilder.asSortKey(ikey);
             
             final SimpleEntry val = vals[index];
             
@@ -1816,7 +1817,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                     
                     Map.Entry<Integer,SimpleEntry> entry = itr.next();
                     
-                    final byte[] tmp = KeyBuilder.asSortKey(entry.getKey()); 
+                    final byte[] tmp = TestKeyBuilder.asSortKey(entry.getKey()); 
                     
                     assertEquals("lookup(" + entry.getKey() + ")", entry
                             .getValue(), btree.lookup(tmp));
@@ -1855,7 +1856,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
         for( int i=0; i<nkeys; i++ ) {
             
-            keys[i] = KeyBuilder.asSortKey(i+1); // Note: this produces dense keys with origin ONE(1).
+            keys[i] = TestKeyBuilder.asSortKey(i+1); // Note: this produces dense keys with origin ONE(1).
             
             vals[i] = new SimpleEntry();
             
@@ -2597,7 +2598,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         for (int i = 0; i < N; i++) {
 
             // @todo param governs chance of a key collision and maximum #of distinct keys.
-            final byte[] key = KeyBuilder.asSortKey(r.nextInt(100000));
+            final byte[] key = TestKeyBuilder.asSortKey(r.nextInt(100000));
 
             // Note: #of bytes effects very little that we want to test so we keep it small.
             final byte[] val = new byte[4];
