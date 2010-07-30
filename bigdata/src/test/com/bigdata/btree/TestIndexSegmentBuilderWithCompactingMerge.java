@@ -32,7 +32,7 @@ import java.io.File;
 import java.util.UUID;
 
 import com.bigdata.LRUNexus;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
@@ -119,7 +119,7 @@ public class TestIndexSegmentBuilderWithCompactingMerge extends
 
         for (int i = 1; i <= 10; i++) {
 
-            expected.insert(KeyBuilder.asSortKey(i), new SimpleEntry(i));
+            expected.insert(TestKeyBuilder.asSortKey(i), new SimpleEntry(i));
 
         }
 
@@ -201,8 +201,8 @@ public class TestIndexSegmentBuilderWithCompactingMerge extends
             final byte[] fromKey = null;
             final byte[] toKey = null;
 
-            expected.remove(KeyBuilder.asSortKey(3));
-            expected.remove(KeyBuilder.asSortKey(5));
+            expected.remove(TestKeyBuilder.asSortKey(3));
+            expected.remove(TestKeyBuilder.asSortKey(5));
             
             // should cover all keys (since deleted tuples are still present).
             assertEquals(10, expected.getEntryCount());

@@ -40,6 +40,7 @@ import java.util.SortedMap;
 import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.journal.ConcurrencyManager;
 
 /**
@@ -71,7 +72,7 @@ import com.bigdata.journal.ConcurrencyManager;
  * allows application keys that are instances of acceptable classes. This issue
  * is more critical for keys than for values since the keys define the total
  * index order and the default coercion rules for keys are provided by
- * {@link KeyBuilder#asSortKey(Object)} which does not attenpt to partition the
+ * {@link TestKeyBuilder#asSortKey(Object)} which does not attenpt to partition the
  * key space by the application key type (keys are not safely polymorphic by
  * default).
  * <p>

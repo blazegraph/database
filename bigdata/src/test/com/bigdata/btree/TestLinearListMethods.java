@@ -31,8 +31,8 @@ import java.util.Arrays;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.NoSuccessorException;
+import com.bigdata.btree.keys.TestKeyBuilder;
 
 /**
  * Test suite for the "linear list" access methods.
@@ -196,9 +196,9 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
         SimpleEntry v5 = new SimpleEntry(5);
         SimpleEntry v7 = new SimpleEntry(7);
 
-        btree.insert(KeyBuilder.asSortKey(3), v3);
-        btree.insert(KeyBuilder.asSortKey(5), v5);
-        btree.insert(KeyBuilder.asSortKey(7), v7);
+        btree.insert(TestKeyBuilder.asSortKey(3), v3);
+        btree.insert(TestKeyBuilder.asSortKey(5), v5);
+        btree.insert(TestKeyBuilder.asSortKey(7), v7);
         
         assertKeys(new int[]{3,5,7},a);
         assertValues(new Object[]{v3,v5,v7},a);
@@ -206,7 +206,7 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
         /*
          * split the leaf.
          */
-        btree.insert(KeyBuilder.asSortKey(2),v2);
+        btree.insert(TestKeyBuilder.asSortKey(2),v2);
         assertTrue(btree.dump(Level.DEBUG,System.err));
         
         Node root = (Node)btree.getRoot();

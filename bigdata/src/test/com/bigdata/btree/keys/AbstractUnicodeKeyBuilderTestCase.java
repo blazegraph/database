@@ -278,10 +278,10 @@ abstract public class AbstractUnicodeKeyBuilderTestCase extends TestCase2 {
         
         final KVO<String>[] a = new KVO[] {
           
-                new KVO<String>(keyBuilder.asSortKey("bro"),null,"bro"),
-                new KVO<String>(keyBuilder.asSortKey("brown"),null,"brown"),
-                new KVO<String>(keyBuilder.asSortKey("bre"),null,"bre"),
-                new KVO<String>(keyBuilder.asSortKey("break"),null,"break"),
+                new KVO<String>(TestKeyBuilder.asSortKey("bro"),null,"bro"),
+                new KVO<String>(TestKeyBuilder.asSortKey("brown"),null,"brown"),
+                new KVO<String>(TestKeyBuilder.asSortKey("bre"),null,"bre"),
+                new KVO<String>(TestKeyBuilder.asSortKey("break"),null,"break"),
                 
         };
         

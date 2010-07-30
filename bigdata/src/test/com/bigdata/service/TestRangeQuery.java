@@ -43,6 +43,7 @@ import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.PartitionLocator;
@@ -415,7 +416,7 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
 
         fed.registerIndex(metadata, new byte[][]{//
                 new byte[]{},
-                KeyBuilder.asSortKey(5) // the half-way point.
+                TestKeyBuilder.asSortKey(5) // the half-way point.
         }, new UUID[]{//
                 dataService0.getServiceUUID(),
                 dataService1.getServiceUUID()
@@ -430,7 +431,7 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
         
         for(int i=0; i<nentries; i++) {
             
-            keys[i] = KeyBuilder.asSortKey(i);
+            keys[i] = TestKeyBuilder.asSortKey(i);
             
             vals[i] = new byte[4];
             
@@ -540,7 +541,7 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
 
         fed.registerIndex(metadata, new byte[][]{//
                 new byte[]{},
-                KeyBuilder.asSortKey(5) // the half-way point.
+                TestKeyBuilder.asSortKey(5) // the half-way point.
         }, new UUID[]{//
                 dataService0.getServiceUUID(),
                 dataService1.getServiceUUID()
@@ -556,7 +557,7 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
         
         for(int i=0; i<nentries; i++) {
             
-            keys[i] = KeyBuilder.asSortKey(i);
+            keys[i] = TestKeyBuilder.asSortKey(i);
             
             vals[i] = new byte[4];
             

@@ -38,7 +38,7 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ScatterSplitConfiguration;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.BufferMode;
@@ -235,7 +235,7 @@ public class TestScatterSplit extends AbstractEmbeddedFederationTestCase {
 
                 for (int i = 0; i < batchSize; i++) {
 
-                    keys[i] = KeyBuilder.asSortKey(nwritten + i);
+                    keys[i] = TestKeyBuilder.asSortKey(nwritten + i);
 
                     vals[i] = SerializerUtil.serialize(nwritten + i);
                     

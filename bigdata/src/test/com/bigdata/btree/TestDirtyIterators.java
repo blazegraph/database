@@ -29,7 +29,7 @@ package com.bigdata.btree;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 
 /**
  * Test suite for iterators that visit only dirty nodes or leaves. This test
@@ -82,12 +82,12 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
         SimpleEntry v9 = new SimpleEntry(9);
 
         // fill up the root leaf.
-        btree.insert(KeyBuilder.asSortKey(3), v3);
-        btree.insert(KeyBuilder.asSortKey(5), v5);
-        btree.insert(KeyBuilder.asSortKey(7), v7);
+        btree.insert(TestKeyBuilder.asSortKey(3), v3);
+        btree.insert(TestKeyBuilder.asSortKey(5), v5);
+        btree.insert(TestKeyBuilder.asSortKey(7), v7);
 
         // split the root leaf.
-        btree.insert(KeyBuilder.asSortKey(9), v9);
+        btree.insert(TestKeyBuilder.asSortKey(9), v9);
         final Node c = (Node) btree.root;
         assertKeys(new int[]{7},c);
         assertEquals(a,c.getChild(0));
@@ -109,8 +109,8 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
          * split another leaf so that there are now three children to visit. at
          * this point the root is full.
          */
-        btree.insert(KeyBuilder.asSortKey(1), v1);
-        btree.insert(KeyBuilder.asSortKey(2), v2);
+        btree.insert(TestKeyBuilder.asSortKey(1), v1);
+        btree.insert(TestKeyBuilder.asSortKey(2), v2);
         assertKeys(new int[]{3,7},c);
         assertEquals(a,c.getChild(0));
         Leaf d = (Leaf)c.getChild(1);
@@ -135,7 +135,7 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
          * remove a key from a leaf forcing two leaves to join and verify the
          * visitation order.
          */
-        assertEquals(v1,btree.remove(KeyBuilder.asSortKey(1)));
+        assertEquals(v1,btree.remove(TestKeyBuilder.asSortKey(1)));
         assertKeys(new int[]{7},c);
         assertEquals(a,c.getChild(0));
         assertEquals(b,c.getChild(1));
@@ -187,12 +187,12 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
         SimpleEntry v9 = new SimpleEntry(9);
 
         // fill up the root leaf.
-        btree.insert(KeyBuilder.asSortKey(3), v3);
-        btree.insert(KeyBuilder.asSortKey(5), v5);
-        btree.insert(KeyBuilder.asSortKey(7), v7);
+        btree.insert(TestKeyBuilder.asSortKey(3), v3);
+        btree.insert(TestKeyBuilder.asSortKey(5), v5);
+        btree.insert(TestKeyBuilder.asSortKey(7), v7);
 
         // split the root leaf.
-        btree.insert(KeyBuilder.asSortKey(9), v9);
+        btree.insert(TestKeyBuilder.asSortKey(9), v9);
         final Node c = (Node) btree.root;
         assertKeys(new int[]{7},c);
         assertEquals(a,c.getChild(0));
@@ -212,8 +212,8 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
          * split another leaf so that there are now three children to visit. at
          * this point the root is full.
          */
-        btree.insert(KeyBuilder.asSortKey(1), v1);
-        btree.insert(KeyBuilder.asSortKey(2), v2);
+        btree.insert(TestKeyBuilder.asSortKey(1), v1);
+        btree.insert(TestKeyBuilder.asSortKey(2), v2);
         assertKeys(new int[]{3,7},c);
         assertEquals(a,c.getChild(0));
         Leaf d = (Leaf)c.getChild(1);
@@ -258,7 +258,7 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
          * visitation order.  this triggers copy-on-write for (a) and (a) is
          * dirty as a post-condition.
          */
-        assertEquals(v1,btree.remove(KeyBuilder.asSortKey(1)));
+        assertEquals(v1,btree.remove(TestKeyBuilder.asSortKey(1)));
         assertKeys(new int[]{7},c);
         assertNotSame(a,c.getChild(0));
         Leaf a1 = (Leaf)c.getChild(0);
@@ -279,7 +279,7 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
          * insert a key that will go into (b).  since (b) is immutable this
          * triggers copy-on-write.
          */
-        btree.insert(KeyBuilder.asSortKey(8),v8);
+        btree.insert(TestKeyBuilder.asSortKey(8),v8);
         assertKeys(new int[]{7},c);
         assertEquals(a1,c.getChild(0));
         assertNotSame(b,c.getChild(1));
@@ -313,7 +313,7 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
          * remove a key from (a1). since (a1) is immutable this triggers
          * copy-on-write. since the root is immtuable, it is also copied.
          */
-        assertEquals(v2,btree.remove(KeyBuilder.asSortKey(2)));
+        assertEquals(v2,btree.remove(TestKeyBuilder.asSortKey(2)));
         assertNotSame(c,btree.root);
         Node c1 = (Node)btree.root;
         assertKeys(new int[]{7},c1);
@@ -368,12 +368,12 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
                 .postOrderNodeIterator(true));
         
         // fill up the root leaf.
-        btree.insert(KeyBuilder.asSortKey(3), v3);
-        btree.insert(KeyBuilder.asSortKey(5), v5);
-        btree.insert(KeyBuilder.asSortKey(7), v7);
+        btree.insert(TestKeyBuilder.asSortKey(3), v3);
+        btree.insert(TestKeyBuilder.asSortKey(5), v5);
+        btree.insert(TestKeyBuilder.asSortKey(7), v7);
 
         // split the root leaf.
-        btree.insert(KeyBuilder.asSortKey(9), v9);
+        btree.insert(TestKeyBuilder.asSortKey(9), v9);
         final Node c = (Node) btree.root;
         assertKeys(new int[]{7},c);
         assertEquals(a,c.getChild(0));
@@ -393,8 +393,8 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
          * split another leaf so that there are now three children to visit. at
          * this point the root is full.
          */
-        btree.insert(KeyBuilder.asSortKey(1), v1);
-        btree.insert(KeyBuilder.asSortKey(2), v2);
+        btree.insert(TestKeyBuilder.asSortKey(1), v1);
+        btree.insert(TestKeyBuilder.asSortKey(2), v2);
         assertKeys(new int[]{3,7},c);
         assertEquals(a,c.getChild(0));
         Leaf d = (Leaf)c.getChild(1);
@@ -416,8 +416,8 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
          * cause another leaf (d) to split, forcing the split to propagate to and
          * split the root and the tree to increase in height.
          */
-        btree.insert(KeyBuilder.asSortKey(4), v4);
-        btree.insert(KeyBuilder.asSortKey(6), v6);
+        btree.insert(TestKeyBuilder.asSortKey(4), v4);
+        btree.insert(TestKeyBuilder.asSortKey(6), v6);
 //        btree.dump(Level.DEBUG,System.err);
         assertNotSame(c,btree.root);
         final Node g = (Node)btree.root;
@@ -450,7 +450,7 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
          * be deleted. this causes (c,f) to merge as well, which in turn forces
          * the root to be replaced by (c).
          */
-        assertEquals(v4,btree.remove(KeyBuilder.asSortKey(4)));
+        assertEquals(v4,btree.remove(TestKeyBuilder.asSortKey(4)));
 //        btree.dump(Level.DEBUG,System.err);
         assertKeys(new int[]{5,7},c);
         assertEquals(d,c.getChild(0));
@@ -474,7 +474,7 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
          * remove a key (7) from a leaf (b) forcing two leaves to join and
          * verify the visitation order.
          */
-        assertEquals(v7,btree.remove(KeyBuilder.asSortKey(7)));
+        assertEquals(v7,btree.remove(TestKeyBuilder.asSortKey(7)));
         btree.dump(Level.DEBUG,System.err);
         assertKeys(new int[]{5},c);
         assertEquals(d,c.getChild(0));
@@ -495,9 +495,9 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
          * remove keys from a leaf forcing the remaining two leaves to join and
          * verify the visitation order.
          */
-        assertEquals(v3,btree.remove(KeyBuilder.asSortKey(3)));
-        assertEquals(v5,btree.remove(KeyBuilder.asSortKey(5)));
-        assertEquals(v6,btree.remove(KeyBuilder.asSortKey(6)));
+        assertEquals(v3,btree.remove(TestKeyBuilder.asSortKey(3)));
+        assertEquals(v5,btree.remove(TestKeyBuilder.asSortKey(5)));
+        assertEquals(v6,btree.remove(TestKeyBuilder.asSortKey(6)));
         assertKeys(new int[]{1,2,9},b);
         assertValues(new Object[]{v1,v2,v9}, b);
         assertTrue(d.isDeleted());
@@ -560,18 +560,18 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
          * and verify that both iterators now visit the root.
          */
         assertEquals(a,btree.root);
-        btree.insert(KeyBuilder.asSortKey(3), v3);
+        btree.insert(TestKeyBuilder.asSortKey(3), v3);
         assertNotSame(a,btree.root);
         a = (Leaf)btree.root; // new reference for the root leaf.
         assertSameIterator(new IAbstractNode[] { btree.root }, btree.root
                 .postOrderNodeIterator(false));
         assertSameIterator(new IAbstractNode[] { btree.root }, btree.root
                 .postOrderNodeIterator(true));
-        btree.insert(KeyBuilder.asSortKey(5), v5);
-        btree.insert(KeyBuilder.asSortKey(7), v7);
+        btree.insert(TestKeyBuilder.asSortKey(5), v5);
+        btree.insert(TestKeyBuilder.asSortKey(7), v7);
 
         // split the root leaf.
-        btree.insert(KeyBuilder.asSortKey(9), v9);
+        btree.insert(TestKeyBuilder.asSortKey(9), v9);
         Node c = (Node) btree.root;
         assertKeys(new int[]{7},c);
         assertEquals(a,c.getChild(0));
@@ -618,7 +618,7 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
         assertTrue(a.isPersistent());
         assertTrue(b.isPersistent());
         assertTrue(c.isPersistent());
-        btree.insert(KeyBuilder.asSortKey(1), v1); // triggers copy on write for (a) and (c).
+        btree.insert(TestKeyBuilder.asSortKey(1), v1); // triggers copy on write for (a) and (c).
         assertNotSame(c,btree.root);
         c = (Node)btree.root;
         assertNotSame(a,c.getChild(0));
@@ -627,7 +627,7 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
         assertFalse(a.isPersistent());
         assertTrue(b.isPersistent());
         assertFalse(c.isPersistent());
-        btree.insert(KeyBuilder.asSortKey(2), v2);
+        btree.insert(TestKeyBuilder.asSortKey(2), v2);
         assertKeys(new int[]{3,7},c);
         assertEquals(a,c.getChild(0));
         Leaf d = (Leaf)c.getChild(1);
@@ -652,8 +652,8 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
          * cause another leaf (d) to split, forcing the split to propagate to and
          * split the root and the tree to increase in height.
          */
-        btree.insert(KeyBuilder.asSortKey(4), v4);
-        btree.insert(KeyBuilder.asSortKey(6), v6);
+        btree.insert(TestKeyBuilder.asSortKey(4), v4);
+        btree.insert(TestKeyBuilder.asSortKey(6), v6);
 //        btree.dump(Level.DEBUG,System.err);
         assertNotSame(c,btree.root);
         final Node g = (Node)btree.root;
@@ -715,7 +715,7 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
          * 
          * the following are cloned: d, c, g.
          */
-        assertEquals(v4,btree.remove(KeyBuilder.asSortKey(4)));
+        assertEquals(v4,btree.remove(TestKeyBuilder.asSortKey(4)));
         assertNotSame(g,btree.root);
         assertNotSame(c,btree.root);
         c = (Node) btree.root;
@@ -745,7 +745,7 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
          * remove a key (7) from a leaf (b) forcing two leaves (b,e) into (b) to
          * join and verify the visitation order.
          */
-        assertEquals(v7,btree.remove(KeyBuilder.asSortKey(7)));
+        assertEquals(v7,btree.remove(TestKeyBuilder.asSortKey(7)));
         btree.dump(Level.DEBUG,System.err);
         assertKeys(new int[]{5},c);
         assertEquals(d,c.getChild(0));
@@ -779,16 +779,16 @@ public class TestDirtyIterators extends AbstractBTreeTestCase {
         assertEquals(c,btree.root);
         assertEquals(d,c.getChild(0));
         assertEquals(b,c.getChild(1));
-        assertEquals(v3, btree.remove(KeyBuilder.asSortKey(3))); // remove from (d)
+        assertEquals(v3, btree.remove(TestKeyBuilder.asSortKey(3))); // remove from (d)
         assertNotSame(c,btree.root); // c was cloned.
         c = (Node) btree.root;
         assertNotSame(d,c.getChild(0));
         d = (Leaf)c.getChild(0); // d was cloned.
         assertEquals(b,c.getChild(1));
-        assertEquals(v5,btree.remove(KeyBuilder.asSortKey(5))); // remove from (b)
+        assertEquals(v5,btree.remove(TestKeyBuilder.asSortKey(5))); // remove from (b)
         assertNotSame(b,c.getChild(1));
         b = (Leaf)c.getChild(1); // b was cloned.
-        assertEquals(v6,btree.remove(KeyBuilder.asSortKey(6))); // remove from (b)
+        assertEquals(v6,btree.remove(TestKeyBuilder.asSortKey(6))); // remove from (b)
         assertKeys(new int[]{1,2,9},b);
         assertValues(new Object[]{v1,v2,v9}, b);
         assertTrue(d.isDeleted());

@@ -88,7 +88,7 @@ import com.bigdata.btree.keys.KeyBuilder.Options;
  * {@link #appendText(String, boolean, boolean)}.
  * </p>
  * 
- * @see KeyBuilder#asSortKey(Object)
+ * @see TestKeyBuilder#asSortKey(Object)
  * @see KeyBuilder#newInstance()
  * @see KeyBuilder#newUnicodeInstance()
  * @see KeyBuilder#newUnicodeInstance(Properties)

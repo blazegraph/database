@@ -35,7 +35,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.ITx;
 import com.bigdata.service.DataService;
@@ -144,7 +144,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
                 // separator keys.
                 new byte[][] {
                     new byte[]{},
-                    KeyBuilder.asSortKey(500)
+                    TestKeyBuilder.asSortKey(500)
                 },//
                 // data service assignments.
                 new UUID[] { //
@@ -187,7 +187,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
 
         for (int i = 0; i < limit; i++) {
 
-            keys[i] = KeyBuilder.asSortKey(i);
+            keys[i] = TestKeyBuilder.asSortKey(i);
     
             final byte[] val = new byte[10];
             
