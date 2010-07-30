@@ -398,7 +398,7 @@ public class IVUtility {
      * @return
      *          the IV
      */
-    public static final IV fromString(String s) {
+    public static final IV fromString(final String s) {
         if (s.startsWith("TermId")) {
             char type = s.charAt(s.length()-2);
             long tid = Long.valueOf(s.substring(7, s.length()-2));

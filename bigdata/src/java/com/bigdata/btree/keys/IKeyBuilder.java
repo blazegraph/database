@@ -97,7 +97,7 @@ import com.bigdata.btree.keys.KeyBuilder.Options;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IKeyBuilder extends ISortKeyBuilder {
+public interface IKeyBuilder extends ISortKeyBuilder<Object> {
 
     /**
      * The #of bytes of data in the key.
