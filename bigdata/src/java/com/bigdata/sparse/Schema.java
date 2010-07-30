@@ -521,8 +521,7 @@ public class Schema implements Externalizable {
      *         <code>null</code> iff the <i>key</i> is <code>null</code>. If the
      *         <i>key</i> is a byte[], then the byte[] itself will be returned.
      */
-    @SuppressWarnings("unchecked")
-    private static final byte[] asSortKey(Object val) {
+    private static final byte[] asSortKey(final Object val) {
         
         if (val == null) {
 
