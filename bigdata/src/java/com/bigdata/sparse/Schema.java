@@ -128,14 +128,22 @@ public class Schema implements Externalizable {
 
         if (schemaBytes == null) {
 
-            /*
-             * One time encoding of the schema name as a Unicode sort key.
-             */
-        
-            schemaBytes = KeyBuilder.asSortKey(name);
+            if (SparseRowStore.schemaNameUnicodeClean) {
+                /*
+                 * One time encoding of the schema name as UTF8.
+                 */
+                try {
+                    schemaBytes = name.getBytes(SparseRowStore.UTF8);
+                } catch (UnsupportedEncodingException e) {
+                    throw new RuntimeException(e);
+                }
+            } else {
+                /*
+                 * One time encoding of the schema name as a Unicode sort key.
+                 */
+                schemaBytes = KeyBuilder.asSortKey(name);
+            }
             
-//            schemaBytes = KeyBuilder.newInstance().append(name).append("\0").getKey();
-
         }
         
         return schemaBytes;

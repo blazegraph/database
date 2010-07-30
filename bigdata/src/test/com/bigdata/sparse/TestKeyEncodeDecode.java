@@ -28,17 +28,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.sparse;
 
+import java.text.Collator;
+import java.util.Properties;
+
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.relation.RelationSchema;
 import com.ibm.icu.text.CollationKey;
-
-import java.text.Collator;
-import java.util.Properties;
 
 /**
  * Test suite for round trip of keys as encoded by
@@ -101,7 +100,7 @@ public class TestKeyEncodeDecode extends TestCase2 {
 
     /**
      * Unit test verifies that we can correctly locate the start of the column
-     * name and decode the key when using {@link CollatorEnum#ASCII}.
+     * name and decode the key when using {@link CollatorEnum#ICU}.
      */
     public void test_keyDecode_ICU() {
 
@@ -138,19 +137,6 @@ public class TestKeyEncodeDecode extends TestCase2 {
         assertFalse(keyBuilder.isUnicodeSupported());
 
         doKeyDecodeTest(keyBuilder);
-
-//        final Schema schema = new RelationSchema();
-//        final String primaryKey = "U100.lex";
-//        final String column = "com.bigdata.btree.keys.KeyBuilder.collator";
-//        final long writeTime = 1279133923566L;
-//
-//        final byte[] key = schema.getKey(keyBuilder, primaryKey, column, writeTime);
-//
-//        final KeyDecoder decoded = new KeyDecoder(key);
-//        assertEquals(schema.getPrimaryKeyType(), decoded.getPrimaryKeyType());
-//        assertEquals(column, decoded.getColumnName());
-//        assertEquals(writeTime, decoded.getTimestamp());
-
     }
 
     /**
@@ -181,7 +167,7 @@ public class TestKeyEncodeDecode extends TestCase2 {
      */
     protected void doKeyDecodeTest(final IKeyBuilder keyBuilder) {
 
-        final Schema schema = new RelationSchema();
+        final Schema schema = new MySchema();
         final String primaryKey = "U100.lex";
         final String column = "com.bigdata.btree.keys.KeyBuilder.collator";
         final long writeTime = 1279133923566L;
@@ -189,17 +175,54 @@ public class TestKeyEncodeDecode extends TestCase2 {
         final byte[] key = schema.getKey(keyBuilder, primaryKey, column, writeTime);
 
         final KeyDecoder decoded = new KeyDecoder(key);
-        assertEquals(schema.getPrimaryKeyType(), decoded.getPrimaryKeyType());
-        if(SparseRowStore.primaryKeyUnicodeClean) {
-            assertEquals(primaryKey,decoded.getPrimaryKey());
+
+        System.err.println("decoded: "+decoded);
+        
+        if(SparseRowStore.schemaNameUnicodeClean) {
+            
+            assertEquals(schema.getName(),decoded.getSchemaName());
+            
         }
+
+        assertEquals(schema.getPrimaryKeyType(), decoded.getPrimaryKeyType());
+        
+        if(SparseRowStore.primaryKeyUnicodeClean) {
+        
+            assertEquals(primaryKey,decoded.getPrimaryKey());
+            
+        }
+
         /*
-         * Note: While this fails on the column name for the JDK, the problem is
-         * that the JDK collator embeds null bytes into the primaryKey so we are
-         * not able to correctly locate the start of the column name.
+         * Note: Historically, this would fail on the column name for the JDK
+         * CollatorEnum option. The problem was that the JDK CollatorEnum option
+         * embeds nul bytes into the primaryKey so we are not able to correctly
+         * locate the start of the column name. This was resolved with the
+         * [primaryKeyUnicodeClean] option.
          */
         assertEquals(column, decoded.getColumnName());
+        
         assertEquals(writeTime, decoded.getTimestamp());
 
     }
+
+    /**
+     * Private schema used by the unit tests.
+     */
+    static private class MySchema extends Schema {
+
+        /**
+         * The primary key.
+         */
+        public static final String NAMESPACE = MySchema.class.getPackage()
+                .getName()
+                + ".namespace";
+
+        public MySchema() {
+
+            super("my/own-schema_now.10.0", NAMESPACE, KeyType.Unicode);
+
+        }
+
+    }
+    
 }

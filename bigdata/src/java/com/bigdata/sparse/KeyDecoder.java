@@ -73,6 +73,9 @@ import com.bigdata.btree.keys.KeyBuilder;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo The key is now 100% decodable. The package should be updated to take
+ *       advantage of that.
  */
 public class KeyDecoder {
 
@@ -155,6 +158,22 @@ public class KeyDecoder {
         System.arraycopy(key, 0, a, 0, schemaBytesLength);
         
         return a;
+        
+    }
+
+    /**
+     * Return the schema name.
+     * 
+     * @throws UnsupportedOperationException
+     *             unless {@link SparseRowStore#schemaNameUnicodeClean} is
+     *             <code>true</code>.
+     */
+    public String getSchemaName() {
+        
+        if(!SparseRowStore.schemaNameUnicodeClean)
+            throw new UnsupportedOperationException();
+        
+        return new String(getSchemaBytes());
         
     }
     
@@ -485,10 +504,17 @@ public class KeyDecoder {
      */
     public String toString() {
         
-        return "KeyDecoder{primaryKeyType=" + primaryKeyType + ",col=" + col
-                + ",timestamp=" + timestamp + ",key=" + BytesUtil.toString(key)
+        return "KeyDecoder{"
+                + (SparseRowStore.schemaNameUnicodeClean ? "schema="
+                        + getSchemaName() + "," : "")//
+                + "primaryKeyType="+ primaryKeyType//
+                + (SparseRowStore.primaryKeyUnicodeClean ? ",primaryKey="
+                        + getPrimaryKey() : "")//
+                + ",col=" + col //
+                + ",timestamp=" + timestamp //
+                + ",key=" + BytesUtil.toString(key) //
                 + "}";
 
     }
-    
+
 }

@@ -1048,10 +1048,34 @@ public class SparseRowStore implements IRowStoreConstants {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     public interface Options {
 
+        /**
+         * The schema name was originally written using a Unicode sort key.
+         * However, the JDK can generate Unicode sort keys with embedded nuls
+         * which in turn will break the logic to detect the end of the schema
+         * name in the key. In order to accommodate this behavior, the schema
+         * name is now encoded as UTF8 which also has the advantage that we can
+         * decode the schema name. Standard prefix compression on the B+Tree
+         * should make up for the larger representation of the schema name in
+         * the B+Tree.
+         * <p>
+         * This change was introduced on 7/29/2010 in the trunk. When this
+         * property is <code>true</code> it breaks compatibility with earlier
+         * revisions of the {@link SparseRowStore}. This flag may be set to
+         * <code>false</code> for backward compatibility.
+         * 
+         * @see #DEFAULT_SCHEMA_NAME_UNICODE_CLEAN
+         */
+        String SCHEMA_NAME_UNICODE_CLEAN = Schema.class.getName()
+                + ".schemaName.unicodeClean";
+
+        /**
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/107
+         */
+        String DEFAULT_SCHEMA_NAME_UNICODE_CLEAN = "false";
+        
         /**
          * The primary key was originally written using a Unicode sort key.
          * However, the JDK generates Unicode sort keys with embedded nuls and
@@ -1078,6 +1102,17 @@ public class SparseRowStore implements IRowStoreConstants {
         String DEFAULT_PRIMARY_KEY_UNICODE_CLEAN = "true";
 
     }
+
+    /**
+     * This is a global option since it was always <code>false</code> for
+     * historical stores.
+     * 
+     * @see Options#SCHEMA_NAME_UNICODE_CLEAN
+     */
+    final static transient boolean schemaNameUnicodeClean = Boolean
+            .valueOf(System.getProperty(
+                    SparseRowStore.Options.SCHEMA_NAME_UNICODE_CLEAN,
+                    SparseRowStore.Options.DEFAULT_SCHEMA_NAME_UNICODE_CLEAN));
 
     /**
      * This is a global option since it was always <code>false</code> for
