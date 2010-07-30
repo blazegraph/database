@@ -64,7 +64,7 @@ public class Predicate<E> implements IPredicate<E> {
     
     private final IVariableOrConstant[] values;
     
-    private final boolean optional;
+    private final int optionalGoto;
     
     private final IElementFilter<E> constraint;
 
@@ -90,7 +90,7 @@ public class Predicate<E> implements IPredicate<E> {
 
         this.values = src.values.clone();
 
-        this.optional = src.optional;
+        this.optionalGoto = src.optionalGoto;
         
         this.constraint = src.constraint;
 
@@ -161,7 +161,7 @@ public class Predicate<E> implements IPredicate<E> {
 
         this.values = src.values;
 
-        this.optional = src.optional;
+        this.optionalGoto = src.optionalGoto;
         
         this.constraint = src.constraint;
         
@@ -209,7 +209,7 @@ public class Predicate<E> implements IPredicate<E> {
 
         this.values = src.values;
 
-        this.optional = src.optional;
+        this.optionalGoto = src.optionalGoto;
 
         this.constraint = src.constraint;
 
@@ -228,7 +228,7 @@ public class Predicate<E> implements IPredicate<E> {
     public Predicate(String relationName, IVariableOrConstant[] values) {
         
         this(new String[] { relationName }, -1/* partitionId */, values,
-                false/* optional */, null/* constraint */, null/* expander */);
+                -1/* optional=false */, null/* constraint */, null/* expander */);
         
     }
 
@@ -250,7 +250,7 @@ public class Predicate<E> implements IPredicate<E> {
      *            Allows selective override of the predicate evaluation.
      */
     public Predicate(String[] relationName, int partitionId,
-            IVariableOrConstant[] values, boolean optional,
+            IVariableOrConstant[] values, int optionalGoto,
             IElementFilter<E> constraint, ISolutionExpander<E> expander) {
 
         if (relationName == null)
@@ -286,7 +286,7 @@ public class Predicate<E> implements IPredicate<E> {
 
         this.values = values;
         
-        this.optional = optional;
+        this.optionalGoto = optionalGoto;
         
         this.constraint = constraint;
         
@@ -345,7 +345,13 @@ public class Predicate<E> implements IPredicate<E> {
 
     final public boolean isOptional() {
         
-        return optional;
+        return optionalGoto >= 0;
+        
+    }
+    
+    final public int getOptionalGoto() {
+        
+        return optionalGoto;
         
     }
     
