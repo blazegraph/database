@@ -85,8 +85,9 @@ import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.journal.WORMStrategy;
 import com.bigdata.journal.WriteExecutorService;
-import com.bigdata.journal.DiskOnlyStrategy.StoreCounters;
+import com.bigdata.journal.WORMStrategy.StoreCounters;
 import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.IndexPartitionCause;
@@ -2454,6 +2455,11 @@ abstract public class StoreManager extends ResourceEvents implements
                 ((DiskOnlyStrategy) getBufferStrategy())
                         .setStoreCounters(getStoreCounters());
 
+            } else if (getBufferStrategy() instanceof WORMStrategy) {
+
+                ((WORMStrategy) getBufferStrategy())
+                        .setStoreCounters(getStoreCounters());
+
             }
  
         }
@@ -4556,7 +4562,7 @@ abstract public class StoreManager extends ResourceEvents implements
         // make sure that directory exists.
         indexDir.mkdirs();
 
-        final String partitionStr = (partitionId == -1 ? "" : "_part"
+        final String partitionStr = (partitionId == -1 ? "" : "_shardId"
                 + leadingZeros.format(partitionId));
 
         final String prefix = mungedName + "" + partitionStr + "_";

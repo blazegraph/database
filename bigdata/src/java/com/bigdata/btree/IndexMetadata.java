@@ -2049,10 +2049,14 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         // Note: default assumes NOT an index partition.
         this.pmd = null;
         
+        /* Intern'd to reduce duplication on the heap. Will be com.bigdata.btree.BTree or
+         * com.bigdata.btree.IndexSegment and occasionally a class derived from BTree.
+         */
         this.btreeClassName = getProperty(indexManager, properties, namespace,
-                Options.BTREE_CLASS_NAME, BTree.class.getName().toString());
+                Options.BTREE_CLASS_NAME, BTree.class.getName()).intern();
 
-        this.checkpointClassName = Checkpoint.class.getName();
+        // Intern'd to reduce duplication on the heap.
+        this.checkpointClassName = Checkpoint.class.getName().intern();
         
 //        this.addrSer = AddressSerializer.INSTANCE;
         
