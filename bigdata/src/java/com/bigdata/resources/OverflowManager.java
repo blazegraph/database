@@ -724,33 +724,36 @@ abstract public class OverflowManager extends IndexManager {
                 + ".movePercentCpuTimeThreshold";
 
         String DEFAULT_MOVE_PERCENT_CPU_TIME_THRESHOLD = ".7";
-        
-        /**
-         * The maximum #of optional compacting merge operations that will be
-         * performed during a single overflow event (default
-         * {@value #DEFAULT_OPTIONAL_COMPACTING_MERGES_PER_OVERFLOW}).
-         * <p>
-         * Once this #of optional compacting merge tasks have been identified
-         * for a given overflow event, the remainder of the index partitions
-         * that are neither split, joined, moved, nor copied will use
-         * incremental builds. An incremental build is generally cheaper since
-         * it only copies the data on the mutable {@link BTree} for the
-         * lastCommitTime rather than the fused view. A compacting merge permits
-         * the older index segments to be released and results in a simpler view
-         * with view {@link IndexSegment}s. Either a compacting merge or an
-         * incremental build will permit old journals to be released once the
-         * commit points on those journals are no longer required.
-         * <p>
-         * Note: Mandatory compacting merges are identified based on
-         * {@link #MAXIMUM_JOURNALS_PER_VIEW} and
-         * {@link #MAXIMUM_SEGMENTS_PER_VIEW}. There is NO limit the #of
-         * mandatory compacting merges that will be performed during an
-         * asynchronous overflow event. However, each mandatory compacting merge
-         * does count towards the maximum #of optional merges. Therefore if the
-         * #of mandatory compacting merges is greater than this parameter then
-         * NO optional compacting merges will be selected in a given overflow
-         * cycle.
-         */
+
+		/**
+		 * The maximum #of optional compacting merge operations that will be
+		 * performed during a single overflow event (default
+		 * {@value #DEFAULT_OPTIONAL_COMPACTING_MERGES_PER_OVERFLOW}).
+		 * <p>
+		 * Once this #of optional compacting merge tasks have been identified
+		 * for a given overflow event, the remainder of the index partitions
+		 * that are neither split, joined, moved, nor copied will use
+		 * incremental builds. An incremental build is generally cheaper since
+		 * it only copies the data on the mutable {@link BTree} for the
+		 * lastCommitTime rather than the fused view. A compacting merge permits
+		 * the older index segments to be released and results in a simpler view
+		 * with view {@link IndexSegment}s. Either a compacting merge or an
+		 * incremental build will permit old journals to be released once the
+		 * commit points on those journals are no longer required.
+		 * <p>
+		 * Note: Mandatory compacting merges are identified based on
+		 * {@link #MAXIMUM_JOURNALS_PER_VIEW} and
+		 * {@link #MAXIMUM_SEGMENTS_PER_VIEW}. There is NO limit the #of
+		 * mandatory compacting merges that will be performed during an
+		 * asynchronous overflow event. However, each mandatory compacting merge
+		 * does count towards the maximum #of optional merges. Therefore if the
+		 * #of mandatory compacting merges is greater than this parameter then
+		 * NO optional compacting merges will be selected in a given overflow
+		 * cycle.
+		 * 
+		 * @deprecated merges are now performed in priority order while time
+		 *             remains in a given asynchronous overflow cycle.
+		 */
         String MAXIMUM_OPTIONAL_MERGES_PER_OVERFLOW = OverflowManager.class
                 .getName()
                 + ".maximumOptionalMergesPerOverflow";

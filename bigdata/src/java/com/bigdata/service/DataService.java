@@ -413,6 +413,7 @@ abstract public class DataService extends AbstractService
          * reattaching the counters for the live {@link ManagedJournal} during
          * synchronous overflow.
          */
+        @Override
         synchronized public void reattachDynamicCounters() {
 
             final long now = System.currentTimeMillis();
@@ -422,6 +423,9 @@ abstract public class DataService extends AbstractService
             if (service.isOpen() && service.resourceManager.isRunning()
                     && elapsed > 5000/* ms */) {
 
+            	// inherit base class behavior
+            	super.reattachDynamicCounters();
+            	
                 // The service's counter set hierarchy.
                 final CounterSet serviceRoot = service.getFederation()
                         .getServiceCounterSet();

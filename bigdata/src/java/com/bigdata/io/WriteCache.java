@@ -51,7 +51,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.DiskOnlyStrategy;
-import com.bigdata.journal.DiskOnlyStrategy.StoreCounters;
+//import com.bigdata.journal.DiskOnlyStrategy.StoreCounters;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.RWStore;
