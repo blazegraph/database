@@ -278,9 +278,22 @@ public class KeyDecoder {
             this.schemaBytesLength = schemaBytesLength;
             
             this.primaryKeyTypeOffset = schemaBytesLength;
-            
-            // note: ArrayIndexOutOfBounds with index==-1 means ICU library not on classpath!
-            this.primaryKeyType = KeyType.getKeyType(KeyBuilder.decodeByte(key[primaryKeyTypeOffset]));
+
+            /*
+             * Note: ArrayIndexOutOfBounds with index==-1 is an indication that
+             * the schema name or a Unicode primary key contained embedded nul
+             * bytes. This should no longer be possible when using the unicode
+             * clean options on the SparseRowStore which encoded those data as
+             * UTF8 rather than as Unicode sort keys. Historically, these were
+             * encoded as Unicode sort keys. However, the JDK CollatorEnum
+             * option does not support compressed Unicode sort keys and embeds
+             * nul bytes in its generated sort keys. We rely on nul bytes as
+             * boundary markers when decoding the row store keys. The presence
+             * of those nul byte within the scheme and and/or the a Unicode
+             * primary key was causing the ArrayIndexOutOfBoundsException here.
+             */
+            this.primaryKeyType = KeyType.getKeyType(KeyBuilder
+                    .decodeByte(key[primaryKeyTypeOffset]));
             
         }
 
