@@ -116,7 +116,8 @@ public class AllocBlock {
     RWStore.clrBit(m_bits, bit);
     
     if (!RWStore.tstBit(m_commit, bit)) {
-      m_writeCache.clearWrite(addr);
+      // Should not be cleared here!
+      // m_writeCache.clearWrite(addr);
 
       RWStore.clrBit(m_transients, bit);
       
