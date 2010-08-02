@@ -916,6 +916,11 @@ public class Splitter {
          * {@inheritDoc}
          */
         public long flush() {
+			if (numStmts == 0) {
+				// Nothing to write.
+        		return 0;
+        	}
+        	
             {
 
                 // The output directory for the next file.
