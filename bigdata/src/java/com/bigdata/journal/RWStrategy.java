@@ -31,6 +31,8 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
@@ -41,6 +43,7 @@ import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rwstore.RWStore;
+import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -82,6 +85,14 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	private volatile IRootBlockView m_rb0;
 	private volatile IRootBlockView m_rb1;
 	
+	final ReentrantLock m_commitLock = new ReentrantLock();
+	
+    /**
+     * Access to the transaction manager of any owning Journal, needed by
+     * RWStrategy to manager deleted data.
+     */
+    private AbstractLocalTransactionManager localTransactionManager = null;
+    
 //	CounterSet m_counters = new CounterSet();
 
 	/**
@@ -242,6 +253,9 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 
 			return retaddr;
 		} catch (RuntimeException re) {
+			
+			re.printStackTrace();
+			
 			m_needsReopen = true;			
 			
 			reopen(); // FIXME
@@ -282,8 +296,27 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		return (int) (addr & 0xFFFFFFFF);
 	}
 
+	/**
+	 * Must check whether there are existing transactions which may access
+	 * this data, and if not free immediately, otherwise defer.
+	 */
 	public void delete(long addr) {
-		m_store.free(decodeAddr(addr), decodeSize(addr));
+		final JournalTransactionService service = (JournalTransactionService) (localTransactionManager == null ? null
+				: localTransactionManager.getTransactionService());
+		
+		final int rwaddr = decodeAddr(addr);
+		final int sze = decodeSize(addr);
+		
+		if (service == null) {
+			m_store.free(rwaddr, sze);
+		} else {
+			/*
+			 * May well be better to always defer and then free in batch,
+			 * but for now need to confirm transaction logic
+			 */
+			m_store.deferFree(rwaddr, sze, service
+					.getLastCommitTime());
+		}
 	}
 
 	public static class RWAddressManager implements IAddressManager {
@@ -471,18 +504,29 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 				m_rb.getCommitRecordAddr(), m_rb.getCommitRecordIndexAddr(), getMetaStartAddr(), getMetaBitsAddr(), m_rb.getCloseTime() );
 		
 	}
+	
+	/**
+	 * commit must use a commit lock to synchronize the rootBlock with the commit.
+	 * 
+	 * Must pass in earliestTxnTime to commitChanges to enable
+	 */
 	public void commit() {
-		m_store.commitChanges(); // includes a force(false)
-		IRootBlockView rb = getRootBlock();
-		
-		writeRootBlock(rb, ForceEnum.No);
-
-		m_rb = rb;
-		
-		if (m_rb.isRootBlock0()) {
-			m_rb0 = m_rb;
-		} else {
-			m_rb1 = m_rb;
+		m_commitLock.lock();
+		try {
+			m_store.commitChanges(); // includes a force(false)
+			IRootBlockView rb = getRootBlock();
+			
+			writeRootBlock(rb, ForceEnum.No);
+	
+			m_rb = rb;
+			
+			if (m_rb.isRootBlock0()) {
+				m_rb0 = m_rb;
+			} else {
+				m_rb1 = m_rb;
+			}
+		} finally {
+			m_commitLock.unlock();
 		}
 	}
 	
@@ -662,6 +706,11 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
         
         m_store.establishHAExtent(extent);
         
+	}
+
+	public void setTransactionManager(AbstractLocalTransactionManager localTransactionManager) {
+		this.localTransactionManager = localTransactionManager;
+		m_store.setTransactionService((JournalTransactionService) localTransactionManager.getTransactionService());
 	}
 
 }
