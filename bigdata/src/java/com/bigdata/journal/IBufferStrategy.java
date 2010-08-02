@@ -258,4 +258,16 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
      */
     public boolean useChecksums();
 
+    /**
+     * Needed to enable transaction support for standalone buffer strategies.
+     * 
+     * The WORMStrategy does not need this since no data is ever deleted, but
+     * the RWStrategy must manage deletions such that no data is deleted until
+     * it can be guaranteed not to be accessed by existing transactions.
+     * 
+     * @param localTransactionManager
+     * 	The transaction manager for the owning Journal
+     */
+	public void setTransactionManager(AbstractLocalTransactionManager localTransactionManager);
+
 }
