@@ -59,7 +59,7 @@ public class TestBigdataSailWithoutSids extends AbstractBigdataSailTestCase {
          * Use a proxy test suite and specify the delegate.
          */
 
-        final ProxyTestSuite suite = new ProxyTestSuite(delegate, "SAIL without SIDS");
+        final ProxyTestSuite suite = new ProxyTestSuite(delegate, "SAIL with Triples (no SIDs)");
 
         // test pruning of variables not required for downstream processing.
         suite.addTestSuite(TestPruneBindingSets.class);
@@ -75,6 +75,10 @@ public class TestBigdataSailWithoutSids extends AbstractBigdataSailTestCase {
 
         suite.addTestSuite(TestBigdataSailEvaluationStrategyImpl.class);
 
+        suite.addTestSuite(TestUnions.class);
+        
+        suite.addTestSuite(TestDescribe.class);
+        
         return suite;
         
     }

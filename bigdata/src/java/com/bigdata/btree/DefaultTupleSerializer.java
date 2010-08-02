@@ -308,20 +308,42 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
         
     }
 
-    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+    /**
+     * The initial version.
+     * <p>
+     * Note: Explicit versioning for the {@link DefaultTupleSerializer} was
+     * introduced with inlining of datatype literals for the RDF database.
+     */
+    private final static transient byte VERSION0 = 0;
 
-        delegateKeyBuilderFactory = (IKeyBuilderFactory)in.readObject();
-        
-        threadLocalKeyBuilderFactory = new ThreadLocalKeyBuilderFactory(delegateKeyBuilderFactory);
-        
-        leafKeysCoder = (IRabaCoder) in.readObject();
+    /**
+     * The current version.
+     */
+    private final static transient byte VERSION = VERSION0;
 
-        leafValsCoder = (IRabaCoder) in.readObject();
+    public void readExternal(final ObjectInput in) throws IOException,
+            ClassNotFoundException {
+
+        final byte version = in.readByte();
+        switch (version) {
+        case VERSION0:
+            delegateKeyBuilderFactory = (IKeyBuilderFactory) in.readObject();
+            threadLocalKeyBuilderFactory = new ThreadLocalKeyBuilderFactory(
+                    delegateKeyBuilderFactory);
+            leafKeysCoder = (IRabaCoder) in.readObject();
+            leafValsCoder = (IRabaCoder) in.readObject();
+            break;
+        default:
+            throw new UnsupportedOperationException("Unknown version: "
+                    + version);
+        }
 
     }
 
-    public void writeExternal(ObjectOutput out) throws IOException {
+    public void writeExternal(final ObjectOutput out) throws IOException {
 
+        out.writeByte(VERSION);
+        
         out.writeObject(delegateKeyBuilderFactory);
         
         out.writeObject(leafKeysCoder);

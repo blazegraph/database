@@ -11,7 +11,7 @@ import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.rdf.load.RDFDataLoadMaster;
+import com.bigdata.rdf.load.MappedRDFDataLoadMaster;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -25,7 +25,7 @@ import com.bigdata.rdf.store.LocalTripleStore;
  * If the journal file exists, you should generally delete it 
  * before the load so that the load takes place on a clean journal.
  * <p>
- * Note: For scale-out, use the {@link RDFDataLoadMaster} instead.
+ * Note: For scale-out, use the {@link MappedRDFDataLoadMaster} instead.
  * 
  * @author mike
  * @author thompsonbry

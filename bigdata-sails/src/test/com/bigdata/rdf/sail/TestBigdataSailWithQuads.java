@@ -92,6 +92,10 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
         // unit tests for custom evaluation of high-level query
         suite.addTestSuite(TestBigdataSailEvaluationStrategyImpl.class);
 
+        suite.addTestSuite(TestUnions.class);
+        
+        suite.addTestSuite(TestDescribe.class);
+        
         // The Sesame TCK, including the SPARQL test suite.
         {
 

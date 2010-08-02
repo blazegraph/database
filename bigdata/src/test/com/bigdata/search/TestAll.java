@@ -34,8 +34,8 @@ import junit.framework.TestSuite;
 
 import com.bigdata.journal.AbstractIndexManagerTestCase;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.service.TestEDS;
 import com.bigdata.service.TestJournal;
-import com.bigdata.service.TestLDS;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -70,11 +70,11 @@ public class TestAll extends TestCase {
         // search backed by a Journal.
         suite.addTest(proxySuite(new TestJournal("Journal Search"),"Journal"));
 
-        // search backed by LDS.
-        suite.addTest(proxySuite(new TestLDS("LDS Search"),"LDS"));
+//        // search backed by LDS.
+//        suite.addTest(proxySuite(new TestLDS("LDS Search"),"LDS"));
 
         // search backed by EDS.
-        suite.addTest(proxySuite(new TestLDS("EDS Search"),"EDS"));
+        suite.addTest(proxySuite(new TestEDS("EDS Search"),"EDS"));
 
         /* For EDS:
          * 

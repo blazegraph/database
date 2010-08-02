@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.SPOStarJoin.SPOStarConstraint;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.ArrayBindingSet;
@@ -66,14 +67,14 @@ public class SPOPredicate implements IPredicate<ISPO> {
 
     protected final int partitionId;
     
-    protected final IVariableOrConstant<Long> s;
+    protected final IVariableOrConstant<IV> s;
 
-    protected final IVariableOrConstant<Long> p;
+    protected final IVariableOrConstant<IV> p;
 
-    protected final IVariableOrConstant<Long> o;
+    protected final IVariableOrConstant<IV> o;
 
     /** The context position MAY be <code>null</code>. */
-    protected final IVariableOrConstant<Long> c;
+    protected final IVariableOrConstant<IV> c;
 
     protected final boolean optional;
     
@@ -129,8 +130,8 @@ public class SPOPredicate implements IPredicate<ISPO> {
      * @param o
      */
     public SPOPredicate(final String relationName,
-            final IVariableOrConstant<Long> s,
-            final IVariableOrConstant<Long> p, final IVariableOrConstant<Long> o) {
+            final IVariableOrConstant<IV> s,
+            final IVariableOrConstant<IV> p, final IVariableOrConstant<IV> o) {
 
         this(new String[] { relationName }, -1/* partitionId */, s, p, o,
                 null/* c */, false/* optional */, null/* constraint */, null/* expander */);
@@ -148,9 +149,9 @@ public class SPOPredicate implements IPredicate<ISPO> {
      * @param c
      */
     public SPOPredicate(final String relationName,
-            final IVariableOrConstant<Long> s,
-            final IVariableOrConstant<Long> p,
-            final IVariableOrConstant<Long> o, final IVariableOrConstant<Long> c) {
+            final IVariableOrConstant<IV> s,
+            final IVariableOrConstant<IV> p,
+            final IVariableOrConstant<IV> o, final IVariableOrConstant<IV> c) {
 
         this(new String[] { relationName }, -1/* partitionId */, s, p, o, c,
                 false/* optional */, null/* constraint */, null/* expander */);
@@ -168,8 +169,8 @@ public class SPOPredicate implements IPredicate<ISPO> {
      * @param o
      */
     public SPOPredicate(final String[] relationName,
-            final IVariableOrConstant<Long> s,
-            final IVariableOrConstant<Long> p, final IVariableOrConstant<Long> o) {
+            final IVariableOrConstant<IV> s,
+            final IVariableOrConstant<IV> p, final IVariableOrConstant<IV> o) {
 
         this(relationName, -1/* partitionId */, s, p, o,
                 null/* c */, false/* optional */, null/* constraint */, null/* expander */);
@@ -187,9 +188,9 @@ public class SPOPredicate implements IPredicate<ISPO> {
      * @param optional
      */
     public SPOPredicate(final String relationName,
-            final IVariableOrConstant<Long> s,
-            final IVariableOrConstant<Long> p,
-            final IVariableOrConstant<Long> o, final boolean optional) {
+            final IVariableOrConstant<IV> s,
+            final IVariableOrConstant<IV> p,
+            final IVariableOrConstant<IV> o, final boolean optional) {
 
         this(new String[] { relationName }, -1/* partitionId */, s, p, o,
                 null/* c */, optional, null/* constraint */, null/* expander */);
@@ -208,9 +209,9 @@ public class SPOPredicate implements IPredicate<ISPO> {
      *            MAY be <code>null</code>.
      */
     public SPOPredicate(final String relationName,
-            final IVariableOrConstant<Long> s,
-            final IVariableOrConstant<Long> p,
-            final IVariableOrConstant<Long> o,
+            final IVariableOrConstant<IV> s,
+            final IVariableOrConstant<IV> p,
+            final IVariableOrConstant<IV> o,
             final ISolutionExpander<ISPO> expander) {
 
         this(new String[] { relationName }, -1/* partitionId */, s, p, o,
@@ -232,9 +233,9 @@ public class SPOPredicate implements IPredicate<ISPO> {
      *            MAY be <code>null</code>.
      */
     public SPOPredicate(final String relationName,
-            final IVariableOrConstant<Long> s,
-            final IVariableOrConstant<Long> p,
-            final IVariableOrConstant<Long> o, final boolean optional,
+            final IVariableOrConstant<IV> s,
+            final IVariableOrConstant<IV> p,
+            final IVariableOrConstant<IV> o, final boolean optional,
             final ISolutionExpander<ISPO> expander) {
 
         this(new String[] { relationName }, -1/* partitionId */, s, p, o,
@@ -259,10 +260,10 @@ public class SPOPredicate implements IPredicate<ISPO> {
      */
     public SPOPredicate(String[] relationName, //
             final int partitionId, //
-            final IVariableOrConstant<Long> s,//
-            final IVariableOrConstant<Long> p,//
-            final IVariableOrConstant<Long> o,//
-            final IVariableOrConstant<Long> c,//
+            final IVariableOrConstant<IV> s,//
+            final IVariableOrConstant<IV> p,//
+            final IVariableOrConstant<IV> o,//
+            final IVariableOrConstant<IV> c,//
             final boolean optional, //
             final IElementFilter<ISPO> constraint,//
             final ISolutionExpander<ISPO> expander//
@@ -426,7 +427,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
      *             unless the context position on the {@link SPOPredicate} is
      *             <code>null</code>.
      */
-    public SPOPredicate setC(final IConstant<Long> c) {
+    public SPOPredicate setC(final IConstant<IV> c) {
 
         if(c == null)
             throw new IllegalArgumentException();
@@ -495,8 +496,16 @@ public class SPOPredicate implements IPredicate<ISPO> {
             
         }
 
-        public boolean accept(final ISPO e) {
-
+        public boolean accept(final Object o) {
+            
+            if (!canAccept(o)) {
+                
+                return true;
+                
+            }
+            
+            final ISPO e = (ISPO) o;
+            
             if (a.canAccept(e) && a.accept(e) && b.canAccept(e) && b.accept(e)) {
 
                 return true;
@@ -509,7 +518,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
     }
     
-    public final IVariableOrConstant<Long> get(final int index) {
+    public final IVariableOrConstant<IV> get(final int index) {
         switch (index) {
         case 0:
             return s;
@@ -526,16 +535,16 @@ public class SPOPredicate implements IPredicate<ISPO> {
         }
     }
     
-    public final IConstant<Long> get(final ISPO spo, final int index) {
+    public final IConstant<IV> get(final ISPO spo, final int index) {
         switch (index) {
         case 0:
-            return new Constant<Long>(spo.s());
+            return new Constant<IV>(spo.s());
         case 1:
-            return new Constant<Long>(spo.p());
+            return new Constant<IV>(spo.p());
         case 2:
-            return new Constant<Long>(spo.o());
+            return new Constant<IV>(spo.o());
         case 3:
-            return new Constant<Long>(spo.c());
+            return new Constant<IV>(spo.c());
         default:
             throw new IndexOutOfBoundsException("" + index);
         }
@@ -568,25 +577,25 @@ public class SPOPredicate implements IPredicate<ISPO> {
 //        
 //    }
 
-    final public IVariableOrConstant<Long> s() {
+    final public IVariableOrConstant<IV> s() {
         
         return s;
         
     }
     
-    final public IVariableOrConstant<Long> p() {
+    final public IVariableOrConstant<IV> p() {
         
         return p;
         
     }
 
-    final public IVariableOrConstant<Long> o() {
+    final public IVariableOrConstant<IV> o() {
         
         return o;
         
     }
     
-    final public IVariableOrConstant<Long> c() {
+    final public IVariableOrConstant<IV> c() {
         
         return c;
         
@@ -650,8 +659,8 @@ public class SPOPredicate implements IPredicate<ISPO> {
      * @throws IllegalArgumentException
      *             if either argument is <code>null</code>.
      */
-    public SPOPredicate asBound(final IVariable<Long> var,
-            final IConstant<Long> val) {
+    public SPOPredicate asBound(final IVariable<IV> var,
+            final IConstant<IV> val) {
 
         return asBound(new ArrayBindingSet(new IVariable[]{var}, new IConstant[]{val}));
         
@@ -732,7 +741,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
     
     public SPOPredicate asBound(final IBindingSet bindingSet) {
         
-        final IVariableOrConstant<Long> s;
+        final IVariableOrConstant<IV> s;
         {
             if (this.s.isVar() && bindingSet.isBound((IVariable) this.s)) {
 
@@ -745,7 +754,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
             }
         }
         
-        final IVariableOrConstant<Long> p;
+        final IVariableOrConstant<IV> p;
         {
             if (this.p.isVar() && bindingSet.isBound((IVariable)this.p)) {
 
@@ -758,7 +767,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
             }
         }
         
-        final IVariableOrConstant<Long> o;
+        final IVariableOrConstant<IV> o;
         {
             if (this.o.isVar() && bindingSet.isBound((IVariable) this.o)) {
 
@@ -771,7 +780,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
             }
         }
         
-        final IVariableOrConstant<Long> c;
+        final IVariableOrConstant<IV> c;
         {
             if (this.c != null && this.c.isVar()
                     && bindingSet.isBound((IVariable) this.c)) {
@@ -970,7 +979,9 @@ public class SPOPredicate implements IPredicate<ISPO> {
     private int hash = 0;
 
     
-    public SPOPredicate reBound( IVariableOrConstant<Long> s, IVariableOrConstant<Long> p, IVariableOrConstant<Long> o, IVariableOrConstant<Long> c) {
+    public SPOPredicate reBound(final IVariableOrConstant<IV> s, 
+            final IVariableOrConstant<IV> p, final IVariableOrConstant<IV> o, 
+            final IVariableOrConstant<IV> c) {
 
         return new SPOPredicate(relationName, partitionId, s, p, o, c,
                 optional, constraint, expander);

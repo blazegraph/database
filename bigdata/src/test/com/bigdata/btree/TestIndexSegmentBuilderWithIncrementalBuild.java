@@ -32,7 +32,7 @@ import java.io.File;
 import java.util.UUID;
 
 import com.bigdata.LRUNexus;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
@@ -121,7 +121,7 @@ public class TestIndexSegmentBuilderWithIncrementalBuild extends
 
         for (int i = 1; i <= 10; i++) {
 
-            expected.insert(KeyBuilder.asSortKey(i), new SimpleEntry(i));
+            expected.insert(TestKeyBuilder.asSortKey(i), new SimpleEntry(i));
 
         }
 
@@ -193,8 +193,8 @@ public class TestIndexSegmentBuilderWithIncrementalBuild extends
          */
         {
             
-            final byte[] fromKey = KeyBuilder.asSortKey(3);
-            final byte[] toKey = KeyBuilder.asSortKey(7);
+            final byte[] fromKey = TestKeyBuilder.asSortKey(3);
+            final byte[] toKey = TestKeyBuilder.asSortKey(7);
             
             // should cover keys {3, 4, 5, and 6}.
             assertEquals(4, expected.rangeCount(fromKey, toKey));
@@ -260,11 +260,11 @@ public class TestIndexSegmentBuilderWithIncrementalBuild extends
          */
         {
             
-            final byte[] fromKey = KeyBuilder.asSortKey(3);
-            final byte[] toKey = KeyBuilder.asSortKey(7);
+            final byte[] fromKey = TestKeyBuilder.asSortKey(3);
+            final byte[] toKey = TestKeyBuilder.asSortKey(7);
             
-            expected.remove(KeyBuilder.asSortKey(3));
-            expected.remove(KeyBuilder.asSortKey(5));
+            expected.remove(TestKeyBuilder.asSortKey(3));
+            expected.remove(TestKeyBuilder.asSortKey(5));
 
             // entry count is NOT changed since delete markers are enabled.
             assertEquals(10, expected.getEntryCount());
@@ -331,8 +331,8 @@ public class TestIndexSegmentBuilderWithIncrementalBuild extends
          */
         {
             
-            final byte[] fromKey = KeyBuilder.asSortKey(6);
-            final byte[] toKey = KeyBuilder.asSortKey(11);
+            final byte[] fromKey = TestKeyBuilder.asSortKey(6);
+            final byte[] toKey = TestKeyBuilder.asSortKey(11);
             
             // should cover keys {6, 7, 8, 9, 10}.
             assertEquals(5, expected.rangeCount(fromKey, toKey));
@@ -469,8 +469,8 @@ public class TestIndexSegmentBuilderWithIncrementalBuild extends
             final byte[] fromKey = null;
             final byte[] toKey = null;
 
-            expected.insert(KeyBuilder.asSortKey(3), new SimpleEntry(3));
-            expected.insert(KeyBuilder.asSortKey(5), new SimpleEntry(5));
+            expected.insert(TestKeyBuilder.asSortKey(3), new SimpleEntry(3));
+            expected.insert(TestKeyBuilder.asSortKey(5), new SimpleEntry(5));
             
             // should cover all keys.
             assertEquals(10, expected.getEntryCount());
@@ -539,7 +539,7 @@ public class TestIndexSegmentBuilderWithIncrementalBuild extends
 
             for (int i = 1; i <= 10; i++) {
                 
-                expected.remove(KeyBuilder.asSortKey(i));
+                expected.remove(TestKeyBuilder.asSortKey(i));
                 
             }
                         

@@ -29,10 +29,17 @@ public class SPOSortKeyBuilder implements ISortKeyBuilder<ISPO> {
      */
     public byte[] getSortKey(final ISPO spo) {
 
-        keyBuilder.reset().append(spo.s()).append(spo.p()).append(spo.o());
+        keyBuilder.reset();
+        
+        spo.s().encode(keyBuilder);
+        spo.p().encode(keyBuilder);
+        spo.o().encode(keyBuilder);
 
-        if (arity == 4)
-            keyBuilder.append(spo.c());
+        if (arity == 4) {
+
+            spo.c().encode(keyBuilder);
+            
+        }
 
         return keyBuilder.getKey();
 

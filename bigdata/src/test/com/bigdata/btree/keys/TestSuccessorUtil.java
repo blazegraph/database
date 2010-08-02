@@ -541,7 +541,7 @@ public class TestSuccessorUtil extends TestCase2 {
 //                short v = -1;
                 
                 // original data.
-                byte[] b = KeyBuilder.asSortKey(v);
+                byte[] b = TestKeyBuilder.asSortKey(v);
 
                 if(true){
                 boolean allones = true;
@@ -563,7 +563,7 @@ public class TestSuccessorUtil extends TestCase2 {
                     }
                 } else {
                     // expected successor.
-                    byte[] e = KeyBuilder.asSortKey((short) (v + 1));
+                    byte[] e = TestKeyBuilder.asSortKey((short) (v + 1));
 
                     // successor.
                     byte[] s = SuccessorUtil.successor(b.clone());

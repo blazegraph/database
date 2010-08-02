@@ -42,7 +42,6 @@ import com.bigdata.btree.AsynchronousIndexWriteConfiguration;
 import com.bigdata.btree.BigdataMap;
 import com.bigdata.btree.BigdataSet;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.rdf.load.RDFDataLoadMaster;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.jini.JiniFederation;
@@ -81,7 +80,7 @@ V extends Serializable//
         extends TaskMaster<S, T, U> {
 
     /**
-     * {@link Configuration} options for the {@link RDFDataLoadMaster}.
+     * {@link Configuration} options for the {@link MappedTaskMaster}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -145,7 +144,7 @@ V extends Serializable//
     }
     
     /**
-     * The job description for an {@link RDFDataLoadMaster}.
+     * The job description for an {@link MappedTaskMaster}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -237,7 +236,7 @@ V extends Serializable//
              * is assigned to a client in advance of observing the rate at which
              * the client is consuming its workload.
              */
-            final int masterChunkSize = 10000;
+            final int masterChunkSize = 100; // was 10000 (BBT 6/21/2010).
             final int sinkChunkSize = 1000;
             conf = (AsynchronousIndexWriteConfiguration) config.getEntry(component,
                     ConfigurationOptions.RESOURCE_BUFFER_CONFIG, AsynchronousIndexWriteConfiguration.class,
@@ -318,6 +317,8 @@ V extends Serializable//
             // start scanner.
             final Future<Long> scannerFuture = fed.getExecutorService().submit(
                     scanner);
+
+            System.out.println("Master running : " + scanner);
 
             // await scanner future.
             final Long acceptCount = scannerFuture.get();

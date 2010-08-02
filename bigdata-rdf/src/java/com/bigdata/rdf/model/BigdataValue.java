@@ -49,51 +49,49 @@ package com.bigdata.rdf.model;
 
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 
 /**
  * An interface which exposes the internal 64-bit long integer identifiers for
- * {@link Value}s stored within a {@link IRawTripleStore}.
+ * {@link Value}s stored within a {@link IRawTripleStore}.  Values may also be
+ * stored inline inside the statement indices rather than referencing the 
+ * lexicon.  See {@link IV}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public interface BigdataValue extends Value {//, Comparable<BigdataValue> {
     public BigdataValueFactory getValueFactory();
-    /**
-     * A value which corresponds to an unassigned term identifier.
-     * 
-     * @see IRawTripleStore#NULL
-     */
-    long NULL = IRawTripleStore.NULL;
     
     /**
-     * Return the term identifier for this value. The term identifier uniquely
-     * identifies a {@link Value} for a database. Sometimes a
-     * {@link TempTripleStore} will be used that shares the lexicon with a given
-     * database, in which case the same term identifiers will be value for that
-     * {@link TempTripleStore}.
+     * Return the internal value for this value. May be a term identifier or an
+     * inline value. The term identifier uniquely identifies a {@link Value} 
+     * for a database. Sometimes a {@link TempTripleStore} will be used that 
+     * shares the lexicon with a given database, in which case the same term 
+     * identifiers will be value for that {@link TempTripleStore}.
      */
-    public long getTermId();
+    public IV getIV();
     
     /**
-     * Set the term identifier for this value.
+     * Set the internal value for this value.  May be a term identifier or an
+     * inline value.
      * 
-     * @param termId
-     *            The term identifier.
+     * @param iv
+     *            The internal value.
      * 
      * @throws IllegalArgumentException
-     *             if <i>termId</i> is {@link #NULL}.
+     *             if <i>iv</i> is null.
      * @throws IllegalStateException
-     *             if the term identifier is already set to a different non-{@link #NULL}
+     *             if the internal value is already set to a different non-null
      *             value.
      */
-    public void setTermId(long termId);
+    public void setIV(IV iv);
     
     /**
-     * Clears the term identifier to {@link #NULL}.
+     * Clears the internal value to null.
      */
-    public void clearTermId();
+    public void clearInternalValue();
     
 }

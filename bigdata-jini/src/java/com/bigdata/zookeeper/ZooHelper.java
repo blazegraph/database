@@ -42,6 +42,7 @@ import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 
 import com.bigdata.jini.start.config.AbstractHostConstraint;
+import com.bigdata.util.config.NicUtil;
 
 /**
  * Utility class for issuing the four letter commands to a zookeeper service.
@@ -53,6 +54,14 @@ public class ZooHelper {
 
     protected static final Logger log = Logger.getLogger(ZooHelper.class);
     
+    private static InetAddress thisInetAddr = null;
+    static {
+	try {
+            thisInetAddr = InetAddress.getByName
+                    (NicUtil.getIpAddress("default.nic", "default", false));
+	} catch (Throwable t) { /* swallow */ }
+    }
+
     /**
      * Inquires whether a zookeeper instance is running in a non-error state and
      * returns iff the service reports "imok".
@@ -129,7 +138,7 @@ public class ZooHelper {
         if (log.isInfoEnabled())
             log.info("Killing service: @ port=" + clientPort);
 
-        final Socket socket = new Socket(InetAddress.getLocalHost(), clientPort);
+        final Socket socket = new Socket(thisInetAddr, clientPort);
 
         try {
     
@@ -180,7 +189,7 @@ public class ZooHelper {
         if (log.isInfoEnabled())
             log.info("hostname=" + addr + ", port=" + clientPort);
     
-        final Socket socket = new Socket(InetAddress.getLocalHost(), clientPort);
+        final Socket socket = new Socket(thisInetAddr, clientPort);
     
         try {
     
@@ -251,7 +260,7 @@ public class ZooHelper {
         if (log.isInfoEnabled())
             log.info("hostname=" + addr + ", port=" + clientPort);
     
-        final Socket socket = new Socket(InetAddress.getLocalHost(), clientPort);
+        final Socket socket = new Socket(thisInetAddr, clientPort);
     
         try {
     

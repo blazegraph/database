@@ -61,8 +61,6 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("com.bigdata.util.concurrent");
 
-        suite.addTestSuite( TestParallelismLimitedExecutorService.class );
-
         suite.addTestSuite( TestLatch.class );
 
         return suite;

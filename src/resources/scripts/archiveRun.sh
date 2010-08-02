@@ -19,7 +19,8 @@ if [ -z "$1" ]; then
 	exit 1
 fi
 
-source `dirname $0`/bigdataenv
+BINDIR=`dirname $0`
+source $BINDIR/bigdataenv
 
 targetDir=$1
 
@@ -29,21 +30,13 @@ mkdir -p $targetDir
 mkdir -p $targetDir/counters
 mkdir -p $targetDir/indexDumps
 
-# Look for the load balancer service directory on the local host. If
-# we find it, then we read the pid for the LBS and send it a HUP signal
-# so it will write a snapshot of its performance counters.
+# Broadcast a HUP request to the load balancer in the federation so 
+# that it will write a snapshot of its performance counters.
 waitDur=60
-if [ -f "$lockFile" ]; then
-    read pid < `find $LAS -name pid | grep LoadBalancerServer`
-    if [ -z "$pid" ]; then
-        echo "Could not find LoadBalancer process: `hostname` LAS=$LAS."
-    else
-        echo "Sending HUP to the LoadBalancer: $pid"
-        kill -hup $pid
-        echo "Waiting $waitDur seconds for the performance counter dump."
-        sleep $waitDur
-    fi
-fi
+echo "Sending HUP to the LoadBalancer: $pid"
+$BINDIR/broadcast_sighup local loadBalancer
+echo "Waiting $waitDur seconds for the performance counter dump."
+sleep $waitDur
 
 # Copy the configuration file and the various log files.
 cp -v $BIGDATA_CONFIG \

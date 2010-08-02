@@ -34,7 +34,7 @@ import java.util.TreeMap;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.io.SerializerUtil;
 
 import cutthecrap.utils.striterators.Resolver;
@@ -311,19 +311,19 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
         /*
          * fill the root leaf.
          */
-        assertNull(btree.insert(KeyBuilder.asSortKey(4), e4));
-        assertNull(btree.insert(KeyBuilder.asSortKey(2), e2));
-        assertNull(btree.insert(KeyBuilder.asSortKey(1), e1));
-        assertNull(btree.insert(KeyBuilder.asSortKey(3), e3));
+        assertNull(btree.insert(TestKeyBuilder.asSortKey(4), e4));
+        assertNull(btree.insert(TestKeyBuilder.asSortKey(2), e2));
+        assertNull(btree.insert(TestKeyBuilder.asSortKey(1), e1));
+        assertNull(btree.insert(TestKeyBuilder.asSortKey(3), e3));
 
         /*
          * verify that re-inserting does not split the leaf and returns the old
          * value.
          */
-        assertEquals(e4,btree.insert(KeyBuilder.asSortKey(4),e4));
-        assertEquals(e2,btree.insert(KeyBuilder.asSortKey(2),e2));
-        assertEquals(e1,btree.insert(KeyBuilder.asSortKey(1),e1));
-        assertEquals(e3,btree.insert(KeyBuilder.asSortKey(3),e3));
+        assertEquals(e4,btree.insert(TestKeyBuilder.asSortKey(4),e4));
+        assertEquals(e2,btree.insert(TestKeyBuilder.asSortKey(2),e2));
+        assertEquals(e1,btree.insert(TestKeyBuilder.asSortKey(1),e1));
+        assertEquals(e3,btree.insert(TestKeyBuilder.asSortKey(3),e3));
         assertEquals(root,btree.root);
         
         // validate
@@ -331,29 +331,29 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
         assertSameIterator(new Object[]{e1,e2,e3,e4}, root.entryIterator());
 
         // remove (2).
-        assertEquals(e2,btree.remove(KeyBuilder.asSortKey(2)));
+        assertEquals(e2,btree.remove(TestKeyBuilder.asSortKey(2)));
         assertKeys(new int[]{1,3,4},root);
         assertSameIterator(new Object[]{e1,e3,e4}, root.entryIterator());
 
         // remove (1).
-        assertEquals(e1,btree.remove(KeyBuilder.asSortKey(1)));
+        assertEquals(e1,btree.remove(TestKeyBuilder.asSortKey(1)));
         assertKeys(new int[]{3,4},root);
         assertSameIterator(new Object[]{e3,e4}, root.entryIterator());
 
         // remove (4).
-        assertEquals(e4,btree.remove(KeyBuilder.asSortKey(4)));
+        assertEquals(e4,btree.remove(TestKeyBuilder.asSortKey(4)));
         assertKeys(new int[]{3},root);
         assertSameIterator(new Object[]{e3}, root.entryIterator());
 
         // remove (3).
-        assertEquals(e3,btree.remove(KeyBuilder.asSortKey(3)));
+        assertEquals(e3,btree.remove(TestKeyBuilder.asSortKey(3)));
         assertKeys(new int[]{},root);
         assertSameIterator(new Object[]{}, root.entryIterator());
 
-        assertNull(btree.remove(KeyBuilder.asSortKey(1)));
-        assertNull(btree.remove(KeyBuilder.asSortKey(2)));
-        assertNull(btree.remove(KeyBuilder.asSortKey(3)));
-        assertNull(btree.remove(KeyBuilder.asSortKey(4)));
+        assertNull(btree.remove(TestKeyBuilder.asSortKey(1)));
+        assertNull(btree.remove(TestKeyBuilder.asSortKey(2)));
+        assertNull(btree.remove(TestKeyBuilder.asSortKey(3)));
+        assertNull(btree.remove(TestKeyBuilder.asSortKey(4)));
         
     }
     
@@ -389,7 +389,7 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
             
             final Integer ikey = keys[index];
             
-            final byte[] key = KeyBuilder.asSortKey(ikey);
+            final byte[] key = TestKeyBuilder.asSortKey(ikey);
             
             SimpleEntry val = vals[index];
             
@@ -435,7 +435,7 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
                     
                     Map.Entry<Integer,SimpleEntry> entry = itr.next();
                     
-                    final byte[] tmp = KeyBuilder.asSortKey(entry.getKey());
+                    final byte[] tmp = TestKeyBuilder.asSortKey(entry.getKey());
                     
                     assertEquals("lookup(" + entry.getKey() + ")", entry
                             .getValue(), btree

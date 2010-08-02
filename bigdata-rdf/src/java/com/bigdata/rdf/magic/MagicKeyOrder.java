@@ -3,6 +3,7 @@ package com.bigdata.rdf.magic;
 import java.io.Serializable;
 import java.util.Comparator;
 
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.striterator.IKeyOrder;
 
 public class MagicKeyOrder implements IKeyOrder<IMagicTuple>, Serializable {
@@ -36,9 +37,9 @@ public class MagicKeyOrder implements IKeyOrder<IMagicTuple>, Serializable {
         
                 // compare terms one by one in the appropriate key order
                 for (int i = 0; i < keyMap.length; i++) {
-                    long t1 = o1.getTerm(keyMap[i]);
-                    long t2 = o2.getTerm(keyMap[i]);
-                    int ret = t1 < t2 ? -1 : t1 > t2 ? 1 : 0;
+                    IV t1 = o1.getTerm(keyMap[i]);
+                    IV t2 = o2.getTerm(keyMap[i]);
+                    int ret = t1.compareTo(t2);
                     if (ret != 0) {
                         return ret;
                     }

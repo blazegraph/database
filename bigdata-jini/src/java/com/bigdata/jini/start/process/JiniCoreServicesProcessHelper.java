@@ -42,6 +42,7 @@ import com.bigdata.jini.start.config.JiniCoreServicesConfiguration.JiniCoreServi
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.util.JiniServicesHelper;
 import com.bigdata.service.jini.util.LookupStarter;
+import com.bigdata.util.config.NicUtil;
 
 /**
  * Class for starting the jini services.
@@ -169,7 +170,7 @@ public class JiniCoreServicesProcessHelper extends ProcessHelper {
          */
 
         if (log.isInfoEnabled())
-            log.info("Will start instance: " + InetAddress.getLocalHost()
+            log.info("Will start instance: " + NicUtil.getIpAddress("default.nic", "default", false)
                     + ", config=" + config);
 
         final JiniCoreServicesStarter<JiniCoreServicesProcessHelper> serviceStarter = serviceConfig

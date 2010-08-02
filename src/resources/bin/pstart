@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import os, sys, socket, getopt, fcntl, struct
+import os, sys, socket, getopt, struct
 from os.path import dirname
 
 
@@ -46,49 +46,41 @@ Useful properties:
     java.util.logging.config.file=/path/to/jini.logging
         The path to the java.util.logging configuration file
 
-    exportNic=<interfacename>
-        Specifies the name of the network interface on which the Jini service
-        will be exported. This property takes precedence over exportHost.
-        The default value is "eth0".
+    default.nic=<interfacename>
+        Specifies the name of the network interface to use by default
+        for service export and remote communication. This property
+        takes precedence over exportHost. The default behavior
+        regarding this property (in conjunction with configuration
+        files that use NicUtil to retrieve the interface's associated
+        ip address) is to direct the configuration file to use the
+        IPv4 address of the first active network inteface that can
+        be found on the system.
 
     exportHost=<ipaddress|hostname>
-        Specifies the IP address on which the Jini service(s) will be exported.
-        This property is not used unless exportNic is "".
+        Specifies the IP address or host name to use when exporting
+        services for remote communication. This property will be
+        employed only when the value of the default.nic property
+        is set to the empty string ("") or a value that does not
+        correspond to any of the network interfaces on the system.
 
     bigdata.codebase.host=<interfacename|ipaddress|hostname>
         Specifies the network address of the codebase HTTP server. If the
         value is an interface name, the IP address assigned to that interface
         will be used. If the value is an IP address or hostname, that value
-        will be used directly. The default value is "eth0".
+        will be used directly. The default behavior regarding this property
+        (in conjunction with configuration files that use NicUtil to
+        retrieve the interface's associated ip address) is to direct the
+        configuration file to use the IPv4 address of the first active
+        network inteface that can be found on the system.
 
     bigdata.codebase.port=<n>
         The port number on <bigdata.codebase.host> on which the HTTP class
-        server is running.
+        server is listening.
 
 """
     serviceNames = bigdataServiceMap.keys()
     serviceNames.sort()
     print "Services: \n  " + ", ".join(serviceNames)
-
-
-def get_interface_ipaddress(ifname):
-    """Gets the IP address assigned to a network interface.
-
-       Parameters:
-           ifname The name of he interface whose IP address to get
-
-       Returns:
-           A string contain the IP address of the interface
-    """
-    if sys.platform == "linux2":
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        return socket.inet_ntoa(fcntl.ioctl(
-            s.fileno(),
-            0x8915,  # SIOCGIFADDR
-            struct.pack('256s', ifname[:15])
-        )[20:24])
-    else:
-        raise NotImplementedError("Not implemented for " + sys.platform)
 
 
 class Params:
@@ -109,9 +101,7 @@ class BigdataServiceBase:
         # The name of the service
         self.serviceName = serviceName
 
-        # appHome is the base directory of the Java applications. In the
-        # source tree this is the top-level "java" directory. This will
-        # always be valid.
+        # appHome is the base directory of the application being started.
         self.appHome = params.appHome
 
         # A dictionary containing all of the Java system properties to set
@@ -149,14 +139,14 @@ class BigdataServiceBase:
         self.properties['java.security.debug'] = "off"
 
     def setEntityProperties(self):
-        self.properties['exportNic'] = "eth0"
+        self.properties['default.nic'] = "${default.nic}"
         self.properties['exportHost'] = socket.gethostname()
         self.properties['exportPort'] = "0"
-        self.properties['bigdata.codebase.host'] = "eth0"
+        self.properties['bigdata.codebase.host'] = "${bigdata.codebase.host}"
         self.properties['bigdata.codebase.port'] = "8081"
 
-        self.properties['log4j.configuration'] = \
-            "src/resources/config/log4j.properties"
+        self.properties['log4j.configuration'] = os.path.join( \
+            self.appHome,  "var", "config", "logging", "log4j.properties")
         self.properties['log4j.primary.configuration'] = os.path.join( \
             self.appHome,  "var", "config", "logging", \
             serviceName + "-logging.properties")
@@ -170,17 +160,41 @@ class BigdataServiceBase:
         """Using the params.groups, params.mGroups, and params.lookupLocators
            lists, create Java system properties appropriate for the service to
            convey it the information."""
-        if len(params.groups) > 0:
-            self.properties['groupsToJoin'] = \
-                "{\"" + "\",\"".join(params.groups) + "\"}"
+        if sys.platform == "win32":
+            if len(params.groups) > 0:
+                self.properties['groupsToJoin'] = \
+                    "\"" + "{" + \
+                    "\\" + \
+                    "\"" + \
+                    "\\\",\\\"".join(params.groups) + \
+                    "\\" + \
+                    "\"" + \
+                    "}" + "\""
+            else:
+                self.properties['groupsToJoin'] = "\"" + "{}" + "\""
+            if len(params.lookupLocators) > 0:
+                self.properties['locsToJoin'] = \
+                    "\"" + "{" + \
+                    "new LookupLocator(\\\"" + \
+                    "\\\"),new LookupLocator(\\\"".join(params.lookupLocators) + \
+                    "\\" + \
+                    "\"" + \
+                    ")" + \
+                    "}" + "\""
+            else:
+                self.properties['locsToJoin'] = "\"" + "{}" + "\""
         else:
-            self.properties['groupsToJoin'] = "{}"
-        if len(params.lookupLocators) > 0:
-            self.properties['locsToJoin'] = "{new LookupLocator(\"" + \
-                "\"),new LookupLocator(\"".join(params.lookupLocators) + \
-                "\")}"
-        else:
-            self.properties['locsToJoin'] = "{}"
+            if len(params.groups) > 0:
+                self.properties['groupsToJoin'] = \
+                    "{\"" + "\",\"".join(params.groups) + "\"}"
+            else:
+                self.properties['groupsToJoin'] = "{}"
+            if len(params.lookupLocators) > 0:
+                self.properties['locsToJoin'] = "{new LookupLocator(\"" + \
+                    "\"),new LookupLocator(\"".join(params.lookupLocators) + \
+                    "\")}"
+            else:
+                self.properties['locsToJoin'] = "{}"
 
     def setProperties(self, propList):
         for k, v in propList:
@@ -222,7 +236,7 @@ class BigdataServiceBase:
         self.migrateProperties()
 
         # Build the list of command line arguments
-        argList = [ "java", "-cp", ":".join(starterClasspath) ]
+        argList = [ "java", "-cp", os.pathsep.join(starterClasspath) ]
         propNames = self.properties.keys()
         propNames.sort()
         for p in propNames:
@@ -281,22 +295,50 @@ class BigdataService(BigdataServiceBase):
 
         # Construct the ServiceStarter Service Descriptor list
         if params.startCodebaseHttpd and serviceName != "httpd":
-            self.serviceStarterArgs = [
-                "com.sun.jini.start.serviceDescriptors = " + \
-                "new ServiceDescriptor[] { httpdDescriptor, " + \
-                serviceName + "Descriptor }" ]
+            if sys.platform == "win32":
+                self.serviceStarterArgs = [
+                    "\"" + \
+                    "com.sun.jini.start.serviceDescriptors = " + \
+                    "new ServiceDescriptor[] { httpdDescriptor, " + \
+                    serviceName + "Descriptor }" + \
+                    "\"" ]
+            else:
+                self.serviceStarterArgs = [
+                    "com.sun.jini.start.serviceDescriptors = " + \
+                    "new ServiceDescriptor[] { httpdDescriptor, " + \
+                    serviceName + "Descriptor }" ]
         else:
-            self.serviceStarterArgs = [
-                "com.sun.jini.start.serviceDescriptors = " + \
-                "new ServiceDescriptor[] { " + serviceName + "Descriptor }" ]
+            if sys.platform == "win32":
+                self.serviceStarterArgs = [
+                    "\"" + \
+                    "com.sun.jini.start.serviceDescriptors = " + \
+                    "new ServiceDescriptor[] { " + serviceName + "Descriptor }" + \
+                    "\"" ]
+            else:
+                self.serviceStarterArgs = [
+                    "com.sun.jini.start.serviceDescriptors = " + \
+                    "new ServiceDescriptor[] { " + serviceName + "Descriptor }" ]
 
     def setGroupProperties(self):
         BigdataServiceBase.setGroupProperties(self)
-        if len(params.mGroups) > 0:
-            self.properties['memberGroups'] = \
-                "{\"" + "\",\"".join(params.mGroups) + "\"}"
+        if sys.platform == "win32":
+            if len(params.mGroups) > 0:
+                self.properties['memberGroups'] = \
+                    "\"" + "{" + \
+                    "\\" + \
+                    "\"" + \
+                    "\\\",\\\"".join(params.mGroups) + \
+                    "\\" + \
+                    "\"" + \
+                    "}" + "\""
+            else:
+                self.properties['memberGroups'] = "\"" + "{}" + "\""
         else:
-            self.properties['memberGroups'] = "{}"
+            if len(params.mGroups) > 0:
+                self.properties['memberGroups'] = \
+                    "{\"" + "\",\"".join(params.mGroups) + "\"}"
+            else:
+                self.properties['memberGroups'] = "{}"
 
 
 class BigdataMetaservice(BigdataService):
@@ -328,10 +370,18 @@ class BigdataMetaservice(BigdataService):
                     break
 
         # Construct the ServiceStarter Service Descriptor list
-        self.serviceStarterArgs = [
-            "com.sun.jini.start.serviceDescriptors = " + \
-            "new ServiceDescriptor[] {" + \
-            "Descriptor, ".join(services) + "Descriptor}" ]
+        if sys.platform == "win32":
+            self.serviceStarterArgs = [
+                "\"" +
+                "com.sun.jini.start.serviceDescriptors = " + \
+                "new ServiceDescriptor[] {" + \
+                "Descriptor, ".join(services) + "Descriptor}" + \
+                "\"" ]
+        else:
+            self.serviceStarterArgs = [
+                "com.sun.jini.start.serviceDescriptors = " + \
+                "new ServiceDescriptor[] {" + \
+                "Descriptor, ".join(services) + "Descriptor}" ]
 
 
 class BigdataServiceOldLog(BigdataService):
@@ -418,9 +468,7 @@ if __name__ == '__main__':
     if params.appHome == "NOT_SET":
         params.appHome = dirname(dirname( os.path.abspath(sys.argv[0])) )
 
-    # BTM - params.appHome = dirname(dirname( os.path.abspath(sys.argv[0])) )
-
-    print "appHome=" + params.appHome
+    # print "appHome=" + params.appHome
 
     # Instiantate the object for the service
     serviceName = args[0]

@@ -13,39 +13,40 @@
 ##
 # Throughput (triples per second and toldTriples) for the RDF bulk distributed data load)
 ##
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/(toldTriplesRestartSafePerSec)&depth=7&correlated=true&period=Minutes&file=service/cs/toldTriplesRestartSafePerSec
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/(toldTriplesRestartSafeCount)&depth=8&correlated=true&file=service/cs/toldTriplesRestartSafeCount
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/(toldTriplesRestartSafePerSec)&depth=7&correlated=true&period=Minutes&file=service/cs/toldTriplesRestartSafePerSec
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/(toldTriplesRestartSafeCount)&depth=8&correlated=true&file=service/cs/toldTriplesRestartSafeCount
 
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/(toldTriplesWriteCount)&depth=8&correlated=true&file=service/cs/toldTriplesWriteCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/(documentTIDsWaitingCount)&depth=8&correlated=true&file=service/cs/documentTIDsWaitingCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/(documentTIDsReadyCount)&depth=8&correlated=true&file=service/cs/documentTIDsReadyCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/(documentErrorCount)&depth=8&correlated=true&file=service/cs/documentErrorCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/(documentRestartSafeCount)&depth=8&correlated=true&file=service/cs/documentRestartSafeCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/(documentsParsedCount)&depth=8&correlated=true&file=service/cs/documentsParsedCount
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/(toldTriplesWriteCount)&depth=8&correlated=true&file=service/cs/toldTriplesWriteCount
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/(documentTIDsWaitingCount)&depth=8&correlated=true&file=service/cs/documentTIDsWaitingCount
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/(documentTIDsReadyCount)&depth=8&correlated=true&file=service/cs/documentTIDsReadyCount
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/(documentErrorCount)&depth=8&correlated=true&file=service/cs/documentErrorCount
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/(documentRestartSafeCount)&depth=8&correlated=true&file=service/cs/documentRestartSafeCount
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/(documentsParsedCount)&depth=8&correlated=true&file=service/cs/documentsParsedCount
 
 # counters related to pausing the parser pool
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/pause/(outstandingStatementCount)&depth=8&correlated=true&file=service/cs/pause/outstandingStatementCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/pause/(unbufferedStatementCount)&depth=8&correlated=true&file=service/cs/pause/unbufferedStatementCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/pause/(pausedThreadCount)&depth=8&correlated=true&file=service/cs/pause/pausedThreadCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/pause/(poolPausedCount)&depth=8&correlated=true&file=service/cs/pause/poolPausedCount
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/pause/(outstandingStatementCount)&depth=8&correlated=true&file=service/cs/pause/outstandingStatementCount
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/pause/(unbufferedStatementCount)&depth=8&correlated=true&file=service/cs/pause/unbufferedStatementCount
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/pause/(pausedThreadCount)&depth=8&correlated=true&file=service/cs/pause/pausedThreadCount
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/pause/(poolPausedCount)&depth=8&correlated=true&file=service/cs/pause/poolPausedCount
 
 # services (parser, term2Id writers, other index writers, file deletes)
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/services/parserService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/parserServiceQueueLength
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/services/parserService%2FAverage+Active+Count&depth=8&correlated=true&file=service/cs/parserServiceAverageActiveCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/services/term2IdWriterService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/term2IdWriterServiceQueueLength
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/services/term2IdWriterService%2FAverage+Active+Count&depth=8&correlated=true&file=service/cs/term2IdWriterServiceAverageActiveCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/services/otherWriterService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/otherWriterServiceQueueLength
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/services/otherWriterService%2FAverage+Active+Count&depth=8&correlated=true&file=service/cs/otherWriterServiceAverageActiveCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/services/deleteService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/deleteServiceAverageQueueLength
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/parserService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/service/parserServiceQueueLength
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/parserService%2FAverage+Active+Count&depth=8&correlated=true&file=service/cs/service/parserServiceAverageActiveCount
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/term2IdWriterService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/service/term2IdWriterServiceQueueLength
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/term2IdWriterService%2FAverage+Active+Count&depth=8&correlated=true&file=service/cs/service/term2IdWriterServiceAverageActiveCount
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/otherWriterService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/service/otherWriterServiceQueueLength
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/otherWriterService%2FAverage+Active+Count&depth=8&correlated=true&file=service/cs/service/otherWriterServiceAverageActiveCount
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/services/deleteService%2FAverage+Queue+Length&depth=8&correlated=true&file=service/cs/service/deleteServiceAverageQueueLength
 
 # The workflow latch counters (indicate #of documents in a given workflow state).
 # The 'document' latch is the #of documents that are in process in any of the 
 # workflow states.
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/workflowLatch/(document)&depth=8&correlated=true&file=service/cs/workflowLatch/document
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/workflowLatch/(parser)&depth=8&correlated=true&file=service/cs/workflowLatch/parser
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/workflowLatch/(bufferTerm2Id)&depth=8&correlated=true&file=service/cs/workflowLatch/bufferTerm2Id
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/workflowLatch/(bufferOther)&depth=8&correlated=true&file=service/cs/workflowLatch/bufferOther
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/workflowLatch/(document)&depth=8&correlated=true&file=service/cs/workflowLatch/document
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/workflowLatch/(parser)&depth=8&correlated=true&file=service/cs/workflowLatch/parser
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/workflowLatch/(bufferTerm2Id)&depth=8&correlated=true&file=service/cs/workflowLatch/bufferTerm2Id
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/workflowLatch/(bufferOther)&depth=8&correlated=true&file=service/cs/workflowLatch/bufferOther
 
 # Latches used to guard against premature close of the workflow states.
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/bufferGuard/(guardTerm2Id)&depth=8&correlated=true&file=service/cs/bufferGuard/guardTerm2Id
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/bufferGuard/(guardOther)&depth=8&correlated=true&file=service/cs/bufferGuard/guardOther
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/bufferGuard/(guardTerm2Id)&depth=8&correlated=true&file=service/cs/bufferGuard/guardTerm2Id
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/bufferGuard/(guardOther)&depth=8&correlated=true&file=service/cs/bufferGuard/guardOther
+http://localhost:8080/?regex=/([^/]*)/.*/(.*)/bufferGuard/(guardNotify)&depth=8&correlated=true&file=service/cs/bufferGuard/guardNotify

@@ -38,7 +38,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -139,7 +139,7 @@ public class TestRestartSafe extends AbstractEmbeddedFederationTestCase {
 
         for (int i = 0; i < nentries; i++) {
 
-            keys[i] = KeyBuilder.asSortKey(i);
+            keys[i] = TestKeyBuilder.asSortKey(i);
 
             vals[i] = new byte[4];
 

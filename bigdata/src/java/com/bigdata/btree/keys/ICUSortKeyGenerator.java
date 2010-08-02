@@ -28,7 +28,6 @@ package com.bigdata.btree.keys;
 
 import java.util.Locale;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.ibm.icu.text.Collator;
@@ -90,18 +89,6 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
     protected static final Logger log = Logger.getLogger(ICUSortKeyGenerator.class);
     
     /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
-
-    /**
      * Used to encode unicode strings into compact byte[]s that have the same
      * sort order (aka sort keys).
      */
@@ -121,14 +108,14 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
         
     }
     
-    ICUSortKeyGenerator(Locale locale, Object strength, DecompositionEnum mode) {
+    ICUSortKeyGenerator(final Locale locale, final Object strength, final DecompositionEnum mode) {
 
         if (locale == null)
             throw new IllegalArgumentException();
 
         this.locale = locale;
         
-        if(INFO) log.info("locale="+locale);
+        if(log.isInfoEnabled()) log.info("locale="+locale);
         
         this.collator = (RuleBasedCollator) Collator.getInstance(locale);
 
@@ -138,16 +125,16 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
 
                 final int str = ((Integer) strength).intValue();
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("strength=" + str);
 
                 collator.setStrength(str);
 
             } else {
 
-                StrengthEnum str = (StrengthEnum) strength;
+                final StrengthEnum str = (StrengthEnum) strength;
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("strength=" + str);
                 
                 switch (str) {
@@ -184,7 +171,7 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
         
         if (mode != null) {
 
-            if(INFO) log.info("mode="+mode);
+            if(log.isInfoEnabled()) log.info("mode="+mode);
 
             switch (mode) {
 
@@ -213,9 +200,9 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
      * Buffer is reused for each {@link String} from which a sort key is
      * derived.
      */
-    private RawCollationKey raw = new RawCollationKey(128);
+    final private RawCollationKey raw = new RawCollationKey(128);
 
-    public void appendSortKey(KeyBuilder keyBuilder, String s) {
+    public void appendSortKey(final KeyBuilder keyBuilder, final String s) {
 
 //        RawCollationKey raw = collator.getRawCollationKey(s, null);
         

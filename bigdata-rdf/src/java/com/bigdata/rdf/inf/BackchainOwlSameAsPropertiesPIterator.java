@@ -29,6 +29,8 @@ package com.bigdata.rdf.inf;
 import java.util.Arrays;
 import java.util.Set;
 
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ISPO;
@@ -79,8 +81,8 @@ public class BackchainOwlSameAsPropertiesPIterator extends
      *            database.
      */
     public BackchainOwlSameAsPropertiesPIterator(
-            IChunkedOrderedIterator<ISPO> src, long p, AbstractTripleStore db,
-            final long sameAs) {
+            IChunkedOrderedIterator<ISPO> src, IV p, AbstractTripleStore db,
+            final IV sameAs) {
 
         super(src, db, sameAs);
 
@@ -151,16 +153,16 @@ public class BackchainOwlSameAsPropertiesPIterator extends
         int numSPOs = 0;
         // create a new link between {s,? sameAs s} X {o,? sameAs o} tuples
         // using the supplied p
-        Set<Long> sAndSames = getSelfAndSames(spo.s());
-        Set<Long> oAndSames = getSelfAndSames(spo.o());
+        Set<IV> sAndSames = getSelfAndSames(spo.s());
+        Set<IV> oAndSames = getSelfAndSames(spo.o());
         if (sAndSames.size() == 1 && oAndSames.size() == 1) {
             // no point in continuing if there are no sames
             return;
         }
-        for (long s1 : sAndSames) {
-            for (long o1 : oAndSames) {
+        for (IV s1 : sAndSames) {
+            for (IV o1 : oAndSames) {
                 // do not add ( s sameAs s ) inferences
-                if (spo.p() == sameAs && s1 == o1) {
+                if (IVUtility.equals(spo.p(), sameAs) && IVUtility.equals(s1, o1)) {
                     continue;
                 }
                 if (numSPOs == chunkSize) {

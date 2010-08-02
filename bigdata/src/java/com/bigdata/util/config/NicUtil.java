@@ -33,7 +33,9 @@ import java.net.MalformedURLException;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Enumeration;
 import java.util.Collections;
 import java.util.logging.LogRecord;
@@ -102,7 +104,6 @@ public class NicUtil {
     {
         NetworkInterface nic = NetworkInterface.getByName(name);
         if (nic == null) {
-
             // try by IP address
             InetAddress targetIp = null;
             try {
@@ -113,6 +114,43 @@ public class NicUtil {
             }
         }
         return nic;
+    }
+
+    /**
+     * Method that returns a <code>Map</code> in which the key component
+     * of each element is one of the addresses of one of the network
+     * interface cards (nics) installed on the current node, and the
+     * corresponding value component is the name of the associated
+     * nic to which that address is assigned.
+     *
+     * @return a <code>Map</code> of key-value pairs in which the key
+     *         is an instance of <code>InetAddress</code> referencing
+     *         the address of one of the network interface cards installed
+     *         on the current node, and the corresponding value is a
+     *         <code>String</code> referencing the name of the associated
+     *         network interface to which the address is assigned.
+     *
+     * @throws SocketException if there is an error in the underlying
+     *         I/O subsystem and/or protocol.
+     */
+    public static Map<InetAddress, String> getInetAddressMap() 
+                                                      throws SocketException
+    {
+        Map<InetAddress, String> retMap = new HashMap<InetAddress, String>();
+
+        //get all nics on the current node
+        Enumeration<NetworkInterface> nics = 
+                                    NetworkInterface.getNetworkInterfaces();
+
+        while( nics.hasMoreElements() ) {
+            NetworkInterface curNic = nics.nextElement();
+            Enumeration<InetAddress> curNicAddrs = curNic.getInetAddresses();
+            String curNicName = curNic.getName();
+            while( curNicAddrs.hasMoreElements() ) {
+                retMap.put( curNicAddrs.nextElement(), curNicName );
+            }
+        }
+        return retMap;
     }
 
     /**
@@ -464,6 +502,230 @@ public class NicUtil {
         InetAddress inetAddr = getInetAddress(null, 0, null, true);
         if(inetAddr != null) return inetAddr.getHostAddress();
         return null;
+    }
+
+    /**
+     * Special-purpose convenience method that returns a
+     * <code>String</code> value representing the ip address of 
+     * the current node.
+     * <p>
+     * If a non-<code>null</code> value is input for the
+     * <code>systemPropertyName</code> parameter, then this
+     * method first determines if a system property with
+     * name equivalent to the given value has been set and,
+     * if it has, returns the ip address of the nic whose name
+     * is equivalent to that system property value; or
+     * <code>null</code> if there is no nic with the desired
+     * name installed on the node.
+     * <p>
+     * If there is no system property whose name is the value
+     * of the <code>systemPropertyName</code> parameter, and
+     * if the value "default" is input for the 
+     * <code>defaultNic</code> parameter, then this method
+     * will return the IPV4 based address of the first reachable
+     * nic that can be found on the node; otherwise, if a
+     * non-<code>null</code> value not equal to "default" is
+     * input for the the <code>defaultNic</code> parameter, 
+     * then this method returns the ip address of the nic 
+     * corresponding to that given name; or <code>null</code>
+     * if there is no such nic name installed on the node.
+     * <p>
+     * If, on the other hand, <code>null</code> is input for
+     * the <code>systemPropertyName</code> parameter, then 
+     * this method will attempt to find the desired ip address
+     * using only the value of the <code>defaultNic</code>,
+     * and applying the same search criteria as described
+     * above.
+     * <p>
+     * Note that in all cases, if <code>true</code> is input
+     * for the <code>loopOk</code> parameter, then upon failing
+     * to find a valid ip address using the specified search
+     * mechanism, this method will return the <i>loop back</i>
+     * address; otherwise, <code>null</code> is returned.
+     * <p>
+     * This method can be called from within a configuration
+     * as well as from within program control.
+     *
+     * @param systemPropertyName <code>String</code> value containing
+     *                           the name of a system property whose
+     *                           value is the network interface name
+     *                           whose ip address should be returned.
+     *                           May be <code>null</code>.
+     *
+     * @param defaultNic         <code>String</code> value containing
+     *                           the name of the network interface
+     *                           whose ip address should be returned
+     *                           if <code>null</code> is input for the
+     *                           <code>systemPropertyName</code> parameter,
+     *                           or if there is no system property with
+     *                           name equivalent the value of the
+     *                           <code>systemPropertyName</code> parameter.
+     *
+     * @param loopbackOk         if <code>true</code>, then return the
+     *                           <i>loop back</i> address upon failure
+     *                           to find a valid ip address using the 
+     *                           search criteria specified through the
+     *                           <code>systemPropertyName</code> and
+     *                           <code>defaultNic</code> parameters.
+     *
+     * @return a <code>String</code> representing an ip address associated
+     *         with the current node; where the value that is returned is
+     *         determined according to the criteria described above.
+     */
+    public static String getIpAddress(String  systemPropertyName,
+                                      String  defaultNic,
+                                      boolean loopbackOk)
+                             throws SocketException, IOException
+    {
+        if(systemPropertyName != null) {//system property takes precedence
+            String nicName = System.getProperty(systemPropertyName);
+            boolean propSet = true;
+            if(nicName == null) {
+                propSet = false;
+            } else {
+                // handle ant script case where the system property
+                // may not have been set on the command line, but
+                // was still set to "${<systemPropertyName>}" using
+                // ant <sysproperty> tag
+                String rawProp = "${" + systemPropertyName + "}";
+                if( rawProp.equals(nicName) ) propSet = false;
+            }
+            if(propSet) {
+                return getIpAddress(nicName, 0, loopbackOk);
+            } else {//system property not set, try default and/or fallback
+                if(defaultNic != null) {
+                    if( defaultNic.equals("default") ) {
+                        return getDefaultIpv4Address(loopbackOk);
+                    } else {
+                        return getIpAddress(defaultNic, 0, loopbackOk);
+                    }
+                } else {
+                    return null;
+                }
+            }
+        } else {//no system property name provided, try default
+            if(defaultNic != null) {
+                if( defaultNic.equals("default") ) {
+                    return getDefaultIpv4Address(loopbackOk);
+                } else {
+                    return getIpAddress(defaultNic, 0, loopbackOk);
+                }
+            } else {
+                return getIpAddress(null, loopbackOk);
+            }
+        }
+    }
+
+    /**
+     * Examines each address associated with each network interface
+     * card (nic) installed on the current node, and returns the
+     * <code>String</code> value of the first such address that is
+     * determined to be both <i>reachable</i> and an address type
+     * that represents an <i>IPv4</i> address.
+     *
+     * This method will always first examine addresses that are
+     * <i>not</i> the <i>loopback</i> address (<i>local host</i>);
+     * returning a loopback adddress only if <code>true</code>
+     * is input for the <code>loopbackOk</code> parameter, and
+     * none of the non-loopback addresses satisfy this method's
+     * search criteria.
+     *
+     * If this method fails to find any address that satisfies the
+     * above criteria, then this method returns <code>null</code>.
+     *
+     * @param loopbackOk if <code>true</code>, then upon failure
+     *                   find an non-<i>loopback</i> address that
+     *                   satisfies this method's search criteria
+     *                   (an IPv4 type address and reachable), the
+     *                   first loopback address that is found to be
+     *                   reachable is returned.
+     *
+     *                   If <code>false</code> is input for this
+     *                   parameter, then this method will examine
+     *                   only those addresses that do <i>not</i>
+     *                   correspond to the corresponding nic's
+     *                   loopback address.
+     *
+     * @return a <code>String</code> value representing the first
+     *         network interface address installed on the current
+     *         node that is determined to be both <i>reachable</i>
+     *         and an IPv4 type address; where the return value
+     *         corresponds to a <i>loopback</i> address only if 
+     *         <code>true</code> is input for the <code>loopbackOk</code>
+     *         parameter, and no non-loopback address satisfying
+     *         the desired criteria can be found. If this method
+     *         fails to find any address that satisfies the desired
+     *         criteria, then <code>null</code> is returned.
+     *
+     * @throws SocketException if there is an error in the underlying
+     *         I/O subsystem and/or protocol while retrieving the
+     *         the network interfaces currently installed on the
+     *         node.
+     *
+     * @throws IOException if a network error occurs while determining
+     *         if a candidate return address is <i>reachable</i>.
+     */
+    public static String getDefaultIpv4Address(boolean loopbackOk)
+                             throws SocketException, IOException
+    {
+        //get all nics on the current node
+        Enumeration<NetworkInterface> nics = 
+            NetworkInterface.getNetworkInterfaces();
+        while( nics.hasMoreElements() ) {
+            NetworkInterface curNic = nics.nextElement();
+            List<InterfaceAddress> interfaceAddrs = 
+                                       curNic.getInterfaceAddresses();
+            for(InterfaceAddress interfaceAddr : interfaceAddrs) {
+                InetAddress inetAddr = interfaceAddr.getAddress();
+                boolean isIpv4 = inetAddr instanceof Inet4Address;
+                boolean isLoopbackAddress = inetAddr.isLoopbackAddress();
+                if(isIpv4) {
+                    if(isLoopbackAddress) continue;
+                    boolean isReachable = inetAddr.isReachable(3*1000);
+                    Inet4Address inet4Addr = (Inet4Address)inetAddr;
+                    String retVal = inet4Addr.getHostAddress();
+
+                    jiniConfigLogger.log
+                        (CONFIG, "default IPv4 address: "+retVal);
+                    utilLogger.log
+                        (Level.TRACE, "default IPv4 address: "+retVal);
+                    return retVal;
+                }
+            }
+        }
+
+        if(!loopbackOk) return null;
+
+        nics = NetworkInterface.getNetworkInterfaces();
+        while( nics.hasMoreElements() ) {
+            NetworkInterface curNic = nics.nextElement();
+            List<InterfaceAddress> interfaceAddrs = 
+                                       curNic.getInterfaceAddresses();
+            for(InterfaceAddress interfaceAddr : interfaceAddrs) {
+                InetAddress inetAddr = interfaceAddr.getAddress();
+                boolean isIpv4 = inetAddr instanceof Inet4Address;
+                boolean isLoopbackAddress = inetAddr.isLoopbackAddress();
+                if(isIpv4) {
+                    if(!isLoopbackAddress) continue;
+                    boolean isReachable = inetAddr.isReachable(3*1000);
+                    Inet4Address inet4Addr = (Inet4Address)inetAddr;
+                    String retVal = inet4Addr.getHostAddress();
+
+                    jiniConfigLogger.log
+                        (CONFIG, "default IPv4 address: "+retVal);
+                    utilLogger.log
+                        (Level.TRACE, "default IPv4 address: "+retVal);
+                    return retVal;
+                }
+            }
+        }
+        return null;
+    }
+
+    public static String getDefaultIpv4Address()
+                             throws SocketException, IOException
+    {
+        return getDefaultIpv4Address(false);//localhost NOT ok
     }
 
     /**

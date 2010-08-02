@@ -29,6 +29,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Set;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
@@ -83,7 +85,7 @@ public class SPOStarJoin extends SPOPredicate
      *          the subject of this star join
      */
     public SPOStarJoin(final String relationName,
-            final IVariableOrConstant<Long> s) {
+            final IVariableOrConstant<IV> s) {
 
         this(new String[] { relationName }, -1/* partitionId */, s, 
                 Var.var(), Var.var(),
@@ -110,10 +112,10 @@ public class SPOStarJoin extends SPOPredicate
      */
     public SPOStarJoin(final String[] relationName, //
             final int partitionId, //
-            final IVariableOrConstant<Long> s,//
-            final IVariableOrConstant<Long> p,//
-            final IVariableOrConstant<Long> o,//
-            final IVariableOrConstant<Long> c,//
+            final IVariableOrConstant<IV> s,//
+            final IVariableOrConstant<IV> p,//
+            final IVariableOrConstant<IV> o,//
+            final IVariableOrConstant<IV> c,//
             final boolean optional, //
             final IElementFilter<ISPO> constraint,//
             final ISolutionExpander<ISPO> expander//
@@ -239,12 +241,12 @@ public class SPOStarJoin extends SPOPredicate
         /**
          * Variable or constant P for the constraint.
          */
-        protected final IVariableOrConstant<Long> p;
+        protected final IVariableOrConstant<IV> p;
         
         /**
          * Variable or constant O for the constraint.
          */
-        protected final IVariableOrConstant<Long> o;
+        protected final IVariableOrConstant<IV> o;
         
         /**
          * Is the constraint optional or non-optional.
@@ -258,8 +260,8 @@ public class SPOStarJoin extends SPOPredicate
          * @param p
          * @param o
          */
-        public SPOStarConstraint(final IVariableOrConstant<Long> p, 
-                final IVariableOrConstant<Long> o) {
+        public SPOStarConstraint(final IVariableOrConstant<IV> p, 
+                final IVariableOrConstant<IV> o) {
             
             this(p, o, false /* optional */);
             
@@ -272,8 +274,8 @@ public class SPOStarJoin extends SPOPredicate
          * @param o
          * @param optional
          */
-        public SPOStarConstraint(final IVariableOrConstant<Long> p, 
-                final IVariableOrConstant<Long> o, final boolean optional) {
+        public SPOStarConstraint(final IVariableOrConstant<IV> p, 
+                final IVariableOrConstant<IV> o, final boolean optional) {
         
             this.p = p;
             
@@ -283,13 +285,13 @@ public class SPOStarJoin extends SPOPredicate
             
         }
         
-        final public IVariableOrConstant<Long> p() {
+        final public IVariableOrConstant<IV> p() {
             
             return p;
             
         }
 
-        final public IVariableOrConstant<Long> o() {
+        final public IVariableOrConstant<IV> o() {
             
             return o;
             
@@ -313,8 +315,8 @@ public class SPOStarJoin extends SPOPredicate
          */
         final public boolean isMatch(ISPO spo) {
             
-            return ((p.isVar() || p.get() == spo.p()) &&
-                    (o.isVar() || o.get() == spo.o()));    
+            return ((p.isVar() || IVUtility.equals(p.get(), spo.p())) &&
+                    (o.isVar() || IVUtility.equals(o.get(), spo.o())));    
             
         }
         
@@ -327,14 +329,14 @@ public class SPOStarJoin extends SPOPredicate
             if (p.isVar()) {
                 
                 bs.set((IVariable) p, 
-                    new Constant<Long>(spo.p()));
+                    new Constant<IV>(spo.p()));
                 
             }
             
             if (o.isVar()) {
                 
                 bs.set((IVariable) o, 
-                    new Constant<Long>(spo.o()));
+                    new Constant<IV>(spo.o()));
                 
             }
             
@@ -346,7 +348,7 @@ public class SPOStarJoin extends SPOPredicate
          */
         public IStarConstraint<ISPO> asBound(IBindingSet bindingSet) {
             
-            final IVariableOrConstant<Long> p;
+            final IVariableOrConstant<IV> p;
             {
                 if (this.p.isVar() && bindingSet.isBound((IVariable)this.p)) {
 
@@ -359,7 +361,7 @@ public class SPOStarJoin extends SPOPredicate
                 }
             }
             
-            final IVariableOrConstant<Long> o;
+            final IVariableOrConstant<IV> o;
             {
                 if (this.o.isVar() && bindingSet.isBound((IVariable) this.o)) {
 

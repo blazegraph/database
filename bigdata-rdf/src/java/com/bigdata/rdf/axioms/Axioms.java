@@ -28,6 +28,7 @@ package com.bigdata.rdf.axioms;
 
 import java.util.Iterator;
 
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.SPO;
 
 
@@ -44,16 +45,16 @@ public interface Axioms {
      * Test for an axiom.
      * 
      * @param s
-     *            The term identifier in the subject position.
+     *            The internal value ({@link IV}) in the subject position.
      * @param p
-     *            The term identifier in the predicate position.
+     *            The internal value ({@link IV}) in the predicate position.
      * @param o
-     *            The term identifier in the object position.
+     *            The internal value ({@link IV}) in the object position.
      *            
      * @throws IllegalStateException
      *             if the axioms have not been defined.
      */
-    boolean isAxiom(long s, long p, long o);
+    boolean isAxiom(IV s, IV p, IV o);
 
     /**
      * The #of defined axioms.

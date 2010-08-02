@@ -1178,21 +1178,22 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
                         currentpmd.getLeftSeparatorKey(),//
                         currentpmd.getRightSeparatorKey(),//
                         newResources, //
-                        currentpmd.getIndexPartitionCause(),
-                        currentpmd.getHistory()
-                                + OverflowActionEnum.Merge//
-                                + "(lastCommitTime="
-                                + segmentMetadata.getCreateTime()//
-                                + ",btreeEntryCount="
-                                + btree.getEntryCount()//
-                                + ",segmentEntryCount="
-                                + buildResult.builder.getCheckpoint().nentries//
-                                + ",segment="
-                                + segmentMetadata.getUUID()//
-                                + ",counter="
-                                + btree.getCounter().get()//
-                                + ",oldResources="
-                                + Arrays.toString(currentResources) + ") "));
+                        currentpmd.getIndexPartitionCause()
+//                        currentpmd.getHistory()
+//                                + OverflowActionEnum.Merge//
+//                                + "(lastCommitTime="
+//                                + segmentMetadata.getCreateTime()//
+//                                + ",btreeEntryCount="
+//                                + btree.getEntryCount()//
+//                                + ",segmentEntryCount="
+//                                + buildResult.builder.getCheckpoint().nentries//
+//                                + ",segment="
+//                                + segmentMetadata.getUUID()//
+//                                + ",counter="
+//                                + btree.getCounter().get()//
+//                                + ",oldResources="
+//                                + Arrays.toString(currentResources) + ") "
+                ));
 
                 // update the metadata associated with the btree
                 btree.setIndexMetadata(indexMetadata);

@@ -62,6 +62,8 @@ public class TestAll extends TestCase {
 
         TestSuite suite = new TestSuite("RDF data model");
 
+        suite.addTestSuite(TestFactory.class);
+        
         return suite;
         
     }

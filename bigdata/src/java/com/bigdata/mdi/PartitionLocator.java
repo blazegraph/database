@@ -224,19 +224,36 @@ o     */
 
     }
 
+    /**
+     * The original version.
+     */
     private static final transient short VERSION0 = 0x0;
+
+    /**
+     * The {@link #partitionId} is now 32-bits clean.
+     */
+    private static final transient short VERSION1 = 0x0;
+    
+    /**
+     * The current version.
+     */
+    private static final transient short VERSION = VERSION1;
     
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
         
         final short version = ShortPacker.unpackShort(in);
         
-        if (version != VERSION0) {
-            
+        if (version != VERSION0 && version != VERSION1) {
+
             throw new IOException("Unknown version: "+version);
             
         }
 
-        partitionId = (int)LongPacker.unpackLong(in);
+        if (version < VERSION1) {
+            partitionId = (int) LongPacker.unpackLong(in);
+        } else {
+            partitionId = in.readInt();
+        }
         
         dataServiceUUID = new UUID(in.readLong()/*MSB*/,in.readLong()/*LSB*/);
         
@@ -264,9 +281,13 @@ o     */
 
     public void writeExternal(ObjectOutput out) throws IOException {
 
-        ShortPacker.packShort(out, VERSION0);
+        ShortPacker.packShort(out, VERSION);
         
-        LongPacker.packLong(out, partitionId);
+        if (VERSION < VERSION1) {
+            LongPacker.packLong(out, partitionId);
+        } else {
+            out.writeInt(partitionId);
+        }
 
         out.writeLong(dataServiceUUID.getMostSignificantBits());
         

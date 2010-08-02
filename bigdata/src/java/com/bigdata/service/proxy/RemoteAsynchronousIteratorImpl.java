@@ -195,8 +195,28 @@ public class RemoteAsynchronousIteratorImpl<E> implements
             
         }
 
+        /**
+         * The initial version.
+         */
+        private static final transient byte VERSION0 = 0;
+
+        /**
+         * The current version.
+         */
+        private static final transient byte VERSION = VERSION0;
+
         public void readExternal(ObjectInput in) throws IOException,
                 ClassNotFoundException {
+
+            final byte version = in.readByte();
+
+            switch (version) {
+            case VERSION0:
+                break;
+            default:
+                throw new UnsupportedOperationException("Unknown version: "
+                        + version);
+            }
             
             ser = (IStreamSerializer<E>) in.readObject();
 
@@ -206,6 +226,8 @@ public class RemoteAsynchronousIteratorImpl<E> implements
 
         public void writeExternal(ObjectOutput out) throws IOException {
 
+            out.writeByte(VERSION);
+            
             out.writeObject(ser);
             
             ser.serialize(out, e);

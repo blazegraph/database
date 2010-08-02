@@ -54,6 +54,7 @@ import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
@@ -289,7 +290,7 @@ public class TestSegSplitter extends TestCase2 {
         int ninsert = 0;
         for (int i = low; i <= high && ninsert < ntuples; i += inc) {
 
-            btree.insert(KeyBuilder.asSortKey(i), i);
+            btree.insert(TestKeyBuilder.asSortKey(i), i);
 
             ninsert++;
 
@@ -528,8 +529,8 @@ public class TestSegSplitter extends TestCase2 {
                     fromKey, //
                     toKey,//
                     new IResourceMetadata[] { store.getResourceMetadata() }, //
-                    null, // cause
-                    null // history
+                    null // cause
+//                    , null // history
             );
 
             // Generates BTree w/ constrained keys and commits to store.
@@ -664,8 +665,8 @@ public class TestSegSplitter extends TestCase2 {
                     fromKey, //
                     toKey,//
                     new IResourceMetadata[] { store.getResourceMetadata() }, //
-                    null, // cause
-                    null // history
+                    null // cause
+//                    , null // history
             );
 
             // Generates BTree w/ constrained keys and commits to store.
@@ -774,8 +775,8 @@ public class TestSegSplitter extends TestCase2 {
                     fromKey, //
                     toKey,//
                     new IResourceMetadata[] { store.getResourceMetadata() }, //
-                    null, // cause
-                    null // history
+                    null // cause
+//                    ,null // history
             );
 
             // Generates BTree w/ constrained keys and commits to store.
@@ -868,8 +869,8 @@ public class TestSegSplitter extends TestCase2 {
                     fromKey, //
                     toKey,//
                     new IResourceMetadata[] { store.getResourceMetadata() }, //
-                    null, // cause
-                    null // history
+                    null // cause
+//                    ,null // history
             );
 
             // Generates BTree w/ constrained keys and commits to store.
@@ -970,8 +971,8 @@ public class TestSegSplitter extends TestCase2 {
                     fromKey, //
                     toKey,//
                     new IResourceMetadata[] { store.getResourceMetadata() }, //
-                    null, // cause
-                    null // history
+                    null // cause
+//                    ,null // history
             );
 
             // Generates BTree w/ constrained keys and commits to store.
@@ -1140,8 +1141,8 @@ public class TestSegSplitter extends TestCase2 {
                     fromKey, //
                     toKey,//
                     new IResourceMetadata[] { store.getResourceMetadata() }, //
-                    null, // cause
-                    null // history
+                    null // cause
+//                    ,null // history
             );
 
             // Generates BTree w/ constrained keys and commits to store.
@@ -1229,8 +1230,8 @@ public class TestSegSplitter extends TestCase2 {
                     fromKey, //
                     toKey,//
                     new IResourceMetadata[] { store.getResourceMetadata() }, //
-                    null, // cause
-                    null // history
+                    null // cause
+//                    ,null // history
             );
 
             // Generates BTree w/ constrained keys and commits to store.
@@ -1316,8 +1317,8 @@ public class TestSegSplitter extends TestCase2 {
                     fromKey, //
                     toKey,//
                     new IResourceMetadata[] { store.getResourceMetadata() }, //
-                    null, // cause
-                    null // history
+                    null // cause
+//                    ,null // history
             );
 
             // Generates BTree w/ constrained keys and commits to store.
@@ -1476,8 +1477,8 @@ public class TestSegSplitter extends TestCase2 {
                     fromKey, //
                     toKey,//
                     new IResourceMetadata[] { store.getResourceMetadata() }, //
-                    null, // cause
-                    null // history
+                    null // cause
+//                    ,null // history
             );
 
             // Generates BTree w/ constrained keys and commits to store.
@@ -1622,8 +1623,8 @@ public class TestSegSplitter extends TestCase2 {
                     fromKey, //
                     toKey,//
                     new IResourceMetadata[] { store.getResourceMetadata() }, //
-                    null, // cause
-                    null // history
+                    null // cause
+//                    null // history
             );
 
             // Generates BTree w/ constrained keys and commits to store.

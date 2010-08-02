@@ -39,7 +39,6 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.rdf.load.RDFFileLoadTask;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -387,13 +386,16 @@ public class TestAsynchronousStatementBufferFactory extends
             final AbstractTripleStore store, final File resource,
             final boolean parallel) throws Exception {
 
+        final RDFParserOptions parserOptions = new RDFParserOptions();
+        parserOptions.setVerifyData(false);
+        
         final AsynchronousStatementBufferFactory<BigdataStatement,File> statementBufferFactory = new AsynchronousStatementBufferFactory<BigdataStatement,File>(
                 (ScaleOutTripleStore) store,//
                 chunkSize, //
                 valuesInitialCapacity,//
                 bnodesInitialCapacity,//
                 RDFFormat.RDFXML, // defaultFormat
-                false, // verifyData
+                parserOptions, // 
                 false, // deleteAfter
                 parallel?5:1,  // parserPoolSize,
                 20, // parserQueueCapacity

@@ -466,7 +466,42 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
             
         }
 
-    }
+        /**
+         * The initial version (no additional persistent state).
+         */
+        private final static transient byte VERSION0 = 0;
+
+        /**
+         * The current version.
+         */
+        private final static transient byte VERSION = VERSION0;
+
+        public void readExternal(final ObjectInput in) throws IOException,
+                ClassNotFoundException {
+
+            super.readExternal(in);
+            
+            final byte version = in.readByte();
+            
+            switch (version) {
+            case VERSION0:
+                break;
+            default:
+                throw new UnsupportedOperationException("Unknown version: "
+                        + version);
+            }
+
+        }
+
+        public void writeExternal(final ObjectOutput out) throws IOException {
+
+            super.writeExternal(out);
+            
+            out.writeByte(VERSION);
+            
+        }
+
+    } // PartitionLocatorTupleSerializer
 
     /**
      * Passes the notice along to the {@link #view}. It caches de-serialized

@@ -76,7 +76,8 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestStoreAndAddressLRUCache.class);
 
-        suite.addTestSuite(TestHardReferenceGlobalLRU.class);
+        // Note: This implementation is not used.
+//        suite.addTestSuite(TestHardReferenceGlobalLRU.class);
 
         suite.addTestSuite(TestHardReferenceGlobalLRURecycler.class);
 

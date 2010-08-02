@@ -28,6 +28,8 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.axioms.Axioms;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOFilter;
@@ -63,8 +65,8 @@ public class DoNotAddFilter extends SPOFilter {
     
     private final Axioms axioms;
     
-    private final long rdfType;
-    private final long rdfsResource;
+    private final IV rdfType;
+    private final IV rdfsResource;
     private final boolean forwardChainRdfTypeRdfsResource;
     
     /**
@@ -114,15 +116,23 @@ public class DoNotAddFilter extends SPOFilter {
              * defined).
              */
          
-            this.rdfType = this.rdfsResource = IRawTripleStore.NULL;
+            this.rdfType = this.rdfsResource = null;
 
         }
 
     }
     
-    public boolean accept(final ISPO spo) {
+    public boolean accept(final Object o) {
         
-        if(AbstractTripleStore.isLiteral(spo.s())) {
+        if (!canAccept(o)) {
+            
+            return true;
+            
+        }
+        
+        final ISPO spo = (ISPO) o;
+        
+        if(spo.s().isLiteral()) {
             
             /*
              * Note: Explicitly toss out entailments that would place a
@@ -166,8 +176,8 @@ public class DoNotAddFilter extends SPOFilter {
             
         }
 
-        if (!forwardChainRdfTypeRdfsResource && spo.p() == rdfType
-                && spo.o() == rdfsResource) {
+        if (!forwardChainRdfTypeRdfsResource && IVUtility.equals(spo.p(), rdfType)
+                && IVUtility.equals(spo.o(), rdfsResource)) {
             
             // reject (?x, rdf:type, rdfs:Resource ) 
             

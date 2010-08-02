@@ -4,7 +4,10 @@ import java.io.File;
 import java.io.FilenameFilter;
 import java.io.Serializable;
 
+import org.apache.log4j.Logger;
 import org.openrdf.rio.RDFFormat;
+
+import com.bigdata.rdf.rio.NQuadsParser;
 
 /**
  * Filter recognizes anything that is a registered as an {@link RDFFormat} or
@@ -17,11 +20,27 @@ import org.openrdf.rio.RDFFormat;
  */
 public class RDFFilenameFilter implements FilenameFilter, Serializable {
 
+    final protected transient static Logger log = Logger
+            .getLogger(RDFFilenameFilter.class);
+
     /**
      * 
      */
     private static final long serialVersionUID = -628798437502907063L;
 
+    /**
+     * Force the load of the NxParser integration class and its registration
+     * of the NQuadsParser#nquads RDFFormat.
+     * 
+     * @todo Should be done via META-INFO.
+     */
+    static {
+
+        // Force the load of the NXParser integration.
+        NQuadsParser.forceLoad();
+        
+    }
+    
     public boolean accept(final File dir, final String name) {
 
         final File file = new File(dir, name);

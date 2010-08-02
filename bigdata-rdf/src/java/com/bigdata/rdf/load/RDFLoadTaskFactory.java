@@ -6,9 +6,8 @@ import org.openrdf.rio.RDFFormat;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.rdf.rio.IAsynchronousWriteStatementBufferFactory;
-import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.ILoadBalancerService;
 
 /**
@@ -37,10 +36,10 @@ public class RDFLoadTaskFactory<S extends Statement,T extends Runnable> extends
      * @todo drop the writeBuffer arg.
      */
     public RDFLoadTaskFactory(final AbstractTripleStore db,
-            final int bufferCapacity, final boolean verifyData,
+            final int bufferCapacity, final RDFParserOptions parserOptions,
             final boolean deleteafter, final RDFFormat fallback) {
 
-        this(db, verifyData, deleteafter, fallback,
+        this(db, parserOptions, deleteafter, fallback,
                 new LoadStatementBufferFactory<S>(db, bufferCapacity));
 
     }
@@ -61,10 +60,10 @@ public class RDFLoadTaskFactory<S extends Statement,T extends Runnable> extends
      *            Used to buffer and load statements.
      */
     public RDFLoadTaskFactory(final AbstractTripleStore db,
-            final boolean verifyData, final boolean deleteafter,
+            final RDFParserOptions parserOptions, final boolean deleteafter,
             final RDFFormat fallback, IStatementBufferFactory factory) {
 
-        super(db, verifyData, deleteafter, fallback, factory);
+        super(db, parserOptions, deleteafter, fallback, factory);
 
     }
 

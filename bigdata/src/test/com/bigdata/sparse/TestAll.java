@@ -34,9 +34,8 @@ import junit.framework.TestSuite;
 
 import com.bigdata.journal.AbstractIndexManagerTestCase;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.resources.TestSegSplitter;
+import com.bigdata.service.TestEDS;
 import com.bigdata.service.TestJournal;
-import com.bigdata.service.TestLDS;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -83,11 +82,11 @@ public class TestAll extends TestCase {
         // test row store backed by a Journal.
         suite.addTest(proxySuite(new TestJournal("Journal row store"),"Journal"));
 
-        // test row store backed by LDS.
-        suite.addTest(proxySuite(new TestLDS("LDS row store"),"LDS"));
+//        // test row store backed by LDS.
+//        suite.addTest(proxySuite(new TestLDS("LDS row store"),"LDS"));
 
         // test row store backed by EDS.
-        suite.addTest(proxySuite(new TestLDS("EDS row store"),"EDS"));
+        suite.addTest(proxySuite(new TestEDS("EDS row store"),"EDS"));
 
         /*
          * For EDS:

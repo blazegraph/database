@@ -32,6 +32,7 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
@@ -72,7 +73,7 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
     /**
      * The terms (variables or constants) associated with this predicate.
      */
-    private final List<IVariableOrConstant<Long>> terms;
+    private final List<IVariableOrConstant<IV>> terms;
 
     private final IElementFilter constraint;
 
@@ -122,7 +123,7 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
      * @param predicateName
      * @param terms
      */
-    public MagicPredicate(String relationName, IVariableOrConstant<Long>... terms) {
+    public MagicPredicate(String relationName, IVariableOrConstant<IV>... terms) {
 
         this(new String[] { relationName }, -1/* partitionId */,
                 null/* constraint */, null/* expander */, terms);
@@ -139,7 +140,7 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
      * @param terms
      */
     public MagicPredicate(String relationName, ISolutionExpander expander, 
-            IVariableOrConstant<Long>... terms) {
+            IVariableOrConstant<IV>... terms) {
 
         this(new String[] { relationName }, -1/* partitionId */,
                 null/* constraint */, expander,
@@ -163,7 +164,7 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
             final int partitionId, //
             IElementFilter constraint,//
             ISolutionExpander expander,//
-            IVariableOrConstant<Long>... terms//
+            IVariableOrConstant<IV>... terms//
             ) {
         
         if (relationName == null)
@@ -223,7 +224,7 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
         
         this.expander = src.expander;
         
-        this.terms = new LinkedList<IVariableOrConstant<Long>>();
+        this.terms = new LinkedList<IVariableOrConstant<IV>>();
         
         this.terms.addAll(src.terms);
         
@@ -263,21 +264,21 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
         
         this.expander = src.expander;
         
-        this.terms = new LinkedList<IVariableOrConstant<Long>>();
+        this.terms = new LinkedList<IVariableOrConstant<IV>>();
         
         this.terms.addAll(src.terms);
         
     }
 
-    public final IVariableOrConstant<Long> get(int index) {
+    public final IVariableOrConstant<IV> get(int index) {
         
         return terms.get(index);
         
     }
 
-    public final IConstant<Long> get(final IMagicTuple e, final int index) {
+    public final IConstant<IV> get(final IMagicTuple e, final int index) {
 
-        return new Constant<Long>(e.getTerm(index));
+        return new Constant<IV>(e.getTerm(index));
         
     }
     
@@ -287,7 +288,7 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
      */
     final public boolean isFullyBound() {
 
-        for (IVariableOrConstant<Long> term : terms) {
+        for (IVariableOrConstant<IV> term : terms) {
 
             if (term.isVar()) {
                 
@@ -324,7 +325,7 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
         
         int i = 0;
         
-        for (IVariableOrConstant<Long> term : terms) {
+        for (IVariableOrConstant<IV> term : terms) {
 
             if (term.isVar()) {
                 
@@ -354,14 +355,14 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
     
     public MagicPredicate asBound(IBindingSet bindingSet) {
         
-        final IVariableOrConstant<Long>[] newTerms =
+        final IVariableOrConstant<IV>[] newTerms =
             new IVariableOrConstant[this.terms.size()];
 
         int i = 0;
-        for (IVariableOrConstant<Long> term : this.terms) {
-            IVariableOrConstant<Long> newTerm;
-            if (term.isVar() && bindingSet.isBound((IVariable<Long>) term)) {
-                newTerm = bindingSet.get((IVariable<Long>) term);
+        for (IVariableOrConstant<IV> term : this.terms) {
+            IVariableOrConstant<IV> newTerm;
+            if (term.isVar() && bindingSet.isBound((IVariable<IV>) term)) {
+                newTerm = bindingSet.get((IVariable<IV>) term);
             } else {
                 newTerm = term;
             }
@@ -387,9 +388,9 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
     
     public IMagicTuple toMagicTuple() {
         
-        final long[] terms = new long[this.terms.size()];
+        final IV[] terms = new IV[this.terms.size()];
         int i = 0;
-        for (IVariableOrConstant<Long> term : this.terms) {
+        for (IVariableOrConstant<IV> term : this.terms) {
             if (term.isVar()) {
                 throw new RuntimeException("predicate not fully bound");
             } else {
@@ -417,7 +418,7 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
 
         sb.append(", ");
         
-        for (IVariableOrConstant<Long> term : terms) {
+        for (IVariableOrConstant<IV> term : terms) {
             
             sb.append(term.isConstant() || bindingSet == null
                     || !bindingSet.isBound((IVariable) term) ? term.toString()

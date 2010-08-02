@@ -266,7 +266,7 @@ case "$1" in
 		if [ -z "$pidno" ]; then
 		    echo $"`date` : `hostname` : process died? pid=$pid."
 		else
-		    kill -s hup $pid
+		    ./broadcast_sighup local servicesManager
 		    echo $"`date` : `hostname` : sent SIGHUP pid=$pid."
 		fi
 	    else

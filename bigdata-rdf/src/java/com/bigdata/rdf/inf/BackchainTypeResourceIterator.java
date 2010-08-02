@@ -33,7 +33,9 @@ import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.rdf.lexicon.ITermIdFilter;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.lexicon.ITermIVFilter;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -78,20 +80,18 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
 
     protected static final Logger log = Logger.getLogger(BackchainTypeResourceIterator.class);
     
-    protected final static transient long NULL = IRawTripleStore.NULL;
-    
     private final IChunkedOrderedIterator<ISPO> _src;
     private final Iterator<ISPO> src;
 //    private final long s;
 //    private final AbstractTripleStore db;
-    private final long rdfType, rdfsResource;
+    private final IV rdfType, rdfsResource;
     private final IKeyOrder<ISPO> keyOrder;
 
     /**
      * The subject(s) whose (s rdf:type rdfs:Resource) entailments will be
      * visited.
      */
-    private PushbackIterator<Long> resourceIds;
+    private PushbackIterator<IV> resourceIds;
     
     /**
      * An iterator reading on the {@link SPOKeyOrder#POS} index. The predicate
@@ -100,7 +100,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
      * it will also be bound. The iterator visits the term identifier for the
      * <em>subject</em> position.
      */
-    private PushbackIterator<Long> posItr;
+    private PushbackIterator<IV> posItr;
     
     private boolean sourceExhausted = false;
     
@@ -152,15 +152,15 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
     static public IChunkedOrderedIterator<ISPO> newInstance(
             final IChunkedOrderedIterator<ISPO> _src,
             final IAccessPath<ISPO> accessPath, final AbstractTripleStore db,
-            final long rdfType, final long rdfsResource) {
+            final IV rdfType, final IV rdfsResource) {
         
         if (accessPath == null)
             throw new IllegalArgumentException();
         
         final SPO spo = new SPO(accessPath.getPredicate());
 
-        if (((spo.o == NULL || spo.o == rdfsResource) && 
-             (spo.p == NULL || spo.p == rdfType)) == false) {
+        if (((spo.o == null || spo.o.equals(rdfsResource)) && 
+             (spo.p == null || spo.p.equals(rdfType))) == false) {
             
             /*
              * Backchain will not generate any statements.
@@ -180,7 +180,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
          * The subject(s) whose (s rdf:type rdfs:Resource) entailments will be
          * visited.
          */
-        final PushbackIterator<Long> resourceIds;
+        final PushbackIterator<IV> resourceIds;
         
         /*
          * An iterator reading on the {@link SPOKeyOrder#POS} index. The
@@ -189,9 +189,9 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
          * ctor, then it will also be bound. The iterator visits the term
          * identifier for the <em>subject</em> position.
          */
-        final PushbackIterator<Long> posItr;
+        final PushbackIterator<IV> posItr;
 
-        if (spo.s == NULL) {
+        if (spo.s == null) {
 
             /*
              * Backchain will generate one statement for each distinct subject
@@ -209,15 +209,14 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
 
 //            resourceIds = db.getSPORelation().distinctTermScan(SPOKeyOrder.SPO);
             
-            resourceIds = new PushbackIterator<Long>(new MergedOrderedIterator(//
+            resourceIds = new PushbackIterator<IV>(new MergedOrderedIterator(//
                     db.getSPORelation().distinctTermScan(SPOKeyOrder.SPO), //
                     db.getSPORelation().distinctTermScan(SPOKeyOrder.OSP,
-                            new ITermIdFilter() {
+                            new ITermIVFilter() {
                                 private static final long serialVersionUID = 1L;
-                                public boolean isValid(long termId) {
+                                public boolean isValid(IV iv) {
                                     // filter out literals from the OSP scan.
-                                    return !AbstractTripleStore
-                                            .isLiteral(termId);
+                                    return !iv.isLiteral();
                                 }
                             })));
 
@@ -225,14 +224,14 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
              * Reading (? rdf:Type rdfs:Resource) using the POS index.
              */
 
-            posItr = new PushbackIterator<Long>(new Striterator(db.getAccessPath(
-                    NULL, rdfType, rdfsResource,
+            posItr = new PushbackIterator<IV>(new Striterator(db.getAccessPath(
+                    null, rdfType, rdfsResource,
                             ExplicitSPOFilter.INSTANCE).iterator())
                     .addFilter(new Resolver() {
                         private static final long serialVersionUID = 1L;
                         @Override
                         protected Object resolve(Object obj) {
-                            return Long.valueOf(((SPO) obj).s);
+                            return ((SPO) obj).s;
                         }
                     }));
 
@@ -281,7 +280,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
 
                 final SPO o = (SPO) arg0;
 
-                if (o.p == rdfType && o.o == rdfsResource) {
+                if (o.p.equals(rdfType) && o.o.equals(rdfsResource)) {
                     
                     return false;
                     
@@ -321,10 +320,10 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
     @SuppressWarnings({ "unchecked", "serial" })
     private BackchainTypeResourceIterator(IChunkedOrderedIterator<ISPO> _src,//
             Iterator<ISPO> src,//
-            PushbackIterator<Long> resourceIds,//
-            PushbackIterator<Long> posItr,//
-            final long rdfType,//
-            final long rdfsResource//
+            PushbackIterator<IV> resourceIds,//
+            PushbackIterator<IV> posItr,//
+            final IV rdfType,//
+            final IV rdfsResource//
             ) {
         
         // the raw source - we pass close() through to this.
@@ -453,12 +452,12 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
              */
             
             // resourceIds is the source for _inferences_
-            final Long s1 = resourceIds.next();
+            final IV s1 = resourceIds.next();
             
             if(posItr.hasNext()) {
                 
                 // posItr is the source for _explicit_ statements.
-                final Long s2 = posItr.next();
+                final IV s2 = posItr.next();
                 
                 final int cmp = s1.compareTo(s2);
                 
@@ -594,7 +593,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
          * order.
          */
         
-        long[] s = new long[chunkSize];
+        IV[] s = new IV[chunkSize];
         
         int n = 0;
         
@@ -938,22 +937,22 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
         private final IChunkedOrderedIterator<ISPO> _src;
         private final IAccessPath<ISPO> accessPath;
         private final AbstractTripleStore db;
-        private final long rdfType;
-        private final long rdfsResource;
-        private final long s;
+        private final IV rdfType;
+        private final IV rdfsResource;
+        private final IV s;
         private IChunkedOrderedIterator<ISPO> appender;
         private boolean canRemove;
         
         public BackchainSTypeResourceIterator(
             final IChunkedOrderedIterator<ISPO> _src,
             final IAccessPath<ISPO> accessPath, final AbstractTripleStore db,
-            final long rdfType, final long rdfsResource) {
+            final IV rdfType, final IV rdfsResource) {
             this._src = _src;
             this.accessPath = accessPath;
             this.db = db;
             this.rdfType = rdfType;
             this.rdfsResource = rdfsResource;
-            this.s = (Long) accessPath.getPredicate().get(0).get();
+            this.s = (IV) accessPath.getPredicate().get(0).get();
             SPO spo = new SPO(s, rdfType, rdfsResource, StatementEnum.Inferred);
             this.appender = new ChunkedArrayIterator<ISPO>
                 ( 1, new SPO[] { spo }, SPOKeyOrder.SPO
@@ -962,7 +961,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
         
         private void testSPO(ISPO spo) {
             // do not need to append if we see it in the data
-            if (spo.s() == s && spo.p() == rdfType && spo.o() == rdfsResource) {
+            if (spo.s().equals(s) && spo.p().equals(rdfType) && spo.o().equals(rdfsResource)) {
                 appender = null;
             }
         }

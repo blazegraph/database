@@ -29,7 +29,7 @@ package com.bigdata.btree;
 
 import java.util.UUID;
 
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
@@ -357,10 +357,10 @@ public class TestTouch extends AbstractBTreeTestCase {
         final SimpleEntry v5 = new SimpleEntry(5);
         final SimpleEntry v7 = new SimpleEntry(7);
         final SimpleEntry v9 = new SimpleEntry(9);
-        btree.insert(KeyBuilder.asSortKey(3),v3);
-        btree.insert(KeyBuilder.asSortKey(5),v5);
-        btree.insert(KeyBuilder.asSortKey(7),v7);
-        btree.insert(KeyBuilder.asSortKey(9),v9);
+        btree.insert(TestKeyBuilder.asSortKey(3),v3);
+        btree.insert(TestKeyBuilder.asSortKey(5),v5);
+        btree.insert(TestKeyBuilder.asSortKey(7),v7);
+        btree.insert(TestKeyBuilder.asSortKey(9),v9);
         assertNotSame(a,btree.getRoot());
         final Node c = (Node) btree.getRoot();
         assertKeys(new int[]{7},c);

@@ -6,8 +6,6 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.nio.ByteBuffer;
 
-import org.CognitiveWeb.extser.LongPacker;
-
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.IRawStore;
 
@@ -316,19 +314,24 @@ public class Checkpoint implements Externalizable {
         this.counter = counter;
         
     }
-    
-    /**
-     * Initial serialization version.
-     */
-    private static transient final int VERSION0 = 0x0;
 
     /**
-     * This serialization version adds the field recording the address of the
-     * optional bloom filter. That address defaults to zero (0L) for earlier
-     * versions, indicating that no bloom filter is stored for the
-     * {@link Checkpoint}.
+     * Initial serialization version.
+     * <p>
+     * Note: The fields of the {@link Checkpoint} record use fixed length
+     * representations in order to support the possibility that we might do an
+     * in place update of a {@link Checkpoint} record as part of a data
+     * migration strategy. For the same reason, the {@link Checkpoint} record
+     * includes some unused fields. Those fields are available for future
+     * version changes without requiring us to change the length of the
+     * {@link Checkpoint} record.
      */
-    private static transient final int VERSION1 = 0x1;
+    private static transient final int VERSION0 = 0x0;
+    
+    /**
+     * The current version.
+     */
+    private static transient final int VERSION = VERSION0;
 
     /**
      * Write the {@link Checkpoint} record on the store, setting
@@ -381,57 +384,56 @@ public class Checkpoint implements Externalizable {
 
     public void readExternal(final ObjectInput in) throws IOException, ClassNotFoundException {
         
-        final int version = (int) LongPacker.unpackLong(in);
+        final int version = in.readInt();
 
-        if (version != VERSION0 && version != VERSION1)
+        if (version != VERSION0)
             throw new IOException("Unknown version: " + version);
 
         this.addrMetadata = in.readLong();
 
         this.addrRoot = in.readLong();
 
-        if (version == VERSION1) {
-
-            this.addrBloomFilter = in.readLong();
-
-        } else {
-
-            this.addrBloomFilter = 0L;
-
-        }
+        this.addrBloomFilter = in.readLong();
         
-        this.height = (int) LongPacker.unpackLong(in);
+        this.height = in.readInt();
 
-        this.nnodes = (int) LongPacker.unpackLong(in);
+        this.nnodes = in.readInt();
 
-        this.nleaves = (int) LongPacker.unpackLong(in);
+        this.nleaves = in.readInt();
 
-        this.nentries = (int) LongPacker.unpackLong(in);
+        this.nentries = in.readInt();
 
-        this.counter = LongPacker.unpackLong(in);
+        this.counter = in.readLong();
 
+        in.readLong(); // unused.
+        
+        in.readLong(); // unused.
+        
     }
 
     public void writeExternal(final ObjectOutput out) throws IOException {
 
-        LongPacker.packLong(out, VERSION1);
+        out.writeInt(VERSION);
 
         out.writeLong(addrMetadata);
 
         out.writeLong(addrRoot);
         
-        // Note: added in VERSION1.
         out.writeLong(addrBloomFilter);
 
-        LongPacker.packLong(out, height);
+        out.writeInt(height);
 
-        LongPacker.packLong(out, nnodes);
+        out.writeInt(nnodes);
 
-        LongPacker.packLong(out, nleaves);
+        out.writeInt(nleaves);
 
-        LongPacker.packLong(out, nentries);
+        out.writeInt(nentries);
 
-        LongPacker.packLong(out, counter);
+        out.writeLong(counter);
+
+        out.writeLong(0L/*unused*/);
+        
+        out.writeLong(0L/*unused*/);
         
     }
 

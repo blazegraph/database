@@ -54,6 +54,7 @@ import org.apache.zookeeper.server.quorum.QuorumPeerMain;
 import com.bigdata.io.FileLockUtility;
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.process.ZookeeperProcessHelper;
+import com.bigdata.util.config.NicUtil;
 import com.bigdata.zookeeper.ZooHelper;
 
 /**
@@ -213,6 +214,8 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
      */
     public final Map<String, String> other;
 
+    private final InetAddress thisInetAddr;
+
     /**
      * Adds value to {@link #other} if found in the {@link Configuration}.
      * 
@@ -318,6 +321,14 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
         putIfDefined(config, Options.FORCE_SYNC, Boolean.TYPE);
         putIfDefined(config, Options.SKIP_ACL, Boolean.TYPE);
 
+        try {
+            thisInetAddr = InetAddress.getByName(NicUtil.getIpAddress("default.nic", "default", false));
+        } catch(IOException e) {
+            throw new ConfigurationException(e.getMessage(), e);
+        }
+        if (log.isInfoEnabled()) {
+            log.info("zookeeper host="+thisInetAddr.getCanonicalHostName());
+        }
     }
 
     /**
@@ -541,7 +552,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
          */
         public V call() throws Exception {
 
-            if (ZooHelper.isRunning(InetAddress.getLocalHost(), clientPort)) {
+            if (ZooHelper.isRunning(thisInetAddr, clientPort)) {
 
                 /*
                  * Query for an instance already running on local host at that
@@ -552,7 +563,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
                  * instance on the localhost.
                  */
 
-                ZooHelper.ruok(InetAddress.getLocalHost(), clientPort);
+                ZooHelper.ruok(thisInetAddr, clientPort);
 
                 throw new ZookeeperRunningException(
                         "Zookeeper already running on localhost: clientport="
@@ -625,7 +636,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
                          * Note: We don't test this until we have the file lock.
                          */
 
-                        ZooHelper.ruok(InetAddress.getLocalHost(), clientPort);
+                        ZooHelper.ruok(thisInetAddr, clientPort);
 
                         throw new ZookeeperRunningException(
                                 "Zookeeper already running on localhost: clientport="
@@ -727,7 +738,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
              * clientPort. That could have already been true.
              */
 
-            ZooHelper.ruok(InetAddress.getLocalHost(), clientPort);
+            ZooHelper.ruok(thisInetAddr, clientPort);
 
             // adjust for time remaining.
             nanos = (System.nanoTime() - begin);

@@ -43,6 +43,7 @@ import junit.framework.TestCase2;
 
 import com.bigdata.service.ResourceService.ReadResourceTask;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.config.NicUtil;
 
 /**
  * Test verifies the ability to transmit a file using the
@@ -103,14 +104,15 @@ public class TestResourceService extends TestCase2 {
 
         };
 
+        InetAddress thisInetAddr;
+        thisInetAddr = InetAddress.getByName(NicUtil.getIpAddress("default.nic", "default", true));
         try {
 
             service.awaitRunning(100, TimeUnit.MILLISECONDS);
 
             assertTrue(service.isOpen());
 
-            assertEquals(tmpFile, new ReadResourceTask(InetAddress
-                    .getLocalHost(), service.port, allowedUUID, tmpFile).call());
+            assertEquals(tmpFile, new ReadResourceTask(thisInetAddr, service.port, allowedUUID, tmpFile).call());
 
             if (log.isInfoEnabled())
                 log.info(service.counters.getCounters());
@@ -182,6 +184,8 @@ public class TestResourceService extends TestCase2 {
 
         final List<File> tempFiles = new LinkedList<File>();
         
+        InetAddress thisInetAddr;
+        thisInetAddr = InetAddress.getByName(NicUtil.getIpAddress("default.nic", "default", true));
         try {
 
             service.awaitRunning(100, TimeUnit.MILLISECONDS);
@@ -197,8 +201,7 @@ public class TestResourceService extends TestCase2 {
 
                 tempFiles.add(tmpFile);
 
-                tasks.add(new ReadResourceTask(InetAddress.getLocalHost(),
-                        service.port, allowedUUID, tmpFile));
+                tasks.add(new ReadResourceTask(thisInetAddr, service.port, allowedUUID, tmpFile));
 
             }
 

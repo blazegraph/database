@@ -29,7 +29,7 @@ package com.bigdata.rdf.rules;
 
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
-
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
@@ -72,11 +72,11 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
 
             final BigdataValueFactory f = store.getValueFactory();
             
-            final long a = store.addTerm(f.createURI("http://www.bigdata.com/a"));
-            final long b = store.addTerm(f.createURI("http://www.bigdata.com/b"));
-            final long y = store.addTerm(f.createURI("http://www.bigdata.com/y"));
-            final long x = store.addTerm(f.createURI("http://www.bigdata.com/x"));
-            final long z = store.addTerm(f.createURI("http://www.bigdata.com/z"));
+            final IV a = store.addTerm(f.createURI("http://www.bigdata.com/a"));
+            final IV b = store.addTerm(f.createURI("http://www.bigdata.com/b"));
+            final IV y = store.addTerm(f.createURI("http://www.bigdata.com/y"));
+            final IV x = store.addTerm(f.createURI("http://www.bigdata.com/x"));
+            final IV z = store.addTerm(f.createURI("http://www.bigdata.com/z"));
 
             final Vocabulary vocab = store.getVocabulary();
 
@@ -144,11 +144,11 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
 
             final BigdataValueFactory f = store.getValueFactory();
             
-            final long a = store.addTerm(f.createURI("http://www.bigdata.com/a"));
-            final long b = store.addTerm(f.createURI("http://www.bigdata.com/b"));
-            final long y = store.addTerm(f.createURI("http://www.bigdata.com/y"));
-            final long x = store.addTerm(f.createURI("http://www.bigdata.com/x"));
-            final long z = store.addTerm(f.createURI("http://www.bigdata.com/z"));
+            final IV a = store.addTerm(f.createURI("http://www.bigdata.com/a"));
+            final IV b = store.addTerm(f.createURI("http://www.bigdata.com/b"));
+            final IV y = store.addTerm(f.createURI("http://www.bigdata.com/y"));
+            final IV x = store.addTerm(f.createURI("http://www.bigdata.com/x"));
+            final IV z = store.addTerm(f.createURI("http://www.bigdata.com/z"));
 
             final Vocabulary vocab = store.getVocabulary();
 

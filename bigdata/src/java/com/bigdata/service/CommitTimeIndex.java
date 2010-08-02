@@ -1,5 +1,8 @@
 package com.bigdata.service;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
@@ -288,6 +291,41 @@ public class CommitTimeIndex extends BTree {
 
             return id;
 
+        }
+
+        /**
+         * The initial version (no additional persistent state).
+         */
+        private final static transient byte VERSION0 = 0;
+
+        /**
+         * The current version.
+         */
+        private final static transient byte VERSION = VERSION0;
+
+        public void readExternal(final ObjectInput in) throws IOException,
+                ClassNotFoundException {
+
+            super.readExternal(in);
+            
+            final byte version = in.readByte();
+            
+            switch (version) {
+            case VERSION0:
+                break;
+            default:
+                throw new UnsupportedOperationException("Unknown version: "
+                        + version);
+            }
+
+        }
+
+        public void writeExternal(final ObjectOutput out) throws IOException {
+
+            super.writeExternal(out);
+            
+            out.writeByte(VERSION);
+            
         }
 
     }

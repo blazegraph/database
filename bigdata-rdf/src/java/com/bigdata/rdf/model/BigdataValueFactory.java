@@ -55,10 +55,10 @@ public interface BigdataValueFactory extends ValueFactory {
      * Returns a factory that will assign its blank node IDs within a globally
      * unique namespace. This factory should be used when processing a document
      * as the generated IDs are clustered and make the ordered writes on the
-     * lexicon more efficent since all blank nodes for the same document tend to
+     * lexicon more efficient since all blank nodes for the same document tend to
      * be directed to the same index partition. All {@link BigdataValue}s are
      * actually created by <i>this</i> factory, it is only the semantics of
-     * blank node ID generation that are overriden.
+     * blank node ID generation that are overridden.
      * 
      * @see BNodeContextFactory
      */
@@ -136,6 +136,29 @@ public interface BigdataValueFactory extends ValueFactory {
     BigdataStatement createStatement(Resource s, URI p, Value o,
             Resource c, StatementEnum type);
     
+    /**
+     * Create a statement (core impl). The s,p,o, and the optional c arguments
+     * will be normalized to this {@link BigdataValueFactory} using
+     * {@link #asValue(Value)}.
+     * 
+     * @param s
+     *            The subject.
+     * @param p
+     *            The predicate.
+     * @param o
+     *            The object.
+     * @param c
+     *            The context (optional). Note: When non-<code>null</code>
+     *            and statement identifiers are enabled, then this will be a
+     *            blank node whose term identifier is the statement identifier.
+     * @param type
+     *            The statement type (optional).
+     * @param userFlag
+     *            The user flag
+     */
+    BigdataStatement createStatement(Resource s, URI p, Value o,
+            Resource c, StatementEnum type, boolean userFlag);
+
     /**
      * Converts a {@link Value} into a {@link BigdataValue}. If the value is
      * already a {@link BigdataValue} and it was allocated by <i>this</i>

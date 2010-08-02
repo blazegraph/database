@@ -1,28 +1,35 @@
 package com.bigdata.rdf.magic;
 
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IVariableOrConstant;
 
 public class MagicTuple implements IMagicTuple {
-    static long NULL = IRawTripleStore.NULL;
-    
-    private long[] terms;
+    private IV[] terms;
 
-    public MagicTuple(long... terms) {
+    public MagicTuple(int... terms) {
+        IV[] ivs = new IV[terms.length];
+        for (int i = 0; i < terms.length; i++) {
+            ivs[i] = new TermId(VTE.URI, terms[i]);
+        }
+        this.terms = ivs;
+    }
+    
+    public MagicTuple(IV... terms) {
         this.terms = terms;
     }
     
     public MagicTuple(IPredicate<IMagicTuple> pred) {
-        terms = new long[pred.arity()];
+        terms = new IV[pred.arity()];
         for (int i = 0; i < pred.arity(); i++) {
-            final IVariableOrConstant<Long> t = pred.get(i);
-            terms[i] = t.isVar() ? NULL : t.get();
+            final IVariableOrConstant<IV> t = pred.get(i);
+            terms[i] = t.isVar() ? null : t.get();
         }
     }
 
-    public long getTerm(int index) {
+    public IV getTerm(int index) {
         if (index < 0 || index >= terms.length) {
             throw new IllegalArgumentException();
         }
@@ -33,13 +40,13 @@ public class MagicTuple implements IMagicTuple {
         return terms.length;
     }
 
-    public long[] getTerms() {
+    public IV[] getTerms() {
         return terms;
     }
     
     public boolean isFullyBound() {
-        for (long term : terms) {
-            if (term == NULL) {
+        for (IV term : terms) {
+            if (term == null) {
                 return false;
             }
         }
@@ -52,7 +59,7 @@ public class MagicTuple implements IMagicTuple {
         
         sb.append("< ");
         
-        for (long l : terms) {
+        for (IV l : terms) {
             sb.append(toString(l)).append(", ");
         }
         
@@ -74,24 +81,12 @@ public class MagicTuple implements IMagicTuple {
      *            The term identifier.
      * @return
      */
-    public static String toString(long id) {
+    public static String toString(IV id) {
 
-        if (id == NULL)
+        if (id == null)
             return "NULL";
 
-        if (AbstractTripleStore.isLiteral(id))
-            return id + "L";
-
-        if (AbstractTripleStore.isURI(id))
-            return id + "U";
-
-        if (AbstractTripleStore.isBNode(id))
-            return id + "B";
-
-        if (AbstractTripleStore.isStatement(id))
-            return id + "S";
-
-        throw new AssertionError("id="+id);
+        return id.toString();
         
     }
 
