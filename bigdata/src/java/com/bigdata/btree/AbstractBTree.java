@@ -3695,6 +3695,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         
         // write the serialized node or leaf onto the store.
         final long addr;
+        final long oldAddr;
         {
 
             final long begin = System.nanoTime();
@@ -3704,7 +3705,9 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             
             // now we have a new address, delete previous identity if any
             if (node.isPersistent()) {
-            	store.delete(node.getIdentity());
+            	oldAddr = node.getIdentity();
+            } else {
+            	oldAddr = 0;
             }
 
             btreeCounters.writeNanos += System.nanoTime() - begin;
@@ -3721,6 +3724,13 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          */
 
         node.setIdentity(addr);
+        if (oldAddr != 0L) {
+            if (storeCache!=null) {
+                // remove from cache.
+            	storeCache.remove(oldAddr);
+            }
+        	store.delete(oldAddr);
+        }
 
         node.setDirty(false);
 
