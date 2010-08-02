@@ -1634,6 +1634,9 @@ abstract public class WriteCache implements IWriteCache {
 				view.position(pos);
 
 				final long offset = entry.getKey(); // offset in file to update
+				
+				registerWriteStatus(offset, md.recordLength, 'W');
+
 				nwrites += FileChannelUtility.writeAll(opener, view, offset);
 				// if (log.isInfoEnabled())
 				// log.info("writing to: " + offset);
@@ -1757,6 +1760,10 @@ abstract public class WriteCache implements IWriteCache {
 		}
 	}
 
+	protected void registerWriteStatus(long offset, int length, char action) {
+		// NOP to be overidden for debug if required
+	}
+
 	boolean m_written = false;
 
 	private long lastOffset;
@@ -1792,7 +1799,10 @@ abstract public class WriteCache implements IWriteCache {
 				 * Using the conditional remove on ConcurrentMap guards against
 				 * this.
 				 */
-				serviceRecordMap.remove(addr, this);
+				boolean removed = serviceRecordMap.remove(addr, this);
+				
+				registerWriteStatus(addr, 0, removed ? 'R' : 'L');
+
 			}
 
 		} else {

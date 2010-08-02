@@ -313,7 +313,21 @@ abstract public class WriteCacheService implements IWriteCache {
 	 * {@link #writeChk(long, ByteBuffer, int)}).
 	 */
 	final private WriteCache[] buffers;
-
+	
+	/**
+	 * Debug arrays to chase down write/removal errors.
+	 * 
+	 * Toggle comment appropriately to activate/deactivate
+	 */
+	final long[] addrsUsed = new long[4024 * 1024];
+	int addrsUsedCurs = 0;
+	final char[] addrActions = new char[addrsUsed.length];
+	final int[] addrLens = new int[addrsUsed.length];
+//	final long[] addrsUsed = null;
+//	int addrsUsedCurs = 0;
+//	final char[] addrActions = null;
+//	final int[] addrLens = null;
+	
 	/**
 	 * The current file extent.
 	 */
@@ -1422,6 +1436,7 @@ abstract public class WriteCacheService implements IWriteCache {
 			final WriteCache cache = acquireForWriter();
 
 			try {
+				debugAddrs(offset, 0, 'A');
 
 				// write on the cache.
 				if (cache.write(offset, data, chk, useChecksum)) {
@@ -1596,6 +1611,19 @@ abstract public class WriteCacheService implements IWriteCache {
 
 		}
 
+	}
+
+	public void debugAddrs(long offset, int length, char c) {
+		if (addrsUsed != null) {
+			addrsUsed[addrsUsedCurs] = offset;
+			addrActions[addrsUsedCurs] = c;
+			addrLens[addrsUsedCurs] = length;
+			
+			addrsUsedCurs++;
+			if (addrsUsedCurs >= addrsUsed.length) {
+				addrsUsedCurs = 0;
+			}
+		}
 	}
 
 	/**
@@ -1917,6 +1945,7 @@ abstract public class WriteCacheService implements IWriteCache {
 			if (cache == null)
 				return;
 			acquireForWriter(); // in case current
+			debugAddrs(offset, 0, 'F');
 			try {
 				cache.clearAddrMap(offset);
 			} finally {
@@ -1925,6 +1954,41 @@ abstract public class WriteCacheService implements IWriteCache {
 		} catch (InterruptedException e) {
 			throw new RuntimeException(e);
 		}
+	}
+
+	/**
+	 * An array of writeCache actions is maintained that can be used
+	 * to provide a breadcrumb of how that address has been written, saved,
+	 * freed or removed.
+	 * 
+	 * Write errors often show up as a checksum error, so the length of
+	 * data written to the address cab be crucial information in determining the
+	 * root of any problem.
+	 * 
+	 * @param address for which info requested
+	 * @return summary of writeCache actions
+	 */
+	public String addrDebugInfo(final long paddr) {
+		if (addrsUsed == null) {
+			return "No WriteCache debug info";
+		}
+		
+		StringBuffer ret = new StringBuffer();
+		// first see if address was ever written
+		boolean written = false;
+		for (int i = 0; i < addrsUsed.length; i++) {
+			if (i == addrsUsedCurs) {
+				ret.append("|...|");
+			}
+			if (addrsUsed[i] == paddr) {
+				ret.append(addrActions[i]);
+				if (addrActions[i]=='W') {
+					ret.append("[" + addrLens[i] + "]");
+				}
+			}
+		}
+		
+		return ret.toString();
 	}
 
 	/**
