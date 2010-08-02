@@ -183,9 +183,29 @@ public class SameVariableConstraint<E> implements IElementFilter<E>,
 
     }
     
+    /**
+     * The initial version.
+     */
+    private static final transient byte VERSION0 = 0;
+
+    /**
+     * The current version.
+     */
+    private static final transient byte VERSION = VERSION0;
+
     @SuppressWarnings("unchecked")
     public void readExternal(ObjectInput in) throws IOException,
             ClassNotFoundException {
+
+        final short version = in.readByte();
+
+        switch (version) {
+        case VERSION0:
+            break;
+        default:
+            throw new UnsupportedOperationException("Unknown version: "
+                    + version);
+        }
 
         p = (IPredicate<E>) in.readObject();
 
@@ -202,6 +222,8 @@ public class SameVariableConstraint<E> implements IElementFilter<E>,
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
+
+        out.writeByte(VERSION);
 
         out.writeObject(p);
 

@@ -23,6 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.resources;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
@@ -328,6 +331,41 @@ public class JournalIndex extends BTree {
 
             return id;
 
+        }
+
+        /**
+         * The initial version (no additional persistent state).
+         */
+        private final static transient byte VERSION0 = 0;
+
+        /**
+         * The current version.
+         */
+        private final static transient byte VERSION = VERSION0;
+
+        public void readExternal(final ObjectInput in) throws IOException,
+                ClassNotFoundException {
+
+            super.readExternal(in);
+            
+            final byte version = in.readByte();
+            
+            switch (version) {
+            case VERSION0:
+                break;
+            default:
+                throw new UnsupportedOperationException("Unknown version: "
+                        + version);
+            }
+
+        }
+
+        public void writeExternal(final ObjectOutput out) throws IOException {
+
+            super.writeExternal(out);
+            
+            out.writeByte(VERSION);
+            
         }
 
     }

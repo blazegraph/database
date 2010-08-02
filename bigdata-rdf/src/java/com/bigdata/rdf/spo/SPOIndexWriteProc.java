@@ -29,9 +29,7 @@ package com.bigdata.rdf.spo;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-
 import org.apache.log4j.Logger;
-
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
@@ -41,8 +39,10 @@ import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
@@ -81,8 +81,6 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
      * 
      */
     private static final long serialVersionUID = 3969394126242598370L;
-
-    private static transient final long NULL = IRawTripleStore.NULL;
 
     private transient boolean reportMutation;
     
@@ -213,6 +211,8 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
             // figure out if the override bit is set.
             final boolean override = StatementEnum.isOverride(val[0]);
 
+            final boolean userFlag = StatementEnum.isUserFlag(val[0]);
+            
             /*
              * Decode the new (proposed) statement type (override bit is
              * masked off).
@@ -222,7 +222,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
             /*
              * Decode the new (proposed) statement identifier.
              */
-            final long new_sid = decodeStatementIdentifier(newType, val);
+            final IV new_sid = decodeStatementIdentifier(newType, val);
 
             /*
              * The current value for the statement in this index partition (or
@@ -244,7 +244,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                  * Statement is NOT pre-existing.
                  */
 
-                ndx.insert(key, SPO.serializeValue(tmp, false/* override */,
+                ndx.insert(key, SPO.serializeValue(tmp, false/* override */,userFlag,
                         newType, new_sid/* MAY be NULL */));
 
                 if (isPrimaryIndex && DEBUG) {
@@ -280,7 +280,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                         // Note: No statement identifier since statement is not
                         // explicit.
                         ndx.insert(key, SPO.serializeValue(tmp,
-                                false/* override */, newType, NULL/* sid */));
+                                false/* override */,userFlag, newType, null/* sid */));
 
                         if (isPrimaryIndex && DEBUG) {
                             log.debug("Downgrading SPO: key="
@@ -310,7 +310,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                          * path below if statement identifiers are not enabled.
                          */
 
-                        final long sid;
+                        final IV sid;
 
                         if (maxType == oldType) {
 
@@ -325,7 +325,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                         }
 
                         ndx.insert(key, SPO.serializeValue(tmp,
-                                false/* override */, maxType, sid));
+                                false/* override */,userFlag, maxType, sid));
 
                         if (isPrimaryIndex && DEBUG) {
                             log.debug("Changing statement type: key="
@@ -371,10 +371,10 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
      * @throws RuntimeException
      *             if validation fails.
      */
-    protected long decodeStatementIdentifier(final StatementEnum type,
+    protected IV decodeStatementIdentifier(final StatementEnum type,
             final byte[] val) {
         
-        final long sid;
+        IV iv = null;
 
         if (type == StatementEnum.Explicit && val.length == 9) {
 
@@ -386,15 +386,15 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 
             try {
 
-                sid = vbuf.readLong();
+                final long sid = vbuf.readLong();
 
+                iv = new TermId(VTE.STATEMENT, sid);
+                
             } catch (IOException ex) {
 
                 throw new RuntimeException(ex);
 
             }
-
-            assert AbstractTripleStore.isStatement(sid) : "" + sid;
 
         } else {
             
@@ -405,11 +405,9 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 
             assert val.length == 1 : "value length=" + val.length;
 
-            sid = IRawTripleStore.NULL;
-
         }
 
-        return sid;
+        return iv;
 
     }
 

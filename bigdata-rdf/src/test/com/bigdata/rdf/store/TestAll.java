@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
-import com.bigdata.service.jini.util.JiniServicesHelper;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -72,7 +70,9 @@ public class TestAll extends TestCase {
         
         suite.addTest( com.bigdata.rdf.store.TestLocalTripleStore.suite() );
 
-        suite.addTest( com.bigdata.rdf.store.TestLocalTripleStoreWORM.suite() );
+//        suite.addTest( com.bigdata.rdf.store.TestLocalTripleStoreWORM.suite() );
+
+        suite.addTest( com.bigdata.rdf.store.TestLocalTripleStoreWithoutInlining.suite() );
 
         suite.addTest( com.bigdata.rdf.store.TestLocalTripleStoreWithoutStatementIdentifiers.suite() );
 

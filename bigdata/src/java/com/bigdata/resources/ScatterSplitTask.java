@@ -51,8 +51,6 @@ import com.bigdata.sparse.SparseRowStore;
  *      update the index partition definitions on the live journal and the
  *      {@link MetadataIndex} as an atomic operation.
  * 
- * @see DefaultSplitHandler#getAdjustedSplitHandlerForEqualSplits(int, long)
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

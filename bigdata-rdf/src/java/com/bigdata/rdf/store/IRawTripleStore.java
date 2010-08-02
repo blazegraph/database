@@ -29,7 +29,7 @@ package com.bigdata.rdf.store;
 
 import org.openrdf.model.Value;
 
-import com.bigdata.rdf.lexicon.ITermIdCodes;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
@@ -53,12 +53,7 @@ import com.bigdata.striterator.IKeyOrder;
  *       realize non-Sesame integrations by layering an appropriate interface
  *       over this one.
  */
-public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
-    
-    /**
-     * Value used for a "NULL" term identifier.
-     */
-    long NULL = 0L;
+public interface IRawTripleStore extends ITripleStore {
     
     /**
      * The constant <code>NULL</code>.
@@ -72,12 +67,12 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      * @param value
      *            The term.
      * 
-     * @return The assigned term identifier.
+     * @return The assigned internal value.
      */
-    public long addTerm(Value value);
+    public IV addTerm(Value value);
 
     /**
-     * Batch insert of terms into the database. The term identifiers are set on
+     * Batch insert of terms into the database. The internal values are set on
      * the terms as a side-effect.
      * 
      * @param terms
@@ -88,41 +83,38 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
     public void addTerms(BigdataValue[] terms);
 
     /**
-     * Return the RDF {@link Value} given a term identifier (non-batch api).
+     * Return the RDF {@link Value} given an internal value (non-batch api).
      * 
      * @return the RDF value or <code>null</code> if there is no term with
-     *         that identifier in the index.
+     *         that internal value in the index.
      */
-    public Value getTerm(long id);
+    public Value getTerm(IV iv);
 
     /**
-     * Return the pre-assigned termId for the value (non-batch API).
+     * Return the pre-assigned internal value for the value (non-batch API).
      * 
      * @param value
      *            Any {@link Value} reference (MAY be <code>null</code>).
      * 
-     * @return The pre-assigned termId -or- {@link #NULL} iff the term is not
+     * @return The pre-assigned internal value -or- null iff the term is not
      *         known to the database.
      */
-    public long getTermId(Value value);
+    public IV getIV(Value value);
 
     /**
      * Chooses and returns the best {@link IAccessPath} for the given triple
      * pattern.
      * 
      * @param s
-     *            The term identifier for the subject -or-
-     *            {@link IRawTripleStore#NULL}.
+     *            The internal value for the subject -or- null.
      * @param p
-     *            The term identifier for the predicate -or-
-     *            {@link IRawTripleStore#NULL}.
+     *            The internal value for the predicate -or- null.
      * @param o
-     *            The term identifier for the object -or-
-     *            {@link IRawTripleStore#NULL}.
+     *            The internal value for the object -or- null.
      * 
-     * @deprecated by {@link SPORelation#getAccessPath(long, long, long)}
+     * @deprecated by {@link SPORelation#getAccessPath(IV, IV, IV)}
      */
-    public IAccessPath<ISPO> getAccessPath(long s, long p, long o);
+    public IAccessPath<ISPO> getAccessPath(IV s, IV p, IV o);
 
     /**
      * Return the {@link IAccessPath} for the specified {@link IKeyOrder} and a
@@ -140,28 +132,29 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      * Note: This may be used to examine the {@link StatementEnum}.
      * 
      * @param s
-     *            The term identifier for the subject.
+     *            The internal value ({@link IV}) for the subject.
      * @param p
-     *            The term identifier for the predicate.
+     *            The internal value ({@link IV}) for the predicate.
      * @param o
-     *            The term identifier for the object.
+     *            The internal value ({@link IV}) for the object.
      * @param c
-     *            The term identifier for the context (required for quads and
-     *            ignored for triples).
+     *            The internal value ({@link IV}) for the context (required for 
+     *            quads and ignored for triples).
      * 
      * @return The {@link SPO} for that statement, including its
      *         {@link StatementEnum} -or- <code>null</code> iff the statement is
      *         not in the database.
      * 
      * @exception IllegalArgumentException
-     *                if the s, p, or o is {@link #NULL}.
+     *                if the s, p, or o is null.
      * @exception IllegalArgumentException
-     *                if the c is {@link #NULL} and {@link #isQuads()} would
+     *                if the c is null and {@link #isQuads()} would
      *                return <code>true</code>.
      */
-    public ISPO getStatement(long s, long p, long o, long c);
+    public ISPO getStatement(IV s, IV p, IV o, IV c);
+    
     /** @deprecated does not support quads. */
-    public ISPO getStatement(long s, long p, long o);
+    public ISPO getStatement(IV s, IV p, IV o);
     
     /**
      * Writes the statements onto the statements indices (batch, parallel, NO
@@ -307,23 +300,23 @@ public interface IRawTripleStore extends ITripleStore, ITermIdCodes {
      * Externalizes a quad or a triple with a statement identifier using an
      * abbreviated syntax.
      */
-    public String toString(long s, long p, long o, long c);
+    public String toString(IV s, IV p, IV o, IV c);
 
     /**
      * Externalizes a triple using an abbreviated syntax.
      * 
-     * @deprecated by {@link #toString(long, long, long, long)}
+     * @deprecated by {@link #toString(IV, IV, IV, IV)}
      */
-    public String toString(long s, long p, long o);
+    public String toString(IV s, IV p, IV o);
 
     /**
      * Externalizes a term using an abbreviated syntax.
      * 
-     * @param termId
+     * @param iv
      *            The term identifier.
      * 
      * @return A representation of the term.
      */
-    public String toString(long termId);
+    public String toString(IV iv);
 
 }

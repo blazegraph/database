@@ -85,8 +85,9 @@ import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.journal.WORMStrategy;
 import com.bigdata.journal.WriteExecutorService;
-import com.bigdata.journal.DiskOnlyStrategy.StoreCounters;
+import com.bigdata.journal.WORMStrategy.StoreCounters;
 import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.IndexPartitionCause;
@@ -2446,11 +2447,17 @@ abstract public class StoreManager extends ResourceEvents implements
              * the "historical" journals managed by this data service.
              * 
              * FIXME Must also roll the counters forward for the other journal
-             * buffer strategies!
+             * buffer strategies! (The implementation class is different for the
+             * WORMStrategy, which is causing complications right now.)
              */
             if (getBufferStrategy() instanceof DiskOnlyStrategy) {
 
                 ((DiskOnlyStrategy) getBufferStrategy())
+                        .setStoreCounters(getStoreCounters());
+
+            } else if (getBufferStrategy() instanceof WORMStrategy) {
+
+                ((WORMStrategy) getBufferStrategy())
                         .setStoreCounters(getStoreCounters());
 
             }
@@ -2470,7 +2477,7 @@ abstract public class StoreManager extends ResourceEvents implements
                     + "{file="
                     + getFile()
                     + ", open="
-                    + isOpen()
+                    + ManagedJournal.this.isOpen()
                     + (rootBlock != null ? ", uuid="
                             + getRootBlockView().getUUID() : "") + "}";
             
@@ -2602,14 +2609,15 @@ abstract public class StoreManager extends ResourceEvents implements
                                 getResourceMetadata() //
                                 },
                                 // cause
-                                IndexPartitionCause.register(resourceManager),
-                                /*
-                                 * Note: Retains whatever history given by the
-                                 * caller.
-                                 */
-                                pmd.getHistory() + "register(name=" + name
-                                        + ",partitionId="
-                                        + pmd.getPartitionId() + ") "));
+                                IndexPartitionCause.register(resourceManager)
+//                                /*
+//                                 * Note: Retains whatever history given by the
+//                                 * caller.
+//                                 */
+//                                , pmd.getHistory() + "register(name=" + name
+//                                        + ",partitionId="
+//                                        + pmd.getPartitionId() + ") "
+                        ));
 
             } else {
 
@@ -3832,9 +3840,8 @@ abstract public class StoreManager extends ResourceEvents implements
 
             final File file = resourceFiles.remove(uuid);
 
-//            if (log.isInfoEnabled())
-//                log.info
-                log.warn("DELETE: file=" + file + ", uuid=" + uuid + ", isJournal="
+            if (log.isInfoEnabled())
+                log.info("DELETE: file=" + file + ", uuid=" + uuid + ", isJournal="
                     + isJournal);
             
             if (file == null) {
@@ -4104,9 +4111,9 @@ abstract public class StoreManager extends ResourceEvents implements
              * Note: This logs the file as reported by [resourceFiles] as well
              * as the file in IResourceMetadata in case any discrepency arises.
              */
-//            if (log.isInfoEnabled())
-//                log.info
-                log.warn("DELETE: " + resourceMetadata + " : " + file);
+            if (log.isInfoEnabled())
+                log.info("DELETE: " + resourceMetadata + " : " + file);
+//                log.warn("DELETE: " + resourceMetadata + " : " + file);
             
             if (file == null) {
 
@@ -4555,7 +4562,7 @@ abstract public class StoreManager extends ResourceEvents implements
         // make sure that directory exists.
         indexDir.mkdirs();
 
-        final String partitionStr = (partitionId == -1 ? "" : "_part"
+        final String partitionStr = (partitionId == -1 ? "" : "_shardId"
                 + leadingZeros.format(partitionId));
 
         final String prefix = mungedName + "" + partitionStr + "_";

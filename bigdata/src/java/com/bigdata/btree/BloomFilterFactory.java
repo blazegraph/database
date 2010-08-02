@@ -31,7 +31,6 @@ package com.bigdata.btree;
 import java.io.Serializable;
 
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.resources.DefaultSplitHandler;
 
 /**
  * An interface that is used to generate a bloom filter for an
@@ -145,16 +144,12 @@ public class BloomFilterFactory implements Serializable {
      * scale-out indices DO NOT share the same limitation. Each time a scale-out
      * index is partitioned, it is broken into a mutable {@link BTree} for
      * absorbing writes for an index partition and zero or more
-     * {@link IndexSegment}s. The default configuration of the
-     * {@link DefaultSplitHandler} for a scale-out index caps the #of entries in
-     * an index partition at ~ 1.5M. However, many of those index entries are
-     * going to migrate to the {@link IndexSegment}s, so the #of index entries
-     * in the {@link BTree} is never that large. Finally, #of index entries in
-     * an {@link IndexSegment} is always known when the {@link IndexSegment} is
+     * {@link IndexSegment}s. Each time an overflow occurs, index entries are
+     * migrated to the {@link IndexSegment}s, so the #of index entries in the
+     * {@link BTree} is never that large. Finally, #of index entries in an
+     * {@link IndexSegment} is always known when the {@link IndexSegment} is
      * built, so the {@link BloomFilter} for an {@link IndexSegment} is always a
      * perfect fit.
-     * 
-     * @see DefaultSplitHandler
      */
     public static final transient BloomFilterFactory DEFAULT = new BloomFilterFactory(
             DEFAULT_N, DEFAULT_ERROR_RATE, DEFAULT_MAX_ERROR_RATE); 
@@ -234,15 +229,15 @@ public class BloomFilterFactory implements Serializable {
      * Create and return a new (empty) bloom filter for a {@link BTree} or
      * {@link IndexSegment}.
      * <p>
-     * The bloom filter can be provisioned with reference to
-     * {@link src/architecture/bloomfilter.xls}. Let <code>p</code> be the
-     * probability of a false positive (aka the error rate) and <code>n</code>
-     * be the #of index entries. The values p=.02 and n=1M result in a space
-     * requirement of 8656171 bits or approximately 1mb and uses ~ 8.6 bits per
-     * element. In order to achieve the same error rate with n=10M, the size
-     * requirements of the bloom filter will be approximately 10mb since the
-     * filter will still use ~ 8.6 bits per element for that error rate, or
-     * roughly one byte per index entry.
+     * The bloom filter can be provisioned with reference to {@link src
+     * /architecture/bloomfilter.xls}. Let <code>p</code> be the probability of
+     * a false positive (aka the error rate) and <code>n</code> be the #of index
+     * entries. The values p=.02 and n=1M result in a space requirement of
+     * 8656171 bits or approximately 1mb and uses ~ 8.6 bits per element. In
+     * order to achieve the same error rate with n=10M, the size requirements of
+     * the bloom filter will be approximately 10mb since the filter will still
+     * use ~ 8.6 bits per element for that error rate, or roughly one byte per
+     * index entry.
      * <p>
      * The maximum record length for the backing store can easily be exceeded by
      * a large bloom filter, large bloom filters will require significant time
@@ -252,12 +247,12 @@ public class BloomFilterFactory implements Serializable {
      * While the scale-out architecture uses group commits and hence can be
      * expected to perform more commits during a bulk data load, it also uses
      * one bloom filter per {@link AbstractBTree} so the #of index entries is
-     * bounded by the configured {@link ISplitHandler}. On the other hand, the
-     * bloom filter performance will degrade as a scale-up index grows in size
-     * since the bloom filter can not be made very large for a scale-up store
-     * (the maximum record size is reduced in order to permit more records) and
-     * large indices will therefore experience increasing false positive rates
-     * as they grow.
+     * bounded by the configured {@link ISimpleSplitHandler} in an application
+     * dependent manner. On the other hand, the bloom filter performance will
+     * degrade as a scale-up index grows in size since the bloom filter can not
+     * be made very large for a scale-up store (the maximum record size is
+     * reduced in order to permit more records) and large indices will therefore
+     * experience increasing false positive rates as they grow.
      * <p>
      * Whether or not a bloom filter is useful depends on the application. The
      * bloom filter will ONLY be used for point tests such as contains(),

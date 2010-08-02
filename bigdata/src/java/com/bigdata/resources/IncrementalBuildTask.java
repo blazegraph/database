@@ -552,21 +552,22 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                         currentpmd.getLeftSeparatorKey(),//
                         currentpmd.getRightSeparatorKey(),//
                         newResources, //
-                        currentpmd.getIndexPartitionCause(),
-                        currentpmd.getHistory()
-                                + OverflowActionEnum.Build//
-                                + "(lastCommitTime="
-                                + segmentMetadata.getCreateTime()//
-                                + ",segment="
-                                + segmentMetadata.getUUID()//
-                                + ",#buildSources="
-                                + buildResult.sourceCount//
-                                + ",merge="
-                                + buildResult.compactingMerge//
-                                + ",counter="
-                                + btree.getCounter().get()//
-                                + ",oldResources="
-                                + Arrays.toString(currentResources) + ") "));
+                        currentpmd.getIndexPartitionCause()
+//                        , currentpmd.getHistory()
+//                                + OverflowActionEnum.Build//
+//                                + "(lastCommitTime="
+//                                + segmentMetadata.getCreateTime()//
+//                                + ",segment="
+//                                + segmentMetadata.getUUID()//
+//                                + ",#buildSources="
+//                                + buildResult.sourceCount//
+//                                + ",merge="
+//                                + buildResult.compactingMerge//
+//                                + ",counter="
+//                                + btree.getCounter().get()//
+//                                + ",oldResources="
+//                                + Arrays.toString(currentResources) + ") "
+                                ));
 
                 // update the metadata associated with the btree
                 btree.setIndexMetadata(indexMetadata);

@@ -7,7 +7,7 @@ import java.util.Map;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.ILocalBTreeView;
-import com.bigdata.btree.ISplitHandler;
+import com.bigdata.btree.ISimpleSplitHandler;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.service.Event;
@@ -16,7 +16,7 @@ import com.bigdata.util.InnerCause;
 
 /**
  * Adds additional metadata to a {@link BTreeMetadata} that deals with the index
- * partition view, including its fast rangeCount, its {@link ISplitHandler},
+ * partition view, including its fast rangeCount, its {@link ISimpleSplitHandler},
  * etc.
  * <p>
  * Note: There is overhead in opening a view comprised of more than just the
@@ -87,8 +87,7 @@ class ViewMetadata extends BTreeMetadata implements Params {
      * BTree but the full view). The view is cached. If the reference has been
      * cleared then the view is re-opened. This also initializes values
      * requiring additional effort which are not available until this method is
-     * invoked including {@link #getRangeCount()} ,
-     * {@link #getAdjustedSplitHandler()}, etc.
+     * invoked including {@link #getRangeCount()}, etc.
      */
     public ILocalBTreeView getView() {
 
@@ -243,15 +242,22 @@ class ViewMetadata extends BTreeMetadata implements Params {
 
             final int accelerateSplitThreshold = resourceManager.accelerateSplitThreshold;
 
-            if (accelerateSplitThreshold == 0) {
+            if (accelerateSplitThreshold == 0
+                    || partitionCount > accelerateSplitThreshold) {
 
                 this.adjustedNominalShardSize = resourceManager.nominalShardSize;
 
             } else {
 
-                // discount: given T=100, will be 1 when N=100; 10 when N=10,
-                // and
-                // 100 when N=1.
+                /*
+                 * discount: given T=100:
+                 * 
+                 * d = .01 when N=1
+                 * 
+                 * d = .1 when N=10
+                 * 
+                 * d = 1 when N=100
+                 */
                 final double d = (double) partitionCount
                         / accelerateSplitThreshold;
 

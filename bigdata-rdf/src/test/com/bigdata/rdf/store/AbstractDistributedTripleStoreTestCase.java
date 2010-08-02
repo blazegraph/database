@@ -57,8 +57,6 @@ abstract public class AbstractDistributedTripleStoreTestCase extends AbstractDis
         super(arg0);
     }
 
-    protected final long NULL = IRawTripleStore.NULL;
-    
     /**
      * The triple store under test.
      */

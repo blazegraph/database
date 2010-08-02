@@ -676,6 +676,7 @@ abstract public class LoadBalancerService extends AbstractService
         
     }
     
+    @Override
     synchronized public void shutdown() {
 
         if(!isOpen()) return;
@@ -692,7 +693,7 @@ abstract public class LoadBalancerService extends AbstractService
          * Obtain the exclusive write lock for the event BTree before flushing
          * writes.
          */
-        final Lock lock = eventReceiver.getWriteLock();
+        final Lock tmpLock = eventReceiver.getWriteLock();
         try {
 
             // Flush any buffered writes to the event store.
@@ -707,7 +708,7 @@ abstract public class LoadBalancerService extends AbstractService
             
         } finally {
             
-            lock.unlock();
+            tmpLock.unlock();
             
         }
         
@@ -718,6 +719,7 @@ abstract public class LoadBalancerService extends AbstractService
 
     }
 
+    @Override
     synchronized public void shutdownNow() {
 
         if(!isOpen()) return;
@@ -740,6 +742,7 @@ abstract public class LoadBalancerService extends AbstractService
 
     }
 
+    @Override
     synchronized public void destroy() {
         
         super.destroy();
@@ -1271,7 +1274,7 @@ abstract public class LoadBalancerService extends AbstractService
          * Note: If we are not getting critical counters for some host then we
          * are assuming a reasonable values for the missing data and computing
          * the utilization based on those assumptions. Note that a value of zero
-         * (0) may be interepreted as either critically high utilization or no
+         * (0) may be interpreted as either critically high utilization or no
          * utilization depending on the performance counter involved and that
          * the impact of the different counters can vary depending on the
          * formula used to compute the utilization score.
@@ -1341,7 +1344,7 @@ abstract public class LoadBalancerService extends AbstractService
              * Note: This reflects the disk IO utilization primarily through
              * IOWAIT.
              * 
-             * @todo Play around with other forumulas too.
+             * @todo Play around with other formulas too.
              */
             double adjustedRawScore;
             final double baseRawScore = adjustedRawScore = (1d + percentIOWait * 100d)
@@ -1537,7 +1540,7 @@ abstract public class LoadBalancerService extends AbstractService
             /*
              * dataDir
              * 
-             * Note: If you set these threasholds to GT the default value
+             * Note: If you set these thresholds to GT the default value
              * reported when the counters are not yet available then you will
              * see false 'short on disk' claims. They will go away once the
              * performance counters arrive with real disk space measurements.
@@ -1566,7 +1569,7 @@ abstract public class LoadBalancerService extends AbstractService
             /*
              * tmpDir
              * 
-             * Note: If you set these threasholds to GT the default value
+             * Note: If you set these thresholds to GT the default value
              * reported when the counters are not yet available then you will
              * see false 'short on disk' claims. They will go away once the
              * performance counters arrive with real disk space measurements.
@@ -2017,7 +2020,37 @@ abstract public class LoadBalancerService extends AbstractService
         }
         
     }
-    
+
+    /**
+     * Logs the counters on a file created using
+     * {@link File#createTempFile(String, String, File)} in the log
+     * directory.
+     *
+     * @throws IOException
+     *
+     * @todo this method is not exposed to RMI (it is not on any
+     *       {@link Remote} interface) but it could be.
+     */
+    public void logCounters() throws IOException {
+
+        if (isTransient) {
+
+            log.warn("LBS is transient - request ignored.");
+
+            return;
+
+        }
+
+        final File file = File.createTempFile("counters-hup", ".xml", logDir);
+
+        logCounters(file);
+
+    }
+
+    public void sighup() throws IOException {
+        logCounters();
+    }
+
     /**
      * Notify the {@link LoadBalancerService} that a new service is available.
      * <p>

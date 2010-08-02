@@ -3,6 +3,7 @@ package com.bigdata.rdf.sail;
 import java.util.Map;
 import java.util.Properties;
 import java.util.StringTokenizer;
+
 import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryLanguage;
@@ -25,7 +26,10 @@ import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.repository.sail.SailTupleQuery;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
+
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sail.bench.NanoSparqlClient;
+import com.bigdata.rdf.sail.bench.NanoSparqlClient.QueryType;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 
@@ -40,65 +44,91 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
         
     }
     
+    @Override
+    public BigdataSailRepository getRepository() {
+        return (BigdataSailRepository)super.getRepository();
+    }
+    
     /**
-     * Overriden to capture query hints from SPARQL queries. Query hints are
+     * {@inheritDoc}
+     * <p>
+     * Overridden to capture query hints from SPARQL queries. Query hints are
      * embedded in query strings as namespaces.  
      * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
      */
     @Override
-    public SailGraphQuery prepareGraphQuery(QueryLanguage ql,
-            String queryString, String baseURI) throws MalformedQueryException {
+    public SailGraphQuery prepareGraphQuery(final QueryLanguage ql,
+            final String qs, final String baseURI) 
+            throws MalformedQueryException {
         final ParsedGraphQuery parsedQuery = QueryParserUtil.parseGraphQuery(
-                ql, queryString, baseURI);
-        Properties queryHints = parseQueryHints(ql, queryString, baseURI);
-        return new BigdataSailGraphQuery(parsedQuery, this, queryHints);
+                ql, qs, baseURI);
+        final Properties queryHints = parseQueryHints(ql, qs, baseURI);
+        final boolean describe = 
+            ql == QueryLanguage.SPARQL &&
+            NanoSparqlClient.QueryType.fromQuery(qs) == QueryType.DESCRIBE;
+        return new BigdataSailGraphQuery(parsedQuery, this, queryHints, describe);
     }
 
     /**
-     * Overriden to capture query hints from SPARQL queries. Query hints are
+     * {@inheritDoc}
+     * <p>
+     * Overridden to capture query hints from SPARQL queries. Query hints are
      * embedded in query strings as namespaces.  
      * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
      */
     @Override
-    public SailTupleQuery prepareTupleQuery(QueryLanguage ql,
-            String queryString, String baseURI) throws MalformedQueryException {
+    public SailTupleQuery prepareTupleQuery(final QueryLanguage ql,
+            final String queryString, final String baseURI) 
+            throws MalformedQueryException {
         final ParsedTupleQuery parsedQuery = QueryParserUtil.parseTupleQuery(
                 ql, queryString, baseURI);
-        Properties queryHints = parseQueryHints(ql, queryString, baseURI);
+        final Properties queryHints = parseQueryHints(ql, queryString, baseURI);
         return new BigdataSailTupleQuery(parsedQuery, this, queryHints);
     }
 
     /**
-     * Overriden to capture query hints from SPARQL queries. Query hints are
-     * embedded in query strings as namespaces.  
-     * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
+     * {@inheritDoc}
+     * <p>
+     * Overridden to capture query hints from SPARQL queries. Query hints are
+     * embedded in query strings as namespaces. See
+     * {@link BD#QUERY_HINTS_NAMESPACE} for more information.
      */
     @Override
-    public SailBooleanQuery prepareBooleanQuery(QueryLanguage ql,
-            String queryString, String baseURI) throws MalformedQueryException {
+    public SailBooleanQuery prepareBooleanQuery(final QueryLanguage ql,
+            final String queryString, final String baseURI) 
+            throws MalformedQueryException {
         final ParsedBooleanQuery parsedQuery = QueryParserUtil
                 .parseBooleanQuery(ql, queryString, baseURI);
-        Properties queryHints = parseQueryHints(ql, queryString, baseURI);
+        final Properties queryHints = parseQueryHints(ql, queryString, baseURI);
         return new BigdataSailBooleanQuery(parsedQuery, this, queryHints);
     }
 
     /**
-     * Overriden to capture query hints from SPARQL queries. Query hints are
+     * {@inheritDoc}
+     * <p>
+     * Overridden to capture query hints from SPARQL queries. Query hints are
      * embedded in query strings as namespaces.  
      * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
      */
     @Override
-    public SailQuery prepareQuery(QueryLanguage ql, String queryString,
-            String baseURI) throws MalformedQueryException {
-        ParsedQuery parsedQuery = QueryParserUtil.parseQuery(ql, queryString,
-                baseURI);
-        Properties queryHints = parseQueryHints(ql, queryString, baseURI);
+    public SailQuery prepareQuery(final QueryLanguage ql, final String qs,
+            final String baseURI) 
+            throws MalformedQueryException {
+        final ParsedQuery parsedQuery = QueryParserUtil.parseQuery(ql, 
+                qs, baseURI);
+        final Properties queryHints = parseQueryHints(ql, qs, baseURI);
         if (parsedQuery instanceof ParsedTupleQuery) {
-            return new BigdataSailTupleQuery((ParsedTupleQuery) parsedQuery, this, queryHints);
+            return new BigdataSailTupleQuery(
+                    (ParsedTupleQuery) parsedQuery, this, queryHints);
         } else if (parsedQuery instanceof ParsedGraphQuery) {
-            return new BigdataSailGraphQuery((ParsedGraphQuery) parsedQuery, this, queryHints);
+            final boolean describe = 
+                ql == QueryLanguage.SPARQL &&
+                NanoSparqlClient.QueryType.fromQuery(qs) == QueryType.DESCRIBE;
+            return new BigdataSailGraphQuery(
+                    (ParsedGraphQuery) parsedQuery, this, queryHints, describe);
         } else if (parsedQuery instanceof ParsedBooleanQuery) {
-            return new BigdataSailBooleanQuery((ParsedBooleanQuery) parsedQuery, this, queryHints);
+            return new BigdataSailBooleanQuery(
+                    (ParsedBooleanQuery) parsedQuery, this, queryHints);
         } else {
             throw new RuntimeException("Unexpected query type: "
                     + parsedQuery.getClass());
@@ -106,6 +136,8 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
      * Note: auto-commit is an EXTREMELY bad idea. Performance will be terrible.
      * The database will swell to an outrageous size. TURN OFF AUTO COMMIT.
      * 

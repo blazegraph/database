@@ -46,6 +46,7 @@ import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
+import com.bigdata.journal.WORMStrategy.StoreCounters;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.StoreManager.ManagedJournal;
@@ -155,6 +156,8 @@ import com.bigdata.resources.StoreManager.ManagedJournal;
  * 
  * @see BufferMode#Disk
  * @see BufferMode#Temporary
+ * 
+ * @deprecated This has been replaced by {@link WORMStrategy}.
  */
 public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         IDiskBasedStrategy {
@@ -468,16 +471,16 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         }
         
     }
-    
+
     /**
-     * Need to overide commit to ensure the writeCache is flushed prior to
-     * writing the rootblock.
+     * Need to override commit to ensure the writeCache is flushed prior to
+     * writing the root block.
      * 
-     * For the DiskOnlyStrategy flushing the writeCache also ensures the
-     * backing file is created if the file is temporary.
+     * For the DiskOnlyStrategy flushing the writeCache also ensures the backing
+     * file is created if the file is temporary.
      * 
-     * Note that the call must be syncronized or concurrent writers to the
-     * cache will cause problems.
+     * Note that the internal call to flush the writeCache must be synchronized
+     * or concurrent writers to the cache will cause problems.
      */
     public void commit() {
     	if (writeCache != null) {
@@ -499,7 +502,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         writeCache.flush();
         
-        storeCounters.ncacheFlush++;
+//        storeCounters.ncacheFlush++;
 
     }
     
@@ -542,551 +545,551 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
     }
 
-    /**
-     * Counters for {@link IRawStore} access, including operations that read or
-     * write through to the underlying media.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * @todo report elapsed time and average latency for force, reopen, and
-     *       writeRootBlock.
-     * 
-     * @todo counters need to be atomic if we want to avoid the possibility of
-     *       concurrent <code>x++</code> operations failing to correctly
-     *       increment <code>x</code> for each request.
-     */
-    public static class StoreCounters {
-        
-        /**
-         * #of read requests.
-         */
-        public long nreads;
-
-        /**
-         * #of read requests that are satisfied by our write cache (vs the
-         * OS or disk level write cache).
-         */
-        public long ncacheRead;
-
-        /**
-         * #of read requests that read through to the backing file.
-         */
-        public long ndiskRead;
-        
-        /**
-         * #of bytes read.
-         */
-        public long bytesRead;
-
-        /**
-         * #of bytes that have been read from the disk.
-         */
-        public long bytesReadFromDisk;
-        
-        /**
-         * The size of the largest record read.
-         */
-        public long maxReadSize;
-        
-        /**
-         * Total elapsed time for reads.
-         */
-        public long elapsedReadNanos;
-
-        /**
-         * Total elapsed time checking the disk write cache for records to be
-         * read.
-         */
-        public long elapsedCacheReadNanos;
-        
-        /**
-         * Total elapsed time for reading on the disk.
-         */
-        public long elapsedDiskReadNanos;
-        
-        /**
-         * #of write requests.
-         */
-        public long nwrites;
-
-        /**
-         * #of write requests that are absorbed by our write cache (vs the OS or
-         * disk level write cache).
-         */
-        public long ncacheWrite;
-        
-        /**
-         * #of times the write cache was flushed to disk.
-         */
-        public long ncacheFlush;
-        
-        /**
-         * #of write requests that write through to the backing file.
-         */
-        public long ndiskWrite;
-
-        /**
-         * The size of the largest record written.
-         */
-        public long maxWriteSize;
-        
-        /**
-         * #of bytes written.
-         */
-        public long bytesWritten;
-        
-        /**
-         * #of bytes that have been written on the disk.
-         */
-        public long bytesWrittenOnDisk;
-        
-        /**
-         * Total elapsed time for writes.
-         */
-        public long elapsedWriteNanos;
-        
-        /**
-         * Total elapsed time writing records into the cache (does not count
-         * time to flush the cache when it is full or to write records that do
-         * not fit in the cache directly to the disk).
-         */
-        public long elapsedCacheWriteNanos;
-        
-        /**
-         * Total elapsed time for writing on the disk.
-         */
-        public long elapsedDiskWriteNanos;
-        
-        /**
-         * #of times the data were forced to the disk.
-         */
-        public long nforce;
-        
-        /**
-         * #of times the length of the file was changed (typically, extended).
-         */
-        public long ntruncate;
-        
-        /**
-         * #of times the file has been reopened after it was closed by an
-         * interrupt.
-         */
-        public long nreopen;
-        
-        /**
-         * #of times one of the root blocks has been written.
-         */
-        public long nwriteRootBlock;
-
-        /**
-         * Initialize a new set of counters.
-         */
-        public StoreCounters() {
-            
-        }
-        
-        /**
-         * Copy ctor.
-         * @param o
-         */
-        public StoreCounters(final StoreCounters o) {
-            
-            add( o );
-            
-        }
-        
-        /**
-         * Adds counters to the current counters.
-         * 
-         * @param o
-         */
-        public void add(final StoreCounters o) {
-
-            nreads += o.nreads;
-            ncacheRead += o.ncacheRead;
-            ndiskRead += o.ndiskRead;
-            bytesRead += o.bytesRead;
-            bytesReadFromDisk += o.bytesReadFromDisk;
-            maxReadSize += o.maxReadSize;
-            elapsedReadNanos += o.elapsedReadNanos;
-            elapsedCacheReadNanos += o.elapsedCacheReadNanos;
-            elapsedDiskReadNanos += o.elapsedDiskReadNanos;
-
-            nwrites += o.nwrites;
-            ncacheWrite += o.ncacheWrite;
-            ncacheFlush += o.ncacheFlush;
-            ndiskWrite += o.ndiskWrite;
-            maxWriteSize += o.maxWriteSize;
-            bytesWritten += o.bytesWritten;
-            bytesWrittenOnDisk += o.bytesWrittenOnDisk;
-            elapsedWriteNanos += o.elapsedWriteNanos;
-            elapsedCacheWriteNanos += o.elapsedCacheWriteNanos;
-            elapsedDiskWriteNanos += o.elapsedDiskWriteNanos;
-
-            nforce += o.nforce;
-            ntruncate += o.ntruncate;
-            nreopen += o.nreopen;
-            nwriteRootBlock += o.nwriteRootBlock;
-            
-        }
-
-        /**
-         * Returns a new {@link StoreCounters} containing the current counter values
-         * minus the given counter values.
-         * 
-         * @param o
-         * 
-         * @return
-         */
-        public StoreCounters subtract(final StoreCounters o) {
-
-            // make a copy of the current counters.
-            final StoreCounters t = new StoreCounters(this);
-            
-            // subtract out the given counters.
-            t.nreads -= o.nreads;
-            t.ncacheRead -= o.ncacheRead;
-            t.ndiskRead -= o.ndiskRead;
-            t.bytesRead -= o.bytesRead;
-            t.bytesReadFromDisk -= o.bytesReadFromDisk;
-            t.maxReadSize -= o.maxReadSize;
-            t.elapsedReadNanos -= o.elapsedReadNanos;
-            t.elapsedCacheReadNanos -= o.elapsedCacheReadNanos;
-            t.elapsedDiskReadNanos -= o.elapsedDiskReadNanos;
-
-            t.nwrites -= o.nwrites;
-            t.ncacheWrite -= o.ncacheWrite;
-            t.ncacheFlush -= o.ncacheFlush;
-            t.ndiskWrite -= o.ndiskWrite;
-            t.maxWriteSize -= o.maxWriteSize;
-            t.bytesWritten -= o.bytesWritten;
-            t.bytesWrittenOnDisk -= o.bytesWrittenOnDisk;
-            t.elapsedWriteNanos -= o.elapsedWriteNanos;
-            t.elapsedCacheWriteNanos -= o.elapsedCacheWriteNanos;
-            t.elapsedDiskWriteNanos -= o.elapsedDiskWriteNanos;
-
-            t.nforce -= o.nforce;
-            t.ntruncate -= o.ntruncate;
-            t.nreopen -= o.nreopen;
-            t.nwriteRootBlock -= o.nwriteRootBlock;
-
-            return t;
-            
-        }
-        
-        synchronized public CounterSet getCounters() {
-
-            if (root == null) {
-
-                root = new CounterSet();
-
-                // IRawStore API
-                {
-
-                    /*
-                     * reads
-                     */
-
-                    root.addCounter("nreads", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(nreads);
-                        }
-                    });
-
-                    root.addCounter("bytesRead", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(bytesRead);
-                        }
-                    });
-
-                    root.addCounter("readSecs", new Instrument<Double>() {
-                        public void sample() {
-                            final double elapsedReadSecs = (elapsedReadNanos / 1000000000.);
-                            setValue(elapsedReadSecs);
-                        }
-                    });
-
-                    root.addCounter("bytesReadPerSec",
-                            new Instrument<Double>() {
-                                public void sample() {
-                                    final double readSecs = (elapsedReadNanos / 1000000000.);
-                                    final double bytesReadPerSec = (readSecs == 0L ? 0d
-                                            : (bytesRead / readSecs));
-                                    setValue(bytesReadPerSec);
-                                }
-                            });
-
-                    root.addCounter("maxReadSize", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(maxReadSize);
-                        }
-                    });
-
-                    /*
-                     * writes
-                     */
-
-                    root.addCounter("nwrites", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(nwrites);
-                        }
-                    });
-
-                    root.addCounter("bytesWritten", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(bytesWritten);
-                        }
-                    });
-
-                    root.addCounter("writeSecs", new Instrument<Double>() {
-                        public void sample() {
-                            final double writeSecs = (elapsedWriteNanos / 1000000000.);
-                            setValue(writeSecs);
-                        }
-                    });
-
-                    root.addCounter("bytesWrittenPerSec",
-                            new Instrument<Double>() {
-                                public void sample() {
-                                    final double writeSecs = (elapsedWriteNanos / 1000000000.);
-                                    final double bytesWrittenPerSec = (writeSecs == 0L ? 0d
-                                            : (bytesWritten / writeSecs));
-                                    setValue(bytesWrittenPerSec);
-                                }
-                            });
-
-                    root.addCounter("maxWriteSize", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(maxWriteSize);
-                        }
-                    });
-
-                }
-
-                /*
-                 * write cache statistics
-                 */
-                {
-
-                    final CounterSet writeCache = root.makePath("writeCache");
-
-                    /*
-                     * read
-                     */
-                    writeCache.addCounter("nread", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(ncacheRead);
-                        }
-                    });
-
-                    writeCache.addCounter("readHitRate", new Instrument<Double>() {
-                        public void sample() {
-                            setValue(nreads == 0L ? 0d : (double) ncacheRead
-                                    / nreads);
-                        }
-                    });
-
-                    writeCache.addCounter("readSecs", new Instrument<Double>() {
-                        public void sample() {
-                            setValue(elapsedCacheReadNanos / 1000000000.);
-                        }
-                    });
-
-                    /*
-                     * write
-                     */
-                    
-                    // #of writes on the write cache.
-                    writeCache.addCounter("nwrite", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(ncacheWrite);
-                        }
-                    });
-
-                    /*
-                     * % of writes that are buffered vs writing through to the
-                     * disk.
-                     * 
-                     * Note: This will be 1.0 unless you are writing large
-                     * records. Large records are written directly to the disk
-                     * rather than first into the write cache. When this happens
-                     * the writeHitRate on the cache can be less than one.
-                     */
-                    writeCache.addCounter("writeHitRate", new Instrument<Double>() {
-                        public void sample() {
-                            setValue(nwrites == 0L ? 0d : (double) ncacheWrite
-                                    / nwrites);
-                        }
-                    });
-
-                    writeCache.addCounter("writeSecs", new Instrument<Double>() {
-                        public void sample() {
-                            setValue(elapsedCacheWriteNanos / 1000000000.);
-                        }
-                    });
-
-                    // #of times the write cache was flushed to the disk.
-                    writeCache.addCounter("nflush", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(ncacheFlush);
-                        }
-                    });
-                    
-                }
-
-                // disk statistics
-                {
-                    final CounterSet disk = root.makePath("disk");
-
-                    /*
-                     * read
-                     */
-
-                    disk.addCounter("nreads", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(ndiskRead);
-                        }
-                    });
-
-                    disk.addCounter("bytesRead", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(bytesReadFromDisk);
-                        }
-                    });
-
-                    disk.addCounter("bytesPerRead", new Instrument<Double>() {
-                        public void sample() {
-                            final double bytesPerDiskRead = (ndiskRead == 0 ? 0d
-                                    : (bytesReadFromDisk / (double)ndiskRead));
-                            setValue(bytesPerDiskRead);
-                        }
-                    });
-
-                    disk.addCounter("readSecs", new Instrument<Double>() {
-                        public void sample() {
-                            final double diskReadSecs = (elapsedDiskReadNanos / 1000000000.);
-                            setValue(diskReadSecs);
-                        }
-                    });
-
-                    disk.addCounter("bytesReadPerSec",
-                            new Instrument<Double>() {
-                                public void sample() {
-                                    final double diskReadSecs = (elapsedDiskReadNanos / 1000000000.);
-                                    final double bytesReadPerSec = (diskReadSecs == 0L ? 0d
-                                            : bytesReadFromDisk / diskReadSecs);
-                                    setValue(bytesReadPerSec);
-                                }
-                            });
-
-                    disk.addCounter("secsPerRead", new Instrument<Double>() {
-                        public void sample() {
-                            final double diskReadSecs = (elapsedDiskReadNanos / 1000000000.);
-                            final double readLatency = (diskReadSecs == 0 ? 0d
-                                    : diskReadSecs / ndiskRead);
-                            setValue(readLatency);
-                        }
-                    });
-
-                    /*
-                     * write
-                     */
-
-                    disk.addCounter("nwrites", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(ndiskWrite);
-                        }
-                    });
-
-                    disk.addCounter("bytesWritten", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(bytesWrittenOnDisk);
-                        }
-                    });
-
-                    disk.addCounter("bytesPerWrite", new Instrument<Double>() {
-                        public void sample() {
-                            final double bytesPerDiskWrite = (ndiskWrite == 0 ? 0d
-                                    : (bytesWrittenOnDisk / (double)ndiskWrite));
-                            setValue(bytesPerDiskWrite);
-                        }
-                    });
-
-                    disk.addCounter("writeSecs", new Instrument<Double>() {
-                        public void sample() {
-                            final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
-                            setValue(diskWriteSecs);
-                        }
-                    });
-
-                    disk.addCounter("bytesWrittenPerSec",
-                            new Instrument<Double>() {
-                                public void sample() {
-                                    final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
-                                    final double bytesWrittenPerSec = (diskWriteSecs == 0L ? 0d
-                                            : bytesWrittenOnDisk
-                                                    / diskWriteSecs);
-                                    setValue(bytesWrittenPerSec);
-                                }
-                            });
-
-                    disk.addCounter("secsPerWrite", new Instrument<Double>() {
-                        public void sample() {
-                            final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
-                            final double writeLatency = (diskWriteSecs == 0 ? 0d
-                                    : diskWriteSecs / ndiskWrite);
-                            setValue(writeLatency);
-                        }
-                    });
-
-                    /*
-                     * other
-                     */
-
-                    disk.addCounter("nforce", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(nforce);
-                        }
-                    });
-
-                    disk.addCounter("nextend", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(ntruncate);
-                        }
-                    });
-
-                    disk.addCounter("nreopen", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(nreopen);
-                        }
-                    });
-
-                    disk.addCounter("rootBlockWrites", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(nwriteRootBlock);
-                        }
-                    });
-
-                }
-
-            }
-
-            return root;
-
-        }
-        private CounterSet root;
-        
-        /**
-         * Human readable representation of the counters.
-         */
-        public String toString() {
-
-            return getCounters().toString();
-            
-        }
-        
-    }
+//    /**
+//     * Counters for {@link IRawStore} access, including operations that read or
+//     * write through to the underlying media.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     * 
+//     * @todo report elapsed time and average latency for force, reopen, and
+//     *       writeRootBlock.
+//     * 
+//     * @todo counters need to be atomic if we want to avoid the possibility of
+//     *       concurrent <code>x++</code> operations failing to correctly
+//     *       increment <code>x</code> for each request.
+//     */
+//    public static class StoreCounters {
+//        
+//        /**
+//         * #of read requests.
+//         */
+//        public long nreads;
+//
+//        /**
+//         * #of read requests that are satisfied by our write cache (vs the
+//         * OS or disk level write cache).
+//         */
+//        public long ncacheRead;
+//
+//        /**
+//         * #of read requests that read through to the backing file.
+//         */
+//        public long ndiskRead;
+//        
+//        /**
+//         * #of bytes read.
+//         */
+//        public long bytesRead;
+//
+//        /**
+//         * #of bytes that have been read from the disk.
+//         */
+//        public long bytesReadFromDisk;
+//        
+//        /**
+//         * The size of the largest record read.
+//         */
+//        public long maxReadSize;
+//        
+//        /**
+//         * Total elapsed time for reads.
+//         */
+//        public long elapsedReadNanos;
+//
+//        /**
+//         * Total elapsed time checking the disk write cache for records to be
+//         * read.
+//         */
+//        public long elapsedCacheReadNanos;
+//        
+//        /**
+//         * Total elapsed time for reading on the disk.
+//         */
+//        public long elapsedDiskReadNanos;
+//        
+//        /**
+//         * #of write requests.
+//         */
+//        public long nwrites;
+//
+//        /**
+//         * #of write requests that are absorbed by our write cache (vs the OS or
+//         * disk level write cache).
+//         */
+//        public long ncacheWrite;
+//        
+//        /**
+//         * #of times the write cache was flushed to disk.
+//         */
+//        public long ncacheFlush;
+//        
+//        /**
+//         * #of write requests that write through to the backing file.
+//         */
+//        public long ndiskWrite;
+//
+//        /**
+//         * The size of the largest record written.
+//         */
+//        public long maxWriteSize;
+//        
+//        /**
+//         * #of bytes written.
+//         */
+//        public long bytesWritten;
+//        
+//        /**
+//         * #of bytes that have been written on the disk.
+//         */
+//        public long bytesWrittenOnDisk;
+//        
+//        /**
+//         * Total elapsed time for writes.
+//         */
+//        public long elapsedWriteNanos;
+//        
+//        /**
+//         * Total elapsed time writing records into the cache (does not count
+//         * time to flush the cache when it is full or to write records that do
+//         * not fit in the cache directly to the disk).
+//         */
+//        public long elapsedCacheWriteNanos;
+//        
+//        /**
+//         * Total elapsed time for writing on the disk.
+//         */
+//        public long elapsedDiskWriteNanos;
+//        
+//        /**
+//         * #of times the data were forced to the disk.
+//         */
+//        public long nforce;
+//        
+//        /**
+//         * #of times the length of the file was changed (typically, extended).
+//         */
+//        public long ntruncate;
+//        
+//        /**
+//         * #of times the file has been reopened after it was closed by an
+//         * interrupt.
+//         */
+//        public long nreopen;
+//        
+//        /**
+//         * #of times one of the root blocks has been written.
+//         */
+//        public long nwriteRootBlock;
+//
+//        /**
+//         * Initialize a new set of counters.
+//         */
+//        public StoreCounters() {
+//            
+//        }
+//        
+//        /**
+//         * Copy ctor.
+//         * @param o
+//         */
+//        public StoreCounters(final StoreCounters o) {
+//            
+//            add( o );
+//            
+//        }
+//        
+//        /**
+//         * Adds counters to the current counters.
+//         * 
+//         * @param o
+//         */
+//        public void add(final StoreCounters o) {
+//
+//            nreads += o.nreads;
+//            ncacheRead += o.ncacheRead;
+//            ndiskRead += o.ndiskRead;
+//            bytesRead += o.bytesRead;
+//            bytesReadFromDisk += o.bytesReadFromDisk;
+//            maxReadSize += o.maxReadSize;
+//            elapsedReadNanos += o.elapsedReadNanos;
+//            elapsedCacheReadNanos += o.elapsedCacheReadNanos;
+//            elapsedDiskReadNanos += o.elapsedDiskReadNanos;
+//
+//            nwrites += o.nwrites;
+//            ncacheWrite += o.ncacheWrite;
+//            ncacheFlush += o.ncacheFlush;
+//            ndiskWrite += o.ndiskWrite;
+//            maxWriteSize += o.maxWriteSize;
+//            bytesWritten += o.bytesWritten;
+//            bytesWrittenOnDisk += o.bytesWrittenOnDisk;
+//            elapsedWriteNanos += o.elapsedWriteNanos;
+//            elapsedCacheWriteNanos += o.elapsedCacheWriteNanos;
+//            elapsedDiskWriteNanos += o.elapsedDiskWriteNanos;
+//
+//            nforce += o.nforce;
+//            ntruncate += o.ntruncate;
+//            nreopen += o.nreopen;
+//            nwriteRootBlock += o.nwriteRootBlock;
+//            
+//        }
+//
+//        /**
+//         * Returns a new {@link StoreCounters} containing the current counter values
+//         * minus the given counter values.
+//         * 
+//         * @param o
+//         * 
+//         * @return
+//         */
+//        public StoreCounters subtract(final StoreCounters o) {
+//
+//            // make a copy of the current counters.
+//            final StoreCounters t = new StoreCounters(this);
+//            
+//            // subtract out the given counters.
+//            t.nreads -= o.nreads;
+//            t.ncacheRead -= o.ncacheRead;
+//            t.ndiskRead -= o.ndiskRead;
+//            t.bytesRead -= o.bytesRead;
+//            t.bytesReadFromDisk -= o.bytesReadFromDisk;
+//            t.maxReadSize -= o.maxReadSize;
+//            t.elapsedReadNanos -= o.elapsedReadNanos;
+//            t.elapsedCacheReadNanos -= o.elapsedCacheReadNanos;
+//            t.elapsedDiskReadNanos -= o.elapsedDiskReadNanos;
+//
+//            t.nwrites -= o.nwrites;
+//            t.ncacheWrite -= o.ncacheWrite;
+//            t.ncacheFlush -= o.ncacheFlush;
+//            t.ndiskWrite -= o.ndiskWrite;
+//            t.maxWriteSize -= o.maxWriteSize;
+//            t.bytesWritten -= o.bytesWritten;
+//            t.bytesWrittenOnDisk -= o.bytesWrittenOnDisk;
+//            t.elapsedWriteNanos -= o.elapsedWriteNanos;
+//            t.elapsedCacheWriteNanos -= o.elapsedCacheWriteNanos;
+//            t.elapsedDiskWriteNanos -= o.elapsedDiskWriteNanos;
+//
+//            t.nforce -= o.nforce;
+//            t.ntruncate -= o.ntruncate;
+//            t.nreopen -= o.nreopen;
+//            t.nwriteRootBlock -= o.nwriteRootBlock;
+//
+//            return t;
+//            
+//        }
+//        
+//        synchronized public CounterSet getCounters() {
+//
+//            if (root == null) {
+//
+//                root = new CounterSet();
+//
+//                // IRawStore API
+//                {
+//
+//                    /*
+//                     * reads
+//                     */
+//
+//                    root.addCounter("nreads", new Instrument<Long>() {
+//                        public void sample() {
+//                            setValue(nreads);
+//                        }
+//                    });
+//
+//                    root.addCounter("bytesRead", new Instrument<Long>() {
+//                        public void sample() {
+//                            setValue(bytesRead);
+//                        }
+//                    });
+//
+//                    root.addCounter("readSecs", new Instrument<Double>() {
+//                        public void sample() {
+//                            final double elapsedReadSecs = (elapsedReadNanos / 1000000000.);
+//                            setValue(elapsedReadSecs);
+//                        }
+//                    });
+//
+//                    root.addCounter("bytesReadPerSec",
+//                            new Instrument<Double>() {
+//                                public void sample() {
+//                                    final double readSecs = (elapsedReadNanos / 1000000000.);
+//                                    final double bytesReadPerSec = (readSecs == 0L ? 0d
+//                                            : (bytesRead / readSecs));
+//                                    setValue(bytesReadPerSec);
+//                                }
+//                            });
+//
+//                    root.addCounter("maxReadSize", new Instrument<Long>() {
+//                        public void sample() {
+//                            setValue(maxReadSize);
+//                        }
+//                    });
+//
+//                    /*
+//                     * writes
+//                     */
+//
+//                    root.addCounter("nwrites", new Instrument<Long>() {
+//                        public void sample() {
+//                            setValue(nwrites);
+//                        }
+//                    });
+//
+//                    root.addCounter("bytesWritten", new Instrument<Long>() {
+//                        public void sample() {
+//                            setValue(bytesWritten);
+//                        }
+//                    });
+//
+//                    root.addCounter("writeSecs", new Instrument<Double>() {
+//                        public void sample() {
+//                            final double writeSecs = (elapsedWriteNanos / 1000000000.);
+//                            setValue(writeSecs);
+//                        }
+//                    });
+//
+//                    root.addCounter("bytesWrittenPerSec",
+//                            new Instrument<Double>() {
+//                                public void sample() {
+//                                    final double writeSecs = (elapsedWriteNanos / 1000000000.);
+//                                    final double bytesWrittenPerSec = (writeSecs == 0L ? 0d
+//                                            : (bytesWritten / writeSecs));
+//                                    setValue(bytesWrittenPerSec);
+//                                }
+//                            });
+//
+//                    root.addCounter("maxWriteSize", new Instrument<Long>() {
+//                        public void sample() {
+//                            setValue(maxWriteSize);
+//                        }
+//                    });
+//
+//                }
+//
+//                /*
+//                 * write cache statistics
+//                 */
+//                {
+//
+//                    final CounterSet writeCache = root.makePath("writeCache");
+//
+//                    /*
+//                     * read
+//                     */
+//                    writeCache.addCounter("nread", new Instrument<Long>() {
+//                        public void sample() {
+//                            setValue(ncacheRead);
+//                        }
+//                    });
+//
+//                    writeCache.addCounter("readHitRate", new Instrument<Double>() {
+//                        public void sample() {
+//                            setValue(nreads == 0L ? 0d : (double) ncacheRead
+//                                    / nreads);
+//                        }
+//                    });
+//
+//                    writeCache.addCounter("readSecs", new Instrument<Double>() {
+//                        public void sample() {
+//                            setValue(elapsedCacheReadNanos / 1000000000.);
+//                        }
+//                    });
+//
+//                    /*
+//                     * write
+//                     */
+//                    
+//                    // #of writes on the write cache.
+//                    writeCache.addCounter("nwrite", new Instrument<Long>() {
+//                        public void sample() {
+//                            setValue(ncacheWrite);
+//                        }
+//                    });
+//
+//                    /*
+//                     * % of writes that are buffered vs writing through to the
+//                     * disk.
+//                     * 
+//                     * Note: This will be 1.0 unless you are writing large
+//                     * records. Large records are written directly to the disk
+//                     * rather than first into the write cache. When this happens
+//                     * the writeHitRate on the cache can be less than one.
+//                     */
+//                    writeCache.addCounter("writeHitRate", new Instrument<Double>() {
+//                        public void sample() {
+//                            setValue(nwrites == 0L ? 0d : (double) ncacheWrite
+//                                    / nwrites);
+//                        }
+//                    });
+//
+//                    writeCache.addCounter("writeSecs", new Instrument<Double>() {
+//                        public void sample() {
+//                            setValue(elapsedCacheWriteNanos / 1000000000.);
+//                        }
+//                    });
+//
+//                    // #of times the write cache was flushed to the disk.
+//                    writeCache.addCounter("nflush", new Instrument<Long>() {
+//                        public void sample() {
+//                            setValue(ncacheFlush);
+//                        }
+//                    });
+//                    
+//                }
+//
+//                // disk statistics
+//                {
+//                    final CounterSet disk = root.makePath("disk");
+//
+//                    /*
+//                     * read
+//                     */
+//
+//                    disk.addCounter("nreads", new Instrument<Long>() {
+//                        public void sample() {
+//                            setValue(ndiskRead);
+//                        }
+//                    });
+//
+//                    disk.addCounter("bytesRead", new Instrument<Long>() {
+//                        public void sample() {
+//                            setValue(bytesReadFromDisk);
+//                        }
+//                    });
+//
+//                    disk.addCounter("bytesPerRead", new Instrument<Double>() {
+//                        public void sample() {
+//                            final double bytesPerDiskRead = (ndiskRead == 0 ? 0d
+//                                    : (bytesReadFromDisk / (double)ndiskRead));
+//                            setValue(bytesPerDiskRead);
+//                        }
+//                    });
+//
+//                    disk.addCounter("readSecs", new Instrument<Double>() {
+//                        public void sample() {
+//                            final double diskReadSecs = (elapsedDiskReadNanos / 1000000000.);
+//                            setValue(diskReadSecs);
+//                        }
+//                    });
+//
+//                    disk.addCounter("bytesReadPerSec",
+//                            new Instrument<Double>() {
+//                                public void sample() {
+//                                    final double diskReadSecs = (elapsedDiskReadNanos / 1000000000.);
+//                                    final double bytesReadPerSec = (diskReadSecs == 0L ? 0d
+//                                            : bytesReadFromDisk / diskReadSecs);
+//                                    setValue(bytesReadPerSec);
+//                                }
+//                            });
+//
+//                    disk.addCounter("secsPerRead", new Instrument<Double>() {
+//                        public void sample() {
+//                            final double diskReadSecs = (elapsedDiskReadNanos / 1000000000.);
+//                            final double readLatency = (diskReadSecs == 0 ? 0d
+//                                    : diskReadSecs / ndiskRead);
+//                            setValue(readLatency);
+//                        }
+//                    });
+//
+//                    /*
+//                     * write
+//                     */
+//
+//                    disk.addCounter("nwrites", new Instrument<Long>() {
+//                        public void sample() {
+//                            setValue(ndiskWrite);
+//                        }
+//                    });
+//
+//                    disk.addCounter("bytesWritten", new Instrument<Long>() {
+//                        public void sample() {
+//                            setValue(bytesWrittenOnDisk);
+//                        }
+//                    });
+//
+//                    disk.addCounter("bytesPerWrite", new Instrument<Double>() {
+//                        public void sample() {
+//                            final double bytesPerDiskWrite = (ndiskWrite == 0 ? 0d
+//                                    : (bytesWrittenOnDisk / (double)ndiskWrite));
+//                            setValue(bytesPerDiskWrite);
+//                        }
+//                    });
+//
+//                    disk.addCounter("writeSecs", new Instrument<Double>() {
+//                        public void sample() {
+//                            final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
+//                            setValue(diskWriteSecs);
+//                        }
+//                    });
+//
+//                    disk.addCounter("bytesWrittenPerSec",
+//                            new Instrument<Double>() {
+//                                public void sample() {
+//                                    final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
+//                                    final double bytesWrittenPerSec = (diskWriteSecs == 0L ? 0d
+//                                            : bytesWrittenOnDisk
+//                                                    / diskWriteSecs);
+//                                    setValue(bytesWrittenPerSec);
+//                                }
+//                            });
+//
+//                    disk.addCounter("secsPerWrite", new Instrument<Double>() {
+//                        public void sample() {
+//                            final double diskWriteSecs = (elapsedDiskWriteNanos / 1000000000.);
+//                            final double writeLatency = (diskWriteSecs == 0 ? 0d
+//                                    : diskWriteSecs / ndiskWrite);
+//                            setValue(writeLatency);
+//                        }
+//                    });
+//
+//                    /*
+//                     * other
+//                     */
+//
+//                    disk.addCounter("nforce", new Instrument<Long>() {
+//                        public void sample() {
+//                            setValue(nforce);
+//                        }
+//                    });
+//
+//                    disk.addCounter("nextend", new Instrument<Long>() {
+//                        public void sample() {
+//                            setValue(ntruncate);
+//                        }
+//                    });
+//
+//                    disk.addCounter("nreopen", new Instrument<Long>() {
+//                        public void sample() {
+//                            setValue(nreopen);
+//                        }
+//                    });
+//
+//                    disk.addCounter("rootBlockWrites", new Instrument<Long>() {
+//                        public void sample() {
+//                            setValue(nwriteRootBlock);
+//                        }
+//                    });
+//
+//                }
+//
+//            }
+//
+//            return root;
+//
+//        }
+//        private CounterSet root;
+//        
+//        /**
+//         * Human readable representation of the counters.
+//         */
+//        public String toString() {
+//
+//            return getCounters().toString();
+//            
+//        }
+//        
+//    }  // class StoreCounters
     
     /**
      * Performance counters for this class.
@@ -1613,7 +1616,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                      */
                     storeCounters.nreads++;
                     storeCounters.bytesRead+=nbytes;
-                    storeCounters.ncacheRead++;
+//                    storeCounters.ncacheRead++;
                     storeCounters.elapsedReadNanos+=(System.nanoTime()-begin);
 
                     // return the new buffer.
@@ -1621,7 +1624,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
                 } else {
                     
-                    storeCounters.elapsedCacheReadNanos+=(System.nanoTime()-beginCache);
+//                    storeCounters.elapsedCacheReadNanos+=(System.nanoTime()-beginCache);
                     
                 }
                 
@@ -2107,9 +2110,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                     
                     writeCache.write(addr, data);
 
-                    storeCounters.ncacheWrite++;
-
-                    storeCounters.elapsedCacheWriteNanos+=(System.nanoTime()-beginCache);
+//                    storeCounters.ncacheWrite++;
+//
+//                    storeCounters.elapsedCacheWriteNanos+=(System.nanoTime()-beginCache);
 
                 }
                 

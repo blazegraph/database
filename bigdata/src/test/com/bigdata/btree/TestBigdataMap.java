@@ -28,6 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.UUID;
@@ -36,7 +39,7 @@ import junit.framework.TestCase;
 
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
@@ -160,7 +163,7 @@ public class TestBigdataMap extends TestCase {
      * Handles {@link String} keys and values and makes the keys available for
      * {@link BigdataMap} and {@link BigdataSet} (under the assumption that the
      * key and the value are the same!). The actual index order is governed by
-     * {@link KeyBuilder#asSortKey(Object)}.
+     * {@link TestKeyBuilder#asSortKey(Object)}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -208,6 +211,41 @@ public class TestBigdataMap extends TestCase {
             
         }
         
-    }
+        /**
+         * The initial version (no additional persistent state).
+         */
+        private final static transient byte VERSION0 = 0;
+
+        /**
+         * The current version.
+         */
+        private final static transient byte VERSION = VERSION0;
+
+        public void readExternal(final ObjectInput in) throws IOException,
+                ClassNotFoundException {
+
+            super.readExternal(in);
+            
+            final byte version = in.readByte();
+            
+            switch (version) {
+            case VERSION0:
+                break;
+            default:
+                throw new UnsupportedOperationException("Unknown version: "
+                        + version);
+            }
+
+        }
+
+        public void writeExternal(final ObjectOutput out) throws IOException {
+
+            super.writeExternal(out);
+            
+            out.writeByte(VERSION);
+            
+        }
+
+    } // StringSerializer
 
 }

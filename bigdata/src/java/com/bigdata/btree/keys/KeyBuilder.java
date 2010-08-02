@@ -28,14 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.keys;
 
 import java.io.UnsupportedEncodingException;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.text.Collator;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.UUID;
-
 import org.apache.log4j.Logger;
-
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
@@ -69,7 +68,7 @@ public class KeyBuilder implements IKeyBuilder {
 
     protected static final Logger log = Logger.getLogger(KeyBuilder.class);
     
-    protected static final boolean INFO = log.isInfoEnabled();
+//    protected static final boolean INFO = log.isInfoEnabled();
 
 //    protected static final boolean DEBUG = log.isDebugEnabled();
     
@@ -159,7 +158,7 @@ public class KeyBuilder implements IKeyBuilder {
      *            The buffer reference is used directly rather than making a
      *            copy of the data.
      */
-    /*public*/ KeyBuilder(int len, byte[] buf) {
+    /*public*/ KeyBuilder(final int len, final byte[] buf) {
 
         this( null /* no unicode support*/, len, buf );
         
@@ -180,9 +179,9 @@ public class KeyBuilder implements IKeyBuilder {
      *            The buffer reference is used directly rather than making a
      *            copy of the data.
      */
-    protected KeyBuilder(UnicodeSortKeyGenerator sortKeyGenerator, int len,
-            byte[] buf) {
-        
+    protected KeyBuilder(final UnicodeSortKeyGenerator sortKeyGenerator,
+            final int len, final byte[] buf) {
+
         if (len < 0)
             throw new IllegalArgumentException("len");
 
@@ -216,7 +215,7 @@ public class KeyBuilder implements IKeyBuilder {
      * Sets the position to any non-negative length less than the current
      * capacity of the buffer.
      */
-    final public void position(int pos) {
+    final public void position(final int pos) {
         
         if (len < 0 || len > buf.length) {
 
@@ -229,7 +228,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
-    final public IKeyBuilder append(int off, int len, byte[] a) {
+    final public KeyBuilder append(final int off, final int len, final byte[] a) {
         
         ensureFree(len);
         
@@ -248,7 +247,7 @@ public class KeyBuilder implements IKeyBuilder {
      * {@link #buf buffer} may be grown by this operation but it will not be
      * truncated.
      * <p>
-     * This operation is equivilent to
+     * This operation is equivalent to
      * 
      * <pre>
      * ensureCapacity(this.len + len)
@@ -326,7 +325,7 @@ public class KeyBuilder implements IKeyBuilder {
 //        
 //    }
     
-    final public IKeyBuilder reset() {
+    final public KeyBuilder reset() {
         
         len = 0;
         
@@ -350,7 +349,7 @@ public class KeyBuilder implements IKeyBuilder {
      * The object responsible for generating sort keys from Unicode strings.
      * 
      * The {@link UnicodeSortKeyGenerator} -or- <code>null</code> if Unicode
-     * is not supported by this {@link KeyBuilder} instance.
+     * is not supported by this {@link IKeyBuilder} instance.
      */
     final public UnicodeSortKeyGenerator getSortKeyGenerator() {
         
@@ -358,9 +357,9 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    final public IKeyBuilder append(String s) {
+    final public KeyBuilder append(final String s) {
         
-        if(sortKeyGenerator==null) {
+        if (sortKeyGenerator == null) {
          
             // Force ASCII semantics on the Unicode text.
             
@@ -389,13 +388,13 @@ public class KeyBuilder implements IKeyBuilder {
      * Non-optional operations.
      */
     
-    public IKeyBuilder appendASCII(String s) {
+    public KeyBuilder appendASCII(final String s) {
         
-        int len = s.length();
+        int tmpLen = s.length();
         
-        ensureFree(len);
+        ensureFree(tmpLen);
         
-        for(int j=0; j<len; j++) {
+        for(int j=0; j<tmpLen; j++) {
             
             char ch = s.charAt(j);
             
@@ -524,7 +523,7 @@ public class KeyBuilder implements IKeyBuilder {
 
     }
     
-    public IKeyBuilder appendText(String text, final boolean unicode,
+    public KeyBuilder appendText(String text, final boolean unicode,
             final boolean successor) {
 
         // current length of the encoded key.
@@ -622,13 +621,13 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
-    final public IKeyBuilder append(final byte[] a) {
+    final public KeyBuilder append(final byte[] a) {
         
         return append(0, a.length, a);
         
     }
     
-    final public IKeyBuilder append(double d) {
+    final public KeyBuilder append(double d) {
         
         // performance tweak.
         if (len + 8 > buf.length) ensureCapacity(len+8);
@@ -664,7 +663,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    final public IKeyBuilder append(float f) {
+    final public KeyBuilder append(float f) {
 
         // performance tweak.
         if (len + 4 > buf.length) ensureCapacity(len+4);
@@ -699,7 +698,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
-    final public IKeyBuilder append(final UUID uuid) {
+    final public KeyBuilder append(final UUID uuid) {
 
         if (len + 16 > buf.length) ensureCapacity(len+16);
 
@@ -711,7 +710,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
-    final public IKeyBuilder append(long v) {
+    final public KeyBuilder append(long v) {
 
         // performance tweak adds .3% on rdfs bulk load.
         if (len + 8 > buf.length) ensureCapacity(len+8);
@@ -753,6 +752,8 @@ public class KeyBuilder implements IKeyBuilder {
      * 
      * @return The value that will impose the lexiographic ordering as an
      *         unsigned long integer.
+     * 
+     * @todo This is unused and untested.
      */
     static final /*public*/ long encode(long v) {
 
@@ -770,7 +771,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    final public IKeyBuilder append(int v) {
+    final public KeyBuilder append(int v) {
 
         // performance tweak.
         if (len + 4 > buf.length) ensureCapacity(len+4);
@@ -798,7 +799,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    final public IKeyBuilder append(short v) {
+    final public KeyBuilder append(short v) {
 
         // performance tweak.
         if (len + 2 > buf.length) ensureCapacity(len+2);
@@ -845,7 +846,7 @@ public class KeyBuilder implements IKeyBuilder {
 //        
 //    }
 
-    final public IKeyBuilder appendUnsigned(final byte v) {
+    final public KeyBuilder appendUnsigned(final byte v) {
 
         // performance tweak
         if (len + 1 > buf.length) ensureCapacity(len+1);
@@ -857,7 +858,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    final public IKeyBuilder append(final byte v) {
+    final public KeyBuilder append(final byte v) {
 
         // performance tweak
         if (len + 1 > buf.length) ensureCapacity(len+1);
@@ -913,7 +914,7 @@ public class KeyBuilder implements IKeyBuilder {
 //        
 //    }
     
-    final public IKeyBuilder appendNul() {
+    final public KeyBuilder appendNul() {
 
 //        return append(0);
         
@@ -927,7 +928,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    public IKeyBuilder append(final BigInteger i) {
+    public KeyBuilder append(final BigInteger i) {
 
         // Note: BigInteger.ZERO is represented as byte[]{0}.
         final byte[] b = i.toByteArray();
@@ -944,69 +945,127 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    /*
-     * static helper methods.
-     */
-    
     /**
-     * Used to unbox an application key (convert it to an unsigned byte[]).
-     */
-    static private final IKeyBuilder _keyBuilder = newUnicodeInstance();
-
-    /**
-     * Utility method converts an application key to a sort key (an unsigned
-     * byte[] that imposes the same sort order).
-     * <p>
-     * Note: This method is thread-safe.
-     * <p>
-     * Note: Strings are Unicode safe for the default locale. See
-     * {@link Locale#getDefault()}. If you require a specific local or
-     * different locals at different times or for different indices then you
-     * MUST provision and apply your own {@link KeyBuilder}.
+     * Return the #of bytes in the unsigned byte[] representation of the
+     * {@link BigInteger} value.
      * 
-     * @param val
-     *            An application key.
-     * 
-     * @return The unsigned byte[] equivilent of that key. This will be
-     *         <code>null</code> iff the <i>key</i> is <code>null</code>.
-     *         If the <i>key</i> is a byte[], then the byte[] itself will be
-     *         returned.
+     * @param value
+     *            The {@link BigInteger} value.
+     *            
+     * @return The byte length of its unsigned byte[] representation.
      */
-    @SuppressWarnings("unchecked")
-    public static final byte[] asSortKey(Object val) {
+    static public int byteLength(final BigInteger value) {
         
-        if (val == null) {
-
-            return null;
-            
-        }
-
-        if (val instanceof byte[]) {
-
-            return (byte[]) val;
-            
-        }
-
-        /*
-         * Synchronize on the keyBuilder to avoid concurrent modification of its
-         * state.
-         */
-
-        synchronized (_keyBuilder) {
-
-            return _keyBuilder.getSortKey(val);
-            
-//            _keyBuilder.reset();
-//
-//            _keyBuilder.append( key );
-//
-//            return _keyBuilder.getKey();
-    
-        }
-    
+        return 2/* runLength */+ (value.bitLength() / 8 + 1)/* data */;
+        
     }
 
-    public byte[] getSortKey(Object val) {
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: Precision is NOT preserved by this encoding.
+     * <h2>Implementation details</h2>
+     * The encoding to a BigDecimal requires the expression of scale and length
+     * {@link BigDecimal#scale()} indicates the precision of the number, where
+     * '3' is three decimal places and '-3' rounded to '000'
+     * {@link BigDecimal#precision()} is the number of unscaled digits therefore
+     * <code>precision - scale</code> is an expression of the exponent of the
+     * normalized number. This means that the exponent could be zero or negative
+     * so the sign of the number cannot be indicated by adding to the exponent.
+     * Instead an explicit sign byte,'0' or '1' is used. The actual
+     * {@link BigDecimal} serialization uses the {@link String} conversions
+     * supported by {@link BigDecimal}, less the '-' sign character if
+     * applicable. The length of this data is terminated by a trailing byte. The
+     * value of that byte depends on the sign of the original {@link BigDecimal}
+     * and is used to impose the correct sort order on negative
+     * {@link BigDecimal} values which differ only in the digits in the decimal
+     * portion.
+     *<p>
+     * The variable encoding of BigNumbers requires this String representation
+     * and negative representations are further encoded using
+     * {@link #flipDigits(String)} for the equivalent of 2s compliment negative
+     * representation.
+     * 
+     * There are two cases where scale and trailing zeros interact.  The
+     * case of "0.000" is represented as precision of 1 and scale of 3, 
+     * indicating the "0" is shifted down 3 decimal places.  While "5.000"
+     * is represented as precision of 4 and scale of 3.  The special case
+     * of zero is allowed because shifting zero to the right leaves a new
+     * zero on the left, so a zero value must be checked for explicitly, while
+     * if we want to compare "5", "5.00" and "5.0000" as equal we must
+     * remove and compensate for trailing zeros. 
+     * 
+     * @see #decodeBigDecimal(int, byte[])
+     */
+    public KeyBuilder append(final BigDecimal d) {
+        final int sign = d.signum(); 
+        
+        if (sign == 0) {
+            append((byte) 0);
+            
+            return this;
+        }
+        
+        BigDecimal nd = d.stripTrailingZeros();
+        
+        String unscaledStr = nd.unscaledValue().toString();
+        
+        final int precision = nd.precision();
+        final int scale =  nd.scale();
+        
+        int exponent = precision - scale;
+        if (sign == -1) {
+            exponent = -exponent;
+        }
+        
+        append((byte) sign);
+        append(exponent);       
+        
+        // Note: coded as digits 
+        
+        if (sign == -1) {
+            unscaledStr = flipDigits(unscaledStr);
+        }
+        appendASCII(unscaledStr); // the unscaled BigInteger representation
+        // Note: uses unsigned 255 if negative and unsigned 0 if positive. 
+        append(sign == -1 ? (byte) Byte.MAX_VALUE: (byte) 0);
+        
+        return this;
+    }
+
+    /**
+     * Return the #of bytes in the unsigned byte[] representation of the
+     * {@link BigDecimal} value.
+     * 
+     * @param value
+     *            The {@link BigDecimal} value.
+     *            
+     * @return The byte length of its unsigned byte[] representation.
+     */
+    static public int byteLength(final BigDecimal value) {
+        
+        final int byteLength;
+        
+        if (value.signum() == 0) {
+            byteLength = 1;
+        } else {
+            final BigDecimal nbd = value.stripTrailingZeros();
+            
+            final int dataLen = nbd.unscaledValue().toString().length();
+        
+            byteLength = 
+            + 1 /* sign */ 
+            + 4 /* exponent */
+            + dataLen /* data */
+            + 1 /* termination byte */
+            ;
+        } 
+        
+        return byteLength;
+       
+    }
+
+    public byte[] getSortKey(final Object val) {
         
         reset();
         
@@ -1016,7 +1075,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
-    public IKeyBuilder append(final Object val) {
+    public KeyBuilder append(final Object val) {
         
         if (val == null) {
 
@@ -1054,6 +1113,10 @@ public class KeyBuilder implements IKeyBuilder {
         } else if (val instanceof BigInteger) {
 
             append((BigInteger) val);
+
+        } else if (val instanceof BigDecimal) {
+
+            append((BigDecimal) val);
 
         } else if (val instanceof Float) {
 
@@ -1238,6 +1301,28 @@ public class KeyBuilder implements IKeyBuilder {
     }
 
     /**
+     * Decode a {@link UUID} as encoded by {@link #append(UUID)}.
+     * 
+     * @param buf
+     *            The buffer containing the encoded key.
+     * @param off
+     *            The offset at which to decode the key.
+     *            
+     * @return The decoded {@link UUID}.
+     */
+    static public UUID decodeUUID(final byte[] buf, int off) {
+
+        final long msb = decodeLong(buf, off);
+
+        off += 8;
+
+        final long lsb = decodeLong(buf, off);
+
+        return new UUID(msb, lsb);
+
+    }
+
+    /**
      * Decodes a signed int value as encoded by {@link #append(int)}.
      * 
      * @param buf
@@ -1313,8 +1398,35 @@ public class KeyBuilder implements IKeyBuilder {
      */
     static public BigInteger decodeBigInteger(final int offset, final byte[] key) {
 
+        return new BigInteger(decodeBigInteger2(offset, key));
+        
+    }
+
+    /**
+     * Decodes a {@link BigInteger} key, returning a byte[] which may be used to
+     * construct a {@link BigInteger} having the decoded value. The number of
+     * bytes consumed by the key component is <code>2 + runLength</2>. The
+     * <code>2</code> is a fixed length field coding the signum of the value and
+     * its runLength. The length of the returned array is the runLength of the
+     * variable length portion of the value. This method may be used to scan
+     * through a key containing {@link BigInteger} components.
+     * 
+     * @param offset
+     *            The offset of the start of the {@link BigInteger} in the key.
+     * @param key
+     *            The key.
+     * @return The byte[] to be passed to {@link BigInteger#BigInteger(byte[])}.
+     */
+    static public byte[] decodeBigInteger2(final int offset, final byte[] key) {
+
         final int tmp = KeyBuilder.decodeShort(key, offset);
 
+        /*
+         * Note: The signum is thrown away when we decode the runLength field.
+         * Signum is actually in the key twice: once in the runLength to put the
+         * BigInteger values into total order and once in the representation of
+         * the BigInteger as a byte[].
+         */
         final int runLength = tmp < 0 ? -tmp : tmp;
         
         final byte[] b = new byte[runLength];
@@ -1322,10 +1434,96 @@ public class KeyBuilder implements IKeyBuilder {
         System.arraycopy(key/* src */, offset + 2/* srcpos */, b/* dst */,
                 0/* destPos */, runLength);
         
-        return new BigInteger(b);
+        return b;
         
     }
 
+    /**
+     * Decodes a {@link BigDecimal} key, returning a byte[] which may be used to
+     * construct a {@link BigDecimal} having the decoded value.
+     * 
+     * The number of bytes consumed by the key component is
+     * <code>2 + runLength</2>. The
+     * <code>2</code> is a fixed length field coding the signum of the value and
+     * its runLength. The length of the returned array is the runLength of the
+     * variable length portion of the value.
+     * 
+     * This method may be used to scan through a key containing
+     * {@link BigDecimal} components.
+     * 
+     * @param offset
+     *            The offset of the start of the {@link BigDecimal} in the key.
+     * @param key
+     *            The key.
+     * @return The byte[] to be passed to {@link BigDecimal#BigInteger(byte[])}.
+     * 
+     * @todo update javadoc
+     * 
+     * FIXME We need a version which has all the metadata to support scanning
+     *       through a key as well as one that does a simple decode.
+     */
+    static public BigDecimal decodeBigDecimal(final int offset, final byte[] key) {
+        int curs = offset;
+        final byte sign = key[curs++];
+        
+        if (sign == decodeZero) {
+            return new BigDecimal(0);
+        }
+        
+        int exponent = decodeInt(key, curs);
+        final boolean neg = sign == negSign;
+        if (neg) {
+            exponent = -exponent;
+        }
+        curs += 4;
+        int len = 0;
+        for (int i = curs; key[i] != (neg ? eos2 : eos); i++) len++;
+        String unscaledStr = decodeASCII(key, curs, len);
+        if (neg) {
+            unscaledStr = flipDigits(unscaledStr);
+        }
+        
+        final BigInteger unscaled = new BigInteger(unscaledStr);
+        
+        final int precision = len;
+        final int scale  = precision - exponent - (neg ? 1 : 0);
+        
+        final BigDecimal ret = new BigDecimal(unscaled, scale);
+
+        return ret; // relative scale adjustment
+    }
+    
+    private static final byte decodeZero = decodeByte(0);
+    private static final byte eos = decodeZero;
+    private static final byte eos2 = decodeByte(Byte.MAX_VALUE);
+    private static final byte negSign = decodeByte(-1);
+
+    private static final char[] flipMap = {'0', '1', '2', '3', '4',
+        '5', '6', '7', '8', '9'
+    };
+
+    /**
+     * Flip numbers such that <code>0/9,1/8,2/7,3/6,4/5</code> - this is the
+     * equivalent of a two-complement representation for the base 10 character
+     * digits.
+     */
+    static private String flipDigits(final String str) {
+        final char[] chrs = str.toCharArray();
+        for (int i = 0; i < chrs.length; i++) {
+            final int flip = '9' - chrs[i];
+            if (flip >= 0 && flip < 10) {
+                chrs[i] = flipMap[flip];
+            }
+        }
+        
+        return new String(chrs);
+    }
+    
+    /**
+     * Create an instance for ASCII keys.
+     * 
+     * @return The new instance.
+     */
     public static IKeyBuilder newInstance() {
 
         return newInstance(DEFAULT_INITIAL_CAPACITY);
@@ -1363,10 +1561,8 @@ public class KeyBuilder implements IKeyBuilder {
        
         /**
          * Optional property specifies the library that will be used to generate
-         * sort keys from Unicode data. The default always supports Unicode, but
-         * the library choice depends on whether or not ICU library is found on
-         * the classpath. When the ICU library is present, it is the default.
-         * Otherwise the JDK library is the default. You may explicitly specify
+         * sort keys from Unicode data. The ICU library is the default.
+         * You may explicitly specify
          * the library choice using one of the {@link CollatorEnum} values. The
          * {@link CollatorEnum#ASCII} value may be used to disable Unicode
          * support entirely, treating the characters as if they were ASCII. If
@@ -1405,7 +1601,7 @@ public class KeyBuilder implements IKeyBuilder {
         /**
          * Optional string property whose value is one of the type safe
          * {@link DecompositionEnum}s. The default decomposition mode will be
-         * overriden on the collator one is explicitly specified using this
+         * overridden on the collator one is explicitly specified using this
          * property.
          * 
          * @see DecompositionEnum
@@ -1564,7 +1760,7 @@ public class KeyBuilder implements IKeyBuilder {
 
             locale = Locale.getDefault();
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("Using default locale: " + locale.getDisplayName());
 
         }

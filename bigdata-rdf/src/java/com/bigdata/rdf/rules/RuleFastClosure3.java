@@ -31,6 +31,7 @@ import java.util.Set;
 
 import org.openrdf.model.vocabulary.RDFS;
 
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IConstant;
@@ -82,7 +83,7 @@ public class RuleFastClosure3 extends AbstractRuleFastClosure_3_5_6_7_9 {
 
         final private String focusStore;
 
-        final private IConstant<Long> rdfsSubPropertyOf;
+        final private IConstant<IV> rdfsSubPropertyOf;
 
         public FastClosure_3_RuleTaskFactory(final String database,
                 final String focusStore, final Vocabulary vocab) {
@@ -107,7 +108,7 @@ public class RuleFastClosure3 extends AbstractRuleFastClosure_3_5_6_7_9 {
                  * Note: This is the set {P} in the fast closure
                  * program.
                  */
-                public Set<Long> getSet() {
+                public Set<IV> getSet() {
 
                     return getSubProperties();
 

@@ -63,6 +63,7 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.ResourceService;
+import com.bigdata.util.config.NicUtil;
 
 /**
  * Task moves an index partition to another {@link IDataService}.
@@ -155,7 +156,6 @@ import com.bigdata.service.ResourceService;
  * need to do the atomic update phase.  
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class MoveTask extends AbstractPrepareTask<MoveResult> {
     
@@ -421,7 +421,6 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
      * successful.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      * 
      * @todo optimization to NOT send an empty index segment if there are no
      *       buffered writes on the live journal.
@@ -434,6 +433,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
         private final UUID targetDataServiceUUID;
         private final int targetIndexPartitionId;
         private final Event parentEvent;
+        private final InetAddress thisInetAddr;
         
         /**
          * 
@@ -481,6 +481,11 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
             this.targetIndexPartitionId = targetIndexPartitionId;
             this.parentEvent = parentEvent;
 
+            try {
+                this.thisInetAddr = InetAddress.getByName(NicUtil.getIpAddress("default.nic", "default", false));
+            } catch(Throwable t) {
+                throw new IllegalArgumentException(t.getMessage(), t);
+            }
         }
 
         /**
@@ -591,7 +596,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
                                                     targetIndexPartitionId,//
                                                     historicalWritesBuildResult.segmentMetadata,//
                                                     bufferedWritesBuildResult.segmentMetadata,//
-                                                    InetAddress.getLocalHost(),//
+                                                    thisInetAddr,
                                                     resourceManager
                                                             .getResourceServicePort()//
                                             )).get();
@@ -856,7 +861,6 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
      * until the "receive" operation is complete.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private static class IsIndexRegistered_UsingWriteService implements
             IIndexProcedure {
@@ -896,7 +900,6 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
      * @see InnerReceiveIndexPartitionTask
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     protected static class ReceiveIndexPartitionTask extends DataServiceCallable<Void> {
 
@@ -1039,7 +1042,6 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
      * source data service.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private static class InnerReceiveIndexPartitionTask extends AbstractTask<Void> {
         
@@ -1365,9 +1367,10 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
                             // Historical writes from the source DS.
                             historySegmentMetadata//
                         },
-                        IndexPartitionCause.move(resourceManager),
-                        // history line.
-                        oldpmd.getHistory() + summary + " "));
+                        IndexPartitionCause.move(resourceManager)
+//                        // history line.
+//                        ,oldpmd.getHistory() + summary + " "
+                ));
                         
                 /*
                  * Create the BTree to aborb writes for the target index

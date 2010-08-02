@@ -29,16 +29,17 @@ package com.bigdata.rdf.lexicon;
 
 import java.util.Arrays;
 import java.util.Comparator;
-
 import junit.framework.TestCase2;
-
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
-import com.bigdata.rdf.model.TermIdComparator;
+import com.bigdata.rdf.model.TermIVComparator;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -61,25 +62,25 @@ public class TestComparators extends TestCase2 {
 
     public void test_termIdComparator() {
 
-        final long lmin = Long.MIN_VALUE;
-        final long lm1 = -1L;
-        final long l0 = 0L;
-        final long lp1 = 1L;
-        final long lmax = Long.MAX_VALUE;
+        final IV lmin = new TermId(VTE.URI, Long.MIN_VALUE);
+        final IV lm1 = new TermId(VTE.URI, -1L);
+        final IV l0 = new TermId(VTE.URI, 0L);
+        final IV lp1 = new TermId(VTE.URI, 1L);
+        final IV lmax = new TermId(VTE.URI, Long.MAX_VALUE);
 
         final BigdataValueFactory f = BigdataValueFactoryImpl
                 .getInstance(getName()/*namespace*/);
 
-        final BigdataValue vmin = f.createLiteral("a"); vmin.setTermId( lmin);
-        final BigdataValue vm1  = f.createLiteral("b"); vm1 .setTermId( lm1 );
-        final BigdataValue v0   = f.createLiteral("c"); v0  .clearTermId(); // Note: equivilent to setTermId( l0  );
-        final BigdataValue vp1  = f.createLiteral("d"); vp1 .setTermId( lp1 );
-        final BigdataValue vmax = f.createLiteral("e"); vmax.setTermId( lmax);
+        final BigdataValue vmin = f.createLiteral("a"); vmin.setIV( lmin);
+        final BigdataValue vm1  = f.createLiteral("b"); vm1 .setIV( lm1 );
+        final BigdataValue v0   = f.createLiteral("c"); v0  .setIV( l0 );
+        final BigdataValue vp1  = f.createLiteral("d"); vp1 .setIV( lp1 );
+        final BigdataValue vmax = f.createLiteral("e"); vmax.setIV( lmax);
 
         // ids out of order.
-        final long[] actualIds = new long[] { lm1, lmax, l0, lp1, lmin };
+        final IV[] actualIds = new IV[] { lm1, lmax, l0, lp1, lmin };
         // ids in order.
-        final long[] expectedIds = new long[] { lmin, lm1, l0, lp1, lmax };
+        final IV[] expectedIds = new IV[] { lmin, lm1, l0, lp1, lmax };
         
         // values out of order.
         final BigdataValue[] terms = new BigdataValue[] { vmax, vm1, vmin, v0, vp1 };
@@ -92,7 +93,7 @@ public class TestComparators extends TestCase2 {
             byte[][] keys = new byte[actualIds.length][];
             KeyBuilder keyBuilder = new KeyBuilder(8);
             for(int i=0; i<actualIds.length; i++) {
-                keys[i] = keyBuilder.reset().append(actualIds[i]).getKey();
+                keys[i] = keyBuilder.reset().append(actualIds[i].getTermId()).getKey();
             }
             Arrays.sort(keys,UnsignedByteArrayComparator.INSTANCE);
             for(int i=0;i<actualIds.length;i++) {
@@ -100,7 +101,7 @@ public class TestComparators extends TestCase2 {
                 /*
                  * Decode and verify sorted into the expected order.
                  */
-                assertEquals(expectedIds[i], KeyBuilder.decodeLong(keys[i],0));
+                assertEquals(expectedIds[i].getTermId(), KeyBuilder.decodeLong(keys[i],0));
             }
         }
         
@@ -118,7 +119,7 @@ public class TestComparators extends TestCase2 {
          * Test the term identifier comparator.
          */
         
-        final Comparator<BigdataValue> c = TermIdComparator.INSTANCE;
+        final Comparator<BigdataValue> c = TermIVComparator.INSTANCE;
 
         System.err.println("unsorted terms: "+Arrays.toString(terms));
         Arrays.sort(terms,c);

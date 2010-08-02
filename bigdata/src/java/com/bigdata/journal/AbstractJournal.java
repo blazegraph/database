@@ -37,7 +37,6 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
-import java.rmi.Remote;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -59,6 +58,7 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
@@ -73,7 +73,6 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
-import com.bigdata.ha.QuorumServiceBase;
 import com.bigdata.io.IDataRecord;
 import com.bigdata.io.IDataRecordAccess;
 import com.bigdata.journal.Name2Addr.Entry;
@@ -92,19 +91,29 @@ import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.LocalDataServiceClient;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.util.ChecksumUtility;
 
 /**
  * <p>
+<<<<<<< .working
  * The journal is an append-only persistence capable data structure supporting
  * atomic commit, named indices, and transactions. Writes are logically appended
  * to the journal to minimize disk head movement.
  * </p>
  * <p>
+=======
+ * The journal is a persistence capable data structure supporting atomic commit,
+ * named indices, and full transactions. The {@link BufferMode#DiskRW} mode
+ * provides an persistence scheme based on reusable allocation slots while the
+ * {@link BufferMode#DiskWORM} mode provides an append only persistence scheme.
+ * Journals may be configured in highly available quorums.
+ * </p>
+ * <p>
+>>>>>>> .merge-right.r3391
  * This class is an abstract implementation of the {@link IJournal} interface
  * that does not implement the {@link IConcurrencyManager},
+<<<<<<< .working
  * {@link IResourceManager}, or {@link ITransactionService} interfaces. There
  * are several classes which DO support all of these features, relying on the
  * {@link AbstractJournal} for their underlying persistence store. These
@@ -138,6 +147,13 @@ import com.bigdata.util.ChecksumUtility;
  * </dl>
  * </p>
  * <h2>Limitations</h2>
+=======
+ * {@link IResourceManager}, or {@link ITransactionService} interfaces. The
+ * {@link Journal} provides a concrete implementation that may be used for a
+ * standalone database complete with concurrency control and transaction
+ * management.
+ * </p> <h2>Limitations</h2>
+>>>>>>> .merge-right.r3391
  * <p>
  * The {@link IIndexStore} implementation on this class is NOT thread-safe. The
  * basic limitation is that the mutable {@link BTree} is NOT thread-safe. The
@@ -185,6 +201,20 @@ import com.bigdata.util.ChecksumUtility;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+<<<<<<< .working
+=======
+ * @todo Checksums and/or record compression are currently handled on a per-
+ *       {@link BTree} or other persistence capable data structure basis. It is
+ *       nice to be able to choose for which indices and when ( {@link Journal}
+ *       vs {@link IndexSegment}) to apply these algorithms. However, it might
+ *       be nice to factor their application out a bit into a layered api - as
+ *       long as the right layering is correctly re-established on load of the
+ *       persistence data structure. In that view the {@link IRawStore} either
+ *       computes checksums or it does not and the checksums is stored in the
+ *       record, perhaps in the last 4 bytes. The checksum itself would not be
+ *       visible at the {@link IRawStore} API layer.
+ * 
+>>>>>>> .merge-right.r3391
  * @todo There are lots of annoying ways in which asynchronously closing the
  *       journal, e.g., using {@link #close()} or {@link #shutdown()} can cause
  *       exceptions to be thrown out of concurrent threads. It would be nice if
@@ -842,25 +872,25 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 				}
 
-				case Disk: {
-
-					/*
-					 * Setup the buffer strategy.
-					 */
-
-					_bufferStrategy = new DiskOnlyStrategy(0L/*
-															 * soft limit for
-															 * maximumExtent
-															 */,
-					// minimumExtension,
-							fileMetadata);
-
-					this._rootBlock = fileMetadata.rootBlock;
-
-					break;
-
-				}
-
+//				case Disk: {
+//
+//					/*
+//					 * Setup the buffer strategy.
+//					 */
+//
+//					_bufferStrategy = new DiskOnlyStrategy(0L/*
+//															 * soft limit for
+//															 * maximumExtent
+//															 */,
+//					// minimumExtension,
+//							fileMetadata);
+//
+//					this._rootBlock = fileMetadata.rootBlock;
+//
+//					break;
+//
+//				}
+				case Disk:
 				case DiskWORM: {
 
 					/*

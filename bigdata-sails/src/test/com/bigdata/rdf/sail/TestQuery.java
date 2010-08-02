@@ -27,29 +27,32 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail;
 
 import info.aduna.iteration.CloseableIteration;
-
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
-
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQuery;
 import org.openrdf.query.algebra.Join;
+import org.openrdf.query.algebra.Projection;
+import org.openrdf.query.algebra.ProjectionElem;
+import org.openrdf.query.algebra.ProjectionElemList;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.Var;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.impl.DatasetImpl;
+import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.rio.RDFFormat;
-import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
-
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.store.DataLoader;
 
 /**
@@ -150,7 +153,7 @@ public class TestQuery extends ProxyBigdataSailTestCase {
      * @throws QueryEvaluationException
      * @throws IOException 
      */
-    public void test_query() throws SailException, QueryEvaluationException, IOException {
+    public void test_query() throws SailException, QueryEvaluationException, IOException, Exception {
 
 //        assertEquals(new URIImpl(
 //                "http://www.Department0.University0.edu/GraduateStudent44"),
@@ -164,7 +167,7 @@ public class TestQuery extends ProxyBigdataSailTestCase {
         
         loadData(sail);
         
-        final SailConnection conn = sail.getConnection();
+        final BigdataSailConnection conn = sail.getConnection();
 
         final URI graduateStudent = new URIImpl(ub+"GraduateStudent");
 
@@ -172,6 +175,10 @@ public class TestQuery extends ProxyBigdataSailTestCase {
         
         final URI graduateCourse0 = new URIImpl("http://www.Department0.University0.edu/GraduateCourse0");
        
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+        
+        final RepositoryConnection cxn = repo.getReadOnlyConnection();
+        
         try {
 
             /*
@@ -183,7 +190,9 @@ public class TestQuery extends ProxyBigdataSailTestCase {
              * checking the log.
              */
             
-            TupleExpr tupleExpr = new Join(//
+            TupleExpr tupleExpr = 
+                new Projection(
+                new Join(//
                     new StatementPattern(//
                             new Var("X"), // unbound
                             new Var("1", RDF.TYPE),//
@@ -191,7 +200,8 @@ public class TestQuery extends ProxyBigdataSailTestCase {
                     new StatementPattern(//
                             new Var("X"), // unbound
                             new Var("3", takesCourse),//
-                            new Var("4", graduateCourse0)));
+                            new Var("4", graduateCourse0))),
+                new ProjectionElemList(new ProjectionElem[] { new ProjectionElem( "X" )}));
 
 //            System.err.println("queryString: "+getQueryString(tupleExpr));
             
@@ -208,6 +218,31 @@ public class TestQuery extends ProxyBigdataSailTestCase {
             final CloseableIteration<? extends BindingSet, QueryEvaluationException> itr = conn
                     .evaluate(tupleExpr, dataSet, bindingSet, true/* includeInferred */);
 
+//            {
+//                System.err.println("tail 1:");
+//                RepositoryResult<Statement> stmts1 = cxn.getStatements(null, RDF.TYPE, graduateStudent, true);
+//                while (stmts1.hasNext()) {
+//                    System.err.println(stmts1.next());
+//                }
+//                System.err.println("tail 2:");
+//                RepositoryResult<Statement> stmts2 = cxn.getStatements(null, takesCourse, graduateCourse0, true);
+//                while (stmts2.hasNext()) {
+//                    System.err.println(stmts2.next());
+//                }
+//            }
+            
+//            final String query =
+//                "select ?X " +
+//                "where { " +
+//                "   ?X <"+RDF.TYPE+"> <"+graduateStudent+"> . " +
+//                "   ?X <"+takesCourse+"> <"+graduateCourse0+"> . " +
+//                "}";
+//        
+//            final TupleQuery tupleQuery = 
+//                cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+//            
+//            final TupleQueryResult itr = tupleQuery.evaluate();
+            
             if (log.isInfoEnabled())
                 log.info("Verifying query.");
             
@@ -267,6 +302,8 @@ public class TestQuery extends ProxyBigdataSailTestCase {
         finally {
 
             conn.close();
+            
+            cxn.close();
 
         }
         

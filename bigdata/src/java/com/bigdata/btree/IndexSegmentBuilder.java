@@ -1257,9 +1257,9 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                                 pmd.getLeftSeparatorKey(),//
                                 pmd.getRightSeparatorKey(),//
                                 null, // No resource metadata for indexSegment.
-                                pmd.getIndexPartitionCause(),
-                                pmd.getHistory()+
-                                "build("+pmd.getPartitionId()+",compactingMerge="+compactingMerge+") "
+                                pmd.getIndexPartitionCause()
+//                                ,pmd.getHistory()+
+//                                "build("+pmd.getPartitionId()+",compactingMerge="+compactingMerge+") "
                         )
                         );
                 
@@ -3862,7 +3862,21 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      */
     enum BuildEnum {
 
-        TwoPass, FullyBuffered;
+        /**
+         * Do two passes over the source iterator. The first pass will compute
+         * the exact range count. The second pass will build the
+         * {@link IndexSegment}. The two pass algorithm uses less memory and can
+         * be highly efficient when using {@link IndexSegmentMultiBlockIterator}
+         * since it will read the data from any source {@link IndexSegment}(s)
+         * at the disk transfer rate.
+         */
+        TwoPass,
+        /**
+         * Fully buffer the tuples from the {@link IndexSegment} into memory in
+         * a single pass over the source index. This approach does less IO, but
+         * requires more memory in the Java heap.
+         */
+        FullyBuffered;
 
     }
 
@@ -3959,7 +3973,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         boolean bufferNodes = true;
         
         // Which build algorithm to use.
-        BuildEnum buildEnum = BuildEnum.FullyBuffered;
+        BuildEnum buildEnum = BuildEnum.TwoPass;//FullyBuffered;
         
         final File tmpDir = new File(System.getProperty("java.io.tmpdir"));
 

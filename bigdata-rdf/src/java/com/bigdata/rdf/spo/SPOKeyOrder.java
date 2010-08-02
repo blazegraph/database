@@ -30,13 +30,34 @@ package com.bigdata.rdf.spo;
 import java.io.Externalizable;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.UUID;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.SuccessorUtil;
+import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.AbstractLiteralIV;
+import com.bigdata.rdf.internal.AbstractIV;
+import com.bigdata.rdf.internal.DTE;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.UUIDLiteralIV;
+import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.XSDBooleanIV;
+import com.bigdata.rdf.internal.XSDByteIV;
+import com.bigdata.rdf.internal.XSDDoubleIV;
+import com.bigdata.rdf.internal.XSDFloatIV;
+import com.bigdata.rdf.internal.XSDIntIV;
+import com.bigdata.rdf.internal.XSDIntegerIV;
+import com.bigdata.rdf.internal.XSDLongIV;
+import com.bigdata.rdf.internal.XSDShortIV;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.rule.IPredicate;
@@ -64,8 +85,6 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
      */
     private static final long serialVersionUID = 87501920529732159L;
     
-    static private final transient long NULL = IRawTripleStore.NULL;
-
     /*
      * Note: these constants make it possible to use switch(index()) constructs.
      */
@@ -93,13 +112,10 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
      * The three perfect natural orders for triples.
      */
 
-    // FIXME quads : review ALL use of the SPO index (92 refs)
     public static final transient SPOKeyOrder SPO = new SPOKeyOrder(_SPO);
     
-    // FIXME quads : review ALL use of the POS index (39 refs)
     public static final transient SPOKeyOrder POS = new SPOKeyOrder(_POS);
 
-    // FIXME quads : review ALL use of the OSP index (31 refs)
     public static final transient SPOKeyOrder OSP = new SPOKeyOrder(_OSP);
 
     /*
@@ -363,11 +379,11 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
             // compare terms one by one in the appropriate key order
             for (int i = 0; i < keyMap.length; i++) {
                 
-                final long t1 = o1.get(keyMap[i]);
+                final IV t1 = o1.get(keyMap[i]);
                 
-                final long t2 = o2.get(keyMap[i]);
+                final IV t2 = o2.get(keyMap[i]);
                 
-                int ret = t1 < t2 ? -1 : t1 > t2 ? 1 : 0;
+                int ret = IVUtility.compare(t1, t2);
                 
                 if (ret != 0) {
                 
@@ -385,6 +401,57 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
     }
 
     /**
+     * Return the from key for this particular set of known terms that will
+     * allow us to read everything about those terms from the index.  For
+     * example, if this happens to be the SPO key order and the size of known
+     * terms is 2, this method will provide a from key that will allow the
+     * caller to read all the Os for a particular SP combo. 
+     * 
+     * @param knownTerms
+     *          the known terms 
+     * @return
+     *          the from key
+     */
+    final public byte[] getFromKey(final IKeyBuilder keyBuilder, 
+            final IV[] knownTerms) {
+        
+        if (knownTerms == null || knownTerms.length == 0)
+            return null;
+        
+        keyBuilder.reset();
+        
+        for (int i = 0; i < knownTerms.length; i++) 
+            knownTerms[i].encode(keyBuilder);
+        
+        return keyBuilder.getKey();
+        
+    }
+    
+    /**
+     * Return the to key for this particular set of known terms that will
+     * allow us to read everything about those terms from the index.  For
+     * example, if this happens to be the SPO key order and the size of known
+     * terms is 2, this method will provide a to key that will allow the
+     * caller to read all the Os for a particular SP combo. 
+     * 
+     * @param knownTerms
+     *          the known terms 
+     * @return
+     *          the to key
+     */
+    final public byte[] getToKey(final IKeyBuilder keyBuilder, 
+            final IV[] knownTerms) {
+        
+        if (knownTerms == null || knownTerms.length == 0)
+            return null;
+        
+        final byte[] from = getFromKey(keyBuilder, knownTerms);
+        
+        return SuccessorUtil.successor(from);
+        
+    }
+
+    /**
      * Return the inclusive lower bound which would be used for a query against
      * this {@link IKeyOrder} for the given {@link IPredicate}.
      * 
@@ -393,32 +460,25 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
     final public byte[] getFromKey(final IKeyBuilder keyBuilder,
             final IPredicate<ISPO> predicate) {
 
-        final int keyArity = getKeyArity(); // use the key's "arity".
-
         keyBuilder.reset();
+
+        final int keyArity = getKeyArity(); // use the key's "arity".
 
         boolean noneBound = true;
         
         for (int i = 0; i < keyArity; i++) {
         
-            final IVariableOrConstant<Long> term = predicate.get(getKeyOrder(i));
-            
-            final long l;
+            final IVariableOrConstant<IV> term = predicate.get(getKeyOrder(i));
             
             // Note: term MAY be null for the context position.
-            if (term == null || term.isVar()) {
+            if (term == null || term.isVar())
+                break;
+                
+            final IV iv = term.get();
+                
+            iv.encode(keyBuilder);
             
-                l = Long.MIN_VALUE;
-                
-            } else {
-                
-                l = term.get();
-
-                noneBound = false;
-                
-            }
-
-            keyBuilder.append(l);
+            noneBound = false;
             
         }
 
@@ -435,68 +495,12 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
     final public byte[] getToKey(final IKeyBuilder keyBuilder,
             final IPredicate<ISPO> predicate) {
 
-        keyBuilder.reset();
-
-        final int keyArity = getKeyArity();
+        final byte[] from = getFromKey(keyBuilder, predicate);
         
-        boolean noneBound = true;
+        return from == null ? null : SuccessorUtil.successor(from);
         
-        boolean foundLastBound = false;
-        
-        for (int i = 0; i < keyArity; i++) {
-        
-            final IVariableOrConstant<Long> term = predicate
-                    .get(getKeyOrder(i));
-            
-            long l;
-            
-            // Note: term MAY be null for context.
-            if (term == null || term.isVar()) {
-            
-                l = Long.MIN_VALUE;
-                
-            } else {
-                
-                l = term.get();
-                
-                noneBound = false;
-                
-                if (!foundLastBound) {
-                
-                    if (i == keyArity - 1) {
-                    
-                        l++;
-                        
-                        foundLastBound = true;
-                        
-                    } else {
-                        
-                        final IVariableOrConstant<Long> next = predicate
-                                .get(getKeyOrder(i + 1));
-                        
-                        // Note: next can be null for quads (context pos).
-                        if (next == null || next.isVar()) {
-                        
-                            l++;
-                            
-                            foundLastBound = true;
-                            
-                        }
-                        
-                    }
-                    
-                }
-                
-            }
-            
-            keyBuilder.append(l);
-            
-        }
-
-        return noneBound ? null : keyBuilder.getKey();
-
     }
-    
+        
     final public byte[] encodeKey(final IKeyBuilder keyBuilder, final ISPO spo) {
 
         keyBuilder.reset();
@@ -504,9 +508,11 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
         final int[] a = orders[index];
 
         for (int i = 0; i < a.length; i++) {
+            
+            IV iv = spo.get(a[i]);
 
-            keyBuilder.append(spo.get(a[i]));
-
+            IVUtility.encode(keyBuilder, iv);
+            
         }
         
         return keyBuilder.getKey();
@@ -534,23 +540,22 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
          */
         final int keyArity = getKeyArity();
 
-        assert key.length >= 8 * keyArity;
+        final IV[] ivs = IVUtility.decode(key, keyArity);
 
-        final long _0 = KeyBuilder.decodeLong(key, 0);
+        final IV _0 = ivs[0];
         
-        final long _1 = KeyBuilder.decodeLong(key, 8);
+        final IV _1 = ivs[1];
       
-        final long _2 = KeyBuilder.decodeLong(key, 8+8);
+        final IV _2 = ivs[2];
 
         // 4th key position exists iff quad keys.
-        final long _3 = keyArity == 4 ? KeyBuilder.decodeLong(key, 8 + 8 + 8)
-                : IRawTripleStore.NULL;
+        final IV _3 = keyArity == 4 ? ivs[3] : null;
 
         /*
          * Re-order the key into SPO order.
          */
         
-        final long s, p, o, c;
+        final IV s, p, o, c;
         
         switch (index) {
 
@@ -565,21 +570,21 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
             s = _0;
             p = _1;
             o = _2;
-            c = IRawTripleStore.NULL;
+            c = null;
             break;
             
         case SPOKeyOrder._POS:
             p = _0;
             o = _1;
             s = _2;
-            c = IRawTripleStore.NULL;
+            c = null;
             break;
             
         case SPOKeyOrder._OSP:
             o = _0;
             s = _1;
             p = _2;
-            c = IRawTripleStore.NULL;
+            c = null;
             break;
 
         /*
@@ -673,32 +678,32 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
     static public SPOKeyOrder getKeyOrder(final IPredicate<ISPO> predicate,
             final int keyArity) {
 
-        final long s = predicate.get(0).isVar() ? NULL : (Long) predicate
+        final Object s = predicate.get(0).isVar() ? null : predicate
                 .get(0).get();
         
-        final long p = predicate.get(1).isVar() ? NULL : (Long) predicate
+        final Object p = predicate.get(1).isVar() ? null : predicate
                 .get(1).get();
         
-        final long o = predicate.get(2).isVar() ? NULL : (Long) predicate
+        final Object o = predicate.get(2).isVar() ? null : predicate
                 .get(2).get();
 
         if (keyArity == 3) {
 
             // Note: Context is ignored!
 
-            if (s != NULL && p != NULL && o != NULL) {
+            if (s != null && p != null && o != null) {
                 return SPO;
-            } else if (s != NULL && p != NULL) {
+            } else if (s != null && p != null) {
                 return SPO;
-            } else if (s != NULL && o != NULL) {
+            } else if (s != null && o != null) {
                 return OSP;
-            } else if (p != NULL && o != NULL) {
+            } else if (p != null && o != null) {
                 return POS;
-            } else if (s != NULL) {
+            } else if (s != null) {
                 return SPO;
-            } else if (p != NULL) {
+            } else if (p != null) {
                 return POS;
-            } else if (o != NULL) {
+            } else if (o != null) {
                 return OSP;
             } else {
                 return SPO;
@@ -707,41 +712,41 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
         } else {
 
             @SuppressWarnings("unchecked")
-            final IVariableOrConstant<Long> t = predicate.get(3);
+            final IVariableOrConstant<IV> t = predicate.get(3);
             
-            final long c = t == null ? NULL : (t.isVar() ? NULL : t.get());
+            final IV c = t == null ? null : (t.isVar() ? null : t.get());
             
             /*
-             * if ((s == NULL && p == NULL && o == NULL && c == NULL) || (s !=
-             * NULL && p == NULL && o == NULL && c == NULL) || (s != NULL && p
-             * != NULL && o == NULL && c == NULL) || (s != NULL && p != NULL &&
-             * o != NULL && c == NULL) || (s != NULL && p != NULL && o != NULL
-             * && c != NULL)) { return SPOKeyOrder.SPOC; }
+             * if ((s == null && p == null && o == null && c == null) || (s !=
+             * null && p == null && o == null && c == null) || (s != null && p
+             * != null && o == null && c == null) || (s != null && p != null &&
+             * o != null && c == null) || (s != null && p != null && o != null
+             * && c != null)) { return SPOKeyOrder.SPOC; }
              */
             
-            if ((s == NULL && p != NULL && o == NULL && c == NULL)
-                    || (s == NULL && p != NULL && o != NULL && c == NULL)
-                    || (s == NULL && p != NULL && o != NULL && c != NULL)) {
+            if ((s == null && p != null && o == null && c == null)
+                    || (s == null && p != null && o != null && c == null)
+                    || (s == null && p != null && o != null && c != null)) {
                 return POCS;
             }
 
-            if ((s == NULL && p == NULL && o != NULL && c == NULL)
-                    || (s == NULL && p == NULL && o != NULL && c != NULL)
-                    || (s != NULL && p == NULL && o != NULL && c != NULL)) {
+            if ((s == null && p == null && o != null && c == null)
+                    || (s == null && p == null && o != null && c != null)
+                    || (s != null && p == null && o != null && c != null)) {
                 return OCSP;
             }
 
-            if ((s == NULL && p == NULL && o == NULL && c != NULL)
-                    || (s != NULL && p == NULL && o == NULL && c != NULL)
-                    || (s != NULL && p != NULL && o == NULL && c != NULL)) {
+            if ((s == null && p == null && o == null && c != null)
+                    || (s != null && p == null && o == null && c != null)
+                    || (s != null && p != null && o == null && c != null)) {
                 return CSPO;
             }
 
-            if ((s == NULL && p != NULL && o == NULL && c != NULL)) {
+            if ((s == null && p != null && o == null && c != null)) {
                 return PCSO;
             }
 
-            if ((s != NULL && p == NULL && o != NULL && c == NULL)) {
+            if ((s != null && p == null && o != null && c == null)) {
                 return SOPC;
             }
 

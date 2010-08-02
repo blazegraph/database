@@ -50,6 +50,7 @@ import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.jini.AbstractServer;
+import com.bigdata.util.config.NicUtil;
 import com.sun.jini.tool.ClassServer;
 
 /**
@@ -371,8 +372,7 @@ public abstract class AbstractServerTestCase extends TestCase2 {
          */
 
         // get the hostname.
-        InetAddress addr = InetAddress.getLocalHost();
-        String hostname = addr.getHostName();
+        String hostname = NicUtil.getIpAddress("default.nic", "default", true);
 
         // Find the service registrar (unicast protocol).
         final int timeout = 4*1000; // seconds.

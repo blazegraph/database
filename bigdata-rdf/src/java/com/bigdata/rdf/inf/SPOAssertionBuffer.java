@@ -174,7 +174,7 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
 
         final long n;
         
-        log.info("numStmts=" + numStmts+", numJustifications="+numJustifications);
+        if(log.isInfoEnabled()) log.info("numStmts=" + numStmts+", numJustifications="+numJustifications);
 
         final long begin = System.currentTimeMillis();
         
@@ -191,11 +191,11 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
             
             /*
              * Use a thread pool to write out the statement and the
-             * justifications concurrently. This drammatically reduces the
+             * justifications concurrently. This dramatically reduces the
              * latency when also writing justifications.
              */
 
-            List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(2);
+            final List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(2);
             
             /*
              * Note: we reject using the filter before stmts or
@@ -204,7 +204,7 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
              */
            
             // set as a side-effect.
-            AtomicLong nwritten = new AtomicLong();
+            final AtomicLong nwritten = new AtomicLong();
 
             // task will write SPOs on the statement indices.
             tasks.add(new StatementWriter(getTermDatabase(), focusStore,
@@ -212,7 +212,7 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
                             numStmts, stmts, null/*keyOrder*/), nwritten));
             
             // task will write justifications on the justifications index.
-            AtomicLong nwrittenj = new AtomicLong();
+            final AtomicLong nwrittenj = new AtomicLong();
             tasks.add(new JustificationWriter(focusStore,
                     new ChunkedArrayIterator<Justification>(numJustifications,
                             justifications, null/* keyOrder */), nwrittenj));
@@ -238,7 +238,7 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
             
             }
 
-            log.info("Wrote " + nwritten + " statements in " + elapsed_SPO
+            if(log.isInfoEnabled()) log.info("Wrote " + nwritten + " statements in " + elapsed_SPO
                     + "ms and " + nwrittenj + " justifications in "
                     + elapsed_JST + "ms");
             
@@ -250,9 +250,9 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
          * reset the buffer.
          */
 
-        long elapsed = System.currentTimeMillis() - begin;
+        final long elapsed = System.currentTimeMillis() - begin;
 
-        log.info("Wrote "
+        if(log.isInfoEnabled()) log.info("Wrote "
                 + n
                 + " statements"
                 + (justify ? " with " + numJustifications + " justifications"

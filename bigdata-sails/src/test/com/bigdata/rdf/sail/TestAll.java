@@ -86,6 +86,7 @@ public class TestAll extends TestCase {
 
         // run the test suite with statement identifiers enabled.
         suite.addTest(TestBigdataSailWithSids.suite());
+        suite.addTest(TestBigdataSailWithSidsWithoutInlining.suite());
         
         // run the test suite without statement identifiers enabled.
         suite.addTest(TestBigdataSailWithoutSids.suite());
@@ -96,6 +97,7 @@ public class TestAll extends TestCase {
         
         // quad store test suite w/ pipeline joins.
         suite.addTest(TestBigdataSailWithQuadsAndPipelineJoins.suite());
+        suite.addTest(TestBigdataSailWithQuadsAndPipelineJoinsWithoutInlining.suite());
         
         return suite;
 

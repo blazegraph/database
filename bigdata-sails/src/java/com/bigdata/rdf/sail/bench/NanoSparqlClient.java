@@ -79,7 +79,7 @@ public class NanoSparqlClient {
 		
 		private final int order;
 		
-		private QueryType(int order) {
+		private QueryType(final int order) {
 			this.order = order;
 		}
 
@@ -106,12 +106,12 @@ public class NanoSparqlClient {
 			final int offset;
 			final QueryType queryType;
 
-			public P(int offset, QueryType queryType) {
+			public P(final int offset, final QueryType queryType) {
 				this.offset = offset;
 				this.queryType = queryType;
 			}
 			/** Sort into descending offset. */
-			public int compareTo(P o) {
+			public int compareTo(final P o) {
 				return o.offset - offset;
 			}
 		}
@@ -275,7 +275,8 @@ public class NanoSparqlClient {
 
 				final int rc = conn.getResponseCode();
 					if(rc < 200 || rc >= 300) {
-					throw new IOException(conn.getResponseMessage());
+                    throw new IOException(rc + " : "
+                            + conn.getResponseMessage()+" : "+url);
 				}
 
 				if (log.isDebugEnabled()) {
@@ -328,47 +329,85 @@ public class NanoSparqlClient {
 
 	}
 
-	/**
-	 * Read the contents of a file.
-	 * <p>
-	 * Note: This makes default platform assumptions about the encoding of the
-	 * file.
-	 * 
-	 * @param file
-	 *            The file.
-	 * @return The file's contents.
-	 * 
-	 * @throws IOException
-	 */
-	static private String readFromFile(final File file) throws IOException {
+    /**
+     * Read the contents of a file.
+     * <p>
+     * Note: This makes default platform assumptions about the encoding of the
+     * file.
+     * 
+     * @param file
+     *            The file.
+     * @return The file's contents.
+     * 
+     * @throws IOException
+     */
+    static private String readFromFile(final File file) throws IOException {
 
-		final LineNumberReader r = new LineNumberReader(new FileReader(file));
+        final LineNumberReader r = new LineNumberReader(new FileReader(file));
 
-		try {
+        try {
 
-			final StringBuilder sb = new StringBuilder();
+            final StringBuilder sb = new StringBuilder();
 
-			String s;
-			while ((s = r.readLine()) != null) {
+            String s;
+            while ((s = r.readLine()) != null) {
 
-				if (r.getLineNumber() > 1)
-					sb.append("\n");
+                if (r.getLineNumber() > 1)
+                    sb.append("\n");
 
-				sb.append(s);
+                sb.append(s);
 
-			}
+            }
 
-			return sb.toString();
+            return sb.toString();
 
-		} finally {
+        } finally {
 
-			r.close();
+            r.close();
 
-		}
+        }
 
-	}
+    }
 
-	/**
+    /**
+     * Read from stdin.
+     * <p>
+     * Note: This makes default platform assumptions about the encoding of the
+     * data being read.
+     * 
+     * @return The data read.
+     * 
+     * @throws IOException
+     */
+    static private String readFromStdin() throws IOException {
+
+        final LineNumberReader r = new LineNumberReader(new InputStreamReader(System.in));
+
+        try {
+
+            final StringBuilder sb = new StringBuilder();
+
+            String s;
+            while ((s = r.readLine()) != null) {
+
+                if (r.getLineNumber() > 1)
+                    sb.append("\n");
+
+                sb.append(s);
+
+            }
+
+            return sb.toString();
+
+        } finally {
+
+            r.close();
+
+        }
+
+    }
+    
+    /**
 	 * Options for the query.
 	 */
 	private static class QueryOptions {
@@ -384,17 +423,20 @@ public class NanoSparqlClient {
 		/** The connection timeout (ms). */
 		public int timeout = DEFAULT_TIMEOUT;
 		public boolean showQuery = false;
+        public boolean verbose = false;
+        public boolean quiet = false;
 
 	}
 
 	private static void usage() {
 
-		System.out.println("usage: (option)* [serviceURL] (query)");
+		System.err.println("usage: (option)* [serviceURL] (query)");
 		
 	}
 
 	/**
-	 * Issue a query against a SPARQL endpoint.
+	 * Issue a query against a SPARQL endpoint.  By default, the client will
+	 * read from stdin.  It will write on stdout.
 	 * 
 	 * @param args
 	 *            <code>(option)* [serviceURL] (query)</code>
@@ -416,10 +458,18 @@ public class NanoSparqlClient {
 	 *            <dt>-timeout</dt>
 	 *            <dd>The connection timeout in milliseconds (default
 	 *            {@value #DEFAULT_TIMEOUT}).</dd>
-	 *            <dt>-show</dt>
-	 *            <dd>Show the parser query (operator tree).</dd>
-	 *            <dt>-f</dt>
-	 *            <dd>A file containing the query.</dd>
+     *            <dt>-show</dt>
+     *            <dd>Show the parser query (operator tree).</dd>
+     *            <dt>-verbose</dt>
+     *            <dd>Be verbose.</dd>
+     *            <dt>-quiet</dt>
+     *            <dd>Be quiet.</dd>
+     *            <dt>-f</dt>
+     *            <dd>A file containing the query.</dd>
+     *            <dt>-query</dt>
+     *            <dd>The query follows immediately on the command line (be sure to quote the query).</dd>
+     *            <dt>-t</dt>
+     *            <dd>The http connection timeout in milliseconds -or- ZERO (0) for an infinite timeout.</dd>
 	 *            <dt>-defaultGraph</dt>
 	 *            <dd>The URI of the default graph to use for the query.</dd>
 	 *            </dl>
@@ -453,21 +503,53 @@ public class NanoSparqlClient {
 
                 	opts.password = args[++i];
 
-				} else if (arg.equals("-f")) {
+                } else if (arg.equals("-f")) {
 
-					opts.queryStr = readFromFile(new File(args[++i]));
+                    final String file = args[++i];
+                    
+                    if (opts.verbose)
+                        System.err.println("reading from file: " + file);
+
+                    opts.queryStr = readFromFile(new File(file));
+
+                } else if (arg.equals("-verbose")) {
+                    
+                    opts.verbose = true;
+                    opts.quiet = false;
+
+                } else if (arg.equals("-quiet")) {
+                    
+                    opts.verbose = false;
+                    opts.quiet = true;
+                    
+                } else if (arg.equals("-query")) {
+
+                    opts.queryStr = args[++i];
 
 				} else if (arg.equals("-defaultGraph")) {
 
 					opts.defaultGraphUri = args[++i];
 
+                    if (opts.verbose)
+                        System.err.println("defaultGraph: "
+                                + opts.defaultGraphUri);
+
 				} else if (arg.equals("-show")) {
 
 					opts.showQuery = true;
 					
-				} else if (arg.equals("-f")) {
+				} else if (arg.equals("-t")) {
 
-					opts.timeout = Integer.valueOf(args[++i]);
+                    if ((opts.timeout = Integer.valueOf(args[++i])) < 0) {
+
+                        throw new IllegalArgumentException("Bad timeout.");
+                        
+				    }
+
+                    if (opts.verbose)
+                        System.err.println("timeout: "
+                                + (opts.timeout == 0 ? "infinite" : (""
+                                        + opts.timeout + "ms")));
 
 				} else if (arg.equals("-help") || arg.equals("--?")) {
 
@@ -487,27 +569,22 @@ public class NanoSparqlClient {
 			// The next argument is the serviceURL, which is required.
 			if (i < args.length) {
 				opts.serviceURL = args[i++];
+                if (opts.verbose)
+                    System.err.println("serviceURL: " + opts.serviceURL);
 			} else {
 				usage();
 				System.exit(1);
 			}
 
 			if (opts.queryStr == null) {
-				// The next argument is the query.
-				if (i < args.length) {
-					opts.queryStr = args[i++];
-				} else {
-					usage();
-					System.exit(1);
-				}
-			}
 
-//            // The remaining argument(s)
-//            while (i < args.length) {
-//
-//                names.add(args[i++]);
-//
-//            }
+                if (opts.verbose) {
+                    System.err.println("Reading from stdin...");
+                }
+			    
+			    opts.queryStr = readFromStdin();
+			    
+			}
 
         } // parse command line.
 
@@ -535,15 +612,16 @@ public class NanoSparqlClient {
 //		}
 
 		// Run the query, writes on stdout.
-		{
-			
-			final long elapsed = new Query(/* client, */opts).call();
+        final long elapsed = new Query(/* client, */opts).call();
 
-			// Show the query run time.
-			System.err.println("elapsed="
-					+ TimeUnit.NANOSECONDS.toMillis(elapsed) + "ms");
-			
-		}
+        if (!opts.quiet) {
+            // Show the query run time.
+            System.err.println("elapsed="
+                    + TimeUnit.NANOSECONDS.toMillis(elapsed) + "ms");
+        }
+		
+		// Normal exit.
+		System.exit(0);
 
 	}
 

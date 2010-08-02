@@ -415,28 +415,23 @@ public interface Options {
     String FORCE_ON_COMMIT = AbstractJournal.class.getName()+".forceOnCommit";
 
     /**
-     * This boolean option causes application data to be forced to stable
-     * storage <em>before</em> we update the root blocks. This option seeks to
-     * guarantee that the application data is stable on the disk before the
-     * atomic commit. Some operating systems and/or file systems may otherwise
-     * choose an ordered write or otherwise process the writes in a different
-     * order. This could have the consequence that the root blocks are laid down
-     * on the disk before the application data. In this situation a hard failure
-     * during the write could result in the loss of application data since the
-     * updated root blocks represent the atomic commit point but not all
-     * application data was successfully made stable on disk.
+     * This boolean option may be used to request that application data are
+     * forced to stable storage <em>before</em> we update the root blocks
+     * (default {@value #DEFAULT_DOUBLE_SYNC}). This is accomplished by invoking
+     * {@link FileChannel#force(boolean)} before root blocks are updated as part
+     * of the atomic commit protocol in an attempt to guard against operating
+     * systems and/or file systems which may otherwise reorders writes with the
+     * consequence that the root blocks are laid down on the disk before the
+     * application data. In this situation a hard failure during the root block
+     * write could result in the loss of application data since the updated root
+     * blocks represent the atomic commit point but not all application data was
+     * successfully made stable on disk. However, note that there are often
+     * multiple cache layers in use by the operating system, the disk
+     * controller, and the disk. Therefore durability is thus best achieved
+     * through a mixture of methods, which can include battery powered hardware
+     * write cache and/or replication.
      * 
-     * @deprecated This option does NOT provide a sufficient guarantee when a
-     *             write cache is in use by the operating system or the disk if
-     *             the layered write caches return before all data is safely on
-     *             disk (or in a battery powered cache). In order to protect
-     *             against this you MUST disable the write cache layers in the
-     *             operating system and the disk drive such that
-     *             {@link FileChannel#force(boolean)} will not return until the
-     *             data are in fact on stable storage. If you disable the OS and
-     *             disk write cache then you do NOT need to specify this option
-     *             since writes will be ordered and all data will be on disk
-     *             before we update the commit blocks.
+     * @see #DEFAULT_DOUBLE_SYNC
      */
     String DOUBLE_SYNC = AbstractJournal.class.getName()+".doubleSync";
 
@@ -517,7 +512,7 @@ public interface Options {
     /**
      * The default for the {@link #BUFFER_MODE}.
      */
-    String DEFAULT_BUFFER_MODE = BufferMode.Disk.toString();
+    String DEFAULT_BUFFER_MODE = BufferMode.DiskWORM.toString();
     
     /**
      * The default for {@link #USE_DIRECT_BUFFERS}.

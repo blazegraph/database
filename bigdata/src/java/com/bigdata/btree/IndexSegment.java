@@ -623,7 +623,7 @@ public class IndexSegment extends AbstractBTree {
      * 
      * @throws IllegalArgumentException
      *             if the <i>key</i> is <code>null</code>.
-     * @throws RUntimeException
+     * @throws RuntimeException
      *             if the key does not lie within the optional key-range
      *             constraints for an index partition.
      */
@@ -1402,5 +1402,5 @@ public class IndexSegment extends AbstractBTree {
         }
         
     }
-    
+
 }

@@ -38,6 +38,9 @@ import org.deri.iris.builtins.BuiltinsFactory;
 import org.deri.iris.terms.TermFactory;
 
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.rules.AbstractInferenceEngineTestCase;
 import com.bigdata.rdf.rules.RuleRdfs11;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -143,7 +146,7 @@ public class TestMagicStore extends AbstractInferenceEngineTestCase {
             }
             relation.insert(new IMagicTuple[] { tuple }, 1);
             
-            IVariableOrConstant<Long>[] terms = new IVariableOrConstant[arity];
+            IVariableOrConstant<IV>[] terms = new IVariableOrConstant[arity];
             terms[0] = Var.var("a");
             terms[1] = Var.var("b");
             terms[2] = Var.var("c");
@@ -209,7 +212,7 @@ public class TestMagicStore extends AbstractInferenceEngineTestCase {
                 
             relation.insert(tuples, tuples.length);
             
-            IVariableOrConstant<Long>[] terms = new IVariableOrConstant[arity];
+            IVariableOrConstant<IV>[] terms = new IVariableOrConstant[arity];
             terms[0] = Var.var("a");
             terms[1] = Var.var("b");
             terms[2] = Var.var("c");

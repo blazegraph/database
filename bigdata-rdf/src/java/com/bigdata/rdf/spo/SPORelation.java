@@ -55,7 +55,9 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.isolation.IConflictResolver;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.btree.proc.LongAggregator;
 import com.bigdata.btree.raba.codec.EmptyRabaValueCoder;
 import com.bigdata.btree.raba.codec.IRabaCoder;
@@ -67,7 +69,9 @@ import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.Justification;
-import com.bigdata.rdf.lexicon.ITermIdFilter;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.lexicon.ITermIVFilter;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.JustIndexWriteProc.WriteJustificationsProcConstructor;
@@ -123,8 +127,6 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     protected static final transient Logger log = Logger
             .getLogger(SPORelation.class);
-
-    private static transient final long NULL = IRawTripleStore.NULL;
 
     private final Set<String> indexNames;
 
@@ -320,6 +322,16 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         // Note: Do not eagerly resolve the indices.
         
+//        {
+//            
+//            final boolean inlineTerms = Boolean.parseBoolean(getProperty(
+//                    AbstractTripleStore.Options.INLINE_TERMS,
+//                    AbstractTripleStore.Options.DEFAULT_INLINE_TERMS));
+//
+//            lexiconConfiguration = new LexiconConfiguration(inlineTerms);
+//            
+//        }
+        
     }
     
     /**
@@ -350,79 +362,6 @@ public class SPORelation extends AbstractRelation<ISPO> {
         return true;
         
     }
-
-//    /**
-//     * Attempt to resolve each index for the {@link SPORelation} and cache a
-//     * hard reference to that index.
-//     * 
-//     * FIXME The LDS unit tests are failing when attempting to resolve the JUST
-//     * index from the SPORelation when it was not declared for the AbstractTask.
-//     * The eager resolution of indices is going to break all of the LDS
-//     * execution.
-//     * 
-//     * @todo Optimization. When materializing a relation, such as the
-//     *       {@link SPORelation} or the {@link LexiconRelation}, on a
-//     *       {@link DataService} we may not want to have all indices resolved
-//     *       eager. The {@link AbstractTask} will actually return
-//     *       <code>null</code> rather than throwing an exception, but eager
-//     *       resolution of the indices will force {@link IClientIndex}s to
-//     *       spring into existence when we might only want a single index for
-//     *       the relation.
-//     */
-//    private void lookupIndices() {
-//
-//        /*
-//         * Note: if full transactions are to be used then the statement indices
-//         * and the justification indices should be assigned the transaction
-//         * identifier.
-//         */
-//
-//        if (keyArity == 3) {
-//
-//            if (oneAccessPath) {
-//
-//                // attempt to resolve the index and set the index reference.
-//                indices[SPOKeyOrder._SPO] = super.getIndex(SPOKeyOrder.SPO);
-//
-//            } else {
-//
-//                // attempt to resolve the index and set the index reference.
-//                indices[SPOKeyOrder._SPO] = super.getIndex(SPOKeyOrder.SPO);
-//                indices[SPOKeyOrder._POS] = super.getIndex(SPOKeyOrder.POS);
-//                indices[SPOKeyOrder._OSP] = super.getIndex(SPOKeyOrder.OSP);
-//
-//            }
-//
-//        } else {
-//
-//            if(oneAccessPath) {
-//            
-//                indices[SPOKeyOrder._SPOC] = super.getIndex(SPOKeyOrder.SPOC);
-//                
-//            } else {
-//
-//                for (int i = SPOKeyOrder.FIRST_QUAD_INDEX; i <= SPOKeyOrder.LAST_QUAD_INDEX; i++) {
-//
-//                    indices[i] = super.getIndex(SPOKeyOrder.valueOf(i));
-//
-//                }
-//
-//            }
-//            
-//        }
-//
-//        if (justify) {
-//
-//            // attempt to resolve the index and set the index reference.
-//            just = super.getIndex(getNamespace() + "." + NAME_JUST);
-//
-//        } else {
-//
-//            just = null;
-//
-//        }
-//
-//    }
 
     public void create() {
       
@@ -942,15 +881,14 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * @throws UnsupportedOperationException
      *             unless the {@link #getKeyArity()} is <code>3</code>.
      * 
-     * @deprecated by {@link #getAccessPath(long, long, long, long)}
+     * @deprecated by {@link #getAccessPath(IV, IV, IV, IV)}
      */
-    public IAccessPath<ISPO> getAccessPath(final long s, final long p,
-            final long o) {
+    public IAccessPath<ISPO> getAccessPath(final IV s, final IV p, final IV o) {
 
         if (keyArity != 3)
             throw new UnsupportedOperationException();
 
-        return getAccessPath(s, p, o, NULL/* c */, null/* filter */);
+        return getAccessPath(s, p, o, null/* c */, null/* filter */);
 
     }
 
@@ -958,8 +896,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * Return the access path for a triple or quad pattern with an optional
      * filter.
      */
-    public IAccessPath<ISPO> getAccessPath(final long s, final long p,
-            final long o, final long c) {
+    public IAccessPath<ISPO> getAccessPath(final IV s, final IV p,
+            final IV o, final IV c) {
         
         return getAccessPath(s, p, o, c, null/*filter*/);
         
@@ -992,24 +930,24 @@ public class SPORelation extends AbstractRelation<ISPO> {
      *             <i>c</i> is non-{@link #NULL}.
      */
     @SuppressWarnings("unchecked")
-    public IAccessPath<ISPO> getAccessPath(final long s, final long p,
-            final long o, final long c, IElementFilter<ISPO> filter) {
+    public IAccessPath<ISPO> getAccessPath(final IV s, final IV p,
+            final IV o, final IV c, IElementFilter<ISPO> filter) {
         
-        final IVariableOrConstant<Long> S = (s == NULL ? Var.var("s")
-                : new Constant<Long>(s));
+        final IVariableOrConstant<IV> S = (s == null ? Var.var("s")
+                : new Constant<IV>(s));
 
-        final IVariableOrConstant<Long> P = (p == NULL ? Var.var("p")
-                : new Constant<Long>(p));
+        final IVariableOrConstant<IV> P = (p == null ? Var.var("p")
+                : new Constant<IV>(p));
 
-        final IVariableOrConstant<Long> O = (o == NULL ? Var.var("o")
-                : new Constant<Long>(o));
+        final IVariableOrConstant<IV> O = (o == null ? Var.var("o")
+                : new Constant<IV>(o));
         
-        IVariableOrConstant<Long> C = null;
+        IVariableOrConstant<IV> C = null;
 
         switch (keyArity) {
 
         case 3:
-            if (!statementIdentifiers && c != NULL) {
+            if (!statementIdentifiers && c != null) {
                 /*
                  * The 4th position should never become bound for a triple store
                  * without statement identifiers.
@@ -1018,7 +956,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
             }
             break;
         case 4:
-            C = (c == NULL ? Var.var("c") : new Constant<Long>(c));
+            C = (c == null ? Var.var("c") : new Constant<IV>(c));
             break;
         default:
             throw new AssertionError();
@@ -1337,7 +1275,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * 
      * @return An iterator visiting the distinct term identifiers.
      */
-    public IChunkedIterator<Long> distinctTermScan(final IKeyOrder<ISPO> keyOrder) {
+    public IChunkedIterator<IV> distinctTermScan(final IKeyOrder<ISPO> keyOrder) {
 
         return distinctTermScan(keyOrder,/* termIdFilter */null);
         
@@ -1358,8 +1296,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * @todo add the ability to specify {@link IRangeQuery#PARALLEL} here for
      *       fast scans across multiple shards when chunk-wise order is Ok.
      */
-    public IChunkedIterator<Long> distinctTermScan(
-            final IKeyOrder<ISPO> keyOrder, final ITermIdFilter termIdFilter) {
+    public IChunkedIterator<IV> distinctTermScan(
+            final IKeyOrder<ISPO> keyOrder, final ITermIVFilter termIdFilter) {
 
         final FilterConstructor<SPO> filter = new FilterConstructor<SPO>();
         
@@ -1382,10 +1320,11 @@ public class SPORelation extends AbstractRelation<ISPO> {
                 @Override
                 protected boolean isValid(final ITuple<SPO> tuple) {
 
-                    final long id = KeyBuilder.decodeLong(tuple
-                            .getKeyBuffer().array(), 0);
-
-                    return termIdFilter.isValid(id);
+                    final byte[] key = tuple.getKey();
+                    
+                    final IV iv = IVUtility.decode(key);
+                    
+                    return termIdFilter.isValid(iv);
 
                 }
 
@@ -1394,22 +1333,28 @@ public class SPORelation extends AbstractRelation<ISPO> {
         }
 
         @SuppressWarnings("unchecked")
-        final Iterator<Long> itr = new Striterator(getIndex(keyOrder)
+        final Iterator<IV> itr = new Striterator(getIndex(keyOrder)
                 .rangeIterator(null/* fromKey */, null/* toKey */,
                         0/* capacity */, IRangeQuery.KEYS | IRangeQuery.CURSOR,
                         filter)).addFilter(new Resolver() {
+                    
                     private static final long serialVersionUID = 1L;
+                    
                     /**
-                     * Resolve SPO key to Long.
+                     * Resolve SPO key to IV.
                      */
                     @Override
-                    protected Long resolve(Object obj) {
-                        return KeyBuilder.decodeLong(((ITuple) obj)
-                                .getKeyBuffer().array(), 0);
+                    protected IV resolve(Object obj) {
+                        
+                        final byte[] key = ((ITuple) obj).getKey();
+                        
+                        return IVUtility.decode(key);
+                        
                     }
+                    
                 });
 
-        return new ChunkedWrappedIterator<Long>(itr);
+        return new ChunkedWrappedIterator<IV>(itr);
                 
     }
 	/**
@@ -1424,9 +1369,10 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * 
      * @return An iterator visiting the distinct term identifiers.
      */
-    public IChunkedIterator<Long> distinctMultiTermScan(final IKeyOrder<ISPO> keyOrder,long[] knownTerms) {
+    public IChunkedIterator<IV> distinctMultiTermScan(
+            final IKeyOrder<ISPO> keyOrder, IV[] knownTerms) {
 
-        return distinctMultiTermScan(keyOrder,knownTerms,/* termIdFilter */null);
+        return distinctMultiTermScan(keyOrder, knownTerms,/* termIdFilter */null);
 
     }
 
@@ -1450,26 +1396,24 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * @todo add the ability to specify {@link IRangeQuery#PARALLEL} here for
      *       fast scans across multiple shards when chunk-wise order is Ok.
      */
-    public IChunkedIterator<Long> distinctMultiTermScan(
-            final IKeyOrder<ISPO> keyOrder, final long[] knownTerms,
-            final ITermIdFilter termIdFilter) {
+    public IChunkedIterator<IV> distinctMultiTermScan(
+            final IKeyOrder<ISPO> keyOrder, final IV[] knownTerms,
+            final ITermIVFilter termIdFilter) {
 
         final FilterConstructor<SPO> filter = new FilterConstructor<SPO>();
         final int nterms = knownTerms.length;
 
-        final KeyBuilder fromKey = new KeyBuilder(getKeyArity() * 8);
-        for (long l : knownTerms) {
-            fromKey.append(l);
+        final IKeyBuilder keyBuilder = KeyBuilder.newInstance();
+        
+        for (int i = 0; i < knownTerms.length; i++) {
+            knownTerms[i].encode(keyBuilder);
         }
-
-        final KeyBuilder toKey = new KeyBuilder(getKeyArity() * 8);
-        for (int i = 0; i < nterms; i++) {
-            if (i == nterms - 1) {
-                toKey.append(knownTerms[i] + 1);
-            } else {
-                toKey.append(knownTerms[i]);
-            }
-        }
+        
+        final byte[] fromKey = knownTerms.length == 0 ? null 
+                : keyBuilder.getKey();
+        
+        final byte[] toKey = fromKey == null ? null 
+                : SuccessorUtil.successor(fromKey.clone());
         
         /*
          * Layer in the logic to advance to the tuple that will have the next
@@ -1490,10 +1434,13 @@ public class SPORelation extends AbstractRelation<ISPO> {
                 @Override
                 protected boolean isValid(final ITuple<SPO> tuple) {
 
-                    final long id = KeyBuilder.decodeLong(tuple
-                            .getKeyBuffer().array(), 0);
-
-                    return termIdFilter.isValid(id);
+                    final byte[] key = tuple.getKey();
+                    
+                    final int pos = knownTerms.length;
+                    
+                    final IV iv = IVUtility.decode(key, pos+1)[pos];
+                    
+                    return termIdFilter.isValid(iv);
 
                 }
 
@@ -1502,24 +1449,30 @@ public class SPORelation extends AbstractRelation<ISPO> {
         }
 
         @SuppressWarnings("unchecked")
-        final Iterator<Long> itr = new Striterator(getIndex(keyOrder)
-                .rangeIterator(fromKey.getKey(), toKey.getKey(),
+        final Iterator<IV> itr = new Striterator(getIndex(keyOrder)
+                .rangeIterator(fromKey, toKey,
                         0/* capacity */, IRangeQuery.KEYS | IRangeQuery.CURSOR,
                         filter)).addFilter(new Resolver() {
 
             private static final long serialVersionUID = 1L;
 
             /**
-             * Resolve SPO key to Long.
+             * Resolve SPO key to IV.
              */
             @Override
-            protected Long resolve(Object obj) {
-                return KeyBuilder.decodeLong(((ITuple) obj).getKeyBuffer()
-                        .array(), (nterms - 1) * 8);
+            protected IV resolve(Object obj) {
+                
+                final byte[] key = ((ITuple) obj).getKey();
+                
+                final int pos = knownTerms.length;
+                
+                return IVUtility.decode(key, pos+1)[pos];
+                
             }
+            
         });
 
-        return new ChunkedWrappedIterator<Long>(itr);
+        return new ChunkedWrappedIterator<IV>(itr);
 
     }
 
@@ -1532,11 +1485,11 @@ public class SPORelation extends AbstractRelation<ISPO> {
         if (bindingSet == null)
             throw new IllegalArgumentException();
         
-        final long s = asBound(predicate, 0, bindingSet);
+        final IV s = asBound(predicate, 0, bindingSet);
 
-        final long p = asBound(predicate, 1, bindingSet);
+        final IV p = asBound(predicate, 1, bindingSet);
 
-        final long o = asBound(predicate, 2, bindingSet);
+        final IV o = asBound(predicate, 2, bindingSet);
 
         final SPO spo = new SPO(s, p, o, StatementEnum.Inferred);
         
@@ -1567,23 +1520,23 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * @return The bound value.
      */
     @SuppressWarnings("unchecked")
-    private long asBound(final IPredicate<ISPO> pred, final int index,
+    private IV asBound(final IPredicate<ISPO> pred, final int index,
             final IBindingSet bindingSet) {
 
-        final IVariableOrConstant<Long> t = pred.get(index);
+        final IVariableOrConstant<IV> t = pred.get(index);
 
-        final IConstant<Long> c;
+        final IConstant<IV> c;
         if(t.isVar()) {
             
             c = bindingSet.get((IVariable) t);
             
         } else {
             
-            c = (IConstant<Long>)t;
+            c = (IConstant<IV>)t;
             
         }
 
-        return c.get().longValue();
+        return c.get();
 
     }
 
@@ -2305,4 +2258,34 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     }
 
+    /**
+     * The {@link ILexiconConfiguration} instance, which will determine how
+     * terms are encoded and decoded in the key space.
+    private ILexiconConfiguration lexiconConfiguration;
+     */
+
+    /**
+     * See {@link ILexiconConfiguration#isInline(DTE)}.  Delegates to the
+     * {@link #lexiconConfiguration} instance.
+    public boolean isInline(DTE dte) {
+        return lexiconConfiguration.isInline(dte);
+    }
+     */
+
+    /**
+     * See {@link ILexiconConfiguration#isLegacyEncoding()}.  Delegates to the
+     * {@link #lexiconConfiguration} instance.
+    public boolean isLegacyEncoding() {
+        return lexiconConfiguration.isLegacyEncoding();
+    }
+     */
+    
+    /**
+     * Return the {@link #lexiconConfiguration} instance.  Used to determine
+     * how to encode and decode terms in the key space.
+    public ILexiconConfiguration getLexiconConfiguration() {
+        return lexiconConfiguration;
+    }
+     */
+    
 }

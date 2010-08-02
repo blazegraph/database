@@ -104,8 +104,9 @@ public class TestJournalBasics extends TestCase {
         
         // test basics of the concurrent task execution.
         suite.addTestSuite(TestConcurrentJournal.class);
-        // test tasks to add and drop named indices.
-        suite.addTestSuite(TestAddDropIndexTask.class);
+//        test tasks to add and drop named indices.
+//        This has been commented out since the unit test has dated semantics.
+//        suite.addTestSuite(TestAddDropIndexTask.class);
         // test writing on one or more unisolated indices and verify read back after the commit.
         suite.addTestSuite(TestUnisolatedWriteTasks.class);
         // stress test of throughput when lock contention serializes unisolated writers.

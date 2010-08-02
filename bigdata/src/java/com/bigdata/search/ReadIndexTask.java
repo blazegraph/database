@@ -7,7 +7,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.ISplitHandler;
+import com.bigdata.btree.ISimpleSplitHandler;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -26,7 +26,7 @@ import com.bigdata.rawstore.Bytes;
  * Those results are aggregated on the {@link Hit} collection, which is
  * maintained in a thread-safe hash map.
  * <p>
- * Note: An {@link ISplitHandler} imposes the constraint that index
+ * Note: An {@link ISimpleSplitHandler} imposes the constraint that index
  * partitions may only fall on a term boundary, hence all tuples for any
  * given term will always be found on the same index partition.
  * 

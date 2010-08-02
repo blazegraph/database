@@ -35,13 +35,13 @@ import com.bigdata.btree.BTree.PartitionedCounter;
  * available for bit flags in the low two-bits of the resulting long value
  * (they will be ZERO(0) and may be overwritten by the caller).
  * <p>
- * The purpose of this encoding is to cause the N high bits to vary rapily
+ * The purpose of this encoding is to cause the N high bits to vary rapidly
  * as the local counter is driven up by writes on the index partition. This
  * has the effect of scattering writes on dependent indices (those using the
  * resulting long value as the sole or leading component of their key).
  * <p>
  * Given a source RDF/XML document with M "terms" distributed uniformly over
- * K TERM2ID index partitions, each term has a uniform likelyhood of setting
+ * K TERM2ID index partitions, each term has a uniform likelihood of setting
  * any of the low bits of the local counter. After encoding, this means that
  * the N high-bits of encoded term identifier are uniformly distributed.
  * Assuming that the separator keys for the ID2TERM index divide the key
@@ -49,7 +49,7 @@ import com.bigdata.btree.BTree.PartitionedCounter;
  * ID2TERM index partitions will be uniformly distributed as well.
  * <p>
  * The next bits in the encoded values are derived from the partition
- * identifer followed by the term identifier and therefore have a strong
+ * identifier followed by the term identifier and therefore have a strong
  * bias for the index partition and the sequential assignment of local
  * counter values within an index partition respectively. This means that
  * read / write access within an index partition tends to have some
@@ -287,58 +287,58 @@ public class TermIdEncoder {
 
     }
 
-    /**
-     * Set the bit flags for the Value type on the 2 low order bits.
-     * 
-     * @param id
-     *            The encoded term identifier.
-     * @param code
-     *            The term code, which is one of the values defined by
-     *            {@link ITermIndexCodes}.
-     * 
-     * @return The term identifier with the 2 low order bits set to reflect
-     *         the term code using the bit flags defined by
-     *         {@link ITermIdCodes} which correspond to the specified term
-     *         code.
-     */
-    public static long setFlags(long id, final byte code) {
-
-        switch (code) {
-
-        case ITermIndexCodes.TERM_CODE_URI:
-
-            id |= ITermIdCodes.TERMID_CODE_URI;
-
-            break;
-
-        case ITermIndexCodes.TERM_CODE_LIT:
-        case ITermIndexCodes.TERM_CODE_DTL:
-        case ITermIndexCodes.TERM_CODE_LCL:
-
-            id |= ITermIdCodes.TERMID_CODE_LITERAL;
-
-            break;
-
-        case ITermIndexCodes.TERM_CODE_BND:
-
-            id |= ITermIdCodes.TERMID_CODE_BNODE;
-
-            break;
-
-        case ITermIndexCodes.TERM_CODE_STMT:
-
-            id |= ITermIdCodes.TERMID_CODE_STATEMENT;
-
-            break;
-
-        default:
-
-            throw new AssertionError("Unknown term type: code=" + code);
-
-        }
-
-        return id;
-
-    }
+//    /**
+//     * Set the bit flags for the Value type on the 2 low order bits.
+//     * 
+//     * @param id
+//     *            The encoded term identifier.
+//     * @param code
+//     *            The term code, which is one of the values defined by
+//     *            {@link ITermIndexCodes}.
+//     * 
+//     * @return The term identifier with the 2 low order bits set to reflect
+//     *         the term code using the bit flags defined by
+//     *         {@link ITermIdCodes} which correspond to the specified term
+//     *         code.
+//     */
+//    public static long setFlags(long id, final byte code) {
+//
+//        switch (code) {
+//
+//        case ITermIndexCodes.TERM_CODE_URI:
+//
+//            id |= ITermIdCodes.TERMID_CODE_URI;
+//
+//            break;
+//
+//        case ITermIndexCodes.TERM_CODE_LIT:
+//        case ITermIndexCodes.TERM_CODE_DTL:
+//        case ITermIndexCodes.TERM_CODE_LCL:
+//
+//            id |= ITermIdCodes.TERMID_CODE_LITERAL;
+//
+//            break;
+//
+//        case ITermIndexCodes.TERM_CODE_BND:
+//
+//            id |= ITermIdCodes.TERMID_CODE_BNODE;
+//
+//            break;
+//
+//        case ITermIndexCodes.TERM_CODE_STMT:
+//
+//            id |= ITermIdCodes.TERMID_CODE_STATEMENT;
+//
+//            break;
+//
+//        default:
+//
+//            throw new AssertionError("Unknown term type: code=" + code);
+//
+//        }
+//
+//        return id;
+//
+//    }
 
 }

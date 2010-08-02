@@ -27,16 +27,17 @@ package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
 import java.util.UUID;
-
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.raba.codec.EmptyRabaValueCoder;
 import com.bigdata.journal.TemporaryRawStore;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.ISPO;
@@ -165,7 +166,7 @@ public class Justification implements Comparable<Justification> {
      * Note: A term identifier MAY be {@link IRawTripleStore#NULL} to indicate a
      * wildcard.
      */
-    final long[] ids;
+    final IV[] ivs;
     
 //    /**
 //     * Construct an entailment for an {@link StatementEnum#Inferred} statement.
@@ -219,7 +220,7 @@ public class Justification implements Comparable<Justification> {
      */
     public SPO getHead() {
 
-        return new SPO(ids[0], ids[1], ids[2], StatementEnum.Inferred);
+        return new SPO(ivs[0], ivs[1], ivs[2], StatementEnum.Inferred);
         
     }
     
@@ -237,7 +238,7 @@ public class Justification implements Comparable<Justification> {
     public SPO[] getTail() {
         
         // #of triple patterns in the tail.
-        final int m = (ids.length / N) - 1;
+        final int m = (ivs.length / N) - 1;
 
         SPO[] tail = new SPO[m];
         
@@ -245,7 +246,7 @@ public class Justification implements Comparable<Justification> {
         int j = N;
         for(int i=0; i<m; i++, j+=N) {
         
-            tail[i] = new SPO(ids[j], ids[j + 1], ids[j + 2],
+            tail[i] = new SPO(ivs[j], ivs[j + 1], ivs[j + 2],
                     StatementEnum.Inferred);
             
         }
@@ -306,13 +307,13 @@ public class Justification implements Comparable<Justification> {
         final int tailCount = rule.getTailCount();
 
         // allocate enough for the head and the tail.
-        ids = new long[(1 + tailCount) * N];
+        ivs = new IV[(1 + tailCount) * N];
         
         int j = 0;
         
-        ids[j++] = head.s;
-        ids[j++] = head.p;
-        ids[j++] = head.o;
+        ivs[j++] = head.s;
+        ivs[j++] = head.p;
+        ivs[j++] = head.o;
         
         /*
          * Note: Some of variables in the tail(s) are left unbound by some of
@@ -329,17 +330,17 @@ public class Justification implements Comparable<Justification> {
 
             for(int i=0; i<N; i++) {
 
-                final IVariableOrConstant<Long> t = predicate.get(i);
+                final IVariableOrConstant<IV> t = predicate.get(i);
                 
-                final long id;
+                final IV id;
                 
                 if (t.isVar()) {
                  
-                    final IConstant<Long> c = bindingSet.get((IVariable)t);
+                    final IConstant<IV> c = bindingSet.get((IVariable)t);
                     
                     if(c == null) {
                     
-                        id = IRawTripleStore.NULL;
+                        id = null;
                         
                     } else {
                         
@@ -353,7 +354,7 @@ public class Justification implements Comparable<Justification> {
                     
                 }
 
-                ids[j++] = id;
+                ivs[j++] = id;
 
             }
             
@@ -407,13 +408,13 @@ public class Justification implements Comparable<Justification> {
      * @param ids
      *            The bindings on the head and tail(s).
      */
-    public Justification(final int N, final long[] ids) {
+    public Justification(final int N, final IV[] ids) {
         
         this.rule = null; // not serialized.
         
         this.N = N;
         
-        this.ids = ids;
+        this.ivs = ids;
         
     }
     
@@ -436,12 +437,12 @@ public class Justification implements Comparable<Justification> {
         
         keyBuilder.reset();
 
-        final long[] ids = jst.ids;
+        final IV[] ivs = jst.ivs;
 
-        for (int i = 0; i < ids.length; i++) {
+        for (int i = 0; i < ivs.length; i++) {
 
-            keyBuilder.append(ids[i]);
-
+            IVUtility.encode(keyBuilder, ivs[i]);
+            
         }
 
         return keyBuilder.getKey();
@@ -455,7 +456,7 @@ public class Justification implements Comparable<Justification> {
         if (this == o)
             return true;
 
-        return Arrays.equals(ids, o.ids);
+        return Arrays.equals(ivs, o.ivs);
 
     }
     
@@ -467,19 +468,19 @@ public class Justification implements Comparable<Justification> {
 
         // the length of the longer ids[].
         
-        final int len = ids.length > o.ids.length ? ids.length : o.ids.length;
+        final int len = ivs.length > o.ivs.length ? ivs.length : o.ivs.length;
         
         // compare both arrays until a difference emerges or one is exhausted.
         
         for(int i=0; i<len; i++) {
             
-            if(i>=ids.length) {
+            if(i>=ivs.length) {
                 
                 // shorter with common prefix is ordered first.
                 
                 return -1;
                 
-            } else if(i>=o.ids.length) {
+            } else if(i>=o.ivs.length) {
                 
                 // shorter with common prefix is ordered first.
                 
@@ -494,7 +495,7 @@ public class Justification implements Comparable<Justification> {
              * difference between two longs.
              */
 
-            int ret = ids[i] < o.ids[i] ? -1 : ids[i] > o.ids[i] ? 1 : 0;
+            int ret = IVUtility.compare(ivs[i], o.ivs[i]);
 
             if (ret != 0)
                 return ret;
@@ -503,7 +504,7 @@ public class Justification implements Comparable<Justification> {
 
         // identical values and identical lengths.
 
-        assert ids.length == o.ids.length;
+        assert ivs.length == o.ivs.length;
         
         return 0;
         
@@ -521,7 +522,7 @@ public class Justification implements Comparable<Justification> {
 
         if (rule != null) {
 
-            sb.append(rule.getClass().getSimpleName());
+            sb.append(rule.getName());
 
             sb.append("\n");
 
@@ -531,7 +532,7 @@ public class Justification implements Comparable<Justification> {
         {
 
             // #of triple patterns in the tail.
-            final int m = (ids.length / N) - 1;
+            final int m = (ivs.length / N) - 1;
 
             for( int i=0; i<m; i++) {
 
@@ -539,7 +540,7 @@ public class Justification implements Comparable<Justification> {
 
                 for( int j=0; j<N; j++ ) {
                     
-                    long id = ids[i*N+N+j];
+                    IV id = ivs[i*N+N+j];
                     
                     sb.append((db == null ? "" + id : db.toString(id)));
 
@@ -568,9 +569,9 @@ public class Justification implements Comparable<Justification> {
             sb.append("(");
 
             // Note: test on i<ids.length useful when unit tests report errors
-            for (int i = 0; i < N && i<ids.length; i++) {
+            for (int i = 0; i < N && i<ivs.length; i++) {
 
-                long id = ids[i];
+                IV id = ivs[i];
                 
                 sb.append((db == null ? "" + id : db.toString(id)));
 

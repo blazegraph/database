@@ -81,6 +81,7 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.load.ConcurrentDataLoader;
 import com.bigdata.rdf.load.FileSystemLoader;
 import com.bigdata.rdf.load.RDFLoadTaskFactory;
+import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.sail.BigdataSail;
@@ -97,7 +98,6 @@ import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.LocalDataServiceClient;
 import com.bigdata.service.jini.util.JiniServicesHelper;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.IComparisonTest;
@@ -518,31 +518,31 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
             break;
 
-        case LDS: {
-
-            jiniServicesHelper = null;
-            
-            /*
-             * The name of the data directory (LDS).
-             */
-            properties
-                    .setProperty(
-                            com.bigdata.service.LocalDataServiceClient.Options.DATA_DIR,
-                            file.toString());
-            
-            /*
-             * Delete the temp file before running since LDS will create a
-             * directory by that name.
-             */
-            file.delete();
-
-            fed = new LocalDataServiceClient(properties).connect();
-
-            sail = getSail(fed, namespace, timestamp);
-
-            break;
-        
-        }
+//        case LDS: {
+//
+//            jiniServicesHelper = null;
+//            
+//            /*
+//             * The name of the data directory (LDS).
+//             */
+//            properties
+//                    .setProperty(
+//                            com.bigdata.service.LocalDataServiceClient.Options.DATA_DIR,
+//                            file.toString());
+//            
+//            /*
+//             * Delete the temp file before running since LDS will create a
+//             * directory by that name.
+//             */
+//            file.delete();
+//
+//            fed = new LocalDataServiceClient(properties).connect();
+//
+//            sail = getSail(fed, namespace, timestamp);
+//
+//            break;
+//        
+//        }
             
         case EDS: {
 
@@ -645,7 +645,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
     private static enum DatabaseModel {
         
         LTS,
-        LDS,
+//        LDS,
         EDS,
         JDS;
         
@@ -851,7 +851,8 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
          * 
          * @todo configure via Properties.
          */
-        final boolean verifyRDFSourceData = false;
+        final RDFParserOptions parserOptions = new RDFParserOptions();
+        parserOptions.setVerifyData(false);
 
         /*
          * Properties that are used iff we use the ConcurrentDataLoader.
@@ -925,7 +926,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
                     didTruthMaintenance = false;
             
                     loadConcurrent(nthreads, nclients, clientNum,
-                            bufferCapacity, dataDir, verifyRDFSourceData);
+                            bufferCapacity, dataDir, parserOptions);
 
                 } else {
 
@@ -1116,7 +1117,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
      *             if interrupted.
      */
     protected void loadConcurrent(int nthreads, int nclients, int clientNum,
-            int bufferCapacity, File dataDir, boolean verifyRDFSourceData)
+            int bufferCapacity, File dataDir, RDFParserOptions parserOptions)
             throws InterruptedException {
 
         System.out.println("Will load files: dataDir=" + dataDir);
@@ -1129,7 +1130,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
         final AbstractTripleStore db = sail.getDatabase();
 
         final RDFLoadTaskFactory loadTaskFactory = //
-        new RDFLoadTaskFactory(db, bufferCapacity, verifyRDFSourceData,
+        new RDFLoadTaskFactory(db, bufferCapacity, parserOptions,
                 false/* deleteAfter */, fallback);
 
         final ConcurrentDataLoader service = new ConcurrentDataLoader(fed,
@@ -2509,8 +2510,8 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
             conditions = apply(conditions, new NV[][] {
                     new NV[] { new NV(TestOptions.DATABASE_MODEL,
                             DatabaseModel.LTS.toString()) },
-                    new NV[] { new NV(TestOptions.DATABASE_MODEL,
-                            DatabaseModel.LDS.toString()) },
+//                    new NV[] { new NV(TestOptions.DATABASE_MODEL,
+//                            DatabaseModel.LDS.toString()) },
                     new NV[] { new NV(TestOptions.DATABASE_MODEL,
                             DatabaseModel.EDS.toString()) }
             /*

@@ -40,7 +40,9 @@ import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.ByteArrayBuffer;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.StatementEnum;
 
 /**
@@ -59,7 +61,7 @@ import com.bigdata.rdf.model.StatementEnum;
  * <p>
  * Note: While the static methods used to decode an existing key are safe for
  * concurrent readers, concurrent readers also form keys using
- * {@link #statement2Key(long, long, long)} and therefore require a thread-local
+ * {@link #statement2Key(IV, IV, IV)} and therefore require a thread-local
  * {@link IKeyBuilder}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -117,8 +119,7 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
     public SPOTupleSerializer(final SPOKeyOrder keyOrder,
             final IRabaCoder leafKeySer, final IRabaCoder leafValSer) {
 
-        super(new ASCIIKeyBuilderFactory(keyOrder.getKeyArity()
-                * Bytes.SIZEOF_LONG), leafKeySer, leafValSer);
+        super(new ASCIIKeyBuilderFactory(), leafKeySer, leafValSer);
         
 //        if (keyOrder == null)
 //            throw new IllegalArgumentException();
@@ -153,6 +154,8 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         final StatementEnum type = StatementEnum.decode(vbuf.array()[0]);
 
         spo.setStatementType(type);
+        
+        spo.setUserFlag(StatementEnum.isUserFlag(vbuf.array()[0]));
 
         if (vbuf.limit() == 1 + 8) {
 
@@ -164,7 +167,7 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
             // SIDs only valid for triples.
             assert keyOrder.getKeyArity() == 3;
 
-            spo.setStatementIdentifier(vbuf.getLong(1));
+            spo.setStatementIdentifier(new TermId(VTE.STATEMENT, vbuf.getLong(1)));
 
         }
 
@@ -242,33 +245,6 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
 //    }
     
     /**
-     * Encodes a statement represented as three long integers as an unsigned
-     * byte[] sort key.
-     * <p>
-     * Note: while the conversion of long integers into the byte[] is
-     * non-trivial the value identifiers are mapped onto 8 bytes at a time and
-     * the contents of the array could be rearranged into alternative orders
-     * directly. For example, if you provide (s,p,o) then you could form the
-     * (p,o,s) key by copying 8 byte sections of the returned sort key around to
-     * generate the desired permutation.
-     * 
-     * @param id1
-     *            An RDF value identifier from the term index.
-     * @param id2
-     *            An RDF value identifier from the term index.
-     * @param id3
-     *            An RDF value identifier from the term index.
-     * 
-     * @return The sort key for the statement with those values.
-     */
-    public byte[] statement2Key(final long id1, final long id2, final long id3) {
-
-        return getKeyBuilder().reset().append(id1).append(id2).append(id3)
-                .getKey();
-
-    }
-
-    /**
      * Encodes the {@link StatementEnum} and the optional statement identifier.
      */
     public byte[] serializeVal(final SPO spo) {
@@ -281,9 +257,9 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         final StatementEnum type = spo.getStatementType();
 
         // optionally set the override bit on the value.
-        final byte b = (byte) (spo.isOverride() ? (type.code() | StatementEnum.MASK_OVERRIDE)
+        byte b = (byte) (spo.isOverride() ? (type.code() | StatementEnum.MASK_OVERRIDE)
                 : type.code());
-
+        b=(byte)(spo.getUserFlag()?b|StatementEnum.MASK_USER_FLAG:b);
         buf.putByte(b);
 
         if (keyOrder.getKeyArity() == 3) {
@@ -295,7 +271,7 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
                 assert type == StatementEnum.Explicit : "Statement identifier not allowed: type="
                         + type;
 
-                buf.putLong(spo.getStatementIdentifier());
+                buf.putLong(spo.getStatementIdentifier().getTermId());
 
             }
 
@@ -305,20 +281,41 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         
     }
 
+    /**
+     * The initial version.
+     */
+    private final static transient byte VERSION0 = 0;
+
+    /**
+     * The current version.
+     */
+    private final static transient byte VERSION = VERSION0;
+
     public void readExternal(ObjectInput in) throws IOException,
             ClassNotFoundException {
 
         super.readExternal(in);
         
+        final byte version = in.readByte();
+        
+        switch (version) {
+        case VERSION0:
+            break;
+        default:
+            throw new UnsupportedOperationException("Unknown version: "
+                    + version);
+        }
+
         keyOrder = SPOKeyOrder.valueOf(in.readByte());
 
     }
 
-    // FIXME VERSION: Not explicitly versioned.
     public void writeExternal(ObjectOutput out) throws IOException {
 
         super.writeExternal(out);
-        
+
+        out.writeByte(VERSION);
+
         out.writeByte(keyOrder.index());
 
     }

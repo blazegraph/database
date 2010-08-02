@@ -27,19 +27,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.keys;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
-
+import java.util.UUID;
 import junit.framework.TestCase2;
-
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 
 /**
  * Test suite for high level operations that build variable length _unsigned_
@@ -52,6 +54,11 @@ import com.bigdata.btree.BytesUtil;
  * @version $Id$
  */
 public class TestKeyBuilder extends TestCase2 {
+
+    /**
+     * Used to unbox an application key (convert it to an unsigned byte[]).
+     */
+    static private final IKeyBuilder _keyBuilder = KeyBuilder.newUnicodeInstance();
 
     /**
      * 
@@ -407,19 +414,19 @@ public class TestKeyBuilder extends TestCase2 {
         assertTrue("k0<kp1", BytesUtil.compareBytes(k0, kp1) < 0);
         assertTrue("kp1<kmax", BytesUtil.compareBytes(kp1, kmax) < 0);
 
-        assertEquals((short) 0, KeyBuilder.decodeShort(KeyBuilder
+        assertEquals((short) 0, KeyBuilder.decodeShort(TestKeyBuilder
                 .asSortKey(Short.valueOf((short) 0)), 0/* off */));
 
-        assertEquals((short) -1, KeyBuilder.decodeShort(KeyBuilder
+        assertEquals((short) -1, KeyBuilder.decodeShort(TestKeyBuilder
                 .asSortKey(Short.valueOf((short) -1)), 0/* off */));
 
-        assertEquals((short) 1, KeyBuilder.decodeShort(KeyBuilder
+        assertEquals((short) 1, KeyBuilder.decodeShort(TestKeyBuilder
                 .asSortKey(Short.valueOf((short) 1)), 0/* off */));
 
-        assertEquals(Short.MIN_VALUE, KeyBuilder.decodeShort(KeyBuilder
+        assertEquals(Short.MIN_VALUE, KeyBuilder.decodeShort(TestKeyBuilder
                 .asSortKey(Short.valueOf(Short.MIN_VALUE)), 0/* off */));
 
-        assertEquals(Short.MAX_VALUE, KeyBuilder.decodeShort(KeyBuilder
+        assertEquals(Short.MAX_VALUE, KeyBuilder.decodeShort(TestKeyBuilder
                 .asSortKey(Short.valueOf(Short.MAX_VALUE)), 0/* off */));
 
     }
@@ -629,6 +636,60 @@ public class TestKeyBuilder extends TestCase2 {
     }
 
     /**
+     * Test verifies encode/decode of {@link UUID}s and also verifies that the
+     * natural order of the encoded {@link UUID}s respects the order imposed
+     * by {@link UUID#compareTo(UUID)}.
+     */
+    public void test_keyBuilder_UUID() {
+
+        final IKeyBuilder keyBuilder = new KeyBuilder();
+        
+        final int limit = 1000;
+        
+        final UUID[] a = new UUID[limit];
+
+        final byte[][] b = new byte[limit][];
+
+        for (int i = 0; i < limit; i++) {
+
+            final UUID expected = UUID.randomUUID();
+
+            final byte[] key = keyBuilder.reset().append(expected).getKey();
+
+            final UUID actual = KeyBuilder.decodeUUID(key, 0/* offset */);
+
+            a[i] = expected;
+            
+            b[i] = key;
+
+            // verify decode.
+            assertEquals(expected, actual);
+
+        }
+        
+        // Put the UUIDs into their natural order.
+        Arrays.sort(a);
+
+        // Put the keys into their natural order.
+        Arrays.sort(b, UnsignedByteArrayComparator.INSTANCE);
+
+        // Verify that the natural orders are the same.
+        for (int i = 0; i < limit; i++) {
+
+            final UUID expected = a[i];
+
+            final byte[] key = b[i];
+
+            final UUID actual = KeyBuilder.decodeUUID(key, 0/* offset */);
+
+            // verify decode.
+            assertEquals(expected, actual);
+
+        }
+        
+    }
+    
+    /**
      * Test ordering imposed by encoding a single ASCII key.
      * 
      * @todo test ability to decode an ASCII field in a non-terminal position of
@@ -667,65 +728,7 @@ public class TestKeyBuilder extends TestCase2 {
     }
 
     /**
-     * Test of the ability to normalize trailing pad characters.
-     */
-    public void test_keyBuilder_normalizeTrailingPadCharacters() {
-        
-        KeyBuilder keyBuilder = (KeyBuilder)KeyBuilder.newInstance();
-        
-        assertEquals(//
-                keyBuilder.normalizeText(""),//
-                keyBuilder.normalizeText(" ")//
-                );
-        assertEquals(//
-                keyBuilder.normalizeText(""),//
-                keyBuilder.normalizeText("  ")//
-                );
-        assertEquals(//
-                keyBuilder.normalizeText(""),//
-                keyBuilder.normalizeText("      ")//
-                );
-        assertEquals(//
-                keyBuilder.normalizeText(" "),//
-                keyBuilder.normalizeText("      ")//
-                );
-        assertEquals(//
-                keyBuilder.normalizeText("abc"),//
-                keyBuilder.normalizeText("abc      ")//
-                );
-        assertEquals(//
-                keyBuilder.normalizeText("   abc"),//
-                keyBuilder.normalizeText("   abc      ")//
-                );
-        assertNotSame(//
-                keyBuilder.normalizeText("abc"),//
-                keyBuilder.normalizeText("   abc      ")//
-                );
-        
-    }
-    
-    /**
-     * Test verifies that very long strings are truncated.
-     * 
-     * @todo verify that trailing whitespace is removed after truncation rather
-     *       than before truncation.
-     */
-    public void test_keyBuilder_normalizeTruncatesVeryLongStrings() {
-
-        KeyBuilder keyBuilder = (KeyBuilder)KeyBuilder.newInstance();
-
-        final String text = getMaximumLengthText();
-
-        assertEquals(//
-                keyBuilder.normalizeText(text),//
-                keyBuilder.normalizeText(text+"abc")//
-                );
-        
-    }
-    
-    
-    /**
-     * Test verifies the order among unicode sort keys, including verifying that
+     * Test verifies the order for ASCII sort keys, including verifying that
      * the pad byte causes a prefix such as "bro" to sort before a term which
      * extends that prefix, such as "brown".
      */
@@ -735,42 +738,10 @@ public class TestKeyBuilder extends TestCase2 {
         
         KVO<String>[] a = new KVO[] {
           
-                new KVO<String>(keyBuilder.asSortKey("bro"),null,"bro"),
-                new KVO<String>(keyBuilder.asSortKey("brown"),null,"brown"),
-                new KVO<String>(keyBuilder.asSortKey("bre"),null,"bre"),
-                new KVO<String>(keyBuilder.asSortKey("break"),null,"break"),
-                
-        };
-        
-        // sort by the assigned sort keys.
-        Arrays.sort(a);
-        
-        /*
-         * verify that "bre(ak)" is before "bro(wn)" and that "bre" is before
-         * "break" and "bro" is before "brown".
-         */
-        assertEquals("bre", a[0].obj);
-        assertEquals("break", a[1].obj);
-        assertEquals("bro", a[2].obj);
-        assertEquals("brown", a[3].obj);
-        
-    }
-    
-    /**
-     * Test verifies the order among unicode sort keys, including verifying that
-     * the pad byte causes a prefix such as "bro" to sort before a term which
-     * extends that prefix, such as "brown".
-     */
-    public void test_keyBuilder_unicode_order() {        
-
-        KeyBuilder keyBuilder = (KeyBuilder) KeyBuilder.newUnicodeInstance();
-        
-        KVO<String>[] a = new KVO[] {
-          
-                new KVO<String>(keyBuilder.asSortKey("bro"),null,"bro"),
-                new KVO<String>(keyBuilder.asSortKey("brown"),null,"brown"),
-                new KVO<String>(keyBuilder.asSortKey("bre"),null,"bre"),
-                new KVO<String>(keyBuilder.asSortKey("break"),null,"break"),
+                new KVO<String>(TestKeyBuilder.asSortKey("bro"),null,"bro"),
+                new KVO<String>(TestKeyBuilder.asSortKey("brown"),null,"brown"),
+                new KVO<String>(TestKeyBuilder.asSortKey("bre"),null,"bre"),
+                new KVO<String>(TestKeyBuilder.asSortKey("break"),null,"break"),
                 
         };
         
@@ -804,50 +775,144 @@ public class TestKeyBuilder extends TestCase2 {
      */
     public void test_keyBuilder_multiField_ascii_long() {
 
-        doMultiFieldTests(false/*unicode*/);
+        final KeyBuilder keyBuilder = (KeyBuilder) KeyBuilder.newInstance();
+
+        doMultiFieldTests(false/*unicode*/,keyBuilder);
         
     }
     
-    /**
-     * <p>
-     * Test that lexiographic order is maintain when a variable length Unicode
-     * field is followed by another field. This test works by comparing the
-     * original multi-field key with the multi-field key formed from the
-     * successor of the Unicode field followed by the other field:
-     * </p>
-     * 
-     * <pre>
-     *   
-     *   [text][nextValue] LT [successor(text)][nextValue]
-     *   
-     * </pre>
-     */
-    public void test_keyBuilder_multiField_unicode() {
-        
-        doMultiFieldTests(true/*unicode*/);
-
-        /*
-         * Now test some strings that contain code points outside of the 8-bit
-         * range.
-         */
-        
-        final KeyBuilder keyBuilder = (KeyBuilder) KeyBuilder
-                .newUnicodeInstance();
-
-        final boolean unicode = true;
-        {
-            
-            // Note: This is "Japanese" in kanji.
-            String text = "\u65E5\u672C\u8A9E / \u306B\u307B\u3093\u3054";
-            
-            doMultiFieldTest(keyBuilder, unicode, text, (byte) 0);
-            doMultiFieldTest(keyBuilder, unicode, text, (byte) 1);
-            doMultiFieldTest(keyBuilder, unicode, text, (byte) -1);
-            doMultiFieldTest(keyBuilder, unicode, text, Byte.MIN_VALUE);
-            doMultiFieldTest(keyBuilder, unicode, text, Byte.MAX_VALUE);
-        }
-
-    }
+/*
+ * Moved to TestKeyBuilderCollation.  bbt 7/15/2010.
+ */
+//    /**
+//     * Test of the ability to normalize trailing pad characters.
+//     */
+//    public void test_keyBuilder_normalizeTrailingPadCharacters() {
+//        
+//        KeyBuilder keyBuilder = (KeyBuilder)KeyBuilder.newInstance();
+//        
+//        assertEquals(//
+//                keyBuilder.normalizeText(""),//
+//                keyBuilder.normalizeText(" ")//
+//                );
+//        assertEquals(//
+//                keyBuilder.normalizeText(""),//
+//                keyBuilder.normalizeText("  ")//
+//                );
+//        assertEquals(//
+//                keyBuilder.normalizeText(""),//
+//                keyBuilder.normalizeText("      ")//
+//                );
+//        assertEquals(//
+//                keyBuilder.normalizeText(" "),//
+//                keyBuilder.normalizeText("      ")//
+//                );
+//        assertEquals(//
+//                keyBuilder.normalizeText("abc"),//
+//                keyBuilder.normalizeText("abc      ")//
+//                );
+//        assertEquals(//
+//                keyBuilder.normalizeText("   abc"),//
+//                keyBuilder.normalizeText("   abc      ")//
+//                );
+//        assertNotSame(//
+//                keyBuilder.normalizeText("abc"),//
+//                keyBuilder.normalizeText("   abc      ")//
+//                );
+//        
+//    }
+//    
+//    /**
+//     * Test verifies that very long strings are truncated.
+//     * 
+//     * @todo verify that trailing whitespace is removed after truncation rather
+//     *       than before truncation.
+//     */
+//    public void test_keyBuilder_normalizeTruncatesVeryLongStrings() {
+//
+//        KeyBuilder keyBuilder = (KeyBuilder)KeyBuilder.newInstance();
+//
+//        final String text = getMaximumLengthText();
+//
+//        assertEquals(//
+//                keyBuilder.normalizeText(text),//
+//                keyBuilder.normalizeText(text+"abc")//
+//                );
+//        
+//    }
+//    
+//    /**
+//     * Test verifies the order among unicode sort keys, including verifying that
+//     * the pad byte causes a prefix such as "bro" to sort before a term which
+//     * extends that prefix, such as "brown".
+//     */
+//    public void test_keyBuilder_unicode_order() {        
+//
+//        KeyBuilder keyBuilder = (KeyBuilder) KeyBuilder.newUnicodeInstance();
+//        
+//        KVO<String>[] a = new KVO[] {
+//          
+//                new KVO<String>(keyBuilder.asSortKey("bro"),null,"bro"),
+//                new KVO<String>(keyBuilder.asSortKey("brown"),null,"brown"),
+//                new KVO<String>(keyBuilder.asSortKey("bre"),null,"bre"),
+//                new KVO<String>(keyBuilder.asSortKey("break"),null,"break"),
+//                
+//        };
+//        
+//        // sort by the assigned sort keys.
+//        Arrays.sort(a);
+//        
+//        /*
+//         * verify that "bre(ak)" is before "bro(wn)" and that "bre" is before
+//         * "break" and "bro" is before "brown".
+//         */
+//        assertEquals("bre", a[0].obj);
+//        assertEquals("break", a[1].obj);
+//        assertEquals("bro", a[2].obj);
+//        assertEquals("brown", a[3].obj);
+//        
+//    }
+//
+//    /**
+//     * <p>
+//     * Test that lexiographic order is maintain when a variable length Unicode
+//     * field is followed by another field. This test works by comparing the
+//     * original multi-field key with the multi-field key formed from the
+//     * successor of the Unicode field followed by the other field:
+//     * </p>
+//     * 
+//     * <pre>
+//     *   
+//     *   [text][nextValue] LT [successor(text)][nextValue]
+//     *   
+//     * </pre>
+//     */
+//    public void test_keyBuilder_multiField_unicode() {
+//        
+//        doMultiFieldTests(true/*unicode*/);
+//
+//        /*
+//         * Now test some strings that contain code points outside of the 8-bit
+//         * range.
+//         */
+//        
+//        final KeyBuilder keyBuilder = (KeyBuilder) KeyBuilder
+//                .newUnicodeInstance();
+//
+//        final boolean unicode = true;
+//        {
+//            
+//            // Note: This is "Japanese" in kanji.
+//            String text = "\u65E5\u672C\u8A9E / \u306B\u307B\u3093\u3054";
+//            
+//            doMultiFieldTest(keyBuilder, unicode, text, (byte) 0);
+//            doMultiFieldTest(keyBuilder, unicode, text, (byte) 1);
+//            doMultiFieldTest(keyBuilder, unicode, text, (byte) -1);
+//            doMultiFieldTest(keyBuilder, unicode, text, Byte.MIN_VALUE);
+//            doMultiFieldTest(keyBuilder, unicode, text, Byte.MAX_VALUE);
+//        }
+//
+//    }
     
     /**
      * Test helper.
@@ -856,10 +921,14 @@ public class TestKeyBuilder extends TestCase2 {
      *            When <code>true</code> tests Unicode semantics. Otherwise
      *            tests ASCII semantics.
      */
-    private void doMultiFieldTests(boolean unicode) {
-        
-        final KeyBuilder keyBuilder = (KeyBuilder) (unicode ? KeyBuilder
-                .newUnicodeInstance() : KeyBuilder.newInstance());
+    static void doMultiFieldTests(final boolean unicode,
+            final KeyBuilder keyBuilder) {
+
+        if (unicode) {
+          assertTrue(keyBuilder.isUnicodeSupported());
+      }
+//        final KeyBuilder keyBuilder = (KeyBuilder) (unicode ? KeyBuilder
+//                .newUnicodeInstance() : KeyBuilder.newInstance());
 
         /*
          * example: zero length string will be padded.
@@ -949,7 +1018,7 @@ public class TestKeyBuilder extends TestCase2 {
      * Return a string consisting of a repeating sequence of the digits zero
      * through nine whose length is {@link IKeyBuilder#maxlen}.
      */
-    private String getMaximumLengthText() {
+    static String getMaximumLengthText() {
 
         final int len = IKeyBuilder.maxlen;
 
@@ -987,9 +1056,9 @@ public class TestKeyBuilder extends TestCase2 {
      * @param nextValue
      *            The value to be encoded into the next field of the key.
      */
-    private void doMultiFieldTest(KeyBuilder keyBuilder, final boolean unicode,
+    static void doMultiFieldTest(KeyBuilder keyBuilder, final boolean unicode,
             final String text, final Object nextValue) {
- 
+
         // form a key from [text][nextValue].
         keyBuilder.reset();
         final byte[] k1 = keyBuilder
@@ -1379,53 +1448,53 @@ public class TestKeyBuilder extends TestCase2 {
         }
 
         assertTrue(BytesUtil.compareBytes(//
-                KeyBuilder.asSortKey(Byte.valueOf((byte)-1)),
-                KeyBuilder.asSortKey(Byte.valueOf((byte)0))
+                TestKeyBuilder.asSortKey(Byte.valueOf((byte)-1)),
+                TestKeyBuilder.asSortKey(Byte.valueOf((byte)0))
                 )<0);
         
         assertTrue(BytesUtil.compareBytes(//
-                KeyBuilder.asSortKey(Byte.valueOf((byte)0)),
-                KeyBuilder.asSortKey(Byte.valueOf((byte)1))
+                TestKeyBuilder.asSortKey(Byte.valueOf((byte)0)),
+                TestKeyBuilder.asSortKey(Byte.valueOf((byte)1))
                 )<0);
 
         assertTrue(BytesUtil.compareBytes(//
-                KeyBuilder.asSortKey(Byte.MAX_VALUE-1),
-                KeyBuilder.asSortKey(Byte.MAX_VALUE)
+                TestKeyBuilder.asSortKey(Byte.MAX_VALUE-1),
+                TestKeyBuilder.asSortKey(Byte.MAX_VALUE)
                 )<0);
 
         assertTrue(BytesUtil.compareBytes(//
-                KeyBuilder.asSortKey(Byte.MIN_VALUE),
-                KeyBuilder.asSortKey(Byte.MIN_VALUE+1)
+                TestKeyBuilder.asSortKey(Byte.MIN_VALUE),
+                TestKeyBuilder.asSortKey(Byte.MIN_VALUE+1)
                 )<0);
      
         assertTrue(BytesUtil.compareBytes(//
-                KeyBuilder.asSortKey(Byte.MIN_VALUE),
-                KeyBuilder.asSortKey(Byte.valueOf((byte)-1))
+                TestKeyBuilder.asSortKey(Byte.MIN_VALUE),
+                TestKeyBuilder.asSortKey(Byte.valueOf((byte)-1))
                 )<0);
         
         assertTrue(BytesUtil.compareBytes(//
-                KeyBuilder.asSortKey(Byte.MIN_VALUE),
-                KeyBuilder.asSortKey(Byte.valueOf((byte)0))
+                TestKeyBuilder.asSortKey(Byte.MIN_VALUE),
+                TestKeyBuilder.asSortKey(Byte.valueOf((byte)0))
                 )<0);
         
         assertTrue(BytesUtil.compareBytes(//
-                KeyBuilder.asSortKey(Byte.MIN_VALUE),
-                KeyBuilder.asSortKey(Byte.valueOf((byte)1))
+                TestKeyBuilder.asSortKey(Byte.MIN_VALUE),
+                TestKeyBuilder.asSortKey(Byte.valueOf((byte)1))
                 )<0);
 
         assertTrue(BytesUtil.compareBytes(//
-                KeyBuilder.asSortKey(Byte.valueOf((byte)-1)),
-                KeyBuilder.asSortKey(Byte.MAX_VALUE)
+                TestKeyBuilder.asSortKey(Byte.valueOf((byte)-1)),
+                TestKeyBuilder.asSortKey(Byte.MAX_VALUE)
                 )<0);
         
         assertTrue(BytesUtil.compareBytes(//
-                KeyBuilder.asSortKey(Byte.valueOf((byte)0)),
-                KeyBuilder.asSortKey(Byte.MAX_VALUE)
+                TestKeyBuilder.asSortKey(Byte.valueOf((byte)0)),
+                TestKeyBuilder.asSortKey(Byte.MAX_VALUE)
                 )<0);
         
         assertTrue(BytesUtil.compareBytes(//
-                KeyBuilder.asSortKey(Byte.valueOf((byte)1)),
-                KeyBuilder.asSortKey(Byte.MAX_VALUE)
+                TestKeyBuilder.asSortKey(Byte.valueOf((byte)1)),
+                TestKeyBuilder.asSortKey(Byte.MAX_VALUE)
                 )<0);
         
 
@@ -1471,6 +1540,17 @@ public class TestKeyBuilder extends TestCase2 {
         
     }
 
+    private BigDecimal decodeBigDecimal(final byte[] key) {
+
+        return KeyBuilder.decodeBigDecimal(0/*offset*/, key);
+    }
+    
+    /**
+     * FIXME The 2 byte run length limits the maximum key length for a
+     * BigInteger to ~32k. Write unit tests which verify that we detect and
+     * throw an IllegalArgumentException rather than just truncating the run
+     * length!
+     */
     private byte[] encodeBigInteger(final BigInteger i) {
 
         return new KeyBuilder().append(i).getKey();
@@ -1489,7 +1569,13 @@ public class TestKeyBuilder extends TestCase2 {
 //        return key;
         
     }
+    
+    private byte[] encodeBigDecimal(final BigDecimal d) {
 
+        return new KeyBuilder().append(d).getKey();
+        
+    }
+    
     protected void doEncodeDecodeTest(final BigInteger expected) {
 
         byte[] encoded = null;
@@ -1537,6 +1623,53 @@ public class TestKeyBuilder extends TestCase2 {
 
     }
 
+    protected void doEncodeDecodeTest(final BigDecimal expected) {
+
+        byte[] encoded = null;
+        BigDecimal actual = null;
+        Throwable cause = null;
+        try {
+
+            encoded = encodeBigDecimal(expected);
+
+            actual = decodeBigDecimal(encoded);
+
+        } catch (Throwable t) {
+
+            cause = t;
+
+        }
+
+        if (cause != null || !(expected.compareTo(actual) == 0)) {
+
+            final String msg = "BigDecimal" + //
+                    "\nexpected=" + expected + //
+//                    "\nsigned  =" + Arrays.toString(expected.toByteArray())+//
+//                    "\nunsigned=" + BytesUtil.toString(expected.toByteArray())+//
+                    "\nencoded =" + BytesUtil.toString(encoded) + //
+                    "\nactual  =" + actual//
+//                    +(actual != null ? "\nactualS ="
+//                            + Arrays.toString(actual.toByteArray())
+//                            + //
+//                            "\nactualU ="
+//                            + BytesUtil.toString(actual.toByteArray()) //
+//                    : "")
+                    ;
+
+            if (cause == null) {
+
+                fail(msg);
+                
+            } else {
+                
+                fail(msg, cause);
+                
+            }
+            
+        }
+
+    }
+
     protected void doLTTest(final BigInteger i1, final BigInteger i2) {
         
         final byte[] k1 = encodeBigInteger(i1);
@@ -1563,10 +1696,70 @@ public class TestKeyBuilder extends TestCase2 {
 
     }
 
+    protected void doEQTest(final BigDecimal i1, final BigDecimal i2) {
+        
+        final byte[] k1 = encodeBigDecimal(i1);
+
+        final byte[] k2 = encodeBigDecimal(i2);
+
+        final int ret = BytesUtil.compareBytes(k1, k2);
+
+        if (ret != 0) {
+
+            fail("BigDecimal" + //
+                    "\ni1=" + i1 + //
+                    "\ni2=" + i2 + //
+//                    "\ns1=" + Arrays.toString(i1.toByteArray())+//
+//                    "\ns2=" + Arrays.toString(i2.toByteArray())+//
+//                    "\nu1=" + BytesUtil.toString(i1.toByteArray())+//
+//                    "\nu2=" + BytesUtil.toString(i2.toByteArray())+//
+                    "\nk1=" + BytesUtil.toString(k1) + //
+                    "\nk2=" + BytesUtil.toString(k2) + //
+                    "\nret=" + (ret == 0 ? "EQ" : (ret < 0 ? "LT" : "GT"))//
+            );
+
+        }
+
+    }
+
+    protected void doLTTest(final BigDecimal i1, final BigDecimal i2) {
+        
+        final byte[] k1 = encodeBigDecimal(i1);
+
+        final byte[] k2 = encodeBigDecimal(i2);
+
+        final int ret = BytesUtil.compareBytes(k1, k2);
+
+        if (ret >= 0) {
+
+            fail("BigDecimal" + //
+                    "\ni1=" + i1 + //
+                    "\ni2=" + i2 + //
+//                    "\ns1=" + Arrays.toString(i1.toByteArray())+//
+//                    "\ns2=" + Arrays.toString(i2.toByteArray())+//
+//                    "\nu1=" + BytesUtil.toString(i1.toByteArray())+//
+//                    "\nu2=" + BytesUtil.toString(i2.toByteArray())+//
+                    "\nk1=" + BytesUtil.toString(k1) + //
+                    "\nk2=" + BytesUtil.toString(k2) + //
+                    "\nret=" + (ret == 0 ? "EQ" : (ret < 0 ? "LT" : "GT"))//
+            );
+
+        }
+
+    }
+
     public void test_BigInteger_383() {
 
         final BigInteger v1 = BigInteger.valueOf(383);
         final BigInteger v2 = BigInteger.valueOf(383+1);
+        doLTTest(v1,v2);
+
+    }
+    
+    public void test_BigDecimal_383() {
+
+        final BigDecimal v1 = new BigDecimal("383.00000000000001");
+        final BigDecimal v2 = new BigDecimal("383.00000000000002");
         doLTTest(v1,v2);
 
     }
@@ -1579,6 +1772,52 @@ public class TestKeyBuilder extends TestCase2 {
 
     }
     
+    public void test_BigDecimal_m1() {
+        
+        final BigDecimal v = BigDecimal.valueOf(-1.00000000001);
+        
+        doEncodeDecodeTest(v);
+
+    }
+    
+    public void test_BigDecimal_zeros() {
+        
+        final BigDecimal z1 = new BigDecimal("0.0");
+        final BigDecimal negz1 = new BigDecimal("-0.0");
+        final BigDecimal z2 = new BigDecimal("0.00");
+        final BigDecimal p1 = new BigDecimal("0.01");
+        final BigDecimal negp1 = new BigDecimal("-0.01");
+        final BigDecimal z3 = new BigDecimal("0000.00");
+        final BigDecimal m1 = new BigDecimal("1.5");
+        final BigDecimal m2 = new BigDecimal("-1.51");
+        final BigDecimal m5 = new BigDecimal("5");
+        final BigDecimal m53 = new BigDecimal("5.000");
+        final BigDecimal m500 = new BigDecimal("00500");
+        final BigDecimal m5003 = new BigDecimal("500.000");
+        
+        doEncodeDecodeTest(m5);
+        doEncodeDecodeTest(negz1);
+        doEncodeDecodeTest(z1);
+        doEncodeDecodeTest(z2);
+        doEncodeDecodeTest(z3);
+        doEncodeDecodeTest(m1);
+        doEncodeDecodeTest(m2);
+
+        doLTTest(z1, p1);
+        doLTTest(negp1, z1);
+        doLTTest(negp1, p1);
+        doEQTest(z1, negz1);
+
+        doEQTest(m5, m53);
+        doEQTest(m500, m5003);
+        doEQTest(z3, z2);
+        doEQTest(z1, z2);
+        doEQTest(z1, z3);
+        doLTTest(z1, m1);
+        doLTTest(m2, z2);
+        doLTTest(z3, m1);
+
+    }
     /**
      * Unit tests for encoding {@link BigInteger} keys.
      */
@@ -1637,6 +1876,69 @@ public class TestKeyBuilder extends TestCase2 {
             doEncodeDecodeTest(BigInteger.valueOf(i));
 
             doLTTest(BigInteger.valueOf(i), BigInteger.valueOf(i + 1));
+
+        }       
+
+    }
+
+    /**
+     * Unit tests for encoding {@link BigDecimal} keys.
+     */
+    public void test_bigDecimalKey() {
+
+        doEncodeDecodeTest(BigDecimal.valueOf(0));
+        
+        doEncodeDecodeTest(BigDecimal.valueOf(-123450));
+        doEncodeDecodeTest(BigDecimal.valueOf(-99));
+        doEncodeDecodeTest(BigDecimal.valueOf(-9));
+        
+        doEncodeDecodeTest(BigDecimal.valueOf(1.001));
+        doEncodeDecodeTest(BigDecimal.valueOf(8.0001));
+        doEncodeDecodeTest(BigDecimal.valueOf(255.0001));
+        doEncodeDecodeTest(BigDecimal.valueOf(256.0001));
+        doEncodeDecodeTest(BigDecimal.valueOf(512.0001));
+        doEncodeDecodeTest(BigDecimal.valueOf(1028.001));
+
+        doEncodeDecodeTest(BigDecimal.valueOf(-1.0001));
+        doEncodeDecodeTest(BigDecimal.valueOf(-8.0001));
+        doEncodeDecodeTest(BigDecimal.valueOf(-255.0001));
+        doEncodeDecodeTest(BigDecimal.valueOf(-256.0001));
+        doEncodeDecodeTest(BigDecimal.valueOf(-512.0001));
+        doEncodeDecodeTest(BigDecimal.valueOf(-1028.001));
+
+        doEncodeDecodeTest(BigDecimal.valueOf(Double.MIN_VALUE));
+        doEncodeDecodeTest(BigDecimal.valueOf(Double.MAX_VALUE));
+        doEncodeDecodeTest(BigDecimal.valueOf(Double.MIN_VALUE - 1));
+        doEncodeDecodeTest(BigDecimal.valueOf(Double.MAX_VALUE + 1));
+
+        doLTTest(BigDecimal.valueOf(1.01), BigDecimal.valueOf(2.01));
+
+        doLTTest(BigDecimal.valueOf(0.01), BigDecimal.valueOf(1.01));
+
+        doLTTest(BigDecimal.valueOf(-1.01), BigDecimal.valueOf(0.01));
+
+        doLTTest(BigDecimal.valueOf(-2.01), BigDecimal.valueOf(-1.01));
+
+        doLTTest(BigDecimal.valueOf(10.01), BigDecimal.valueOf(11.01));
+
+        doLTTest(BigDecimal.valueOf(258.01), BigDecimal.valueOf(259.01));
+
+        doLTTest(BigDecimal.valueOf(3.01), BigDecimal.valueOf(259.01));
+
+        doLTTest(BigDecimal.valueOf(383.01), BigDecimal.valueOf(383.02));
+
+        for (int i = 0; i <= 516; i++) {
+
+            doEncodeDecodeTest(BigDecimal.valueOf(i));
+
+            doLTTest(BigDecimal.valueOf(i), BigDecimal.valueOf(i + 1));
+
+        }
+        for (int i = 0; i >= -516; i--) {
+
+            doEncodeDecodeTest(BigDecimal.valueOf(i));
+
+            doLTTest(BigDecimal.valueOf(i), BigDecimal.valueOf(i + 1));
 
         }       
 
@@ -1703,6 +2005,111 @@ public class TestKeyBuilder extends TestCase2 {
 
     }
     
+    /**
+     * Stress test with random <code>double</code> values.
+     */
+    public void test_BigDecimal_stress_double_values() {
+        
+        final Random r = new Random();
+        
+        for (int i = 0; i < 100000; i++) {
+            
+            final BigDecimal t1 = BigDecimal.valueOf(r.nextDouble());
+            
+            final BigDecimal v2 = BigDecimal.valueOf(Math.abs(r.nextDouble()));
+            
+            final BigDecimal v4 = BigDecimal.valueOf(r.nextDouble());
+            
+            // x LT t1
+            final BigDecimal t2 = t1.subtract(v2);
+            final BigDecimal t4 = t1.subtract(BigDecimal.valueOf(5));
+            final BigDecimal t5 = t1.subtract(BigDecimal.valueOf(9));
+
+            // t1 LT x
+            final BigDecimal t3 = t1.add(v2);
+            final BigDecimal t6 = t1.add(BigDecimal.valueOf(5));
+            final BigDecimal t7 = t1.add(BigDecimal.valueOf(9));
+            
+            doEncodeDecodeTest(t1);
+            doEncodeDecodeTest(t2);
+            doEncodeDecodeTest(t3);
+            doEncodeDecodeTest(t4);
+            doEncodeDecodeTest(t5);
+            doEncodeDecodeTest(t6);
+            doEncodeDecodeTest(t7);
+
+            doLTTest(t2, t1);
+            doLTTest(t4, t1);
+            doLTTest(t5, t1);
+
+            doLTTest(t1, t3);
+            doLTTest(t1, t6);
+            doLTTest(t1, t7);
+
+            final int ret = t1.compareTo(v4);
+            
+            if (ret < 0) {
+
+                doLTTest(t1, v4);
+                
+            } else if (ret > 0) {
+                
+                doLTTest(v4, t1);
+                
+            } else {
+
+                // equal
+                
+            }
+            
+        }
+
+    }
+
+    /**
+     * Test with positive and negative {@link BigInteger}s having a common
+     * prefix with varying digits after the prefix.
+     */
+    public void test_BigInteger_sortOrder() {
+        
+        final BigInteger p1 = new BigInteger("15");
+        final BigInteger p2 = new BigInteger("151");
+        final BigInteger m1 = new BigInteger("-15");
+        final BigInteger m2 = new BigInteger("-151");
+        
+        doEncodeDecodeTest(p1);
+        doEncodeDecodeTest(p2);
+        doEncodeDecodeTest(m1);
+        doEncodeDecodeTest(m2);
+
+        doLTTest(p1, p2); // 15 LT 151
+        doLTTest(m1, p1); // -15 LT 15
+        doLTTest(m2, m1); // -151 LT -15
+
+    }
+
+    /**
+     * Test with positive and negative {@link BigDecimal}s having varying
+     * digits after the decimals. 
+     */
+    public void test_BigDecimal_negativeSortOrder() {
+        
+        final BigDecimal p1 = new BigDecimal("1.5");
+        final BigDecimal p2 = new BigDecimal("1.51");
+        final BigDecimal m1 = new BigDecimal("-1.5");
+        final BigDecimal m2 = new BigDecimal("-1.51");
+        
+        doEncodeDecodeTest(p1);
+        doEncodeDecodeTest(p2);
+        doEncodeDecodeTest(m1);
+        doEncodeDecodeTest(m2);
+
+        doLTTest(p1, p2); // 1.5 LT 1.51
+        doLTTest(m1, p1); // -1.5 LT 1.5
+        doLTTest(m2, m1); // -1.51 LT -1.5
+
+    }
+
     /**
      * Stress test with random byte[]s from which we then construct
      * {@link BigInteger}s.
@@ -1775,6 +2182,388 @@ public class TestKeyBuilder extends TestCase2 {
                 
             }
             
+        }
+
+    }
+    /**
+     * Stress test with random byte[]s from which we then construct
+     * {@link BigDecimal}s.
+     */
+    public void badTest_BigDecimal_stress_byteArray_values() {
+        
+        final Random r = new Random();
+        
+        final int maxlen = 64;
+        
+        for (int i = 0; i < 100000; i++) {
+
+            final int len1 = r.nextInt(maxlen) + 1;
+
+            final int len2 = r.nextInt(maxlen) + 1;
+
+            final byte[] b1 = new byte[len1];
+
+            final byte[] b2 = new byte[len2];
+
+            r.nextBytes(b1);
+
+            r.nextBytes(b2);
+
+            // final BigDecimal t1 = new BigDecimal(new BigInteger(b1), -100 + r.nextInt(200));
+            final BigDecimal t1 = new BigDecimal(new BigInteger(b1));
+            
+            final BigDecimal v2 = BigDecimal.valueOf(Math.abs(r.nextDouble()));
+            
+            // final BigDecimal v4 = new BigDecimal(new BigInteger(b2), -100 + r.nextInt(200));
+            final BigDecimal v4 = new BigDecimal(new BigInteger(b2));
+            
+            // x LT t1
+            final BigDecimal t2 = t1.subtract(v2);
+            final BigDecimal t4 = t1.subtract(BigDecimal.valueOf(5));
+            final BigDecimal t5 = t1.subtract(BigDecimal.valueOf(9));
+
+            // t1 LT x
+            final BigDecimal t3 = t1.add(v2);
+            final BigDecimal t6 = t1.add(BigDecimal.valueOf(5));
+            final BigDecimal t7 = t1.add(BigDecimal.valueOf(9));
+            
+            doEncodeDecodeTest(t1);
+            doEncodeDecodeTest(t2);
+            doEncodeDecodeTest(t3);
+            doEncodeDecodeTest(t4);
+            doEncodeDecodeTest(t5);
+            doEncodeDecodeTest(t6);
+            doEncodeDecodeTest(t7);
+
+            doLTTest(t2, t1);
+            doLTTest(t4, t1);
+            doLTTest(t5, t1);
+
+            doLTTest(t1, t3);
+            doLTTest(t1, t6);
+            doLTTest(t1, t7);
+
+            final int ret = t1.compareTo(v4);
+            
+            if (ret < 0) {
+
+                doLTTest(t1, v4);
+                
+            } else if (ret > 0) {
+                
+                doLTTest(v4, t1);
+                
+            } else {
+
+                // equal
+                
+            }
+            
+        }
+
+    }
+
+//    /*
+//     * BigDecimal (w/o precision).
+//     */
+//
+//    /*
+//     * Note: signum is in the key twice. Once as the first thing in the key to
+//     * put the values into the correct total order and once in the byte[]
+//     * representation of the unscaled BigInteger value. The first occurrence of
+//     * the signum is thrown away when we decode the key.
+//     */
+//    private BigDecimal decodeBigDecimal(final byte[] key) {
+//
+//        final int offset = 0;
+//        final int signum = KeyBuilder.decodeByte(key[offset]);
+//        final int scale = -KeyBuilder.decodeInt(key, offset + 1);
+//        final int runLength = KeyBuilder.decodeShort(key, offset + 1 + 4);
+//        final byte[] b = new byte[runLength];
+//        System.arraycopy(key/* src */, offset + (1 + 4 + 2)/* srcpos */,
+//                b/* dst */, 0/* destPos */, runLength);
+//        final BigInteger i = new BigInteger(b);// unscaled value.
+//        final BigDecimal d = new BigDecimal(i, scale);
+//        return d;
+//        
+//      }
+//
+//    /*
+//     * Note: This relies on front-coding to compress common leading bytes
+//     * (signum, scale, and runLength).
+//     * 
+//     * @todo limit runLength to 32kbits.
+//     * @todo do we really need signum first or just scale?
+//     */
+//      private byte[] encodeBigDecimal(final BigDecimal i) {
+//
+//          // @todo When elevating into the KeyBuilder, normalize here.  We are
+//          // normalizing in the unit tests in order to be able to compare the
+//          // normalized values for EQ since BigDecimal compares value and
+//          // scale in BigDecimal#equals().
+//          final KeyBuilder keyBuilder = new KeyBuilder();
+//
+//          // Extract the scale of the BigDecimal. This has 32bits of significance.
+//          // We flip the sign since it represents digits after the decimal, so
+//          // negative scale() means smaller values.
+//          final int scale = -i.scale();
+//          // Extract the unscaled BigInteger component.
+//          final byte[] b = i.unscaledValue().toByteArray();
+//          // key := [signum(1)][scale(4)][runLength(2)][b.length]
+//          keyBuilder.ensureFree(1 + 4 + 2 + b.length);
+//          keyBuilder.append((byte)i.signum()); // signum (front-coding will compress)
+//          keyBuilder.append(scale); // int32 scale.
+//          keyBuilder.append((short) b.length); // run-length.
+//          keyBuilder.append(b); // unscaled BigInteger bytes.
+//
+//          final byte[] key = keyBuilder.getKey();
+//
+//          return key;
+//
+//      }
+
+    /**
+     * Normalize the {@link BigDecimal} by setting the scale such that there are
+     * no digits before the decimal point.
+     * 
+     * FIXME This fails for "0" and "0.0". The trailing .0 is considered a
+     * significant digit and is not being stripped. We need to also strip
+     * trailing zeros which are significant.
+     * 
+     * <pre>
+     * i=0   (scale=0,prec=1) : 0,   scale=0, precision=1, unscaled=0, unscaled_byte[]=[0]
+     * i=0.0 (scale=1,prec=1) : 0.0, scale=1, precision=1, unscaled=0, unscaled_byte[]=[0]
+     * </pre>
+     */
+      private BigDecimal normalizeBigDecimal(final BigDecimal i) {
+          
+          return i.stripTrailingZeros();
+          
+      }
+
+      /**
+       * Dumps out interesting bits of the {@link BigDecimal} state.
+       * 
+       * @return The dump.
+       */
+      private String dumpBigDecimal(final BigDecimal i) {
+
+        final BigInteger unscaled = i.unscaledValue();
+
+        final String msg = i.toString() + ", scale=" + i.scale()
+                + //
+                ", precision=" + i.precision()
+                + //
+                ", unscaled=" + unscaled
+                + //
+                ", unscaled_byte[]="
+                + BytesUtil.toString(unscaled.toByteArray())//
+        ;
+
+          return msg;
+
+      }
+//      
+//    /**
+//     * Note: must have normalized representation of the BigDecimal to do
+//     * equals(). BigDecimal#equals(foo) compares both value and scale, while we
+//     * can only test on value here.
+//     */
+//    protected void doEncodeDecodeTest(BigDecimal expected) {
+//
+//          expected = normalizeBigDecimal(expected);
+//          
+//          byte[] encoded = null;
+//          BigDecimal actual = null;
+//          Throwable cause = null;
+//          try {
+//
+//              encoded = encodeBigDecimal(expected);
+//
+//              actual = decodeBigDecimal(encoded);
+//
+//          } catch (Throwable t) {
+//
+//              cause = t;
+//
+//          }
+//
+//          if (cause != null || !expected.equals(actual)) {
+//
+//              final String msg = "BigDecimal" + //
+//                      "\nexpected=" + expected + //
+//                      "\nsigned  =" + Arrays.toString(expected.unscaledValue().toByteArray())+//
+//                      "\nunsigned=" + BytesUtil.toString(expected.unscaledValue().toByteArray())+//
+//                      "\nencoded =" + BytesUtil.toString(encoded) + //
+//                      "\nactual  =" + actual+//
+//                      (actual != null ? "\nactualS ="
+//                              + Arrays.toString(actual.unscaledValue().toByteArray())
+//                              + //
+//                              "\nactualU ="
+//                              + BytesUtil.toString(actual.unscaledValue().toByteArray()) //
+//                      : "")
+//                      ;
+//
+//              if (cause == null) {
+//
+//                  fail(msg);
+//                  
+//              } else {
+//                  
+//                  fail(msg, cause);
+//                  
+//              }
+//              
+//          }
+//
+//      }
+//
+    private enum CompareEnum {
+
+        LT(-1), EQ(0), GT(1);
+        
+        private CompareEnum(final int ret) {
+            this.ret = ret;
+        }
+
+        private int ret;
+        
+        static public CompareEnum valueOf(final int ret) {
+            if(ret<0) return LT;
+            if(ret>0) return GT;
+            return EQ;
+        }
+        
+    }
+
+    protected void doCompareTest(BigDecimal i1, BigDecimal i2, final CompareEnum cmp) {
+
+      i1 = normalizeBigDecimal(i1);
+      i2 = normalizeBigDecimal(i2);
+
+      final byte[] k1 = encodeBigDecimal(i1);
+
+      final byte[] k2 = encodeBigDecimal(i2);
+
+      final int ret = BytesUtil.compareBytes(k1, k2);
+
+      final CompareEnum cmp2 = CompareEnum.valueOf(ret);
+
+        if (cmp2 != cmp) {
+
+              fail("BigDecimal" + //
+                      "\ni1=" + dumpBigDecimal(i1) + //
+                      "\ni2=" + dumpBigDecimal(i2) + //
+                      "\nk1=" + BytesUtil.toString(k1) + //
+                      "\nk2=" + BytesUtil.toString(k2) + //
+                      "\nret=" + cmp2 +", but expected="+cmp//
+              );
+
+          }
+
+      }
+
+    /**
+     * Test encode/decode for various values of zero.
+     */
+    public void test_BigDecimal0() {
+
+        final BigDecimal[] a = new BigDecimal[] {
+                new BigDecimal("0"),    // scale=0, precision=1
+                new BigDecimal("0."),   // scale=0, precision=1
+                new BigDecimal("0.0"),  // scale=1, precision=1
+                new BigDecimal("0.00"), // scale=2, precision=1
+                new BigDecimal("00.0"), // scale=1, precision=1
+                new BigDecimal("00.00"),// scale=2, precision=1
+                new BigDecimal(".0"),   // scale=1, precision=1
+                // NB: The precision is the #of decimal digits in the unscaled value.
+                // NB: scaled := unscaled * (10 ^ -scale) 
+//                new BigDecimal(".010"), // scale=3, precision=2
+//                new BigDecimal(".01"),  // scale=2, precision=1
+//                new BigDecimal(".1"),   // scale=1, precision=1
+//                new BigDecimal("1."),   // scale=0, precision=1
+//                new BigDecimal("10."),  // scale=0, precision=2
+//                new BigDecimal("10.0"), // scale=1, precision=3
+//                new BigDecimal("010.0"), // scale=1, precision=3
+//                new BigDecimal("0010.00"), // scale=2, precision=4
+                // @todo Test with cases where scale is negative (large powers of 10).
+                };
+
+        for (BigDecimal i : a) {
+            i = i.stripTrailingZeros();
+            System.err.println("i="
+                    + i
+                    + "\t(scale="
+                    + i.scale()
+                    + ",prec="
+                    + i.precision()
+                    + ") : "
+                    + dumpBigDecimal(i)
+//                    i.scaleByPowerOfTen(i.scale()- i.precision()))
+                            );
+        }
+
+        for (BigDecimal i : a) {
+            doEncodeDecodeTest(i);
+        }
+
+        for (int i = 0; i < a.length; i++) {
+            for (int j = 0; j < a.length; j++) {
+                doCompareTest(a[i], a[j], CompareEnum.EQ);
+            }
+        }
+
+    }
+
+    /**
+     * Utility method converts an application key to a sort key (an unsigned
+     * byte[] that imposes the same sort order).
+     * <p>
+     * Note: This method is thread-safe.
+     * <p>
+     * Note: Strings are Unicode safe for the default locale. See
+     * {@link Locale#getDefault()}. If you require a specific local or different
+     * locals at different times or for different indices then you MUST
+     * provision and apply your own {@link KeyBuilder}.
+     * <p>
+     * Note: This method circumvents explicit configuration of the
+     * {@link KeyBuilder} and is used nearly exclusively by unit tests. While
+     * explicit configuration is not required for keys which do not include
+     * Unicode sort key components, this method also relies on a single global
+     * {@link KeyBuilder} instance protected by a lock. That lock is therefore a
+     * bottleneck. The correct practice is to use thread-local or per task
+     * {@link IKeyBuilder}s to avoid lock contention.
+     * 
+     * @param val
+     *            An application key.
+     * 
+     * @return The unsigned byte[] equivalent of that key. This will be
+     *         <code>null</code> iff the <i>key</i> is <code>null</code>. If the
+     *         <i>key</i> is a byte[], then the byte[] itself will be returned.
+     */
+    public static final byte[] asSortKey(final Object val) {
+
+        if (val == null) {
+
+            return null;
+
+        }
+
+        if (val instanceof byte[]) {
+
+            return (byte[]) val;
+
+        }
+
+        /*
+         * Synchronize on the keyBuilder to avoid concurrent modification of its
+         * state.
+         */
+
+        synchronized (_keyBuilder) {
+
+            return _keyBuilder.getSortKey(val);
+
         }
 
     }

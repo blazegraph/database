@@ -426,9 +426,29 @@ abstract public class AbstractAtomicRowReadOrWrite extends
 
     }
 
+    /**
+     * The initial version.
+     */
+    private static final transient byte VERSION0 = 0;
+
+    /**
+     * The current version.
+     */
+    private static final transient byte VERSION = VERSION0;
+
     public void readExternal(ObjectInput in) throws IOException,
             ClassNotFoundException {
         
+        final byte version = in.readByte();
+
+        switch (version) {
+        case VERSION0:
+            break;
+        default:
+            throw new UnsupportedOperationException("Unknown version: "
+                    + version);
+        }
+
         schema = (Schema) in.readObject();
         
         primaryKey = in.readObject();
@@ -442,7 +462,9 @@ abstract public class AbstractAtomicRowReadOrWrite extends
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
-        
+
+        out.writeByte(VERSION);
+
         out.writeObject(schema);
         
         out.writeObject(primaryKey);

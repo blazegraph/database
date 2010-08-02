@@ -150,7 +150,14 @@ public class RuleState implements IRuleState {
         
         this.nvars = new int[rule.getTailCount()];
         
-        // The key order that will be used for each join dimension.
+        /*
+         * The key order that will be used for each join dimension.
+         * 
+         * @todo Elevate this into the query optimizer so we can handle
+         * extension indices.  Also, make the query optimizer explictly
+         * aware of the presence or absence of the bloom filter for the
+         * SPO (or other) index.
+         */
         this.keyOrder = computeKeyOrderForEachTail(rule, joinNexus, plan.getOrder(), nvars);
         
         this.requiredVars = computeRequiredVarsForEachTail(rule, plan.getOrder());

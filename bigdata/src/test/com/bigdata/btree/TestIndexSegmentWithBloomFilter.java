@@ -33,7 +33,7 @@ import java.util.Properties;
 import java.util.UUID;
 
 import com.bigdata.LRUNexus;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
 import com.bigdata.rawstore.IRawStore;
@@ -216,9 +216,9 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
         SimpleEntry v5 = new SimpleEntry(5);
         SimpleEntry v7 = new SimpleEntry(7);
 
-        btree.insert(KeyBuilder.asSortKey(3), v3);
-        btree.insert(KeyBuilder.asSortKey(5), v5);
-        btree.insert(KeyBuilder.asSortKey(7), v7);
+        btree.insert(TestKeyBuilder.asSortKey(3), v3);
+        btree.insert(TestKeyBuilder.asSortKey(5), v5);
+        btree.insert(TestKeyBuilder.asSortKey(7), v7);
        
         final File outFile2 = new File(getName()+"_m"+m+ "_bloom.seg");
 

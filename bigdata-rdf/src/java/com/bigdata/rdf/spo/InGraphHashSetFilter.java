@@ -1,9 +1,11 @@
 package com.bigdata.rdf.spo;
 
+import java.util.HashSet;
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 
 import org.openrdf.model.URI;
 
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.store.IRawTripleStore;
 
@@ -28,7 +30,7 @@ public final class InGraphHashSetFilter extends SPOFilter {
      */
     private static final long serialVersionUID = -6059009162692785772L;
 
-    final LongLinkedOpenHashSet contextSet;
+    final HashSet<IV> contextSet;
     
     /**
      * 
@@ -43,13 +45,13 @@ public final class InGraphHashSetFilter extends SPOFilter {
          * we will accept.
          */
 
-        contextSet = new LongLinkedOpenHashSet(initialCapacity);
+        contextSet = new HashSet<IV>(initialCapacity);
         
         for (URI uri : graphs) {
         
-            final long termId = ((BigdataURI) uri).getTermId();
+            final IV termId = ((BigdataURI) uri).getIV();
             
-            if (termId != IRawTripleStore.NULL) {
+            if (termId != null) {
 
                 contextSet.add(termId);
                 
@@ -59,7 +61,15 @@ public final class InGraphHashSetFilter extends SPOFilter {
         
     }
 
-    public boolean accept(final ISPO spo) {
+    public boolean accept(final Object o) {
+        
+        if (!canAccept(o)) {
+            
+            return true;
+            
+        }
+        
+        final ISPO spo = (ISPO) o;
         
         return contextSet.contains(spo.c());
         

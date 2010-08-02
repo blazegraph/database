@@ -48,12 +48,8 @@ public enum StatementEnum {
      * A statement that was inferred from the explicit statements by the
      * appropriate model theory.
      */
-    Inferred((byte) 2),
-    /**
-     * For debugging.
-     */
-    Backchained((byte) 4);
-
+    Inferred((byte) 2);
+    
     private final byte code;
     
     private StatementEnum(final byte code) {
@@ -105,15 +101,13 @@ public enum StatementEnum {
      */
     static public StatementEnum decode(final byte b) {
 
-        switch (b & ~MASK_OVERRIDE) {
+        switch (b & ~MASK_OVERRIDE & ~MASK_USER_FLAG) {
 
         case 0: return Explicit;
         
         case 1: return Axiom;
         
         case 2: return Inferred;
-        
-        case 4: return Backchained;
         
         default:
             throw new RuntimeException("Unexpected byte: " + b);
@@ -163,6 +157,23 @@ public enum StatementEnum {
      */
     public static final int MASK_OVERRIDE = 0x1 << 3;
 
+    /**
+     * A user bit mask used by applications to flag statements
+     */
+    public static final int MASK_USER_FLAG = 0x1 << 2;
+  
+    /**
+     * Return <code>true</code> iff the user bit is set.
+     * 
+     * @param b
+     *            The byte.
+     */
+    public static boolean isUserFlag(final byte b) {
+    
+        return (b & StatementEnum.MASK_USER_FLAG) != 0;
+        
+    }
+    
     /**
      * Return <code>true</code> iff the override bit is set.
      * 

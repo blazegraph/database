@@ -32,8 +32,10 @@ import java.util.Iterator;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.LRUNexus;
 import com.bigdata.btree.IndexSegment.ImmutableLeafCursor;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
+import com.bigdata.io.DirectBufferPool;
 
 /**
  * Adds some methods for testing an {@link IndexSegment} for consistency.
@@ -190,6 +192,7 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
 
         final ImmutableLeafCursor itr = seg.newLeafCursor(SeekEnum.First);
         
+        if(LRUNexus.INSTANCE!=null)
         assertTrue(firstLeaf.getDelegate()==itr.leaf().getDelegate()); // Note: test depends on cache!
         
         ImmutableLeaf priorLeaf = itr.leaf();
@@ -242,6 +245,7 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
 
         final ImmutableLeafCursor itr = seg.newLeafCursor(SeekEnum.Last);
 
+        if(LRUNexus.INSTANCE!=null)
         assertTrue(lastLeaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache!
 
         ImmutableLeaf nextLeaf = itr.leaf();
@@ -269,6 +273,28 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
         }
         
         assertEquals("#leaves",nleaves,n);
+
+    }
+
+    /**
+     * Compares the {@link IndexSegmentMultiBlockIterator} against the standard
+     * {@link BTree} iterator.
+     * 
+     * @param expected
+     *            The ground truth {@link BTree}.
+     * @param actual
+     *            The {@link IndexSegment}.
+     */
+    static public void testMultiBlockIterator(final BTree expected,
+            final IndexSegment actual) {
+
+        final long actualTupleCount = doEntryIteratorTest(expected
+                .rangeIterator(), new IndexSegmentMultiBlockIterator(actual,
+                DirectBufferPool.INSTANCE_10M, null/* fromKey */,
+                null/* toKey */, IRangeQuery.DEFAULT));
+
+        // verifies based on what amounts to an exact range count.
+        assertEquals("entryCount", expected.getEntryCount(), actualTupleCount);
 
     }
 

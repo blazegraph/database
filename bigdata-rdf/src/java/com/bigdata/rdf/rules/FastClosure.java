@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.openrdf.model.vocabulary.OWL;
 
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.rule.ArrayBindingSet;
 import com.bigdata.relation.rule.IBindingSet;
@@ -71,7 +72,7 @@ public class FastClosure extends BaseClosure {
         
         {
 //                // 2. Compute P (the set of possible sub properties).
-//                final Set<Long> P = getSubProperties(focusStore, database);
+//                final Set<IV> P = getSubProperties(focusStore, database);
 
             // 3. (?x, P, ?y) -> (?x, rdfs:subPropertyOf, ?y)
             program.addStep(new RuleFastClosure3(db,focusStore,vocab));//, P));
@@ -82,10 +83,10 @@ public class FastClosure extends BaseClosure {
         program.addClosureOf(new IRule[] { new RuleRdfs05(db, vocab) });
 
         // 4a. Obtain: D,R,C,T.
-//            final Set<Long> D = getSubPropertiesOf(focusStore, database, rdfsDomain.get());
-//            final Set<Long> R = getSubPropertiesOf(focusStore, database, rdfsRange.get());
-//            final Set<Long> C = getSubPropertiesOf(focusStore, database, rdfsSubClassOf.get());
-//            final Set<Long> T = getSubPropertiesOf(focusStore, database, rdfType.get());
+//            final Set<IV> D = getSubPropertiesOf(focusStore, database, rdfsDomain.get());
+//            final Set<IV> R = getSubPropertiesOf(focusStore, database, rdfsRange.get());
+//            final Set<IV> C = getSubPropertiesOf(focusStore, database, rdfsSubClassOf.get());
+//            final Set<IV> T = getSubPropertiesOf(focusStore, database, rdfType.get());
 
         {
             /*
@@ -242,7 +243,7 @@ public class FastClosure extends BaseClosure {
             // owl:sameAs
             if (forwardChainOwlSameAsClosure) {
 
-                final IConstant<Long> owlSameAs = vocab.getConstant(OWL.SAMEAS);
+                final IConstant<IV> owlSameAs = vocab.getConstant(OWL.SAMEAS);
                 
                 // reflexive closure over owl:sameAs.
                 program.addClosureOf(new RuleOwlSameAs1(db, vocab));
@@ -272,7 +273,7 @@ public class FastClosure extends BaseClosure {
 
                         // the variable in the predicate position of the head of
                         // the rule.
-                        final IVariable<Long> p = (IVariable<Long>) tmp
+                        final IVariable<IV> p = (IVariable<IV>) tmp
                                 .getHead().get(1/* p */);
 
                         program.addStep(tmp.specialize(//
@@ -290,7 +291,7 @@ public class FastClosure extends BaseClosure {
 
                         // the variable in the predicate position of the head of
                         // the rule.
-                        final IVariable<Long> p = (IVariable<Long>) tmp
+                        final IVariable<IV> p = (IVariable<IV>) tmp
                                 .getHead().get(1/* p */);
 
                         program.addStep(tmp.specialize(//

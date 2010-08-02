@@ -36,6 +36,7 @@ import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
@@ -109,7 +110,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
         
         for(int i=0; i<nentries; i++) {
             
-            keys[i] = KeyBuilder.asSortKey(i);
+            keys[i] = TestKeyBuilder.asSortKey(i);
             
             vals[i] = new byte[4];
             
@@ -203,7 +204,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
         
         for(int i=0; i<nentries; i++) {
             
-            keys[i] = KeyBuilder.asSortKey(i);
+            keys[i] = TestKeyBuilder.asSortKey(i);
             
             vals[i] = new byte[4];
             
@@ -337,7 +338,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
         
         for(int i=0; i<nentries; i++) {
             
-            keys[i] = KeyBuilder.asSortKey(i);
+            keys[i] = TestKeyBuilder.asSortKey(i);
             
             vals[i] = new byte[4];
             
@@ -425,7 +426,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
         
         for(int i=0; i<nentries; i++) {
             
-            keys[i] = KeyBuilder.asSortKey(i);
+            keys[i] = TestKeyBuilder.asSortKey(i);
             
             vals[i] = new byte[4];
             

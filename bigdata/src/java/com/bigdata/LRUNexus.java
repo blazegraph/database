@@ -151,11 +151,25 @@ public class LRUNexus {
     public static interface Options {
 
         /**
-         * Option may be used to disable the {@link LRUNexus#INSTANCE}.
+         * Option may be used to (en|dis)able the {@link LRUNexus#INSTANCE} 
+         * (default {@value #DEFAULT_ENABLED}).
          */
         String ENABLED = LRUNexus.class.getName() + ".enabled";
 
-        String DEFAULT_ENABLED = "true";
+        /**
+         * Note: The {@link LRUNexus} is now disabled by default. With the
+         * removal of the synchronization bottlenecks in the low levels of the
+         * RW and WORM Journal modes, it is now more efficient to NOT use the
+         * embedded concurrent non-blocking caches and to pass through the
+         * burden of cache operations to the OS. Also, due to the large number
+         * of records retained by the embedded cache and the length of time that
+         * those records are retained, the embedded concurrent non-blocking
+         * caches have proven to be a challenge to the garbage collector. If
+         * enabled, it is advisable to use the
+         * <code>-XX:+UseParallelOldGC</code> GC option in order to avoid JVM
+         * hangs or crashes.
+         */
+        String DEFAULT_ENABLED = "false";
 
         /**
          * The maximum heap capacity as a percentage of the JVM heap expressed
@@ -799,7 +813,8 @@ public class LRUNexus {
 
             if (BigdataStatics.debug || log.isInfoEnabled()) {
 
-                final String msg = s.toString();
+                final String msg = s.enabled ? s.toString()
+                        : "LRUNexus is disabled";
 
                 if (BigdataStatics.debug)
                     System.err.println(msg);

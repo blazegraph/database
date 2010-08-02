@@ -26,22 +26,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
-import java.io.InputStreamReader;
-import java.io.Reader;
 import java.net.URL;
 import java.util.Collection;
 import java.util.LinkedList;
 import org.openrdf.model.BNode;
-import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.BNodeImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryLanguage;
-import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.TupleExpr;
-import org.openrdf.query.impl.BindingImpl;
 import org.openrdf.repository.sail.SailTupleQuery;
 import org.openrdf.rio.RDFFormat;
 

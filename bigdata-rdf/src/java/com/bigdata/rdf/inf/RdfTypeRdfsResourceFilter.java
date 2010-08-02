@@ -4,15 +4,12 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-
-import org.CognitiveWeb.extser.LongPacker;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
-
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOFilter;
 import com.bigdata.rdf.vocab.Vocabulary;
-import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
  * Filter matches <code>(x rdf:type rdfs:Resource).
@@ -27,8 +24,8 @@ public class RdfTypeRdfsResourceFilter extends SPOFilter implements Externalizab
      */
     private static final long serialVersionUID = -2157234197316632000L;
     
-    private long rdfType;
-    private long rdfsResource;
+    private IV rdfType;
+    private IV rdfsResource;
     
     /**
      * De-serialization ctor.
@@ -49,9 +46,17 @@ public class RdfTypeRdfsResourceFilter extends SPOFilter implements Externalizab
         
     }
 
-    public boolean accept(ISPO spo) {
-
-        if (spo.p() == rdfType && spo.o() == rdfsResource) {
+    public boolean accept(final Object o) {
+        
+        if (!canAccept(o)) {
+            
+            return true;
+            
+        }
+        
+        final ISPO spo = (ISPO) o;
+        
+        if (spo.p().equals(rdfType) && spo.o().equals(rdfsResource)) {
             
             // reject (?x, rdf:type, rdfs:Resource )
             
@@ -65,27 +70,49 @@ public class RdfTypeRdfsResourceFilter extends SPOFilter implements Externalizab
         
     }
 
+    /**
+     * The initial version.
+     */
+    private static final transient short VERSION0 = 0;
+
+    /**
+     * The current version.
+     */
+    private static final transient short VERSION = VERSION0;
+
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+    
+        final short version = in.readShort();
+        
+        switch (version) {
+        case VERSION0:
+            break;
+        default:
+            throw new UnsupportedOperationException("Unknown version: "
+                    + version);
+        }
         
 //        rdfType = LongPacker.unpackLong(in);
 //
 //        rdfsResource = LongPacker.unpackLong(in);
 
-        rdfType = in.readLong();
+        rdfType = (IV) in.readObject();
 
-        rdfsResource = in.readLong();
+        rdfsResource = (IV) in.readObject();
         
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
 
+        out.writeShort(VERSION);
+
 //        LongPacker.packLong(out,rdfType);
 //
 //        LongPacker.packLong(out,rdfsResource);
 
-        out.writeLong(rdfType);
+        out.writeObject(rdfType);
 
-        out.writeLong(rdfsResource);
+        out.writeObject(rdfsResource);
         
     }
     

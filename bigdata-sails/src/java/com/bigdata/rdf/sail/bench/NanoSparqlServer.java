@@ -40,21 +40,29 @@ import java.io.PipedOutputStream;
 import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Date;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.TreeMap;
 import java.util.Vector;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
-import org.openrdf.query.parser.ParsedQuery;
 import org.openrdf.query.parser.QueryParser;
 import org.openrdf.query.parser.sparql.SPARQLParserFactory;
 import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLWriter;
@@ -63,10 +71,12 @@ import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.LRUNexus;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
+import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.RWStrategy;
@@ -74,11 +84,15 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
 import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.bench.NanoSparqlClient.QueryType;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.AbstractResource;
+import com.bigdata.relation.RelationSchema;
 import com.bigdata.rwstore.RWStore;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.JiniClient;
+import com.bigdata.sparse.ITPS;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.httpd.AbstractHTTPD;
 import com.bigdata.util.httpd.NanoHTTPD;
@@ -91,84 +105,119 @@ import com.bigdata.util.httpd.NanoHTTPD;
  * @todo Allow configuration options for the sparql endpoint either as URI
  *       parameters, in the property file, as request headers, or as query hints
  *       using the PREFIX mechanism.
- * 
+
  * @todo Allow timestamp for server reads as protocol parameter (URL query
  *       parameter or header).
  * 
- * @todo Add an "EXPLAIN" query type and show the execution plan and costs.
+ * @todo Add an "?explain" URL query parameter and show the execution plan and
+ *       costs (or make this a navigable option from the set of running queries
+ *       to drill into their running costs and offer an opportunity to kill them
+ *       as well).
  * 
- * @todo Add command to drop the LRUNexus cache.
+ * @todo Add command to kill a running query.
  */
 public class NanoSparqlServer extends AbstractHTTPD {
 
-	/**
-	 * The logger for the concrete {@link NanoSparqlServer} class.  The {@link NanoHTTPD}
-	 * class has its own logger.
-	 */
-	static protected final Logger log = Logger.getLogger(NanoSparqlServer.class); 
-	
-	/**
-	 * A SPARQL results set in XML.
-	 */
-	static private final String MIME_SPARQL_RESULTS_XML = "application/sparql-results+xml";
+    /**
+     * The logger for the concrete {@link NanoSparqlServer} class.  The {@link NanoHTTPD}
+     * class has its own logger.
+     */
+    static protected final Logger log = Logger.getLogger(NanoSparqlServer.class); 
+    
+    /**
+     * A SPARQL results set in XML.
+     */
+    static private final String MIME_SPARQL_RESULTS_XML = "application/sparql-results+xml";
 
-	/**
-	 * RDF/XML.
-	 */
-	static private final String MIME_RDF_XML = "application/rdf+xml";
+    /**
+     * RDF/XML.
+     */
+    static private final String MIME_RDF_XML = "application/rdf+xml";
 
-	/**
-	 * The character set used for the response (not negotiated).
-	 */
+    /**
+     * The character set used for the response (not negotiated).
+     */
     static private final String charset = "UTF-8";
     
-	/**
-	 * The target repository.
-	 */
-	final BigdataSailRepository repo;
+//    /**
+//     * The target Sail.
+//     */
+//    private final BigdataSail sail;
+//
+//    /**
+//   * The target repository.
+//   */
+//  private final BigdataSailRepository repo;
 
-	/**
-	 * @todo use to decide ASK, DESCRIBE, CONSTRUCT, SELECT, EXPLAIN, etc.
-	 */
-	private final QueryParser engine;
-	
+    /**
+     * The configuration object.
+     */
+    private final Config config;
+    
+    /**
+     * Provides access to the bigdata database.
+     */
+    private final IIndexManager indexManager;
+    
+    /**
+     * @todo use to decide ASK, DESCRIBE, CONSTRUCT, SELECT, EXPLAIN, etc.
+     */
+    private final QueryParser engine;
+    
     /**
      * Runs a pool of threads for handling requests.
      */
     private final ExecutorService queryService;
 
-	public NanoSparqlServer(final int port, final String namespace,
-			final IIndexManager indexManager) throws IOException,
-			SailException, RepositoryException {
+    /**
+     * Metadata about running queries.
+     */
+    private static class RunningQuery {
+        /** The unique identifier for this query. */
+        final long queryId;
+        /** The query. */
+        final String query;
+        /** The timestamp when the query was accepted (ns). */
+        final long begin;
+        public RunningQuery(long queryId, String query, long begin) {
+            this.queryId = queryId;
+            this.query = query;
+            this.begin = begin;
+        }
+    }
 
-		super(port);
+    /**
+     * The currently executing queries (does not include queries where a client
+     * has established a connection but the query is not running because the
+     * {@link #queryService} is blocking).
+     */
+    private final ConcurrentHashMap<Long,RunningQuery> queries = new ConcurrentHashMap<Long,RunningQuery>();
 
-		// resolve the kb instance of interest.
-		final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
-				.getResourceLocator().locate(namespace, ITx.UNISOLATED);
+    /**
+     * Factory for the query identifiers.
+     */
+    private final AtomicLong queryIdFactory = new AtomicLong(); 
+    
+    public NanoSparqlServer(final Config config,
+            final IIndexManager indexManager) throws IOException,
+            SailException, RepositoryException {
 
-		if (tripleStore == null) {
+        super(config.port);
 
-			throw new RuntimeException("No such kb: " + namespace);
-
-		}
-		
-		// since the kb exists, wrap it as a sail.
-		final BigdataSail sail = new BigdataSail(tripleStore);
-
-		// Log some information about the kb (#of statements, etc).
-		System.out.println(getKBInfo(sail)); // @todo log @ info?
-
-		repo = new BigdataSailRepository(sail);
-		repo.initialize();
-
-		// used to parse qeries.
+        if (config.namespace == null)
+            throw new IllegalArgumentException();
+        
+        if(indexManager == null)
+            throw new IllegalArgumentException();
+        
+        this.config = config;
+        
+        this.indexManager = indexManager;
+        
+        // used to parse qeries.
         engine = new SPARQLParserFactory().getParser();
 
-        // @todo parameter and configuration of same.
-        final int requestServicePoolSize = 0;
-
-        if (requestServicePoolSize == 0) {
+        if (config.queryThreadPoolSize == 0) {
 
             queryService = (ThreadPoolExecutor) Executors
                     .newCachedThreadPool(new DaemonThreadFactory
@@ -177,150 +226,251 @@ public class NanoSparqlServer extends AbstractHTTPD {
         } else {
 
             queryService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-                    requestServicePoolSize, new DaemonThreadFactory
+                    config.queryThreadPoolSize, new DaemonThreadFactory
                     (getClass().getName()+".queryService"));
 
         }
 
-	}
+    }
 
     /**
-     * Return various interesting metadata about the KB state.
+     * Return a list of the registered {@link AbstractTripleStore}s.
      */
-	protected StringBuilder getKBInfo(final BigdataSail sail) {
+    protected List<String> getNamespaces() {
+    
+        // the triple store namespaces.
+        final List<String> namespaces = new LinkedList<String>();
 
-		final StringBuilder sb = new StringBuilder();
+        // scan the relation schema in the global row store.
+        final Iterator<ITPS> itr = (Iterator<ITPS>) indexManager
+                .getGlobalRowStore().rangeIterator(RelationSchema.INSTANCE);
 
-		try {
+        while (itr.hasNext()) {
 
-			final AbstractTripleStore tripleStore = sail.getDatabase();
+            // A timestamped property value set is a logical row with
+            // timestamped property values.
+            final ITPS tps = itr.next();
 
-			sb.append("class\t = " + tripleStore.getClass().getName() + "\n");
+            // If you want to see what is in the TPS, uncomment this.
+//          System.err.println(tps.toString());
+            
+            // The namespace is the primary key of the logical row for the
+            // relation schema.
+            final String namespace = (String) tps.getPrimaryKey();
 
-			sb
-					.append("indexManager\t = "
-							+ tripleStore.getIndexManager().getClass()
-									.getName() + "\n");
+            // Get the name of the implementation class
+            // (AbstractTripleStore, SPORelation, LexiconRelation, etc.)
+            final String className = (String) tps.get(RelationSchema.CLASS)
+                    .getValue();
 
-			sb.append("namespace\t = " + tripleStore.getNamespace() + "\n");
-
-			sb.append("timestamp\t = "
-					+ TimestampUtility.toString(tripleStore.getTimestamp())
-					+ "\n");
-
-			sb.append("statementCount\t = " + tripleStore.getStatementCount()
-					+ "\n");
-
-			sb.append("termCount\t = " + tripleStore.getTermCount() + "\n");
-
-			sb.append("uriCount\t = " + tripleStore.getURICount() + "\n");
-
-			sb.append("literalCount\t = " + tripleStore.getLiteralCount() + "\n");
-
-			sb.append("bnodeCount\t = " + tripleStore.getBNodeCount() + "\n");
-
-			sb.append(IndexMetadata.Options.BTREE_BRANCHING_FACTOR
-					+ "="
-					+ tripleStore.getSPORelation().getPrimaryIndex()
-							.getIndexMetadata().getBranchingFactor() + "\n");
-
-			sb.append(IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY
-					+ "="
-					+ tripleStore.getSPORelation().getPrimaryIndex()
-							.getIndexMetadata()
-							.getWriteRetentionQueueCapacity() + "\n");
-
-			sb.append(BigdataSail.Options.STAR_JOINS + "=" + sail.isStarJoins()
-					+ "\n");
-
-			sb.append(AbstractResource.Options.MAX_PARALLEL_SUBQUERIES + "="
-					+ tripleStore.getMaxParallelSubqueries() + "\n");
-
-			/*
-			 * Stuff which is specific to a local/embedded database.
-			 */
-			if (tripleStore.getIndexManager() instanceof IJournal) {
-
-                final AbstractJournal jnl = (AbstractJournal) sail
-                        .getDatabase().getIndexManager();
-
-                sb.append("file\t= " + jnl.getFile() + "\n");
-
-                sb.append("BufferMode\t= "
-                        + jnl.getBufferStrategy().getBufferMode() + "\n");
-
-                switch (jnl.getBufferStrategy().getBufferMode()) {
-                case Disk:
-                case DiskWORM: {
-                    sb.append("nextOffset\t= "
-                            + jnl.getRootBlockView().getNextOffset() + "\n");
-                    break;
+            try {
+                final Class cls = Class.forName(className);
+                if (AbstractTripleStore.class.isAssignableFrom(cls)) {
+                    // this is a triple store (vs something else).
+                    namespaces.add(namespace);
                 }
-                case DiskRW: {
-                    final RWStrategy bufferStrategy = (RWStrategy) jnl
-                            .getBufferStrategy();
-                    final RWStore rw = bufferStrategy.getRWStore();
-                    sb.append("Fixed Allocators\t="
-                            + rw.getFixedAllocatorCount() + "\n");
-                    sb.append("Heap allocated\t=" + rw.getFileStorage() + "\n");
-                    sb.append("Utilised bytes\t=" + rw.getAllocatedSlots()
+            } catch (ClassNotFoundException e) {
+                log.error(e,e);
+            }
+
+        }
+
+        return namespaces;
+
+    }
+    
+    /**
+     * Return various interesting metadata about the KB state.
+     * 
+     * @todo The range counts can take some time if the cluster is heavily
+     *       loaded since they must query each shard for the primary statement
+     *       index and the TERM2ID index.
+     */
+    protected StringBuilder getKBInfo(final String namespace,
+            final long timestamp) {
+
+        final StringBuilder sb = new StringBuilder();
+
+        BigdataSailRepositoryConnection conn = null;
+
+        try {
+
+            conn = getQueryConnection(namespace, timestamp);
+            
+            final AbstractTripleStore tripleStore = conn.getTripleStore();
+
+            sb.append("class\t = " + tripleStore.getClass().getName() + "\n");
+
+            sb
+                    .append("indexManager\t = "
+                            + tripleStore.getIndexManager().getClass()
+                                    .getName() + "\n");
+
+            sb.append("namespace\t = " + tripleStore.getNamespace() + "\n");
+
+            sb.append("timestamp\t = "
+                    + TimestampUtility.toString(tripleStore.getTimestamp())
+                    + "\n");
+
+            sb.append("statementCount\t = " + tripleStore.getStatementCount()
+                    + "\n");
+
+            sb.append("termCount\t = " + tripleStore.getTermCount() + "\n");
+
+            sb.append("uriCount\t = " + tripleStore.getURICount() + "\n");
+
+            sb.append("literalCount\t = " + tripleStore.getLiteralCount() + "\n");
+
+            /*
+             * Note: The blank node count is only available when using the told
+             * bnodes mode.
+             */
+            sb
+                    .append("bnodeCount\t = "
+                            + (tripleStore.getLexiconRelation()
+                                    .isStoreBlankNodes() ? ""
+                                    + tripleStore.getBNodeCount() : "N/A")
                             + "\n");
-                    break;
-                }
-                }
 
-                sb.append("File length\t=" + jnl.getFile().length() + "\n");
+            sb.append(IndexMetadata.Options.BTREE_BRANCHING_FACTOR
+                    + "="
+                    + tripleStore.getSPORelation().getPrimaryIndex()
+                            .getIndexMetadata().getBranchingFactor() + "\n");
+
+            sb.append(IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY
+                    + "="
+                    + tripleStore.getSPORelation().getPrimaryIndex()
+                            .getIndexMetadata()
+                            .getWriteRetentionQueueCapacity() + "\n");
+
+            sb.append(BigdataSail.Options.STAR_JOINS + "="
+                    + conn.getRepository().getSail().isStarJoins() + "\n");
+
+            sb.append(AbstractResource.Options.MAX_PARALLEL_SUBQUERIES + "="
+                    + tripleStore.getMaxParallelSubqueries() + "\n");
+
+            sb.append("-- All properties.--\n");
+            
+            // get the triple store's properties from the global row store.
+            final Map<String, Object> properties = indexManager
+                    .getGlobalRowStore().read(RelationSchema.INSTANCE,
+                            namespace);
+
+            // write them out,
+            for (String key : properties.keySet()) {
+                sb.append(key + "=" + properties.get(key)+"\n");
+            }
+
+            // sb.append(tripleStore.predicateUsage());
+
+        } catch (Throwable t) {
+
+            log.warn(t.getMessage(), t);
+
+        } finally {
+            
+            if(conn != null) {
+                try {
+                    conn.close();
+                } catch (RepositoryException e) {
+                    log.error(e, e);
+                }
                 
-	            /*
-				 * @todo The rest of this is all metadata that is only
-				 * interesting after the server has been running for a while.
-				 * It could be issued in response to a STATUS message.
-				 */
-				
-//				if (LRUNexus.INSTANCE != null)
-//					sb.append(LRUNexus.INSTANCE.toString() + "\n");
-				
-				// if (false) {
-				//
-				// // show the disk access details.
-				//
-				// sb.append(((Journal) sail.getDatabase().getIndexManager())
-				// .getBufferStrategy().getCounters().toString());
-				//
-				// }
+            }
+            
+        }
 
-			}
+        return sb;
 
-			// sb.append(tripleStore.predicateUsage());
+    }
 
-		} catch (Throwable t) {
+    /**
+     * Return some interesting information about the backend.
+     */
+    protected StringBuilder getStoreInfo() {
 
-			log.warn(t.getMessage(), t);
+        final StringBuilder sb = new StringBuilder();
 
-		}
+        if (indexManager instanceof AbstractJournal) {
 
-		return sb;
+            final AbstractJournal jnl = (AbstractJournal) indexManager;
+
+            sb.append("file\t= " + jnl.getFile() + "\n");
+
+            sb.append("BufferMode\t= "
+                    + jnl.getBufferStrategy().getBufferMode() + "\n");
+
+            switch (jnl.getBufferStrategy().getBufferMode()) {
+            case Disk:
+            case DiskWORM: {
+                sb.append("nextOffset\t= "
+                        + jnl.getRootBlockView().getNextOffset() + "\n");
+                break;
+            }
+            case DiskRW: {
+                final RWStrategy bufferStrategy = (RWStrategy) jnl
+                        .getBufferStrategy();
+                final RWStore rw = bufferStrategy.getRWStore();
+                sb.append("Fixed Allocators\t=" + rw.getFixedAllocatorCount()
+                        + "\n");
+                sb.append("Heap allocated\t=" + rw.getFileStorage() + "\n");
+                sb.append("Utilised bytes\t=" + rw.getAllocatedSlots() + "\n");
+                break;
+            }
+            }
+
+            sb.append("File length\t=" + jnl.getFile().length() + "\n");
+
+        }
+
+        return sb;
 
     }
     
     synchronized public void shutdown() {
-    	queryService.shutdown();
-    	super.shutdown();
-		synchronized (alive) {
-			alive.set(false);
-			alive.notifyAll();
-		}
+        System.err.println("Normal shutdown.");
+        queryService.shutdown();
+        try {
+            System.err.println("Awaiting termination of running queries.");
+            queryService.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
+        } catch (InterruptedException ex) {
+            throw new RuntimeException(ex);
+        }
+        super.shutdown();
+        synchronized (alive) {
+            alive.set(false);
+            alive.notifyAll();
+        }
     }
 
+    /**
+     * FIXME Must abort any open transactions.
+     */
     synchronized public void shutdownNow() {
-    	queryService.shutdownNow();
-    	super.shutdown();
-		synchronized (alive) {
-			alive.set(false);
-			alive.notifyAll();
-		}
+        System.err.println("Immediate shutdown");
+        // interrupt all running queries.
+        queryService.shutdownNow();
+        /*
+         * Wait a moment for any running queries to close their query
+         * connections.
+         */
+        try {
+            Thread.sleep(1000/* ms */);
+        } catch (InterruptedException ex) {
+            // ignore 
+        }
+        super.shutdown();
+        synchronized (alive) {
+            alive.set(false);
+            alive.notifyAll();
+        }
     }
-    
+
+    /**
+     * Note: This uses an atomic boolean in order to give us a synchronization
+     * object whose state also serves as a condition variable. findbugs objects,
+     * but this is a deliberate usage.
+     */
     private final AtomicBoolean alive = new AtomicBoolean(true);
 
 //    @Override
@@ -330,519 +480,1035 @@ public class NanoSparqlServer extends AbstractHTTPD {
 //    
 //        if ("STOP".equalsIgnoreCase(method)) {
 //
-//        	queryService.execute(new Runnable(){
-//        		public void run() {
-//        			shutdown();
-//        		}
-//        	});
-//        	
+//          queryService.execute(new Runnable(){
+//              public void run() {
+//                  shutdown();
+//              }
+//          });
+//          
 //            return new Response(HTTP_OK, MIME_TEXT_PLAIN, "Shutting down.");
 //            
 //        }
 //        
-//    	return super.serve(uri, method, header, parms);
-//    	
+//      return super.serve(uri, method, header, parms);
+//      
 //    }
 
-	@Override
-	public Response doPost(final String uri, final String method,
-			final Properties header,
-			final LinkedHashMap<String, Vector<String>> params) throws Exception {
+    @Override
+    public Response doPost(final String uri, final String method,
+            final Properties header,
+            final LinkedHashMap<String, Vector<String>> params) throws Exception {
 
-		if (log.isInfoEnabled()) {
-			log.info("uri=" + uri);
-			log.info("method=" + method);
-			log.info("headser=" + header);
-			log.info("params=" + params);
-		}
-		
-		if("/stop".equals(uri)) {
+        if (log.isInfoEnabled()) {
+            log.info("uri=" + uri);
+            log.info("method=" + method);
+            log.info("headser=" + header);
+            log.info("params=" + params);
+        }
+        
+        if("/stop".equals(uri)) {
 
-			queryService.execute(new Runnable() {
-				public void run() {
-					System.err.println("Will shutdown.");
-					try {
-						/*
-						 * Sleep for a bit so the Response will be delivered
-						 * before we shutdown the server.
-						 */
-						Thread.sleep(100/* ms */);
-					} catch (InterruptedException ex) {
-						// ignore
-					}
-					// Shutdown the server.
-					shutdown();
-				}
-			});
+            /*
+             * Create a new thread to run shutdown since we do not want this to
+             * block on the queryService.
+             */
+            final Thread t = new Thread(new Runnable() {
+                public void run() {
+                    System.err.println("Will shutdown.");
+                    try {
+                        /*
+                         * Sleep for a bit so the Response will be delivered
+                         * before we shutdown the server.
+                         */
+                        Thread.sleep(100/* ms */);
+                    } catch (InterruptedException ex) {
+                        // ignore
+                    }
+                    // Shutdown the server.
+                    shutdown();
+                }
+            });
 
-//			// Shutdown.
-//			shutdown();
-//			// Note: Client probably will not see this response.
-			return new Response(HTTP_OK, MIME_TEXT_PLAIN, "Shutting down.");
+            t.setDaemon(true);
+            
+            // Start the shutdown thread.
+            t.start();
+            
+//          // Shutdown.
+//          shutdown();
 
-		}
-		
-		return new Response(HTTP_NOTIMPLEMENTED, MIME_TEXT_PLAIN,
-				"SPARQL POST QUERY not implemented.");
+            /*
+             * Note: Client probably might not see this response since the
+             * shutdown thread may have already terminated the httpd service.
+             */
+            return new Response(HTTP_OK, MIME_TEXT_PLAIN, "Shutting down.");
 
-	}
-	
+        }
+        
+        return new Response(HTTP_NOTIMPLEMENTED, MIME_TEXT_PLAIN,
+                "SPARQL POST QUERY not implemented.");
+
+    }
+    
     /**
-	 * Accepts SPARQL queries.
-	 */
-	@Override
-	public Response doGet(final String uri, final String method,
-			final Properties header,
-			final LinkedHashMap<String, Vector<String>> params) throws Exception {
+     * Accepts SPARQL queries.
+     */
+    @Override
+    public Response doGet(final String uri, final String method,
+            final Properties header,
+            final LinkedHashMap<String, Vector<String>> params) throws Exception {
 
-		if (log.isInfoEnabled()) {
-			log.info("uri=" + uri);
-			log.info("method=" + method);
-			log.info("headser=" + header);
-			log.info("params=" + params);
-		}
+        if (log.isInfoEnabled()) {
+            log.info("uri=" + uri);
+            log.info("method=" + method);
+            log.info("headser=" + header);
+            log.info("params=" + params);
+        }
 
-		final String queryStr = params.get("query").get(0);
+        if (uri == null || uri.length() == 0) {
 
-		if (log.isInfoEnabled())
-			log.info("query: " + queryStr);
+            return doQuery(uri, method, header, params);
 
-		/*
-		 * Setup pipes. The [os] will be passed into the task that executes the
-		 * query. The [is] will be passed into the Response. The task is
-		 * executed on a thread pool.
-		 * 
-		 * Note: If the client closes the connection, then the InputStream
-		 * passed into the Response will be closed and the task will terminate
-		 * rather than running on in the background with a disconnected client.
-		 */
-		final PipedOutputStream os = new PipedOutputStream();
-		final InputStream is = new PipedInputStream(os);//Bytes.kilobyte32*8/*pipeSize*/);
-		final FutureTask<Void> ft = new FutureTask<Void>(getQueryTask(queryStr,
-				os));
-		try {
+        }
+        
+        if("/status".equals(uri)) {
+            
+            // @todo Could list the known namespaces.
+            return doStatus(uri, method, header, params);
 
-			// Begin executing the query (asynchronous).
-			queryService.execute(ft);
-			
-			// Choose an appropriate MIME type.
-			final String mimeType;
-			final QueryType queryType = QueryType.fromQuery(queryStr);
-			switch(queryType) {
-			case DESCRIBE:
-			case CONSTRUCT:
-				mimeType = MIME_RDF_XML;
-				break;
-			case ASK:
-			case SELECT:
-				mimeType = MIME_SPARQL_RESULTS_XML;
-				break;
-			default:
-				throw new RuntimeException("Unknown query type: "+queryType);
-			}
+        }
 
-			// Setup the response.
-			final Response r = new Response(HTTP_OK, mimeType + "; charset='"
-					+ charset + "'", is);
+        if (uri.startsWith("/namespace/")) {
 
-			/*
-			 * Sets the cache behavior.
-			 */
-			// r.addHeader("Cache-Control",
-			// "max-age=60, must-revalidate, public");
-			// to disable caching.
-			// r.addHeader("Cache-Control", "no-cache");
+            // @todo allow status query against any namespace.
+            return doQuery(uri, method, header, params);
+            
+        }
 
-			return r;
+        return new Response(HTTP_NOTFOUND, MIME_TEXT_PLAIN, uri);
+        
+    }
 
-		} catch (Throwable e) {
+    /**
+     * Return the namespace which will be used to execute the query. The
+     * namespace is represented by the first component of the URI. If there is
+     * no namespace, then return the configured default namespace.
+     * 
+     * @param uri
+     *            The URI path string.
+     * 
+     * @return The namespace.
+     */
+    private String getNamespace(final String uri) {
 
-			throw launderThrowable(e, os);
+//        // locate the "//" after the protocol.
+//        final int index = uri.indexOf("//");
 
-		}
+        if(!uri.startsWith("/namespace/")) {
+            // use the default namespace.
+            return config.namespace;
+        }
 
-	}
+        // locate the next "/" in the URI path.
+        final int beginIndex = uri.indexOf('/', 1/* fromIndex */);
 
-	static private RuntimeException launderThrowable(final Throwable t,
-			final OutputStream os) throws Exception {
-		if (os != null) {
-			try {
-				/*
-				 * Write the stack trace onto the output stream. This will show
-				 * up in the client's response. This code path will only be
-				 * taken if we have already begun writing the response.
-				 * Otherwise, an HTTP error status will be used instead.
-				 */
-				t.printStackTrace(new PrintWriter(os));
-				// flush the output stream.
-				os.flush();
-			} finally {
-				// ignore any problems here.
-			}
-			try {
-				// ensure output stream is closed.
-				os.close();
-			} catch (Throwable t2) {
-				// ignore any problems here.
-			}
-		}
-		try {
-			// log an error for the service.
-			log.error(t, t);
-		} finally {
-			// ignore any problems here.
-		}
-		if (t instanceof RuntimeException) {
-			return (RuntimeException) t;
-		} else if (t instanceof Error) {
-			throw (Error) t;
-		} else if (t instanceof Exception) {
-			throw (Exception) t;
-		} else
-			throw new RuntimeException(t);
-	}
+        // locate the next "/" in the URI path.
+        int endIndex = uri.indexOf('/', beginIndex + 1/* fromIndex */);
 
-	/**
-	 * Return the task which will execute the query.
-	 * 
-	 * @param queryStr
-	 *            The query.
-	 * @param os
-	 *            Where the task will write its output.
-	 *            
-	 * @return The task.
-	 * 
-	 * @throws MalformedQueryException 
-	 */
-	private Callable<Void> getQueryTask(final String queryStr,
-			final PipedOutputStream os) throws MalformedQueryException {
+        if (endIndex == -1) {
+            // use the rest of the URI.
+            endIndex = uri.length();
+        }
 
-		/*
-		 * Parse the query so we can figure out how it will need to be executed.
-		 * 
-		 * Note: This will fail a query on its syntax. However, the logic used
-		 * in the tasks to execute a query will not fail a bad query for some
-		 * reason which I have not figured out yet. Therefore, we are in the
-		 * position of having to parse the query here and then again when it is
-		 * executed.
-		 */
-		final ParsedQuery q = engine.parseQuery(queryStr, null/*baseURI*/);
-
-		final NanoSparqlClient.QueryType queryType = NanoSparqlClient.QueryType
-				.fromQuery(queryStr);
-
-		switch (queryType) {
-		//case ASK:
-		// @todo ASK as boolean - which task to run?
-		case DESCRIBE:
-		case CONSTRUCT:
-			return new GraphQueryTask(queryStr, os);
-		case SELECT:
-			return new TupleQueryTask(queryStr, os);
-		}
-
-		throw new RuntimeException("Unknown query type: " + queryType);
-
-	}
-
-	/**
-	 * Note: A read-only connection from the lastCommitTime
-	 * 
-	 * @throws RepositoryException
-	 */
-	protected SailRepositoryConnection getQueryConnection()
-			throws RepositoryException {
-
-		return repo.getReadOnlyConnection();
+        // return the namespace.
+        return uri.substring(beginIndex + 1, endIndex);
 
     }
 
-	/**
-	 * Executes a tuple query.
-	 */
-	private class TupleQueryTask implements Callable<Void> {
+    /**
+     * Return the timestamp which will be used to execute the query.
+     * 
+     * @todo the configured timestamp should only be used for the default
+     *       namespace (or it should be configured for each graph explicitly, or
+     *       we should bundle the (namespace,timestamp) together as a single
+     *       object).
+     * 
+     * @todo use path for the timestamp or acquire read lock when the server
+     *       starts against a specific namespace?
+     */
+    private long getTimestamp(final String uri,
+            final LinkedHashMap<String, Vector<String>> params) {
 
-		private final String queryStr;
-		private final PipedOutputStream os;
+        return config.timestamp;
+        
+    }
+    
+    /**
+     * Respond to a status request.
+     * 
+     * @param uri
+     * @param method
+     * @param header
+     * @param params
+     * @return
+     * @throws Exception
+     */
+    public Response doStatus(final String uri, final String method,
+            final Properties header,
+            final LinkedHashMap<String, Vector<String>> params) throws Exception {
 
-		public TupleQueryTask(final String queryStr, final PipedOutputStream os) {
+        final boolean showQueries = params.get("showQueries") != null;
 
-			this.queryStr = queryStr;
-			this.os = os;
+        final boolean showKBInfo = params.get("showKBInfo") != null;
 
-		}
+        final boolean showNamespaces = params.get("showNamespaces") != null;
 
-		public Void call() throws Exception {
-			final SailRepositoryConnection cxn = getQueryConnection();
-			try {
-				final TupleQuery query = cxn.prepareTupleQuery(
-						QueryLanguage.SPARQL, queryStr);
-				query.evaluate(new SPARQLResultsXMLWriter(new XMLWriter(os)));
-				os.close();
-				return null;
-			} catch (Throwable t) {
-				// launder and rethrow the exception.
-				throw launderThrowable(t,os);
-			} finally {
-				cxn.close();
-			}
-		}
+        final StringBuilder sb = new StringBuilder();
 
-	}
+        sb.append("Accepted query count=" + queryIdFactory.get() + "\n");
 
-	/**
-	 * Executes a graph query.
-	 */
-	private class GraphQueryTask implements Callable<Void> {
+        sb.append("Running query count=" + queries.size() + "\n");
 
-		private final String queryStr;
-		private final PipedOutputStream os;
+        if (showNamespaces) {
 
-		public GraphQueryTask(final String queryStr, final PipedOutputStream os) {
+            final List<String> namespaces = getNamespaces();
+            
+            sb.append("Namespaces: ");
 
-			this.queryStr = queryStr;
-			this.os = os;
+            for (String s : namespaces) {
 
-		}
+                sb.append(s);
 
-		public Void call() throws Exception {
-			final SailRepositoryConnection cxn = getQueryConnection();
-			try {
-				final BigdataSailGraphQuery query = (BigdataSailGraphQuery) cxn
-						.prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
-				/*
-				 * FIXME BSBM constructs statements with values not actually in
-				 * the database, which breaks the native construct iterator.
-				 */
-				query.setUseNativeConstruct(false);
-				query.evaluate(new RDFXMLWriter(os));
-				os.close();
-				return null;
-			} catch (Throwable t) {
-				throw launderThrowable(t, os);
-			} finally {
-				cxn.close();
-			}
-		}
-	
-	}
+            }
+            
+            sb.append("\n");
+            
+        }
+        
+        if (showKBInfo) {
 
-	/**
-	 * Send a STOP message to the service
-	 *
-	 * @param port The port for that service.
-	 * 
-	 * @throws IOException 
-	 * 
-	 * @todo This winds up warning <pre> java.net.SocketTimeoutException: Read timed out</pre>
-	 * even though the shutdown request was accepted and processed by the server.  I'm not
-	 * sure why. 
-	 */
-	public static void sendStop(int port) throws IOException {
-		
-		final URL url = new URL("http://localhost:" + port+"/stop");
-		HttpURLConnection conn = null;
-		try {
+            // General information on the connected kb.
+            sb.append(getKBInfo(getNamespace(uri), getTimestamp(uri, params)));
 
-			conn = (HttpURLConnection) url.openConnection();
-			conn.setRequestMethod("POST");
-			conn.setDoInput(true); // true to read from the server.
-			conn.setDoOutput(true); // true to write to the server.
-			conn.setUseCaches(false);
-			conn.setReadTimeout(2000/* ms */);
-			conn.setRequestProperty("Content-Type",
-					"application/x-www-form-urlencoded");
-			conn.setRequestProperty("Content-Length", "" + Integer.toString(0));
-			conn.setRequestProperty("Content-Language", "en-US");
+        }
+        
+        if (indexManager instanceof IJournal) {
 
-			// Send request
-			conn.getOutputStream().close();
+            /*
+             * Stuff which is specific to a local/embedded database.
+             */
 
-			// connect.
-			try {
+            final AbstractJournal jnl = (AbstractJournal) indexManager;
 
-				conn.connect();
+            sb.append("file\t= " + jnl.getFile() + "\n");
 
-				final int rc = conn.getResponseCode();
-				
-				if (rc < 200 || rc >= 300) {
-					
-					log.error(conn.getResponseMessage());
-					
-				}
+            sb.append("BufferMode\t= "
+                    + jnl.getBufferStrategy().getBufferMode() + "\n");
 
-				System.out.println(conn.getResponseMessage());
+            sb.append("nextOffset\t= " + jnl.getRootBlockView().getNextOffset()
+                    + "\n");
 
-			} catch (IOException ex) {
+            if (LRUNexus.INSTANCE != null) {
 
-				log.warn(ex);
-				
-			}
+                sb.append(LRUNexus.Options.CLASS + "="
+                        + LRUNexus.INSTANCE.toString().getClass() + "\n");
 
-		} finally {
+                sb.append(LRUNexus.INSTANCE.toString() + "\n");
 
-			// clean up the connection resources
-			if (conn != null)
-				conn.disconnect();
+            } else {
+                
+                sb.append("LRUNexus is disabled.");
+                
+            }
 
-		}
+            // show the disk access details.
+            sb.append(jnl.getBufferStrategy().getCounters().toString()+"\n\n");
 
-	}
-	
-	private static void usage() {
-		
-		System.err.println("port (-stop | <i>namespace</i> (propertyFile|configFile) )");
-		
-	}
-	
-	/**
-	 * Run an httpd service exposing a SPARQL endpoint. The service will respond
-	 * at the root path for the specified port.
-	 * 
-	 * @param args
-	 *            USAGE:
-	 *            <code>port (-stop | <i>namespace</i> (propertyFile|configFile) )</code>
-	 *            where
-	 *            <dl>
-	 *            <dt>port</dt>
-	 *            <dd>The port on which the service will respond.</dd>
-	 *            <dt>namespace</dt>
-	 *            <dd>The namespace of the target KB instance ("kb" is the
-	 *            default namespace).</dd>
-	 *            <dt>propertyFile</dt>
-	 *            <dd>A java properties file for a standalone {@link Journal}</dd>
-	 *            <dt>configFile</dt>
-	 *            <dd>A jini configuration file for a bigdata federation</dd>
-	 *            </dl>
-	 * 
-	 * @todo introduce "-jnl" or "-fed" options to specify the standalone
-	 *       journal or a jini federation?
-	 */
-	public static void main(final String[] args) {
-		int port = 80;
-		Journal jnl = null;
-		JiniClient<?> jiniClient = null;
-		NanoSparqlServer server = null;
-		try {
-			if (args.length == 2) {
-				port = Integer.valueOf(args[0]);
-				if("-stop".equals(args[1])) {
-					// Send stop to server.
-					sendStop(port);
-					// Normal exit.
-					System.exit(0);
-				}
-			}
-			if (args.length != 3) {
-				usage();
-				System.exit(1);
-			}
-			port = Integer.valueOf(args[0]);
-			final String namespace = args[1];
-			final String propertyFile = args[2];
-			final File file = new File(propertyFile);
-			if (!file.exists()) {
-				throw new RuntimeException("Could not find file: " + file);
-			}
-			boolean isJini = false;
-			if (propertyFile.endsWith(".config")) {
-				isJini = true;
-			} else if (propertyFile.endsWith(".properties")) {
-				isJini = false;
-			} else {
+        }
+        
+        if(showQueries) {
+            
+            /*
+             * Show the queries which are currently executing.
+             */
+            
+            final long now = System.nanoTime();
+            
+            final TreeMap<Long, RunningQuery> ages = new TreeMap<Long, RunningQuery>();
+            
+            {
 
-				/*
-				 * Note: This is a hack, but we are recognizing the jini
-				 * configuration file with a .config extension and the journal
-				 * properties file with a .properties extension.
-				 */
-				System.err
-						.println("File should have '.config' or '.properties' extension: "
-								+ file);
-				System.exit(1);
-			}
-			System.out.println("port: " + port);
-			System.out.println("namespace: " + namespace);
-			System.out.println("file: " + file.getAbsoluteFile());
+                final Iterator<RunningQuery> itr = queries.values().iterator();
 
-			/*
-			 * Connect to the database.
-			 */
-			final IIndexManager indexManager;
-			{
+                while (itr.hasNext()) {
 
-				if (isJini) {
+                    final RunningQuery query = itr.next();
 
-					/*
-					 * A bigdata federation.
-					 */
+                    final long age = now - query.begin;
 
-					jiniClient = new JiniClient(new String[] { propertyFile });
+                    ages.put(age, query);
 
-					indexManager = jiniClient.connect();
+                }
 
-				} else {
+            }
 
-					/*
-					 * Note: we only need to specify the FILE when re-opening a
-					 * journal containing a pre-existing KB.
-					 */
-					final Properties properties = new Properties();
-					{
-						// Read the properties from the file.
-						final InputStream is = new BufferedInputStream(
-								new FileInputStream(propertyFile));
-						try {
-							properties.load(is);
-						} finally {
-							is.close();
-						}
-						if (System.getProperty(BigdataSail.Options.FILE) != null) {
-							// Override/set from the environment.
-							properties
-									.setProperty(
-											BigdataSail.Options.FILE,
-											System
-													.getProperty(BigdataSail.Options.FILE));
-						}
-					}
+            {
 
-					indexManager = jnl = new Journal(properties);
+                final Iterator<RunningQuery> itr = ages.values().iterator();
 
-				}
+                while (itr.hasNext()) {
 
-			}
+                    final RunningQuery query = itr.next();
 
-			server = new NanoSparqlServer(port, namespace, indexManager);
+                    final long age = now - query.begin;
 
-			/*
-			 * Wait until the server is terminated.
-			 */
-			synchronized (server.alive) {
+                    sb.append("age="
+                            + java.util.concurrent.TimeUnit.NANOSECONDS
+                                    .toMillis(age) + "ms, queryId="
+                            + query.queryId + ", query=" + query.query+"\n");
 
-				while (server.alive.get()) {
+                }
 
-					server.alive.wait();
+            }
+            
+        }
+        
+        return new Response(HTTP_OK, MIME_TEXT_PLAIN, sb.toString());
 
-				}
+    }
+    
+    /**
+     * Answer a SPARQL query.
+     * 
+     * @param uri
+     * @param method
+     * @param header
+     * @param params
+     * @return
+     * @throws Exception
+     */
+    public Response doQuery(final String uri, final String method,
+            final Properties header,
+            final LinkedHashMap<String, Vector<String>> params) throws Exception {
 
-				System.out.println("Service is down.");
+        final String namespace = getNamespace(uri);
 
-			}
+        final long timestamp = getTimestamp(uri, params);
+        
+        final String queryStr = params.get("query").get(0);
 
-		} catch (Exception ex) {
-			ex.printStackTrace();
-		} finally {
-			if (server != null)
-				server.shutdownNow();
-			if (jnl != null) {
-				jnl.close();
-			}
-			if (jiniClient != null) {
-				jiniClient.disconnect(true/* immediateShutdown */);
-			}
-		}
+        if (queryStr == null) {
 
-	}
+            return new Response(HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                    "Specify query using ?query=....");
+
+        }
+
+        if (log.isInfoEnabled())
+            log.info("query: " + queryStr);
+        
+        /*
+         * Setup pipes. The [os] will be passed into the task that executes the
+         * query. The [is] will be passed into the Response. The task is
+         * executed on a thread pool.
+         * 
+         * Note: If the client closes the connection, then the InputStream
+         * passed into the Response will be closed and the task will terminate
+         * rather than running on in the background with a disconnected client.
+         */
+        final PipedOutputStream os = new PipedOutputStream();
+        final InputStream is = new PipedInputStream(os);//Bytes.kilobyte32*8/*pipeSize*/);
+        final FutureTask<Void> ft = new FutureTask<Void>(getQueryTask(
+                namespace, timestamp, queryStr, os));
+        try {
+
+            // Choose an appropriate MIME type.
+            final String mimeType;
+            final QueryType queryType = QueryType.fromQuery(queryStr);
+            switch(queryType) {
+            case DESCRIBE:
+            case CONSTRUCT:
+                mimeType = MIME_RDF_XML;
+                break;
+            case ASK:
+            case SELECT:
+                mimeType = MIME_SPARQL_RESULTS_XML;
+                break;
+            default:
+                throw new RuntimeException("Unknown query type: "+queryType);
+            }
+
+            // Begin executing the query (asynchronous).
+            queryService.execute(ft);
+            
+            // Setup the response.
+            final Response r = new Response(HTTP_OK, mimeType + "; charset='"
+                    + charset + "'", is);
+
+            /*
+             * Sets the cache behavior.
+             */
+            // r.addHeader("Cache-Control",
+            // "max-age=60, must-revalidate, public");
+            // to disable caching.
+            // r.addHeader("Cache-Control", "no-cache");
+
+            return r;
+
+        } catch (Throwable e) {
+
+            throw launderThrowable(e, os);
+
+        }
+
+    }
+
+    static private RuntimeException launderThrowable(final Throwable t,
+            final OutputStream os) throws Exception {
+        if (os != null) {
+            try {
+                /*
+                 * Write the stack trace onto the output stream. This will show
+                 * up in the client's response. This code path will only be
+                 * taken if we have already begun writing the response.
+                 * Otherwise, an HTTP error status will be used instead.
+                 */
+                t.printStackTrace(new PrintWriter(os));
+                // flush the output stream.
+                os.flush();
+            } finally {
+                // ignore any problems here.
+            }
+            try {
+                // ensure output stream is closed.
+                os.close();
+            } catch (Throwable t2) {
+                // ignore any problems here.
+            }
+        }
+        try {
+            // log an error for the service.
+            log.error(t, t);
+        } finally {
+            // ignore any problems here.
+        }
+        if (t instanceof RuntimeException) {
+            return (RuntimeException) t;
+        } else if (t instanceof Error) {
+            throw (Error) t;
+        } else if (t instanceof Exception) {
+            throw (Exception) t;
+        } else
+            throw new RuntimeException(t);
+    }
+
+    /**
+     * Return the task which will execute the query.
+     * 
+     * @param queryStr
+     *            The query.
+     * @param os
+     *            Where the task will write its output.
+     *            
+     * @return The task.
+     * 
+     * @throws MalformedQueryException 
+     */
+    private Callable<Void> getQueryTask(final String namespace,
+            final long timestamp, final String queryStr,
+            final PipedOutputStream os) throws MalformedQueryException {
+
+        /*
+         * Parse the query so we can figure out how it will need to be executed.
+         * 
+         * Note: This will fail a query on its syntax. However, the logic used
+         * in the tasks to execute a query will not fail a bad query for some
+         * reason which I have not figured out yet. Therefore, we are in the
+         * position of having to parse the query here and then again when it is
+         * executed.
+         */
+        /*final ParsedQuery q =*/ engine.parseQuery(queryStr, null/*baseURI*/);
+
+        final NanoSparqlClient.QueryType queryType = NanoSparqlClient.QueryType
+                .fromQuery(queryStr);
+
+        switch (queryType) {
+        case ASK:
+            /*
+             * FIXME handle ASK.
+             */
+            break;
+        case DESCRIBE:
+        case CONSTRUCT:
+            return new GraphQueryTask(namespace, timestamp, queryStr, os);
+        case SELECT:
+            return new TupleQueryTask(namespace, timestamp, queryStr, os);
+        }
+
+        throw new RuntimeException("Unknown query type: " + queryType);
+
+    }
+
+    /**
+     * Note: A read-only connection.
+     * 
+     * @param namespace
+     * @param timestamp
+     * 
+     * @throws RepositoryException
+     * 
+     * @todo enforce historical query by making sure timestamps conform (we do
+     *       not want to allow read/write tx queries unless update semantics are
+     *       introduced ala SPARQL 1.1).
+     * 
+     * @todo Use a distributed read-only tx for queries (it would be nice if a
+     *       tx used 2PL to specify which namespaces it could touch).
+     */
+    protected BigdataSailRepositoryConnection getQueryConnection(
+            final String namespace, final long timestamp)
+            throws RepositoryException {
+        
+        // resolve the default namespace.
+        final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
+                .getResourceLocator().locate(namespace, timestamp);
+
+        if (tripleStore == null) {
+
+            throw new RuntimeException("Not found: namespace=" + namespace
+                    + ", timestamp=" + TimestampUtility.toString(timestamp));
+
+        }
+
+        /*
+         * Since the kb exists, wrap it as a sail.
+         * 
+         * @todo cache? close when not in use any more?
+         */
+        final BigdataSail sail = new BigdataSail(tripleStore);
+
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+
+        repo.initialize();
+
+        return (BigdataSailRepositoryConnection) repo
+                .getReadOnlyConnection(timestamp);
+
+    }
+
+    /**
+     * Abstract base class for running queries handles the timing, pipe,
+     * reporting, obtains the connection, and provides the finally {} semantics
+     * for each type of query task.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     */
+    abstract private class AbstractQueryTask implements Callable<Void> {
+        
+        /** The namespace against which the query will be run. */
+        private final String namespace;
+
+        /**
+         * The timestamp of the view for that namespace against which the query
+         * will be run.
+         */
+        private final long timestamp;
+
+        /** The SPARQL query string. */
+        protected final String queryStr;
+
+        /** A pipe used to incrementally deliver the results to the client. */
+        private final PipedOutputStream os;
+
+        /**
+         * 
+         * @param namespace
+         *            The namespace against which the query will be run.
+         * @param timestamp
+         *            The timestamp of the view for that namespace against which
+         *            the query will be run.
+         * @param queryStr
+         *            The SPARQL query string.
+         * @param os
+         *            A pipe used to incrementally deliver the results to the
+         *            client.
+         */
+        protected AbstractQueryTask(final String namespace,
+                final long timestamp, final String queryStr,
+                final PipedOutputStream os) {
+
+            this.namespace = namespace;
+            this.timestamp = timestamp;
+            this.queryStr = queryStr;
+            this.os = os;
+
+        }
+
+        /**
+         * Execute the query.
+         * 
+         * @param cxn
+         *            The connection.
+         * @param os
+         *            Where the write the query results.
+         * 
+         * @throws Exception
+         */
+        abstract protected void doQuery(SailRepositoryConnection cxn,
+                OutputStream os) throws Exception;
+
+        final public Void call() throws Exception {
+            final Long queryId = Long.valueOf(queryIdFactory.incrementAndGet());
+            final SailRepositoryConnection cxn = getQueryConnection(namespace,
+                    timestamp);
+            final long begin = System.nanoTime();
+            try {
+                queries.put(queryId, new RunningQuery(queryId.longValue(),
+                        queryStr, begin));
+                doQuery(cxn, os);
+                os.flush();
+                return null;
+            } catch (Throwable t) {
+                // launder and rethrow the exception.
+                throw launderThrowable(t, os);
+            } finally {
+                queries.remove(queryId);
+                try {
+                    os.close();
+                } catch (Throwable t) {
+                    log.error(t, t);
+                }
+                try {
+                    cxn.close();
+                } catch (Throwable t) {
+                    log.error(t, t);
+                }
+            }
+        }
+
+    }
+
+    /**
+     * Executes a tuple query.
+     */
+    private class TupleQueryTask extends AbstractQueryTask {
+
+        public TupleQueryTask(final String namespace, final long timestamp,
+                final String queryStr, final PipedOutputStream os) {
+
+            super(namespace, timestamp, queryStr, os);
+
+        }
+
+        protected void doQuery(final SailRepositoryConnection cxn,
+                final OutputStream os) throws Exception {
+
+            final TupleQuery query = cxn.prepareTupleQuery(
+                    QueryLanguage.SPARQL, queryStr);
+            
+            query.evaluate(new SPARQLResultsXMLWriter(new XMLWriter(os)));
+            
+        }
+        
+//      public Void call() throws Exception {
+//          final Long queryId = Long.valueOf(queryIdFactory.incrementAndGet());
+//          final SailRepositoryConnection cxn = getQueryConnection();
+//          try {
+//              final long begin = System.nanoTime();
+//              queries.put(queryId, new RunningQuery(queryId.longValue(), queryStr, begin));
+//              final TupleQuery query = cxn.prepareTupleQuery(
+//                      QueryLanguage.SPARQL, queryStr);
+//              query.evaluate(new SPARQLResultsXMLWriter(new XMLWriter(os)));
+//              os.close();
+//              return null;
+//          } catch (Throwable t) {
+//              // launder and rethrow the exception.
+//              throw launderThrowable(t,os);
+//          } finally {
+//              try {
+//                  cxn.close();
+//              } finally {
+//                  queries.remove(queryId);
+//              }
+//          }
+//      }
+
+    }
+
+    /**
+     * Executes a graph query.
+     */
+    private class GraphQueryTask extends AbstractQueryTask {
+
+        public GraphQueryTask(final String namespace, final long timestamp,
+                final String queryStr, final PipedOutputStream os) {
+
+            super(namespace,timestamp,queryStr,os);
+
+        }
+
+//      public Void call() throws Exception {
+//          final Long queryId = Long.valueOf(queryIdFactory.incrementAndGet());
+//          final SailRepositoryConnection cxn = getQueryConnection();
+//          try {
+//              final long begin = System.nanoTime();
+//              queries.put(queryId, new RunningQuery(queryId.longValue(), queryStr, begin));
+//              final BigdataSailGraphQuery query = (BigdataSailGraphQuery) cxn
+//                      .prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
+//              query.evaluate(new RDFXMLWriter(os));
+//              os.close();
+//              return null;
+//          } catch (Throwable t) {
+//              throw launderThrowable(t, os);
+//          } finally {
+//              try {
+//                  cxn.close();
+//              } finally {
+//                  queries.remove(queryId);
+//              }
+//          }
+//      }
+
+        @Override
+        protected void doQuery(final SailRepositoryConnection cxn,
+                final OutputStream os) throws Exception {
+
+            final BigdataSailGraphQuery query = (BigdataSailGraphQuery) cxn
+                    .prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
+
+            query.evaluate(new RDFXMLWriter(os));
+
+        }
+
+    }
+
+    /**
+     * Send a STOP message to the service
+     * 
+     * @param port
+     *            The port for that service.
+     * 
+     * @throws IOException
+     * 
+     * @todo This winds up warning <code>
+     * java.net.SocketTimeoutException: Read timed out
+     * </code> even though the shutdown request was
+     *       accepted and processed by the server. I'm not sure why.
+     */
+    public static void sendStop(final int port) throws IOException {
+
+        final URL url = new URL("http://localhost:" + port + "/stop");
+        HttpURLConnection conn = null;
+        try {
+
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setDoInput(true); // true to read from the server.
+            conn.setDoOutput(true); // true to write to the server.
+            conn.setUseCaches(false);
+            conn.setReadTimeout(2000/* ms */);
+            conn.setRequestProperty("Content-Type",
+                    "application/x-www-form-urlencoded");
+            conn.setRequestProperty("Content-Length", "" + Integer.toString(0));
+            conn.setRequestProperty("Content-Language", "en-US");
+
+            // Send request
+            conn.getOutputStream().close();
+
+            // connect.
+            try {
+
+                conn.connect();
+
+                final int rc = conn.getResponseCode();
+                
+                if (rc < 200 || rc >= 300) {
+                    
+                    log.error(conn.getResponseMessage());
+                    
+                }
+
+                System.out.println(conn.getResponseMessage());
+
+            } catch (IOException ex) {
+
+                log.warn(ex);
+                
+            }
+
+        } finally {
+
+            // clean up the connection resources
+            if (conn != null)
+                conn.disconnect();
+
+        }
+
+    }
+    
+    /**
+     * Configuration object.
+     */
+    private static class Config {
+
+        /**
+         * The port on which the server will answer requests.
+         */
+        public int port;
+        
+        /**
+         * The default namespace.
+         */
+        public String namespace;
+        
+        /**
+         * The default timestamp used to query the default namespace.
+         */
+        public long timestamp;
+        
+        /**
+         * The #of threads to use to handle SPARQL queries -or- ZERO (0) for an
+         * unbounded pool.
+         */
+        public int queryThreadPoolSize = 8;
+        
+        public Config() {
+        }
+        
+    }
+    
+    private static void usage() {
+        
+        System.err.println("port (-stop | <i>namespace</i> (propertyFile|configFile) )");
+        
+    }
+
+    /**
+     * Run an httpd service exposing a SPARQL endpoint. The service will respond
+     * to the following URL paths:
+     * <dl>
+     * <dt>http://localhost:port/</dt>
+     * <dd>The SPARQL end point for the default namespace as specified by the
+     * <code>namespace</code> command line argument.</dd>
+     * <dt>http://localhost:port/namespace/NAMESPACE</dt>
+     * <dd>where <code>NAMESPACE</code> is the namespace of some triple store or
+     * quad store, may be used to address ANY triple or quads store in the
+     * bigdata instance.</dd>
+     * <dt>http://localhost:port/status</dt>
+     * <dd>A status page.</dd>
+     * </dl>
+     * 
+     * @param args
+     *            USAGE: <code>port -stop</code> to stop the server; OR<br/>
+     *            <code>(options) <i>namespace</i> (propertyFile|configFile) )</code>
+     *            where
+     *            <dl>
+     *            <dt>port</dt>
+     *            <dd>The port on which the service will respond.</dd>
+     *            <dt>namespace</dt>
+     *            <dd>The namespace of the default SPARQL endpoint (the
+     *            namespace will be <code>kb</code> if none was specified when
+     *            the triple/quad store was created).</dd>
+     *            <dt>propertyFile</dt>
+     *            <dd>A java properties file for a standalone {@link Journal}.</dd>
+     *            <dt>configFile</dt>
+     *            <dd>A jini configuration file for a bigdata federation.</dd>
+     *            </dl>
+     *            and <i>options</i> are any of:
+     *            <dl>
+     *            <dt>-nthreads</dt>
+     *            <dd>The #of threads which will be used to answer SPARQL
+     *            queries.</dd>
+     *            </dl>
+     */
+    public static void main(final String[] args) {
+        final Config config = new Config();
+        config.port = 80;
+        Journal jnl = null;
+        JiniClient<?> jiniClient = null;
+        NanoSparqlServer server = null;
+        ITransactionService txs = null;
+        try {
+            /*
+             * `
+             * modify the rest of this to handle additional options, which get
+             * set on [config].
+             */
+            if (args.length == 2) {
+                final int port = Integer.valueOf(args[0]);
+                if("-stop".equals(args[1])) {
+                    // Send stop to server.
+                    sendStop(port);
+                    // Normal exit.
+                    System.exit(0);
+                } else {
+                    usage();
+                    System.exit(1);
+                }
+            }
+            if (args.length != 3) {
+                usage();
+                System.exit(1);
+            }
+            config.port = Integer.valueOf(args[0]);
+            config.namespace = args[1];
+            final String propertyFile = args[2];
+            final File file = new File(propertyFile);
+            if (!file.exists()) {
+                throw new RuntimeException("Could not find file: " + file);
+            }
+            boolean isJini = false;
+            if (propertyFile.endsWith(".config")) {
+                isJini = true;
+            } else if (propertyFile.endsWith(".properties")) {
+                isJini = false;
+            } else {
+
+                /*
+                 * Note: This is a hack, but we are recognizing the jini
+                 * configuration file with a .config extension and the journal
+                 * properties file with a .properties extension.
+                 */
+                System.err
+                        .println("File should have '.config' or '.properties' extension: "
+                                + file);
+                System.exit(1);
+            }
+            System.out.println("port: " + config.port);
+            System.out.println("namespace: " + config.namespace);
+            System.out.println("file: " + file.getAbsoluteFile());
+
+            /*
+             * Connect to the database.
+             */
+            final IIndexManager indexManager;
+            {
+
+                if (isJini) {
+
+                    /*
+                     * A bigdata federation.
+                     */
+
+                    jiniClient = new JiniClient(new String[] { propertyFile });
+
+                    indexManager = jiniClient.connect();
+
+                } else {
+
+                    /*
+                     * Note: we only need to specify the FILE when re-opening a
+                     * journal containing a pre-existing KB.
+                     */
+                    final Properties properties = new Properties();
+                    {
+                        // Read the properties from the file.
+                        final InputStream is = new BufferedInputStream(
+                                new FileInputStream(propertyFile));
+                        try {
+                            properties.load(is);
+                        } finally {
+                            is.close();
+                        }
+                        if (System.getProperty(BigdataSail.Options.FILE) != null) {
+                            // Override/set from the environment.
+                            properties
+                                    .setProperty(
+                                            BigdataSail.Options.FILE,
+                                            System
+                                                    .getProperty(BigdataSail.Options.FILE));
+                        }
+                    }
+
+                    indexManager = jnl = new Journal(properties);
+
+                }
+
+            }
+
+            txs = (indexManager instanceof Journal ? ((Journal) indexManager)
+                    .getTransactionManager().getTransactionService()
+                    : ((IBigdataFederation<?>) indexManager)
+                            .getTransactionService());
+
+            config.timestamp = txs.newTx(ITx.READ_COMMITTED);
+            System.out.println("tx: " + config.timestamp);
+
+            // start the server.
+            server = new NanoSparqlServer(config, indexManager);
+
+            /*
+             * Install a shutdown hook so that the master will cancel any
+             * running clients if it is interrupted (normal kill will trigger
+             * this hook).
+             */
+            {
+                
+                final NanoSparqlServer tmp = server;
+                
+                Runtime.getRuntime().addShutdownHook(new Thread() {
+
+                    public void run() {
+
+                        tmp.shutdownNow();
+
+                        System.err.println("Caught signal, shutting down: "
+                                + new Date());
+
+                    }
+
+                });
+
+            }
+
+            System.out.println("Service is running.");
+
+            if (true) { // @todo if(!quiet) or if(verbose)
+                /*
+                 * Log some information about the default kb (#of statements, etc).
+                 */
+                System.out.println(server.getKBInfo(config.namespace,
+                        config.timestamp));
+                System.out.println(server.getStoreInfo());
+            }
+
+            /*
+             * Wait until the server is terminated.
+             */
+            synchronized (server.alive) {
+
+                while (server.alive.get()) {
+
+                    server.alive.wait();
+
+                }
+
+                System.out.println("Service is down.");
+
+            }
+
+        } catch (Throwable ex) {
+            ex.printStackTrace();
+        } finally {
+            if (txs != null) {
+                try {
+                    txs.abort(config.timestamp);
+                } catch (IOException e) {
+                    log.error("Could not release transaction: tx="
+                            + config.timestamp, e);
+                }
+            }
+            if (server != null)
+                server.shutdownNow();
+            if (jnl != null) {
+                jnl.close();
+            }
+            if (jiniClient != null) {
+                jiniClient.disconnect(true/* immediateShutdown */);
+            }
+        }
+
+    }
 
 }

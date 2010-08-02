@@ -26,22 +26,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
+import info.aduna.xml.XMLWriter;
+import java.io.StringWriter;
 import java.util.Collection;
 import java.util.LinkedList;
+import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
-import org.openrdf.model.Literal;
-import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.BNodeImpl;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
-import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.impl.BindingImpl;
+import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLWriter;
 
 /**
  * Unit tests the UNION aspects of the {@link BigdataSail} implementation.
@@ -51,6 +52,8 @@ import org.openrdf.query.impl.BindingImpl;
  */
 public class TestUnions extends QuadsTestCase {
 
+    protected static final Logger log = Logger.getLogger(TestUnions.class);
+    
     /**
      * 
      */
@@ -189,6 +192,98 @@ public class TestUnions extends QuadsTestCase {
                 
                 compare(result, answer);
 
+            }
+            
+        } finally {
+            cxn.close();
+            sail.__tearDownUnitTest();
+        }
+
+    }
+    
+    /**
+     * Tests mapping of UNIONS in SPARQL onto unions in bigdata rules.
+     * 
+     * @throws Exception 
+     */
+    public void testSesameFilters() throws Exception {
+
+        final BigdataSail sail = getSail();
+        sail.initialize();
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+        final BigdataSailRepositoryConnection cxn = 
+            (BigdataSailRepositoryConnection) repo.getConnection();
+        cxn.setAutoCommit(false);
+        
+        try {
+    
+            final URI jack = new URIImpl("_:Jack");
+            final URI jill = new URIImpl("_:Jill");
+            final URI person = new URIImpl("_:Person");
+            final URI age = new URIImpl("_:age");
+            final URI integer = new URIImpl("http://www.w3.org/2001/XMLSchema#integer");
+/**/            
+            cxn.add(
+                    jack,
+                    RDF.TYPE,
+                    person
+                    );
+            cxn.add(
+                    jill,
+                    RDF.TYPE,
+                    person
+                    );
+            cxn.add(
+                    jack,
+                    age,
+                    new LiteralImpl("40", integer)
+                    );
+            cxn.add(
+                    jill,
+                    age,
+                    new LiteralImpl("30", integer)
+                    );
+/**/
+
+            /*
+             * Note: The either flush() or commit() is required to flush the
+             * statement buffers to the database before executing any operations
+             * that go around the sail.
+             */
+            cxn.flush();//commit();
+            
+/**/            
+            log.info("hello");
+            if (log.isInfoEnabled()) {
+                log.info("\n" + sail.getDatabase().dumpStore());
+            }
+
+            {
+                
+                String query = 
+                    "SELECT * " +
+                    "WHERE { " +
+                    "  { " +
+                    "    ?x <"+RDF.TYPE+"> <"+person+"> . " +
+                    "    ?x <"+age+"> ?age1 . " +
+                    "    FILTER( ?age1 > 35 ) . " +
+                    "  } " +
+                    "  UNION " +
+                    "  { " +
+                    "    ?x <"+RDF.TYPE+"> <"+person+"> . " +
+                    "    ?x <"+age+"> ?age2 . " +
+                    "    FILTER( ?age2 > 25 ) . " +
+                    "  } " +
+                    "}";
+                
+                final StringWriter sw = new StringWriter();
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                tupleQuery.evaluate(new SPARQLResultsXMLWriter(new XMLWriter(sw)));
+    
+                System.err.println(sw.toString());
             }
             
         } finally {

@@ -5,6 +5,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
@@ -30,8 +31,8 @@ public class MatchRule extends Rule<SPO> {
     private static final long serialVersionUID = -5002902183499739018L;
 
     public MatchRule(String relationName, Vocabulary vocab,
-            IVariable<Long> lit, IConstant<Long>[] preds,
-            IConstant<Long> cls) {
+            IVariable<IV> lit, IConstant<IV>[] preds,
+            IConstant<IV> cls) {
 
     super(  "matchRule", //
             new SPOPredicate(relationName, var("s"), var("t"), lit), //

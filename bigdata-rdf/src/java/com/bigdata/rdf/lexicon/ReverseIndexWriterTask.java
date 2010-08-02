@@ -1,20 +1,16 @@
 package com.bigdata.rdf.lexicon;
 
 import java.util.concurrent.Callable;
-
 import org.openrdf.model.BNode;
 import org.openrdf.model.Value;
-
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.lexicon.Id2TermWriteProc.Id2TermWriteProcConstructor;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.spo.ISPO;
 
@@ -80,7 +76,7 @@ public class ReverseIndexWriterTask implements Callable<Long> {
         this.ndistinct = ndistinct;
         
         this.storeBlankNodes = storeBlankNodes;
-
+        
     }
 
     /**
@@ -102,7 +98,7 @@ public class ReverseIndexWriterTask implements Callable<Long> {
         {
 
             // thread-local key builder removes single-threaded constraint.
-            final IKeyBuilder tmp = KeyBuilder.newInstance(Bytes.SIZEOF_LONG);
+            final IKeyBuilder tmp = KeyBuilder.newInstance();
 
             // buffer is reused for each serialized term.
             final DataOutputBuffer out = new DataOutputBuffer();
@@ -118,7 +114,7 @@ public class ReverseIndexWriterTask implements Callable<Long> {
 
                 }
 
-                keys[nonBNodeCount] = tmp.reset().append(x.getTermId())
+                keys[nonBNodeCount] = x.getIV().encode(tmp.reset())
                         .getKey();
 
                 // Serialize the term.

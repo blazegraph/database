@@ -30,12 +30,11 @@ package com.bigdata.rdf.rules;
 import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
-
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDFS;
-
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -120,12 +119,12 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
             final SubPropertyClosureTask task = new SubPropertyClosureTask(
                     view, vocab.getConstant(RDFS.SUBPROPERTYOF));
 
-            Set<Long> subProperties = task.getSubProperties();
+            Set<IV> subProperties = task.getSubProperties();
 
             assertTrue(subProperties.contains(store
-                    .getTermId(rdfsSubPropertyOf)));
-            assertTrue(subProperties.contains(store.getTermId(A)));
-            assertTrue(subProperties.contains(store.getTermId(B)));
+                    .getIV(rdfsSubPropertyOf)));
+            assertTrue(subProperties.contains(store.getIV(A)));
+            assertTrue(subProperties.contains(store.getIV(B)));
 
             assertEquals(3, subProperties.size());
 
@@ -136,10 +135,10 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
             subProperties = task.getSubProperties();
 
             assertTrue(subProperties.contains(store
-                    .getTermId(rdfsSubPropertyOf)));
-            assertTrue(subProperties.contains(store.getTermId(A)));
-            assertTrue(subProperties.contains(store.getTermId(B)));
-            assertTrue(subProperties.contains(store.getTermId(C)));
+                    .getIV(rdfsSubPropertyOf)));
+            assertTrue(subProperties.contains(store.getIV(A)));
+            assertTrue(subProperties.contains(store.getIV(B)));
+            assertTrue(subProperties.contains(store.getIV(C)));
 
             assertEquals(4, subProperties.size());
 
@@ -213,11 +212,11 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
              * treating it as such for the purpose of this test.
              */
 
-            Set<Long> R = new HashSet<Long>();
+            Set<IV> R = new HashSet<IV>();
 
-            R.add(store.getTermId(RDFS.RANGE));
+            R.add(store.getIV(RDFS.RANGE));
 
-            R.add(store.getTermId(MyRange));
+            R.add(store.getIV(MyRange));
 
             /*
              * setup the rule execution.
@@ -272,9 +271,9 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
         public MyRuleFastClosure6(String name,
                 final String database,
                 final String focusStore,
-                final IConstant<Long> rdfsSubPropertyOf,
-                final IConstant<Long> propertyId,
-                final Set<Long> set) {
+                final IConstant<IV> rdfsSubPropertyOf,
+                final IConstant<IV> propertyId,
+                final Set<IV> set) {
 
             super(name, database, rdfsSubPropertyOf, propertyId,
                     new MyFastClosure_6_RuleTaskFactory(database,
@@ -300,17 +299,17 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
 
         final String focusStore;
 
-        final IConstant<Long> rdfsSubPropertyOf;
+        final IConstant<IV> rdfsSubPropertyOf;
 
-        final IConstant<Long> propertyId;
+        final IConstant<IV> propertyId;
         
-        final Set<Long> set;
+        final Set<IV> set;
         
         public MyFastClosure_6_RuleTaskFactory(final String database,
                 final String focusStore,
-                final IConstant<Long> rdfsSubPropertyOf,
-                final IConstant<Long> propertyId,
-                final Set<Long> set) {
+                final IConstant<IV> rdfsSubPropertyOf,
+                final IConstant<IV> propertyId,
+                final Set<IV> set) {
 
             this.database = database;
             
@@ -331,7 +330,7 @@ public class TestRuleFastClosure_3_5_6_7_9 extends AbstractRuleTestCase {
                     joinNexus, buffer, /* P, */
                     rdfsSubPropertyOf, propertyId) {
 
-                public Set<Long> getSet() {
+                public Set<IV> getSet() {
 
                     // the hand-built property set closure.
                     return set;

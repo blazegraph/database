@@ -146,13 +146,22 @@ public class EDSAsyncLoader {
 
             }
 
+            // @todo there is no way to configure this.
+            final RDFParserOptions parserOptions = new RDFParserOptions();
+
+            if (tripleStore.getLexiconRelation().isStoreBlankNodes()) {
+
+                parserOptions.setPreserveBNodeIDs(true);
+
+            }
+
             final AsynchronousStatementBufferFactory<BigdataStatement, File> statementBufferFactory = new AsynchronousStatementBufferFactory<BigdataStatement, File>(
                     (ScaleOutTripleStore) tripleStore,//
                     producerChunkSize, //
                     valuesInitialCapacity,//
                     bnodesInitialCapacity,//
                     RDFFormat.RDFXML, // defaultFormat
-                    false, // verifyData
+                    parserOptions, // parserOptions
                     false, // deleteAfter
                     poolSize, // parserPoolSize,
                     20, // parserQueueCapacity

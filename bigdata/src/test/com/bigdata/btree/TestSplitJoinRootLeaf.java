@@ -29,7 +29,7 @@ package com.bigdata.btree;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.io.SerializerUtil;
 
 /**
@@ -98,15 +98,15 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
 //        SimpleEntry v5 = new SimpleEntry(5);
 //        SimpleEntry v7 = new SimpleEntry(7);
         
-        btree.insert(KeyBuilder.asSortKey(3), v3);
-        btree.insert(KeyBuilder.asSortKey(5), v5);
-        btree.insert(KeyBuilder.asSortKey(7), v7);
+        btree.insert(TestKeyBuilder.asSortKey(3), v3);
+        btree.insert(TestKeyBuilder.asSortKey(5), v5);
+        btree.insert(TestKeyBuilder.asSortKey(7), v7);
         
         assertKeys(new int[]{3,5,7},a);
         assertValues(new Object[]{v3,v5,v7},a);
 
         // split the root leaf.
-        btree.insert(KeyBuilder.asSortKey(2), v2);
+        btree.insert(TestKeyBuilder.asSortKey(2), v2);
         assertTrue("after split",btree.dump(Level.DEBUG,System.err));
         
         Node root = (Node)btree.getRoot();
@@ -132,7 +132,7 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
          * a with the remaining keys and values. Both the root node and the
          * merged sibling should be marked as deleted.
          */
-        btree.remove(KeyBuilder.asSortKey(2));
+        btree.remove(TestKeyBuilder.asSortKey(2));
         assertTrue("after join",btree.dump(Level.DEBUG,System.err));
         
         assertKeys(new int[]{3,5,7},a);
@@ -164,15 +164,15 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
 //        SimpleEntry v5 = new SimpleEntry(5);
 //        SimpleEntry v7 = new SimpleEntry(7);
         
-        btree.insert(KeyBuilder.asSortKey(3), v3);
-        btree.insert(KeyBuilder.asSortKey(5), v5);
-        btree.insert(KeyBuilder.asSortKey(7), v7);
+        btree.insert(TestKeyBuilder.asSortKey(3), v3);
+        btree.insert(TestKeyBuilder.asSortKey(5), v5);
+        btree.insert(TestKeyBuilder.asSortKey(7), v7);
         
         assertKeys(new int[]{3,5,7},a);
         assertValues(new Object[]{v3,v5,v7},a);
 
         // split the root leaf.
-        btree.insert(KeyBuilder.asSortKey(2), v2);
+        btree.insert(TestKeyBuilder.asSortKey(2), v2);
         assertTrue("after split",btree.dump(Level.DEBUG,System.err));
         
         Node root = (Node)btree.getRoot();
@@ -198,7 +198,7 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
          * a with the remaining keys and values. Both the root node and the
          * merged sibling should be marked as deleted.
          */
-        btree.remove(KeyBuilder.asSortKey(3));
+        btree.remove(TestKeyBuilder.asSortKey(3));
         assertTrue("after join",btree.dump(Level.DEBUG,System.err));
         
         assertKeys(new int[]{2,5,7},a);
@@ -230,15 +230,15 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
 //        SimpleEntry v5 = new SimpleEntry(5);
 //        SimpleEntry v7 = new SimpleEntry(7);
         
-        btree.insert(KeyBuilder.asSortKey(3), v3);
-        btree.insert(KeyBuilder.asSortKey(5), v5);
-        btree.insert(KeyBuilder.asSortKey(7), v7);
+        btree.insert(TestKeyBuilder.asSortKey(3), v3);
+        btree.insert(TestKeyBuilder.asSortKey(5), v5);
+        btree.insert(TestKeyBuilder.asSortKey(7), v7);
         
         assertKeys(new int[]{3,5,7},a);
         assertValues(new Object[]{v3,v5,v7},a);
 
         // split the root leaf.
-        btree.insert(KeyBuilder.asSortKey(2), v2);
+        btree.insert(TestKeyBuilder.asSortKey(2), v2);
         assertTrue("after split",btree.dump(Level.DEBUG,System.err));
         
         Node root = (Node)btree.getRoot();
@@ -264,7 +264,7 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
          * b with the remaining keys and values. Both the root node and the
          * merged sibling should be marked as deleted.
          */
-        btree.remove(KeyBuilder.asSortKey(5));
+        btree.remove(TestKeyBuilder.asSortKey(5));
         assertTrue("after join",btree.dump(Level.DEBUG,System.err));
         
         assertKeys(new int[]{2,3,7},b);
@@ -296,15 +296,15 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
 //        SimpleEntry v5 = new SimpleEntry(5);
 //        SimpleEntry v7 = new SimpleEntry(7);
         
-        btree.insert(KeyBuilder.asSortKey(3), v3);
-        btree.insert(KeyBuilder.asSortKey(5), v5);
-        btree.insert(KeyBuilder.asSortKey(7), v7);
+        btree.insert(TestKeyBuilder.asSortKey(3), v3);
+        btree.insert(TestKeyBuilder.asSortKey(5), v5);
+        btree.insert(TestKeyBuilder.asSortKey(7), v7);
         
         assertKeys(new int[]{3,5,7},a);
         assertValues(new Object[]{v3,v5,v7},a);
 
         // split the root leaf.
-        btree.insert(KeyBuilder.asSortKey(2), v2);
+        btree.insert(TestKeyBuilder.asSortKey(2), v2);
         assertTrue("after split",btree.dump(Level.DEBUG,System.err));
                 
         Node root = (Node)btree.getRoot();
@@ -330,7 +330,7 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
          * b with the remaining keys and values. Both the root node and the
          * merged sibling should be marked as deleted.
          */
-        btree.remove(KeyBuilder.asSortKey(7));
+        btree.remove(TestKeyBuilder.asSortKey(7));
         assertTrue("after join",btree.dump(Level.DEBUG,System.err));
         
         assertKeys(new int[]{2,3,5},b);
@@ -373,16 +373,16 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
 //        SimpleEntry v7 = new SimpleEntry(7);
 //        SimpleEntry v9 = new SimpleEntry(9);
         
-        btree.insert(KeyBuilder.asSortKey(3), v3);
-        btree.insert(KeyBuilder.asSortKey(5), v5);
-        btree.insert(KeyBuilder.asSortKey(7), v7);
-        btree.insert(KeyBuilder.asSortKey(9), v9);
+        btree.insert(TestKeyBuilder.asSortKey(3), v3);
+        btree.insert(TestKeyBuilder.asSortKey(5), v5);
+        btree.insert(TestKeyBuilder.asSortKey(7), v7);
+        btree.insert(TestKeyBuilder.asSortKey(9), v9);
         
         assertKeys(new int[]{3,5,7,9},a);
         assertValues(new Object[]{v3,v5,v7,v9},a);
 
         // split the root leaf.
-        btree.insert(KeyBuilder.asSortKey(2), v2);
+        btree.insert(TestKeyBuilder.asSortKey(2), v2);
         assertTrue("after split",btree.dump(Level.DEBUG,System.err));
         
         Node root = (Node)btree.getRoot();
@@ -408,7 +408,7 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
          * will move one key from (b) -> (a) and update the separator key on the
          * parent.
          */
-        assertEquals(v3,btree.remove(KeyBuilder.asSortKey(3)));
+        assertEquals(v3,btree.remove(TestKeyBuilder.asSortKey(3)));
         assertTrue("after redistribute b->a", btree.dump(Level.DEBUG,System.err));
         
         assertKeys(new int[]{7},root);
@@ -438,7 +438,7 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
          * the root leaf and that (a) and the root node are deleted.
          */
 
-        assertEquals(v7,btree.remove(KeyBuilder.asSortKey(7)));
+        assertEquals(v7,btree.remove(TestKeyBuilder.asSortKey(7)));
         assertTrue("after join", btree.dump(Level.DEBUG,System.err));
         
         assertKeys(new int[]{2,5,9},b);
@@ -477,16 +477,16 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
 //        SimpleEntry v7 = new SimpleEntry(7);
 //        SimpleEntry v9 = new SimpleEntry(9);
         
-        btree.insert(KeyBuilder.asSortKey(3), v3);
-        btree.insert(KeyBuilder.asSortKey(5), v5);
-        btree.insert(KeyBuilder.asSortKey(7), v7);
-        btree.insert(KeyBuilder.asSortKey(9), v9);
+        btree.insert(TestKeyBuilder.asSortKey(3), v3);
+        btree.insert(TestKeyBuilder.asSortKey(5), v5);
+        btree.insert(TestKeyBuilder.asSortKey(7), v7);
+        btree.insert(TestKeyBuilder.asSortKey(9), v9);
         
         assertKeys(new int[]{3,5,7,9},a);
         assertValues(new Object[]{v3,v5,v7,v9},a);
 
         // split the root leaf.
-        btree.insert(KeyBuilder.asSortKey(2), v2);
+        btree.insert(TestKeyBuilder.asSortKey(2), v2);
         assertTrue("after split", btree.dump(Level.DEBUG,System.err));
 
         Node root = (Node)btree.getRoot();
@@ -510,7 +510,7 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
          * insert another key that will go into (a) bringing it above its
          * minimum capacity.
          */
-        btree.insert(KeyBuilder.asSortKey(4),v4);
+        btree.insert(TestKeyBuilder.asSortKey(4),v4);
         assertKeys(new int[]{5},root);
         assertEquals(a,root.getChild(0));
         assertEquals(b,root.getChild(1));
@@ -533,12 +533,12 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
          * b.redistributeKeys(a). The latter will move one key from (a) -> (b)
          * and update the separator key on the parent.
          */
-        assertEquals(v5,btree.remove(KeyBuilder.asSortKey(5)));
+        assertEquals(v5,btree.remove(TestKeyBuilder.asSortKey(5)));
         assertKeys(new int[]{7,9},b);
         assertValues(new Object[]{v7,v9},b);
         assertEntryCounts(new int[]{3,2},root);
 
-        assertEquals(v9,btree.remove(KeyBuilder.asSortKey(9)));
+        assertEquals(v9,btree.remove(TestKeyBuilder.asSortKey(9)));
         assertTrue("after redistribute a->b",btree.dump(Level.DEBUG,System.err));
         
         assertKeys(new int[]{4},root);
@@ -567,7 +567,7 @@ public class TestSplitJoinRootLeaf extends AbstractBTreeTestCase {
          * postcondition is that (a) has all the remaining keys and has become
          * the root leaf and (b) and the root node are deleted.
          */
-        assertEquals(v3,btree.remove(KeyBuilder.asSortKey(3)));
+        assertEquals(v3,btree.remove(TestKeyBuilder.asSortKey(3)));
         assertTrue("after join",btree.dump(Level.DEBUG,System.err));
         
         assertKeys(new int[]{2,4,7},a);

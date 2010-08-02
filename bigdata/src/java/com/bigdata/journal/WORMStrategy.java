@@ -607,7 +607,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                     }
                 });
 
-            }
+            } // IRawStore
 
             // disk statistics
             {
@@ -739,11 +739,11 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                     }
                 });
 
-            }
-
+            } // disk
+            
             return root;
 
-        }
+        } // getCounters()
         
     } // class StoreCounters
     

@@ -49,11 +49,10 @@ package com.bigdata.rdf.rules;
 
 import java.util.Arrays;
 import java.util.Properties;
-
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
-
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.SPOKeyOrder;
@@ -119,9 +118,9 @@ public class TestDistinctTermScan extends AbstractRuleTestCase {
             // distinct subject term identifiers.
             {
 
-                Long[] expected = new Long[] {
+                IV[] expected = new IV[] {
 
-                store.getTermId(A), store.getTermId(C)
+                store.getIV(A), store.getIV(C)
 
                 };
 
@@ -136,9 +135,9 @@ public class TestDistinctTermScan extends AbstractRuleTestCase {
             // distinct predicate term identifiers.
             {
 
-                Long[] expected = new Long[] {
+                IV[] expected = new IV[] {
 
-                store.getTermId(B), store.getTermId(E)
+                store.getIV(B), store.getIV(E)
 
                 };
 
@@ -153,9 +152,9 @@ public class TestDistinctTermScan extends AbstractRuleTestCase {
             // distinct object term identifiers.
             {
 
-                Long[] expected = new Long[] {
+                IV[] expected = new IV[] {
 
-                store.getTermId(C), store.getTermId(D)
+                store.getIV(C), store.getIV(D)
 
                 };
 

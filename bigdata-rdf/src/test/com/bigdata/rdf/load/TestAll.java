@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.load;
 
+import com.bigdata.rdf.rio.TestLoadAndVerify;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -61,6 +63,12 @@ public class TestAll extends TestCase {
          * @todo test suite for the bulk loader (much of this is tested in the
          * rio package)?
          */
+
+        /*
+         * A test suite for the Lock deserialization pattern used by the
+         * MappedRDFFileLoadTask.
+         */
+        suite.addTestSuite(TestLockDeserialization.class);
 
         return suite;
         

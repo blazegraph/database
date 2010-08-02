@@ -44,6 +44,7 @@ public class ExecutionExceptions extends ExecutionException implements
 
     }
 
+    @SuppressWarnings("unchecked")
     public Iterator<Throwable> iterator() {
         
         return (Iterator<Throwable>) causes.iterator();

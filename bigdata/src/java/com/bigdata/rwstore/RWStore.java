@@ -33,7 +33,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
-import java.nio.channels.OverlappingFileLockException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -44,8 +43,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import javax.naming.OperationNotSupportedException;
-
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.FileChannelUtility;
@@ -53,7 +50,6 @@ import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.ForceEnum;
 import com.bigdata.journal.IRootBlockView;
-import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.JournalTransactionService;
 import com.bigdata.journal.Options;
 import com.bigdata.journal.RWStrategy.FileMetadataView;

@@ -31,7 +31,7 @@ import org.apache.log4j.Level;
 import com.bigdata.LRUNexus;
 import com.bigdata.btree.IndexSegment.ImmutableLeafCursor;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 
 /**
  * Test suite based on a small btree with known keys and values.
@@ -102,7 +102,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends
 
         for (int i = 1; i <= 10; i++) {
 
-            btree.insert(KeyBuilder.asSortKey(i), new SimpleEntry(i));
+            btree.insert(TestKeyBuilder.asSortKey(i), new SimpleEntry(i));
 
         }
         
@@ -268,10 +268,14 @@ public class TestIndexSegmentBuilderWithSmallTree extends
          
             final ImmutableLeafCursor itr = seg.newLeafCursor(SeekEnum.First);
             
+            if(LRUNexus.INSTANCE!=null)
             assertTrue(firstLeaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache!
             assertNull(itr.prior());
 
+            if(LRUNexus.INSTANCE!=null)
             assertTrue(lastLeaf.getDelegate() == itr.next().getDelegate()); // Note: test depends on cache!
+
+            if(LRUNexus.INSTANCE!=null)
             assertTrue(lastLeaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache!
             
         }
@@ -286,10 +290,13 @@ public class TestIndexSegmentBuilderWithSmallTree extends
             
             final ImmutableLeafCursor itr = seg.newLeafCursor(SeekEnum.Last);
             
+            if(LRUNexus.INSTANCE!=null)
             assertTrue(lastLeaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache!
             assertNull(itr.next());
 
+            if(LRUNexus.INSTANCE!=null)
             assertTrue(firstLeaf.getDelegate() == itr.prior().getDelegate()); // Note: test depends on cache!
+            if(LRUNexus.INSTANCE!=null)
             assertTrue(firstLeaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache!
 
         }
@@ -373,6 +380,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends
         assertEquals("nextAddr", 0L, leaf.getNextAddr());
 
         final ImmutableLeafCursor itr = seg.newLeafCursor(SeekEnum.First);
+        if(LRUNexus.INSTANCE!=null)
         assertTrue(leaf.getDelegate() == itr.leaf().getDelegate()); // Note: test depends on cache.
         assertNull(itr.prior());
         assertNull(itr.next());
@@ -424,7 +432,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends
 
         for (int i = 1; i <= 9; i++) {
 
-            btree.insert(KeyBuilder.asSortKey(i), new SimpleEntry(i));
+            btree.insert(TestKeyBuilder.asSortKey(i), new SimpleEntry(i));
 
         }
         
@@ -527,7 +535,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends
 
         for (int i = 1; i <= 20; i++) {
 
-            btree.insert(KeyBuilder.asSortKey(i), new SimpleEntry(i));
+            btree.insert(TestKeyBuilder.asSortKey(i), new SimpleEntry(i));
 
         }
         
