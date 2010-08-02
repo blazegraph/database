@@ -356,6 +356,36 @@ Open questions:
 
 ============================================================
 
+Quorum next steps:
+
+   I am closing out the zookeeper quorum integration.  It appears to
+   work fine and in exact the same manner for the mock quorum fixture
+   and the zookeeper integration with the quorum logic.
+
+   I want to revisit some aspects of the quorum's internal behavior in
+   the context of addressing the resynchronization protocol for the
+   services in the quorum.  The basic issue is that there is some
+   concurrent indeterminism in the ordering of events as observed by
+   the local quorum objects for each service.  I think that the right
+   way to handle this may be to split the quorum into a model class
+   with atomic set/get methods for its state, whose implementations
+   could be trivially unit tested, and a behavior class which is
+   responsible for bringing the quorum state for a service to the
+   target "run state" for that service.
+
+   I am thinking of target run states as {MEMBER, SYNCHRONIZE, JOIN}.
+   MEMBER would correspond to a service which was online but not
+   synchronized.  SYNCHRONIZE would correspond to a service which was
+   attempting to join a quorum and was making up for the delta in its
+   persistent state so it could join.  JOIN would be a service which
+   was synchronized.
+
+   Since the details of any such run levels really interact with the
+   resynchronization protocol and other issues such as hot spare
+   recruitment, I'd like to put them off until we take up the
+   resynchronization logic.
+
+
 TODO:
 
    - RWStore, write cache, write replication, standalone HA in
