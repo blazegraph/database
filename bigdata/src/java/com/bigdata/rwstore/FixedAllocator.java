@@ -372,7 +372,7 @@ public class FixedAllocator implements Allocator {
 				}
 			}
 		}
-
+		
 		return false;
 	}
 
@@ -500,5 +500,16 @@ public class FixedAllocator implements Allocator {
 		long alloted = (allocBlocks * 32 * m_bitSize) - freeBits;
 		
 		return alloted * m_size;		
+	}
+
+	public boolean isAllocated(int offset) {
+	  	offset -= 3;
+
+		int allocBlockRange = 32 * m_bitSize;
+
+		AllocBlock block = (AllocBlock) m_allocBlocks.get(offset / allocBlockRange);
+		int bit = offset % allocBlockRange;
+		
+		return RWStore.tstBit(block.m_bits, bit);
 	}
 }

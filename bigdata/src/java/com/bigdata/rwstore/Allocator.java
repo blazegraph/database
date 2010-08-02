@@ -39,6 +39,7 @@ public interface Allocator extends Comparable {
   public int getDiskAddr();
   public void setDiskAddr(int addr);
   public long getPhysicalAddress(int offset);
+  public boolean isAllocated(int offset);
   public int getPhysicalSize(int offset);
   public byte[] write();
   public void read(DataInputStream str);

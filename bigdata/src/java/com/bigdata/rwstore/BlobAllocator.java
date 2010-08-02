@@ -265,4 +265,8 @@ public class BlobAllocator implements Allocator {
 		str.append("Index: " + m_index + ", address: " + getStartAddr() + ", BLOB\n");
 	}
 
+	public boolean isAllocated(int offset) {
+		return m_hdrs[offset] != 0;
+	}
+
 }
