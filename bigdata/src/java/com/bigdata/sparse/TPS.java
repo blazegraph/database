@@ -53,9 +53,9 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
 
     protected static final transient Logger log = Logger.getLogger(TPS.class);
     
-    protected static final transient boolean INFO = log.isInfoEnabled();
-
-    protected static final transient boolean DEBUG = log.isDebugEnabled();
+//    protected static final transient boolean INFO = log.isInfoEnabled();
+//
+//    protected static final transient boolean DEBUG = log.isDebugEnabled();
     
     /**
      * 
@@ -220,7 +220,7 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
 
             if (tpv != null) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Exact timestamp match: name="
                             + name
                             + (timestamp == Long.MAX_VALUE ? ", current value"
@@ -271,14 +271,14 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
              * encountered by the iterator.
              */
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("No match: name=" + name);
 
             return new TPV(schema, name, 0L, null);
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Most recent match: name=" + name + ", value="
                     + last.value + ", timestamp=" + last.timestamp);
 
@@ -335,7 +335,7 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
      */
     public TPS currentRow(final INameFilter filter) {
         
-        if(DEBUG) {
+        if(log.isDebugEnabled()) {
             
             log.debug("filter=" + filter + ", preFilter=" + this);
             
@@ -352,7 +352,7 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
 
             if (filter != null && !filter.accept(tpv.name)) {
 
-                if(DEBUG) {
+                if(log.isDebugEnabled()) {
                     
                     log.debug("rejecting on filter: "+tpv);
                     
@@ -367,7 +367,7 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
                 // remove binding.
                 final TPV old = m.remove(tpv.name);
                 
-                if (DEBUG && old != null) {
+                if (log.isDebugEnabled() && old != null) {
                     
                     log.debug("removed binding: " + old);
                     
@@ -378,7 +378,7 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
                 // (over)write binding.
                 final TPV old = m.put(tpv.name, tpv);
 
-                if (DEBUG && old != null) {
+                if (log.isDebugEnabled() && old != null) {
 
                     log.debug("overwrote: \nold=" + old + "\nnew=" + tpv);
                     
@@ -408,7 +408,7 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
             
         }
         
-        if(DEBUG) {
+        if(log.isDebugEnabled()) {
             
             log.debug("postFilter: "+tps);
             
@@ -453,7 +453,7 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
         if (toTime <= fromTime)
             throw new IllegalArgumentException();
         
-        if(DEBUG) {
+        if(log.isDebugEnabled()) {
             
             log.debug("fromTime=" + fromTime + ", toTime=" + toTime
                     + ", filter=" + filter + ", preFilter=" + this);
@@ -479,7 +479,7 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
 
                 // Outside of the half-open range.
 
-                if (DEBUG) {
+                if (log.isDebugEnabled()) {
 
                     log.debug("rejecting on timestamp: " + tp);
 
@@ -491,7 +491,7 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
 
             if (filter != null && !filter.accept(tp.name)) {
 
-                if (DEBUG) {
+                if (log.isDebugEnabled()) {
 
                     log.debug("rejecting on filter: " + tp);
 
@@ -506,7 +506,7 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
             
         }
         
-        if(DEBUG) {
+        if(log.isDebugEnabled()) {
             
             log.debug("postFilter: "+tps);
             
@@ -736,7 +736,7 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
         // #of tuples.
         final int n = in.readInt();
 
-        if (INFO)
+        if (log.isDebugEnabled())
             log.info("n=" + n + ", schema=" + schema);
 
         for (int i = 0; i < n; i++) {
@@ -761,7 +761,7 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
             
             tuples.put(new TP(name, timestamp), tpv);
             
-            if (INFO)
+            if (log.isDebugEnabled())
                 log.info("tuple: name=" + name + ", timestamp=" + timestamp
                         + ", value=" + value);
 
@@ -899,7 +899,7 @@ public class TPS implements ITPS, Externalizable, IRowStoreConstants {
         
         public String toString() {
             
-            return "TPS{name="+name+",timestamp="+timestamp+",value="+value+"}";
+            return "TPV{name="+name+",timestamp="+timestamp+",value="+value+"}";
             
         }
 
