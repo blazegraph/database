@@ -2313,7 +2313,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *          the inline internal value, or <code>null</code> if it cannot
      *          be converted
      */
-    private IV getInlineIV(Value value) {
+    final public IV getInlineIV(Value value) {
         
         return getLexiconConfiguration().createInlineIV(value);
 
