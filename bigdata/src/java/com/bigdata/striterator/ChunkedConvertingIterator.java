@@ -99,7 +99,7 @@ public class ChunkedConvertingIterator<E, F> implements IChunkedOrderedIterator<
      * 
      * @return A converted chunk of elements.
      */
-    protected F[] convert(IChunkedOrderedIterator<E> src) {
+    protected F[] convert(final IChunkedOrderedIterator<E> src) {
         
         final F[] tmp = converter.convert(src);
 
