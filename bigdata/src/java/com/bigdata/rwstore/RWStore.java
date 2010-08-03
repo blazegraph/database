@@ -968,7 +968,7 @@ public class RWStore implements IStore {
 						String cacheDebugInfo = m_writeCache.addrDebugInfo(paddr);
 						log.warn("Invalid data checksum for addr: " + paddr 
 								+ ", chk: " + chk + ", tstchk: " + tstchk + ", length: " + length
-								+ ", first byte: " + buf[0] + ", successful reads: " + m_diskReads
+								+ ", first bytes: " + toHexString(buf, 32) + ", successful reads: " + m_diskReads
 								+ ", at last extend: " + m_readsAtExtend + ", cacheReads: " + m_cacheReads
 								+ ", writeCacheDebug: " + cacheDebugInfo);
 						
@@ -985,6 +985,25 @@ public class RWStore implements IStore {
 		} finally {
 			readLock.unlock();
 		}
+	}
+
+	  static final char[] HEX_CHAR_TABLE = {
+		   '0', '1','2','3',
+		   '4','5','6','7',
+		   '8','9','a','b',
+		   'c','d','e','f'
+		  };    
+
+	// utility to display byte array of maximum i bytes as hexString
+	private String toHexString(byte[] buf, int n) {
+		n = n < buf.length ? n : buf.length;
+		StringBuffer out = new StringBuffer();
+		for (int i = 0; i < n; i++) {
+			int v = buf[i] & 0xFF;
+			out.append(HEX_CHAR_TABLE[v >>> 4]);
+			out.append(HEX_CHAR_TABLE[v &0xF]);
+		}
+		return out.toString();
 	}
 
 	/**
@@ -1492,14 +1511,6 @@ public class RWStore implements IStore {
 					bb.flip();
 					m_deferredFreeListAddr = (int) alloc(deferBuf, addrSize);
 					m_deferredFreeListEntries = addrs;
-					final int chk = ChecksumUtility.getCHK().checksum(deferBuf);
-					try {
-						m_writeCache.write(physicalAddress(m_deferredFreeListAddr), bb, chk);
-					} catch (IllegalStateException e) {
-						throw new RuntimeException(e);
-					} catch (InterruptedException e) {
-						throw new RuntimeException(e);
-					}
 					free(oldDeferredFreeListAddr, 0);
 				} else {
 					m_deferredFreeListAddr = 0;
@@ -2658,9 +2669,13 @@ public class RWStore implements IStore {
 		m_currentTxnFreeList.clear();
 
 		long rwaddr = alloc(buf, buf.length);
+		long paddr = physicalAddress((int) rwaddr);
 		
 		rwaddr <<= 32;
-		rwaddr += addrCount;
+		rwaddr += buf.length;
+		
+		if (log.isTraceEnabled())
+			log.trace("saveDeferrals: " + paddr + ", size: " + buf.length);
 		
 		// Now add the reference of this block
 		m_deferredFreeList.add(m_lastTxReleaseTime);
@@ -2675,8 +2690,11 @@ public class RWStore implements IStore {
 	 * @param blockAddr
 	 */
 	protected void freeDeferrals(long blockAddr) {
-		int addr = (int) -(blockAddr >> 32);
+		int addr = (int) (blockAddr >> 32);
 		int sze = (int) blockAddr & 0xFFFFFF;
+		
+		if (log.isTraceEnabled())
+			log.trace("freeDeferrals at " + physicalAddress(addr) + ", size: " + sze);
 		
 		byte[] buf = new byte[sze+4]; // allow for checksum
 		getData(addr, buf);
