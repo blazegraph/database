@@ -1635,11 +1635,10 @@ abstract public class WriteCache implements IWriteCache {
 
 				final long offset = entry.getKey(); // offset in file to update
 				
-				registerWriteStatus(offset, md.recordLength, 'W');
-
 				nwrites += FileChannelUtility.writeAll(opener, view, offset);
 				// if (log.isInfoEnabled())
 				// log.info("writing to: " + offset);
+				registerWriteStatus(offset, md.recordLength, 'W');
 			}
 
 			final WriteCacheCounters counters = this.counters.get();

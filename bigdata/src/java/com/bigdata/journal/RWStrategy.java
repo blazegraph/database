@@ -307,15 +307,16 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		final int rwaddr = decodeAddr(addr);
 		final int sze = decodeSize(addr);
 		
-		if (service == null) {
+		// FIXME: need to decide on correct way to handle transaction oriented
+		//	allocations
+		if (true || service == null) {
 			m_store.free(rwaddr, sze);
 		} else {
 			/*
 			 * May well be better to always defer and then free in batch,
 			 * but for now need to confirm transaction logic
 			 */
-			m_store.deferFree(rwaddr, sze, service
-					.getLastCommitTime());
+			m_store.deferFree(rwaddr, sze, m_rb.getLastCommitTime());
 		}
 	}
 
