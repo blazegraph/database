@@ -2803,27 +2803,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      */
     @SuppressWarnings("unchecked")
     static <V extends BigdataValue> IChunkedIterator<V> newT2IdIterator(
-            final LexiconRelation r, final Iterator<V> itr, 
-            final int chunkSize) {
+            final Iterator<V> itr, final int chunkSize) {
 
-        return new ChunkedWrappedIterator(new Striterator(itr)
-                .addFilter(new Filter() {
-
-                    private static final long serialVersionUID = 1L;
-        
-                    /*
-                     * Filter hides inline terms since we don't want to write
-                     * them on the forward index.
-                     */
-                    @Override
-                    protected boolean isValid(Object obj) {
-        
-                        // will set IV on BigdataValues as a side-effect
-                        return r.getInlineIV((Value) obj) != null;
-        
-                    }
-        
-                }), chunkSize, BigdataValue.class);
+        return new ChunkedWrappedIterator(new Striterator(itr), chunkSize,
+                BigdataValue.class);
 
     }
 
@@ -3081,13 +3064,6 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                         }
 
-                        if (v.getIV().isInline()) {
-                            
-                            // Do not write inline terms on the reverse index.
-                            continue;
-                            
-                        }
-                        
                         final byte[] key = v.getIV().encode(tmp.reset())
                                 .getKey();
 
@@ -3791,9 +3767,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             try {
 
                 final Callable<Void> task = new AsyncTerm2IdIndexWriteTask(
-                        tidsLatch, lexiconRelation, newT2IdIterator(
-                                lexiconRelation, values.values().iterator(), 
-                                producerChunkSize),
+                        tidsLatch, lexiconRelation, newT2IdIterator(values
+                                .values().iterator(), producerChunkSize),
                         buffer_t2id);
 
                 // queue chunks onto the write buffer.
