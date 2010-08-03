@@ -1021,7 +1021,14 @@ public class NanoSparqlServer extends AbstractHTTPD {
             try {
                 queries.put(queryId, new RunningQuery(queryId.longValue(),
                         queryStr, begin));
-                doQuery(cxn, os);
+                try {
+                	doQuery(cxn, os);
+                } catch(Throwable t) {
+                	/*
+                	 * Log the query and the exception together.
+                	 */
+					log.error(t.getLocalizedMessage() + ":\n" + queryStr, t);
+                }
                 os.flush();
                 return null;
             } catch (Throwable t) {
