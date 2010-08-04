@@ -40,7 +40,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.btree.IndexSegmentStore;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
@@ -421,7 +421,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
                     // populate with some data.
                     for (int j = 0; j < 100; j++) {
 
-                        ndx.insert(KeyBuilder.asSortKey(j), SerializerUtil
+                        ndx.insert(TestKeyBuilder.asSortKey(j), SerializerUtil
                                 .serialize(new Integer(j)));
 
                     }
@@ -587,7 +587,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
                     // format the value.
                     buf.reset().putInt(j);
                     
-                    ndx.insert(KeyBuilder.asSortKey(j), buf.toByteArray());
+                    ndx.insert(TestKeyBuilder.asSortKey(j), buf.toByteArray());
 
                 }
 

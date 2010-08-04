@@ -258,7 +258,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
      * For each term whose serialized key is mapped to the current index
      * partition, lookup the term in the <em>terms</em> index. If it is there
      * then note its assigned termId. Otherwise, use the partition local counter
-     * to assign the term identifier, note the term identifer so that it can be
+     * to assign the term identifier, note the term identifier so that it can be
      * communicated back to the client, and insert the {term,termId} entry into
      * the <em>terms</em> index.
      * 
@@ -288,8 +288,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         // used to serialize term identifiers.
         final DataOutputBuffer idbuf = new DataOutputBuffer();
         
-        final TermIdEncoder encoder = new TermIdEncoder(//scaleOutTermIds,
-                scaleOutTermIdBitsToReverse);
+		final TermIdEncoder encoder = readOnly ? null : new TermIdEncoder(
+				scaleOutTermIdBitsToReverse);
         
         // #of new terms (#of writes on the index).
         int nnew = 0;
@@ -532,7 +532,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 
     }
     
-    final public static VTE VTE(byte code) {
+    final public static VTE VTE(final byte code) {
         
         switch(code) {
         case ITermIndexCodes.TERM_CODE_URI:
@@ -574,7 +574,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
             
         }
         
-        public Result(IV[] ivs) {
+        public Result(final IV[] ivs) {
 
             assert ivs != null;
             
@@ -618,15 +618,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
             LongPacker.packLong(out,n);
 
             for (int i = 0; i < n; i++) {
-                
-                /*
-                 * This is the implementation for backwards
-                 * compatibility.  We should not see inline values here.
-                 */
-                if (ivs[i].isInline()) {
-                    throw new RuntimeException();
-                }
-                
+                                
 //                LongPacker.packLong(out, ids[i]);
                 out.writeObject(ivs[i]);
                 

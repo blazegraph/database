@@ -41,7 +41,7 @@ import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.AbstractJournal;
@@ -154,7 +154,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
 
             for (int i = 0; i < nentries; i++) {
 
-                keys[i] = KeyBuilder.asSortKey(i);
+                keys[i] = TestKeyBuilder.asSortKey(i);
 
                 vals[i] = new byte[4];
 
@@ -344,7 +344,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
 
             for (int i = 0; i < nentries; i++) {
 
-                keys[i] = KeyBuilder.asSortKey(i);
+                keys[i] = TestKeyBuilder.asSortKey(i);
 
                 vals[i] = new byte[4];
 
@@ -456,7 +456,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
 
                 for (int i = 0; i < nentries; i++) {
 
-                    keys[i] = KeyBuilder.asSortKey(i+100);
+                    keys[i] = TestKeyBuilder.asSortKey(i+100);
 
                     vals[i] = new byte[4];
 

@@ -112,7 +112,8 @@ public class ResourceEvents {
     
     /**
      * Leading zeros without commas used to format the partition identifiers
-     * into index segment file names.
+     * into index segment file names.  This uses 10 digits, which is enough
+     * to represent {@link Integer#MAX_VALUE}.
      */
     static NumberFormat leadingZeros;
 
@@ -130,7 +131,7 @@ public class ResourceEvents {
 
         leadingZeros = NumberFormat.getIntegerInstance();
         
-        leadingZeros.setMinimumIntegerDigits(5);
+        leadingZeros.setMinimumIntegerDigits(10);
         
         leadingZeros.setGroupingUsed(false);
         

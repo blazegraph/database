@@ -64,7 +64,7 @@ public class XSDDecimalIV<V extends BigdataLiteral> extends
     public V asValue(final BigdataValueFactory f, 
             final ILexiconConfiguration config) {
         // @todo factory should cache the XSD URIs.
-        final V v = (V) f.createLiteral(value.toString(),//
+        final V v = (V) f.createLiteral(value.toPlainString(),//
                 f.createURI(DTE.XSDDecimal.getDatatype()));
         v.setIV(this);
         return v;
@@ -105,9 +105,13 @@ public class XSDDecimalIV<V extends BigdataLiteral> extends
         return value.shortValue();
     }
     
+    /**
+     * Use toPlainString to avoid expression with exponent value that 
+     * would imply xsd:double rather than xsd:decimal
+     */
     @Override
     public String stringValue() {
-        return value.toString();
+        return value.toPlainString();
     }
 
     @Override

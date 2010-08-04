@@ -91,11 +91,27 @@ public class IVUtility {
      */
     public static int numericalCompare(IV iv1, IV iv2) {
 
-        if (!iv1.isInline() || !iv2.isInline())
-            throw new IllegalArgumentException("not inline terms");
+		if (!iv1.isInline())
+			throw new IllegalArgumentException("left term is not inline: left="
+					+ iv1 + ", right=" + iv2);
+
+		if (!iv2.isInline())
+			throw new IllegalArgumentException(
+					"right term is not inline: left=" + iv1 + ", right=" + iv2);
         
-        if (!iv1.isLiteral() || !iv2.isLiteral())
-            throw new IllegalArgumentException("not literals");
+//        if (!iv1.isInline() || !iv2.isInline())
+//            throw new IllegalArgumentException("not inline terms");
+        
+		if (!iv1.isLiteral())
+			throw new IllegalArgumentException(
+					"left term is not literal: left=" + iv1 + ", right=" + iv2);
+
+		if (!iv2.isLiteral())
+			throw new IllegalArgumentException(
+					"right term is not literal: left=" + iv1 + ", right=" + iv2);
+
+//        if (!iv1.isLiteral() || !iv2.isLiteral())
+//            throw new IllegalArgumentException("not literals");
         
         final DTE dte1 = iv1.getDTE();
         final DTE dte2 = iv2.getDTE();
@@ -398,7 +414,7 @@ public class IVUtility {
      * @return
      *          the IV
      */
-    public static final IV fromString(String s) {
+    public static final IV fromString(final String s) {
         if (s.startsWith("TermId")) {
             char type = s.charAt(s.length()-2);
             long tid = Long.valueOf(s.substring(7, s.length()-2));

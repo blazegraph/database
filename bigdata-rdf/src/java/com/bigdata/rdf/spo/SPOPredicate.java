@@ -76,7 +76,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
     /** The context position MAY be <code>null</code>. */
     protected final IVariableOrConstant<IV> c;
 
-    protected final int optionalGoto;
+    protected final boolean optional;
     
     protected final IElementFilter<ISPO> constraint;
 
@@ -134,7 +134,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
             final IVariableOrConstant<IV> p, final IVariableOrConstant<IV> o) {
 
         this(new String[] { relationName }, -1/* partitionId */, s, p, o,
-                null/* c */, -1/* optional */, null/* constraint */, null/* expander */);
+                null/* c */, false/* optional */, null/* constraint */, null/* expander */);
 
     }
 
@@ -154,7 +154,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
             final IVariableOrConstant<IV> o, final IVariableOrConstant<IV> c) {
 
         this(new String[] { relationName }, -1/* partitionId */, s, p, o, c,
-                -1/* optional */, null/* constraint */, null/* expander */);
+                false/* optional */, null/* constraint */, null/* expander */);
 
     }
 
@@ -173,7 +173,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
             final IVariableOrConstant<IV> p, final IVariableOrConstant<IV> o) {
 
         this(relationName, -1/* partitionId */, s, p, o,
-                null/* c */, -1/* optional */, null/* constraint */, null/* expander */);
+                null/* c */, false/* optional */, null/* constraint */, null/* expander */);
 
     }
 
@@ -190,10 +190,10 @@ public class SPOPredicate implements IPredicate<ISPO> {
     public SPOPredicate(final String relationName,
             final IVariableOrConstant<IV> s,
             final IVariableOrConstant<IV> p,
-            final IVariableOrConstant<IV> o, final int optionalGoto) {
+            final IVariableOrConstant<IV> o, final boolean optional) {
 
         this(new String[] { relationName }, -1/* partitionId */, s, p, o,
-                null/* c */, optionalGoto, null/* constraint */, null/* expander */);
+                null/* c */, optional, null/* constraint */, null/* expander */);
 
     }
 
@@ -215,7 +215,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
             final ISolutionExpander<ISPO> expander) {
 
         this(new String[] { relationName }, -1/* partitionId */, s, p, o,
-                null/* c */, -1/* optional */, null/* constraint */,
+                null/* c */, false/* optional */, null/* constraint */,
                 expander);
 
     }
@@ -235,11 +235,11 @@ public class SPOPredicate implements IPredicate<ISPO> {
     public SPOPredicate(final String relationName,
             final IVariableOrConstant<IV> s,
             final IVariableOrConstant<IV> p,
-            final IVariableOrConstant<IV> o, final int optionalGoto,
+            final IVariableOrConstant<IV> o, final boolean optional,
             final ISolutionExpander<ISPO> expander) {
 
         this(new String[] { relationName }, -1/* partitionId */, s, p, o,
-                null/* c */, optionalGoto, null/* constraint */, expander);
+                null/* c */, optional, null/* constraint */, expander);
         
     }
     
@@ -264,7 +264,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
             final IVariableOrConstant<IV> p,//
             final IVariableOrConstant<IV> o,//
             final IVariableOrConstant<IV> c,//
-            final int optionalGoto, //
+            final boolean optional, //
             final IElementFilter<ISPO> constraint,//
             final ISolutionExpander<ISPO> expander//
             ) {
@@ -303,7 +303,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
         this.o = o;
         this.c = c; // MAY be null.
 
-        this.optionalGoto = optionalGoto;
+        this.optional = optional;
         
         this.constraint = constraint; /// MAY be null.
         
@@ -341,7 +341,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
         this.relationName = relationName; // override.
      
-        this.optionalGoto = src.optionalGoto;
+        this.optional = src.optional;
         
         this.constraint = src.constraint;
         
@@ -384,7 +384,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
         this.o = src.o;
         this.c = src.c;
         
-        this.optionalGoto = src.optionalGoto;
+        this.optional = src.optional;
         
         this.constraint = src.constraint;
         
@@ -406,7 +406,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
         this.o = src.o;
         this.c = src.c;
         
-        this.optionalGoto = src.optionalGoto;
+        this.optional = src.optional;
         
         this.constraint = src.constraint;
         
@@ -439,7 +439,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
                 p,//
                 o,//
                 c, // override.
-                optionalGoto, //
+                optional, //
                 constraint,//
                 expander//
         );
@@ -465,7 +465,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
                 p,//
                 o,//
                 c, // 
-                optionalGoto, //
+                optional, //
                 tmp,// override.
                 expander//
         );
@@ -795,7 +795,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
         }
         
         return new SPOPredicate(relationName, partitionId, s, p, o, c,
-                optionalGoto, constraint, expander);
+                optional, constraint, expander);
         
     }
 
@@ -861,7 +861,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
         sb.append(")");
 
-        if (isOptional() || constraint != null || expander != null
+        if (optional || constraint != null || expander != null
                 || partitionId != -1) {
             
             /*
@@ -872,9 +872,9 @@ public class SPOPredicate implements IPredicate<ISPO> {
             
             sb.append("[");
             
-            if(isOptional()) {
+            if(optional) {
                 if(!first) sb.append(", ");
-                sb.append("optionalGoto="+optionalGoto);
+                sb.append("optional");
                 first = false;
             }
 
@@ -906,13 +906,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
 
     final public boolean isOptional() {
         
-        return optionalGoto >= -1;
-        
-    }
-    
-    final public int getOptionalGoto() {
-        
-        return optionalGoto;
+        return optional;
         
     }
     
@@ -990,7 +984,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
             final IVariableOrConstant<IV> c) {
 
         return new SPOPredicate(relationName, partitionId, s, p, o, c,
-                optionalGoto, constraint, expander);
+                optional, constraint, expander);
         
     }
 }

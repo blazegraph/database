@@ -27,7 +27,7 @@ import java.util.UUID;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
@@ -115,10 +115,10 @@ public class TestReopen extends AbstractBTreeTestCase {
             
         }
 
-        btree.insert(KeyBuilder.asSortKey(1), new SimpleEntry(1));
-        btree.insert(KeyBuilder.asSortKey(2), new SimpleEntry(2));
-        btree.insert(KeyBuilder.asSortKey(3), new SimpleEntry(3));
-        btree.insert(KeyBuilder.asSortKey(4), new SimpleEntry(4));
+        btree.insert(TestKeyBuilder.asSortKey(1), new SimpleEntry(1));
+        btree.insert(TestKeyBuilder.asSortKey(2), new SimpleEntry(2));
+        btree.insert(TestKeyBuilder.asSortKey(3), new SimpleEntry(3));
+        btree.insert(TestKeyBuilder.asSortKey(4), new SimpleEntry(4));
         
         // verify that the root was split.
         assertEquals("height",1,btree.getHeight());
@@ -141,10 +141,10 @@ public class TestReopen extends AbstractBTreeTestCase {
         assertTrue(btree.isOpen());
         
         // force materialization of the leaves.
-        btree.lookup(KeyBuilder.asSortKey(1));
-        btree.lookup(KeyBuilder.asSortKey(2));
-        btree.lookup(KeyBuilder.asSortKey(3));
-        btree.lookup(KeyBuilder.asSortKey(4));
+        btree.lookup(TestKeyBuilder.asSortKey(1));
+        btree.lookup(TestKeyBuilder.asSortKey(2));
+        btree.lookup(TestKeyBuilder.asSortKey(3));
+        btree.lookup(TestKeyBuilder.asSortKey(4));
 
         // dump after re-open.
         System.out.println("Dump after reopen:");

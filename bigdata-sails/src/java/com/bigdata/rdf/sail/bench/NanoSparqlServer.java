@@ -43,6 +43,9 @@ import java.net.URL;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.TreeMap;
 import java.util.Vector;
@@ -84,8 +87,10 @@ import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.bench.NanoSparqlClient.QueryType;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.AbstractResource;
+import com.bigdata.relation.RelationSchema;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.JiniClient;
+import com.bigdata.sparse.ITPS;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.httpd.AbstractHTTPD;
 import com.bigdata.util.httpd.NanoHTTPD;
@@ -226,6 +231,52 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
 	}
 
+	/**
+	 * Return a list of the registered {@link AbstractTripleStore}s.
+	 */
+	protected List<String> getNamespaces() {
+	
+		// the triple store namespaces.
+		final List<String> namespaces = new LinkedList<String>();
+
+		// scan the relation schema in the global row store.
+		final Iterator<ITPS> itr = (Iterator<ITPS>) indexManager
+				.getGlobalRowStore().rangeIterator(RelationSchema.INSTANCE);
+
+		while (itr.hasNext()) {
+
+			// A timestamped property value set is a logical row with
+			// timestamped property values.
+			final ITPS tps = itr.next();
+
+			// If you want to see what is in the TPS, uncomment this.
+//			System.err.println(tps.toString());
+			
+			// The namespace is the primary key of the logical row for the
+			// relation schema.
+			final String namespace = (String) tps.getPrimaryKey();
+
+			// Get the name of the implementation class
+			// (AbstractTripleStore, SPORelation, LexiconRelation, etc.)
+			final String className = (String) tps.get(RelationSchema.CLASS)
+					.getValue();
+
+			try {
+				final Class cls = Class.forName(className);
+				if (AbstractTripleStore.class.isAssignableFrom(cls)) {
+					// this is a triple store (vs something else).
+					namespaces.add(namespace);
+				}
+			} catch (ClassNotFoundException e) {
+				log.error(e,e);
+			}
+
+		}
+
+		return namespaces;
+
+	}
+	
     /**
      * Return various interesting metadata about the KB state.
      * 
@@ -295,6 +346,18 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
 			sb.append(AbstractResource.Options.MAX_PARALLEL_SUBQUERIES + "="
 					+ tripleStore.getMaxParallelSubqueries() + "\n");
+
+			sb.append("-- All properties.--\n");
+			
+			// get the triple store's properties from the global row store.
+			final Map<String, Object> properties = indexManager
+					.getGlobalRowStore().read(RelationSchema.INSTANCE,
+							namespace);
+
+			// write them out,
+			for (String key : properties.keySet()) {
+				sb.append(key + "=" + properties.get(key)+"\n");
+			}
 
 			// sb.append(tripleStore.predicateUsage());
 
@@ -553,12 +616,30 @@ public class NanoSparqlServer extends AbstractHTTPD {
 
         final boolean showKBInfo = params.get("showKBInfo") != null;
 
+        final boolean showNamespaces = params.get("showNamespaces") != null;
+
         final StringBuilder sb = new StringBuilder();
 
         sb.append("Accepted query count=" + queryIdFactory.get() + "\n");
 
-        sb.append("Running query count=" + queries.size() + "\n");
+		sb.append("Running query count=" + queries.size() + "\n");
 
+		if (showNamespaces) {
+
+			final List<String> namespaces = getNamespaces();
+			
+			sb.append("Namespaces: ");
+
+			for (String s : namespaces) {
+
+				sb.append(s);
+
+			}
+			
+			sb.append("\n");
+			
+        }
+        
         if (showKBInfo) {
 
             // General information on the connected kb.
@@ -940,7 +1021,14 @@ public class NanoSparqlServer extends AbstractHTTPD {
             try {
                 queries.put(queryId, new RunningQuery(queryId.longValue(),
                         queryStr, begin));
-                doQuery(cxn, os);
+                try {
+                	doQuery(cxn, os);
+                } catch(Throwable t) {
+                	/*
+                	 * Log the query and the exception together.
+                	 */
+					log.error(t.getLocalizedMessage() + ":\n" + queryStr, t);
+                }
                 os.flush();
                 return null;
             } catch (Throwable t) {

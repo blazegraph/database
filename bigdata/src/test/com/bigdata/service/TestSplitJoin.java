@@ -37,7 +37,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.io.SerializerUtil;
@@ -240,7 +240,7 @@ public class TestSplitJoin extends AbstractEmbeddedFederationTestCase {
 
             for (int i = 0; i < nentries; i++) {
 
-                keys[i] = KeyBuilder.asSortKey(nwritten + i);
+                keys[i] = TestKeyBuilder.asSortKey(nwritten + i);
 
                 vals[i] = SerializerUtil.serialize(nwritten + i);
                 

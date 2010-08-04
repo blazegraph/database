@@ -181,9 +181,11 @@ public class Splitter {
         String OUT_FORMAT = "outFormat";
 
         /**
-         * The number of RDF statements per output file.
+         * The number of RDF statements per output file (10,000 is a good number).
          */
         String OUT_CHUNK_SIZE = "outChunkSize";
+
+        int DEFAULT_OUT_CHUNK_SIZE = 10000;
 
         /**
          * The compression style for the output files.
@@ -288,8 +290,9 @@ public class Splitter {
                     ConfigurationOptions.OUT_COMPRESS, CompressEnum.class,
                     CompressEnum.None/* default */);
 
-            outChunkSize = (Integer) c.getEntry(COMPONENT,
-                    ConfigurationOptions.OUT_CHUNK_SIZE, Integer.TYPE);
+			outChunkSize = (Integer) c.getEntry(COMPONENT,
+					ConfigurationOptions.OUT_CHUNK_SIZE, Integer.TYPE,
+					ConfigurationOptions.DEFAULT_OUT_CHUNK_SIZE);
 
             {
                 /*
@@ -913,6 +916,11 @@ public class Splitter {
          * {@inheritDoc}
          */
         public long flush() {
+			if (numStmts == 0) {
+				// Nothing to write.
+        		return 0;
+        	}
+        	
             {
 
                 // The output directory for the next file.
@@ -1104,6 +1112,8 @@ public class Splitter {
         final Configuration c = ConfigurationProvider.getInstance(args);
 
         final Settings settings = new Settings(c);
+        
+        settings.outDir.mkdirs();
         
         final Splitter splitter = new Splitter(settings);
 

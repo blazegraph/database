@@ -29,7 +29,7 @@ import java.util.UUID;
 import com.bigdata.LRUNexus;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.cache.IGlobalLRU;
 import com.bigdata.cache.IGlobalLRU.ILRUCache;
 import com.bigdata.rawstore.IRawStore;
@@ -124,7 +124,7 @@ public class TestIndexSegmentBuilderCacheInteraction extends
 
         for (int i = 1; i <= 10; i++) {
 
-            btree.insert(KeyBuilder.asSortKey(i), new SimpleEntry(i));
+            btree.insert(TestKeyBuilder.asSortKey(i), new SimpleEntry(i));
 
         }
         

@@ -46,6 +46,7 @@ import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
@@ -619,7 +620,7 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
 
             for (int i = 0; i < size; i++, nactual++) {
 
-                data[i] = KeyBuilder.asSortKey(lastKey);
+                data[i] = TestKeyBuilder.asSortKey(lastKey);
 
                 final long remainder = Long.MAX_VALUE - lastKey;
 
