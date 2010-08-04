@@ -49,6 +49,7 @@ import javax.management.openmbean.OpenDataException;
 
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -181,9 +182,9 @@ public class TestMasterTaskWithSplits extends AbstractKeyRangeMasterTestCase {
         assertEquals(BigInteger.valueOf(-1), decodeKey(new byte[] { -1 }));
 
         assertEquals(BigInteger.valueOf(Long.MIN_VALUE + 1),
-                decodeKey(KeyBuilder.asSortKey(1L)));
+                decodeKey(TestKeyBuilder.asSortKey(1L)));
 
-        assertEquals(Long.MAX_VALUE, decodeKey(KeyBuilder.asSortKey(-1L))
+        assertEquals(Long.MAX_VALUE, decodeKey(TestKeyBuilder.asSortKey(-1L))
                 .longValue());
 
         assertEquals(MAX_KEY, decodeKey(null));

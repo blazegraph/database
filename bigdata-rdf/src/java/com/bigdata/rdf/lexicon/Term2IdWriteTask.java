@@ -198,7 +198,7 @@ public class Term2IdWriteTask implements
                     
                 }
                 
-                AbstractKeyArrayIndexProcedureConstructor ctor =
+                final AbstractKeyArrayIndexProcedureConstructor ctor =
                     new Term2IdWriteProcConstructor(
                             readOnly, r.storeBlankNodes, r.termIdBitsToReverse);
                 

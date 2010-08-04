@@ -39,7 +39,7 @@ import junit.framework.TestCase;
 
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
@@ -163,7 +163,7 @@ public class TestBigdataMap extends TestCase {
      * Handles {@link String} keys and values and makes the keys available for
      * {@link BigdataMap} and {@link BigdataSet} (under the assumption that the
      * key and the value are the same!). The actual index order is governed by
-     * {@link KeyBuilder#asSortKey(Object)}.
+     * {@link TestKeyBuilder#asSortKey(Object)}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$

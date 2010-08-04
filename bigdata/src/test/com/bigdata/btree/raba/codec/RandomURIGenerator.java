@@ -31,7 +31,7 @@ import java.util.Arrays;
 import java.util.Random;
 
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 
 /**
  * Generate <i>n</i> random and distinct URIs. This distribution has a shared
@@ -97,7 +97,7 @@ public class RandomURIGenerator implements IRabaGenerator {
 
         for (int i = 0; i < data.length; i++) {
 
-            data[i] = KeyBuilder.asSortKey(ns + String.valueOf(lastCounter));
+            data[i] = TestKeyBuilder.asSortKey(ns + String.valueOf(lastCounter));
 
             final int inc = r.nextInt(100) + 1;
 

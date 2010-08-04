@@ -30,7 +30,6 @@ package com.bigdata.rdf.spo;
 
 import java.util.Properties;
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.internal.ITermIdCodes;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;

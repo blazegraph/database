@@ -75,7 +75,8 @@ http://localhost:8080/?regex=/([^/]*)/.*IO%20Wait&depth=4&correlated=true&period
 http://localhost:8080/?regex=/([^/]*)/.*Memory/Bytes%20Free&correlated=true&depth=3&file=memory/BytesFree
 http://localhost:8080/?regex=/([^/]*)/.*Memory/Swap%20Bytes%20Used&correlated=true&depth=3&period=Minutes&file=memory/SwapBytesUsed
 http://localhost:8080/?regex=/([^/]*)/.*Memory/Major%20Page%20Faults%20Per%20Second&correlated=true&depth=3&period=Minutes&file=memory/MajorPageFaultsPerSecond
-http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*/Memory/DirectBufferPool/poolSize&correlated=true&depth=12&file=memory/directBufferPool/poolSize
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*/Memory/DirectBufferPool/totalBytesUsed&correlated=true&depth=12&file=memory/directBufferPool/totalBytesUsed
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*/Memory/DirectBufferPool/(.*)/poolSize&correlated=true&depth=12&file=memory/directBufferPool/poolSize
 http://localhost:8080/?regex=/([^/]*)/.*(IDataService|IClientService)/.*/Memory/Virtual%20Size&correlated=true&depth=12&file=memory/VirtualSize
 http://localhost:8080/?regex=/([^/]*)/.*(IDataService|IClientService)/.*/Memory/Resident%20Set%20Size&correlated=true&depth=12&file=memory/ResidentSetSize
 http://localhost:8080/?regex=/([^/]*)/.*(IDataService|IClientService)/.*/Memory/Runtime%20Total%20Memory&correlated=true&depth=12&file=memory/RuntimeTotalMemory

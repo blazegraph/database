@@ -683,7 +683,8 @@ abstract public class AbstractRIOTestCase extends AbstractTripleStoreTestCase {
                         new FileInputStream(resource))), baseURI, rdfFormat,
                         options);
 
-                log.info("End of reparse: nerrors=" + nerrs + ", file="
+                if(log.isInfoEnabled())
+                	log.info("End of reparse: nerrors=" + nerrs + ", file="
                         + resource);
 
             }

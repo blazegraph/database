@@ -116,7 +116,6 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.spo.SPOTupleSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -2803,10 +2802,27 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      */
     @SuppressWarnings("unchecked")
     static <V extends BigdataValue> IChunkedIterator<V> newT2IdIterator(
+    		final LexiconRelation r,
             final Iterator<V> itr, final int chunkSize) {
 
-        return new ChunkedWrappedIterator(new Striterator(itr), chunkSize,
-                BigdataValue.class);
+		return new ChunkedWrappedIterator(new Striterator(itr)
+				.addFilter(new Filter() {
+
+					private static final long serialVersionUID = 1L;
+
+					@Override
+					protected boolean isValid(final Object obj) {
+						/*
+						 * Assigns the IV as a side effect iff the RDF Value can
+						 * be inlined according to the governing lexicon
+						 * configuration and returns true iff the value CAN NOT
+						 * be inlined. Thus, inlining is doing as a side effect
+						 * while the caller sees only those Values which need to
+						 * be written onto the TERM2ID index.
+						 */
+						return r.getInlineIV((Value) obj) == null;
+					}
+				}), chunkSize, BigdataValue.class);
 
     }
 
@@ -3061,6 +3077,13 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                         if (v.getIV() == null) {
 
                             throw new RuntimeException("No TID: " + v);
+
+                        }
+
+                        if (v.getIV().isInline()) {
+
+                        	// Do not write inline values on the reverse index.
+                            continue;
 
                         }
 
@@ -3767,8 +3790,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             try {
 
                 final Callable<Void> task = new AsyncTerm2IdIndexWriteTask(
-                        tidsLatch, lexiconRelation, newT2IdIterator(values
-                                .values().iterator(), producerChunkSize),
+                        tidsLatch, lexiconRelation, newT2IdIterator(//
+                        		lexiconRelation,//
+                        		values.values().iterator(),//
+                        		producerChunkSize),
                         buffer_t2id);
 
                 // queue chunks onto the write buffer.

@@ -207,7 +207,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
         
         if (properties != null) {
 
-            val = properties.getProperty(key, def);
+            val = properties.getProperty(key);//, def);
 
         }
 

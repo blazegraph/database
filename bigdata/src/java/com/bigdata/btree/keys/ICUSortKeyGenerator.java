@@ -108,7 +108,7 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
         
     }
     
-    ICUSortKeyGenerator(Locale locale, Object strength, DecompositionEnum mode) {
+    ICUSortKeyGenerator(final Locale locale, final Object strength, final DecompositionEnum mode) {
 
         if (locale == null)
             throw new IllegalArgumentException();
@@ -132,7 +132,7 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
 
             } else {
 
-                StrengthEnum str = (StrengthEnum) strength;
+                final StrengthEnum str = (StrengthEnum) strength;
 
                 if (log.isInfoEnabled())
                     log.info("strength=" + str);
@@ -200,9 +200,9 @@ class ICUSortKeyGenerator implements UnicodeSortKeyGenerator {
      * Buffer is reused for each {@link String} from which a sort key is
      * derived.
      */
-    private RawCollationKey raw = new RawCollationKey(128);
+    final private RawCollationKey raw = new RawCollationKey(128);
 
-    public void appendSortKey(KeyBuilder keyBuilder, String s) {
+    public void appendSortKey(final KeyBuilder keyBuilder, final String s) {
 
 //        RawCollationKey raw = collator.getRawCollationKey(s, null);
         

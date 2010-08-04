@@ -87,6 +87,7 @@ import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.algebra.LangMatches;
 import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
@@ -3100,6 +3101,22 @@ public class BigdataSail extends SailBase implements Sail {
                 @Override
                 public void meet(final ValueConstant constant) {
                     
+                    if (constant.getParentNode() instanceof LangMatches) {
+                	    /* Don't try to resolve for lang matches.
+                	     * 
+                	     * Note: Sesame will sometimes use a Literal to represent
+                	     * a constant parameter to a function, such as LangMatches.
+                	     * For such uses, we DO NOT want to attempt to resolve the
+                	     * Literal against the lexicon.  Instead, it should just be
+                	     * passed through.  BigdataSailEvaluationStrategy is then
+                	     * responsible for recognizing cases where the lack of an
+                	     * IV on a constant is associated with such function calls
+                	     * rather than indicating that the Value is not known to
+                	     * the KB. 
+                	     */
+                	    return;
+                    }
+
                     final Value val = constant.getValue();
 
                     // add BigdataValue variant of the var's Value.
@@ -3186,7 +3203,14 @@ public class BigdataSail extends SailBase implements Sail {
                 @Override
                 public void meet(ValueConstant constant) {
                     
-                    // the Sesame Value object.
+                    if (constant.getParentNode() instanceof LangMatches) {
+                    	/* Note: This is parallel to the meet in the visit
+                    	 * pattern above.
+                    	 */
+                       return;
+                    }
+
+                     // the Sesame Value object.
                     final Value val = constant.getValue();
 
                     // Lookup the resolve BigdataValue object.

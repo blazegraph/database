@@ -277,19 +277,19 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
             AbstractStatisticsCollector
                     .addGarbageCollectorMXBeanCounters(serviceRoot
                             .makePath(ICounterHierarchy.Memory_GarbageCollectors));
-            
-            /*
-             * Add counters reporting on the various DirectBufferPools.
-             */
-            {
 
-                // general purpose pool.
-                serviceRoot.makePath(
-                        IProcessCounters.Memory + ICounterSet.pathSeparator
-                                + "DirectBufferPool").attach(
-                        DirectBufferPool.getCounters());
-                
-            }
+            // Moved since counters must be dynamically reattached to reflect pool hierarchy.
+//            /*
+//             * Add counters reporting on the various DirectBufferPools.
+//             */
+//            {
+//
+//                serviceRoot.makePath(
+//                        IProcessCounters.Memory + ICounterSet.pathSeparator
+//                                + "DirectBufferPool").attach(
+//                        DirectBufferPool.getCounters());
+//                
+//            }
 
             if (LRUNexus.INSTANCE != null) {
 

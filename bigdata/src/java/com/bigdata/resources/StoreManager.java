@@ -85,8 +85,9 @@ import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.journal.WORMStrategy;
 import com.bigdata.journal.WriteExecutorService;
-import com.bigdata.journal.DiskOnlyStrategy.StoreCounters;
+import com.bigdata.journal.WORMStrategy.StoreCounters;
 import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.IndexPartitionCause;
@@ -673,7 +674,7 @@ abstract public class StoreManager extends ResourceEvents implements
     protected final long accelerateOverflowThreshold;
     
     /**
-     * Used to run the {@link Startup}.
+     * Used to run the {@link Startup}.  @todo defer to init() outside of ctor.  Also, defer {@link Startup} until init() outside of ctor.
      */
     private final ExecutorService startupService = Executors
             .newSingleThreadExecutor(new DaemonThreadFactory
@@ -1419,7 +1420,7 @@ abstract public class StoreManager extends ResourceEvents implements
                 log.info("Waiting for concurrency manager");
             for (int i = 0; i < 5; i++) {
                 try {
-                    getConcurrencyManager();
+                    getConcurrencyManager(); break;
                 } catch (IllegalStateException ex) {
                     Thread.sleep(100/* ms */);
                 }
@@ -2452,6 +2453,11 @@ abstract public class StoreManager extends ResourceEvents implements
             if (getBufferStrategy() instanceof DiskOnlyStrategy) {
 
                 ((DiskOnlyStrategy) getBufferStrategy())
+                        .setStoreCounters(getStoreCounters());
+
+            } else if (getBufferStrategy() instanceof WORMStrategy) {
+
+                ((WORMStrategy) getBufferStrategy())
                         .setStoreCounters(getStoreCounters());
 
             }
@@ -4556,7 +4562,7 @@ abstract public class StoreManager extends ResourceEvents implements
         // make sure that directory exists.
         indexDir.mkdirs();
 
-        final String partitionStr = (partitionId == -1 ? "" : "_part"
+        final String partitionStr = (partitionId == -1 ? "" : "_shardId"
                 + leadingZeros.format(partitionId));
 
         final String prefix = mungedName + "" + partitionStr + "_";

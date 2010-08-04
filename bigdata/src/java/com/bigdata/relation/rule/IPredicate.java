@@ -157,69 +157,6 @@ public interface IPredicate<E> extends Cloneable, Serializable {
      *         evaluating a JOIN.
      */
     public boolean isOptional();
-    
-    /**
-     * Handling nested optional joins can be reduced to a goto logic.  Tails
-     * that are grouped inside an "optional join" are all marked as optional,
-     * and if any one of them fails then join execution should resume with the
-     * tail immediately following the optional join in the plan order.
-     * <p>
-     * For example, the following query:
-     * <code>
-     * where {
-     *    A .
-     *    OPTIONAL {
-     *      B .
-     *      C .
-     *    }
-     *    D .
-     * }
-     * </code>
-     * <p>
-     * Would yield the following plan:
-     * <code>
-     * 0: A, optional=false
-     * 1: B, optional=true, goto=3
-     * 2: C, optional=true, goto=3
-     * 3: D, optional=false
-     * </code>
-     * <p>
-     * Double nested optionals would just continue on in the first optional 
-     * join. For example, the following query:
-     * <code>
-     * where {
-     *    A .
-     *    OPTIONAL {
-     *      B .
-     *      OPTIONAL { C } .
-     *      D .
-     *    }
-     *    E .
-     * }
-     * </code>
-     * <p>
-     * Would yield the following plan:
-     * <code>
-     * 0: A, optional=false
-     * 1: B, optional=true, goto=4
-     * 2: C, optional=true, goto=3
-     * 3: D, optional=true, goto=4
-     * 4: E, optional=false
-     * </code>
-     * <p>
-     * Alternatively, the above plan could be reordered as follows for more
-     * efficient execution:
-     * <code>
-     * 0: A, optional=false
-     * 1: B, optional=true, goto=4
-     * 2: D, optional=true, goto=4
-     * 3: C, optional=true, goto=4
-     * 4: E, optional=false
-     * </code>
-     * 
-     * @return
-     */
-    public int getOptionalGoto();
 
     /**
      * Returns the object that may be used to selectively override the

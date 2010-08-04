@@ -479,12 +479,6 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
         
     }
     
-    final public int getOptionalGoto() {
-        
-        return -1;
-        
-    }
-    
     final public IElementFilter getConstraint() {
 
         return constraint;

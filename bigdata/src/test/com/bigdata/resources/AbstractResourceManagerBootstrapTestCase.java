@@ -59,14 +59,15 @@ public class AbstractResourceManagerBootstrapTestCase extends TestCase2 {
         
         Properties properties = new Properties(super.getProperties());
 
-        log.info("Setting " + Options.DATA_DIR + "=" + dataDir);
-        
+		if (log.isInfoEnabled())
+			log.info("Setting " + Options.DATA_DIR + "=" + dataDir);
+
         properties.setProperty(
                 com.bigdata.resources.ResourceManager.Options.DATA_DIR, dataDir
                         .toString());
 
-        // disable the write cache to avoid memory leak in the test suite.
-        properties.setProperty(Options.WRITE_CACHE_ENABLED, "false");
+//        // disable the write cache to avoid memory leak in the test suite.
+//        properties.setProperty(Options.WRITE_CACHE_ENABLED, "false");
 
         return properties;
         

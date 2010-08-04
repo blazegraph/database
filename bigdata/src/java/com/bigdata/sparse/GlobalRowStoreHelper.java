@@ -103,24 +103,28 @@ public class GlobalRowStoreHelper {
                     indexMetadata
                             .setSplitHandler(LogicalRowSplitHandler.INSTANCE);
 
-                    if (CollatorEnum.JDK.toString().equals(
-                            System.getProperty(KeyBuilder.Options.COLLATOR))) {
-                        /*
-                         * The JDK RulesBasedCollator embeds nul bytes in the
-                         * Unicode sort keys. This makes them unsuitable for the
-                         * SparseRowStore, which can not locate the start of the
-                         * column name if there are embedded nuls in a Unicode
-                         * primary key. As a work around, this forces an ASCII
-                         * collation sequence if the JDK collator is the
-                         * default. This is not ideal since non-ascii
-                         * distinctions will be lost, but it is better than
-                         * being unable to decode the column names.
-                         */
-                        log.warn("Forcing ASCII collator.");
-                        indexMetadata
-                                .setTupleSerializer(new DefaultTupleSerializer(
-                                        new ASCIIKeyBuilderFactory()));
-                    }
+/*
+ * This is now handled by using the UTF8 encoding of the primary key regardless
+ * of the collator mode chosen (this fixes the problem with embedded nuls).
+ */
+//                    if (CollatorEnum.JDK.toString().equals(
+//                            System.getProperty(KeyBuilder.Options.COLLATOR))) {
+//                        /*
+//                         * The JDK RulesBasedCollator embeds nul bytes in the
+//                         * Unicode sort keys. This makes them unsuitable for the
+//                         * SparseRowStore, which can not locate the start of the
+//                         * column name if there are embedded nuls in a Unicode
+//                         * primary key. As a work around, this forces an ASCII
+//                         * collation sequence if the JDK collator is the
+//                         * default. This is not ideal since non-ascii
+//                         * distinctions will be lost, but it is better than
+//                         * being unable to decode the column names.
+//                         */
+//                        log.warn("Forcing ASCII collator.");
+//                        indexMetadata
+//                                .setTupleSerializer(new DefaultTupleSerializer(
+//                                        new ASCIIKeyBuilderFactory()));
+//                    }
                     
                     // Register the index.
                     indexManager.registerIndex(indexMetadata);

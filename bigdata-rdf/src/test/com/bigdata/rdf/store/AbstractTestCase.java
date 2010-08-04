@@ -912,8 +912,8 @@ abstract public class AbstractTestCase
          * @param maxerrors
          *            The maximum #of errors before the test will abort.
          */
-        public StatementVerifier(AbstractTripleStore db, int capacity,
-                AtomicInteger nerrs, final int maxerrors) {
+        public StatementVerifier(final AbstractTripleStore db, final int capacity,
+                final AtomicInteger nerrs, final int maxerrors) {
 
             super(db.getValueFactory());
             
@@ -927,7 +927,7 @@ abstract public class AbstractTestCase
                     Statement.class, null/* filter */) {
 
                 @Override
-                protected long flush(int n, Statement[] a) {
+                protected long flush(final int n, final Statement[] a) {
 
                     verifyStatements( n , a );
                     
@@ -945,7 +945,7 @@ abstract public class AbstractTestCase
          * @param msg
          *            The error message.
          */
-        private void error(String msg) {
+        private void error(final String msg) {
 
             log.error(msg);
             

@@ -38,6 +38,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.NOPTupleSerializer;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
@@ -90,7 +91,7 @@ public class TestTupleFilters extends AbstractBTreeTestCase {
         
         for(int i=0; i<nentries; i++) {
             
-            keys[i] = KeyBuilder.asSortKey(i);
+            keys[i] = TestKeyBuilder.asSortKey(i);
             
             vals[i] = new byte[4];
             
@@ -172,7 +173,7 @@ public class TestTupleFilters extends AbstractBTreeTestCase {
         
         for(int i=0; i<nentries; i++) {
             
-            keys[i] = KeyBuilder.asSortKey(i);
+            keys[i] = TestKeyBuilder.asSortKey(i);
             
             vals[i] = new byte[4];
             

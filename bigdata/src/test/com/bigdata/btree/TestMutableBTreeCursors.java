@@ -32,7 +32,7 @@ import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import com.bigdata.btree.AbstractBTreeTupleCursor.MutableBTreeTupleCursor;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
@@ -325,7 +325,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
             btree.insert(15, "Paul");
 
             // verify the cursor position is unchanged.
-            assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
+            assertEquals(TestKeyBuilder.asSortKey(20),cursor.currentKey());
 
             // verify the current tuple state is unchanged.
             assertEquals(new TestTuple<String>(20, "Mike"), cursor.tuple());
@@ -346,7 +346,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
             assertEquals(null, cursor.tuple());
 
             // verify the cursor position is unchanged.
-            assertEquals(KeyBuilder.asSortKey(15),cursor.currentKey());
+            assertEquals(TestKeyBuilder.asSortKey(15),cursor.currentKey());
 
             // visit the next tuple.
             assertEquals(new TestTuple<String>(20, "Mike"), cursor.next());
@@ -358,13 +358,13 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
             assertEquals(null, cursor.tuple());
             
             // verify the cursor position is unchanged.
-            assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
+            assertEquals(TestKeyBuilder.asSortKey(20),cursor.currentKey());
             
             // insert another tuple that is a successor of the deleted tuple.
             btree.insert(25, "Allen");
 
             // verify the cursor position is unchanged.
-            assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
+            assertEquals(TestKeyBuilder.asSortKey(20),cursor.currentKey());
 
             // verify the tuple state - still null since we have not repositioned the cursor.
             assertEquals(null, cursor.tuple());
@@ -429,7 +429,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
             btree.insert(15, "Paul");
 
             // verify the cursor position is unchanged.
-            assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
+            assertEquals(TestKeyBuilder.asSortKey(20),cursor.currentKey());
 
             // verify the current tuple state is unchanged.
             assertEquals(new TestTuple<String>(20, "Mike"), cursor.tuple());
@@ -448,7 +448,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
             btree.remove(15);
 
             // verify the cursor position is unchanged.
-            assertEquals(KeyBuilder.asSortKey(15),cursor.currentKey());
+            assertEquals(TestKeyBuilder.asSortKey(15),cursor.currentKey());
 
             // verify the tuple state - it should be null since the tuple for that key was just deleted.
             assertEquals(null, cursor.tuple());
@@ -460,7 +460,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
             btree.remove(20);
             
             // verify the cursor position is unchanged.
-            assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
+            assertEquals(TestKeyBuilder.asSortKey(20),cursor.currentKey());
 
             // verify the tuple state - it should be null since the tuple for that key was just deleted.
             assertEquals(null, cursor.tuple());
@@ -469,7 +469,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
             btree.insert(25, "Allen");
 
             // verify the cursor position is unchanged.
-            assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
+            assertEquals(TestKeyBuilder.asSortKey(20),cursor.currentKey());
 
             // verify the tuple state - still null since we have not repositioned the cursor.
             assertEquals(null, cursor.tuple());
@@ -527,7 +527,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
             btree.remove(10);
             
             // verify the cursor position is unchanged.
-            assertEquals(KeyBuilder.asSortKey(10),cursor.currentKey());
+            assertEquals(TestKeyBuilder.asSortKey(10),cursor.currentKey());
 
             // verify the tuple state - still null since we have not repositioned the cursor.
             assertEquals(null, cursor.tuple());
@@ -536,7 +536,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
             assertEquals(new TestTuple<String>(20,"Mike"),cursor.next());
 
             // verify the cursor position.
-            assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
+            assertEquals(TestKeyBuilder.asSortKey(20),cursor.currentKey());
 
             /*
              * flush the btree again making all nodes clean.
@@ -547,7 +547,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
             btree.insert(10, "Bryan");
             
             // verify the cursor position is unchanged.
-            assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
+            assertEquals(TestKeyBuilder.asSortKey(20),cursor.currentKey());
 
             // verify the current tuple state.
             assertEquals(new TestTuple<String>(20,"Mike"),cursor.tuple());

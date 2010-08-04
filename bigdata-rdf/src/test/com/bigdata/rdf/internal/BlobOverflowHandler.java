@@ -30,7 +30,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IOverflowHandler;
 import com.bigdata.btree.ITuple;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.IByteArrayBuffer;
 import com.bigdata.rawstore.IBlock;
@@ -132,7 +132,7 @@ public class BlobOverflowHandler implements IOverflowHandler {
              * Note: empty blocks are allowed and are recorded with 0L as
              * their address.
              */
-            return KeyBuilder.asSortKey(0L);
+            return TestKeyBuilder.asSortKey(0L);
         }
 
         // read block from underlying source store.
