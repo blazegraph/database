@@ -218,12 +218,12 @@ public class DirectBufferPool {
      */
     public final static DirectBufferPool INSTANCE;
 
-    /**
-     * A JVM-wide pool of direct {@link ByteBuffer}s with a default
-     * {@link Options#BUFFER_CAPACITY} of <code>10 MB</code>. The main use case
-     * for the 10M buffers are multi-block IOs for the {@link IndexSegment}s.
-     */
-    public final static DirectBufferPool INSTANCE_10M;
+//    /**
+//     * A JVM-wide pool of direct {@link ByteBuffer}s with a default
+//     * {@link Options#BUFFER_CAPACITY} of <code>10 MB</code>. The main use case
+//     * for the 10M buffers are multi-block IOs for the {@link IndexSegment}s.
+//     */
+//    public final static DirectBufferPool INSTANCE_10M;
 
     /**
      * An unbounded list of all {@link DirectBufferPool} instances.
@@ -251,11 +251,11 @@ public class DirectBufferPool {
                 bufferCapacity//
                 );
 
-        INSTANCE_10M = new DirectBufferPool(//
-                "10M",//
-                Integer.MAX_VALUE, // poolCapacity
-                10 * Bytes.megabyte32 // bufferCapacity
-                );
+//        INSTANCE_10M = new DirectBufferPool(//
+//                "10M",//
+//                Integer.MAX_VALUE, // poolCapacity
+//                10 * Bytes.megabyte32 // bufferCapacity
+//                );
             
             /*
              * This configuration will block if there is a concurrent demand for
