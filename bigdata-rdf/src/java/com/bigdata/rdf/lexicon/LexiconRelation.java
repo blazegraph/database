@@ -1896,7 +1896,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                      * IllegalStateException if the value somehow was assigned
                      * the wrong term identifier (paranoia test).
                      */
-                    assert value.getIV() == tid : "expecting tid=" + tid
+                    assert value.getIV().equals(tid) : "expecting tid=" + tid
                             + ", but found " + value.getIV();
 					assert (value).getValueFactory() == valueFactory;
 
