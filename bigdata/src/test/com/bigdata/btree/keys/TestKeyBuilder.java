@@ -2111,6 +2111,43 @@ public class TestKeyBuilder extends TestCase2 {
     }
 
     /**
+     * Test with positive and negative {@link BigDecimal}s with large
+     * exponents 
+     */
+    public void test_BigDecimal_largeExponents() {
+        
+        final BigDecimal p1 = new BigDecimal("12000000000000000000000000");
+        final BigDecimal p2 = new BigDecimal("12000000000000000000000001");
+        final BigDecimal p3 = new BigDecimal("1.201E25");
+        final BigDecimal p4 = new BigDecimal("12020000000000000000000000");
+        final BigDecimal p5 = new BigDecimal("1.201E260");
+        final BigDecimal n1 = new BigDecimal("-12000000000000000000000000");
+        final BigDecimal n2 = new BigDecimal("-12000000000000000000000001");
+        final BigDecimal n3 = new BigDecimal("-1.2E260");
+        final BigDecimal n4 = new BigDecimal("-1.201E260");
+        
+        doEncodeDecodeTest(p1);
+        doEncodeDecodeTest(p2);
+        doEncodeDecodeTest(p3);
+        doEncodeDecodeTest(p4);
+        doEncodeDecodeTest(p5);
+        doEncodeDecodeTest(n1);
+        doEncodeDecodeTest(n2);
+        doEncodeDecodeTest(n3);
+        doEncodeDecodeTest(n4);
+
+        doLTTest(p1, p2); // 1.5 LT 1.51
+        doLTTest(p1, p3); // 1.5 LT 1.51
+        doLTTest(p3, p4); // 1.5 LT 1.51
+        doLTTest(p3, p5); // 1.5 LT 1.51
+        doLTTest(n1, p1); // -1.5 LT 1.5
+        doLTTest(n2, n1); // -1.51 LT -1.5
+        doLTTest(n3, n1); // -1.51 LT -1.5
+        doLTTest(n4, n3); // -1.51 LT -1.5
+
+    }
+
+    /**
      * Stress test with random byte[]s from which we then construct
      * {@link BigInteger}s.
      */
