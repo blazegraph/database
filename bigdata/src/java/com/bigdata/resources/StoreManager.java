@@ -674,7 +674,7 @@ abstract public class StoreManager extends ResourceEvents implements
     protected final long accelerateOverflowThreshold;
     
     /**
-     * Used to run the {@link Startup}.
+     * Used to run the {@link Startup}.  @todo defer to init() outside of ctor.  Also, defer {@link Startup} until init() outside of ctor.
      */
     private final ExecutorService startupService = Executors
             .newSingleThreadExecutor(new DaemonThreadFactory
@@ -1420,7 +1420,7 @@ abstract public class StoreManager extends ResourceEvents implements
                 log.info("Waiting for concurrency manager");
             for (int i = 0; i < 5; i++) {
                 try {
-                    getConcurrencyManager();
+                    getConcurrencyManager(); break;
                 } catch (IllegalStateException ex) {
                     Thread.sleep(100/* ms */);
                 }

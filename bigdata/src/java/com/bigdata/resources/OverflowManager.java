@@ -1704,7 +1704,7 @@ abstract public class OverflowManager extends IndexManager {
         }
      
         if(overflowEnabled) {
-
+        	// @todo defer allocation until init() outside of ctor.
             overflowService = Executors.newFixedThreadPool(1,
                     new DaemonThreadFactory((serviceName == null ? ""
                             : serviceName + "-")
