@@ -517,8 +517,7 @@ public abstract class AbstractScaleOutFederation<T> extends AbstractFederation<T
 
         final int ndataServices = dataServiceUUIDs.length;
 
-        if(log.isInfoEnabled())
-            log.info("#dataServices=" + ndataServices + ", now=" + new Date());
+        log.warn("Forcing overflow: #dataServices=" + ndataServices + ", now=" + new Date());
 
         final List<Callable<Void>> tasks = new ArrayList<Callable<Void>>(ndataServices);
 
@@ -570,8 +569,7 @@ public abstract class AbstractScaleOutFederation<T> extends AbstractFederation<T
 
         }
 
-        if(log.isInfoEnabled())
-            log.info("Did overflow: #ok=" + nok + ", #dataServices="
+        log.warn("Did overflow: #ok=" + nok + ", #dataServices="
                 + ndataServices + ", now=" + new Date());
 
         if (nok != tasks.size()) {
