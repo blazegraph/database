@@ -105,9 +105,13 @@ public class XSDDecimalIV<V extends BigdataLiteral> extends
         return value.shortValue();
     }
     
+    /**
+     * Use toPlainString to avoid expression with exponent value that 
+     * would imply xsd:double rather than xsd:decimal
+     */
     @Override
     public String stringValue() {
-        return value.toString();
+        return value.toPlainString();
     }
 
     @Override
