@@ -290,7 +290,7 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
 
         final long actualTupleCount = doEntryIteratorTest(expected
                 .rangeIterator(), new IndexSegmentMultiBlockIterator(actual,
-                DirectBufferPool.INSTANCE_10M, null/* fromKey */,
+                DirectBufferPool.INSTANCE, null/* fromKey */,
                 null/* toKey */, IRangeQuery.DEFAULT));
 
         // verifies based on what amounts to an exact range count.
