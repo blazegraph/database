@@ -1,5 +1,8 @@
 package com.bigdata.rdf.internal;
 
+import java.util.Collection;
+import java.util.LinkedList;
+
 /**
  * Simple {@link IExtensionFactory} implementation that creates two
  * {@link IExtension}s - the {@link EpochExtension} and the 
@@ -7,28 +10,29 @@ package com.bigdata.rdf.internal;
  */
 public class SampleExtensionFactory implements IExtensionFactory {
 
-    private final IExtension[] extensions;
+    private final Collection<IExtension> extensions;
+    
+    private volatile IExtension[] extensionsArray;
     
     public SampleExtensionFactory() {
         
-        extensions = new IExtension[] {
-            new EpochExtension(),
-            new ColorsEnumExtension()
-        };
-        
+        extensions = new LinkedList<IExtension>(); 
+            
     }
     
-    public void resolveDatatypes(final IDatatypeURIResolver resolver) {
-        
-        for (IExtension extension : extensions) {
-            extension.resolveDatatype(resolver);
+    public void init(final IDatatypeURIResolver resolver) {
+
+        if (extensions.size() == 0) {
+            extensions.add(new EpochExtension(resolver));
+            extensions.add(new ColorsEnumExtension(resolver));
+            extensionsArray = extensions.toArray(new IExtension[2]);
         }
         
     }
     
     public IExtension[] getExtensions() {
         
-        return extensions;
+        return extensionsArray;
         
     }
     
