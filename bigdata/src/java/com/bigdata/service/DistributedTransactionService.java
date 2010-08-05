@@ -195,7 +195,7 @@ public abstract class DistributedTransactionService extends
                         Options.SHAPSHOT_INTERVAL,
                         Options.DEFAULT_SHAPSHOT_INTERVAL));
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(Options.SHAPSHOT_INTERVAL + "=" + snapshotInterval);
 
         isTransient = snapshotInterval == 0;
@@ -208,7 +208,7 @@ public abstract class DistributedTransactionService extends
             
             dataDir = new File(properties.getProperty(Options.DATA_DIR));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.DATA_DIR + "=" + dataDir);
             
         }
@@ -218,7 +218,7 @@ public abstract class DistributedTransactionService extends
 
         setup();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("lastCommitTime=" + lastCommitTime + ", #commitTimes="
                     + commitTimeIndex.getEntryCount());
         
@@ -1891,7 +1891,7 @@ public abstract class DistributedTransactionService extends
                  * themselves are serialized so that we do not miss any.
                  */
 
-                if (DEBUG)
+                if (log.isDebugEnabled())
                     log.debug("commitTime="
                             + commitTime
                             + ", lastKnownCommitTime="

@@ -287,6 +287,14 @@ abstract public class OverflowManager extends IndexManager {
      */
     protected final AtomicBoolean asyncOverflowEnabled = new AtomicBoolean(true);
 
+	/**
+	 * Flag may be set to force overflow processing during the next group
+	 * commit. The flag is cleared by {@link #overflow()}.
+	 * 
+	 * @see DataService#forceOverflow(boolean, boolean)
+	 */
+    public final AtomicBoolean forceOverflow = new AtomicBoolean(false);
+
     /**
      * A flag that may be set to force the next asynchronous overflow to perform
      * a compacting merge for all indices that are not simply copied over to the
@@ -295,6 +303,8 @@ abstract public class OverflowManager extends IndexManager {
      * made compact and SHOULD NOT be used for deployed federations</strong>).
      * The state of the flag is cleared each time asynchronous overflow
      * processing begins.
+     * 
+	 * @see DataService#forceOverflow(boolean, boolean)
      */
     public final AtomicBoolean compactingMerge = new AtomicBoolean(false);
 
@@ -1849,6 +1859,19 @@ abstract public class OverflowManager extends IndexManager {
      */
     public boolean shouldOverflow() {
      
+        if(forceOverflow.get()) {
+
+        	/*
+        	 * Note: forceOverflow trumps everything else.
+        	 */
+        	
+        	if (log.isInfoEnabled())
+                log.info("Forcing overflow.");
+            
+        	return true;
+        	
+        }
+        
         if (isTransient()) {
 
             /*
@@ -1886,7 +1909,7 @@ abstract public class OverflowManager extends IndexManager {
             return false;
             
         }
-        
+
         /*
          * Look for overflow condition on the "live" journal.
          */
@@ -1959,8 +1982,18 @@ abstract public class OverflowManager extends IndexManager {
      */
     public Future<Object> overflow() {
 
-        assert overflowAllowed.get();
+//        assert overflowAllowed.get();
 
+		/*
+		 * Atomically test and clear the flag. The local boolean is inspected
+		 * below. When true, asynchronous overflow processing will occur unless
+		 * an error occurs during synchronous overflow processing. This ensures
+		 * that we can force a compacting merge on the shards of a data service
+		 * even if that data service has not buffer sufficient writes to warrant
+		 * a build on any of the index segments.
+		 */
+    	final boolean forceOverflow = this.forceOverflow.getAndSet(false/* newValue */);
+    	
         final Event e = new Event(getFederation(), new EventResource(),
                 EventType.SynchronousOverflow).addDetail(
                 "synchronousOverflowCounter",
@@ -1982,7 +2015,12 @@ abstract public class OverflowManager extends IndexManager {
 
             if (asyncOverflowEnabled.get()) {
 
-                if (overflowMetadata.postProcess) {
+				/*
+				 * Do overflow processing if overflow is being forced OR if we
+				 * need to do a build for at least one index partition.
+				 */
+				
+				if (forceOverflow || overflowMetadata.postProcess) {
 
                     /*
                      * Post-processing SHOULD be performed.
