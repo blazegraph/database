@@ -397,12 +397,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     determineExtensionFactoryClass();
                 final IExtensionFactory xFactory = xfc.newInstance();
                 
-                /* 
-                 * Allow the extensions to resolve their datatype URIs into
-                 * term identifiers. 
-                 */
-                xFactory.resolveDatatypes(this);
-                
                 lexiconConfiguration = new LexiconConfiguration(
                         inlineLiterals, inlineBNodes, xFactory);
                 
@@ -2678,6 +2672,15 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 //            }
 //            
 //        }
+        
+        /* 
+         * Allow the extensions to resolve their datatype URIs into
+         * term identifiers.  Unfortunately no way to tell whether to call this
+         * or not without using non-final variables.  The configuration will 
+         * have to be responsible for determining whether they are initialized 
+         * or not (again using only final variables).  Hacky. 
+         */
+        lexiconConfiguration.initExtensions(this);
         
         return lexiconConfiguration;
         

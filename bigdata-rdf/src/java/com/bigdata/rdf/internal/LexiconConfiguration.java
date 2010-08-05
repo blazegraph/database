@@ -30,6 +30,7 @@ package com.bigdata.rdf.internal;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
@@ -40,33 +41,58 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
 /**
- * An object which describes which kinds of RDF Values are inlined into the statement indices and how other RDF Values are coded into the lexicon.
+ * An object which describes which kinds of RDF Values are inlined into the 
+ * statement indices and how other RDF Values are coded into the lexicon.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class LexiconConfiguration<V extends BigdataValue> implements ILexiconConfiguration<V> {
+public class LexiconConfiguration<V extends BigdataValue> 
+        implements ILexiconConfiguration<V> {
 
+    protected static final Logger log = 
+        Logger.getLogger(LexiconConfiguration.class);
+    
     private final boolean inlineLiterals, inlineBNodes;
 
+    private final IExtensionFactory xFactory;
+    
     private final Map<TermId, IExtension> termIds;
 
     private final Map<String, IExtension> datatypes;
-
-    public LexiconConfiguration(final boolean inlineLiterals, final boolean inlineBNodes, final IExtensionFactory xFactory) {
+    
+    public LexiconConfiguration(final boolean inlineLiterals, 
+            final boolean inlineBNodes, final IExtensionFactory xFactory) {
+        
         this.inlineLiterals = inlineLiterals;
         this.inlineBNodes = inlineBNodes;
-
+        this.xFactory = xFactory;
+        
         termIds = new HashMap<TermId, IExtension>();
         datatypes = new HashMap<String, IExtension>();
-        for (IExtension extension : xFactory.getExtensions()) {
-            BigdataURI datatype = extension.getDatatype();
-            if (datatype == null)
-                continue;
-            termIds.put((TermId) datatype.getIV(), extension);
-            datatypes.put(datatype.stringValue(), extension);
+        
+    }
+    
+    public void initExtensions(final IDatatypeURIResolver resolver) {
+        
+        xFactory.init(resolver);
+        
+        /*
+         * Hacky way to know we haven't been initialized yet without using
+         * non-final variables.
+         */
+        if (termIds.size() == 0 && xFactory.getExtensions().length > 0) {
+            
+            for (IExtension extension : xFactory.getExtensions()) {
+                BigdataURI datatype = extension.getDatatype();
+                if (datatype == null)
+                    continue;
+                termIds.put((TermId) datatype.getIV(), extension);
+                datatypes.put(datatype.stringValue(), extension);
+            }
+            
         }
-
+        
     }
 
     public V asValue(final ExtensionIV iv, final BigdataValueFactory vf) {
@@ -92,9 +118,10 @@ public class LexiconConfiguration<V extends BigdataValue> implements ILexiconCon
 
             if (datatypes.containsKey(datatype.stringValue())) {
 
-                try {
+                final IExtension xFactory = 
+                    datatypes.get(datatype.stringValue());
 
-                    final IExtension xFactory = datatypes.get(datatype.stringValue());
+                try {
 
                     final IV iv = xFactory.createIV(value);
 
@@ -105,6 +132,9 @@ public class LexiconConfiguration<V extends BigdataValue> implements ILexiconCon
 
                 } catch (Exception ex) {
 
+                    log.warn("problem creating inline internal value for " +
+                            "extension datatype: " + value.stringValue());
+                    
                     /* 
                      * Some sort of parse error in the literal value most 
                      * likely. Resort to term identifiers. 
@@ -172,6 +202,8 @@ public class LexiconConfiguration<V extends BigdataValue> implements ILexiconCon
                 // some dummy doesn't know how to format a number
                 // default to term identifier for this term 
 
+                log.warn("number format exception: " + v);
+                
             }
 
             if (iv != null && value instanceof BigdataValue)

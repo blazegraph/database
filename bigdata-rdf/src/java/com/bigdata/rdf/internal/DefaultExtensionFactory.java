@@ -9,16 +9,11 @@ public class DefaultExtensionFactory implements IExtensionFactory {
     
     public DefaultExtensionFactory() {
         
-        extensions = new IExtension[] {
-        };
+        extensions = new IExtension[0];
         
     }
     
-    public void resolveDatatypes(final IDatatypeURIResolver resolver) {
-        
-        for (IExtension extension : extensions) {
-            extension.resolveDatatype(resolver);
-        }
+    public void init(final IDatatypeURIResolver resolver) {
         
     }
     
