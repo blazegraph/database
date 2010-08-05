@@ -113,19 +113,20 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      */
     public interface ConfigurationOptions {
 
-        /**
-         * When <code>true</code> as an after action on the job, the
-         * {@link DataService}s in the federation will be made to undergo
-         * asynchronous overflow processing and the live journals will be
-         * truncated so that the total size on disk of the federation is at its
-         * minimum footprint for the given history retention policy (default
-         * <code>false</code>). The master will block during this operation
-         * so you can readily tell when it is finished. Note that this option
-         * only makes sense in benchmark environments where you can contol the
-         * total system otherwise asynchronous writes may continue.
-         * 
-         * @see AbstractScaleOutFederation#forceOverflow(boolean)
-         */
+		/**
+		 * When <code>true</code> as an after action on the job, the
+		 * {@link DataService}s in the federation will be made to undergo
+		 * asynchronous overflow processing, a compacting merge will be
+		 * requested for all shards, and the live journals will be truncated so
+		 * that the total size on disk of the federation is at its minimum
+		 * footprint for the given history retention policy (default
+		 * <code>false</code>). The master will block during this operation so
+		 * you can readily tell when it is finished. Note that this option only
+		 * makes sense in benchmark environments where you can control the total
+		 * system otherwise asynchronous writes may continue.
+		 * 
+		 * @see AbstractScaleOutFederation#forceOverflow(boolean, boolean)
+		 */
         String FORCE_OVERFLOW = "forceOverflow";
 
         /**
@@ -1763,7 +1764,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
         System.out.println("Forcing overflow: now=" + new Date());
 
-        fed.forceOverflow(true/* truncateJournal */);
+		fed.forceOverflow(true/* compactingMerge */, true/* truncateJournal */);
 
         System.out.println("Forced overflow: now=" + new Date());
 

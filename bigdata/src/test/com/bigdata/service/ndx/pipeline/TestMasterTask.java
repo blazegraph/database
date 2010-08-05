@@ -287,6 +287,7 @@ public class TestMasterTask extends AbstractMasterTestCase {
 
             assertNotNull(subtaskStats);
             
+            // @todo this assert fails stochastically.
             assertEquals("chunksOut", 1, subtaskStats.chunksOut.get());
             assertEquals("elementsOut", 2, subtaskStats.elementsOut.get());
             
