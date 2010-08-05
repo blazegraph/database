@@ -22,11 +22,9 @@ public class SampleExtensionFactory implements IExtensionFactory {
     
     public void init(final IDatatypeURIResolver resolver) {
 
-        if (extensions.size() == 0) {
-            extensions.add(new EpochExtension(resolver));
-            extensions.add(new ColorsEnumExtension(resolver));
-            extensionsArray = extensions.toArray(new IExtension[2]);
-        }
+		extensions.add(new EpochExtension(resolver));
+		extensions.add(new ColorsEnumExtension(resolver));
+		extensionsArray = extensions.toArray(new IExtension[2]);
         
     }
     

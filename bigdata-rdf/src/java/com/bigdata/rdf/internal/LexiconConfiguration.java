@@ -73,25 +73,17 @@ public class LexiconConfiguration<V extends BigdataValue>
         
     }
     
-    public void initExtensions(final IDatatypeURIResolver resolver) {
-        
-        xFactory.init(resolver);
-        
-        /*
-         * Hacky way to know we haven't been initialized yet without using
-         * non-final variables.
-         */
-        if (termIds.size() == 0 && xFactory.getExtensions().length > 0) {
-            
-            for (IExtension extension : xFactory.getExtensions()) {
-                BigdataURI datatype = extension.getDatatype();
-                if (datatype == null)
-                    continue;
-                termIds.put((TermId) datatype.getIV(), extension);
-                datatypes.put(datatype.stringValue(), extension);
-            }
-            
-        }
+	public void initExtensions(final IDatatypeURIResolver resolver) {
+
+		xFactory.init(resolver);
+
+		for (IExtension extension : xFactory.getExtensions()) {
+			BigdataURI datatype = extension.getDatatype();
+			if (datatype == null)
+				continue;
+			termIds.put((TermId) datatype.getIV(), extension);
+			datatypes.put(datatype.stringValue(), extension);
+		}
         
     }
 

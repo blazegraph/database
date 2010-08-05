@@ -21,8 +21,8 @@ import com.bigdata.relation.rule.IPredicate;
  */
 public class RelationFusedView<E> implements IRelation<E> {
     
-    private IRelation<E> relation1;
-    private IRelation<E> relation2;
+	final private IRelation<E> relation1;
+    final private IRelation<E> relation2;
     
     public IRelation<E> getRelation1() {
         
@@ -34,6 +34,13 @@ public class RelationFusedView<E> implements IRelation<E> {
         
         return relation2;
         
+    }
+    
+	// NOP
+    public RelationFusedView<E> init() {
+
+    	return this;
+    	
     }
     
     /**

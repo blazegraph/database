@@ -256,7 +256,7 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
                 ITx.UNISOLATED,
                 store.getProperties()
 //                client.getProperties()
-                );
+                ).init();
         
     }
 

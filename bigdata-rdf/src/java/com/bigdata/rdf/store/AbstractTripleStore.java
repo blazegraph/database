@@ -1222,7 +1222,17 @@ abstract public class AbstractTripleStore extends
         }
         
     }
+
+    @Override
+    public AbstractTripleStore init() {
     
+    	super.init();
+    	
+    	return this;
+    	
+    }
+    
+    @Override
     public void create() {
 
         assertWritable();
