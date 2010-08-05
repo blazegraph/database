@@ -1351,6 +1351,12 @@ ${postInstallMessage}</echo>
             <fileset dir="${bigdata.dir}/src/resources/scripts" />
         </copy>
 
+    	<!-- Copy the analysis tools. The queries directory is required for extractCounters.sh. -->
+    	<mkdir dir="${build.dir}/src/resources/analysis" />
+        <copy toDir="${build.dir}/src/resources/analysis">
+            <fileset dir="${bigdata.dir}/src/resources/analysis" />
+        </copy>
+
         <copy tofile="${build.dir}/build.properties" file="build.properties" />
         <copy tofile="${build.dir}/build.xml" file="build.xml" />
         <copy tofile="${build.dir}/LICENSE.txt" file="LICENSE.txt" />
@@ -1988,6 +1994,13 @@ ${postInstallMessage}</echo>
         <!-- changing the appropriate property value above is all       -->
         <!-- that should be required.                                   -->
 
+        <!-- This is a workaround for a JVM bug which can result in a   -->
+        <!-- lost wakeup.  This bug is fixed in JDK1.6.0_18.  However,  -->
+        <!-- JDK1.6.0_18 has other problems which result in segfaults.  -->
+        <!--                                                            -->
+        <!-- http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6822370 -->
+		<jvmarg value="-XX:+UseMembar"/>
+      	
         <sysproperty key="log4j.path" value="${bigdata.test.log4j.abs.path}"/>
 
         <sysproperty key="app.home" value="${app.home}"/>
