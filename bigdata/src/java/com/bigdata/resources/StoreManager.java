@@ -1416,18 +1416,19 @@ abstract public class StoreManager extends ResourceEvents implements
              * Verify that the concurrency manager has been set and wait a while
              * it if is not available yet.
              */
-            if (log.isInfoEnabled())
-                log.info("Waiting for concurrency manager");
-            for (int i = 0; i < 5; i++) {
-                try {
-                    getConcurrencyManager(); break;
-                } catch (IllegalStateException ex) {
-                    Thread.sleep(100/* ms */);
-                }
+			{
+				int nwaits = 0;
+				while (true) {
+					try {
+						getConcurrencyManager();
+						break;
+					} catch (IllegalStateException ex) {
+						Thread.sleep(100/* ms */);
+						if (++nwaits % 50 == 0)
+							log.warn("Waiting for concurrency manager");
+					}
+				}
             }
-            getConcurrencyManager();
-            if (Thread.interrupted())
-                throw new InterruptedException();
 
             /*
              * Look for pre-existing data files.
