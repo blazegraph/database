@@ -777,117 +777,7 @@ ${postInstallMessage}</echo>
 </java>
 
 </target>
-
-<!--                                                                   -->
-<!--                    STANDALONE FEDERATION TARGETS                  -->
-<!--                         (test/benchamarking)                      -->
-
-<target name="generateLookupStarterJar" unless="lookupStarterJarAvailable">
-<antcall target="testCompile" />
-</target>
-
-<target name="testLookupStarterJarAvailability">
-<property name="bigdata-test.lib" location="${bigdata.dir}/bigdata-test/lib" />
-<condition property="lookupStarterJarAvailable">
-	<available file="${bigdata-test.lib}/lookupstarter.jar" />
-</condition>
-</target>
-
-<target name="standalone-setup" depends="testLookupStarterJarAvailability,generateLookupStarterJar" description="Setup properties used by standalone federation and LUS start/stop.">
-<property name="app.home" location="${bigdata.dir}" />
-<property name="test.codebase.port" value="23333" />
-<property name="test.codebase.dir" location="${bigdata.dir}/bigdata-jini/lib/jini/lib-dl" />
-<property name="dist.lib" location="${bigdata.dir}/bigdata-jini/lib/jini/lib" />
-<property name="dist.lib.dl" location="${bigdata.dir}/bigdata-jini/lib/jini/lib-dl" />
-<property name="test.codebase" value="http://${this.hostname}:${test.codebase.port}/jsk-dl.jar" />
-<property name="java.security.policy" value="${bigdata.dir}/policy.all" />
-<property name="log4j.configuration" value="resources/logging/log4j.properties" />
-<property name="java.net.preferIPv4Stack" value="true" />
-<property name="bigdata.fedname" value="${standalone.fed}" />
-</target>
-
-<!-- Note: You should 'nohup' this, e.g., "nohup ant standalone-start" to 
-     avoid taking down the ServicesManagerServer if you are disconnected
-     from a terminal. -->
-<target name="standalone-start" depends="jar,standalone-setup" description="Start the standalone federation.">
-<!-- Start the lookup service. -->
-<antcall target="startHttpd" />
-<antcall target="startLookup" />
-<java classname="com.bigdata.jini.start.ServicesManagerServer" failonerror="true" fork="true" logerror="true">
-	<classpath refid="runtime.classpath" />
-	<jvmarg value="-Xmx200m" />
-	<jvmarg value="-showversion" />
-	<!-- The name of the federation instance. -->
-	<jvmarg value="-Dbigdata.fedname=${standalone.fed}" />
-	<jvmarg value="-Djava.security.policy=policy.all" />
-	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
-	<jvmarg value="-Dcom.bigdata.counters.linux.sysstat.path=${SYSSTAT_HOME}" />
-	<jvmarg value="-Dlog4j.configuration=file:src/resources/config/standalone/log4j.properties" />
-	<arg value="src/resources/config/standalone/bigdataStandalone.config" />
-</java>
-</target>
-
-<target name="standalone-stop" depends="jar,standalone-setup" description="Stop the standalone federation.">
-<java classname="com.bigdata.service.jini.util.ShutdownFederation" failonerror="true" fork="true" logerror="true">
-	<classpath refid="runtime.classpath" />
-	<jvmarg value="-Xmx200m" />
-	<jvmarg value="-showversion" />
-	<!-- The name of the federation instance. -->
-	<jvmarg value="-Dbigdata.fedname=${standalone.fed}" />
-	<jvmarg value="-Djava.security.policy=policy.all" />
-	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
-	<jvmarg value="-Dcom.bigdata.counters.linux.sysstat.path=${SYSSTAT_HOME}" />
-	<jvmarg value="-Dlog4j.configuration=file:src/resources/config/standalone/log4j.properties" />
-	<arg value="src/resources/config/standalone/bigdataStandalone.config" />
-</java>
-<!-- Then take down the lookup service as well. -->
-<antcall target="stopLookup" />
-<antcall target="stopHttpd" />
-</target>
-
-<target name="standalone-start-nano-server" depends="jar" description="Start a small http server fronting for a bigdata database instance.">
-<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true">
-	<arg line="${standalone.nanoServerPort} ${standalone.namespace} src/resources/config/standalone/bigdataStandalone.config" />
-	<jvmarg line="-server" />
-	<jvmarg line="-Xmx200M" />
-	<classpath refid="runtime.classpath" />
-</java>
-</target>
-
-<target name="standalone-stop-nano-server" depends="jar" description="Stop the small http server running at the configured port.">
-<java classname="com.bigdata.rdf.sail.bench.NanoSparqlServer" fork="true" failonerror="true">
-	<arg line="${standalone.nanoServerPort} -stop" />
-	<classpath refid="runtime.classpath" />
-</java>
-</target>
-
-<target name="standalone-bulk-load" depends="jar" description="Bulk load RDF data into the standalone federation.">
-<java classname="com.bigdata.rdf.load.MappedRDFDataLoadMaster" failonerror="true" fork="true" logerror="true">
-	<classpath refid="runtime.classpath" />
-	<jvmarg value="-Xmx200m" />
-	<jvmarg value="-showversion" />
-	<!-- The name of the federation instance. -->
-	<jvmarg value="-Dbigdata.fedname=${standalone.fed}" />
-	<jvmarg value="-Djava.security.policy=policy.all" />
-	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
-	<jvmarg value="-Dcom.bigdata.counters.linux.sysstat.path=${SYSSTAT_HOME}" />
-	<jvmarg value="-Dlog4j.configuration=file:src/resources/config/standalone/log4j.properties" />
-	<!--                    -->
-	<!-- Per job parameters -->
-	<!--                    -->
-	<!-- The namespace of the target KB. -->
-	<jvmarg value="-Dbigdata.rdf.namespace=${standalone.namespace}" />
-	<!-- The job name (same as the KB namespace is a common default). -->
-	<jvmarg value="-Dbigdata.rdf.job.name=bulk-load-kb-${standalone-namespace}" />
-	<!-- The file or directory containing zero or more files to be loaded first. -->
-	<jvmarg value="-Dbigdata.rdf.ontology=${standalone.bulkLoad.ontology}" />
-	<!-- The file or directory containing RDF data to be loaded. -->
-	<jvmarg value="-Dbigdata.rdf.data=${standalone.bulkLoad.data}" />
-	<!-- The main configuration file. -->
-	<arg value="src/resources/config/standalone/bigdataStandalone.config" />
-</java>
-</target>
-
+	
 <!--                                                                   -->
 <!--                    MISC. UTILITY TARGETS                          -->
 <!--                                                                   -->
@@ -1122,9 +1012,9 @@ ${postInstallMessage}</echo>
 
 <!-- Stage the bigdata Jini config files -->
 
+<copy file="${src.resources.config}/bigdataStandalone.config" todir="${dist.var.config.jini}" />
 <copy file="${src.resources.config}/bigdataCluster.config" todir="${dist.var.config.jini}" />
 <copy file="${src.resources.config}/bigdataCluster16.config" todir="${dist.var.config.jini}" />
-<copy file="${src.resources.config}/standalone/bigdataStandalone.config" todir="${dist.var.config.jini}" />
 
 <!-- Stage the infrastructure service config files -->
 
