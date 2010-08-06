@@ -2840,7 +2840,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                  * might also want to limit the maximum size of the reads.
                  */
 
-                final DirectBufferPool pool = DirectBufferPool.INSTANCE_10M;
+//                final DirectBufferPool pool = DirectBufferPool.INSTANCE_10M;
+                final DirectBufferPool pool = DirectBufferPool.INSTANCE;
                 
                 if (true
                         && ((flags & REVERSE) == 0)

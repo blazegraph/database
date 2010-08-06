@@ -47,6 +47,7 @@ import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
@@ -492,40 +493,56 @@ public abstract class AbstractScaleOutFederation<T> extends AbstractFederation<T
         
     }
 
-    /**
-     * Force overflow of each data service in the scale-out federation (only
-     * scale-out federations support overflow processing). This method is
-     * synchronous. It will not return until all {@link DataService}s have
-     * initiated and completed overflow processing. Any unused resources (as
-     * determined by the {@link StoreManager}) will have been purged.
-     * 
-     * @param truncateJournal
-     *            When <code>true</code>, the live journal will be truncated
-     *            to its minimum extent (all writes will be preserved but there
-     *            will be no free space left in the journal). This may be used
-     *            to force the {@link DataService} to its minimum possible
-     *            footprint.
-     * 
-     * @todo when overflow processing is enabled for the {@link MetadataService}
-     *       we will have to modify this to also trigger overflow for those
-     *       services.
-     */
-    public void forceOverflow(final boolean truncateJournal) {
+	/**
+	 * Force overflow of each data service in the scale-out federation (only
+	 * scale-out federations support overflow processing). This method is
+	 * synchronous. It will not return until all {@link DataService}s have
+	 * initiated and completed overflow processing. Any unused resources (as
+	 * determined by the {@link StoreManager}) will have been purged.
+	 * <p>
+	 * This is a relatively fast operation when
+	 * <code>compactingMerge := false</code>. By specifying both
+	 * <code>compactingMerge := false</code> and
+	 * <code>truncateJournal := false</code> you can cause the data services to
+	 * close out their current journals against further writes. While this is
+	 * not a global synchronous operation, it can provide a basis to obtain a
+	 * "near synchronous" snapshot from the federation consisting of all writes
+	 * up to the point where overflow was triggered on each data service.
+	 * 
+	 * @param compactingMerge
+	 *            When <code>true</code>, each shard on each
+	 *            {@link IDataService} will undergo a compacting merge.
+	 *            Synchronous parallel compacting merge of all shards is an
+	 *            expensive operation. This parameter shoudl normally be
+	 *            <code>false</code> unless you are requesting a compacting
+	 *            merge for specific purposes, such as benchmarking when all
+	 *            data is known to exist in one {@link IndexSegment} per shard.
+	 * @param truncateJournal
+	 *            When <code>true</code>, the live journal will be truncated to
+	 *            its minimum extent (all writes will be preserved but there
+	 *            will be no free space left in the journal). This may be used
+	 *            to force the {@link DataService} to its minimum possible
+	 *            footprint.
+	 * 
+	 * @todo when overflow processing is enabled for the {@link MetadataService}
+	 *       we will have to modify this to also trigger overflow for those
+	 *       services.
+	 */
+    public void forceOverflow(final boolean compactingMerge, final boolean truncateJournal) {
         
         // find UUID for each data service.
         final UUID[] dataServiceUUIDs = getDataServiceUUIDs(0/* maxCount */);
 
         final int ndataServices = dataServiceUUIDs.length;
 
-        if(log.isInfoEnabled())
-            log.info("#dataServices=" + ndataServices + ", now=" + new Date());
+        log.warn("Forcing overflow: #dataServices=" + ndataServices + ", now=" + new Date());
 
         final List<Callable<Void>> tasks = new ArrayList<Callable<Void>>(ndataServices);
 
         for (UUID serviceUUID : dataServiceUUIDs) {
 
             tasks.add(new ForceOverflowTask(getDataService(serviceUUID),
-                    truncateJournal));
+                    compactingMerge, truncateJournal));
 
         }
 
@@ -570,8 +587,7 @@ public abstract class AbstractScaleOutFederation<T> extends AbstractFederation<T
 
         }
 
-        if(log.isInfoEnabled())
-            log.info("Did overflow: #ok=" + nok + ", #dataServices="
+        log.warn("Did overflow: #ok=" + nok + ", #dataServices="
                 + ndataServices + ", now=" + new Date());
 
         if (nok != tasks.size()) {
@@ -643,15 +659,18 @@ public abstract class AbstractScaleOutFederation<T> extends AbstractFederation<T
                 .getLogger(ForceOverflowTask.class);
 
         private final IDataService dataService;
+        private final boolean compactingMerge;
         private final boolean truncateJournal;
         
-        public ForceOverflowTask(final IDataService dataService,
-                final boolean truncateJournal) {
+		public ForceOverflowTask(final IDataService dataService,
+				final boolean compactingMerge, final boolean truncateJournal) {
 
             if (dataService == null)
                 throw new IllegalArgumentException();
 
             this.dataService = dataService;
+            
+            this.compactingMerge = compactingMerge;
             
             this.truncateJournal = truncateJournal;
 
@@ -663,8 +682,7 @@ public abstract class AbstractScaleOutFederation<T> extends AbstractFederation<T
                 log.info("dataService: " + dataService.getServiceName());
 
             // returns once synchronous overflow is complete.
-            dataService
-                    .forceOverflow(true/* immediate */, true/* compactingMerge */);
+			dataService.forceOverflow(true/* immediate */, compactingMerge);
 
             if (log.isInfoEnabled())
                 log.info("Synchronous overflow is done: "

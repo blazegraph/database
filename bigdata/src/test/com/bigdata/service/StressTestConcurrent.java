@@ -626,20 +626,14 @@ public class StressTestConcurrent extends
                  * and when we have not since forcing overflow will trigger
                  * compacting merges. So you are more likely to find a problem
                  * if you DO NOT force overflow.
-                 * 
-                 * Note: This DOES NOT guarantee that overflow is forced on a
-                 * given data service. it is forced if the method can gain the
-                 * exclusive write lock for that data service. otherwise it will
-                 * timeout and overflow processing will not be triggered on that
-                 * data service.
                  */
                 final boolean forceOverflow = false;
                 if (forceOverflow) {
 
                     System.err.println("Forcing overflow: " + new Date());
 
-                    ((AbstractScaleOutFederation<?>) federation)
-                            .forceOverflow(true/* truncateJournal */);
+					((AbstractScaleOutFederation<?>) federation)
+							.forceOverflow(true/* compactingMerge */, true/* truncateJournal */);
 
                     System.err.println("Forced  overflow: " + new Date());
 

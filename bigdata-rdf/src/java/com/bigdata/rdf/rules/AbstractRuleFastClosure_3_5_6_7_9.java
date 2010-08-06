@@ -450,7 +450,8 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
                     return new RelationFusedView<ISPO>(
                             //
                             (IRelation<ISPO>)resourceLocator.locate(database, timestamp0),
-                            (IRelation<ISPO>)resourceLocator.locate(focusStore, timestamp1));
+                            (IRelation<ISPO>)resourceLocator.locate(focusStore, timestamp1))
+                            .init();
 
                 }
                     // final IAccessPath accessPath = (focusStore == null //

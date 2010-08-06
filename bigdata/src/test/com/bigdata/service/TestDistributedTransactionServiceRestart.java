@@ -75,6 +75,7 @@ public class TestDistributedTransactionServiceRestart extends TestCase2 {
 
         }
 
+        @Override
         protected void setReleaseTime(final long releaseTime) {
             
             lock.lock();
@@ -102,6 +103,7 @@ public class TestDistributedTransactionServiceRestart extends TestCase2 {
 
         }
 
+        @Override
         public MockDistributedTransactionService start() {
 
             super.start();
@@ -110,6 +112,18 @@ public class TestDistributedTransactionServiceRestart extends TestCase2 {
             
         }
 
+		/**
+		 * This is overridden to be a NOP for this test suite. The unit tests in
+		 * this suite depend on the ability to inject specific commit times into
+		 * the transaction service without having them "release" based on the
+		 * actual system clock.
+		 */
+        @Override
+        protected void updateReleaseTimeForBareCommit(final long commitTime) {
+        	
+        	return;
+        }
+        
         /**
          * Exposed to the unit tests.
          */
@@ -129,19 +143,19 @@ public class TestDistributedTransactionServiceRestart extends TestCase2 {
      * 
      * @return The array.
      */
-    long[] toArray(CommitTimeIndex ndx) {
+    long[] toArray(final CommitTimeIndex ndx) {
         
         synchronized(ndx) {
             
-            long[] a = new long[ndx.getEntryCount()];
+            final long[] a = new long[ndx.getEntryCount()];
             
-            final ITupleIterator itr = ndx.rangeIterator();
+            final ITupleIterator<?> itr = ndx.rangeIterator();
             
             int i = 0;
             
             while(itr.hasNext()) {
                 
-                final ITuple tuple = itr.next();
+                final ITuple<?> tuple = itr.next();
                 
                 a[i] = ndx.decodeKey(tuple.getKey());
                 
@@ -160,7 +174,6 @@ public class TestDistributedTransactionServiceRestart extends TestCase2 {
      * when the release time is advanced and that it is still possible to obtain
      * a read-only tx as of the timestamp immediately after the current release
      * time.
-     * 
      */
     public void test_setReleaseTime() {
 
@@ -169,7 +182,10 @@ public class TestDistributedTransactionServiceRestart extends TestCase2 {
         properties.setProperty(DistributedTransactionService.Options.DATA_DIR,
                 getName());
 
-        MockDistributedTransactionService service = new MockDistributedTransactionService(
+        properties.setProperty(DistributedTransactionService.Options.MIN_RELEASE_AGE,
+                "10");
+
+        final MockDistributedTransactionService service = new MockDistributedTransactionService(
                 properties).start();
 
         try {
@@ -184,7 +200,7 @@ public class TestDistributedTransactionServiceRestart extends TestCase2 {
             // verify the commit index.
             {
 
-                CommitTimeIndex ndx = service.getCommitTimeIndex();
+                final CommitTimeIndex ndx = service.getCommitTimeIndex();
 
                 synchronized (ndx) {
 
@@ -292,7 +308,7 @@ public class TestDistributedTransactionServiceRestart extends TestCase2 {
 
             {
                 
-                CommitTimeIndex ndx = service.getCommitTimeIndex();
+                final CommitTimeIndex ndx = service.getCommitTimeIndex();
                 
                 synchronized(ndx) {
                     
@@ -354,7 +370,7 @@ public class TestDistributedTransactionServiceRestart extends TestCase2 {
 //          verify the commit time index.
             {
                 
-                CommitTimeIndex ndx = service.getCommitTimeIndex();
+                final CommitTimeIndex ndx = service.getCommitTimeIndex();
                 
                 synchronized(ndx) {
                     

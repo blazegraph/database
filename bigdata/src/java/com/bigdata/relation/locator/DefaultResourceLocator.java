@@ -586,6 +586,8 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
                     properties //
                     });
 
+            r.init();
+            
             if(INFO) {
                 
                 log.info("new instance: "+r);
