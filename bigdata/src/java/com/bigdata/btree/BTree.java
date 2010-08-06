@@ -644,7 +644,18 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
         this.lastCommitTime = lastCommitTime;
         
     }
-    private long lastCommitTime = 0L;// Until the first commit.
+
+    /**
+     * The lastCommitTime of the {@link Checkpoint} record from which the
+     * {@link BTree} was loaded.
+     * <p>
+     * Note: Made volatile on 8/2/2010 since it is not otherwise obvious what
+     * would guarantee visibility of this field, through I do seem to remember
+     * that visibility might be guaranteed by how the BTree class is discovered
+     * and returned to the class. Still, it does no harm to make this a volatile
+     * read.
+     */
+    volatile private long lastCommitTime = 0L;// Until the first commit.
     
     /**
      * Return the {@link IDirtyListener}.
