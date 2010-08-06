@@ -1430,16 +1430,31 @@ abstract public class StoreManager extends ResourceEvents implements
 				}
             }
 
-			while (true) {
-				if (getFederation().getTransactionService() != null) {
-					break;
+			try {
+				final IBigdataFederation<?> fed = getFederation();
+				if (fed == null) {
+					/*
+					 * Some of the unit tests do not start the txs until after
+					 * the DataService. For those unit tests getFederation()
+					 * will return null during startup() of the DataService. To
+					 * have a common code path, we throw the exception here
+					 * which is caught below.
+					 */
+					throw new UnsupportedOperationException();
 				}
-				log.warn("Waiting for transaction service discovery");
+				while (true) {
+					if (fed.getTransactionService() != null) {
+						break;
+					}
+					log.warn("Waiting for transaction service discovery");
+				}
+			} catch (UnsupportedOperationException ex) {
+				log.warn("Federation not available - running in test case?");
 			}
-			
-            /*
-             * Look for pre-existing data files.
-             */
+
+			/*
+			 * Look for pre-existing data files.
+			 */
             if (!isTransient) {
 
                 if (log.isInfoEnabled())

@@ -829,7 +829,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     }
 
     /**
-     * Delegated.
+     * Delegated. {@inheritDoc}
      */
     public T getService() {
     
@@ -840,7 +840,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     }
 
     /**
-     * Delegated.
+     * Delegated. {@inheritDoc}
      */
     public String getServiceName() {
     
@@ -851,7 +851,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     }
     
     /**
-     * Delegated.
+     * Delegated. {@inheritDoc}
      */
     public Class getServiceIface() {
 
@@ -862,7 +862,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     }
     
     /**
-     * Delegated.
+     * Delegated. {@inheritDoc}
      */
     public UUID getServiceUUID() {
         
@@ -873,7 +873,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     }
     
     /**
-     * Delegated.
+     * Delegated. {@inheritDoc}
      */
     public boolean isServiceReady() {
 
@@ -894,7 +894,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     }
     
     /**
-     * Delegated.
+     * Delegated. {@inheritDoc}
      */
     public void reattachDynamicCounters() {
         
@@ -905,7 +905,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     }
     
     /**
-     * Delegated.
+     * Delegated. {@inheritDoc}
      */
     public void didStart() {
 
@@ -916,7 +916,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     }
 
     /**
-     * Delegated.
+     * Delegated. {@inheritDoc}
      */
     public AbstractHTTPD newHttpd(final int httpdPort,
             final CounterSet counterSet) throws IOException {
@@ -927,7 +927,10 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
         
     }
 
-    public void serviceJoin(IService service, UUID serviceUUID) {
+    /**
+     * Delegated. {@inheritDoc}
+     */
+    public void serviceJoin(final IService service, final UUID serviceUUID) {
 
         if (!isOpen()) return;
 
@@ -941,7 +944,10 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
     }
 
-    public void serviceLeave(UUID serviceUUID) {
+    /**
+     * Delegated. {@inheritDoc}
+     */
+    public void serviceLeave(final UUID serviceUUID) {
 
         if(!isOpen()) return;
         
@@ -1129,8 +1135,8 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
             
             // notify delegates that deferred startup has occurred.
             AbstractFederation.this.didStart();
-        }
 
+        }
 
         /**
          * Setup sampling on the client's thread pool. This collects interesting
