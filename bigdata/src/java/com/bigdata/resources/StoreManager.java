@@ -1430,6 +1430,13 @@ abstract public class StoreManager extends ResourceEvents implements
 				}
             }
 
+			while (true) {
+				if (getFederation().getTransactionService() != null) {
+					break;
+				}
+				log.warn("Waiting for transaction service discovery");
+			}
+			
             /*
              * Look for pre-existing data files.
              */

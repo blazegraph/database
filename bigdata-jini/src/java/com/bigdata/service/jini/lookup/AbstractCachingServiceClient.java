@@ -211,7 +211,7 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
      * Return an arbitrary service from the cache -or- <code>null</code> if
      * there is no such service in the cache and a remote lookup times out.
      */
-    @SuppressWarnings("unchecked")
+//    @SuppressWarnings("unchecked")
     final public S getService() {
 
         return getService(filter);
@@ -227,16 +227,18 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
      *            An optional filter. If given it will be applied in addition to
      *            the optional filter specified to the ctor.
      */
-    @SuppressWarnings("unchecked")
     final public S getService(final ServiceItemFilter filter) {
 
-        ServiceItem item = getServiceItem(filter);
+    	final ServiceItem item = getServiceItem(filter);
 
-        if (item != null)
-            return (S) item.service;
-        else
-            return null;
-
+        if (item == null)
+        	return null;
+        
+        @SuppressWarnings("unchecked")
+        final S service = (S)item.service;
+        
+        return service;
+        
     }
 
     /**
@@ -302,7 +304,7 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
 
         try {
 
-            item = getServiceDiscoveryManager().lookup(template, filter,
+            item = serviceDiscoveryManager.lookup(template, filter,
                     cacheMissTimeout);
 
         } catch (RemoteException ex) {
