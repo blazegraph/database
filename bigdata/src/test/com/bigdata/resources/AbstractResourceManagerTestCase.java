@@ -162,20 +162,21 @@ public class AbstractResourceManagerTestCase extends
                 
             }
 
-            /** Note: no failover services. */
-            public UUID[] getDataServiceUUIDs() {
-                
-                return new UUID[] { dataServiceUUID };
-                
-            }
-
         };
 
         txService = new MockTransactionService(properties){
 
+        	@Override
             protected void setReleaseTime(long releaseTime) {
                 
                 super.setReleaseTime(releaseTime);
+
+				if (log.isInfoEnabled())
+					log
+							.info("Propagating new release time to the resourceManager: releaseTime="
+									+ releaseTime
+									+ ", releaseAge="
+									+ getMinReleaseAge());
 
                 // propagate the new release time to the resource manager.
                 resourceManager.setReleaseTime(releaseTime);

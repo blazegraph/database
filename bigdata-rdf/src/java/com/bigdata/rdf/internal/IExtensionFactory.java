@@ -42,7 +42,7 @@ public interface IExtensionFactory {
      * @param resolver
      *          the datatype URI resolver
      */
-    void resolveDatatypes(final IDatatypeURIResolver resolver);
+    void init(final IDatatypeURIResolver resolver);
     
     /**
      * Return the supported extensions.

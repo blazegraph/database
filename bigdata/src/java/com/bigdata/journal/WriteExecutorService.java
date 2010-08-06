@@ -1752,11 +1752,11 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 //
 //        }
         
-    /**
-     * Flag may be set to force overflow processing during the next group
-     * commit. The flag is cleared once an overflow has occurred.
-     */
-    public final AtomicBoolean forceOverflow = new AtomicBoolean(false);
+//    /**
+//     * Flag may be set to force overflow processing during the next group
+//     * commit. The flag is cleared once an overflow has occurred.
+//     */
+//    public final AtomicBoolean forceOverflow = new AtomicBoolean(false);
 
     /**
      * Return <code>true</code> if the pre-conditions for overflow processing
@@ -1765,7 +1765,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     private boolean isShouldOverflow() {
 
         return resourceManager.isOverflowEnabled()
-                && (forceOverflow.get() || resourceManager.shouldOverflow());
+//        && (forceOverflow.get() || resourceManager.shouldOverflow());
+        && resourceManager.shouldOverflow();
         
     }
     
@@ -1815,10 +1816,10 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             log.error("Overflow error: "+serviceName+" : "+t, t);
 
-        } finally {
-
-            // clear force flag.
-            forceOverflow.set(false);
+//        } finally {
+//
+//            // clear force flag.
+//            forceOverflow.set(false);
             
         }
 

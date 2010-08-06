@@ -734,7 +734,7 @@ public class RDFJoinNexus implements IJoinNexus {
             final IRelation relation1 = (IRelation) resourceLocator.locate(
                     relationName1, readTimestamp);//timestamp1);
 
-            relation = new RelationFusedView(relation0, relation1);
+            relation = new RelationFusedView(relation0, relation1).init();
 
         } else {
 

@@ -240,7 +240,7 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
 
         // obtain view of the triple store.
         return new ScaleOutTripleStore(helper.client.getFederation(),
-                namespace, ITx.UNISOLATED, store.getProperties());
+                namespace, ITx.UNISOLATED, store.getProperties()).init();
 
     }
 

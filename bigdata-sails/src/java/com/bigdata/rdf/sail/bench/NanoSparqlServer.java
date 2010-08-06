@@ -40,6 +40,7 @@ import java.io.PipedOutputStream;
 import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -88,6 +89,8 @@ import com.bigdata.rdf.sail.bench.NanoSparqlClient.QueryType;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.RelationSchema;
+import com.bigdata.service.AbstractDistributedFederation;
+import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.sparse.ITPS;
@@ -689,7 +692,17 @@ public class NanoSparqlServer extends AbstractHTTPD {
 			
 			final long now = System.nanoTime();
 			
-			final TreeMap<Long, RunningQuery> ages = new TreeMap<Long, RunningQuery>();
+			final TreeMap<Long, RunningQuery> ages = new TreeMap<Long, RunningQuery>(new Comparator<Long>() {
+				/**
+				 * Comparator puts the entries into descending order by the query
+				 * execution time (longest running queries are first).
+				 */
+				public int compare(final Long o1, final Long o2) {
+					if(o1.longValue()<o2.longValue()) return 1;
+					if(o1.longValue()>o2.longValue()) return -1;
+					return 0;
+				}
+			});
 			
 			{
 
@@ -1282,6 +1295,8 @@ public class NanoSparqlServer extends AbstractHTTPD {
      *            <dt>-nthreads</dt>
      *            <dd>The #of threads which will be used to answer SPARQL
      *            queries.</dd>
+     *            <dt>-forceOverflow</dt>
+     *            <dd>Force a compacting merge of all shards on all data services in a bigdata federation.</dd>
      *            </dl>
      */
 	public static void main(final String[] args) {
@@ -1293,9 +1308,8 @@ public class NanoSparqlServer extends AbstractHTTPD {
 		ITransactionService txs = null;
 		try {
 			/*
-			 * `
-			 * modify the rest of this to handle additional options, which get
-			 * set on [config].
+			 * FIXME Modify to handle additional options, which get
+			 * set on [config].  For example, [nthreads] and [forceOverflow].
 			 */
 			if (args.length == 2) {
 				final int port = Integer.valueOf(args[0]);
@@ -1434,6 +1448,18 @@ public class NanoSparqlServer extends AbstractHTTPD {
                         config.timestamp));
             }
 
+            final boolean forceOverflow = false;
+            if(forceOverflow&&indexManager instanceof IBigdataFederation<?>) {
+            	
+            	System.out.println("Forcing compacting merge of all data services: "+new Date());
+            	
+				((AbstractDistributedFederation<?>) indexManager)
+						.forceOverflow(true/* compactingMerge */, false/* truncateJournal */);
+
+            	System.out.println("Did compacting merge of all data services: "+new Date());
+            	
+            }
+            
 			/*
 			 * Wait until the server is terminated.
 			 */

@@ -3,7 +3,9 @@ and default configurations for logging and java permissions.
 
 bigdataStandalone.config - A sample configuration file for a workstation.
 
-bigdataCluster.config - A sample configuration file for a cluster.
+bigdataCluster.config - A sample configuration file for a 3-node cluster.
+
+bigdataCluster.config - A sample configuration file for a 16-node cluster.
 
 log4j.properties - A default log4j configuration file for use by the bigdata
 				   clients and services.

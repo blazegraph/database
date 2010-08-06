@@ -36,6 +36,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.journal.DumpJournal;
 import com.bigdata.rawstore.IRawStore;
 
@@ -154,6 +155,16 @@ public class DumpIndexSegment {
 
         }
 
+        // multi-block scan of the index segment.
+        boolean multiBlockScan = false; // @todo command line option.
+		if (multiBlockScan) {
+			
+            writeBanner("dump leaves using multi-block forward scan");
+
+			dumpLeavesMultiBlockForwardScan(store);
+
+		}
+        
         // dump the leaves using a fast reverse scan.
         boolean fastReverseScan = true;// @todo command line option
         if (fastReverseScan) {
@@ -521,6 +532,36 @@ public class DumpIndexSegment {
         final long elapsed = System.currentTimeMillis() - begin;
         
         System.out.println("Visited "+nscanned+" leaves using fast forward scan in "+elapsed+" ms");
+
+    }
+
+	/**
+	 * Dump leaves using the {@link IndexSegmentMultiBlockIterator}.
+	 * 
+	 * @param store
+	 */
+	static void dumpLeavesMultiBlockForwardScan(final IndexSegmentStore store) {
+
+        final long begin = System.currentTimeMillis();
+        
+		final IndexSegment seg = store.loadIndexSegment();
+
+		final ITupleIterator<?> itr = new IndexSegmentMultiBlockIterator(seg, DirectBufferPool.INSTANCE,
+				null/* fromKey */, null/* toKey */, IRangeQuery.DEFAULT/* flags */);
+
+		int nscanned = 0;
+
+		while(itr.hasNext()) {
+
+			itr.next();
+			
+			nscanned++;
+			
+		}
+		
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        System.out.println("Visited "+nscanned+" tuples using multi-block forward scan in "+elapsed+" ms");
 
     }
 

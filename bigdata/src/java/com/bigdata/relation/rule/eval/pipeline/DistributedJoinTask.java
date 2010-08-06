@@ -1074,16 +1074,20 @@ public class DistributedJoinTask extends JoinTask {
 
                 final UUID sinkUUID = locator.getDataServiceUUID();
 
+                final IDataService dataService;
                 if (sinkUUID.equals(fed.getServiceUUID())) {
 
-                /*
-                 * @todo As an optimization, special case when the downstream
-                 * data service is _this_ data service.
-                 */
+				/*
+				 * As an optimization, special case when the downstream
+				 * data service is _this_ data service.
+				 */
+                	dataService = (IDataService)fed.getService();
                     
-                }
+                } else {
                 
-                final IDataService dataService = fed.getDataService(sinkUUID);
+                	dataService = fed.getDataService(sinkUUID);
+                	
+                }
 
                 sink = new JoinTaskSink(fed, locator, this);
 

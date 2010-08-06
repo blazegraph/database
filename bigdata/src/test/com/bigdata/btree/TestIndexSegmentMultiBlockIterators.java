@@ -303,7 +303,7 @@ public class TestIndexSegmentMultiBlockIterators extends
         try {
 
             final IndexSegmentMultiBlockIterator<?> itr = new IndexSegmentMultiBlockIterator(
-                    seg, DirectBufferPool.INSTANCE_10M, null/* fromKey */,
+                    seg, DirectBufferPool.INSTANCE, null/* fromKey */,
                     null/* toKey */, IRangeQuery.DEFAULT);
 
             assertFalse(itr.hasNext());
@@ -328,7 +328,8 @@ public class TestIndexSegmentMultiBlockIterators extends
         final BTree btree = BTree.createTransient(new IndexMetadata(UUID
                 .randomUUID()));
 
-        final int LIMIT = 1000000;
+        final int LIMIT = 200000; // this works out to 12 1M blocks of data.
+//        final int LIMIT = 1000000; // this works out to 60 1M blocks of data.
 
         // populate the index.
         for (int i = 0; i < LIMIT; i++) {
@@ -407,6 +408,8 @@ public class TestIndexSegmentMultiBlockIterators extends
     private void doRandomScanTest(final BTree groundTruth,
             final IndexSegment actual, final int ntests) {
 
+    	final DirectBufferPool pool = DirectBufferPool.INSTANCE;
+    	
         final Random r = new Random();
         
         final int n = groundTruth.getEntryCount();
@@ -425,7 +428,7 @@ public class TestIndexSegmentMultiBlockIterators extends
                             IRangeQuery.DEFAULT, null/* filter */);
 
             final IndexSegmentMultiBlockIterator<?> actualItr = new IndexSegmentMultiBlockIterator(
-                    actual, DirectBufferPool.INSTANCE_10M, fromKey, toKey,
+                    actual, pool, fromKey, toKey,
                     IRangeQuery.DEFAULT);
             
             assertSameEntryIterator(expectedItr, actualItr);
@@ -446,7 +449,7 @@ public class TestIndexSegmentMultiBlockIterators extends
                             IRangeQuery.DEFAULT, null/* filter */);
 
             final IndexSegmentMultiBlockIterator<?> actualItr = new IndexSegmentMultiBlockIterator(
-                    actual, DirectBufferPool.INSTANCE_10M, fromKey, toKey,
+                    actual, pool, fromKey, toKey,
                     IRangeQuery.DEFAULT);
             
             assertSameEntryIterator(expectedItr, actualItr);
@@ -468,7 +471,7 @@ public class TestIndexSegmentMultiBlockIterators extends
                             IRangeQuery.DEFAULT, null/* filter */);
 
             final IndexSegmentMultiBlockIterator<?> actualItr = new IndexSegmentMultiBlockIterator(
-                    actual, DirectBufferPool.INSTANCE_10M, fromKey, toKey,
+                    actual, pool, fromKey, toKey,
                     IRangeQuery.DEFAULT);
 
             assertSameEntryIterator(expectedItr, actualItr);
@@ -492,7 +495,7 @@ public class TestIndexSegmentMultiBlockIterators extends
                             IRangeQuery.DEFAULT, null/* filter */);
 
             final IndexSegmentMultiBlockIterator<?> actualItr = new IndexSegmentMultiBlockIterator(
-                    actual, DirectBufferPool.INSTANCE_10M, fromKey, toKey,
+                    actual, pool, fromKey, toKey,
                     IRangeQuery.DEFAULT);
 
             assertSameEntryIterator(expectedItr, actualItr);

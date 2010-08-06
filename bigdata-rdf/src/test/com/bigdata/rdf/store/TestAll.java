@@ -87,8 +87,8 @@ public class TestAll extends TestCase {
  * @todo We should run this test suite against a CI cluster on a single machine using
  * the full bigdata federation rather than EDS.
  */
-        suite.addTest(com.bigdata.rdf.store.TestScaleOutTripleStoreWithEmbeddedFederation
-                        .suite());
+//        suite.addTest(com.bigdata.rdf.store.TestScaleOutTripleStoreWithEmbeddedFederation
+//                        .suite());
 
 //        if (Boolean.parseBoolean(System.getProperty("maven.test.services.skip",
 //                "false"))

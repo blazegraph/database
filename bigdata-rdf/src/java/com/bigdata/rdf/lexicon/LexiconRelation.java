@@ -45,6 +45,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.log4j.Logger;
 import org.omg.CORBA.portable.ValueFactory;
@@ -99,6 +100,7 @@ import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
@@ -397,12 +399,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     determineExtensionFactoryClass();
                 final IExtensionFactory xFactory = xfc.newInstance();
                 
-                /* 
-                 * Allow the extensions to resolve their datatype URIs into
-                 * term identifiers. 
-                 */
-                xFactory.resolveDatatypes(this);
-                
                 lexiconConfiguration = new LexiconConfiguration(
                         inlineLiterals, inlineBNodes, xFactory);
                 
@@ -453,6 +449,22 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     }
 
+    @Override
+    public LexiconRelation init() {
+
+    	super.init();
+    	
+		/*
+		 * Allow the extensions to resolve their datatype URIs into term
+		 * identifiers.
+		 */
+    	lexiconConfiguration.initExtensions(this);
+    	
+    	return this;
+        
+    }
+    
+    @Override
     public void create() {
         
         final IResourceLock resourceLock = acquireExclusiveLock();
@@ -493,6 +505,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 //
 //            assert id2term != null;
 
+            /*
+    		 * Allow the extensions to resolve their datatype URIs into term
+    		 * identifiers.
+    		 */
+        	lexiconConfiguration.initExtensions(this);
+            
         } finally {
 
             unlock(resourceLock);
@@ -712,6 +730,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                         tmp = (ITextIndexer) gi.invoke(null/* object */,
                                 getIndexManager(), getNamespace(),
                                 getTimestamp(), getProperties());
+                        if(tmp instanceof ILocatableResource<?>) {
+                        	((ILocatableResource<?>)tmp).init();
+                        }
 //                        new FullTextIndex(getIndexManager(),
 //                                getNamespace(), getTimestamp(), getProperties())
                         viewRef.set(tmp);
@@ -1896,7 +1917,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                      * IllegalStateException if the value somehow was assigned
                      * the wrong term identifier (paranoia test).
                      */
-                    assert value.getIV() == tid : "expecting tid=" + tid
+                    assert value.getIV().equals(tid) : "expecting tid=" + tid
                             + ", but found " + value.getIV();
 					assert (value).getValueFactory() == valueFactory;
 

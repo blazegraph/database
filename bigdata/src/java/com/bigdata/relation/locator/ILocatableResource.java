@@ -45,6 +45,13 @@ import com.bigdata.btree.IIndex;
  */
 public interface ILocatableResource<T> {
 
+	/**
+	 * Deferred initialization method is automatically invoked when the resource
+	 * is materialized by the {@link IResourceLocator}. The implementation is
+	 * encouraged to strengthen the return type.
+	 */
+	public ILocatableResource<T> init();
+	
     /**
      * The identifying namespace.
      */
