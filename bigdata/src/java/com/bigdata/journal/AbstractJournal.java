@@ -201,20 +201,6 @@ import com.bigdata.util.ChecksumUtility;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
-<<<<<<< .working
-=======
- * @todo Checksums and/or record compression are currently handled on a per-
- *       {@link BTree} or other persistence capable data structure basis. It is
- *       nice to be able to choose for which indices and when ( {@link Journal}
- *       vs {@link IndexSegment}) to apply these algorithms. However, it might
- *       be nice to factor their application out a bit into a layered api - as
- *       long as the right layering is correctly re-established on load of the
- *       persistence data structure. In that view the {@link IRawStore} either
- *       computes checksums or it does not and the checksums is stored in the
- *       record, perhaps in the last 4 bytes. The checksum itself would not be
- *       visible at the {@link IRawStore} API layer.
- * 
->>>>>>> .merge-right.r3391
  * @todo There are lots of annoying ways in which asynchronously closing the
  *       journal, e.g., using {@link #close()} or {@link #shutdown()} can cause
  *       exceptions to be thrown out of concurrent threads. It would be nice if
