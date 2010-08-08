@@ -1175,7 +1175,7 @@ ${postInstallMessage}</echo>
       </copy>
     </target>
 
-    <target name="ant-install-artifact" depends="clean, ant-install-prepare, stage"
+    <target name="ant-install-artifact" depends="deploy-artifact, ant-install-prepare"
             description="Create complete source tar file for ant based install.">
 
       <mkdir dir="${release.dir}" />
@@ -1225,10 +1225,6 @@ ${postInstallMessage}</echo>
         </tarfileset>
       </tar>
 
-      <tar destfile="${bigdata.dir}/REL.${version}.tgz"
-           basedir="${bigdata.dir}/dist"
-           compression="gzip">
-      </tar>
     </target>
 
     <target name="ant-install" depends="jar, banner, bundle" description="Ant based install on a node.">
