@@ -45,6 +45,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.log4j.Logger;
 import org.omg.CORBA.portable.ValueFactory;
@@ -99,6 +100,7 @@ import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
@@ -391,6 +393,23 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     AbstractTripleStore.Options.INLINE_BNODES,
                     AbstractTripleStore.Options.DEFAULT_INLINE_BNODES));
             
+            try {
+                
+                final Class<IExtensionFactory> xfc = 
+                    determineExtensionFactoryClass();
+                final IExtensionFactory xFactory = xfc.newInstance();
+                
+                lexiconConfiguration = new LexiconConfiguration(
+                        inlineLiterals, inlineBNodes, xFactory);
+                
+            } catch (InstantiationException e) {
+                throw new IllegalArgumentException(
+                        AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
+            } catch (IllegalAccessException e) {
+                throw new IllegalArgumentException(
+                        AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
+            }
+            
         }
         
     }
@@ -430,6 +449,22 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     }
 
+    @Override
+    public LexiconRelation init() {
+
+    	super.init();
+    	
+		/*
+		 * Allow the extensions to resolve their datatype URIs into term
+		 * identifiers.
+		 */
+    	lexiconConfiguration.initExtensions(this);
+    	
+    	return this;
+        
+    }
+    
+    @Override
     public void create() {
         
         final IResourceLock resourceLock = acquireExclusiveLock();
@@ -470,6 +505,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 //
 //            assert id2term != null;
 
+            /*
+    		 * Allow the extensions to resolve their datatype URIs into term
+    		 * identifiers.
+    		 */
+        	lexiconConfiguration.initExtensions(this);
+            
         } finally {
 
             unlock(resourceLock);
@@ -689,6 +730,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                         tmp = (ITextIndexer) gi.invoke(null/* object */,
                                 getIndexManager(), getNamespace(),
                                 getTimestamp(), getProperties());
+                        if(tmp instanceof ILocatableResource<?>) {
+                        	((ILocatableResource<?>)tmp).init();
+                        }
 //                        new FullTextIndex(getIndexManager(),
 //                                getNamespace(), getTimestamp(), getProperties())
                         viewRef.set(tmp);
@@ -1022,7 +1066,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
          * numTerms-1).  The inline method will respect those semantics but
          * then return a dense array of terms that definitely should be added 
          * to the lexicon indices - that is, terms in the original array at 
-         * index less than numTerms and not inlinable.
+         * index less than numTerms and not inlinable. MRP  [BBT This is not as efficient!]
          */
         final BigdataValue[] terms2 = addInlineTerms(terms, numTerms);
         final int numTerms2 = terms2.length;
@@ -1252,7 +1296,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * @return
      *          the terms that were in consideration but could not be inlined
      */
-    private BigdataValue[] addInlineTerms(BigdataValue[] terms, int numTerms) {
+    private BigdataValue[] addInlineTerms(final BigdataValue[] terms, final int numTerms) {
      
         // these are the terms that will need to be indexed (not inline terms)
         final ArrayList<BigdataValue> terms2 = 
@@ -1873,7 +1917,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                      * IllegalStateException if the value somehow was assigned
                      * the wrong term identifier (paranoia test).
                      */
-                    assert value.getIV() == tid : "expecting tid=" + tid
+                    assert value.getIV().equals(tid) : "expecting tid=" + tid
                             + ", but found " + value.getIV();
 					assert (value).getValueFactory() == valueFactory;
 
@@ -2077,7 +2121,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * The {@link ILexiconConfiguration} instance, which will determine how
      * terms are encoded and decoded in the key space.
      */
-    private ILexiconConfiguration lexiconConfiguration;
+    private final ILexiconConfiguration lexiconConfiguration;
 
     /**
      * Constant for the {@link LexiconRelation} namespace component.
@@ -2313,7 +2357,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      *          the inline internal value, or <code>null</code> if it cannot
      *          be converted
      */
-    private IV getInlineIV(Value value) {
+    final public IV getInlineIV(final Value value) {
         
         return getLexiconConfiguration().createInlineIV(value);
 
@@ -2629,32 +2673,32 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      */
     public ILexiconConfiguration getLexiconConfiguration() {
         
-        if (lexiconConfiguration == null) {
-            
-            try {
-                
-                final Class<IExtensionFactory> xfc = 
-                    determineExtensionFactoryClass();
-                final IExtensionFactory xFactory = xfc.newInstance();
-                
-                /* 
-                 * Allow the extensions to resolve their datatype URIs into
-                 * term identifiers. 
-                 */
-                xFactory.resolveDatatypes(this);
-                
-                lexiconConfiguration = new LexiconConfiguration(
-                        inlineLiterals, inlineBNodes, xFactory);
-                
-            } catch (InstantiationException e) {
-                throw new IllegalArgumentException(
-                        AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
-            } catch (IllegalAccessException e) {
-                throw new IllegalArgumentException(
-                        AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
-            }
-            
-        }
+//        if (lexiconConfiguration == null) {
+//            
+//            try {
+//                
+//                final Class<IExtensionFactory> xfc = 
+//                    determineExtensionFactoryClass();
+//                final IExtensionFactory xFactory = xfc.newInstance();
+//                
+//                /* 
+//                 * Allow the extensions to resolve their datatype URIs into
+//                 * term identifiers. 
+//                 */
+//                xFactory.resolveDatatypes(this);
+//                
+//                lexiconConfiguration = new LexiconConfiguration(
+//                        inlineLiterals, inlineBNodes, xFactory);
+//                
+//            } catch (InstantiationException e) {
+//                throw new IllegalArgumentException(
+//                        AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
+//            } catch (IllegalAccessException e) {
+//                throw new IllegalArgumentException(
+//                        AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
+//            }
+//            
+//        }
         
         return lexiconConfiguration;
         

@@ -38,7 +38,10 @@ import com.bigdata.relation.locator.ILocatableResource;
 public interface IMutableResource<T> extends ILocatableResource<T> {
 
     /**
-     * Create any logically contained resources (relations, indices).
+     * Create any logically contained resources (relations, indices).  There is
+     * no presumption that {@link #init()} is suitable for invocation from 
+     * {@link #create()}.  Instead, you are responsible for invoking {@link #init()}
+     * from this method IFF it is appropriate to reuse its initialization logic.
      */
     void create();
 

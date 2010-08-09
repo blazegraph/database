@@ -280,6 +280,25 @@ class BTreeMetadata {
         actionRef.set(action);
 
     }
+
+    /**
+     * Used to force clear a {@link OverflowActionEnum#Copy} action
+     * when we will force a compacting merge.  This allows us to do
+     * compacting merges on shard views which would otherwise simply
+     * be copied onto the new journal.
+     */
+    void clearCopyAction() {
+
+	lock.lock();
+	try {
+	    if(actionRef.get().equals(OverflowActionEnum.Copy)) {
+		actionRef.set(null/*clear*/);
+	    }
+	} finally {
+	    lock.unlock();
+	}
+
+    }
     
     /**
      * 

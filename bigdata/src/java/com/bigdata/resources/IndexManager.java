@@ -1684,16 +1684,28 @@ abstract public class IndexManager extends StoreManager {
         final StringBuilder sb = new StringBuilder();
 
         final AbstractJournal journal = getJournal(timestamp);
+
+		if (journal == null) {
+			/*
+			 * This condition can occur if there are no shard views on the
+			 * previous journal and the releaseAge is zero since the previous
+			 * journal can be purged (deleted) before this method is invoked.
+			 * This situation arises in a few of the unit tests which begin with
+			 * an empty journal and copy everything onto the new journal such
+			 * that the old journal can be immediately released.
+			 */
+			return "No journal: timestamp=" + timestamp;
+        }
         
         sb.append("timestamp="+timestamp+"\njournal="+journal.getResourceMetadata());
 
         // historical view of Name2Addr as of that timestamp.
-        final ITupleIterator itr = journal.getName2Addr(timestamp)
+        final ITupleIterator<?> itr = journal.getName2Addr(timestamp)
                 .rangeIterator();
         
         while (itr.hasNext()) {
 
-            final ITuple tuple = itr.next();
+            final ITuple<?> tuple = itr.next();
 
             final Entry entry = EntrySerializer.INSTANCE
                     .deserialize(new DataInputBuffer(tuple.getValue()));

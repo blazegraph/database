@@ -44,18 +44,14 @@ public class ColorsEnumExtension<V extends BigdataValue> implements IExtension<V
      */
     public transient static final URI COLOR = new URIImpl(BD.NAMESPACE + "Color");
     
-    private BigdataURI color;
+    private final BigdataURI color;
     
-    public ColorsEnumExtension() {
-        
-    }
-        
-    public void resolveDatatype(final IDatatypeURIResolver resolver) {
+    public ColorsEnumExtension(final IDatatypeURIResolver resolver) {
         
         this.color = resolver.resolve(COLOR);
         
     }
-    
+        
     public BigdataURI getDatatype() {
         
         return color;

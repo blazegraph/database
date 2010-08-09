@@ -596,15 +596,17 @@ public class TestTransactionService extends TestCase2 {
      * GT the lastCommitTime since that could allow data not yet committed to
      * become visible during the transaction (breaking isolation).
      * <p>
-     * A commitTime is identifed by looking up the callers timestamp in a log of
+     * A commitTime is identified by looking up the callers timestamp in a log of
      * the historical commit times and returning the first historical commit
      * time LTE the callers timestamp.
      * <p>
-     * The transaction start time is then choosen from the half-open interval
+     * The transaction start time is then chosen from the half-open interval
      * <i>commitTime</i> (inclusive lower bound) : <i>nextCommitTime</i>
      * (exclusive upper bound).
      * 
      * @throws IOException 
+     * 
+     * @todo This test fails occasionally. I have not figured out why yet. BBT
      */
     public void test_newTx_readOnly() throws IOException {
 

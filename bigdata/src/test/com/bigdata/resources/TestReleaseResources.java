@@ -41,15 +41,6 @@ import com.bigdata.service.AbstractTransactionService;
 /**
  * Test release (aka purge) of old resources.
  * 
- * FIXME This set of unit tests needs to be updated to reflect that
- * purgeResources() is invoked during synchronous overflow. The tests are
- * written with a different assumption, which is why they are failing.
- * 
- * @todo Write a unit test for purge before, during and after the 1st overflow
- *       and after a restart. Before, there should be nothing to release.
- *       During, the views that are being constructed should remain safe. After,
- *       we should be able to achieve a compact footprint for the data service.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -180,20 +171,19 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             return properties;
             
         }
-        
-        /**
-         * Test creates an index whose view is initially defined by the initial
-         * journal on the {@link ResourceManager}. An overflow of the journal
-         * is then forced, which re-defines the view on the new journal. Since
-         * the index is very small (it is empty), it is "copied" onto the new
-         * journal rather than causing an index segment build to be scheduled.
-         * Once the asynchronous overflow completes, the original journal should
-         * qualify for release.
-         * 
-         * @throws IOException
-         * @throws ExecutionException
-         * @throws InterruptedException
-         */
+
+		/**
+		 * Test creates an index whose view is initially defined by the initial
+		 * journal on the {@link ResourceManager}. An overflow of the journal is
+		 * then forced, which re-defines the view on the new journal. Since the
+		 * index is very small (it is empty), it is "copied" onto the new
+		 * journal rather than causing an index segment build to be scheduled.
+		 * The original journal should not be released.
+		 * 
+		 * @throws IOException
+		 * @throws ExecutionException
+		 * @throws InterruptedException
+		 */
         public void test() throws IOException,
                 InterruptedException, ExecutionException {
 
@@ -204,8 +194,9 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             final AbstractJournal j0 = resourceManager.getLiveJournal();
             
             // force overflow on the next commit.
-            concurrencyManager.getWriteService().forceOverflow.set(true);
-            
+//            concurrencyManager.getWriteService().forceOverflow.set(true);
+            resourceManager.forceOverflow.set(true);
+          
             // disable asynchronous overflow processing to simplify the test environment.
             resourceManager.asyncOverflowEnabled.set(false);
             
@@ -229,34 +220,32 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             assertTrue(createTime0 < createTime1);
 
             // verify can still open the original journal.
-            // @todo unit test needs to be updated to reflect purge in sync overflow.
-            assertTrue(j0 == resourceManager.openStore(j0.getResourceMetadata()
-                    .getUUID()));
+			assertTrue(j0 == resourceManager.openStore(j0.getResourceMetadata()
+					.getUUID()));
 
             // verify can still open the new journal.
             assertTrue(j1 == resourceManager.openStore(j1.getResourceMetadata()
                     .getUUID()));
             
-            // 2 journals.
+            // 1 journals.
             assertEquals(2,resourceManager.getManagedJournalCount());
 
             // no index segments.
             assertEquals(0,resourceManager.getManagedSegmentCount());
             
             /*
-             * Verify that we can the first commit record when we provide the
-             * create time for a journal.
+             * Verify that the commit time index.
              */
-            
-            // for j0
-            assertEquals(j0.getRootBlockView().getFirstCommitTime(),
-                    resourceManager
-                            .getCommitTimeStrictlyGreaterThan(createTime0));
 
-            // for j1.
-            assertEquals(j1.getRootBlockView().getFirstCommitTime(),
-                    resourceManager
-                            .getCommitTimeStrictlyGreaterThan(createTime1));
+			// for j0
+			assertEquals(j1.getRootBlockView().getFirstCommitTime(),
+					resourceManager
+							.getCommitTimeStrictlyGreaterThan(createTime1));
+
+			// for j1.
+			assertEquals(j1.getRootBlockView().getFirstCommitTime(),
+					resourceManager
+							.getCommitTimeStrictlyGreaterThan(createTime1));
 
             /*
              * Verify that the resources required for [A] are {j0, j1} when the
@@ -331,20 +320,20 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             return properties;
             
         }
-        
-        /**
-         * Test creates an index whose view is initially defined by the initial
-         * journal on the sole data service. An overflow of the journal is then
-         * forced, which re-defines the view on the new journal. Since the index
-         * is very small (it is empty), it is "copied" onto the new journal
-         * rather than causing an index segment build to be scheduled.  Once the
-         * asynchronous overflow completes, the original journal should qualify
-         * for release.
-         * 
-         * @throws IOException
-         * @throws ExecutionException
-         * @throws InterruptedException
-         */
+
+		/**
+		 * Test creates an index whose view is initially defined by the initial
+		 * journal on the sole data service. An overflow of the journal is then
+		 * forced, which re-defines the view on the new journal. Since the index
+		 * is very small (it is empty), it is "copied" onto the new journal
+		 * rather than causing an index segment build to be scheduled. The
+		 * original journal should be released (deleted) during synchronous
+		 * overflow processing.
+		 * 
+		 * @throws IOException
+		 * @throws ExecutionException
+		 * @throws InterruptedException
+		 */
         public void test() throws IOException,
                 InterruptedException, ExecutionException {
 
@@ -358,8 +347,9 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             final UUID uuid0 = j0.getResourceMetadata().getUUID();
             
             // force overflow on the next commit.
-            concurrencyManager.getWriteService().forceOverflow.set(true);
-            
+//            concurrencyManager.getWriteService().forceOverflow.set(true);
+            resourceManager.forceOverflow.set(true);
+
             // disable asynchronous overflow processing to simplify the test environment.
             resourceManager.asyncOverflowEnabled.set(false);
             
@@ -371,38 +361,37 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             // did overflow.
             assertEquals(1,resourceManager.getAsynchronousOverflowCount());
 
-            /*
-             * Note: the old journal should have been closed for writes during
-             * synchronous overflow processing.
-             */
-            // @todo unit test needs to be updated to reflect purge in sync overflow.
-            assertTrue(j0.isOpen()); // still open
-            assertTrue(j0.isReadOnly()); // but no longer accepts writes.
-            
-            /*
-             * Purge old resources. If the index was copied to the new journal
-             * then there should be no dependency on the old journal and it
-             * should be deleted.
-             */
-            {
-              
-                final AbstractJournal liveJournal = resourceManager
-                        .getLiveJournal();
-
-                final long lastCommitTime = liveJournal.getLastCommitTime();
-                
-                final Set<UUID> actual = resourceManager
-                        .getResourcesForTimestamp(lastCommitTime);
-                
-                assertSameResources(new IRawStore[] {liveJournal}, actual);
-
-                // only retain the lastCommitTime.
-                resourceManager.setReleaseTime(lastCommitTime - 1);
-                
-            }
-
-            resourceManager
-                    .purgeOldResources(1000/* ms */, false/*truncateJournal*/);
+//			/*
+//			 * Note: the old journal should have been closed for writes during
+//			 * synchronous overflow processing and deleted from the file system.
+//			 */
+//            assertTrue(j0.isOpen()); // still open
+//            assertTrue(j0.isReadOnly()); // but no longer accepts writes.
+//            
+//            /*
+//             * Purge old resources. If the index was copied to the new journal
+//             * then there should be no dependency on the old journal and it
+//             * should be deleted.
+//             */
+//            {
+//              
+//                final AbstractJournal liveJournal = resourceManager
+//                        .getLiveJournal();
+//
+//                final long lastCommitTime = liveJournal.getLastCommitTime();
+//                
+//                final Set<UUID> actual = resourceManager
+//                        .getResourcesForTimestamp(lastCommitTime);
+//                
+//                assertSameResources(new IRawStore[] {liveJournal}, actual);
+//
+//                // only retain the lastCommitTime.
+//                resourceManager.setReleaseTime(lastCommitTime - 1);
+//                
+//            }
+//
+//            resourceManager
+//                    .purgeOldResources(1000/* ms */, false/*truncateJournal*/);
             
             // verify that the old journal is no longer open.
             assertFalse(j0.isOpen());
@@ -475,16 +464,17 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             super(arg0);
             
         }
-        
-        /**
-         * This is the minimum release time that will be used for the test.
-         * <P>
-         * Note: 20000 is 20 seconds. This is what you SHOULD use for the test.
-         * <p>
-         * Note: 200000 is 200 seconds. This can be used for debugging, but
-         * always restore the value so that the test will run in a reasonable
-         * timeframe.
-         */
+
+		/**
+		 * This is the minimum release time that will be used for the test.
+		 * <P>
+		 * Note: 2000 is 2 seconds. This is what you SHOULD use for the test (it
+		 * can be a little longer if you run into problems).
+		 * <p>
+		 * Note: 200000 is 200 seconds. This can be used for debugging, but
+		 * always restore the value so that the test will run in a reasonable
+		 * time frame.
+		 */
         final private long MIN_RELEASE_AGE = 2000; 
         
         public Properties getProperties() {
@@ -498,22 +488,22 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             return properties;
             
         }
-        
-        /**
-         * Test where the index view is copied in its entirety onto the new
-         * journal and the [minReleaseAge] is 2 seconds. In this case we have no
-         * dependencies on the old journal, but the [minReleaseAge] is not
-         * satisified immediately so no resources are released during overflow
-         * processing (assuming that overflow processing is substantially faster
-         * than the [minReleaseAge]). We then wait until the [minReleaseAge] has
-         * passed and force overflow processing again and verify that the
-         * original journal was released while the 2nd and 3rd journals are
-         * retained.
-         * 
-         * @throws IOException
-         * @throws ExecutionException
-         * @throws InterruptedException
-         */
+
+		/**
+		 * Test where the index view is copied in its entirety onto the new
+		 * journal and the [minReleaseAge] is 2 seconds. In this case we have no
+		 * dependencies on the old journal, but the [minReleaseAge] is not
+		 * satisfied immediately so no resources are released during synchronous
+		 * overflow processing (assuming that synchronous overflow processing is
+		 * substantially faster than the [minReleaseAge]). We then wait until
+		 * the [minReleaseAge] has passed and force overflow processing again
+		 * and verify that the original journal was released while the 2nd and
+		 * 3rd journals are retained.
+		 * 
+		 * @throws IOException
+		 * @throws ExecutionException
+		 * @throws InterruptedException
+		 */
         public void test() throws IOException,
                 InterruptedException, ExecutionException {
 
@@ -527,7 +517,8 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             final UUID uuid0 = j0.getResourceMetadata().getUUID();
             
             // force overflow on the next commit.
-            concurrencyManager.getWriteService().forceOverflow.set(true);
+//            concurrencyManager.getWriteService().forceOverflow.set(true);
+            resourceManager.forceOverflow.set(true);
             
             // disable asynchronous overflow processing to simplify the test environment.
             resourceManager.asyncOverflowEnabled.set(false);
@@ -582,7 +573,8 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             }
 
             // force overflow on the next commit.
-            concurrencyManager.getWriteService().forceOverflow.set(true);
+//            concurrencyManager.getWriteService().forceOverflow.set(true);
+            resourceManager.forceOverflow.set(true);
 
             // register another index - will force another overflow.
             registerIndex("B");

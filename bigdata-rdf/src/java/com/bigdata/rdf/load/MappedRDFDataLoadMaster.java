@@ -787,7 +787,7 @@ V extends Serializable//
 
             System.out.println("Forcing overflow: now=" + new Date());
 
-            fed.forceOverflow(true/* truncateJournal */);
+			fed.forceOverflow(true/* compactingMerge */, true/* truncateJournal */);
 
             System.out.println("Forced overflow: now=" + new Date());
 

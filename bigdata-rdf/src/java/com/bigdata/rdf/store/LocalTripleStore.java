@@ -158,7 +158,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
     /**
      * Create or re-open a triple store using a local embedded database.
      */
-    public LocalTripleStore(Properties properties) {
+	/* public */LocalTripleStore(final Properties properties) {
 
         /*
          * FIXME This should pass up the existing properties for the KB instance
@@ -189,6 +189,10 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
             
             create();
 
+        } else {
+        	
+        	init();
+        	
         }
 
     }
