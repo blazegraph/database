@@ -185,6 +185,16 @@ o     */
         
     }
 
+    /*
+     * @todo There are some unit tests which depend on this implementation of
+     * equals. However, since the partition locator Id for a given scale out
+     * index SHOULD be immutable, running code can rely on partitionId ==
+     * o.partitionId. Therefore the unit tests should be modified to extract an
+     * "assertSamePartitionLocator" method and rely on that. We could then
+     * simplify this method to just test the partitionId. That would reduce the
+     * effort when maintaining hash tables based on the PartitionLocator since
+     * we would not be comparing the keys, UUIDs, etc.
+     */
     public boolean equals(final Object o) {
 
         if (this == o)
