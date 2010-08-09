@@ -387,12 +387,12 @@ public class RingBuffer<T> implements Queue<T> {
         if (index < 0 || index >= size)
             throw new IllegalArgumentException();
 
-        if (index + 1 == size) {
-            
-            // remove the LRU position.
-            return remove();
-            
-        }
+//        if (index + 1 == size) {
+//
+//            // remove the LRU position.
+//            return remove();
+//
+//        }
 
         /*
          * Otherwise we are removing some non-LRU element.
@@ -409,7 +409,7 @@ public class RingBuffer<T> implements Queue<T> {
 
         for (;;) {
 
-            int nexti = (i + 1) % capacity; // update index.
+            final int nexti = (i + 1) % capacity; // update index.
             
             if (nexti != head) {
             
@@ -581,6 +581,9 @@ public class RingBuffer<T> implements Queue<T> {
 
     public boolean contains(final Object ref) {
 
+        if (ref == null)
+            throw new NullPointerException();
+        
         // MRU to LRU scan.
         for (int n = 0, i = tail; n < size; n++) {
 
@@ -601,7 +604,8 @@ public class RingBuffer<T> implements Queue<T> {
             throw new NullPointerException();
 
         if (c == this)
-            throw new IllegalArgumentException();
+            return true;
+//            throw new IllegalArgumentException();
         
         for( Object e : c ) {
             
