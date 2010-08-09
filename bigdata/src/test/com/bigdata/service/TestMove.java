@@ -360,7 +360,7 @@ public class TestMove extends AbstractEmbeddedFederationTestCase {
                  * Set flag to force overflow on group commit.
                  */
                 dataService0
-                        .forceOverflow(false/* immediate */, false/* compactingMerge */);
+                        .forceOverflow(false/* immediate */, true/* compactingMerge */);
 
                 // insert the data into the scale-out index.
                 fed.getIndex(name, ITx.UNISOLATED)
@@ -395,7 +395,7 @@ public class TestMove extends AbstractEmbeddedFederationTestCase {
             int ndataService0 = 0;// #of index partitions on data service 0.
             int ndataService1 = 0;// #of index partitions on data service 1.
             
-            final ITupleIterator itr = new RawDataServiceTupleIterator(
+            final ITupleIterator<?> itr = new RawDataServiceTupleIterator(
                     fed.getMetadataService(),//
                     MetadataService.getMetadataIndexName(name), //
                     ITx.READ_COMMITTED,//
