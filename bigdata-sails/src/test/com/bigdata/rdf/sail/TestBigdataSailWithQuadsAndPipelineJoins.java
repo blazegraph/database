@@ -108,7 +108,12 @@ public class TestBigdataSailWithQuadsAndPipelineJoins extends AbstractBigdataSai
 
             try {
 
-                tckSuite.addTest(BigdataSparqlTest.suiteLTSWithPipelineJoins());
+                /*
+                 * suite() will call suiteLTSWithPipelineJoins() and then
+                 * filter out the dataset tests, which we don't need right now
+                 */
+//                tckSuite.addTest(BigdataSparqlTest.suiteLTSWithPipelineJoins());
+                tckSuite.addTest(BigdataSparqlTest.suite());
 
             } catch (Exception ex) {
 

@@ -310,6 +310,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
         
         private final OverflowActionEnum action;
         private final ViewMetadata vmd;
+	private final boolean forceCompactingMerge;
         private final AbstractTask<T> task;
 
         /**
@@ -319,11 +320,17 @@ public class AsynchronousOverflowTask implements Callable<Object> {
          * @param vmd
          *            The {@link ViewMetadata} for the index partition for which
          *            that action will be taken.
+	 * @param forceCompactingMerge
+	 *            if a compacting merge should be taken even if the view was
+	 *            simply copied to the new journal.
          * @param task
          *            The task which implements that action.
          */
-        public AtomicCallable(final OverflowActionEnum action,
-                final ViewMetadata vmd, final AbstractTask<T> task) {
+        public AtomicCallable(final OverflowActionEnum action,//
+			      final ViewMetadata vmd,//
+			      final boolean forceCompactingMerge, //
+			      final AbstractTask<T> task//
+			      ) {
 
             if (action == null)
                 throw new IllegalArgumentException();
@@ -337,6 +344,8 @@ public class AsynchronousOverflowTask implements Callable<Object> {
             this.action = action;
             
             this.vmd = vmd;
+
+	    this.forceCompactingMerge = forceCompactingMerge;
             
             this.task = task;
             
@@ -407,110 +416,112 @@ public class AsynchronousOverflowTask implements Callable<Object> {
         
     }
 
-    /**
-     * Schedule a build for each shard and a merge for each shard with a
-     * non-zero merge priority. Whether a build or a merge is performed for a
-     * shard will depend on which action is initiated first. When an build or
-     * merge action is initiated, that choice is atomically registered on the
-     * {@link ViewMetadata} and any subsequent attempt (within this method
-     * invocation) to start a build or merge for the same shard will be dropped.
-     * Processing ends once all tasks scheduled on a "build" service are
-     * complete.
-     * <p>
-     * After actions are considered for each shard for which a compacting merge
-     * is executed. These after actions can cause a shard split, join, or move.
-     * Deferring such actions until we have a compact view (comprised of one
-     * journal and one index segment) greatly improves our ability to decide
-     * whether a shard should be split or joined and simplifies the logic and
-     * effort required to split, join or move a shard.
-     * <p>
-     * The following is a brief summary of some after actions on compact shards.
-     * <dl>
-     * <dt>split</dt>
-     * <dd>A shard is split when its size on the disk exceeds the (adjusted)
-     * nominal size of a shard (overflow). By waiting until the shard view is
-     * compact we have exact information about the size of the shard (it is
-     * contained in a single {@link IndexSegment}) and we are able to easily
-     * select the separator key to split the shard.</dd>
-     * <dt>tailSplit</dt>
-     * <dd>A tail split may be selected for a shard which has a mostly append
-     * access pattern. For such access patterns, a normal split would leave the
-     * left sibling 50% full and the right sibling would quickly fill up with
-     * continued writes on the tail of the key range. To compensate for this
-     * access pattern, a tail split chooses a separator key near the end of the
-     * key range of a shard. This results in a left sibling which is mostly full
-     * and a right sibling which is mostly empty. If the pattern of heavy tail
-     * append continues, then the left sibling will remain mostly full and the
-     * new writes will flow mostly into the right sibling.</dd>
-     * <dt>scatterSplit</dt>
-     * <dd>A scatter split breaks the first shard for a new scale-out index into
-     * N shards and scatters those shards across the data services in a
-     * federation in order to improve the data distribution and potential
-     * concurrency of the index. By waiting until the shard view is compact we
-     * are able to quickly select appropriate separator keys for the shard
-     * splits.</dd>
-     * <dt>move</dt>
-     * <dd>A move transfer a shard from this data service to another data
-     * service in order to reduce the load on this data service. By waiting
-     * until the shard view is compact we are able to rapidly transfer the bulk
-     * of the data in the form of a single {@link IndexSegment}.</dd>
-     * <dt>join</dt>
-     * <dd>A join combines a shard which is under 50% of its (adjusted) nominal
-     * maximum size on the disk (underflow) with its right sibling. Joins are
-     * driven by deletes of tuples from a key range. Since deletes are handled
-     * as writes where a delete marker is set on the tuple, neither the shard
-     * size on the disk nor the range count of the shard will decrease until a
-     * compacting merge. A join is indicated if the size on disk for the shard
-     * has shrunk considerably since the last time a compacting merge was
-     * performed for the view (this covers both the case of deletes, which
-     * reduce the range count, and updates which replace the values in the
-     * tuples with more compact data). <br>
-     * There are actually three cases for a join.
-     * <ol>
-     * <li>If the right sibling is local, then the shard will be joined with its
-     * right sibling.</li>
-     * <li>If the right sibling is remote, then the shard will be moved to the
-     * data service on which the right sibling is found.</li>
-     * <li>If the right sibling does not exist, then nothing is done (the last
-     * shard in a scale-out index does not have a right sibling). The right most
-     * sibling will remain undercapacity until and unless its left sibling also
-     * underflows, at which point the left sibling will cause itself to be
-     * joined with the right sibling (this is done to simplify the logic which
-     * searches for a sibling with which to join an undercapacity shard).</li>
-     * </ol>
-     * </dl>
-     * 
-     * @param forceCompactingMerges
-     *            When <code>true</code> a compacting merge will be forced for
-     *            each non-compact view.
-     * 
-     * @throws InterruptedException
-     * 
-     * @todo The size of the merge queue (or its sum of priorities) may be an
-     *       indication of the load of the node which could be used to decide
-     *       that index partitions should be shed/moved.
-     * 
-     * @todo For HA, this needs to be a shared priority queue using zk or the
-     *       like since any node in the failover set could do the merge (or
-     *       build). [Alternatively, nodes do the build/merge for the shards for
-     *       which they have the highest affinity out of the failover set.]
-     * 
-     *       FIXME tailSplits currently operate on the mutable BTree rather than
-     *       a compact view). This task does not require a compact view (at
-     *       least, not yet) and generating one for it might be a waste of time.
-     *       Instead it examines where the inserts are occurring in the index
-     *       and splits of the tail if the index is heavy for write append. It
-     *       probably could defer that choice until a compact view was some
-     *       percentage of a split (maybe .6?) So, probably an after action for
-     *       the mergeQ.
-     * 
-     *       FIXME joins must track metadata about the previous size on disk of
-     *       the compact view in order to decide when underflow has resulted. In
-     *       order to handle the change in the value of the acceleration factor,
-     *       this data should be stored as the percentage of an adjusted split
-     *       of the last compact view. We can update that metadata each time we
-     *       do a compacting merge.
-     */
+	/**
+	 * Schedule a build for each shard and a merge for each shard with a
+	 * non-zero merge priority. Whether a build or a merge is performed for a
+	 * shard will depend on which action is initiated first. When an build or
+	 * merge action is initiated, that choice is atomically registered on the
+	 * {@link ViewMetadata} and any subsequent attempt (within this method
+	 * invocation) to start a build or merge for the same shard will be dropped.
+	 * Processing ends once all tasks scheduled on a "build" service are
+	 * complete.
+	 * <p>
+	 * After actions are considered for each shard for which a compacting merge
+	 * is executed. These after actions can cause a shard split, join, or move.
+	 * Deferring such actions until we have a compact view (comprised of one
+	 * journal and one index segment) greatly improves our ability to decide
+	 * whether a shard should be split or joined and simplifies the logic and
+	 * effort required to split, join or move a shard.
+	 * <p>
+	 * The following is a brief summary of some after actions on compact shards.
+	 * <dl>
+	 * <dt>split</dt>
+	 * <dd>A shard is split when its size on the disk exceeds the (adjusted)
+	 * nominal size of a shard (overflow). By waiting until the shard view is
+	 * compact we have exact information about the size of the shard (it is
+	 * contained in a single {@link IndexSegment}) and we are able to easily
+	 * select the separator key to split the shard.</dd>
+	 * <dt>tailSplit</dt>
+	 * <dd>A tail split may be selected for a shard which has a mostly append
+	 * access pattern. For such access patterns, a normal split would leave the
+	 * left sibling 50% full and the right sibling would quickly fill up with
+	 * continued writes on the tail of the key range. To compensate for this
+	 * access pattern, a tail split chooses a separator key near the end of the
+	 * key range of a shard. This results in a left sibling which is mostly full
+	 * and a right sibling which is mostly empty. If the pattern of heavy tail
+	 * append continues, then the left sibling will remain mostly full and the
+	 * new writes will flow mostly into the right sibling.</dd>
+	 * <dt>scatterSplit</dt>
+	 * <dd>A scatter split breaks the first shard for a new scale-out index into
+	 * N shards and scatters those shards across the data services in a
+	 * federation in order to improve the data distribution and potential
+	 * concurrency of the index. By waiting until the shard view is compact we
+	 * are able to quickly select appropriate separator keys for the shard
+	 * splits.</dd>
+	 * <dt>move</dt>
+	 * <dd>A move transfer a shard from this data service to another data
+	 * service in order to reduce the load on this data service. By waiting
+	 * until the shard view is compact we are able to rapidly transfer the bulk
+	 * of the data in the form of a single {@link IndexSegment}.</dd>
+	 * <dt>join</dt>
+	 * <dd>A join combines a shard which is under 50% of its (adjusted) nominal
+	 * maximum size on the disk (underflow) with its right sibling. Joins are
+	 * driven by deletes of tuples from a key range. Since deletes are handled
+	 * as writes where a delete marker is set on the tuple, neither the shard
+	 * size on the disk nor the range count of the shard will decrease until a
+	 * compacting merge. A join is indicated if the size on disk for the shard
+	 * has shrunk considerably since the last time a compacting merge was
+	 * performed for the view (this covers both the case of deletes, which
+	 * reduce the range count, and updates which replace the values in the
+	 * tuples with more compact data). <br>
+	 * There are actually three cases for a join.
+	 * <ol>
+	 * <li>If the right sibling is local, then the shard will be joined with its
+	 * right sibling.</li>
+	 * <li>If the right sibling is remote, then the shard will be moved to the
+	 * data service on which the right sibling is found.</li>
+	 * <li>If the right sibling does not exist, then nothing is done (the last
+	 * shard in a scale-out index does not have a right sibling). The right most
+	 * sibling will remain undercapacity until and unless its left sibling also
+	 * underflows, at which point the left sibling will cause itself to be
+	 * joined with the right sibling (this is done to simplify the logic which
+	 * searches for a sibling with which to join an undercapacity shard).</li>
+	 * </ol>
+	 * </dl>
+	 * 
+	 * @param forceCompactingMerges
+	 *            When <code>true</code> a compacting merge will be forced for
+	 *            each non-compact view. Compacting merges will be taken in
+	 *            priority order and will continue until finished or until the
+	 *            journal is nearing its nominal maximum extent.
+	 * 
+	 * @throws InterruptedException
+	 * 
+	 * @todo The size of the merge queue (or its sum of priorities) may be an
+	 *       indication of the load of the node which could be used to decide
+	 *       that index partitions should be shed/moved.
+	 * 
+	 * @todo For HA, this needs to be a shared priority queue using zk or the
+	 *       like since any node in the failover set could do the merge (or
+	 *       build). [Alternatively, nodes do the build/merge for the shards for
+	 *       which they have the highest affinity out of the failover set.]
+	 * 
+	 *       FIXME tailSplits currently operate on the mutable BTree rather than
+	 *       a compact view). This task does not require a compact view (at
+	 *       least, not yet) and generating one for it might be a waste of time.
+	 *       Instead it examines where the inserts are occurring in the index
+	 *       and splits of the tail if the index is heavy for write append. It
+	 *       probably could defer that choice until a compact view was some
+	 *       percentage of a split (maybe .6?) So, probably an after action for
+	 *       the mergeQ.
+	 * 
+	 *       FIXME joins must track metadata about the previous size on disk of
+	 *       the compact view in order to decide when underflow has resulted. In
+	 *       order to handle the change in the value of the acceleration factor,
+	 *       this data should be stored as the percentage of an adjusted split
+	 *       of the last compact view. We can update that metadata each time we
+	 *       do a compacting merge.
+	 */
     private List<Future<?>> scheduleAndAwaitTasks(
             final boolean forceCompactingMerges) throws InterruptedException {
 
@@ -554,20 +565,29 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                 if (log.isInfoEnabled())
                     log.info("was  copied : " + vmd);
 
-                continue;
+            } else {
 
+            	buildList.add(new Priority<ViewMetadata>(vmd.buildPriority, vmd));
+            	
             }
 
-            buildList.add(new Priority<ViewMetadata>(vmd.buildPriority, vmd));
+			if (vmd.mergePriority > 0d || forceCompactingMerges) {
 
-            if (vmd.mergePriority > 0d) {
+				/*
+				 * Schedule a merge if the priority is non-zero or if compacting
+				 * merges are being forced.
+				 */
 
-                mergeList
-                        .add(new Priority<ViewMetadata>(vmd.mergePriority, vmd));
+				mergeList
+						.add(new Priority<ViewMetadata>(vmd.mergePriority, vmd));
 
             }
 
         } // itr.hasNext()
+
+	if(log.isInfoEnabled()) {
+	    log.info("Scheduling tasks: buildList="+buildList.size()+", mergeList="+mergeList.size());
+	}
 
         /*
          * Schedule build and merge tasks and await their futures. The tasks are
@@ -606,26 +626,29 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                     resourceManager.mergeServiceCorePoolSize);
 
             // Schedule merge tasks.
-            if (!forceCompactingMerges) {
-
                 for (Priority<ViewMetadata> p : mergeList) {
 
                     final ViewMetadata vmd = p.v;
 
-                    if (vmd.mergePriority > 0) {
+                    if (vmd.mergePriority > 0 || forceCompactingMerges) {
+
+			if(forceCompactingMerges && OverflowActionEnum.Copy.equals(vmd.getAction())) {
+
+			    vmd.clearCopyAction();
+
+			}
 
                         // Schedule a compacting merge.
                         final FutureTask<?> ft = new FutureTask(
                                 new AtomicCallable(OverflowActionEnum.Merge,
-                                        vmd, new CompactingMergeTask(vmd)));
+						   vmd, forceCompactingMerges,
+						   new CompactingMergeTask(vmd)));
                         mergeFutures.add(ft);
                         mergeService.execute(ft);
 
                     }
 
                 }
-
-            }
 
             // Schedule build tasks.
             for (Priority<ViewMetadata> p : buildList) {
@@ -636,7 +659,8 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 
                     // Force a compacting merge.
                     final FutureTask<?> ft = new FutureTask(new AtomicCallable(
-                            OverflowActionEnum.Merge, vmd,
+		            OverflowActionEnum.Merge, vmd,
+			    forceCompactingMerges,
                             new CompactingMergeTask(vmd)));
                     mergeFutures.add(ft);
                     mergeService.execute(ft);
@@ -646,6 +670,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                     // Schedule a build.
                     final FutureTask<?> ft = new FutureTask(new AtomicCallable(
                             OverflowActionEnum.Build, vmd,
+			    forceCompactingMerges,
                             new IncrementalBuildTask(vmd)));
                     buildFutures.add(ft);
                     buildService.execute(ft);

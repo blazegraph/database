@@ -582,9 +582,21 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
     }
 
     /**
+     * The default implementation only logs the event.
+     */
+    public AbstractResource<E> init() {
+
+    	if (log.isInfoEnabled())
+			log.info(toString());
+    	
+    	return this;
+    	
+	}
+
+    /**
      * 
      * @todo Lock service supporting shared locks, leases and lease renewal,
-     *       excalation of shared locks to exclusive locks, deadlock detection,
+     *       escalation of shared locks to exclusive locks, deadlock detection,
      *       and possibly a resource hierarchy. Leases should be Callable
      *       objects that are submitted by the client to its executor service so
      *       that they will renew automatically until cancelled (and will cancel

@@ -644,7 +644,18 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
         this.lastCommitTime = lastCommitTime;
         
     }
-    private long lastCommitTime = 0L;// Until the first commit.
+
+    /**
+     * The lastCommitTime of the {@link Checkpoint} record from which the
+     * {@link BTree} was loaded.
+     * <p>
+     * Note: Made volatile on 8/2/2010 since it is not otherwise obvious what
+     * would guarantee visibility of this field, through I do seem to remember
+     * that visibility might be guaranteed by how the BTree class is discovered
+     * and returned to the class. Still, it does no harm to make this a volatile
+     * read.
+     */
+    volatile private long lastCommitTime = 0L;// Until the first commit.
     
     /**
      * Return the {@link IDirtyListener}.
@@ -1525,45 +1536,63 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
         
     }
 
-    /**
-     * Load an instance of a {@link BTree} or derived class from the store. The
-     * {@link BTree} or derived class MUST declare a constructor with the
-     * following signature: <code>
+	/**
+	 * Load an instance of a {@link BTree} or derived class from the store. The
+	 * {@link BTree} or derived class MUST declare a constructor with the
+	 * following signature: <code>
      * 
      * <i>className</i>(IRawStore store, Checkpoint checkpoint, BTreeMetadata metadata, boolean readOnly)
      * 
      * </code>
-     * 
-     * @param store
-     *            The store.
-     * @param addrCheckpoint
-     *            The address of a {@link Checkpoint} record for the index.
-     * @param readOnly
-     *            When <code>true</code> the {@link BTree} will be marked as
-     *            read-only. Marking has some advantages relating to the locking
-     *            scheme used by {@link Node#getChild(int)} since the root node
-     *            is known to be read-only at the time that it is allocated as
-     *            per-child locking is therefore in place for all nodes in the
-     *            read-only {@link BTree}. It also results in much higher
-     *            concurrency for {@link AbstractBTree#touch(AbstractNode)}.
-     * 
-     * @return The {@link BTree} or derived class loaded from that
-     *         {@link Checkpoint} record.
-     */
+	 * 
+	 * @param store
+	 *            The store.
+	 * @param addrCheckpoint
+	 *            The address of a {@link Checkpoint} record for the index.
+	 * @param readOnly
+	 *            When <code>true</code> the {@link BTree} will be marked as
+	 *            read-only. Marking has some advantages relating to the locking
+	 *            scheme used by {@link Node#getChild(int)} since the root node
+	 *            is known to be read-only at the time that it is allocated as
+	 *            per-child locking is therefore in place for all nodes in the
+	 *            read-only {@link BTree}. It also results in much higher
+	 *            concurrency for {@link AbstractBTree#touch(AbstractNode)}.
+	 * 
+	 * @return The {@link BTree} or derived class loaded from that
+	 *         {@link Checkpoint} record.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if store is <code>null</code>.
+	 */
     @SuppressWarnings("unchecked")
     public static BTree load(final IRawStore store, final long addrCheckpoint,
             final boolean readOnly) {
 
+		if (store == null)
+			throw new IllegalArgumentException();
+    	
         /*
          * Read checkpoint record from store.
          */
-        final Checkpoint checkpoint = Checkpoint.load(store, addrCheckpoint);
+		final Checkpoint checkpoint;
+		try {
+			checkpoint = Checkpoint.load(store, addrCheckpoint);
+		} catch (Throwable t) {
+			throw new RuntimeException("Could not load Checkpoint: store="
+					+ store + ", addrCheckpoint="
+					+ store.toString(addrCheckpoint), t);
+		}
 
-        /*
-         * Read metadata record from store.
-         */
-        final IndexMetadata metadata = IndexMetadata.read(store, checkpoint
-                .getMetadataAddr());
+		/*
+		 * Read metadata record from store.
+		 */
+		final IndexMetadata metadata;
+		try {
+			metadata = IndexMetadata.read(store, checkpoint.getMetadataAddr());
+		} catch (Throwable t) {
+			throw new RuntimeException("Could not read IndexMetadata: store="
+					+ store + ", checkpoint=" + checkpoint, t);
+		}
 
         if (log.isInfoEnabled()) {
 

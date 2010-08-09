@@ -7,6 +7,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.resources.StoreManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 
@@ -171,16 +172,18 @@ abstract public class AbstractLocalTransactionManager implements
      * Delay between attempts reach the remote service (ms).
      */
     final long delay = 10L;
-    
-    /**
-     * #of attempts to reach the remote service.
-     * 
-     * Note: delay*maxtries == 1000ms of trying before we give up.
-     * 
-     * If this is not enough, then consider adding an optional parameter giving
-     * the time the caller will wait and letting the StoreManager wait longer
-     * during startup to discover the timestamp service.
-     */
+
+	/**
+	 * #of attempts to reach the remote service.
+	 * <p>
+	 * Note: delay*maxtries == 1000ms of trying before we give up, plus however
+	 * long we are willing to wait for service discovery if the problem is
+	 * locating the {@link ITransactionService}.
+	 * <p>
+	 * If this is not enough, then consider adding an optional parameter giving
+	 * the time the caller will wait and letting the {@link StoreManager} wait
+	 * longer during startup to discover the timestamp service.
+	 */
     final int maxtries = 100; 
     
     /**

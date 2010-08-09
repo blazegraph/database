@@ -40,14 +40,14 @@ import com.bigdata.rdf.model.BigdataValueFactory;
  */
 public interface IExtension<V extends BigdataValue> {
 
-    /**
-     * This will be called very early in the IExtension lifecycle so that the
-     * {@link TermId} for the datatype URI will be on hand when needed.
-     * 
-     * @param resolver
-     *          the datatype URI resolver
-     */
-    void resolveDatatype(final IDatatypeURIResolver resolver);
+//    /**
+//     * This will be called very early in the IExtension lifecycle so that the
+//     * {@link TermId} for the datatype URI will be on hand when needed.
+//     * 
+//     * @param resolver
+//     *          the datatype URI resolver
+//     */
+//    void resolveDatatype(final IDatatypeURIResolver resolver);
     
     /**
      * Return the fully resolved datatype in the form of a {@link BigdataURI}

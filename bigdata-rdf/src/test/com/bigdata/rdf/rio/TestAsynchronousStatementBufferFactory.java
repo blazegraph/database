@@ -252,9 +252,14 @@ public class TestAsynchronousStatementBufferFactory extends
         
     }
 
-    /**
-     * LUBM U(1)
-     */
+	/**
+	 * LUBM U(1).
+	 * <p>
+	 * Note: This unit test can hang under JDK 1.6.0_17 if you have been running
+	 * the entire test suite and you do not specify <code>-XX:+UseMembar</code>
+	 * to the JVM. This is a JVM bug. The <code>-XX:+UseMembar</code> option is
+	 * the workaround.
+	 */
     public void test_loadAndVerify_U1() throws Exception {
         
         final String file = "bigdata-rdf/src/resources/data/lehigh/U1";

@@ -1845,8 +1845,8 @@ abstract public class DataService extends AbstractService
         
         public Void call() throws Exception {
 
-            final WriteExecutorService writeService = concurrencyManager
-                    .getWriteService();
+//            final WriteExecutorService writeService = concurrencyManager
+//                    .getWriteService();
 
             final ResourceManager resourceManager = (ResourceManager) DataService.this.resourceManager;
 
@@ -1859,7 +1859,8 @@ abstract public class DataService extends AbstractService
                 }
 
                 // trigger overflow on the next group commit.
-                writeService.forceOverflow.set(true);
+//                writeService.forceOverflow.set(true);
+                resourceManager.forceOverflow.set(true);
 
             }
 

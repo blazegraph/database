@@ -43,7 +43,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.concurrent.LockManager;
 import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
@@ -80,9 +79,9 @@ abstract public class AbstractTransactionService extends AbstractService
      */
     protected static final Logger log = Logger.getLogger(AbstractTransactionService.class);
 
-    protected static final boolean INFO = log.isInfoEnabled();
+//    protected static final boolean INFO = log.isInfoEnabled();
 
-    protected static final boolean DEBUG = log.isDebugEnabled();
+//    protected static final boolean DEBUG = log.isDebugEnabled();
     
     /**
      * Options understood by this service.
@@ -91,29 +90,39 @@ abstract public class AbstractTransactionService extends AbstractService
      * @version $Id$
      */
     public interface Options {
-        
-        /**
-         * How long you want to hold onto the database history (in milliseconds)
-         * or {@link Long#MAX_VALUE} for an (effectively) immortal database. The
-         * {@link ITransactionService} tracks the timestamp corresponding to the
-         * earliest running transaction (if any). When such a transaction
-         * exists, the actual release time is:
-         * 
-         * <pre>
-         * releaseTime = min(earliestRunningTx, now - minimumReleaseAge) - 1
-         * </pre>
-         * 
-         * This ensures that history in use by running transactions is not
-         * released even when the minimumReleaseAge is ZERO (0).
-         * 
-         * @see #DEFAULT_MIN_RELEASE_AGE
-         * @see #MIN_RELEASE_AGE_1H
-         * @see #MIN_RELEASE_AGE_1D
-         * @see #MIN_RELEASE_AGE_1W
-         * @see #MIN_RELEASE_AGE_NEVER
-         * 
-         * @see AbstractTransactionService#updateReleaseTime(long)
-         */
+
+		/**
+		 * How long you want to hold onto the database history (in milliseconds)
+		 * or {@link Long#MAX_VALUE} for an (effectively) immortal database. The
+		 * {@link ITransactionService} tracks the timestamp corresponding to the
+		 * earliest running transaction (if any). When such a transaction
+		 * exists, the actual release time is:
+		 * 
+		 * <pre>
+		 * releaseTime = min(lastCommitTime - 1, min(earliestRunningTx, now - minimumReleaseAge))
+		 * </pre>
+		 * 
+		 * This ensures that history in use by running transactions is not
+		 * released even when the minimumReleaseAge is ZERO (0).
+		 * <p>
+		 * When no transactions exist the actual release time is:
+		 * 
+		 * <pre>
+		 * releaseTime = min(commitTime - 1, now - minimumReleaseAge)
+		 * </pre>
+		 * 
+		 * This ensures that the the release time advances when no transactions
+		 * are in use, but that the minimum release age is still respected.
+		 * 
+		 * @see #DEFAULT_MIN_RELEASE_AGE
+		 * @see #MIN_RELEASE_AGE_1H
+		 * @see #MIN_RELEASE_AGE_1D
+		 * @see #MIN_RELEASE_AGE_1W
+		 * @see #MIN_RELEASE_AGE_NEVER
+		 * 
+		 * @see AbstractTransactionService#updateReleaseTime(long)
+		 * @see AbstractTransactionService#notifyCommit(long)
+		 */
         String MIN_RELEASE_AGE = AbstractTransactionService.class.getName()
                 + ".minReleaseAge";
 
@@ -231,7 +240,7 @@ abstract public class AbstractTransactionService extends AbstractService
                             Options.MIN_RELEASE_AGE,
                             Options.DEFAULT_MIN_RELEASE_AGE));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.MIN_RELEASE_AGE + "=" + minReleaseAge);
         
         }
@@ -291,7 +300,7 @@ abstract public class AbstractTransactionService extends AbstractService
 
         this.runState = newval;
 
-        if (INFO) {
+        if (log.isInfoEnabled()) {
 
             log.info("runState=" + runState);
             
@@ -306,7 +315,7 @@ abstract public class AbstractTransactionService extends AbstractService
      */
     public void shutdown() {
 
-        if(INFO) 
+        if(log.isInfoEnabled()) 
             log.info("");
 
         lock.lock();
@@ -376,7 +385,7 @@ abstract public class AbstractTransactionService extends AbstractService
 
         long elapsed = 0L;
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("activeCount="+getActiveCount());
 
         while (getActiveCount() > 0) {
@@ -390,7 +399,7 @@ abstract public class AbstractTransactionService extends AbstractService
                 // update the elapsed time.
                 elapsed = System.nanoTime() - begin;
 
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info("No transactions remaining: elapsed="+elapsed);
                 
                 return;
@@ -456,7 +465,7 @@ abstract public class AbstractTransactionService extends AbstractService
      */
     public void shutdownNow() {
 
-        if(INFO) 
+        if(log.isInfoEnabled()) 
             log.info("");
 
         lock.lock();
@@ -772,7 +781,7 @@ abstract public class AbstractTransactionService extends AbstractService
      */
     public long getReleaseTime() {
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("releaseTime=" + releaseTime + ", lastKnownCommitTime="
                     + getLastCommitTime());
         
@@ -792,7 +801,7 @@ abstract public class AbstractTransactionService extends AbstractService
         if(!lock.isHeldByCurrentThread())
             throw new IllegalMonitorStateException();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("newValue=" + newValue);
         
         this.releaseTime = newValue;
@@ -914,7 +923,7 @@ abstract public class AbstractTransactionService extends AbstractService
 
             }
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(state.toString());
 
 //        } finally {
@@ -984,10 +993,15 @@ abstract public class AbstractTransactionService extends AbstractService
 
         synchronized (startTimeIndex) {
 
-            isEarliestTx = startTimeIndex.findIndexOf(timestamp) == 0;
+			// Note: ZERO (0) is the first tuple in the B+Tree.
+        	// Note: MINUS ONE (-1) means that the B+Tree is empty.
+			final int indexOf = startTimeIndex.findIndexOf(timestamp);
+			
+			isEarliestTx = indexOf == 0;
 
-            // remove start time from the index.
-            startTimeIndex.remove(timestamp);
+			// remove start time from the index.
+			if (indexOf != -1)
+				startTimeIndex.remove(timestamp);
 
             if (!isEarliestTx) {
 
@@ -1061,7 +1075,7 @@ abstract public class AbstractTransactionService extends AbstractService
              */
             if (this.releaseTime < releaseTime) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("lastCommitTime=" + lastCommitTime
                             + ", earliestTxStartTime=" + earliestTxStartTime
                             + ", minReleaseAge=" + minReleaseAge + ", now="
@@ -1091,34 +1105,63 @@ abstract public class AbstractTransactionService extends AbstractService
 
         try {
 
-            synchronized (startTimeIndex) {
-
-                if (this.releaseTime < (commitTime - 1)
-                        && startTimeIndex.getEntryCount() == 0) {
-
-                    /*
-                     * If there are NO active transactions and the current
-                     * releaseTime is LT (commitTime-1) then advance the
-                     * releaseTime to (commitTime-1).
-                     */
-
-                    if (INFO)
-                        log.info("Advancing releaseTime (no active tx).");
-
-                    setReleaseTime(commitTime - 1);
-
-                }
-
-            }
-
+        	updateReleaseTimeForBareCommit(commitTime);
+        	
         } finally {
 
             lock.unlock();
 
         }
 
-    }
+	}
 
+	/**
+	 * If there are NO active transactions and the current releaseTime is LT
+	 * (commitTime-1) then compute and set the new releaseTime.
+	 * <p>
+	 * Note: This method was historically part of {@link #notifyCommit(long)}.
+	 * It was moved into its own method so it can be overriden for some unit
+	 * tests.
+	 * 
+	 * @throws IllegalMonitorStateException
+	 *             unless the caller is holding the lock.
+	 */
+	protected void updateReleaseTimeForBareCommit(final long commitTime) {
+
+		if(!lock.isHeldByCurrentThread())
+			throw new IllegalMonitorStateException();
+		
+		synchronized (startTimeIndex) {
+
+			if (this.releaseTime < (commitTime - 1)
+					&& startTimeIndex.getEntryCount() == 0) {
+
+				final long lastCommitTime = commitTime;
+
+				final long now = _nextTimestamp();
+
+				final long releaseTime = Math.min(lastCommitTime - 1, now
+						- minReleaseAge);
+
+				if (this.releaseTime < releaseTime) {
+
+					if (log.isInfoEnabled())
+						log.info("Advancing releaseTime (no active tx)"
+								+ ": lastCommitTime=" + lastCommitTime
+								+ ", minReleaseAge=" + minReleaseAge + ", now="
+								+ now + ", releaseTime(" + this.releaseTime
+								+ "->" + releaseTime + ")");
+
+					setReleaseTime(releaseTime);
+
+				}
+
+			}
+
+		}
+
+    }
+    
     /**
      * Return the minimum #of milliseconds of history that must be preserved.
      * 
@@ -1703,7 +1746,7 @@ abstract public class AbstractTransactionService extends AbstractService
      * Note: The commits requests are placed into a partial order by sorting the
      * total set of resources which the transaction declares (via this method)
      * across all operations executed by the transaction and then contending for
-     * locks on the named resources using a {@link LockManager}. This is
+     * locks on the named resources using a LockManager. This is
      * handled by the {@link DistributedTransactionService}.
      */
     public void declareResources(final long tx, final UUID dataServiceUUID,
@@ -2066,7 +2109,7 @@ abstract public class AbstractTransactionService extends AbstractService
             // Note: sufficient to prevent deadlocks when there are shared indices.
             resources.addAll(Arrays.asList(resource));
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("dataService=" + dataService + ", resource="
                         + Arrays.toString(resource));
 
@@ -2206,7 +2249,7 @@ abstract public class AbstractTransactionService extends AbstractService
      */
     public AbstractTransactionService start() {
 
-        if(INFO) 
+        if(log.isInfoEnabled()) 
             log.info("");
 
         lock.lock();

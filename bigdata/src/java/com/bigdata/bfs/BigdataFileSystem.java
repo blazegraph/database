@@ -420,7 +420,7 @@ public class BigdataFileSystem extends
         }
         
     }
-
+    
     /**
      * Note: A commit is required in order for a read-committed view to have
      * access to the registered indices. When running against an

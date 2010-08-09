@@ -64,6 +64,15 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
     V asValue(final ExtensionIV iv, final BigdataValueFactory vf);
     
     /**
+     * Initialize the extensions, which need to resolve their datatype URIs
+     * into term ids.
+     * 
+     * @param resolver
+     *          the datatype URI resolver
+     */
+    void initExtensions(final IDatatypeURIResolver resolver);
+    
+    /**
      * <code>true</code> iff the <code>vte</code> and <code>dte</code> 
      * should be inlined.
      * 

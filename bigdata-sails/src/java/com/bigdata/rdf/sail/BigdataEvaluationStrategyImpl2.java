@@ -1640,7 +1640,23 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             
             final IJoinNexus joinNexus = joinNexusFactory.newInstance(database
                     .getIndexManager());
-            itr1 = joinNexus.runQuery(step);
+        
+//            itr1 = joinNexus.runQuery(step);
+
+			if (step instanceof ProxyRuleWithSesameFilters) {
+
+				/*
+				 * Note: Do not send the proxy rule down the wire. It has Sesame
+				 * Filter objects which are not Serializable.
+				 */
+				itr1 = joinNexus.runQuery(((ProxyRuleWithSesameFilters) step)
+						.getProxyRule());
+
+			} else {
+
+				itr1 = joinNexus.runQuery(step);
+
+			}
             
         } catch (Exception ex) {
             throw new QueryEvaluationException(ex);

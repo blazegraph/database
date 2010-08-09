@@ -720,8 +720,8 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         
         final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
         
-        EpochExtension<BigdataValue> ext = new EpochExtension<BigdataValue>();
-        ext.resolveDatatype(new IDatatypeURIResolver() {
+        EpochExtension<BigdataValue> ext = 
+            new EpochExtension<BigdataValue>(new IDatatypeURIResolver() {
             public BigdataURI resolve(URI uri) {
                 BigdataURI buri = vf.createURI(uri.stringValue());
                 buri.setIV(new TermId(VTE.URI, 1024));
@@ -743,8 +743,8 @@ public class TestEncodeDecodeKeys extends TestCase2 {
         
         final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
         
-        ColorsEnumExtension<BigdataValue> ext = new ColorsEnumExtension<BigdataValue>();
-        ext.resolveDatatype(new IDatatypeURIResolver() {
+        ColorsEnumExtension<BigdataValue> ext = 
+            new ColorsEnumExtension<BigdataValue>(new IDatatypeURIResolver() {
             public BigdataURI resolve(URI uri) {
                 BigdataURI buri = vf.createURI(uri.stringValue());
                 buri.setIV(new TermId(VTE.URI, 1024));
