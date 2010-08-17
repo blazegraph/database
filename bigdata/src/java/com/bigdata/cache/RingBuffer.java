@@ -154,7 +154,7 @@ public class RingBuffer<T> implements Queue<T> {
     public boolean add(final T ref) throws IllegalStateException {
 
         if (ref == null)
-            throw new IllegalArgumentException();
+            throw new NullPointerException();
 
         beforeOffer( ref );
 
@@ -178,7 +178,7 @@ public class RingBuffer<T> implements Queue<T> {
     public boolean offer(final T ref) {
 
         if (ref == null)
-            throw new IllegalArgumentException();
+            throw new NullPointerException();
 
         beforeOffer( ref );
 
@@ -491,10 +491,9 @@ public class RingBuffer<T> implements Queue<T> {
      */
     final public boolean scanHead(final int nscan, final T ref) {
 
-        assert nscan > 0;
-//        if (nscan <= 0)
-//            throw new IllegalArgumentException();
-//        
+        if (nscan <= 0)
+            throw new IllegalArgumentException();
+        
         if (ref == null)
             throw new IllegalArgumentException();
         

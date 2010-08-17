@@ -425,8 +425,8 @@ public class TestRingBuffer extends TestCase2 {
 
         try {
             buffer.add(null);
-            fail("Expecting: " + IllegalArgumentException.class);
-        } catch (IllegalArgumentException ex) {
+            fail("Expecting: " + NullPointerException.class);
+        } catch (NullPointerException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }
@@ -438,8 +438,8 @@ public class TestRingBuffer extends TestCase2 {
 
         try {
             buffer.offer(null);
-            fail("Expecting: " + IllegalArgumentException.class);
-        } catch (IllegalArgumentException ex) {
+            fail("Expecting: " + NullPointerException.class);
+        } catch (NullPointerException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }
