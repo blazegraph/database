@@ -1,7 +1,6 @@
 package com.bigdata.relation.rule.eval.pipeline;
 
 import java.util.Iterator;
-import java.util.concurrent.ExecutionException;
 
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
@@ -31,7 +30,7 @@ class UnsyncDistributedOutputBuffer<E extends IBindingSet> extends
     /** The tailIndex of the next predicate to be evaluated. */
     final int nextTailIndex;
     
-    final IBigdataFederation fed;
+    final IBigdataFederation<?> fed;
 
     /**
      * 
@@ -39,7 +38,7 @@ class UnsyncDistributedOutputBuffer<E extends IBindingSet> extends
      * @param joinTask
      * @param capacity
      */
-    public UnsyncDistributedOutputBuffer(final AbstractScaleOutFederation fed,
+    public UnsyncDistributedOutputBuffer(final AbstractScaleOutFederation<?> fed,
             final DistributedJoinTask joinTask, final int capacity) {
 
         super(capacity);
@@ -92,7 +91,7 @@ class UnsyncDistributedOutputBuffer<E extends IBindingSet> extends
         int bindingSetsOut = 0;
 
         // the next predicate to be evaluated.
-        final IPredicate nextPred = joinTask.rule.getTail(nextTailIndex);
+        final IPredicate<?> nextPred = joinTask.rule.getTail(nextTailIndex);
 
         final IJoinNexus joinNexus = joinTask.joinNexus;
 
@@ -129,8 +128,6 @@ class UnsyncDistributedOutputBuffer<E extends IBindingSet> extends
                 try {
                     sink = joinTask.getSink(locator);
                 } catch (InterruptedException ex) {
-                    throw new RuntimeException(ex);
-                } catch (ExecutionException ex) {
                     throw new RuntimeException(ex);
                 }
 
