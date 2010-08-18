@@ -30,6 +30,8 @@ package com.bigdata.relation.rule;
 
 import java.io.Serializable;
 
+import com.bigdata.bop.IVariable;
+
 /**
  * A variable and an order that will be imposed on the values for that variable.
  * 

@@ -36,11 +36,11 @@ public class SolutionFilter<E> implements IElementFilter<ISolution<E>> {
     
     public boolean canAccept(final Object o) {
 
-        if (o instanceof ISolution == false) {
+        if (!(o instanceof ISolution<?>)) {
             return false;
         }
         
-        final Object o2 = ((ISolution)o).get();
+        final Object o2 = ((ISolution<?>)o).get();
         
         return delegate.canAccept( o2 );
         

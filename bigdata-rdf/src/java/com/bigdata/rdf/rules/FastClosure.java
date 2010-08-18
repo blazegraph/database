@@ -5,15 +5,15 @@ import java.util.List;
 
 import org.openrdf.model.vocabulary.OWL;
 
+import com.bigdata.bop.ArrayBindingSet;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.relation.rule.ArrayBindingSet;
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IConstant;
-import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IVariable;
-import com.bigdata.relation.rule.NEConstant;
 import com.bigdata.relation.rule.Rule;
 
 /**

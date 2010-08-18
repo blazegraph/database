@@ -30,6 +30,9 @@ package com.bigdata.rdf.spo;
 
 import java.util.Iterator;
 import junit.framework.TestCase2;
+
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.Var;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
@@ -38,8 +41,6 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.relation.rule.Constant;
-import com.bigdata.relation.rule.Var;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**

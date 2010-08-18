@@ -32,15 +32,15 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.ap.Predicate;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.rule.IConstraint;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
-import com.bigdata.relation.rule.Predicate;
 import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.Rule;
 

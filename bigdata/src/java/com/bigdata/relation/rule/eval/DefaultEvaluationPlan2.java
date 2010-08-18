@@ -34,12 +34,12 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.journal.ITx;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.IStarJoin;
-import com.bigdata.relation.rule.IVariableOrConstant;
 
 /**
  * The evaluation order is determined by analysis of the propagation of

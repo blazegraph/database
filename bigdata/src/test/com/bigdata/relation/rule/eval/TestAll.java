@@ -59,7 +59,7 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("rule");
+        final TestSuite suite = new TestSuite("rule");
 
         // test evaluation plans.
         suite.addTestSuite( TestDefaultEvaluationPlan.class );

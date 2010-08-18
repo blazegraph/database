@@ -31,6 +31,10 @@ package com.bigdata.relation.rule;
 import java.util.Iterator;
 import java.util.Set;
 
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IJoinNexus;
@@ -221,7 +225,7 @@ public interface IRule<E> extends IStep {
      * @throws IndexOutOfBoundsException
      *             if either index is out of bounds.
      */
-    public Set<IVariable> getSharedVars(int index1, int index2);
+    public Set<IVariable<?>> getSharedVars(int index1, int index2);
 
     /**
      * Return true iff the selected predicate is fully bound.

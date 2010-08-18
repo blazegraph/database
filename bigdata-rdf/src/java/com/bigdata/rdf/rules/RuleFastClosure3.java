@@ -31,10 +31,10 @@ import java.util.Set;
 
 import org.openrdf.model.vocabulary.RDFS;
 
+import com.bigdata.bop.IConstant;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IRuleTaskFactory;

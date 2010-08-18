@@ -30,7 +30,7 @@ package com.bigdata.relation.rule.eval;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.pipeline.JoinStats;
 

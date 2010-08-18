@@ -2,10 +2,10 @@ package com.bigdata.relation.accesspath;
 
 import java.util.Collections;
 
+import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.filter.EmptyTupleIterator;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;

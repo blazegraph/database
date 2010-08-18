@@ -1,0 +1,344 @@
+- Review annotation names and defaults.  Make sure that the annotation
+  names are all in appropriate namespaces.  The namespaces should
+  probably be the interface or class of the operator which defines
+  that annotation.
+
+- RejectAnythingSameAsSelf appears to be assuming termIds rather than
+  IVs.
+
+- Get rid of the concept of a relation view (two or more relations
+  named by a given predicate) in favor of the UNION of the predicates,
+  which is basically a UNION of their access paths.
+
+- Expanders will eventually need to be replaced by either shard-wise
+  expanders (where possible) or query time materialization of various
+  inferences, e.g., using magic sets or other query rewrite
+  techniques.
+
+- IRelation#getAccessPath(IIndexManager,IPredicate). Raise this onto
+  onto IRelation.  It is the shard aware version.  There is also a
+  version getAccessPath(IPredicate) without the IIndexManager
+  parameter which is used for local indices and for RMI based access
+  to a scale-out index.
+
+- IRelation: DDL Support
+  - Iterator<IKeyOrder<E>> getKeyOrders();
+  - IKeyOrder<E> getKeyOrder(IPredicate<E> p);
+  - IKeyOrder<E> getPrimaryKeyOrder();
+  - IIndex getIndex(IKeyOrder)
+
+- IKeyOrder: DDL Support (reconcile with ITupleSerializer)
+  - byte[] getFromKey(IKeyBuilder keyBuilder, IPredicate<ISPO> predicate);
+  - byte[] getToKey(IKeyBuilder keyBuilder, IPredicate<ISPO> predicate);
+  - byte[] encodeKey(IKeyBuilder keyBuilder, E e);
+  - E decodeKey(byte[] key);
+
+- Elements: Add self-description of data to "elements". Harmonize with
+  binding sets.
+  - Iterator<Column> getFields();
+
+- Column:
+  - getIndex();
+  - getName();
+  - getDatatype();
+  - getForeignKeys();
+  ...
+
+- Implement lexicon joins.
+
+- Implement spatial joins.
+
+- Nested optionals (conditional routing of joins).
+
+- Make the free text index a "resource" rather than a relation?
+
+- Use blocking queues with poison objects and chunking or modify
+  BlockingBuffer to raise up the LinkedBlockingDeque into our code
+  base.
+
+- Support tree rewrites using a pattern language.
+
+  - http://functionaljava.org/, Functional Java.
+
+  - tuprolog: http://alice.unibo.it/xwiki/bin/view/Tuprolog/, LGPL, Java.
+
+  - http://scala.sygneca.com/code/mini-kanren, Example of constraint
+    based programming in Scala.  http://scala.sygneca.com/.  BSD
+    license.  http://scala.sygneca.com/code/compressed-executable-jar.
+
+  - PrologCafe: http://kaminari.istc.kobe-u.ac.jp/PrologCafe/, Java.
+    License is not specified.  Authors are in Japan.  Appears to be
+    two people.
+
+  - YAP : http://www.dcc.fc.up.pt/~vsc/Yap/, Perl Artistic license, C.
+
+  - XSB : http://xsb.sourceforge.net/, LGPL, C.
+
+BOp
+      - Serializable
+      - Cloneable
+      - Unmodifiable
+      - arity():int
+      - args():List<BOp>
+      - annotations():Map<String,Object>
+.BOpList: Used to represent lists of operators. E.g., IN(var,{graphIds}).
+      - values():List<BOp>
+.IConstantOrVariable
+      - isConstant()
+      - isVariable()
+      - get() // iff isConstant()
+      - getName() // iff isVariable()
+..IConstant
+..IVariable
+.IOpN
+..IPredicate(name,arg...)[shardId:int;optional:boolean;constraint:IConstraint[],expander]
+
+- BOp execution.
+
+  (***) Implement all BOps for which there is existing functionality.
+
+	PipelineJoin: join binding set producer with local access path
+	using asBound Predicate.
+
+	Predicate: read on as bound access path (IChunked(Ordered)Iterator).
+
+	Work through evaluation for BOps, perhaps using BOpUtility,
+	and definately using unit tests.  We should be able to unit
+	test correct termination, abnormal termination, etc. against
+	the EDS [move to test suite.]
+
+	How are the rule execution statistics going to be passed
+	around?  How will we get visibility into the running rules and
+	their current execution statistics (especially for long
+	running rules)?  How can an operator cancel long running
+	rules?
+
+        Implement optional / conditional binding set routing to
+        ancestors in the BOp tree (parent and eventual parent).
+
+	Implement map shards with RMI then convert to buffers.  Figure
+	out how to label BOps as senders/receivers.
+
+	Implement map nodes.  The ordered list of nodes should be
+	reused for each MapNodes operator.
+
+	All pipeline operators can specify the pipeline annotations
+	(chunkSize, chunksOfChunks, etc).
+
+  (***) Harmonize IElementFilter, IConstraint, BOp, IChunkConverter,
+        PipelineEval.
+
+	Work through how to moving the binding sets and related stuff
+	around, including when running it into a native heap buffer
+	and when just draining a queue, blocking buffer's iterator, a
+	bulk filter (DISTINCT, EXISTS, !EXISTS), bulk completion, etc.
+
+	Asynchronous production of binding sets for vectored pipeline
+        evaluation.  Evaluation should also sets future on buffer as
+        side effect or collects Future's of the operator tree.
+
+	   - Future<Void> eval(IJoinNexus,buffer<BindingSet[]>);
+
+	Evaluation of a predicate, obtaining an access path.  The
+	caller can then wrap the result and do range counts, high
+	level iterators with filters, low level tuple iterators,
+	sample the index / view, etc.
+
+	IPredicate<E>:
+
+	   - Future<IAccessPath<E>> eval(IJoinNexus,IBindingSet);
+
+	IConstant<T>:
+
+	   - T eval(); // return the constant's value.
+
+	IVariable<T>:
+
+	   - T eval(IBindingSet); // return the bound value (vs variable name?)
+
+	Striterator patterns return the wrapped iterator.  The wrapper
+	iterator is then applied an (eventual) parent bop.  This
+	pattern can be used with the CTC Striterator,
+	IChunked(Ordered)Iterator, and probably ITupleIterator (with
+	the FilterConstructor, which could just be some bops).
+
+	   - wrapperItr eval(itr)
+
+  - IElementFilter is element-at-a-time filtering of materialized tuples.
+
+  - IConstraint is IBindingSet-at-a-time filtering.
+
+  - BOp.PipelineEval is IBindingSet at a time evaluation, but it is
+    designed for chunked pipelineing of the binding sets.
+
+  - IChunkConverter is chunk at a time evaluation and has the sense of
+    returning a chunk for each chunk consumed.  That could be used to
+    return the bit map from the DISTINCT operator, which is something
+    that is otherwise missing from the BOp.PipelineEval interface.
+
+  - We need a "batch-oriented" constraint for IN (due to compilation
+    of the set into an efficient representation prior to execution)
+    and DISTINCT (it has to batch binding sets in order to amortize
+    the cost of generating the sort keys and/or chunking up the
+    results).
+
+  - Reconcile Distinct, DistinctSPOIterator, etc.
+
+  - The IN filters should probably be turned into JOINs against an in
+    memory IBindingSet[] source except in those cases where we will
+    have locality in the index for the variable in the IN constraint.
+    At present, IN is only used by the MatchRule.  However, it could
+    also be used for named graphs and default graphs.  There are
+    specialized filters for those purposes SPARQL data sets right now
+    {InGraphBinarySearchFilter, InGraphHashSetFilter}, but I think
+    that this is all pretty general purpose stuff.
+
+IElementFilter: element at a time filtering (does not scale-out).
+.ElementFilter: Unused (discard).
+.SameVariableConstraint: precompiles some private state (ok iff immutable).
+.SolutionFilter: applies filter to the visited elements; related to rule's head...
+.SPOFilter: returns false if not an ISPO.
+      - canAccept(Object):boolean
+..DoNotAddFilter
+..ExplicitSPOFilter
+..InferredSPOFilter
+..InGraphBinarySearchFilter: duplicates IN filter?
+..InGraphHashSetFilter: duplicates IN filter? 
+
+IChunkConverter<E,F>: bulk conversion in/out (scales-out since RMI can be chunky).
+.BulkCompleteConverter
+.BulkFilterConverter
+.DistinctFilter: Reconcile with Distinct, ISortKeyBuilder, IN, InGraphHashSetFilter, etc.
+.HitConverter
+
+- Evaluation types:
+ 
+    IRelation(aka namespace)
+    IDatabase(aka namespace / AbstractTripleStore)
+    IIndex, ILocalBTreeView, BTree, IndexSegment, FusedView,
+    IMap? (aka hash map, DHT)
+    ITable?, IBat?
+    File (flat file in/out),
+
+    Bloomfilter
+
+    E[], BlockingBuffer<E[]>.iterator()
+    
+    IBindingSet[],
+    IChunkedIterator<IBindingSet[]>,
+    BlockingBuffer<IBindingSet[]>.iterator(),
+
+    ISolution[], etc.
+
+  - Life cycle management of resources local to the operator
+    execution.  In some cases, resources must be eventually released,
+    much like "finally{}". This has to be managed in a distributed
+    environment where there is no "stack" to be unwound.
+
+  - Explicit management of query priority, buffers, timeout, etc.
+
+  - Visibility into long running queries.
+
+  - Left-deep operator trees for pipelined execution.
+
+  - newInstance(IJoinNexus) : Future<T>. Tasks will run on
+    ForkJoinPools vs Executors depending on whether they support light
+    weight asynchronous operations all the way down or need to use a
+    thread per disk IO.  However, if the disk IO thread pool is global
+    to a DataService and we use queues for disk IO requests, then we
+    can always use the ForkJoinPool for operators (queuing a request
+    is consistent with fork/join, right?).
+
+- Add IOp library.  Some operators will be specific to standalone (a
+  ConcurrentHashMap based distinct) or scale-out (e.g., a DHT based
+  distinct).
+
+  - RuntimeQueryOptimization(JoinGraph) - Execute the join graph using
+    interleaved query optimization and query execution.
+ 
+    Evaluate for both selective and unselective joins.  Note that
+    sampling can result in all relevant tuples being materialized, at
+    which point chain sampling will perform the actual join and
+    materialize the real intermediate result set.
+
+  - Predicate. This corresponds to an access path with the current
+    bindings.
+
+    - SCAN(fromKey,toKey) (local is trivial)
+
+    - SCAN(partitionId,fromKey,toKey) (distributed requires the
+      partitionId and the local IIndexManager must be set on the
+      DataService where the operation will execute).
+
+  - Sample(Predicate,limit):(E[]). Sample tuples from a relation which
+    satisify the predicate.  Returns the sampled elements.
+
+  - SampleOp(IOp,limit):(E[],est). Sample output from an operation,
+    halting if the limit is satisfied.  Returns the sample and the
+    estimated cardinality of the operation.
+
+  - MapNodes(f,BS[],DS[]). Hash partition mapping of some binding sets
+    using a function across a set of nodes (typically data service
+    nodes, but that is not required).
+
+  - MapShards(BS[],tail[i+1]).  Maps binding sets across shards on
+    which we need to read for the next join predicate.  The operator
+    is associated with a logical port and a maximum buffer allocation.
+
+    @todo If we want to assign indices to variables for binding sets
+    then that needs to be done with reference to a total order over
+    the "rule". With the generalization to an operator tree, the fact
+    that we strip out variables from the binding set when they are no
+    longer in use, and the possibility of permutations over the as yet
+    unevaluated parts of the operator, that mapping needs to be quite
+    explicit. Perhaps it could be part of the {@link IJoinNexus} or
+    raised into the root node of the operator tree.
+
+  - Receive()[queryId, port]. Receive binding sets a logical port for
+    a given query.  The receiver is given a maximum buffer allocation.
+    If the buffers are full, it uses flow control to halt the sender
+    (NACKs the request to send a buffer to the receiver).  Can be used
+    with MapNodes or MapShards. [Can be tested within a single JVM.]
+
+  - IN(var,E[]). Pipeline join operator binds the variable to each of
+    the elements in the array in turn for each binding set presented
+    to the operator. [This is useful for RDF dataset constructs.]
+
+  - JOIN(IPredicate).  Pipeline join operator.  It accepts binding
+    sets on one side and joins then against the (local) access path
+    for the specified predicate.
+
+  - StarJoin(...).
+
+  - ? HashJoin?  Join two arguments, each of which evaluates to a
+    collection of binding sets.  This probably can't be pipelined
+    unless one of the arguments is relatively small and hence can be
+    fully materialized.  Look at how to handle cases where both
+    arguments have large result sets.
+
+  - ? Execute a correlated subquery and join of the results from that
+    subquery against with the each binding set presented to the
+    subquery?
+
+  - DISTINCT (local, concurrent hash map).
+
+  - DISTINCT (distributed hash table).
+
+  - SORT (local, Arrays.sort(), radix sort).
+
+  - SORT (distributed, N-way merge sort).
+
+  - CONSTRUCT (create an element from a binding set).
+
+  - INSERT. Insert elements into a relation (local, sharded uses
+    buffers to move the constructed elements; behavior can use either
+    unisolated writes, eventually consistent unisolated writes, or
+    full transaction isolation).
+
+  - REMOVE. Removes elements from a relation (sharded uses buffers to
+    move the constructed elements).
+
+    Note: Handle remove of elements matching a predicate elements by
+    first executing the predicate to select the elements and then
+    removing the elements using the same kinds of mechansims which are
+    used for insert.

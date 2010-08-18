@@ -49,6 +49,19 @@ import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
 import com.bigdata.BigdataStatics;
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.ap.Predicate;
+import com.bigdata.bop.constraint.EQ;
+import com.bigdata.bop.constraint.EQConstant;
+import com.bigdata.bop.constraint.IN;
+import com.bigdata.bop.constraint.NE;
+import com.bigdata.bop.constraint.NEConstant;
+import com.bigdata.bop.constraint.OR;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rdf.internal.DummyIV;
 import com.bigdata.rdf.internal.IV;
@@ -76,25 +89,12 @@ import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.Constant;
-import com.bigdata.relation.rule.EQ;
-import com.bigdata.relation.rule.EQConstant;
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IConstraint;
-import com.bigdata.relation.rule.IN;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.ISortOrder;
 import com.bigdata.relation.rule.IStep;
-import com.bigdata.relation.rule.IVariable;
-import com.bigdata.relation.rule.IVariableOrConstant;
-import com.bigdata.relation.rule.NE;
-import com.bigdata.relation.rule.NEConstant;
-import com.bigdata.relation.rule.OR;
-import com.bigdata.relation.rule.Predicate;
 import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.QueryOptions;
 import com.bigdata.relation.rule.Rule;
@@ -816,8 +816,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                     throw new AssertionError();
                 }
                 // get ahold of the search variable
-                com.bigdata.relation.rule.Var searchVar = 
-                    (com.bigdata.relation.rule.Var) search.get(0);
+                com.bigdata.bop.Var searchVar = 
+                    (com.bigdata.bop.Var) search.get(0);
                 if (log.isDebugEnabled()) {
                     log.debug(searchVar);
                 }
@@ -950,7 +950,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         IVariable[] requiredVars = new IVariable[required.size()];
         int i = 0;
         for (String v : required) {
-            requiredVars[i++] = com.bigdata.relation.rule.Var.var(v);
+            requiredVars[i++] = com.bigdata.bop.Var.var(v);
         }
         
         if (log.isDebugEnabled()) {
@@ -1328,7 +1328,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                                     + stmtPattern);
                 }
                 final String name = var.getName();
-                c = com.bigdata.relation.rule.Var.var(name);
+                c = com.bigdata.bop.Var.var(name);
             }
         } else {
             /*
@@ -1475,7 +1475,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         final BigdataValue val = (BigdataValue) var.getValue();
         final String name = var.getName();
         if (val == null) {
-            result = com.bigdata.relation.rule.Var.var(name);
+            result = com.bigdata.bop.Var.var(name);
         } else {
             final IV iv = val.getIV();
             if (iv == null)
@@ -1524,14 +1524,14 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         IVariable<IV> var = null;
         BigdataValue constant = null;
         if (left instanceof Var) {
-            var = com.bigdata.relation.rule.Var.var(((Var) left).getName());
+            var = com.bigdata.bop.Var.var(((Var) left).getName());
         } else if (left instanceof ValueConstant) {
             constant = (BigdataValue) ((ValueConstant) left).getValue();
         } else {
             return null;
         }
         if (right instanceof Var) {
-            var = com.bigdata.relation.rule.Var.var(((Var) right).getName());
+            var = com.bigdata.bop.Var.var(((Var) right).getName());
         } else if (right instanceof ValueConstant) {
             constant = (BigdataValue) ((ValueConstant) right).getValue();
         } else {

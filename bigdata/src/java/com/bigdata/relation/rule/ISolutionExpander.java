@@ -30,6 +30,7 @@ package com.bigdata.relation.rule;
 
 import java.io.Serializable;
 
+import com.bigdata.bop.IPredicate;
 import com.bigdata.relation.accesspath.IAccessPath;
 
 /**

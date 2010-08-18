@@ -28,6 +28,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation.rule;
 
 import java.util.Set;
+
+import com.bigdata.bop.ArrayBindingSet;
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.HashBindingSet;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
@@ -155,7 +165,7 @@ public class TestRule extends AbstractRuleTestCase {
         final IPredicate p2 = new P(relation,//
                 Var.var("x"), rdfType, Var.var("u"));
 
-        Set<IVariable> actual = Rule.getSharedVars(p1, p2);
+        final Set<IVariable<?>> actual = Rule.getSharedVars(p1, p2);
 
         assertEquals(1, actual.size());
 

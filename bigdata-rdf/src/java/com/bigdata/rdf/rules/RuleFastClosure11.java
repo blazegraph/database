@@ -27,10 +27,10 @@ package com.bigdata.rdf.rules;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.constraint.NE;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.vocab.Vocabulary;
-import com.bigdata.relation.rule.IConstraint;
-import com.bigdata.relation.rule.NE;
 
 /**
  * Rule for step 11 of {@link InferenceEngine#fastForwardClosure()}.

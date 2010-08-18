@@ -36,6 +36,7 @@ import java.util.concurrent.RejectedExecutionException;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IBloomFilter;
 import com.bigdata.btree.IIndex;
@@ -54,9 +55,6 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.rule.IPredicate;
-import com.bigdata.relation.rule.IVariable;
-import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.service.IDataService;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
@@ -86,10 +84,6 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
     static final protected Logger log = Logger.getLogger(IAccessPath.class);
     
-//    final static protected boolean log.isInfoEnabled() = log.isInfoEnabled();
-//
-//    final static protected boolean log.isDebugEnabled() = log.isDebugEnabled();
-
     /** Access to the index, resource locator, executor service, etc. */
     protected final IIndexManager indexManager;
 

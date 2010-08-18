@@ -29,10 +29,10 @@ package com.bigdata.rdf.rules;
 
 import org.openrdf.model.vocabulary.OWL;
 
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.constraint.NE;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.vocab.Vocabulary;
-import com.bigdata.relation.rule.IConstraint;
-import com.bigdata.relation.rule.NE;
 import com.bigdata.relation.rule.Rule;
 
 /**

@@ -29,12 +29,12 @@ package com.bigdata.striterator;
 
 import java.util.Comparator;
 
+import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
-import com.bigdata.relation.rule.IPredicate;
 
 /**
  * An interface representing the natural traversal orders for the different

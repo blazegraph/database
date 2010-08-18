@@ -37,6 +37,8 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
@@ -60,8 +62,6 @@ import com.bigdata.rdf.internal.XSDShortIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.relation.rule.IPredicate;
-import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.striterator.IKeyOrder;
 
 /**

@@ -54,7 +54,7 @@ public interface IFederationCallable extends Serializable {
      *             if {@link #setFederation(IBigdataFederation)} has already
      *             been invoked and was set with a different value.
      */
-    void setFederation(IBigdataFederation fed);
+    void setFederation(IBigdataFederation<?> fed);
 
     /**
      * Return the {@link IBigdataFederation} reference.
@@ -65,6 +65,6 @@ public interface IFederationCallable extends Serializable {
      *             if {@link #setFederation(IBigdataFederation)} has not been
      *             invoked.
      */
-    IBigdataFederation getFederation();
+    IBigdataFederation<?> getFederation();
 
 }

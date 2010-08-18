@@ -30,15 +30,16 @@ package com.bigdata.relation.rule.eval;
 
 import java.util.Arrays;
 import junit.framework.TestCase2;
+
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.Var;
 import com.bigdata.rdf.spo.SPOPredicate;
-import com.bigdata.relation.rule.Constant;
-import com.bigdata.relation.rule.IConstant;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.QueryOptions;
 import com.bigdata.relation.rule.Rule;
-import com.bigdata.relation.rule.Var;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Mike Personick</a>

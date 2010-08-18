@@ -24,24 +24,35 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.constraints;
 
+import com.bigdata.bop.AbstractBOp;
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IConstant;
-import com.bigdata.relation.rule.IConstraint;
-import com.bigdata.relation.rule.IVariable;
 
 /**
  * Use inline terms to perform numerical comparison operations.
  * <p>
  * @see {@link IVUtility#numericalCompare(IV, IV)}. 
  */
-public abstract class AbstractInlineConstraint implements IConstraint {
+public abstract class AbstractInlineConstraint extends AbstractBOp implements
+        IConstraint {
 
-    public final IVariable v;
-    public final IV iv;
+//    private final IVariable<IV> v;
+//    private final IV iv;
     
-    public AbstractInlineConstraint(final IVariable<IV> v, final IV iv) {
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+    protected AbstractInlineConstraint(final IVariable<IV> v, final IV iv) {
+        
+        super(new BOp[] { v, new Constant<IV>(iv) });
         
         if (v == null)
             throw new IllegalArgumentException();
@@ -49,22 +60,24 @@ public abstract class AbstractInlineConstraint implements IConstraint {
         if (!IVUtility.canNumericalCompare(iv))
             throw new IllegalArgumentException();
         
-        this.v = v;
-        
-        this.iv = iv;
+//        this.v = v;
+//        
+//        this.iv = iv;
         
     }
     
-    public boolean accept(IBindingSet s) {
+    public boolean accept(final IBindingSet s) {
         
         // get binding for "x".
-        final IConstant<IV> c = s.get(this.v);
+        final IConstant<IV> c = s.get((IVariable<IV>) args[0]/* v */);
        
         if (c == null)
             return true; // not yet bound.
 
         final IV term = c.get();
 
+        final IV iv = ((IConstant<IV>) args[1]/* iv */).get();
+        
         final int compare = IVUtility.numericalCompare(term, iv);
         
         return _accept(compare);
@@ -73,10 +86,4 @@ public abstract class AbstractInlineConstraint implements IConstraint {
     
     protected abstract boolean _accept(final int compare);
     
-    public IVariable[] getVariables() {
-        
-        return new IVariable[] { v };
-        
-    }
-
 }

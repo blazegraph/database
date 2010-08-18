@@ -29,11 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation.rule;
 
 import java.io.Serializable;
-import java.util.concurrent.DelayQueue;
 
-import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.TemporaryStore;
-import com.bigdata.journal.TemporaryStoreFactory;
 import com.bigdata.relation.rule.eval.IStepTask;
 import com.bigdata.striterator.DistinctFilter;
 

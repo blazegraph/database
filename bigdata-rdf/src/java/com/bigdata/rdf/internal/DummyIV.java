@@ -29,10 +29,10 @@ package com.bigdata.rdf.internal;
 
 import java.io.ObjectStreamException;
 
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.Var;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.relation.rule.Constant;
-import com.bigdata.relation.rule.Var;
 
 /**
  * A dummy {@link IV} class used in cases where we want a dummy {@link Constant}

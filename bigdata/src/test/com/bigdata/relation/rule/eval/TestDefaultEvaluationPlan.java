@@ -35,6 +35,13 @@ import java.util.Map;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.Var;
+import com.bigdata.bop.ap.Predicate;
 import com.bigdata.btree.keys.ISortKeyBuilder;
 import com.bigdata.config.IValidator;
 import com.bigdata.io.IStreamSerializer;
@@ -46,16 +53,9 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.Constant;
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IConstant;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
-import com.bigdata.relation.rule.IVariableOrConstant;
-import com.bigdata.relation.rule.Predicate;
 import com.bigdata.relation.rule.Rule;
-import com.bigdata.relation.rule.Var;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
@@ -105,33 +105,43 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
 
         final String relation = "spo";
         
-        final Constant rdfType = new Constant<String>("rdfType");
-        final Constant Department = new Constant<String>("Department");
-        final Constant Student = new Constant<String>("Student");
-        final Constant memberOf = new Constant<String>("memberOf");
-        final Constant subOrganizationOf = new Constant<String>("subOrganizationOf");
-        final Constant emailAddress = new Constant<String>("emailAddress");
-        final Constant University0 = new Constant<String>("University0");
+        final Constant<?> rdfType = new Constant<String>("rdfType");
+        final Constant<?> Department = new Constant<String>("Department");
+        final Constant<?> Student = new Constant<String>("Student");
+        final Constant<?> memberOf = new Constant<String>("memberOf");
+        final Constant<?> subOrganizationOf = new Constant<String>("subOrganizationOf");
+        final Constant<?> emailAddress = new Constant<String>("emailAddress");
+        final Constant<?> University0 = new Constant<String>("University0");
 
-        final IPredicate pred0 = new Predicate(relation, //
+        final IPredicate<?> pred0 = new Predicate(//
                 new IVariableOrConstant[] {//
-                Var.var("y"), rdfType, Department });
+                Var.var("y"), rdfType, Department },//
+                relation//
+                );
 
-        final IPredicate pred1 = new Predicate(relation, //
+        final IPredicate<?> pred1 = new Predicate(//
                 new IVariableOrConstant[] {//
-                Var.var("x"), rdfType, Student });
+                Var.var("x"), rdfType, Student },//
+                relation//
+                );
         
-        final IPredicate pred2 = new Predicate(relation, //
+        final IPredicate<?> pred2 = new Predicate( //
                 new IVariableOrConstant[] {//
-                Var.var("x"), memberOf, Var.var("y") });
+                Var.var("x"), memberOf, Var.var("y") },//
+                relation//
+                );
         
-        final IPredicate pred3 = new Predicate(relation, //
+        final IPredicate<?> pred3 = new Predicate(//
                 new IVariableOrConstant[] {//
-                Var.var("y"), subOrganizationOf, University0 });
+                Var.var("y"), subOrganizationOf, University0 },//
+                relation//
+                );
         
-        final IPredicate pred4 = new Predicate(relation, //
+        final IPredicate<?> pred4 = new Predicate(//
                 new IVariableOrConstant[] {//
-                Var.var("x"), emailAddress, Var.var("z") });
+                Var.var("x"), emailAddress, Var.var("z") },
+                relation//
+                );
         
         final IRule rule = new Rule(getName(), null/* head */,
                 new IPredicate[] { pred0, pred1, pred2, pred3, pred4 }, //

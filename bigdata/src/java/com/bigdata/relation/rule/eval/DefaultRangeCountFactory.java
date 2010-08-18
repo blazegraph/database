@@ -30,8 +30,8 @@ package com.bigdata.relation.rule.eval;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.IPredicate;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.rule.IPredicate;
 
 /**
  * Default implementation.

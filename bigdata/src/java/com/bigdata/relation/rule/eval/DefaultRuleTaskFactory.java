@@ -7,9 +7,9 @@ import java.io.ObjectOutput;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.pipeline.DistributedJoinMasterTask;
 import com.bigdata.relation.rule.eval.pipeline.JoinMasterTask;

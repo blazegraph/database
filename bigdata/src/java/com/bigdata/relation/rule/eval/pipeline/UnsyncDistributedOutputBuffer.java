@@ -2,10 +2,10 @@ package com.bigdata.relation.rule.eval.pipeline;
 
 import java.util.Iterator;
 
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.IBigdataFederation;

@@ -36,7 +36,8 @@ import java.io.Serializable;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IElementFilter<E> extends Serializable {
+public interface IElementFilter<E> extends // BOp,
+        Serializable {
 
     /**
      * True iff the argument is matched by the filter.
