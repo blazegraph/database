@@ -30,14 +30,15 @@ package com.bigdata.rdf.spo;
 
 import java.util.HashMap;
 import junit.framework.TestCase2;
+
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.Var;
+import com.bigdata.bop.ap.Predicate;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.relation.rule.Constant;
-import com.bigdata.relation.rule.IPredicate;
-import com.bigdata.relation.rule.IVariableOrConstant;
-import com.bigdata.relation.rule.Predicate;
-import com.bigdata.relation.rule.Var;
 
 /**
  * Test suite for {@link SPOPredicate}.
@@ -163,8 +164,8 @@ public class TestSPOPredicate extends TestCase2 {
 
         final SPOPredicate p1 = new SPOPredicate(relation, u, rdfType, rdfsClass);
 
-        final Predicate p2 = new Predicate(relation, new IVariableOrConstant[] {
-                u, rdfType, rdfsClass });
+        final Predicate p2 = new Predicate(new IVariableOrConstant[] { u,
+                rdfType, rdfsClass }, relation);
 
         log.info(p1.toString());
 
@@ -185,14 +186,18 @@ public class TestSPOPredicate extends TestCase2 {
     public void test_hashMapSameImpl() {
 
         final Var<IV> u = Var.var("u");
-        
-        final SPOPredicate p1 = new SPOPredicate(relation, u, rdfsSubClassOf, rdfsResource);
 
-        final Predicate p1b = new Predicate(relation, new IVariableOrConstant[]{u, rdfsSubClassOf, rdfsResource});
-        
-        final SPOPredicate p2 = new SPOPredicate(relation, u, rdfType, rdfsClass);
+        final SPOPredicate p1 = new SPOPredicate(relation, u, rdfsSubClassOf,
+                rdfsResource);
 
-        final Predicate p2b = new Predicate(relation, new IVariableOrConstant[]{u, rdfType, rdfsClass});
+        final Predicate<?> p1b = new Predicate(new IVariableOrConstant[] { u,
+                rdfsSubClassOf, rdfsResource }, relation);
+
+        final SPOPredicate p2 = new SPOPredicate(relation, u, rdfType,
+                rdfsClass);
+
+        final Predicate<?> p2b = new Predicate(new IVariableOrConstant[] { u,
+                rdfType, rdfsClass }, relation);
 
         // p1 and p1b compare as equal.
         assertTrue(p1.equals(p1));

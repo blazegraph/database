@@ -44,6 +44,11 @@ import java.util.NoSuchElementException;
  */
 abstract public class Filter<I extends Iterator<E>,E> implements IFilter<I,E,E> {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
     private final int chunkSize;
     
     protected Object state;
@@ -68,7 +73,7 @@ abstract public class Filter<I extends Iterator<E>,E> implements IFilter<I,E,E> 
 
     }
 
-    @SuppressWarnings("unchecked")
+//    @SuppressWarnings("unchecked")
     public IChunkedIterator<E> filter(I src) {
 
         return new FilteredIterator<I, E>(chunkSize, src, this);
@@ -124,7 +129,7 @@ abstract public class Filter<I extends Iterator<E>,E> implements IFilter<I,E,E> 
             
             this.filter = filter;
 
-            if(src instanceof IChunkedOrderedIterator) {
+            if(src instanceof IChunkedOrderedIterator<?>) {
                 
                 keyOrder = ((IChunkedOrderedIterator<E>) src).getKeyOrder();
                 
@@ -267,7 +272,7 @@ abstract public class Filter<I extends Iterator<E>,E> implements IFilter<I,E,E> 
 
         public void close() {
             
-            if(src instanceof ICloseableIterator) {
+            if(src instanceof ICloseableIterator<?>) {
 
                 ((ICloseableIterator<E>)src).close();
                 

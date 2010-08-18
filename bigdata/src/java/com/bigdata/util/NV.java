@@ -62,20 +62,24 @@ public class NV implements Serializable, Comparable<NV> {
         
     }
     
-    public boolean equals(NV o) {
-    
-        return name.equals(o.name) && value.equals(o.value);
+    public boolean equals(final Object o) {
+
+        if (this == o)
+            return true;
+
+        if (!(o instanceof NV))
+            return false;
+
+        return name.equals(((NV) o).name) && value.equals(((NV) o).value);
         
     }
 
     /**
      * Places into order by <code>name</code>.
      */
-    public int compareTo(NV o) {
+    public int compareTo(final NV o) {
         
-        int ret = name.compareTo(o.name);
-        
-        return ret;
+        return name.compareTo(o.name);
         
     }
     

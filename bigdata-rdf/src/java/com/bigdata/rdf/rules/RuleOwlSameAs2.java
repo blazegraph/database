@@ -27,11 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.rules;
 
 import org.openrdf.model.vocabulary.OWL;
+
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.constraint.NE;
+import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.vocab.Vocabulary;
-import com.bigdata.relation.rule.IConstraint;
-import com.bigdata.relation.rule.NE;
-import com.bigdata.relation.rule.NEConstant;
 import com.bigdata.relation.rule.Rule;
 
 /**

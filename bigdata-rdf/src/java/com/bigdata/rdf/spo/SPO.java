@@ -24,6 +24,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.spo;
 
 import org.openrdf.model.Statement;
+
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.internal.IV;
@@ -39,9 +43,6 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.rule.IConstant;
-import com.bigdata.relation.rule.IPredicate;
-import com.bigdata.relation.rule.IVariableOrConstant;
 
 /**
  * Represents a triple, triple+SID, or quad. When used to represent a triple,

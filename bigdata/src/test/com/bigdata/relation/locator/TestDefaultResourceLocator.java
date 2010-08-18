@@ -36,6 +36,8 @@ import java.util.concurrent.Executors;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.BufferMode;
@@ -46,8 +48,6 @@ import com.bigdata.journal.Journal.Options;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;

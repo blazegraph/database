@@ -29,16 +29,17 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Set;
+
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.Constant;
-import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.IStarJoin;
-import com.bigdata.relation.rule.IVariable;
-import com.bigdata.relation.rule.IVariableOrConstant;
-import com.bigdata.relation.rule.Var;
 
 /**
  * Implementation of a star join for SPOs.  See {@link IStarJoin}.

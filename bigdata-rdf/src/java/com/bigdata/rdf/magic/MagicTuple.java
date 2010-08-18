@@ -1,10 +1,10 @@
 package com.bigdata.rdf.magic;
 
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.relation.rule.IPredicate;
-import com.bigdata.relation.rule.IVariableOrConstant;
 
 public class MagicTuple implements IMagicTuple {
     private IV[] terms;

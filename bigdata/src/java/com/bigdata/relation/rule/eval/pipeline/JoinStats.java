@@ -7,10 +7,10 @@ import java.io.Serializable;
 import java.text.DateFormat;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.IRuleState;
 import com.bigdata.relation.rule.eval.RuleStats;

@@ -29,6 +29,12 @@ import java.util.Arrays;
 import java.util.UUID;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IndexMetadata;
@@ -48,12 +54,7 @@ import com.bigdata.rdf.spo.SPOTupleSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IConstant;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IVariable;
-import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 

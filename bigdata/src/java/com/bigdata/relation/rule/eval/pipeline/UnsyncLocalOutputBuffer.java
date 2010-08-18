@@ -1,7 +1,7 @@
 package com.bigdata.relation.rule.eval.pipeline;
 
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.relation.rule.IBindingSet;
 
 /**
  * Implementation used for {@link LocalJoinTask}s.

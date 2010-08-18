@@ -31,10 +31,10 @@ package com.bigdata.rdf.rules;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.io.IStreamSerializer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.eval.ISolution;
 
 /**

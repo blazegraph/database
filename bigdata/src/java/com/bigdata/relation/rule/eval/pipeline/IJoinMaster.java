@@ -49,7 +49,7 @@ public interface IJoinMaster extends Remote {
      * same tail predicate and index partition onto the same
      * {@link DistributedJoinTask} sink.
      * 
-     * @return The unique identifer.
+     * @return The unique identifier.
      */
     UUID getUUID() throws IOException;
 

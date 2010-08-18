@@ -32,6 +32,7 @@ import org.openrdf.model.vocabulary.OWL;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
+import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.axioms.Axioms;
@@ -46,7 +47,6 @@ import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;

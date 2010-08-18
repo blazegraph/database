@@ -30,6 +30,7 @@ package com.bigdata.relation.rule;
 
 import java.util.Iterator;
 
+import com.bigdata.bop.IPredicate;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.rule.eval.ISolution;
 

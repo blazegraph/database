@@ -27,6 +27,10 @@ package com.bigdata.relation.rule;
 
 import java.util.Iterator;
 
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
+
 /**
  * Interface for a special type of {@link IPredicate} - the star join predicate.
  * This type of predicate bypasses the normal join operation and does a binding

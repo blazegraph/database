@@ -64,6 +64,8 @@ import org.apache.lucene.analysis.th.ThaiAnalyzer;
 import org.apache.lucene.analysis.tokenattributes.TermAttribute;
 import org.apache.lucene.util.Version;
 
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISimpleSplitHandler;
@@ -81,8 +83,6 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.locator.DefaultResourceLocator;
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.util.concurrent.ExecutionHelper;

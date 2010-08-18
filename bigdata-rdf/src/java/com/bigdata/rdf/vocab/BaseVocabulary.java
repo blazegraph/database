@@ -42,6 +42,8 @@ import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ValueFactoryImpl;
 
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.IConstant;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
@@ -51,8 +53,6 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.relation.rule.Constant;
-import com.bigdata.relation.rule.IConstant;
 
 /**
  * Base class for {@link Vocabulary} implementations.

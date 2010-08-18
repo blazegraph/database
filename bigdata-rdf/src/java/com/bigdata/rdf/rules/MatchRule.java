@@ -5,16 +5,16 @@ import org.openrdf.model.URI;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.constraint.IN;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
-import com.bigdata.relation.rule.IConstant;
-import com.bigdata.relation.rule.IConstraint;
-import com.bigdata.relation.rule.IN;
-import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.Rule;
 
 /**

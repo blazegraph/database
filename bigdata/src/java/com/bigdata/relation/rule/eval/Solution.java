@@ -30,9 +30,9 @@ package com.bigdata.relation.rule.eval;
 
 import java.io.Serializable;
 
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 
 /**

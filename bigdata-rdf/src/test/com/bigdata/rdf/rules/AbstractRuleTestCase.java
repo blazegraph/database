@@ -29,10 +29,10 @@ package com.bigdata.rdf.rules;
 
 
 
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;

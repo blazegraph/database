@@ -28,10 +28,10 @@
 
 package com.bigdata.relation.rule.eval;
 
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.striterator.IKeyOrder;
 

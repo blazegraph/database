@@ -48,13 +48,14 @@ Modifications:
 package com.bigdata.relation.accesspath;
 
 import junit.framework.TestCase2;
+
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOPredicate;
-import com.bigdata.relation.rule.Constant;
-import com.bigdata.relation.rule.Var;
 
 /**
  * Test suite for {@link SameVariableConstraint}.

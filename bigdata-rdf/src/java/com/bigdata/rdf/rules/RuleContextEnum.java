@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.rules;
 
+import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.BTree;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
@@ -31,7 +32,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.service.IBigdataFederation;

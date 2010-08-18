@@ -49,9 +49,9 @@ package com.bigdata.rdf.rules;
 
 import java.util.Set;
 
+import com.bigdata.bop.IConstant;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IRuleTaskFactory;

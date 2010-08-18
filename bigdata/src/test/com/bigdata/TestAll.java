@@ -98,12 +98,15 @@ public class TestAll extends TestCase {
         suite.addTest( com.bigdata.concurrent.TestAll.suite() );
         suite.addTest( com.bigdata.journal.TestAll.suite() );
         suite.addTest( com.bigdata.resources.TestAll.suite() );
+        suite.addTest( com.bigdata.relation.TestAll.suite() );
+        suite.addTest( com.bigdata.bop.TestAll.suite() );
+        suite.addTest( com.bigdata.relation.rule.eval.TestAll.suite() );
         suite.addTest( com.bigdata.mdi.TestAll.suite() );
         suite.addTest( com.bigdata.service.TestAll.suite() );
+        suite.addTest( com.bigdata.bop.fed.TestAll.suite() );
         suite.addTest( com.bigdata.sparse.TestAll.suite() );
         suite.addTest( com.bigdata.search.TestAll.suite() );
         suite.addTest( com.bigdata.bfs.TestAll.suite() );
-        suite.addTest( com.bigdata.relation.TestAll.suite() );
 //        suite.addTest( com.bigdata.service.mapReduce.TestAll.suite() );
 
         // Jini integration

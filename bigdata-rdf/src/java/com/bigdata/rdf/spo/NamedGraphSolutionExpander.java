@@ -36,6 +36,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
+
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
@@ -47,9 +50,7 @@ import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.ISolutionExpander;
-import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.ICloseableIterator;
@@ -200,7 +201,7 @@ public class NamedGraphSolutionExpander implements ISolutionExpander<ISPO> {
 
         final SPOAccessPath accessPath = (SPOAccessPath) accessPath1;
         
-        final IVariableOrConstant<IV> c = accessPath.getPredicate().get(3);
+        final IVariableOrConstant c = accessPath.getPredicate().get(3);
 
         if (c != null && c.isConstant()) {
 

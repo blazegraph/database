@@ -31,6 +31,13 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.EmptyBindingSet;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.Var;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IRuleTaskFactory;
 
@@ -628,7 +635,7 @@ public class Rule<E> implements IRule<E> {
         
     }
     
-    public Set<IVariable> getSharedVars(int index1, int index2) {
+    public Set<IVariable<?>> getSharedVars(int index1, int index2) {
 
         if (index1 == index2) {
 
@@ -655,9 +662,9 @@ public class Rule<E> implements IRule<E> {
      * @throws IllegalArgumentException
      *             if the two predicates are the same reference.
      */
-    public static Set<IVariable> getSharedVars(IPredicate p1, IPredicate p2) {
+    public static Set<IVariable<?>> getSharedVars(final IPredicate p1, final IPredicate p2) {
         
-        final Set<IVariable> vars = new HashSet<IVariable>();
+        final Set<IVariable<?>> vars = new HashSet<IVariable<?>>();
         
         final int arity1 = p1.arity(); 
 
@@ -665,7 +672,7 @@ public class Rule<E> implements IRule<E> {
         
         for(int i=0; i<arity1; i++ ) {
             
-            final IVariableOrConstant avar = p1.get(i);
+            final IVariableOrConstant<?> avar = p1.get(i);
             
             if(avar.isConstant()) continue;
                 
@@ -673,7 +680,7 @@ public class Rule<E> implements IRule<E> {
 
                 if (p2.get(j) == avar) {
                     
-                    vars.add((Var) avar);
+                    vars.add((Var<?>) avar);
                     
                 }
                 

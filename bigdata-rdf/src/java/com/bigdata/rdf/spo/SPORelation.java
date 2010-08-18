@@ -44,6 +44,13 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.Var;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BloomFilterFactory;
 import com.bigdata.btree.DefaultTupleSerializer;
@@ -82,13 +89,6 @@ import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.Constant;
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IConstant;
-import com.bigdata.relation.rule.IPredicate;
-import com.bigdata.relation.rule.IVariable;
-import com.bigdata.relation.rule.IVariableOrConstant;
-import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.InsertSolutionBuffer;
 import com.bigdata.service.DataService;

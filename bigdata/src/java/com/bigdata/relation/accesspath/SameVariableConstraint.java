@@ -11,10 +11,10 @@ import java.util.Map;
 
 import org.CognitiveWeb.extser.LongPacker;
 
-import com.bigdata.relation.rule.IConstant;
-import com.bigdata.relation.rule.IPredicate;
-import com.bigdata.relation.rule.IVariable;
-import com.bigdata.relation.rule.IVariableOrConstant;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
 
 /**
  * Filter imposes the "same variable" constraint on the elements visited by an

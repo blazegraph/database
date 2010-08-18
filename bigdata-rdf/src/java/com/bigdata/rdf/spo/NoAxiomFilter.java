@@ -50,7 +50,7 @@ public class NoAxiomFilter extends SPOFilter {
     /**
      * Shared instance.
      */
-    static public final transient IElementFilter<ISPO> INSTANCE = new NoAxiomFilter();
+    static public final transient NoAxiomFilter INSTANCE = new NoAxiomFilter();
     
     /**
      * De-serialization ctor.

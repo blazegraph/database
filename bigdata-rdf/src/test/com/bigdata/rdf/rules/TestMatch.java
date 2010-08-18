@@ -58,11 +58,11 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.Var;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.Var;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**

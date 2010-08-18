@@ -32,6 +32,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+
 import org.apache.log4j.Logger;
 import org.deri.iris.api.IProgramOptimisation.Result;
 import org.deri.iris.api.basics.ILiteral;
@@ -45,6 +46,20 @@ import org.deri.iris.basics.BasicFactory;
 import org.deri.iris.builtins.BuiltinsFactory;
 import org.deri.iris.optimisations.magicsets.MagicSets;
 import org.deri.iris.terms.TermFactory;
+
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.Var;
+import com.bigdata.bop.constraint.EQ;
+import com.bigdata.bop.constraint.EQConstant;
+import com.bigdata.bop.constraint.IN;
+import com.bigdata.bop.constraint.NE;
+import com.bigdata.bop.constraint.NEConstant;
+import com.bigdata.bop.constraint.OR;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.rules.MappedProgram;
@@ -52,22 +67,11 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.locator.IResourceLocator;
-import com.bigdata.relation.rule.Constant;
-import com.bigdata.relation.rule.EQ;
-import com.bigdata.relation.rule.EQConstant;
-import com.bigdata.relation.rule.IConstraint;
-import com.bigdata.relation.rule.IN;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
-import com.bigdata.relation.rule.IVariableOrConstant;
-import com.bigdata.relation.rule.NE;
-import com.bigdata.relation.rule.NEConstant;
-import com.bigdata.relation.rule.OR;
 import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.Rule;
-import com.bigdata.relation.rule.Var;
 
 /**
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
@@ -323,10 +327,38 @@ public class IRISUtils {
      * @return
      *                  the IRIS literal
      */
-    private static ILiteral convertToIRISLiteral(NE constraint) {
+    private static ILiteral convertToIRISLiteral(final NE constraint) {
 
-        ITerm t0 = TERM.createVariable(constraint.x.getName());
-        ITerm t1 = TERM.createVariable(constraint.y.getName());
+        final ITerm t0 = TERM.createVariable(((IVariable<?>) constraint.get(0))
+                .getName());
+
+        final ITerm t1 = TERM.createVariable(((IVariable<?>) constraint.get(1))
+                .getName());
+
+        return BASIC.createLiteral(
+            true, 
+            BUILTINS.createUnequal(t0, t1)
+            );
+        
+    }
+    
+    /**
+     * Convert a bigdata constraint to an IRIS literal.
+     * 
+     * @param constraint
+     *                  the bigdata constraint
+     * @return
+     *                  the IRIS literal
+     */
+    private static ILiteral convertToIRISLiteral(final NEConstant constraint) {
+
+        final ITerm t0 = TERM.createVariable(((IVariable<?>) constraint.get(0))
+                .getName());
+
+        final ITerm t1 = TERM.createString(String
+                .valueOf(((IConstant<?>) constraint.get(1)).get()));
+
+//        ITerm t1 = TERM.createString(String.valueOf(constraint.val.get()));
         
         return BASIC.createLiteral(
             true, 
@@ -343,31 +375,14 @@ public class IRISUtils {
      * @return
      *                  the IRIS literal
      */
-    private static ILiteral convertToIRISLiteral(NEConstant constraint) {
+    private static ILiteral convertToIRISLiteral(final EQ constraint) {
 
-        ITerm t0 = TERM.createVariable(constraint.var.getName());
-        ITerm t1 = TERM.createString(String.valueOf(constraint.val.get()));
-        
-        return BASIC.createLiteral(
-            true, 
-            BUILTINS.createUnequal(t0, t1)
-            );
-        
-    }
-    
-    /**
-     * Convert a bigdata constraint to an IRIS literal.
-     * 
-     * @param constraint
-     *                  the bigdata constraint
-     * @return
-     *                  the IRIS literal
-     */
-    private static ILiteral convertToIRISLiteral(EQ constraint) {
+        final ITerm t0 = TERM.createVariable(((IVariable<?>) constraint.get(0))
+                .getName());
 
-        ITerm t0 = TERM.createVariable(constraint.x.getName());
-        ITerm t1 = TERM.createVariable(constraint.y.getName());
-        
+        final ITerm t1 = TERM.createVariable(((IVariable<?>) constraint.get(1))
+                .getName());
+
         return BASIC.createLiteral(
             true, 
             BUILTINS.createEqual(t0, t1)
@@ -383,10 +398,16 @@ public class IRISUtils {
      * @return
      *                  the IRIS literal
      */
-    private static ILiteral convertToIRISLiteral(EQConstant constraint) {
+    private static ILiteral convertToIRISLiteral(final EQConstant constraint) {
 
-        ITerm t0 = TERM.createVariable(constraint.var.getName());
-        ITerm t1 = TERM.createString(String.valueOf(constraint.val.get()));
+        final ITerm t0 = TERM.createVariable(((IVariable<?>) constraint.get(0))
+                .getName());
+
+        final ITerm t1 = TERM.createString(String
+                .valueOf(((IConstant<?>) constraint.get(1)).get()));
+
+//        ITerm t0 = TERM.createVariable(constraint.var.getName());
+//        ITerm t1 = TERM.createString(String.valueOf(constraint.val.get()));
         
         return BASIC.createLiteral(
             true, 

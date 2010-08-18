@@ -37,6 +37,10 @@ import org.deri.iris.basics.BasicFactory;
 import org.deri.iris.builtins.BuiltinsFactory;
 import org.deri.iris.terms.TermFactory;
 
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.Var;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
@@ -46,10 +50,6 @@ import com.bigdata.rdf.rules.RuleRdfs11;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.rule.Constant;
-import com.bigdata.relation.rule.IPredicate;
-import com.bigdata.relation.rule.IVariableOrConstant;
-import com.bigdata.relation.rule.Var;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**

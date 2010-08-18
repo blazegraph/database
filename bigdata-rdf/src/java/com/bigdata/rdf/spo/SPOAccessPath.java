@@ -23,20 +23,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.spo;
 
+import com.bigdata.bop.ArrayBindingSet;
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.AbstractAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.rule.ArrayBindingSet;
-import com.bigdata.relation.rule.Constant;
-import com.bigdata.relation.rule.IConstant;
-import com.bigdata.relation.rule.IPredicate;
-import com.bigdata.relation.rule.IVariable;
-import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -293,7 +292,7 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
      * 
      * @return The constrained {@link IAccessPath}.
      */
-    public SPOAccessPath bindPosition(int position, final IV v) {
+    public SPOAccessPath bindPosition(final int position, final IV v) {
 
         if (v == null) {
 
@@ -371,63 +370,65 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
 
     }
 
-    /**
-     * Return a new {@link SPOAccessPath} where the given positions have been bound to the specified constants. The given positions MUST all be variables. All
-     * instances of that variable will be replaced by the specified constant.
-     * <p>
-     * Note: The added constraints may mean that a different index provides more efficient traversal. For scale-out, this means that the data may be on
-     * different index partition.
-     * 
-     * @param values
-     *            The constant values used to constrain the accesspath.
-     * 
-     * @return The constrained {@link IAccessPath}.
-     */
-    public SPOAccessPath bindPosition(final IV[] values) {
-        IVariableOrConstant<IV> s = null, p = null, o = null, c = null;
-
-        s = getPredicate().get(0);
-        if (values[0] != null) {
-            if (s.isVar()) {
-                s = new Constant<IV>(values[0]);
-            }
-        }
-
-        p = getPredicate().get(1);
-        if (values[1] != null) {
-            if (p.isVar()) {
-                p = new Constant<IV>(values[1]);
-            }
-        }
-        o = getPredicate().get(2);
-        if (values[2] != null) {
-            if (o.isVar()) {
-                o = new Constant<IV>(values[2]);
-            }
-        }
-        c = getPredicate().get(3);
-        if (values[3] != null) {
-            if (c == null || c.isVar()) {
-                c = new Constant<IV>(values[3]);
-            }
-        }
-        /*
-         * Constrain the access path by setting the given positions on its
-         * predicate.
-         * 
-         * Note: This option will always do better when you are running against
-         * local data (LocalTripleStore).
-         */
-
-        final SPOPredicate pred = getPredicate().reBound(s, p, o, c);
-
-        /*
-         * Let the relation figure out which access path is best given that
-         * added constraint.
-         */
-
-        SPOAccessPath spoa = (SPOAccessPath) this.getRelation().getAccessPath(pred);
-        return spoa;
-    }
+//    /**
+//     * Return a new {@link SPOAccessPath} where the given positions have been bound to the specified constants. The given positions MUST all be variables. All
+//     * instances of that variable will be replaced by the specified constant.
+//     * <p>
+//     * Note: The added constraints may mean that a different index provides more efficient traversal. For scale-out, this means that the data may be on
+//     * different index partition.
+//     * 
+//     * @param values
+//     *            The constant values used to constrain the accesspath.
+//     * 
+//     * @return The constrained {@link IAccessPath}.
+//     */
+//    public SPOAccessPath bindPosition(final IV[] values) {
+//        IVariableOrConstant<IV> s = null, p = null, o = null, c = null;
+//
+//        s = getPredicate().get(0);
+//        if (values[0] != null) {
+//            if (s.isVar()) {
+//                s = new Constant<IV>(values[0]);
+//            }
+//        }
+//
+//        p = getPredicate().get(1);
+//        if (values[1] != null) {
+//            if (p.isVar()) {
+//                p = new Constant<IV>(values[1]);
+//            }
+//        }
+//        o = getPredicate().get(2);
+//        if (values[2] != null) {
+//            if (o.isVar()) {
+//                o = new Constant<IV>(values[2]);
+//            }
+//        }
+//        c = getPredicate().get(3);
+//        if (values[3] != null) {
+//            if (c == null || c.isVar()) {
+//                c = new Constant<IV>(values[3]);
+//            }
+//        }
+//        /*
+//         * Constrain the access path by setting the given positions on its
+//         * predicate.
+//         * 
+//         * Note: This option will always do better when you are running against
+//         * local data (LocalTripleStore).
+//         */
+//
+//        final SPOPredicate pred = getPredicate().reBound(s, p, o, c);
+//
+//        /*
+//         * Let the relation figure out which access path is best given that
+//         * added constraint.
+//         */
+//
+//        final SPOAccessPath spoa = (SPOAccessPath) this.getRelation()
+//                .getAccessPath(pred);
+//
+//        return spoa;
+//    }
 
 }

@@ -44,6 +44,7 @@ import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.IPredicate;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
@@ -52,7 +53,6 @@ import com.bigdata.journal.ITx;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;

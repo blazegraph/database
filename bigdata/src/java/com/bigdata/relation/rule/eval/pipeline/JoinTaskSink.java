@@ -4,10 +4,10 @@ import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
-import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.service.IBigdataFederation;
 

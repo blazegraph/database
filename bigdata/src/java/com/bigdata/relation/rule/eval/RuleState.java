@@ -1,6 +1,5 @@
 package com.bigdata.relation.rule.eval;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -8,16 +7,17 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.Var;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IConstraint;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStarJoin;
-import com.bigdata.relation.rule.IVariable;
-import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.Rule;
-import com.bigdata.relation.rule.Var;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -238,7 +238,7 @@ public class RuleState implements IRuleState {
 
         final int tailCount = rule.getTailCount();
 
-        final IKeyOrder[] a = new IKeyOrder[tailCount];
+        final IKeyOrder<?>[] a = new IKeyOrder[tailCount];
         
         final IBindingSet bindingSet = joinNexus.newBindingSet(rule);
         
@@ -246,13 +246,13 @@ public class RuleState implements IRuleState {
 
             final int tailIndex = order[orderIndex];
 
-            final IPredicate pred = rule.getTail(tailIndex);
+            final IPredicate<?> pred = rule.getTail(tailIndex);
 
-            final IRelation rel = joinNexus.getTailRelationView(pred);
+            final IRelation<?> rel = joinNexus.getTailRelationView(pred);
             
-            final IPredicate asBound = pred.asBound(bindingSet);
+            final IPredicate<?> asBound = pred.asBound(bindingSet);
             
-            final IKeyOrder keyOrder = joinNexus.getTailAccessPath(
+            final IKeyOrder<?> keyOrder = joinNexus.getTailAccessPath(
                     rel, asBound).getKeyOrder();
 
             if (DEBUG)
@@ -263,17 +263,17 @@ public class RuleState implements IRuleState {
             // save results.
             a[tailIndex] = keyOrder;
             nvars[tailIndex] = keyOrder == null ? asBound.getVariableCount()
-                    : asBound.getVariableCount(keyOrder);
-            
+                    : asBound.getVariableCount((IKeyOrder) keyOrder);
+
             final int arity = pred.arity();
 
             for (int j = 0; j < arity; j++) {
 
-                final IVariableOrConstant t = pred.get(j);
+                final IVariableOrConstant<?> t = pred.get(j);
 
                 if (t.isVar()) {
 
-                    final Var var = (Var) t;
+                    final Var<?> var = (Var<?>) t;
 
                     if (DEBUG) {
 
@@ -335,10 +335,10 @@ public class RuleState implements IRuleState {
         if (rule.getConstraintCount() > 0) {
             final Iterator<IConstraint> constraints = rule.getConstraints();
             while (constraints.hasNext()) {
-                IConstraint c = constraints.next();
-                IVariable[] vars = c.getVariables();
-                for (IVariable v : vars) {
-                    constraintVars.add(v);
+                final IConstraint c = constraints.next();
+                final Iterator<IVariable<?>> vars = BOpUtility.getSpannedVariables(c);
+                while(vars.hasNext()) {
+                    constraintVars.add(vars.next());
                 }
             }
         }

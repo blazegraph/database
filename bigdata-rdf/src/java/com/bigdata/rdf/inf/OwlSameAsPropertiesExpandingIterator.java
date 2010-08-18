@@ -1,7 +1,19 @@
 package com.bigdata.rdf.inf;
 
 import java.util.Arrays;
+
 import org.apache.log4j.Logger;
+
+import com.bigdata.bop.AbstractBOp;
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.Var;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.internal.IV;
@@ -12,20 +24,11 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.rule.Constant;
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IConstant;
-import com.bigdata.relation.rule.IConstraint;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.ISolutionExpander;
-import com.bigdata.relation.rule.IVariable;
-import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.QueryOptions;
 import com.bigdata.relation.rule.Rule;
-import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
 import com.bigdata.relation.rule.eval.IEvaluationPlan;
@@ -492,20 +495,23 @@ public class OwlSameAsPropertiesExpandingIterator implements
         }
     };
 
-    private class RejectSameAsSelf implements IConstraint {
-        private IVariableOrConstant<IV> _s, _p, _o;
+    private class RejectSameAsSelf extends AbstractBOp implements IConstraint {
 
-        public RejectSameAsSelf(IVariableOrConstant<IV> _s,
-                IVariableOrConstant<IV> _p, IVariableOrConstant<IV> _o) {
-            this._s = _s;
-            this._p = _p;
-            this._o = _o;
+//        private IVariableOrConstant<IV> _s, _p, _o;
+
+        public RejectSameAsSelf(final IVariableOrConstant<IV> _s,
+                final IVariableOrConstant<IV> _p,
+                final IVariableOrConstant<IV> _o) {
+            super(new BOp[] { _s, _p, _o });
+//            this._s = _s;
+//            this._p = _p;
+//            this._o = _o;
         }
 
-        public boolean accept(IBindingSet bindings) {
-            IV sVal = getValue(_s, bindings);
-            IV pVal = getValue(_p, bindings);
-            IV oVal = getValue(_o, bindings);
+        public boolean accept(final IBindingSet bindings) {
+            final IV sVal = getValue((IVariableOrConstant)args[0/*_s*/], bindings);
+            final IV pVal = getValue((IVariableOrConstant)args[1/*_p*/], bindings);
+            final IV oVal = getValue((IVariableOrConstant)args[2/*_o*/], bindings);
             // not fully bound yet, just ignore for now
             if (sVal == null || pVal == null || oVal == null) {
                 return true;
@@ -516,33 +522,13 @@ public class OwlSameAsPropertiesExpandingIterator implements
             return true;
         }
         
-        public IVariable[] getVariables() {
-            
-            final IVariable[] vars = new IVariable[
-                (_s.isVar() ? 1 : 0) +
-                (_p.isVar() ? 1 : 0) +
-                (_o.isVar() ? 1 : 0)
-                ];
-            int i = 0;
-            if (_s.isVar()) {
-                vars[i++] = (IVariable) _s;
-            }
-            if (_p.isVar()) {
-                vars[i++] = (IVariable) _p;
-            }
-            if (_o.isVar()) {
-                vars[i++] = (IVariable) _o;
-            }
-            return vars;
-            
-        }
-
-        public IV getValue(IVariableOrConstant<IV> _x, IBindingSet bindings) {
-            IV val;
+        private IV getValue(final IVariableOrConstant<IV> _x,
+                final IBindingSet bindings) {
+            final IV val;
             if (_x.isConstant()) {
                 val = _x.get();
             } else {
-                IConstant<IV> bound = bindings.get((IVariable<IV>) _x);
+                final IConstant<IV> bound = bindings.get((IVariable<IV>) _x);
                 val = bound != null ? bound.get() : null;
             }
             return val;

@@ -41,6 +41,8 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -51,8 +53,6 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.ISlice;

@@ -59,34 +59,21 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("rule");
-
-        // test variable and constant impls.
-        suite.addTestSuite(TestVar.class);
-        suite.addTestSuite(TestConstant.class);
-        
-        // test predicate impls.
-        suite.addTestSuite(TestPredicate.class);
-        
-        // @todo test binding set impls.
-        suite.addTestSuite(TestBindingSet.class);
+        final TestSuite suite = new TestSuite("rule");
 
         // test ISlice() impl.
         suite.addTestSuite(TestSlice.class);
-        
-        // test suite for basic rule mechanisms.
-        suite.addTestSuite( TestRule.class );
-       
-        // test suite for IProgram, but not program evaluation.
-        suite.addTestSuite( TestProgram.class );
 
-        // test suite for rule evaluation.
-        suite.addTest( com.bigdata.relation.rule.eval.TestAll.suite() );
+        // test suite for basic rule mechanisms.
+        suite.addTestSuite(TestRule.class);
+
+        // test suite for IProgram, but not program evaluation.
+        suite.addTestSuite(TestProgram.class);
 
         // @todo test suite for XML interchange of programs.
-        
+
         return suite;
-        
+
     }
-    
+
 }

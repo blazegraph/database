@@ -14,11 +14,11 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.impl.BindingImpl;
 import org.openrdf.query.impl.MapBindingSet;
 
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.Var;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IConstant;
-import com.bigdata.relation.rule.IVariable;
-import com.bigdata.relation.rule.Var;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**

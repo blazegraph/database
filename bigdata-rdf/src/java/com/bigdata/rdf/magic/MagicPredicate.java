@@ -32,15 +32,15 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.Constant;
-import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IConstant;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.ISolutionExpander;
-import com.bigdata.relation.rule.IVariable;
-import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -48,8 +48,12 @@ import com.bigdata.striterator.IKeyOrder;
  * case allows a predicate to have an arbitrary name, for RDFS reasoning we are
  * only concerned with predicates of the form <code>triple(s,p,o)</code>.
  * 
+ * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo This is specific to the RDF and models an SPO or SPOC tuple. It can not
+ *       be used for the lexicon tuples or other kinds of relations.
  */
 public class MagicPredicate implements IPredicate<IMagicTuple> {
 
@@ -282,25 +286,25 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
         
     }
     
-    /**
-     * Return true iff all terms of the predicate are bound (vs
-     * variables).
-     */
-    final public boolean isFullyBound() {
-
-        for (IVariableOrConstant<IV> term : terms) {
-
-            if (term.isVar()) {
-                
-                return false;
-                
-            }
-            
-        }
-        
-        return true;
-
-    }
+//    /**
+//     * Return true iff all terms of the predicate are bound (vs
+//     * variables).
+//     */
+//    final public boolean isFullyBound() {
+//
+//        for (IVariableOrConstant<IV> term : terms) {
+//
+//            if (term.isVar()) {
+//                
+//                return false;
+//                
+//            }
+//            
+//        }
+//        
+//        return true;
+//
+//    }
 
     public boolean isFullyBound(final IKeyOrder<IMagicTuple> keyOrder) {
 
@@ -339,13 +343,13 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
         
     }
     
-    public Iterator<IVariable> getVariables() {
+    public Iterator<IVariable<?>> getVariables() {
         
-        final Set<IVariable> vars = new HashSet<IVariable>();
+        final Set<IVariable<?>> vars = new HashSet<IVariable<?>>();
 
         for (int i = 0; i < arity(); i++) {
             if (get(i).isVar()) {
-                vars.add((IVariable) get(i));
+                vars.add((IVariable<?>) get(i));
             }
         }
         
@@ -491,22 +495,25 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
         
     }
 
-    public boolean equals(Object other) {
-        
+    public boolean equals(final Object other) {
+
         if (this == other)
             return true;
 
-        final IPredicate o = (IPredicate)other;
-        
+        if (!(other instanceof IPredicate<?>))
+            return false;
+
+        final IPredicate<?> o = (IPredicate<?>) other;
+
         final int arity = arity();
         
         if(arity != o.arity()) return false;
         
         for(int i=0; i<arity; i++) {
             
-            final IVariableOrConstant x = get(i);
+            final IVariableOrConstant<?> x = get(i);
             
-            final IVariableOrConstant y = o.get(i);
+            final IVariableOrConstant<?> y = o.get(i);
             
             if (x != y && !(x.equals(y))) {
                 

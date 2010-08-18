@@ -21,6 +21,7 @@
 	<classpathentry kind="lib" path="bigdata/lib/dsi-utils-1.0.6-020610.jar"/>
 	<classpathentry kind="lib" path="bigdata/lib/lgpl-utils-1.0.6-020610.jar"/>
 	<classpathentry kind="lib" path="bigdata-rdf/lib/nxparser-6-22-2010.jar"/>
+	<classpathentry kind="lib" path="bigdata/lib/tuprolog/tuprolog-v2.1.1.jar"/>
 	<classpathentry kind="src" path="lgpl-utils/src/java"/>
 	<classpathentry kind="src" path="lgpl-utils/src/test"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-3_6.jar"/>

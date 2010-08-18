@@ -8,6 +8,8 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.query.algebra.StatementPattern;
 
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.internal.IV;
@@ -22,9 +24,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.ISolutionExpander;
-import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.search.Hiterator;
 import com.bigdata.search.IHit;
 import com.bigdata.striterator.ChunkedConvertingIterator;

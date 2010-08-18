@@ -110,6 +110,9 @@ public class TestAll extends TestCase {
         // test journal overflow scenarios (move)
         suite.addTestSuite(TestMove.class);
 
+        // test scale-out operator semantics. 
+        suite.addTest(com.bigdata.bop.fed.TestAll.suite());
+        
         /*
          * Stress test of concurrent clients writing on a single data service.
          */

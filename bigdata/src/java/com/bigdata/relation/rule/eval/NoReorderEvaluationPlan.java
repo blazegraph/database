@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule.eval;
 
-import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.ISolutionExpander;
 

@@ -38,6 +38,7 @@ import java.util.concurrent.SynchronousQueue;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.spo.SPORelation;
@@ -47,7 +48,6 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
-import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IEvaluationPlan;
