@@ -29,7 +29,6 @@ import org.openrdf.query.algebra.LeftJoin;
 import org.openrdf.query.algebra.MultiProjection;
 import org.openrdf.query.algebra.Or;
 import org.openrdf.query.algebra.Order;
-import org.openrdf.query.algebra.OrderElem;
 import org.openrdf.query.algebra.Projection;
 import org.openrdf.query.algebra.ProjectionElem;
 import org.openrdf.query.algebra.ProjectionElemList;
@@ -247,12 +246,13 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * @version $Id: BigdataEvaluationStrategyImpl.java 2272 2009-11-04 02:10:19Z
  *          mrpersonick $
  */
-public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
+public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
+    
     /**
      * Logger.
      */
     protected static final Logger log = 
-        Logger.getLogger(BigdataEvaluationStrategyImpl2.class);
+        Logger.getLogger(BigdataEvaluationStrategyImpl.class);
 
 //    protected static final boolean INFO = log.isInfoEnabled();
 //
@@ -288,7 +288,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
      * @param tripleSource
      * @param dataset
      */
-    public BigdataEvaluationStrategyImpl2(
+    public BigdataEvaluationStrategyImpl(
             final BigdataTripleSource tripleSource, final Dataset dataset,
             final boolean nativeJoins, final boolean starJoins, 
             final boolean inlineTerms) {
@@ -1640,23 +1640,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             
             final IJoinNexus joinNexus = joinNexusFactory.newInstance(database
                     .getIndexManager());
-        
-//            itr1 = joinNexus.runQuery(step);
-
-			if (step instanceof ProxyRuleWithSesameFilters) {
-
-				/*
-				 * Note: Do not send the proxy rule down the wire. It has Sesame
-				 * Filter objects which are not Serializable.
-				 */
-				itr1 = joinNexus.runQuery(((ProxyRuleWithSesameFilters) step)
-						.getProxyRule());
-
-			} else {
-
-				itr1 = joinNexus.runQuery(step);
-
-			}
+            itr1 = joinNexus.runQuery(step);
             
         } catch (Exception ex) {
             throw new QueryEvaluationException(ex);
