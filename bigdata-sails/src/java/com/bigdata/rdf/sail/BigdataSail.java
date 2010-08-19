@@ -2918,7 +2918,7 @@ public class BigdataSail extends SailBase implements Sail {
             final TripleSource tripleSource = new BigdataTripleSource(this,
                     includeInferred);
 
-            final BigdataEvaluationStrategyImpl2 strategy = new BigdataEvaluationStrategyImpl2(
+            final BigdataEvaluationStrategyImpl strategy = new BigdataEvaluationStrategyImpl(
                     (BigdataTripleSource) tripleSource, dataset,
                     nativeJoins, starJoins, database.isInlineLiterals());
 
@@ -2999,7 +2999,7 @@ public class BigdataSail extends SailBase implements Sail {
                 final TripleSource tripleSource = new BigdataTripleSource(this,
                         includeInferred);
 
-                final BigdataEvaluationStrategyImpl2 strategy = new BigdataEvaluationStrategyImpl2(
+                final BigdataEvaluationStrategyImpl strategy = new BigdataEvaluationStrategyImpl(
                         (BigdataTripleSource) tripleSource, dataset,
                         nativeJoins, starJoins, database.isInlineLiterals());
 
