@@ -27,10 +27,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
-import com.bigdata.bop.ChunkedOrderedIteratorOp;
-import com.bigdata.bop.ap.Predicate;
-
 import junit.framework.TestCase2;
+
+import com.bigdata.bop.ChunkedOrderedIteratorOp;
+import com.bigdata.bop.EmptyBindingSet;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 
 /**
  * Unit tests for the {@link PipelineJoin} operator.
@@ -66,12 +71,57 @@ public class TestPipelineJoin extends TestCase2 {
     }
 
     /**
+     * Return an {@link IAsynchronousIterator} that will read a single,
+     * empty {@link IBindingSet}.
      * 
+     * @param bindingSet
+     *            the binding set.
+     */
+    protected ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+            final IBindingSet bindingSet) {
+
+        return new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { new IBindingSet[] { bindingSet } });
+
+    }
+
+    /**
+     * Explore how we could setup a unit test without using an access path for
+     * this query, or better yet, for a single join operator from this query.
+     * That would probably have to happen at the ChunkTask level since the
+     * AccessPathTask is going to apply an {@link IBindingSet} to the
+     * {@link IPredicate} to read on an {@link IAccessPath}.
+     * 
+     * <pre>
+     * :- ..., POS(A loves B), SPO(B loves C).
+     * 
+     *      and the following intermediate results from the POS shard:
+     * 
+     *      B0:[A=John, B=Mary, ...]
+     *      B1:[A=Mary, B=Paul, ...]
+     *      B2:[A=Paul, B=Leon, ...]
+     *      B3:[A=Leon, B=Paul, ...]
+     * 
+     *      and the following tuples read from the SPO shard:
+     * 
+     *      T0:(John loves Mary)
+     *      T1:(Mary loves Paul)
+     *      T2:(Paul loves Leon)
+     *      T3:(Leon loves Paul)
+     * 
+     *      then we have the following joins:
+     * 
+     *      (T2, B3) // T2:(Paul loves Leon) with B3:[A=Leon, B=Paul, ...].
+     *      (T3, B2) // T3:(Leon loves Leon) with T2:[A=Paul, B=Leon, ...].
+     * </pre>
      */
     public void test_pipelineJoin() {
-        
+
+        // source for the 1st join dimension.
+        final IAsynchronousIterator<IBindingSet[]> source = newBindingSetIterator(EmptyBindingSet.INSTANCE);
+
         fail("write tests");
-        
+
     }
-    
+
 }

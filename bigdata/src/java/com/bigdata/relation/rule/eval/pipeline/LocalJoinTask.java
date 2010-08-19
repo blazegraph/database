@@ -14,9 +14,7 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.relation.rule.eval.IRuleState;
 import com.bigdata.relation.rule.eval.ISolution;
-import com.bigdata.relation.rule.eval.RuleState;
 
 /**
  * {@link JoinTask} implementation for a {@link Journal}.
@@ -171,7 +169,7 @@ public class LocalJoinTask extends JoinTask {
 
             // flushes to the syncBuffer.
             return new UnsyncLocalOutputBuffer<IBindingSet>(
-                    this, joinNexus.getChunkCapacity(), syncBuffer);
+                    stats, joinNexus.getChunkCapacity(), syncBuffer);
 
         }
 

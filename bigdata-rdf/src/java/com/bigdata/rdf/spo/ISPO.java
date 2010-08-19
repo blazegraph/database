@@ -30,6 +30,7 @@ package com.bigdata.rdf.spo;
 
 import org.openrdf.model.Value;
 
+import com.bigdata.bop.IElement;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.TruthMaintenance;
@@ -68,7 +69,7 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ISPO {
+public interface ISPO extends IElement {
 
     /**
      * The term identifier for the subject position (slot 0) -or- {@link #NULL}.
@@ -102,6 +103,7 @@ public interface ISPO {
      * @param index
      *            The legal values are: s=0, p=1, o=2, c=3.
      */
+    @SuppressWarnings("unchecked")
     IV get(int index);
 
     /**

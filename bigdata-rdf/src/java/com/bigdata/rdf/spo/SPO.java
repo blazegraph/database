@@ -91,6 +91,7 @@ public class SPO implements ISPO {
     
     private transient boolean modified = false;
 
+    @SuppressWarnings("unchecked")
     final public IV get(final int index) {
         switch(index) {
         case 0: return s;

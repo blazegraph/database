@@ -46,9 +46,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
 import com.bigdata.btree.BTree;
@@ -1476,6 +1474,18 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     }
 
+    /**
+     * @todo This implementation was written early on and works for creating new
+     *       SPOs licensed by inference against a triple store. It does not
+     *       allow us to specify the statement type, which is always set to
+     *       [inferred]. It also does not capture the context if one exists, but
+     *       that could be done by inspection of the arity of the predicate. It
+     *       might be better to have an explicit "CONSTRUCT" operator rather
+     *       than having this implicit relationship between the head of a rule
+     *       and the element created from that rule. For example, that might let
+     *       us capture the distinction of inferred versus explicit within the
+     *       CONSTRUCT operator.
+     */
     public SPO newElement(final IPredicate<ISPO> predicate,
             final IBindingSet bindingSet) {
 
@@ -1484,12 +1494,12 @@ public class SPORelation extends AbstractRelation<ISPO> {
         
         if (bindingSet == null)
             throw new IllegalArgumentException();
-        
-        final IV s = asBound(predicate, 0, bindingSet);
 
-        final IV p = asBound(predicate, 1, bindingSet);
+        final IV s = (IV) predicate.asBound(0, bindingSet);
 
-        final IV o = asBound(predicate, 2, bindingSet);
+        final IV p = (IV) predicate.asBound(1, bindingSet);
+
+        final IV o = (IV) predicate.asBound(2, bindingSet);
 
         final SPO spo = new SPO(s, p, o, StatementEnum.Inferred);
         
@@ -1506,39 +1516,39 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     }
    
-   /**
-     * Extract the bound value from the predicate. When the predicate is not
-     * bound at that index, then extract its binding from the binding set.
-     * 
-     * @param pred
-     *            The predicate.
-     * @param index
-     *            The index into that predicate.
-     * @param bindingSet
-     *            The binding set.
-     *            
-     * @return The bound value.
-     */
-    @SuppressWarnings("unchecked")
-    private IV asBound(final IPredicate<ISPO> pred, final int index,
-            final IBindingSet bindingSet) {
-
-        final IVariableOrConstant<IV> t = pred.get(index);
-
-        final IConstant<IV> c;
-        if(t.isVar()) {
-            
-            c = bindingSet.get((IVariable) t);
-            
-        } else {
-            
-            c = (IConstant<IV>)t;
-            
-        }
-
-        return c.get();
-
-    }
+//   /**
+//     * Extract the bound value from the predicate. When the predicate is not
+//     * bound at that index, then extract its binding from the binding set.
+//     * 
+//     * @param pred
+//     *            The predicate.
+//     * @param index
+//     *            The index into that predicate.
+//     * @param bindingSet
+//     *            The binding set.
+//     *            
+//     * @return The bound value.
+//     */
+//    @SuppressWarnings("unchecked")
+//    private IV asBound(final IPredicate<ISPO> pred, final int index,
+//            final IBindingSet bindingSet) {
+//
+//        final IVariableOrConstant<IV> t = pred.get(index);
+//
+//        final IConstant<IV> c;
+//        if(t.isVar()) {
+//            
+//            c = bindingSet.get((IVariable) t);
+//            
+//        } else {
+//            
+//            c = (IConstant<IV>)t;
+//            
+//        }
+//
+//        return c.get();
+//
+//    }
 
 //    /**
 //     * Return a buffer onto which a multi-threaded process may write chunks of

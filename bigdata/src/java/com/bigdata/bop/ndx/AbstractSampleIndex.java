@@ -25,9 +25,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 16, 2010
  */
 
-package com.bigdata.bop;
+package com.bigdata.bop.ndx;
 
 
+import com.bigdata.bop.AbstractPipelineOp;
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.BOp.Annotations;
 import com.bigdata.btree.IIndex;
 import com.bigdata.relation.accesspath.IAccessPath;
 

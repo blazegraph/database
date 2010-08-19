@@ -1,18 +1,22 @@
 package com.bigdata.relation.rule.eval.pipeline;
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 /**
- * Implementation used for {@link LocalJoinTask}s.
+ * Keeps track of the chunks of binding sets that are generated on the caller's
+ * {@link JoinStats}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: UnsyncLocalOutputBuffer.java 3448 2010-08-18 20:55:58Z
+ *          thompsonbry $
  * @param <E>
  */
-class UnsyncLocalOutputBuffer<E extends IBindingSet> extends
-        UnsynchronizedOutputBuffer<E> {
+public class UnsyncLocalOutputBuffer<E extends IBindingSet> extends
+    AbstractUnsynchronizedArrayBuffer<E> {//UnsynchronizedOutputBuffer<E> {
 
+    private final JoinStats joinStats;
     private final IBlockingBuffer<E[]> syncBuffer;
 
     /**
@@ -24,11 +28,13 @@ class UnsyncLocalOutputBuffer<E extends IBindingSet> extends
      *            The thread-safe buffer onto which this buffer writes when
      *            it overflows.
      */
-    protected UnsyncLocalOutputBuffer(final LocalJoinTask joinTask,
+    public UnsyncLocalOutputBuffer(final JoinStats joinStats,
             final int capacity, final IBlockingBuffer<E[]> syncBuffer) {
 
-        super(joinTask, capacity);
+        super(capacity);
 
+        this.joinStats = joinStats;
+        
         this.syncBuffer = syncBuffer;
 
     }
@@ -46,8 +52,8 @@ class UnsyncLocalOutputBuffer<E extends IBindingSet> extends
 
         syncBuffer.add(chunk);
 
-        joinTask.stats.bindingSetChunksOut++;
-        joinTask.stats.bindingSetsOut += chunk.length;
+        joinStats.bindingSetChunksOut++;
+        joinStats.bindingSetsOut += chunk.length;
 
     }
     

@@ -28,9 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.ap;
 
+import java.util.Map;
+
 import com.bigdata.bop.AbstractChunkedOrderedIteratorOp;
+import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IElement;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
@@ -148,19 +152,17 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
         
     }
 
+    @SuppressWarnings("unchecked")
     public IVariableOrConstant get(final int index) {
         
         return (IVariableOrConstant<?>) args[index];
         
     }
 
-    /**
-     * @todo there is no general means available to implement this method of an
-     *       awareness of the internal structure of the element type.
-     */
+    @SuppressWarnings("unchecked")
     public IConstant<?> get(final E e, final int index) {
 
-        throw new UnsupportedOperationException();
+        return new Constant(((IElement) e).get(index));
 
     }
 
@@ -295,8 +297,30 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
         
     }
 
+    public Object asBound(final int index, final IBindingSet bindingSet) {
+
+        if (bindingSet == null)
+            throw new IllegalArgumentException();
+
+        final IVariableOrConstant<?> t = get(index);
+
+        final IConstant<?> c;
+        if (t.isVar()) {
+
+            c = bindingSet.get((IVariable<?>) t);
+
+        } else {
+
+            c = (IConstant<?>) t;
+
+        }
+
+        return c == null ? null : c.get();
+
+    }
+
     public Predicate<E> setRelationName(final String[] relationName) {
-    
+
         throw new UnsupportedOperationException();
 //        return new Predicate<E>(this, relationName);
         
@@ -348,65 +372,83 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
 
         sb.append("(");
 
-        sb.append(getOnlyRelationName());
-        
         for (int i = 0; i < args.length; i++) {
 
-//            if (i > 0)
+            if (i > 0)
                 sb.append(", ");
 
             final IVariableOrConstant<?> v = get(i);
 
-            sb.append(v.isConstant() || bindingSet == null
-                    || !bindingSet.isBound((IVariable<?>) v) ? v.toString()
-                    : bindingSet.get((IVariable<?>) v));
+            sb.append(v.isConstant() ? v.toString()
+                    : (v + "=" + (bindingSet == null ? null : bindingSet
+                            .get((IVariable<?>) v))));
 
         }
 
         sb.append(")");
 
-        if (isOptional() || getConstraint() != null
-                || getSolutionExpander() != null || getPartitionId() != -1) {
-
-            /*
-             * Something special, so do all this stuff.
-             */
-
-            boolean first = true;
-
+        if (!annotations.isEmpty()) {
             sb.append("[");
-
-            if (isOptional()) {
+            boolean first = true;
+            for (Map.Entry<String, Object> e : annotations.entrySet()) {
                 if (!first)
                     sb.append(", ");
-                sb.append("optional");
+                sb.append(e.getKey() + "=" + e.getValue());
                 first = false;
             }
-
-            if (getConstraint() != null) {
-                if (!first)
-                    sb.append(", ");
-                sb.append(getConstraint().toString());
-                first = false;
-            }
-
-            if (getSolutionExpander() != null) {
-                if (!first)
-                    sb.append(", ");
-                sb.append(getSolutionExpander().toString());
-                first = false;
-            }
-
-            if (getPartitionId() != -1) {
-                if (!first)
-                    sb.append(", ");
-                sb.append("partitionId=" + getPartitionId());
-                first = false;
-            }
-
             sb.append("]");
-
         }
+        
+//        final String relationName = getOnlyRelationName();
+//        final boolean optional = isOptional();
+//        final IElementFilter<E> constraint = getConstraint();
+//        final ISolutionExpander<E> solutionExpander = getSolutionExpander();
+//        final int partitionId = getPartitionId();
+//        
+//        if (optional || constraint != null || solutionExpander != null
+//                || partitionId != -1) {
+//
+//            /*
+//             * Something special, so do all this stuff.
+//             */
+//
+//            boolean first = true;
+//
+//            sb.append("[");
+//
+//            sb.append(getOnlyRelationName());
+//            
+//            if (isOptional()) {
+//                if (!first)
+//                    sb.append(", ");
+//                sb.append("optional");
+//                first = false;
+//            }
+//
+//            if (getConstraint() != null) {
+//                if (!first)
+//                    sb.append(", ");
+//                sb.append(getConstraint().toString());
+//                first = false;
+//            }
+//
+//            if (getSolutionExpander() != null) {
+//                if (!first)
+//                    sb.append(", ");
+//                sb.append(getSolutionExpander().toString());
+//                first = false;
+//            }
+//
+//            if (getPartitionId() != -1) {
+//                if (!first)
+//                    sb.append(", ");
+//                sb.append("partitionId=" + getPartitionId());
+//                first = false;
+//            }
+//
+//            sb.append("]");
+//
+//        }
 
         return sb.toString();
 

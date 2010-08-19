@@ -129,7 +129,7 @@ public interface PipelineOp<E> extends BOp {
      *            the {@link IJoinNexus#getIndexManager()} returns the
      *            {@link IBigdataFederation} since each read would use RMI. This
      *            condition should be checked by the operator implementation.
-     * @param buffer
+     * @param sink
      *            Where to write the output of the operator.
      * 
      * @return The {@link Future} for the operator's evaluation.
@@ -137,6 +137,6 @@ public interface PipelineOp<E> extends BOp {
      * @todo return the execution statistics here? Return Void?
      */
     Future<Void> eval(IBigdataFederation<?> fed, IJoinNexus joinNexus,
-            IBlockingBuffer<E[]> buffer);
+            IBlockingBuffer<E[]> sink);
 
 }

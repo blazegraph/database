@@ -31,10 +31,6 @@ import java.util.Comparator;
 
 import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOKeyOrder;
 
 /**
  * An interface representing the natural traversal orders for the different
@@ -50,18 +46,18 @@ public interface IKeyOrder<E> {
     /**
      * Return the #of elements in the key for this natural order.
      */
-    public int getKeyArity();
+    int getKeyArity();
     
     /**
      * Return the comparator that places elements into the natural order for the
      * associated index.
      */
-    public Comparator<E> getComparator();
+    Comparator<E> getComparator();
 
     /**
      * The base name for the index.
      */
-    public String getIndexName();
+    String getIndexName();
 
     /**
      * Return the index of the slot in the {@link IPredicate} which appears at
@@ -72,49 +68,22 @@ public interface IKeyOrder<E> {
      * 
      * @return The index of the slot in the {@link IPredicate}.
      */
-    public int getKeyOrder(final int keyPos);
+    int getKeyOrder(final int keyPos);
 
     /*
      * New methods.
      */
     
-//    /**
-//     * Return the inclusive lower bound which would be used for a query against
-//     * this {@link IKeyOrder} for the given {@link IPredicate}.
-//     */
-//    byte[] getFromKey(IKeyBuilder keyBuilder, IPredicate<ISPO> predicate);
-//
-//    /**
-//     * Return the exclusive upper bound which would be used for a query against
-//     * this {@link IKeyOrder} for the given {@link IPredicate}.
-//     */
-//    byte[] getToKey(IKeyBuilder keyBuilder, IPredicate<ISPO> predicate);
-//
-//    /**
-//     * Encode a key for the index.
-//     * 
-//     * @param keyBuilder
-//     *            The object used to encode an unsigned byte[].
-//     * @param e
-//     *            An element for the owning relation type.
-//     * 
-//     * @return The encoded key.
-//     */
-//    byte[] encodeKey(IKeyBuilder keyBuilder, E e);
-//
-//    /**
-//     * Decode the key into an {@link SPO}. The {@link StatementEnum} and the
-//     * optional SID will not be decoded, since it is carried in the B+Tree
-//     * value. However, if the {@link SPOKeyOrder} is a quad order then the
-//     * {@link SPO#c()} will be bound.
-//     * 
-//     * @param keyOrder
-//     *            The natural order of the key.
-//     * @param key
-//     *            The key.
-//     * 
-//     * @return The decoded key.
-//     */
-//    E decodeKey(byte[] key);
+    /**
+     * Return the inclusive lower bound which would be used for a query against
+     * this {@link IKeyOrder} for the given {@link IPredicate}.
+     */
+    byte[] getFromKey(IKeyBuilder keyBuilder, IPredicate<E> predicate);
+
+    /**
+     * Return the exclusive upper bound which would be used for a query against
+     * this {@link IKeyOrder} for the given {@link IPredicate}.
+     */
+    byte[] getToKey(IKeyBuilder keyBuilder, IPredicate<E> predicate);
 
 }

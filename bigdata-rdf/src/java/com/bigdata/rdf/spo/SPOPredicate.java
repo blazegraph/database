@@ -25,7 +25,6 @@ package com.bigdata.rdf.spo;
 
 import com.bigdata.bop.AbstractBOp;
 import com.bigdata.bop.ArrayBindingSet;
-import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
@@ -107,18 +106,15 @@ public class SPOPredicate extends Predicate<ISPO> {
      */
     private static final long serialVersionUID = 1L;
 
-    /**
-     * The arity is 3 unless the context position was given (as either a
-     * variable or bound to a constant) in which case it is 4.
-     * 
-     * FIXME Consider simply not passing in the 4th position to the base class
-     * when using triples so we can make {@link AbstractBOp#arity()} final.
-     */
-    public final int arity() {
-        
-        return args[3/*c*/] == null ? 3 : 4;
-        
-    }
+//    /**
+//     * The arity is 3 unless the context position was given (as either a
+//     * variable or bound to a constant) in which case it is 4.
+//     */
+//    public final int arity() {
+//        
+//        return args[3/*c*/] == null ? 3 : 4;
+//        
+//    }
 
     /**
      * Partly specified ctor. The context will be <code>null</code>. The
@@ -270,7 +266,8 @@ public class SPOPredicate extends Predicate<ISPO> {
             final ISolutionExpander<ISPO> expander//
             ) {
         
-        super(new IVariableOrConstant[] { s, p, o, c }, relationName[0],
+        super((c == null ? new IVariableOrConstant[] { s, p, o }
+                : new IVariableOrConstant[] { s, p, o, c }), relationName[0],
                 partitionId, optional, constraint, expander);
 
 //        if (relationName == null)
@@ -558,20 +555,20 @@ public class SPOPredicate extends Predicate<ISPO> {
 //        }
 //    }
     
-    public final IConstant<IV> get(final ISPO spo, final int index) {
-        switch (index) {
-        case 0:
-            return new Constant<IV>(spo.s());
-        case 1:
-            return new Constant<IV>(spo.p());
-        case 2:
-            return new Constant<IV>(spo.o());
-        case 3:
-            return new Constant<IV>(spo.c());
-        default:
-            throw new IndexOutOfBoundsException("" + index);
-        }
-    }
+//    public final IConstant<IV> get(final ISPO spo, final int index) {
+//        switch (index) {
+//        case 0:
+//            return new Constant<IV>(spo.s());
+//        case 1:
+//            return new Constant<IV>(spo.p());
+//        case 2:
+//            return new Constant<IV>(spo.o());
+//        case 3:
+//            return new Constant<IV>(spo.c());
+//        default:
+//            throw new IndexOutOfBoundsException("" + index);
+//        }
+//    }
     
 //    /**
 //     * Return the index of the variable or constant in the {@link Predicate}.
@@ -682,8 +679,7 @@ public class SPOPredicate extends Predicate<ISPO> {
      * @throws IllegalArgumentException
      *             if either argument is <code>null</code>.
      */
-    public SPOPredicate asBound(final IVariable<IV> var,
-            final IConstant<IV> val) {
+    public SPOPredicate asBound(final IVariable<IV> var, final IConstant<IV> val) {
 
         return asBound(new ArrayBindingSet(new IVariable[]{var}, new IConstant[]{val}));
         

@@ -1,15 +1,23 @@
-package com.bigdata.bop;
+package com.bigdata.bop.ap;
 
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.bigdata.bop.AbstractBOp;
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpList;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.relation.rule.BindingSetSortKeyBuilder;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.rule.eval.IJoinNexus;
+import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.striterator.DistinctFilter;
 import com.bigdata.striterator.IChunkConverter;
+import com.bigdata.striterator.MergeFilter;
 
 /**
  * A DISTINCT operator based on a hash table.
@@ -31,9 +39,10 @@ import com.bigdata.striterator.IChunkConverter;
  *       through the map. Or bound the #of threads hitting the map at once,
  *       increase the map concurrency level, etc.
  * 
- * @todo Reconcile with {@link IChunkConverter} and {@link DistinctFilter}.
+ * @todo Reconcile with {@link IChunkConverter}, {@link DistinctFilter} (handles
+ *       solutions) and {@link MergeFilter} (handles comparables).
  */
-public class Distinct<E> 
+public class DistinctElementFilter<E> 
 extends AbstractBOp
 //extends AbstractChunkedIteratorOp<E>
 //implements IElementFilter<E>,
@@ -56,7 +65,7 @@ extends AbstractBOp
         
     }
 
-    public Distinct(final IVariable<?>[] distinctList, final UUID masterUUID) {
+    public DistinctElementFilter(final IVariable<?>[] distinctList, final UUID masterUUID) {
 
         super(distinctList, NV.asMap(new NV[] { new NV(Annotations.QUERY_ID,
                 masterUUID),

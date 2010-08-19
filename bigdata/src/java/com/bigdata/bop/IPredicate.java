@@ -298,7 +298,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      * this method in the context of the "schema" imposed by the predicate.
      * 
      * @param e
-     *            The element.
+     *            The element, which must implement {@link IElement}.
      * @param index
      *            The index.
      * 
@@ -307,15 +307,39 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      * @throws UnsupportedOperationException
      *             If this operation is not supported by the {@link IPredicate}
      *             implementation or for the given element type.
+     * 
+     * @deprecated by {@link IElement#get(int)} which does exactly what this
+     *             method is trying to do.
      */
     public IConstant<?> get(E e, int index);
-    
+
     /**
      * A copy of this {@link IPredicate} in which zero or more variables have
      * been bound to constants using the given {@link IBindingSet}.
      */
     public IPredicate<E> asBound(IBindingSet bindingSet);
 
+    /**
+     * Extract the as bound value from the predicate. When the predicate is not
+     * bound at that index, the value of the variable is taken from the binding
+     * set.
+     * 
+     * @param index
+     *            The index into that predicate.
+     * @param bindingSet
+     *            The binding set.
+     * 
+     * @return The bound value -or- <code>null</code> if no binding is available
+     *         (the predicate is not bound at that index and the variable at
+     *         that index in the predicate is not bound in the binding set).
+     * 
+     * @throws IndexOutOfBoundsException
+     *             unless the <i>index</i> is in [0:{@link #arity()-1], inclusive.
+     * @throws IllegalArgumentException
+     *             if the <i>bindingSet</i> is <code>null</code>.
+     */
+    public Object asBound(int index, IBindingSet bindingSet);
+    
     /**
      * A copy of this {@link IPredicate} in which the <i>relationName</i>(s)
      * replace the existing set of relation name(s).

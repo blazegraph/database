@@ -57,8 +57,11 @@ abstract public class AbstractChunkedOrderedIteratorOp<E> extends AbstractBOp
      * @param args
      * @param annotations
      */
-    protected AbstractChunkedOrderedIteratorOp(BOp[] args, Map<String, Object> annotations) {
+    protected AbstractChunkedOrderedIteratorOp(final BOp[] args,
+            final Map<String, Object> annotations) {
+
         super(args, annotations);
+
     }
 
     protected int getChunkCapacity() {
