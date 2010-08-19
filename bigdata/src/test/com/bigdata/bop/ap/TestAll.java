@@ -61,11 +61,15 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("access path operators");
 
+        // test basic API for a predicate.
         suite.addTestSuite(TestPredicate.class);
         
-        // @todo test reading on a union of two predicate.
-//        suite.addTestSuite(TestUnion.class);
+        // test reading on an access path using a predicate.
+        suite.addTestSuite(TestPredicateAccessPath.class);
         
+        // test distinct operator for an access path (distinct elements).
+        suite.addTestSuite(TestDistinctElementFilter.class);
+
         return suite;
         
     }

@@ -30,7 +30,6 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -139,75 +138,18 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
 
     }
 
+    /**
+     * Strengthens the return type.
+     * <p>
+     * {@inheritDoc}
+     */
     public SPOAccessPath init() {
 
-        final IKeyBuilder keyBuilder = getTupleSerializer().getKeyBuilder();
-
-        setFromKey(((SPOKeyOrder) keyOrder).getFromKey(keyBuilder, predicate));
-
-        setToKey(((SPOKeyOrder) keyOrder).getToKey(keyBuilder, predicate));
-
-        //        final SPOKeyOrder keyOrder = (SPOKeyOrder) this.keyOrder;
-        //        final int keyArity = keyOrder.getKeyArity(); // use the key's "arity".
-        //        
-        //        { // do the from key
-        //            
-        //            keyBuilder.reset();
-        //            boolean noneBound = true;
-        //            for (int i = 0; i < keyArity; i++) {
-        //                IVariableOrConstant<Long> term = 
-        //                    predicate.get(keyOrder.getKeyOrder(i));
-        //                long l;
-        //                // Note: term MAY be null for the context position.
-        //                if (term == null || term.isVar()) {
-        //                    l = Long.MIN_VALUE;
-        //                } else {
-        //                    l = term.get();
-        //                    noneBound = false;
-        //                }
-        //                keyBuilder.append(l);
-        //            }
-        //            final byte[] fromKey = noneBound ? null : keyBuilder.getKey();
-        //            setFromKey(fromKey);
-        //            
-        //        }
-        //
-        //        { // do the to key
-        //
-        //            keyBuilder.reset();
-        //            boolean noneBound = true;
-        //            boolean foundLastBound = false;
-        //            for (int i = 0; i < keyArity; i++) {
-        //                IVariableOrConstant<Long> term = 
-        //                    predicate.get(keyOrder.getKeyOrder(i));
-        //                long l;
-        //                // Note: term MAY be null for context.
-        //                if (term == null || term.isVar()) {
-        //                    l = Long.MIN_VALUE;
-        //                } else {
-        //                    l = term.get();
-        //                    noneBound = false;
-        //                    if (!foundLastBound) {
-        //                        if (i == keyArity-1) {
-        //                            l++;
-        //                            foundLastBound = true;
-        //                        } else {
-        //                            IVariableOrConstant<Long> next = 
-        //                                predicate.get(keyOrder.getKeyOrder(i+1));
-        //                            // Note: next can be null for quads (context pos).
-        //                            if (next == null || next.isVar()) {
-        //                                l++;
-        //                                foundLastBound = true;
-        //                            }
-        //                        }
-        //                    }
-        //                }
-        //                keyBuilder.append(l);
-        //            }
-        //            final byte[] toKey = noneBound ? null : keyBuilder.getKey();
-        //            setToKey(toKey);
-        //           
-        //        }
+//        final IKeyBuilder keyBuilder = getTupleSerializer().getKeyBuilder();
+//
+//        setFromKey(((SPOKeyOrder) keyOrder).getFromKey(keyBuilder, predicate));
+//
+//        setToKey(((SPOKeyOrder) keyOrder).getToKey(keyBuilder, predicate));
 
         super.init();
 

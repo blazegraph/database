@@ -175,7 +175,7 @@ abstract public class AbstractBOp implements BOp {
         
     }
     
-    public int arity() {
+    final public int arity() {
         
         return args.length;
         

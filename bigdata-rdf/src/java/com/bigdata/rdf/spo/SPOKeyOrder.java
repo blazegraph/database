@@ -30,38 +30,18 @@ package com.bigdata.rdf.spo;
 import java.io.Externalizable;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
-import java.util.UUID;
 
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.keys.SuccessorUtil;
-import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.internal.AbstractLiteralIV;
-import com.bigdata.rdf.internal.AbstractIV;
-import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.TermId;
-import com.bigdata.rdf.internal.UUIDLiteralIV;
-import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.internal.XSDBooleanIV;
-import com.bigdata.rdf.internal.XSDByteIV;
-import com.bigdata.rdf.internal.XSDDoubleIV;
-import com.bigdata.rdf.internal.XSDFloatIV;
-import com.bigdata.rdf.internal.XSDIntIV;
-import com.bigdata.rdf.internal.XSDIntegerIV;
-import com.bigdata.rdf.internal.XSDLongIV;
-import com.bigdata.rdf.internal.XSDShortIV;
-import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.striterator.AbstractKeyOrder;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -78,7 +58,7 @@ import com.bigdata.striterator.IKeyOrder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
+public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements IKeyOrder<ISPO>, Serializable {
 
     /**
      * 
@@ -400,107 +380,123 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
 
     }
 
+//    /**
+//     * Return the from key for this particular set of known terms that will
+//     * allow us to read everything about those terms from the index.  For
+//     * example, if this happens to be the SPO key order and the size of known
+//     * terms is 2, this method will provide a from key that will allow the
+//     * caller to read all the Os for a particular SP combo. 
+//     * 
+//     * @param knownTerms
+//     *          the known terms 
+//     * @return
+//     *          the from key
+//     */
+//    final public byte[] getFromKey(final IKeyBuilder keyBuilder, 
+//            final IV[] knownTerms) {
+//        
+//        if (knownTerms == null || knownTerms.length == 0)
+//            return null;
+//        
+//        keyBuilder.reset();
+//        
+//        for (int i = 0; i < knownTerms.length; i++) 
+//            knownTerms[i].encode(keyBuilder);
+//        
+//        return keyBuilder.getKey();
+//        
+//    }
+//    
+//    /**
+//     * Return the to key for this particular set of known terms that will
+//     * allow us to read everything about those terms from the index.  For
+//     * example, if this happens to be the SPO key order and the size of known
+//     * terms is 2, this method will provide a to key that will allow the
+//     * caller to read all the Os for a particular SP combo. 
+//     * 
+//     * @param knownTerms
+//     *          the known terms 
+//     * @return
+//     *          the to key
+//     */
+//    final public byte[] getToKey(final IKeyBuilder keyBuilder, 
+//            final IV[] knownTerms) {
+//        
+//        if (knownTerms == null || knownTerms.length == 0)
+//            return null;
+//        
+//        final byte[] from = getFromKey(keyBuilder, knownTerms);
+//        
+//        return SuccessorUtil.successor(from);
+//        
+//    }
+
+//    /**
+//     * Return the inclusive lower bound which would be used for a query against
+//     * this {@link IKeyOrder} for the given {@link IPredicate}.
+//     * 
+//     * @todo This method should be declared by {@link IKeyOrder}.
+//     */
+//    final public byte[] getFromKey(final IKeyBuilder keyBuilder,
+//            final IPredicate<ISPO> predicate) {
+//
+//        keyBuilder.reset();
+//
+//        final int keyArity = getKeyArity(); // use the key's "arity".
+//
+//        boolean noneBound = true;
+//        
+//        for (int i = 0; i < keyArity; i++) {
+//        
+//            final IVariableOrConstant<IV> term = predicate.get(getKeyOrder(i));
+//            
+//            // Note: term MAY be null for the context position.
+//            if (term == null || term.isVar())
+//                break;
+//                
+//            final IV iv = term.get();
+//                
+//            iv.encode(keyBuilder);
+//            
+//            noneBound = false;
+//            
+//        }
+//
+//        return noneBound ? null : keyBuilder.getKey();
+//
+//    }
+
+    @Override
+    protected void appendKeyComponent(final IKeyBuilder keyBuilder,
+            final int index, final Object keyComponent) {
+
+        ((IV) keyComponent).encode(keyBuilder);
+
+    }
+
+//    /**
+//     * Return the exclusive upper bound which would be used for a query against
+//     * this {@link IKeyOrder} for the given {@link IPredicate}.
+//     * 
+//     * @todo This method should be declared by {@link IKeyOrder}.
+//     */
+//    final public byte[] getToKey(final IKeyBuilder keyBuilder,
+//            final IPredicate<ISPO> predicate) {
+//
+//        final byte[] from = getFromKey(keyBuilder, predicate);
+//        
+//        return from == null ? null : SuccessorUtil.successor(from);
+//        
+//    }
+
     /**
-     * Return the from key for this particular set of known terms that will
-     * allow us to read everything about those terms from the index.  For
-     * example, if this happens to be the SPO key order and the size of known
-     * terms is 2, this method will provide a from key that will allow the
-     * caller to read all the Os for a particular SP combo. 
+     * Forms the key for a given index order (the {@link SPOTupleSerializer}
+     * delegates its behavior to this method).
      * 
-     * @param knownTerms
-     *          the known terms 
+     * @param keyBuilder
+     * @param spo
      * @return
-     *          the from key
      */
-    final public byte[] getFromKey(final IKeyBuilder keyBuilder, 
-            final IV[] knownTerms) {
-        
-        if (knownTerms == null || knownTerms.length == 0)
-            return null;
-        
-        keyBuilder.reset();
-        
-        for (int i = 0; i < knownTerms.length; i++) 
-            knownTerms[i].encode(keyBuilder);
-        
-        return keyBuilder.getKey();
-        
-    }
-    
-    /**
-     * Return the to key for this particular set of known terms that will
-     * allow us to read everything about those terms from the index.  For
-     * example, if this happens to be the SPO key order and the size of known
-     * terms is 2, this method will provide a to key that will allow the
-     * caller to read all the Os for a particular SP combo. 
-     * 
-     * @param knownTerms
-     *          the known terms 
-     * @return
-     *          the to key
-     */
-    final public byte[] getToKey(final IKeyBuilder keyBuilder, 
-            final IV[] knownTerms) {
-        
-        if (knownTerms == null || knownTerms.length == 0)
-            return null;
-        
-        final byte[] from = getFromKey(keyBuilder, knownTerms);
-        
-        return SuccessorUtil.successor(from);
-        
-    }
-
-    /**
-     * Return the inclusive lower bound which would be used for a query against
-     * this {@link IKeyOrder} for the given {@link IPredicate}.
-     * 
-     * @todo This method should be declared by {@link IKeyOrder}.
-     */
-    final public byte[] getFromKey(final IKeyBuilder keyBuilder,
-            final IPredicate<ISPO> predicate) {
-
-        keyBuilder.reset();
-
-        final int keyArity = getKeyArity(); // use the key's "arity".
-
-        boolean noneBound = true;
-        
-        for (int i = 0; i < keyArity; i++) {
-        
-            final IVariableOrConstant<IV> term = predicate.get(getKeyOrder(i));
-            
-            // Note: term MAY be null for the context position.
-            if (term == null || term.isVar())
-                break;
-                
-            final IV iv = term.get();
-                
-            iv.encode(keyBuilder);
-            
-            noneBound = false;
-            
-        }
-
-        return noneBound ? null : keyBuilder.getKey();
-
-    }
-
-    /**
-     * Return the exclusive upper bound which would be used for a query against
-     * this {@link IKeyOrder} for the given {@link IPredicate}.
-     * 
-     * @todo This method should be declared by {@link IKeyOrder}.
-     */
-    final public byte[] getToKey(final IKeyBuilder keyBuilder,
-            final IPredicate<ISPO> predicate) {
-
-        final byte[] from = getFromKey(keyBuilder, predicate);
-        
-        return from == null ? null : SuccessorUtil.successor(from);
-        
-    }
-        
     final public byte[] encodeKey(final IKeyBuilder keyBuilder, final ISPO spo) {
 
         keyBuilder.reset();
@@ -508,10 +504,8 @@ public class SPOKeyOrder implements IKeyOrder<ISPO>, Serializable {
         final int[] a = orders[index];
 
         for (int i = 0; i < a.length; i++) {
-            
-            IV iv = spo.get(a[i]);
 
-            IVUtility.encode(keyBuilder, iv);
+            IVUtility.encode(keyBuilder, spo.get(a[i]));
             
         }
         

@@ -49,7 +49,7 @@ import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.ITupleFilter;
 import com.bigdata.btree.filter.TupleFilter;
-import com.bigdata.btree.proc.AbstractKeyRangeIndexProcedure;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -79,8 +79,10 @@ import cutthecrap.utils.striterators.Striterator;
  *       applied to the index. That requires a means to dynamically filter out
  *       the elements we do not want from the key-range scan - the filtering
  *       should of course be done at the {@link IDataService}.
+ * 
+ * FIXME Rename since no longer abstract!
  */
-abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
+public class AbstractAccessPath<R> implements IAccessPath<R> {
 
     static final protected Logger log = Logger.getLogger(IAccessPath.class);
     
@@ -198,9 +200,9 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
      */
     private boolean didInit = false;
 
-    private byte[] fromKey;
+    private final byte[] fromKey;
     
-    private byte[] toKey;
+    private final byte[] toKey;
 
     /**
      * The key corresponding to the inclusive lower bound for the
@@ -232,48 +234,48 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         
     }
     
-    protected void setFromKey(final byte[] fromKey) {
-        
-        assertNotInitialized();
-
-        if (pmd != null) {
-
-            /*
-             * The predicate is constrained to an index partition, so constrain
-             * the fromKey so that it lies within that index partition.
-             */
-            
-            this.fromKey = AbstractKeyRangeIndexProcedure.constrainFromKey(fromKey,
-                    pmd);
-
-        } else {
-
-            this.fromKey = fromKey;
-            
-        }
-
-    }
-    
-    protected void setToKey(final byte[] toKey) {
-        
-        assertNotInitialized();
-        
-        if (pmd != null) {
-
-            /*
-             * The predicate is constrained to an index partition, so constrain
-             * the toKey so that it lies within that index partition.
-             */
-            
-            this.toKey = AbstractKeyRangeIndexProcedure.constrainToKey(toKey, pmd);
-
-        } else {
-
-            this.toKey = toKey;
-            
-        }
-        
-    }
+//    protected void setFromKey(final byte[] fromKey) {
+//        
+//        assertNotInitialized();
+//
+//        if (pmd != null) {
+//
+//            /*
+//             * The predicate is constrained to an index partition, so constrain
+//             * the fromKey so that it lies within that index partition.
+//             */
+//            
+//            this.fromKey = AbstractKeyRangeIndexProcedure.constrainFromKey(fromKey,
+//                    pmd);
+//
+//        } else {
+//
+//            this.fromKey = fromKey;
+//            
+//        }
+//
+//    }
+//    
+//    protected void setToKey(final byte[] toKey) {
+//        
+//        assertNotInitialized();
+//        
+//        if (pmd != null) {
+//
+//            /*
+//             * The predicate is constrained to an index partition, so constrain
+//             * the toKey so that it lies within that index partition.
+//             */
+//            
+//            this.toKey = AbstractKeyRangeIndexProcedure.constrainToKey(toKey, pmd);
+//
+//        } else {
+//
+//            this.toKey = toKey;
+//            
+//        }
+//        
+//    }
     
     public IKeyOrder<R> getKeyOrder() {
         
@@ -420,6 +422,13 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
             }
 
         }
+        
+        final IKeyBuilder keyBuilder = ndx.getIndexMetadata()
+                .getTupleSerializer().getKeyBuilder();
+
+        fromKey = keyOrder.getFromKey(keyBuilder, predicate);
+
+        toKey = keyOrder.getToKey(keyBuilder, predicate);
         
     }
 

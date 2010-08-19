@@ -1,9 +1,10 @@
-package com.bigdata.bop;
+package com.bigdata.bop.ndx;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
+import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.rule.eval.IJoinNexus;

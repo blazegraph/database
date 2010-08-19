@@ -30,12 +30,14 @@ package com.bigdata.bop.ap;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.Constant;
-import com.bigdata.bop.Distinct;
+import com.bigdata.bop.EmptyBindingSet;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
-import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
  * Test suite for {@link Predicate}.
@@ -74,7 +76,7 @@ public class TestPredicate extends TestCase2 {
 
             final Var<Long> u = Var.var("u");
 
-            final IPredicate<?> p1 = new P(
+            final IPredicate<?> p1 = new Predicate(
                     new IVariableOrConstant[] { u, c1, c2 }, relation);
             
             if (log.isInfoEnabled())
@@ -99,7 +101,7 @@ public class TestPredicate extends TestCase2 {
 
             final Var<Long> v = Var.var("v");
 
-            final IPredicate<?> p1 = new P(
+            final IPredicate<?> p1 = new Predicate(
                     new IVariableOrConstant[] { u, c1, v }, relation);
 
             if (log.isInfoEnabled())
@@ -127,10 +129,10 @@ public class TestPredicate extends TestCase2 {
 
         final Var<Long> u = Var.var("u");
 
-        final IPredicate<?> p1 = new P(new IVariableOrConstant[] { u, c1, c2 },
+        final IPredicate<?> p1 = new Predicate(new IVariableOrConstant[] { u, c1, c2 },
                 relation);
 
-        final IPredicate<?> p2 = new P(new IVariableOrConstant[] { u, c3, c4 },
+        final IPredicate<?> p2 = new Predicate(new IVariableOrConstant[] { u, c3, c4 },
                 relation);
 
         if (log.isInfoEnabled()) {
@@ -146,27 +148,58 @@ public class TestPredicate extends TestCase2 {
         assertFalse(p2.equals(p1));
 
     }
-
-    /**
-     * Unit test for reading on an index of some relation.
-     * 
-     * @todo layering in {@link IElementFilter}s.
-     * @todo layering in a {@link Distinct} filter.
-     * @todo verify the correct reporting of access path statistics.
-     * @todo write unit tests for the {@link Union} operator.
-     */
-    public void test_scan() {
-        
-        fail("implement");
-        
-    }
     
-    static protected class P<E> extends Predicate<E> {
+    /**
+     * @todo write unit tests for both asBound methods.
+     */
+    public void test_asBound() {
 
-        public P(final IVariableOrConstant<?>[] values, final String relation) {
+        final Var<Long> u = Var.var("u");
 
-            super(values, relation);
+        final IPredicate<?> p1 = new Predicate(new IVariableOrConstant[] { u, c1, c2 },
+                relation);
+        
+        assertEquals("arity", 3, p1.arity());
 
+        // verify variables versus constants.
+        assertTrue(p1.get(0).isVar());
+        assertTrue(p1.get(1).isConstant());
+        assertTrue(p1.get(2).isConstant());
+        
+        // verify object references.
+        assertTrue(u == p1.get(0));
+        assertTrue(c1 == p1.get(1));
+        assertTrue(c2 == p1.get(2));
+
+        // already bound on the predicate, not found in the binding set.
+        assertEquals(c1.get(), p1.asBound(1, EmptyBindingSet.INSTANCE));
+        
+        // already bound on predicate, but has different value in binding set.
+        assertEquals(c1.get(), p1.asBound(1, new ArrayBindingSet(
+                new IVariable[] { u }, new IConstant[] { c3 })));
+
+        // not bound on the predicate, found in the binding set.
+        assertEquals(c3.get(), p1.asBound(0, new ArrayBindingSet(
+                new IVariable[] { u }, new IConstant[] { c3 })));
+
+        // not bound on the predicate, not found in the binding set.
+        assertNull(p1.asBound(0, EmptyBindingSet.INSTANCE));
+
+        // correct rejection tests.
+        try {
+            p1.asBound(-1, EmptyBindingSet.INSTANCE);
+            fail("Expecting: " + IndexOutOfBoundsException.class);
+        } catch (IndexOutOfBoundsException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+        }
+
+        try {
+            p1.asBound(3, EmptyBindingSet.INSTANCE);
+            fail("Expecting: " + IndexOutOfBoundsException.class);
+        } catch (IndexOutOfBoundsException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
         }
 
     }

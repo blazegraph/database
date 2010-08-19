@@ -53,6 +53,24 @@ import com.ibm.icu.impl.ByteBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
+ * @todo I have some basic questions about the ability to use a UNION of two
+ *       predicates in scale-out. I think that this might be more accurately
+ *       modeled as the UNION of two joins. That is, rather than:
+ * 
+ *       <pre>
+ *       JOIN( ...,
+ *             UNION( foo.spo(A,loves,B),
+ *                    bar.spo(A,loves,B) )
+ *             )
+ * </pre>
+ *       using
+ *       <pre>
+ *       UNION( JOIN( ..., foo.spo(A,loves,B) ),
+ *              JOIN( ..., bar.spo(A,loves,B) )
+ *              )
+ * </pre>
+ *       which would be a binding set union rather than an element union.
+ * 
  * @todo This was historically handled by {@link RelationFusedView} which should
  *       be removed when this class is implemented.
  * 
@@ -68,7 +86,7 @@ import com.ibm.icu.impl.ByteBuffer;
  * @todo A similar operator could be defined where child operands to execute
  *       concurrently and the result is no longer strongly ordered.
  * 
- *       FIXME Implement the send/receive pattern.
+ * @todo Implement the send/receive pattern.
  *       <p>
  *       This COULD be done using {@link IRemoteChunkedIterator} if the send and
  *       receive operators are appropriately decorated in order to pass the

@@ -7,6 +7,7 @@ import org.openrdf.model.Value;
 
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueIdComparator;
+import com.bigdata.striterator.AbstractKeyOrder;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -18,7 +19,7 @@ import com.bigdata.striterator.IKeyOrder;
  * @todo define a BigdataValuePredicate that interoperates with this class to
  *       support joins against the lexicon.
  */
-public class LexiconKeyOrder implements IKeyOrder<BigdataValue> {
+public class LexiconKeyOrder extends AbstractKeyOrder<BigdataValue> implements IKeyOrder<BigdataValue> {
 
     /*
      * Note: these constants make it possible to use switch(index())

@@ -208,9 +208,39 @@ public interface IJoinNexus {
      *             if an argument is <code>null</code>.
      * @throws IndexOutOfBoundsException
      *             if the <i>index</i> is out of bounds.
+     * 
+     * @deprecated by {@link #bind(IPredicate, Object, IBindingSet)}
      */
     boolean bind(final IRule rule, final int index, final Object e,
             final IBindingSet bindings);
+
+    /**
+     * Binds variables from a visited element.
+     * <p>
+     * Note: The bindings are propagated before the constraints are verified so
+     * this method will have a side-effect on the bindings even if the
+     * constraints were not satisfied. Therefore you should clone the bindings
+     * before calling this method.
+     * 
+     * @param pred
+     *            The {@link IPredicate} from which the element was read.
+     * @param constraint
+     *            A constraint which must be satisfied (optional).
+     * @param e
+     *            An element materialized by the {@link IAccessPath} for that
+     *            {@link IPredicate}.
+     * @param bindingSet
+     *            the bindings to which new bindings from the element will be
+     *            applied.
+     * 
+     * @return <code>true</code> unless the new bindings would violate any of
+     *         the optional {@link IConstraint}.
+     * 
+     * @throws NullPointerException
+     *             if an argument is <code>null</code>.
+     */
+    boolean bind(IPredicate<?> pred, IConstraint constraint, Object e,
+            IBindingSet bindings);
 
 //    /**
 //     * Copy values the values from the visited element corresponding to the
@@ -599,7 +629,7 @@ public interface IJoinNexus {
      *       {@link SolutionFilter}.
      *       <p>
      *       The return type here should be strongly typed. The generic argument
-     *       is not a sufficient guarentee and the compiler can be fooled by
+     *       is not a sufficient guarantee and the compiler can be fooled by
      *       passing an {@link IElementFilter} that is already defined in terms
      *       of an {@link ISolution} rather than element of an {@link IRelation}.
      */

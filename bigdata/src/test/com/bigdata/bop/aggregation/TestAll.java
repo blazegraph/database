@@ -21,8 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.bop;
-
+package com.bigdata.bop.aggregation;
 
 
 import junit.framework.Test;
@@ -60,41 +59,16 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("bigdata operators");
+        final TestSuite suite = new TestSuite("distinct, sort, and aggregation operators");
 
-        // test variable and constant impls.
-        suite.addTestSuite(TestVar.class);
-        suite.addTestSuite(TestConstant.class);
+        // test distinct operator for binding sets.
+        suite.addTestSuite(TestDistinctBindingSets.class);
 
-        // test binding set impls.
-        suite.addTestSuite(TestBindingSet.class);
-
-        // @todo unit tests for things like deep copy.
-//        suite.addTest(TestAbstractBOp.class);
+        // test sort operators.
+        suite.addTestSuite(TestSortBindingSets.class);
         
-        // @todo counting variables, etc.
-//        suite.addTest(TestBOpUtility.class);
-
-        // constraint operators (EQ, NE, etc).
-        suite.addTest(com.bigdata.bop.constraint.TestAll.suite());
-
-        // index operators.
-        suite.addTest(com.bigdata.bop.ndx.TestAll.suite());
-
-        // access path operators
-        suite.addTest(com.bigdata.bop.ap.TestAll.suite());
-
-        // join operators.
-        suite.addTest(com.bigdata.bop.join.TestAll.suite());
-
-        // high level query optimization and evaluation.
-        suite.addTest(com.bigdata.bop.eval.TestAll.suite());
-
-        /*
-         * Note: This is tested later once we have gone through the core unit
-         * tests for the services.
-         */
-        //suite.addTest( com.bigdata.bop.fed.TestAll.suite() );
+        // @todo test aggregation (rollup) operators.
+//        suite.addTestSuite(TestDistinctBindingSets.class);
 
         return suite;
         

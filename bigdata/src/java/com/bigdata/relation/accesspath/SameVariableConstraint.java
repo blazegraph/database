@@ -11,7 +11,9 @@ import java.util.Map;
 
 import org.CognitiveWeb.extser.LongPacker;
 
+import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IElement;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
@@ -130,7 +132,9 @@ public class SameVariableConstraint<E> implements IElementFilter<E>,
             
             final int firstIndex = indices[i];
             
-            final IConstant<?> c0 = p.get(e, firstIndex);
+            @SuppressWarnings("unchecked")
+            final IConstant<?> c0 = new Constant(((IElement) e).get(firstIndex));
+//            final IConstant<?> c0 = p.get(e, firstIndex);
 
             for (int j = 0; j < nslots; j++, i++) {
 
@@ -143,7 +147,10 @@ public class SameVariableConstraint<E> implements IElementFilter<E>,
                 
                 final int thisIndex = indices[i];
                 
-                final IConstant<?> c1 = p.get(e, thisIndex);
+                @SuppressWarnings("unchecked")
+                final IConstant<?> c1 = new Constant(((IElement) e)
+                        .get(thisIndex));
+//                final IConstant<?> c1 = p.get(e, thisIndex);
 
                 // same reference (including null).
                 if (c0 == c1)

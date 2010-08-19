@@ -4,9 +4,10 @@ import java.io.Serializable;
 import java.util.Comparator;
 
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.striterator.AbstractKeyOrder;
 import com.bigdata.striterator.IKeyOrder;
 
-public class MagicKeyOrder implements IKeyOrder<IMagicTuple>, Serializable {
+public class MagicKeyOrder extends AbstractKeyOrder<IMagicTuple> implements IKeyOrder<IMagicTuple>, Serializable {
 
     /**
      * Generated serialization version.

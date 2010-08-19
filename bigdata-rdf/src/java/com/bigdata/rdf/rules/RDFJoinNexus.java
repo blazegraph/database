@@ -43,6 +43,8 @@ import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IElement;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
@@ -67,8 +69,6 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.rdf.magic.IMagicTuple;
-import com.bigdata.rdf.magic.MagicTuple;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.relation.rule.BindingSetSortKeyBuilder;
 import com.bigdata.rdf.spo.ISPO;
@@ -996,132 +996,172 @@ public class RDFJoinNexus implements IJoinNexus {
             final IBindingSet bindings) {
 
         // propagate bindings from the visited object into the binding set.
-        copyValues(e, rule.getTail(index), bindings);
+        copyValues((IElement) e, rule.getTail(index), bindings);
 
         // verify constraints.
         return rule.isConsistent(bindings);
 
     }
     
-    @SuppressWarnings("unchecked")
-    private void copyValues(final Object e, final IPredicate predicate,
-            final IBindingSet bindingSet) {
+    public boolean bind(final IPredicate<?> pred, final IConstraint constraint,
+            final Object e, final IBindingSet bindings) {
 
-        if (e == null)
-            throw new IllegalArgumentException();
-        
-        if (predicate == null)
-            throw new IllegalArgumentException();
-        
-        if (bindingSet == null)
-            throw new IllegalArgumentException();
-        
-        if (e instanceof SPO) {
-        
-            copyValues((SPO) e, (IPredicate<ISPO>) predicate, bindingSet);
-            
-        } else {
+        // propagate bindings from the visited object into the binding set.
+        copyValues((IElement) e, pred, bindings);
 
-            copyValues((MagicTuple) e, 
-                    (IPredicate<IMagicTuple>) predicate, bindingSet);
-            
+        if (constraint != null) {
+
+            // verify constraint.
+            return constraint.accept(bindings);
+        
         }
+        
+        // no constraint.
+        return true;
         
     }
     
     @SuppressWarnings("unchecked")
-    private void copyValues(final SPO spo, final IPredicate<ISPO> predicate,
+    private void copyValues(final IElement e, final IPredicate<?> pred,
             final IBindingSet bindingSet) {
-    
-        {
 
-            final IVariableOrConstant<IV> t = predicate.get(0);
-            
-            if(t.isVar()) {
-
-                final IVariable<IV> var = (IVariable<IV>)t;
-                
-                final Constant newval = new Constant<IV>(spo.s);
-
-                bindingSet.set(var, newval);
-                
-            }
-
-        }
-
-        {
-
-            final IVariableOrConstant<IV> t = predicate.get(1);
-            
-            if(t.isVar()) {
-
-                final IVariable<IV> var = (IVariable<IV>)t;
-
-                final Constant newval = new Constant<IV>(spo.p);
-
-                bindingSet.set(var, newval);
-                
-            }
-
-        }
-
-        {
-
-            final IVariableOrConstant<IV> t = predicate.get(2);
-            
-            if(t.isVar()) {
-
-                final IVariable<IV> var = (IVariable<IV>)t;
-
-                final Constant newval = new Constant<IV>(spo.o);
-
-                bindingSet.set(var, newval);
-                
-            }
-
-        }
-        
-        /*if (predicate.arity() == 4)*/ {
-
-            // context position / statement identifier.
-
-            final IVariableOrConstant<IV> t = predicate.get(3);
-            
-            if (t != null && t.isVar()) {
-
-                final IVariable<IV> var = (IVariable<IV>) t;
-
-                final Constant newval = new Constant<IV>(spo.c());
-
-                bindingSet.set(var, newval);
-
-            }
-
-        }
-        
-    }
-
-    @SuppressWarnings("unchecked")
-    private void copyValues(final MagicTuple tuple, 
-            final IPredicate<IMagicTuple> pred, final IBindingSet bindingSet) {
-    
         for (int i = 0; i < pred.arity(); i++) {
-            
-            final IVariableOrConstant<IV> t = pred.get(i);
-            
-            if(t.isVar()) {
 
-                final IVariable<IV> var = (IVariable<IV>)t;
-                
-                final Constant newval = new Constant<IV>(tuple.getTerm(i));
+            final IVariableOrConstant<?> t = pred.get(i);
+
+            if (t.isVar()) {
+
+                final IVariable<?> var = (IVariable<?>) t;
+
+                final Constant<?> newval = new Constant(e.get(i));
 
                 bindingSet.set(var, newval);
-                
+
             }
 
         }
-        
+
     }
+    
+//    @SuppressWarnings("unchecked")
+//    private void copyValues(final Object e, final IPredicate predicate,
+//            final IBindingSet bindingSet) {
+//
+//        if (e == null)
+//            throw new IllegalArgumentException();
+//        
+//        if (predicate == null)
+//            throw new IllegalArgumentException();
+//        
+//        if (bindingSet == null)
+//            throw new IllegalArgumentException();
+//        
+//        if (e instanceof SPO) {
+//        
+//            copyValues((SPO) e, (IPredicate<ISPO>) predicate, bindingSet);
+//            
+//        } else {
+//
+//            copyValues((MagicTuple) e, 
+//                    (IPredicate<IMagicTuple>) predicate, bindingSet);
+//            
+//        }
+//        
+//    }
+//    
+//    @SuppressWarnings("unchecked")
+//    private void copyValues(final SPO spo, final IPredicate<ISPO> predicate,
+//            final IBindingSet bindingSet) {
+//    
+//        {
+//
+//            final IVariableOrConstant<IV> t = predicate.get(0);
+//            
+//            if(t.isVar()) {
+//
+//                final IVariable<IV> var = (IVariable<IV>)t;
+//                
+//                final Constant newval = new Constant<IV>(spo.s);
+//
+//                bindingSet.set(var, newval);
+//                
+//            }
+//
+//        }
+//
+//        {
+//
+//            final IVariableOrConstant<IV> t = predicate.get(1);
+//            
+//            if(t.isVar()) {
+//
+//                final IVariable<IV> var = (IVariable<IV>)t;
+//
+//                final Constant newval = new Constant<IV>(spo.p);
+//
+//                bindingSet.set(var, newval);
+//                
+//            }
+//
+//        }
+//
+//        {
+//
+//            final IVariableOrConstant<IV> t = predicate.get(2);
+//            
+//            if(t.isVar()) {
+//
+//                final IVariable<IV> var = (IVariable<IV>)t;
+//
+//                final Constant newval = new Constant<IV>(spo.o);
+//
+//                bindingSet.set(var, newval);
+//                
+//            }
+//
+//        }
+//        
+//        /*if (predicate.arity() == 4)*/ {
+//
+//            // context position / statement identifier.
+//
+//            final IVariableOrConstant<IV> t = predicate.get(3);
+//            
+//            if (t != null && t.isVar()) {
+//
+//                final IVariable<IV> var = (IVariable<IV>) t;
+//
+//                final Constant newval = new Constant<IV>(spo.c());
+//
+//                bindingSet.set(var, newval);
+//
+//            }
+//
+//        }
+//        
+//    }
+//
+//    @SuppressWarnings("unchecked")
+//    private void copyValues(final MagicTuple tuple, 
+//            final IPredicate<IMagicTuple> pred, final IBindingSet bindingSet) {
+//    
+//        for (int i = 0; i < pred.arity(); i++) {
+//            
+//            final IVariableOrConstant<IV> t = pred.get(i);
+//            
+//            if(t.isVar()) {
+//
+//                final IVariable<IV> var = (IVariable<IV>)t;
+//                
+//                final Constant newval = new Constant<IV>(tuple.getTerm(i));
+//
+//                bindingSet.set(var, newval);
+//                
+//            }
+//
+//        }
+//        
+//    }
 
     public IConstant fakeBinding(IPredicate pred, Var var) {
 

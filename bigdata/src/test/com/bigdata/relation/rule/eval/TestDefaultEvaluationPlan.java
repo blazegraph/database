@@ -38,6 +38,7 @@ import junit.framework.TestCase2;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
@@ -251,6 +252,13 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
             
         }
        
+        public boolean bind(IPredicate<?> pred, IConstraint constraint,
+                Object e, IBindingSet bindings) {
+
+            return false;
+            
+        }
+
 //        public void copyValues(Object e, IPredicate predicate, IBindingSet bindingSet) {
 //
 //        }

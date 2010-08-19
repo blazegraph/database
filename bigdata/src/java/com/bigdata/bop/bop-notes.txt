@@ -1,3 +1,11 @@
+- Add IElement interface with Object:get(int index) to pull off the
+  fields from the element by index position.  Use this to make
+  RDFJoinNexus#bind() and copyValues() generic.  We can just do a cast
+  to IElement, but we could also change the generic type constraint on
+  IRelation from <E> to IRelation<E extends IElement>.  But we can
+  just force the cast for now and not have to update all of those
+  generic constraints.
+
 - Review annotation names and defaults.  Make sure that the annotation
   names are all in appropriate namespaces.  The namespaces should
   probably be the interface or class of the operator which defines
@@ -93,12 +101,174 @@ BOp
 .IOpN
 ..IPredicate(name,arg...)[shardId:int;optional:boolean;constraint:IConstraint[],expander]
 
+- Distributed query execution pattern:
+
+  The historical pipeline join propagated evaluation from left to
+  right. This needs to be revisited in now that we are dealing with
+  operator trees. Operator trees lend themselves naturally to top-down
+  evaluation.  While I think that we can do top-down evaluation of the
+  operator tree for scaleup, the distributed query execution logic is
+  more complicated and top-down evaluation is not compatible with
+  distributed evaluation because joins must run for different shards
+  based on the partition identifier associated with each bindingSet[]
+  they receive.
+                  
+  What we been doing is pushing binding sets along propagating joins
+  at specific shards onto nodes together with those binding sets.
+  This was a left-to-right evaluation strategy when the IRule was just
+  an ordered array of tails on which we needed to read.  However, now
+  that we have an operator tree it would correspond to a bottom up
+  evaluation of a left-deep tree where the right operands were always
+  access path reads.  That makes my head hurt just a bit when I
+  consider that the bottom up evaluation would also be "partial" as
+  binding sets appear.
+
+  For a given incoming IBindingSet[] chunk we will continue to do
+  exactly what we have been doing, but the surrounding logic needs to
+  be replaced. Starting a "join" (at least for piplined scale-out)
+  needs to merely register a join task factory that will handle
+  binding sets as they arrive.
+
+  I am thinking that the way to handle this is to send the query
+  identifier, join operation identifier, and partition identifier
+  along with the client's proxy object, the senders operator
+  identifier, and the senders's service identifier.  If the node (a
+  data service) which receives that RMI message has not seen the query
+  yet it uses RMI against the client's proxy to fetch the query and
+  then "starts" the query on that node.  Starting a query would merely
+  allow execution of the operators described in the query plan on the
+  node once they had sufficient data to run.  The current pipeline
+  join is a chunk-wise nested index join.  It runs one pass each time
+  it has a chunk of binding sets for some shard.  Query termination
+  would be controlled by the client.  It would instruct all nodes
+  known to be running the query to halt execution for that query.
+  Even if a node misses that message, it will find out when it tries
+  to send intermediate results to another node that the query was
+  cancelled.
+
+  Per shard locks, tasks, and threads.
+
+  When running within a single Journal, the query plan is executed by
+  one task which holds all of the necessary locks.  Those locks are
+  acquired up front by an inspection of the query plan to determine
+  which indices are needed [actually, it may just be using the
+  unisolated read/write index and otherwise historical views w/o
+  locks.]
+
+  There are issues relating to execution of the joins under the
+  concurrency manager, both in order to have access to the correct
+  IIndexManager and in order to managing reads and writes against the
+  unisolated indices by acquiring the appropriate locks.  The way
+  things work right now the upstream join tests a cache for the
+  downstream join task for a given shard.  If there is a cache miss,
+  it sends a factory task which uses a singleton pattern to start a
+  join task executing with the appropriate locks under the concurrency
+  manager and then returns the proxy for that join task to the caller.
+  This guarantees that each join task has the correct locks, but it
+  does so at the expense of running one thread per join task.  It will
+  be difficult to get around this one task per shard per join
+  constraint without going directly to the lock manager with the shard
+  lock requests. [Or just submitting a per binding set chunk task to
+  the ConcurrencyManager, which might not be that bad if the chunks
+  are chunky.]
+
+  ==> Given this, maybe it would be easiest to adapt the current join
+  execution to allow optional gotos by paying close attention to the
+  termination condition for the query?  We could then refactor to
+  support BOPs within the same general control logic.  A DISTINCT
+  filter could be yet another custom RMI thing layered directly into
+  the join logic.
+
+  Rather than defining an eval() method for each operator, we have
+  standoff interpretation of the pipeline operators (whether for
+  binding sets, elements, or solutions).  The query plan could
+  encapsulate the local versus distributed execution with annotations
+  on the operators rather than interposing operators and those
+  annotations would be used to wrap the sink with one which marshells
+  the outputs onto NIO buffers.
+
+   - Pipelined chunk-wise nested index join.  This is the existing
+     join algorithm.  For each binding set chunk received on a node to
+     be joined with a given shard, we execute that chunk wise join and
+     emit the intermediate results.  [When the join is optional, we
+     have an optional target and we send the binding sets which do not
+     join to that optional target.]
+
+   - multi-block io pipelined join.  This is a version of the piplined
+     chunk-wise nested index join which accumulates much larger chunks
+     (mega chunks) of binding sets (potentially all intermediate
+     results) and then computes the join of that using the
+     operator-at-a-time approach for that mega chunk.  The tradeoff
+     between this join and the pure operator at a time join is that we
+     can keep the intermediate results off the disk using this
+     approach but we may have to read the shard multiple times.
+
+   - operator-at-a-time shard wise multi-block-io join.  This join
+     proceeds an operator at a time.  Once the producer is done, it
+     computes the entire join using the intermediate results from the
+     prior join and a single multi-block IO pass over the shard view.
+
+     A tuple read from the shard joins if there exists a binding set
+     which is consistent with that tuple.  For example, given:
+
+     :- ..., POS(A loves B), SPO(B loves C).
+
+     and the following intermediate results from the POS shard:
+
+     B0:[A=John, B=Mary, ...]
+     B1:[A=Mary, B=Paul, ...]
+     B2:[A=Paul, B=Leon, ...]
+     B3:[A=Leon, B=Paul, ...]
+
+     and the following tuples read from the SPO shard:
+
+     T0:(John loves Mary)
+     T1:(Mary loves Paul)
+     T2:(Paul loves Leon)
+     T3:(Leon loves Paul)
+
+     then we have the following joins:
+
+     (T2, B3) // T2:(Paul loves Leon) with B3:[A=Leon, B=Paul, ...].
+     (T3, B2) // T3:(Leon loves Leon) with T2:[A=Paul, B=Leon, ...].
+
+     There are several ways to manipulate the intermediate results to
+     setup the join: 
+
+     Merge join: Merge sort the binding sets based on the relevant
+     bound values (A,B) and do an ordered scan of the binding sets and
+     the shard, emitting results which join.
+
+     Hash join: Create a temporary hash table (backed by disk) whose
+     keys are the relevant bound values for (A,B) and whose values are
+     either: (a) the associated binding sets (there can be more than
+     one per (A,B) and all must be preserved; or (b) the #of offsets
+     and the offsets into an array or a persistent store of the
+     associated binding sets.
+
+     Based on our need for an N-way merge sort, I would think that the
+     merge join will offer the most benefit initially and is likely to
+     be better organized for execution in memory (it has locality at
+     more memory tiers).
+
+- Scaleup query execution pattern:
+  
+  Queries which are not distributed can use top-down evaluation of the
+  left deep pipeline joins.
+
+
 - BOp execution.
 
   (***) Implement all BOps for which there is existing functionality.
 
-	PipelineJoin: join binding set producer with local access path
-	using asBound Predicate.
+	PipelineJoin: Join binding set producer with local access path
+	using asBound Predicate.  This should be **TRIVIAL** and can
+	be unit tested against mock objects for the left and right
+	hand operands.  (The vast majority of the logic in JoinTask
+	dealt with coordinating the pipeline operations. It should
+	even be trivial to put in "gotos" for failed optional joins.
+	Defer the logic for mapShards until the core joins are
+	running.)
 
 	Predicate: read on as bound access path (IChunked(Ordered)Iterator).
 
