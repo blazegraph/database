@@ -38,6 +38,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.ap.Predicate;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.ISolutionExpander;
@@ -55,69 +56,14 @@ import com.bigdata.striterator.IKeyOrder;
  * @todo This is specific to the RDF and models an SPO or SPOC tuple. It can not
  *       be used for the lexicon tuples or other kinds of relations.
  */
-public class MagicPredicate implements IPredicate<IMagicTuple> {
+public class MagicPredicate extends Predicate<IMagicTuple> {
 
     protected static final Logger log = Logger.getLogger(MagicPredicate.class);
     
-//    public MagicPredicate copy() {
-//        
-//        return new MagicPredicate(this, relationName);
-//        
-//    }
-
     /**
      * 
      */
     private static final long serialVersionUID = 1396017399712849975L;
-
-    private final String[] relationName;
-
-    private final int partitionId;
-    
-    /**
-     * The terms (variables or constants) associated with this predicate.
-     */
-    private final List<IVariableOrConstant<IV>> terms;
-
-    private final IElementFilter constraint;
-
-    private final ISolutionExpander expander;
-    
-    public String getOnlyRelationName() {
-        
-        if (relationName.length != 1)
-            throw new IllegalStateException();
-        
-        return relationName[0];
-        
-    }
-    
-    public String getRelationName(int index) {
-        
-        return relationName[index];
-        
-    }
-    
-    final public int getRelationCount() {
-        
-        return relationName.length;
-        
-    }
-
-    final public int getPartitionId() {
-        
-        return partitionId;
-        
-    }
-    
-    /**
-     * The arity is determined by the number of terms supplied in the ctor.
-     */
-    public final int arity() {
-        
-        return terms.size();
-        
-    }
 
     /**
      * Partly specified ctor. No constraint is specified. No expander is 
@@ -171,387 +117,282 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
             IVariableOrConstant<IV>... terms//
             ) {
         
-        if (relationName == null)
-            throw new IllegalArgumentException();
-       
-        for (int i = 0; i < relationName.length; i++) {
-            
-            if (relationName[i] == null)
-                throw new IllegalArgumentException();
-            
-        }
-        
-        if (relationName.length == 0)
-            throw new IllegalArgumentException();
-        
-        if (partitionId < -1)
-            throw new IllegalArgumentException();
-        
-        this.relationName = relationName;
-        
-        this.partitionId = partitionId;
-        
-        this.constraint = constraint; /// MAY be null.
-        
-        this.expander = expander;// MAY be null.
-        
-        this.terms = Arrays.asList(terms);
+        super(terms, relationName[0], partitionId, false, constraint, expander);
         
     }
 
-    /**
-     * Copy constructor overrides the relation name(s).
-     * 
-     * @param relationName
-     *            The new relation name(s).
-     */
-    protected MagicPredicate(MagicPredicate src, String[] relationName) {
-        
-        if (relationName == null)
-            throw new IllegalArgumentException();
-       
-        for(int i=0; i<relationName.length; i++) {
-            
-            if (relationName[i] == null)
-                throw new IllegalArgumentException();
-            
-        }
-        
-        if (relationName.length == 0)
-            throw new IllegalArgumentException();
- 
-        this.partitionId = src.partitionId;
-        
-        this.relationName = relationName; // override.
-     
-        this.constraint = src.constraint;
-        
-        this.expander = src.expander;
-        
-        this.terms = new LinkedList<IVariableOrConstant<IV>>();
-        
-        this.terms.addAll(src.terms);
-        
-    }
-
-    /**
-     * Copy constructor sets the index partition identifier.
-     * 
-     * @param partitionId
-     *            The index partition identifier.
-     *            
-     * @throws IllegalArgumentException
-     *             if the index partition identified is a negative integer.
-     * @throws IllegalStateException
-     *             if the index partition identifier was already specified.
-     */
-    protected MagicPredicate(final MagicPredicate src, final int partitionId) {
-
-        //@todo uncomment the other half of this test to make it less paranoid.
-        if (src.partitionId != -1 ) {//&& this.partitionId != partitionId) {
-            
-            throw new IllegalStateException();
-
-        }
-
-        if (partitionId < 0) {
-
-            throw new IllegalArgumentException();
-
-        }
-
-        this.relationName = src.relationName;
-        
-        this.partitionId = partitionId;
-        
-        this.constraint = src.constraint;
-        
-        this.expander = src.expander;
-        
-        this.terms = new LinkedList<IVariableOrConstant<IV>>();
-        
-        this.terms.addAll(src.terms);
-        
-    }
-
-    public final IVariableOrConstant<IV> get(int index) {
-        
-        return terms.get(index);
-        
-    }
-
-    public final IConstant<IV> get(final IMagicTuple e, final int index) {
-
-        return new Constant<IV>(e.getTerm(index));
-        
-    }
-    
-//    /**
-//     * Return true iff all terms of the predicate are bound (vs
-//     * variables).
-//     */
-//    final public boolean isFullyBound() {
+//    public final IConstant<IV> get(final IMagicTuple e, final int index) {
 //
+//        return new Constant<IV>(e.getTerm(index));
+//        
+//    }
+//    
+////    /**
+////     * Return true iff all terms of the predicate are bound (vs
+////     * variables).
+////     */
+////    final public boolean isFullyBound() {
+////
+////        for (IVariableOrConstant<IV> term : terms) {
+////
+////            if (term.isVar()) {
+////                
+////                return false;
+////                
+////            }
+////            
+////        }
+////        
+////        return true;
+////
+////    }
+//
+//    public boolean isFullyBound(final IKeyOrder<IMagicTuple> keyOrder) {
+//
+//        return getVariableCount(keyOrder) == 0;
+//
+//    }
+//
+//    public int getVariableCount(final IKeyOrder<IMagicTuple> keyOrder) {
+//        int nunbound = 0;
+//        final int keyArity = keyOrder.getKeyArity();
+//        for (int keyPos = 0; keyPos < keyArity; keyPos++) {
+//            final int index = keyOrder.getKeyOrder(keyPos);
+//            final IVariableOrConstant<?> t = get(index);
+//            if (t == null || t.isVar()) {
+//                nunbound++;
+//            }
+//        }
+//        return nunbound;
+//    }
+//    
+//    final public int getVariableCount() {
+//        
+//        int i = 0;
+//        
 //        for (IVariableOrConstant<IV> term : terms) {
 //
 //            if (term.isVar()) {
 //                
-//                return false;
+//                i++;
 //                
 //            }
 //            
 //        }
 //        
-//        return true;
+//        return i;
+//        
+//    }
+//    
+//    public Iterator<IVariable<?>> getVariables() {
+//        
+//        final Set<IVariable<?>> vars = new HashSet<IVariable<?>>();
+//
+//        for (int i = 0; i < arity(); i++) {
+//            if (get(i).isVar()) {
+//                vars.add((IVariable<?>) get(i));
+//            }
+//        }
+//        
+//        return vars.iterator();
 //
 //    }
-
-    public boolean isFullyBound(final IKeyOrder<IMagicTuple> keyOrder) {
-
-        return getVariableCount(keyOrder) == 0;
-
-    }
-
-    public int getVariableCount(final IKeyOrder<IMagicTuple> keyOrder) {
-        int nunbound = 0;
-        final int keyArity = keyOrder.getKeyArity();
-        for (int keyPos = 0; keyPos < keyArity; keyPos++) {
-            final int index = keyOrder.getKeyOrder(keyPos);
-            final IVariableOrConstant<?> t = get(index);
-            if (t == null || t.isVar()) {
-                nunbound++;
-            }
-        }
-        return nunbound;
-    }
-    
-    final public int getVariableCount() {
-        
-        int i = 0;
-        
-        for (IVariableOrConstant<IV> term : terms) {
-
-            if (term.isVar()) {
-                
-                i++;
-                
-            }
-            
-        }
-        
-        return i;
-        
-    }
-    
-    public Iterator<IVariable<?>> getVariables() {
-        
-        final Set<IVariable<?>> vars = new HashSet<IVariable<?>>();
-
-        for (int i = 0; i < arity(); i++) {
-            if (get(i).isVar()) {
-                vars.add((IVariable<?>) get(i));
-            }
-        }
-        
-        return vars.iterator();
-
-    }
-    
-    public MagicPredicate asBound(IBindingSet bindingSet) {
-        
-        final IVariableOrConstant<IV>[] newTerms =
-            new IVariableOrConstant[this.terms.size()];
-
-        int i = 0;
-        for (IVariableOrConstant<IV> term : this.terms) {
-            IVariableOrConstant<IV> newTerm;
-            if (term.isVar() && bindingSet.isBound((IVariable<IV>) term)) {
-                newTerm = bindingSet.get((IVariable<IV>) term);
-            } else {
-                newTerm = term;
-            }
-            newTerms[i++] = newTerm;
-        }
-        
-        return new MagicPredicate(relationName, partitionId, 
-                constraint, expander, newTerms);
-        
-    }
-
-    public MagicPredicate setRelationName(String[] relationName) {
-
-        return new MagicPredicate(this, relationName);
-        
-    }
-    
-    public MagicPredicate setPartitionId(int partitionId) {
-
-        return new MagicPredicate(this, partitionId);
-
-    }
-    
-    public IMagicTuple toMagicTuple() {
-        
-        final IV[] terms = new IV[this.terms.size()];
-        int i = 0;
-        for (IVariableOrConstant<IV> term : this.terms) {
-            if (term.isVar()) {
-                throw new RuntimeException("predicate not fully bound");
-            } else {
-                terms[i++] = term.get();
-            }
-        }
-        
-        return new MagicTuple(terms);
-        
-    }
-
-    public String toString() {
-
-        return toString(null);
-        
-    }
-
-    public String toString(IBindingSet bindingSet) {
-
-        StringBuilder sb = new StringBuilder();
-
-        sb.append("(");
-
-        sb.append(Arrays.toString(relationName));
-
-        sb.append(", ");
-        
-        for (IVariableOrConstant<IV> term : terms) {
-            
-            sb.append(term.isConstant() || bindingSet == null
-                    || !bindingSet.isBound((IVariable) term) ? term.toString()
-                    : bindingSet.get((IVariable) term));
-
-            sb.append(", ");
-            
-        }
-
-        if (terms.size() > 0) {
-            
-            sb.setLength(sb.length()-2);
-            
-        }
-        
-        sb.append("))");
-
-        if (constraint != null || expander != null
-                || partitionId != -1) {
-            
-            /*
-             * Something special, so do all this stuff.
-             */
-            
-            boolean first = true;
-            
-            sb.append("[");
-            
-            if(constraint!=null) {
-                if(!first) sb.append(", ");
-                sb.append(constraint.toString());
-                first = false;
-            }
-            
-            if(expander!=null) {
-                if(!first) sb.append(", ");
-                sb.append(expander.toString());
-                first = false;
-            }
-            
-            if(partitionId!=-1) {
-                if(!first) sb.append(", ");
-                sb.append("partitionId="+partitionId);
-                first = false;
-            }
-            
-            sb.append("]");
-            
-        }
-        
-        return sb.toString();
-
-    }
-
-    final public boolean isOptional() {
-        
-        return false;
-        
-    }
-    
-    final public IElementFilter getConstraint() {
-
-        return constraint;
-        
-    }
-
-    final public ISolutionExpander getSolutionExpander() {
-        
-        return expander;
-        
-    }
-
-    public boolean equals(final Object other) {
-
-        if (this == other)
-            return true;
-
-        if (!(other instanceof IPredicate<?>))
-            return false;
-
-        final IPredicate<?> o = (IPredicate<?>) other;
-
-        final int arity = arity();
-        
-        if(arity != o.arity()) return false;
-        
-        for(int i=0; i<arity; i++) {
-            
-            final IVariableOrConstant<?> x = get(i);
-            
-            final IVariableOrConstant<?> y = o.get(i);
-            
-            if (x != y && !(x.equals(y))) {
-                
-                return false;
-            
-            }
-            
-        }
-        
-        return true;
-        
-    }
-
-    public int hashCode() {
-        
-        int h = hash;
-
-        if (h == 0) {
-
-            final int n = arity();
-
-            for (int i = 0; i < n; i++) {
-        
-                h = 31 * h + get(i).hashCode();
-                
-            }
-            
-            hash = h;
-            
-        }
-        
-        return h;
-
-    }
-
-    /**
-     * Caches the hash code.
-     */
-    private int hash = 0;
+//    
+//    public MagicPredicate asBound(IBindingSet bindingSet) {
+//        
+//        final IVariableOrConstant<IV>[] newTerms =
+//            new IVariableOrConstant[this.terms.size()];
+//
+//        int i = 0;
+//        for (IVariableOrConstant<IV> term : this.terms) {
+//            IVariableOrConstant<IV> newTerm;
+//            if (term.isVar() && bindingSet.isBound((IVariable<IV>) term)) {
+//                newTerm = bindingSet.get((IVariable<IV>) term);
+//            } else {
+//                newTerm = term;
+//            }
+//            newTerms[i++] = newTerm;
+//        }
+//        
+//        return new MagicPredicate(relationName, partitionId, 
+//                constraint, expander, newTerms);
+//        
+//    }
+//
+//    public MagicPredicate setRelationName(String[] relationName) {
+//
+//        return new MagicPredicate(this, relationName);
+//        
+//    }
+//    
+//    public MagicPredicate setPartitionId(int partitionId) {
+//
+//        return new MagicPredicate(this, partitionId);
+//
+//    }
+//    
+//    public IMagicTuple toMagicTuple() {
+//        
+//        final IV[] terms = new IV[this.terms.size()];
+//        int i = 0;
+//        for (IVariableOrConstant<IV> term : this.terms) {
+//            if (term.isVar()) {
+//                throw new RuntimeException("predicate not fully bound");
+//            } else {
+//                terms[i++] = term.get();
+//            }
+//        }
+//        
+//        return new MagicTuple(terms);
+//        
+//    }
+//
+//    public String toString() {
+//
+//        return toString(null);
+//        
+//    }
+//
+//    public String toString(IBindingSet bindingSet) {
+//
+//        StringBuilder sb = new StringBuilder();
+//
+//        sb.append("(");
+//
+//        sb.append(Arrays.toString(relationName));
+//
+//        sb.append(", ");
+//        
+//        for (IVariableOrConstant<IV> term : terms) {
+//            
+//            sb.append(term.isConstant() || bindingSet == null
+//                    || !bindingSet.isBound((IVariable) term) ? term.toString()
+//                    : bindingSet.get((IVariable) term));
+//
+//            sb.append(", ");
+//            
+//        }
+//
+//        if (terms.size() > 0) {
+//            
+//            sb.setLength(sb.length()-2);
+//            
+//        }
+//        
+//        sb.append("))");
+//
+//        if (constraint != null || expander != null
+//                || partitionId != -1) {
+//            
+//            /*
+//             * Something special, so do all this stuff.
+//             */
+//            
+//            boolean first = true;
+//            
+//            sb.append("[");
+//            
+//            if(constraint!=null) {
+//                if(!first) sb.append(", ");
+//                sb.append(constraint.toString());
+//                first = false;
+//            }
+//            
+//            if(expander!=null) {
+//                if(!first) sb.append(", ");
+//                sb.append(expander.toString());
+//                first = false;
+//            }
+//            
+//            if(partitionId!=-1) {
+//                if(!first) sb.append(", ");
+//                sb.append("partitionId="+partitionId);
+//                first = false;
+//            }
+//            
+//            sb.append("]");
+//            
+//        }
+//        
+//        return sb.toString();
+//
+//    }
+//
+//    final public boolean isOptional() {
+//        
+//        return false;
+//        
+//    }
+//    
+//    final public IElementFilter getConstraint() {
+//
+//        return constraint;
+//        
+//    }
+//
+//    final public ISolutionExpander getSolutionExpander() {
+//        
+//        return expander;
+//        
+//    }
+//
+//    public boolean equals(final Object other) {
+//
+//        if (this == other)
+//            return true;
+//
+//        if (!(other instanceof IPredicate<?>))
+//            return false;
+//
+//        final IPredicate<?> o = (IPredicate<?>) other;
+//
+//        final int arity = arity();
+//        
+//        if(arity != o.arity()) return false;
+//        
+//        for(int i=0; i<arity; i++) {
+//            
+//            final IVariableOrConstant<?> x = get(i);
+//            
+//            final IVariableOrConstant<?> y = o.get(i);
+//            
+//            if (x != y && !(x.equals(y))) {
+//                
+//                return false;
+//            
+//            }
+//            
+//        }
+//        
+//        return true;
+//        
+//    }
+//
+//    public int hashCode() {
+//        
+//        int h = hash;
+//
+//        if (h == 0) {
+//
+//            final int n = arity();
+//
+//            for (int i = 0; i < n; i++) {
+//        
+//                h = 31 * h + get(i).hashCode();
+//                
+//            }
+//            
+//            hash = h;
+//            
+//        }
+//        
+//        return h;
+//
+//    }
+//
+//    /**
+//     * Caches the hash code.
+//     */
+//    private int hash = 0;
 
 }
