@@ -37,7 +37,7 @@ import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.accesspath.AbstractAccessPath;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.BufferClosedException;
@@ -1259,7 +1259,7 @@ abstract public class JoinTask implements Callable<Void> {
         protected void reorderTasks(final AccessPathTask[] tasks) {
 
             // @todo layered access paths do not expose a fromKey.
-            if (tasks[0].accessPath instanceof AbstractAccessPath<?>) {
+            if (tasks[0].accessPath instanceof AccessPath<?>) {
 
                 // reorder the tasks.
                 Arrays.sort(tasks);
@@ -1409,7 +1409,7 @@ abstract public class JoinTask implements Callable<Void> {
          */
         protected byte[] getFromKey() {
 
-            return ((AbstractAccessPath<?>) accessPath).getFromKey();
+            return ((AccessPath<?>) accessPath).getFromKey();
 
         }
 

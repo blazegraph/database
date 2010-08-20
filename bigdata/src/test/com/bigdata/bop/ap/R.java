@@ -41,7 +41,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.IMutableRelation;
-import com.bigdata.relation.accesspath.AbstractAccessPath;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.striterator.AbstractKeyOrder;
@@ -155,6 +155,12 @@ public class R extends AbstractRelation<E> implements IMutableRelation<E> {
 
     }
 
+    public IKeyOrder<E> getPrimaryKeyOrder() {
+        
+        return primaryKeyOrder;
+        
+    }
+    
     /**
      * Simple insert procedure works fine for a local journal.
      */
@@ -224,10 +230,10 @@ public class R extends AbstractRelation<E> implements IMutableRelation<E> {
         // default flags.
         final int flags = IRangeQuery.DEFAULT;
 
-        final AbstractAccessPath<E> accessPath = new AbstractAccessPath<E>(
-                getIndexManager(), getTimestamp(), predicate, keyOrder, ndx,
-                flags, getChunkOfChunksCapacity(), getChunkCapacity(),
-                getFullyBufferedReadThreshold()) {
+        final AccessPath<E> accessPath = new AccessPath<E>(
+                this/* relation */, getIndexManager(), getTimestamp(),
+                predicate, keyOrder, ndx, flags, getChunkOfChunksCapacity(),
+                getChunkCapacity(), getFullyBufferedReadThreshold()) {
         };
 
         accessPath.init();

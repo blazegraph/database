@@ -33,6 +33,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 
@@ -67,6 +68,11 @@ import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Abstract base class for type-specific {@link IAccessPath} implementations.
+ *<p>
+ * Note: Filters should be specified when the {@link IAccessPath} is constructed
+ * so that they will be evaluated on the data service rather than materializing
+ * the elements and then filtering them. This can be accomplished by adding the
+ * filter as a constraint on the predicate when specifying the access path.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -79,13 +85,14 @@ import cutthecrap.utils.striterators.Striterator;
  *       applied to the index. That requires a means to dynamically filter out
  *       the elements we do not want from the key-range scan - the filtering
  *       should of course be done at the {@link IDataService}.
- * 
- * FIXME Rename since no longer abstract!
  */
-public class AbstractAccessPath<R> implements IAccessPath<R> {
+public class AccessPath<R> implements IAccessPath<R> {
 
     static final protected Logger log = Logger.getLogger(IAccessPath.class);
     
+    /** Relation (resolved lazily if not specified to the ctor). */
+    private final AtomicReference<IRelation<R>> relation;
+
     /** Access to the index, resource locator, executor service, etc. */
     protected final IIndexManager indexManager;
 
@@ -207,13 +214,8 @@ public class AbstractAccessPath<R> implements IAccessPath<R> {
     /**
      * The key corresponding to the inclusive lower bound for the
      * {@link IAccessPath} <code>null</code> if there is no lower bound.
-     * <p>
-     * <strong>This MUST be set by the concrete subclass using
-     * {@link #setFromKey(byte[])} BEFORE calling
-     * {@link AbstractAccessPath#init()} - it MAY be set to a <code>null</code>
-     * value</strong>.
      */
-    public byte[] getFromKey() {
+    final public byte[] getFromKey() {
 
         return fromKey;
 
@@ -222,13 +224,8 @@ public class AbstractAccessPath<R> implements IAccessPath<R> {
     /**
      * The key corresponding to the exclusive upper bound for the
      * {@link IAccessPath} -or- <code>null</code> if there is no upper bound.
-     * <p>
-     * <strong>This MUST be set by the concrete subclass using
-     * {@link #setFromKey(byte[])} BEFORE calling
-     * {@link AbstractAccessPath#init()} - it MAY be set to a <code>null</code>
-     * value.</strong>
      */
-    public byte[] getToKey() {
+    final public byte[] getToKey() {
         
         return toKey;
         
@@ -282,8 +279,13 @@ public class AbstractAccessPath<R> implements IAccessPath<R> {
         return keyOrder;
         
     }
-    
+
     /**
+     * @param relation
+     *            The relation for the access path (optional). The
+     *            <i>relation</> is not specified when requested an
+     *            {@link IAccessPath} for a specific index partition in order to
+     *            avoid forcing the materialization of the {@link IRelation}.
      * @param indexManager
      *            Access to the indices, resource locators, executor service,
      *            etc.
@@ -303,9 +305,9 @@ public class AbstractAccessPath<R> implements IAccessPath<R> {
      *            the target or one or more producers. This is generally a small
      *            number on the order of the #of parallel producers that might
      *            be writing on the {@link IBuffer} since the capacity of the
-     *            {@link UnsynchronizedArrayBuffer}s is already quite large
-     *            (10k or better elements, defining a single "chunk" from a
-     *            single producer).
+     *            {@link UnsynchronizedArrayBuffer}s is already quite large (10k
+     *            or better elements, defining a single "chunk" from a single
+     *            producer).
      * @param chunkCapacity
      *            The maximum size for a single chunk (generally 10k or better).
      * @param fullyBufferedReadThreshold
@@ -314,7 +316,8 @@ public class AbstractAccessPath<R> implements IAccessPath<R> {
      *            we will do a fully buffered (synchronous) read. Otherwise we
      *            will do an asynchronous read.
      */
-    protected AbstractAccessPath(//
+    public AccessPath(//
+            final IRelation<R> relation,//
             final IIndexManager indexManager,  //
             final long timestamp,//
             final IPredicate<R> predicate,//
@@ -368,6 +371,9 @@ public class AbstractAccessPath<R> implements IAccessPath<R> {
             
         }
 
+        // Note: the caller's [relation] MAY be null.
+        this.relation = new AtomicReference<IRelation<R>>(relation);
+        
         this.indexManager = indexManager;
         
         this.timestamp = timestamp;
@@ -482,17 +488,6 @@ public class AbstractAccessPath<R> implements IAccessPath<R> {
      * @throws IllegalStateException
      *             unless {@link #init()} has been invoked.
      */
-    final private void assertNotInitialized() {
-
-        if (didInit)
-            throw new IllegalStateException();
-        
-    }
-    
-    /**
-     * @throws IllegalStateException
-     *             unless {@link #init()} has been invoked.
-     */
     final protected void assertInitialized() {
 
         if (!didInit)
@@ -505,7 +500,7 @@ public class AbstractAccessPath<R> implements IAccessPath<R> {
      * 
      * @return <i>this</i>
      */
-    public AbstractAccessPath<R> init() {
+    public AccessPath<R> init() {
         
         if (didInit)
             throw new IllegalStateException();
@@ -532,6 +527,27 @@ public class AbstractAccessPath<R> implements IAccessPath<R> {
         
     }
     
+    /**
+     * Resolved lazily if not specified to the ctor.
+     */
+    @SuppressWarnings("unchecked")
+    public IRelation<R> getRelation() {
+
+        IRelation<R> tmp = relation.get();
+        
+        if (tmp == null) {
+
+            tmp = (IRelation<R>) indexManager.getResourceLocator().locate(
+                    predicate.getOnlyRelationName(), timestamp);
+
+            relation.compareAndSet(null/*expect*/, tmp/*update*/);
+            
+        }
+
+        return relation.get();
+
+    }
+
     public IIndexManager getIndexManager() {
         
         return indexManager;
@@ -1060,7 +1076,7 @@ public class AbstractAccessPath<R> implements IAccessPath<R> {
 //        
 //        static protected final boolean log.isDebugEnabled() = log.isDebugEnabled(); 
         
-        private final AbstractAccessPath<R> accessPath;
+        private final AccessPath<R> accessPath;
 
         private final Iterator<R> src;
         
@@ -1075,7 +1091,7 @@ public class AbstractAccessPath<R> implements IAccessPath<R> {
          *            The buffer onto which chunks of those elements will be
          *            written.
          */
-        public ChunkConsumerTask(final AbstractAccessPath<R> accessPath,
+        public ChunkConsumerTask(final AccessPath<R> accessPath,
                 final Iterator<R> src, final BlockingBuffer<R[]> buffer) {
 
             if (accessPath == null)

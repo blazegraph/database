@@ -58,15 +58,15 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
 
     protected static final Logger log = Logger.getLogger(IAccessPath.class);
 
-    private final AbstractAccessPath<E> path1;
+    private final AccessPath<E> path1;
 
-    private final AbstractAccessPath<E> path2;
+    private final AccessPath<E> path2;
 
     /**
      * 
      */
-    public AccessPathFusedView(AbstractAccessPath<E> path1,
-            AbstractAccessPath<E> path2) {
+    public AccessPathFusedView(AccessPath<E> path1,
+            AccessPath<E> path2) {
 
         if (path1 == null)
             throw new IllegalArgumentException();
@@ -195,7 +195,7 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
     
     /**
      * FIXME write tests for optimizations for point tests and small limits. See
-     * {@link AbstractAccessPath#iterator(long, long, int) for impl details.
+     * {@link AccessPath#iterator(long, long, int) for impl details.
      * 
      * FIXME handle non-zero offset.
      */
@@ -210,7 +210,7 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
             
         }
         
-        if (limit > AbstractAccessPath.MAX_FULLY_BUFFERED_READ_LIMIT) {
+        if (limit > AccessPath.MAX_FULLY_BUFFERED_READ_LIMIT) {
 
             throw new UnsupportedOperationException();
             

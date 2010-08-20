@@ -27,7 +27,6 @@
 
 package com.bigdata.rdf.lexicon;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -45,8 +44,8 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+
 import org.apache.log4j.Logger;
 import org.omg.CORBA.portable.ValueFactory;
 import org.openrdf.model.BNode;
@@ -79,7 +78,6 @@ import com.bigdata.cache.ConcurrentWeakValueCacheWithBatchedUpdates;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.internal.IExtension;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtensionFactory;
 import com.bigdata.rdf.internal.ILexiconConfiguration;
@@ -112,6 +110,7 @@ import com.bigdata.service.Split;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
+
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
 
@@ -224,8 +223,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         return (Class<IExtensionFactory>) cls;
 
     }
-    
-    
 
     /**
      * Note: The term:id and id:term indices MUST use unisolated write operation
@@ -778,6 +775,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         return indexNames;
 
+    }
+    
+    public LexiconKeyOrder getPrimaryKeyOrder() {
+        
+        return LexiconKeyOrder.TERM2ID;
+        
     }
 
     /**

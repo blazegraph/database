@@ -3828,22 +3828,18 @@ abstract public class AbstractTripleStore extends
         }
         
         return new RDFJoinNexusFactory(
-                ruleContext,//
                 action, //
                 writeTimestamp,//
                 readTimestamp, //
-//                isForceSerialExecution(),
-//                getMaxParallelSubqueries(), //
-                justify,//
-                backchain, //
-                isOwlSameAsUsed,//
                 tmp,//
-//                getChunkOfChunksCapacity(), getChunkCapacity(),
-//                getChunkTimeout(), getFullyBufferedReadThreshold(),
                 solutionFlags, //
                 filter, //
                 planFactory, //
-                defaultRuleTaskFactory//
+                defaultRuleTaskFactory,//
+                ruleContext,//
+                justify,//
+                backchain, //
+                isOwlSameAsUsed //
                 );
 
     }

@@ -29,6 +29,7 @@ package com.bigdata.rdf.magic;
 
 import java.util.Iterator;
 import java.util.Properties;
+
 import org.deri.iris.api.factory.IBasicFactory;
 import org.deri.iris.api.factory.IBuiltinsFactory;
 import org.deri.iris.api.factory.ITermFactory;

@@ -112,6 +112,7 @@ public interface IJoinNexus {
      * This can be enabled if you are exploring apparent concurrency problems
      * with the rules. It should normally be <code>false</code> for better
      * performance.
+     * @deprecated by bop annotations.
      */
     boolean forceSerialExecution();
     
@@ -120,12 +121,14 @@ public interface IJoinNexus {
      * issued in parallel. Use ZERO(0) to avoid submitting tasks to the
      * {@link ExecutorService} entirely and ONE (1) to submit a single task at a
      * time to the {@link ExecutorService}.
+     * @deprecated by bop annotations.
      */
     int getMaxParallelSubqueries();
     
     /**
      * The #of elements in a chunk for query or mutation. This is normally a
      * relatively large value on the order of <code>10,000</code> or better.
+     * @deprecated by bop annotations.
      */
     int getChunkCapacity();
     
@@ -139,9 +142,10 @@ public interface IJoinNexus {
      * 
      * @see #getMaxParallelSubqueries()
      * @see #getChunkCapacity()
+     * @deprecated by bop annotations.
      */
     int getChunkOfChunksCapacity();
-        
+
     /**
      * The #of elements that will be materialized in a fully buffered read by an
      * {@link IAccessPath}. When this threshold is exceeded the
@@ -150,6 +154,7 @@ public interface IJoinNexus {
      * 
      * @see IAccessPath#iterator(int, int)
      * @see AbstractResource.Options#FULLY_BUFFERED_READ_THRESHOLD
+     * @deprecated by bop annotations.
      */
     int getFullyBufferedReadThreshold();
 
@@ -241,28 +246,6 @@ public interface IJoinNexus {
      */
     boolean bind(IPredicate<?> pred, IConstraint constraint, Object e,
             IBindingSet bindings);
-
-//    /**
-//     * Copy values the values from the visited element corresponding to the
-//     * given predicate into the binding set.
-//     * 
-//     * @param e
-//     *            An element visited for the <i>predicate</i> using some
-//     *            {@link IAccessPath}.
-//     * @param predicate
-//     *            The {@link IPredicate} providing the {@link IAccessPath}
-//     *            constraint.
-//     * @param bindingSet
-//     *            A set of bindings. The bindings for the predicate will be
-//     *            copied from the element and set on this {@link IBindingSet} as
-//     *            a side-effect.
-//     * 
-//     * @throws IllegalArgumentException
-//     *             if any parameter is <code>null</code>.
-//     * 
-//     * @deprecated by {@link #bind(IRule,int, Object, IBindingSet)}
-//     */
-//    void copyValues(Object e, IPredicate predicate, IBindingSet bindingSet);
 
     /**
      * Return a 'fake' binding for the given variable in the specified
@@ -401,21 +384,6 @@ public interface IJoinNexus {
      */
     IEvaluationPlanFactory getPlanFactory();
     
-//    /**
-//     * The timestamp used when an {@link IBuffer} is flushed against an
-//     * {@link IMutableRelation}.
-//     */
-//    long getWriteTimestamp();
-//
-//    /**
-//     * The timestamp used when obtaining an {@link IAccessPath} to read on a
-//     * {@link IRelation}.
-//     * 
-//     * @param relationName
-//     *            The relation on which you will read.
-//     */
-//    long getReadTimestamp(String relationName);
-    
     /**
      * Equivalent to {@link IJoinNexusFactory#getWriteTimestamp()}.
      */
@@ -521,7 +489,7 @@ public interface IJoinNexus {
      * @return The iterator.
      */
     Iterator<PartitionLocator> locatorScan(
-            final AbstractScaleOutFederation fed, final IPredicate predicate);
+            final AbstractScaleOutFederation<?> fed, final IPredicate<?> predicate);
     
     /**
      * Used to locate indices, relations and relation containers.

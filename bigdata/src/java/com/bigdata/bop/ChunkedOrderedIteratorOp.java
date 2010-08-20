@@ -3,7 +3,7 @@ package com.bigdata.bop;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.relation.accesspath.AbstractAccessPath;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -74,12 +74,12 @@ public interface ChunkedOrderedIteratorOp<E> extends BOp {
 
         /**
          * If the estimated rangeCount for an
-         * {@link AbstractAccessPath#iterator()} is LTE this threshold then use
+         * {@link AccessPath#iterator()} is LTE this threshold then use
          * a fully buffered (synchronous) iterator. Otherwise use an
          * asynchronous iterator whose capacity is governed by
          * {@link #CHUNK_OF_CHUNKS_CAPACITY}.
          */
-        String FULLY_BUFFERED_READ_THRESHOLD = AbstractAccessPath.class
+        String FULLY_BUFFERED_READ_THRESHOLD = AccessPath.class
                 .getName()
                 + ".fullyBufferedReadThreadshold";
 

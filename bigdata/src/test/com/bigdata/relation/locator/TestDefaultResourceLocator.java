@@ -334,6 +334,11 @@ public class TestDefaultResourceLocator extends TestCase2 {
             return null;
 
         }
+
+        public IKeyOrder getPrimaryKeyOrder() {
+            // TODO Auto-generated method stub
+            return null;
+        }
     
     }
     

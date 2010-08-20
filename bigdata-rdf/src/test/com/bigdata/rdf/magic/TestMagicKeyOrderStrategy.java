@@ -27,9 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.magic;
 
-import com.bigdata.rdf.magic.MagicKeyOrderStrategy.CharFormatter;
-
 import junit.framework.TestCase;
+
+import com.bigdata.rdf.magic.MagicKeyOrderStrategy.CharFormatter;
 
 public class TestMagicKeyOrderStrategy extends TestCase {
 

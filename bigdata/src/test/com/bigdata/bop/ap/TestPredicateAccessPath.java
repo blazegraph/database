@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.ap;
 
-import java.util.Iterator;
 import java.util.Properties;
 
 import junit.framework.TestCase2;
@@ -40,7 +39,13 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.rule.eval.ActionEnum;
+import com.bigdata.relation.rule.eval.DefaultRuleTaskFactory;
+import com.bigdata.relation.rule.eval.IJoinNexus;
+import com.bigdata.relation.rule.eval.IJoinNexusFactory;
+import com.bigdata.relation.rule.eval.NOPEvaluationPlanFactory;
 import com.bigdata.striterator.ChunkedArrayIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Unit test for reading on an access path using a {@link Predicate}.
@@ -99,6 +104,7 @@ public class TestPredicateAccessPath extends TestCase2 {
              * Create and populate the relation.
              */
             {
+                
                 // create the relation.
                 final R rel = new R(store, namespace, ITx.UNISOLATED,
                         properties);
@@ -146,15 +152,30 @@ public class TestPredicateAccessPath extends TestCase2 {
 
                     assertEquals(4, accessPath.rangeCount(true/* exact */));
 
-                    // now write out the elements visited by that access path.
-                    System.out.println("accessPath="+accessPath);
-                    final Iterator<E> itr = accessPath.iterator();
-                    int n = 0;
-                    while(itr.hasNext()) {
-                        System.out.println(n + " : " + itr.next());
-                        n++;
+                    // visit that access path, verifying the elements and order.
+                    if (log.isInfoEnabled())
+                        log.info("accessPath=" + accessPath);
+                    final E[] expected = new E[]{//
+                            new E("John", "Mary"),// 
+                            new E("Leon", "Paul"),// 
+                            new E("Mary", "Paul"),// 
+                            new E("Paul", "Leon"),// 
+                    };
+                    final IChunkedOrderedIterator<E> itr = accessPath
+                            .iterator();
+                    try {
+                        int n = 0;
+                        while (itr.hasNext()) {
+                            final E e = itr.next();
+                            if (log.isInfoEnabled())
+                                log.info(n + " : " + e);
+                            assertEquals(expected[n], e);
+                            n++;
+                        }
+                    } finally {
+                        itr.close();
                     }
-                    
+
                 }
 
                 /*
@@ -172,23 +193,79 @@ public class TestPredicateAccessPath extends TestCase2 {
 
                     assertEquals(1, accessPath.rangeCount(true/* exact */));
                     
-                    // now write out the elements visited by that access path.
-                    System.out.println("accessPath="+accessPath);
-                    final Iterator<E> itr = accessPath.iterator();
-                    int n = 0;
-                    while(itr.hasNext()) {
-                        System.out.println(n + " : " + itr.next());
-                        n++;
+                    // visit that access path, verifying the elements and order.
+                    if (log.isInfoEnabled())
+                        log.info("accessPath=" + accessPath);
+                    final E[] expected = new E[] {//
+                        new E("Mary", "Paul"),// 
+                    };
+                    final IChunkedOrderedIterator<E> itr = accessPath
+                            .iterator();
+                    try {
+                        int n = 0;
+                        while (itr.hasNext()) {
+                            final E e = itr.next();
+                            if (log.isInfoEnabled())
+                                log.info(n + " : " + e);
+                            assertEquals(expected[n], e);
+                            n++;
+                        }
+                    } finally {
+                        itr.close();
                     }
 
                 }
 
                 /*
+                 * Now verify that the Predicate itself will return an
+                 * appropriate iterator.
+                 * 
                  * @todo setup and run bops against it w/ filters, sorts, joins
                  * (we can join with an incoming binding set easily enough using
                  * only a single primary index), distincts, selecting only
                  * certain columns, etc.
+                 * 
+                 * @todo This is failing because the MockJoinNexus does not have
+                 * the necessary stuff to resolve the relation.  Is it time to
+                 * clean IJoinNexus up?
                  */
+                {
+
+                    final IJoinNexusFactory joinNexusFactory = new MockJoinNexusFactory(
+                            ActionEnum.Query,//
+                            ITx.UNISOLATED,//writeTimestamp
+                            ITx.READ_COMMITTED,//readTimestamp,
+                            properties,//,
+                            IJoinNexus.ALL,// solutionFlags,
+                            null,// solutionFilter,
+                            NOPEvaluationPlanFactory.INSTANCE,//
+                            DefaultRuleTaskFactory.PIPELINE//
+                            );
+
+                    final Predicate<E> pred = new Predicate<E>(
+                            new IVariableOrConstant[] {
+                                    new Constant<String>("Mary"),
+                                    Var.var("value") }, namespace);
+                    
+                    final E[] expected = new E[]{//
+                    new E("Mary", "Paul"),// 
+                    };
+                    final IChunkedOrderedIterator<E> itr = pred.eval(
+                            null/* fed */, joinNexusFactory.newInstance(store));
+                    try {
+                        int n = 0;
+                        while (itr.hasNext()) {
+                            final E e = itr.next();
+                            if (log.isInfoEnabled())
+                                log.info(n + " : " + e);
+                            assertEquals(expected[n], e);
+                            n++;
+                        }
+                    } finally {
+                        itr.close();
+                    }
+
+                }
                 
             }
 

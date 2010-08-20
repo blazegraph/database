@@ -85,6 +85,7 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.util.concurrent.ExecutionHelper;
 
 /**
@@ -1369,6 +1370,10 @@ public class FullTextIndex extends AbstractRelation {
     }
     
     public Class<?> getElementClass() {
+        throw new UnsupportedOperationException();
+    }
+
+    public IKeyOrder getPrimaryKeyOrder() {
         throw new UnsupportedOperationException();
     }
         

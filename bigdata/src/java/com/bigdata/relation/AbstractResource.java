@@ -39,6 +39,7 @@ import java.util.concurrent.SynchronousQueue;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.config.Configuration;
 import com.bigdata.config.IValidator;
 import com.bigdata.config.IntegerValidator;
@@ -52,7 +53,7 @@ import com.bigdata.rdf.rules.FullClosure;
 import com.bigdata.rdf.rules.RuleFastClosure5;
 import com.bigdata.rdf.rules.RuleFastClosure6;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.relation.accesspath.AbstractAccessPath;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -102,6 +103,8 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
      * The capacity of the buffers accumulating chunks from concurrent producers.
      * 
      * @see Options#CHUNK_OF_CHUNKS_CAPACITY
+     * 
+     * @deprecated by {@link BOp} annotations.
      */
     final public int getChunkOfChunksCapacity() {
         
@@ -113,6 +116,8 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
      * The target chunk size.
      * 
      * @see Options#CHUNK_CAPACITY
+     * 
+     * @deprecated by {@link BOp} annotations.
      */
     final public int getChunkCapacity() {
         
@@ -126,6 +131,8 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
      * current chunk. This may be ZERO (0) to disable the chunk combiner.
      * 
      * @see Options#CHUNK_TIMEOUT
+     * 
+     * @deprecated by {@link BOp} annotations.
      */
     public final long getChunkTimeout() {
 
@@ -140,6 +147,8 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
      * read.
      * 
      * @see Options#FULLY_BUFFERED_READ_THRESHOLD
+     * 
+     * @deprecated by {@link BOp} annotations.
      */
     public int getFullyBufferedReadThreshold() {
 
@@ -152,6 +161,8 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
      * sequentially even when they are not flagged as a sequential program.
      * 
      * @see Options#FORCE_SERIAL_EXECUTION
+     * 
+     * @deprecated by {@link BOp} annotations.
      */
     public boolean isForceSerialExecution() {
 
@@ -166,6 +177,8 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
      * time to the {@link ExecutorService}.
      * 
      * @see Options#MAX_PARALLEL_SUBQUERIES
+     * 
+     * @deprecated by {@link BOp} annotations.
      */
     public int getMaxParallelSubqueries() {
 
@@ -178,6 +191,10 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
      * applied. Otherwise the {@link JoinMasterTask} is applied.
      * 
      * @see Options#NESTED_SUBQUERY
+     * 
+     * @deprecated by {@link BOp} annotations and the pipeline join, which
+     *             always does better than the older nested subquery evaluation
+     *             logic.
      */
     public boolean isNestedSubquery() {
 
@@ -215,12 +232,14 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          * producers if the producers are generating small chunks, e.g., because
          * there are few solutions for a join subquery.
          * </p>
+         * @deprecated by {@link BOp} annotations.
          */
         String CHUNK_OF_CHUNKS_CAPACITY = BlockingBuffer.class.getName()
                 + ".chunkOfChunksCapacity";
 
         /**
-         * Default for {@link #CHUNK_OF_CHUNKS_CAPACITY} 
+         * Default for {@link #CHUNK_OF_CHUNKS_CAPACITY}
+         * @deprecated by {@link BOp} annotations.
          */
         String DEFAULT_CHUNK_OF_CHUNKS_CAPACITY = "1000";
 
@@ -233,6 +252,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          * </p>
          * 
          * @see #CHUNK_OF_CHUNKS_CAPACITY
+         * @deprecated by {@link BOp} annotations.
          */
         String CHUNK_CAPACITY = IBuffer.class.getName() + ".chunkCapacity";
 
@@ -241,6 +261,8 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          * <p>
          * Note: This used to be 20k, but chunks of chunks works better than
          * just a large chunk.
+         * 
+         * @deprecated by {@link BOp} annotations.
          */
         String DEFAULT_CHUNK_CAPACITY = "100";
 
@@ -249,6 +271,8 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          * for another chunk to combine with the current chunk before returning
          * the current chunk (default {@link #DEFAULT_CHUNK_TIMEOUT}). This may
          * be ZERO (0) to disable the chunk combiner.
+         * 
+         * @deprecated by {@link BOp} annotations.
          */
         String CHUNK_TIMEOUT = BlockingBuffer.class.getName() + ".chunkTimeout";
 
@@ -256,24 +280,28 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          * The default for {@link #CHUNK_TIMEOUT}.
          * 
          * @todo this is probably much larger than we want. Try 10ms.
+         * @deprecated by {@link BOp} annotations.
          */
         String DEFAULT_CHUNK_TIMEOUT = "1000";
-        
+
         /**
          * If the estimated rangeCount for an
-         * {@link AbstractAccessPath#iterator()} is LTE this threshold then use
+         * {@link AccessPath#iterator()} is LTE this threshold then use
          * a fully buffered (synchronous) iterator. Otherwise use an
          * asynchronous iterator whose capacity is governed by
          * {@link #CHUNK_OF_CHUNKS_CAPACITY}.
+         * 
+         * @deprecated by {@link BOp} annotations.
          */
-        String FULLY_BUFFERED_READ_THRESHOLD = AbstractAccessPath.class
+        String FULLY_BUFFERED_READ_THRESHOLD = AccessPath.class
                 .getName()
                 + ".fullyBufferedReadThreadshold";
 
         /**
-         * Default for {@link #FULLY_BUFFERED_READ_THRESHOLD} 
+         * Default for {@link #FULLY_BUFFERED_READ_THRESHOLD}
          * 
          * @todo figure out how good this value is.
+         * @deprecated by {@link BOp} annotations.
          */
         String DEFAULT_FULLY_BUFFERED_READ_THRESHOLD = ""+20*Bytes.kilobyte32;
 
@@ -286,18 +314,17 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          *       {@link AbstractTripleStore}. and should be relocated.
          *       <P>
          *       The {@link #CLOSURE_CLASS} option defaults to
-         *       {@link FastClosure}, which has very little possible
-         *       parallelism (it is mostly a sequential program by nature). For
-         *       that reason, {@link #FORCE_SERIAL_EXECUTION} defaults to
-         *       <code>false</code> since the overhead of parallel execution
-         *       is more likely to lower the observed performance with such
-         *       limited possible parallelism. However, when using
-         *       {@link FullClosure} the benefits of parallelism MAY justify its
-         *       overhead.
+         *       {@link FastClosure}, which has very little possible parallelism
+         *       (it is mostly a sequential program by nature). For that reason,
+         *       {@link #FORCE_SERIAL_EXECUTION} defaults to <code>false</code>
+         *       since the overhead of parallel execution is more likely to
+         *       lower the observed performance with such limited possible
+         *       parallelism. However, when using {@link FullClosure} the
+         *       benefits of parallelism MAY justify its overhead.
          *       <p>
          *       The following data are for LUBM datasets.
          * 
-         * <pre>
+         *       <pre>
          * U1  Fast Serial   : closure =  2250ms; 2765, 2499, 2530
          * U1  Fast Parallel : closure =  2579ms; 2514, 2594
          * U1  Full Serial   : closure = 10437ms.
@@ -309,18 +336,19 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          * U10 Full Parallel : closure = 248550ms.
          * </pre>
          * 
-         * Note that the only rules in the fast closure program that have
-         * potential parallelism are {@link RuleFastClosure5} and
-         * {@link RuleFastClosure6} and these rules are not being triggered by
-         * these datasets, so there is in fact NO potential parallelism (in the
-         * data) for these datasets.
-         * <p>
-         * It is possible that a machine with more cores would perform better
-         * under the "full" closure program with parallel rule execution (these
-         * data were collected on a laptop with 2 cores) since performance tends
-         * to be CPU bound for small data sets. However, the benefit of the
-         * "fast" closure program is so large that there is little reason to
-         * consider parallel rule execution for the "full" closure program.
+         *       Note that the only rules in the fast closure program that have
+         *       potential parallelism are {@link RuleFastClosure5} and
+         *       {@link RuleFastClosure6} and these rules are not being
+         *       triggered by these datasets, so there is in fact NO potential
+         *       parallelism (in the data) for these datasets.
+         *       <p>
+         *       It is possible that a machine with more cores would perform
+         *       better under the "full" closure program with parallel rule
+         *       execution (these data were collected on a laptop with 2 cores)
+         *       since performance tends to be CPU bound for small data sets.
+         *       However, the benefit of the "fast" closure program is so large
+         *       that there is little reason to consider parallel rule execution
+         *       for the "full" closure program.
          * 
          * @todo collect new timings for this option. The LUBM performance has
          *       basically doubled since these data were collected. Look further
@@ -328,10 +356,14 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          *       parallelism and also for when rule parallelism is not enabled.
          * 
          * @todo rename as parallel_rule_execution.
+         * @deprecated by {@link BOp} annotations.
          */
         String FORCE_SERIAL_EXECUTION = ProgramTask.class.getName()
                 + ".forceSerialExecution";
-        
+
+        /**
+         * @deprecated by {@link BOp} annotations.
+         */
         String DEFAULT_FORCE_SERIAL_EXECUTION = "true";
 
         /**
@@ -348,10 +380,14 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          *       currently imposed by a per {@link JoinTask}
          *       {@link ExecutorService}, which must be explicitly enabled in
          *       the code).
+         * @deprecated by {@link BOp} annotations.
          */
         String MAX_PARALLEL_SUBQUERIES = ProgramTask.class.getName()
                 + ".maxParallelSubqueries";
-        
+
+        /**
+         * @deprecated by {@link BOp} annotations.
+         */
         String DEFAULT_MAX_PARALLEL_SUBQUERIES = "5";
 
         /**
