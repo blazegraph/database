@@ -66,6 +66,9 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
 
         /**
          * The name of the relation on which the predicate will read.
+         * 
+         * FIXME Change this to be a scalar value. It is currently an array for
+         * backwards compatibility.
          */
         String RELATION_NAME = "relationName";
 
