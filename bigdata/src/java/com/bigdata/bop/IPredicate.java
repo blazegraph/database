@@ -34,7 +34,7 @@ import com.bigdata.bop.ap.Union;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.accesspath.AbstractAccessPath;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IRule;
@@ -146,7 +146,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      * <p>
      * Note: The ability to specify an index partition identifier for a
      * predicate is provided in support of scale-out JOIN strategies. The
-     * {@link AbstractAccessPath} and the {@link JoinMasterTask} are both aware
+     * {@link AccessPath} and the {@link JoinMasterTask} are both aware
      * of this property. The {@link JoinMasterTask} sets the partition
      * identifier in order to request an access path backed by the name of the
      * local index object on a {@link DataService} rather than the name of the
@@ -167,7 +167,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      *         predicate is not locked to a specific index partition.
      * 
      * @see PartitionLocator
-     * @see AbstractAccessPath
+     * @see AccessPath
      * @see JoinMasterTask
      */
     public int getPartitionId();

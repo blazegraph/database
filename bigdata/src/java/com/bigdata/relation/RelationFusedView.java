@@ -4,20 +4,27 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.TemporaryStore;
-import com.bigdata.relation.accesspath.AbstractAccessPath;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.AccessPathFusedView;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * A factory for fused views reading from both of the source {@link IRelation}s.
- *  
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * @param <E>
+ * 
+ * @deprecated by {@link BOp}s using the UNION of JOINs. However, also note that
+ *             this is only used for TM and that the focus store is always local
+ *             for TM.
  */
 public class RelationFusedView<E> implements IRelation<E> {
     
@@ -66,11 +73,11 @@ public class RelationFusedView<E> implements IRelation<E> {
         
     }
     
-    public IAccessPath<E> getAccessPath(IPredicate<E> predicate) {
+    public IAccessPath<E> getAccessPath(final IPredicate<E> predicate) {
 
         return new AccessPathFusedView<E>(//
-                (AbstractAccessPath<E>)relation1.getAccessPath(predicate),//
-                (AbstractAccessPath<E>)relation2.getAccessPath(predicate)//
+                (AccessPath<E>)relation1.getAccessPath(predicate),//
+                (AccessPath<E>)relation2.getAccessPath(predicate)//
         );
         
     }
@@ -138,6 +145,15 @@ public class RelationFusedView<E> implements IRelation<E> {
 
     }
 
+    /**
+     * The value for the first relation in the view.
+     */
+    public IKeyOrder<E> getPrimaryKeyOrder() {
+        
+        return relation1.getPrimaryKeyOrder();
+        
+    }
+    
     /*
      * Note: These methods can not be implemented for the fused view.
      */
@@ -178,6 +194,14 @@ public class RelationFusedView<E> implements IRelation<E> {
     
         throw new UnsupportedOperationException();
         
+    }
+
+    public String getFQN(IKeyOrder<? extends E> keyOrder) {
+        throw new UnsupportedOperationException();
+    }
+
+    public IIndex getIndex(IKeyOrder<? extends E> keyOrder) {
+        throw new UnsupportedOperationException();
     }
 
 }

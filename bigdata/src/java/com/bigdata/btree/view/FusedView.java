@@ -64,7 +64,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
-import com.bigdata.relation.accesspath.AbstractAccessPath;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.Split;
 
@@ -1457,7 +1457,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
          * index (if it exists). Normally false positives will be reported
          * directly to the specific bloom filter instance by the contains() or
          * lookup() method for that index. However, the
-         * {@link AbstractAccessPath} also tests the bloom filter and needs a
+         * {@link AccessPath} also tests the bloom filter and needs a
          * means to report false positives. It should be the only one that calls
          * this method on this implementation class.
          */

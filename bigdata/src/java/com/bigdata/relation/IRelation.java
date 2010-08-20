@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation;
 
-import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
@@ -63,22 +62,12 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
      * The {@link IIndexManager} for the {@link IRelation}.
      */
     public IIndexManager getIndexManager();
-    
+
     /**
-     * The service used to run asynchronous or parallel tasks for the {@link IRelation}.
+     * The service used to run asynchronous or parallel tasks for the
+     * {@link IRelation}.
      */
     public ExecutorService getExecutorService();
-    
-//    /**
-//     * The #of elements in the relation.
-//     * 
-//     * @param exact
-//     *            When <code>true</code> an exact count is reported. An exact
-//     *            count will require a key-range scan if delete markers are in
-//     *            use, in which case it will be more expensive. See
-//     *            {@link IRangeQuery}.
-//     */
-//    long getElementCount(boolean exact);
 
     /**
      * Return the best {@link IAccessPath} for a relation given a predicate with
@@ -103,8 +92,8 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
      * with it to be evaluated local to the data.
      * <p>
      * Note: Filters should be specified when the {@link IAccessPath} is
-     * constructed so that they will be evaluated on the data service rather than
-     * materializing the elements and then filtering then. This can be
+     * constructed so that they will be evaluated on the data service rather
+     * than materializing the elements and then filtering then. This can be
      * accomplished by adding the filter as a constraint on the predicate when
      * specifying the access path.
      * 
@@ -119,6 +108,30 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
 //    IAccessPath<E> getAccessPathForIndexPartition(IIndexManager indexManager, IPredicate<E> predicate);
 
     /**
+     * The fully qualified name of the index.
+     * 
+     * @param keyOrder
+     *            The natural index order.
+     * 
+     * @return The index name.
+     */
+    String getFQN(IKeyOrder<? extends E> keyOrder);
+
+    /**
+     * Return the index for the {@link IKeyOrder} the timestamp for this view of
+     * the relation.
+     * 
+     * @param keyOrder
+     *            The natural index order.
+     * 
+     * @return The index -or- <code>null</code> iff the index does not exist as
+     *         of the timestamp for this view of the relation.
+     * 
+     * @see #getIndex(String)
+     */
+    IIndex getIndex(IKeyOrder<? extends E> keyOrder);
+    
+    /**
      * Return the fully qualified name of each index maintained by this
      * relation.
      * 
@@ -132,15 +145,20 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
      * New methods.
      */
     
+    /**
+     * Return the {@link IKeyOrder} for the primary index for the relation.
+     */
+    IKeyOrder<E> getPrimaryKeyOrder();
+
 //    /**
 //     * Return the {@link IKeyOrder}s corresponding to the registered indices for
-//     * this relation.
+//     * this relation. [rather than getIndexNames?]
 //     */
 //    Iterator<IKeyOrder<E>> getKeyOrders();
 //
 //    /**
 //     * Return the {@link IKeyOrder} for the predicate corresponding to the
-//     * perfect access path. A perfect access path is one where the bound values
+//     * perfect (best?) access path. A perfect access path is one where the bound values
 //     * in the predicate form a prefix in the key space of the corresponding
 //     * index.
 //     * 
@@ -151,19 +169,7 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
 //     *         access path for that predicate.
 //     */
 //    IKeyOrder<E> getKeyOrder(IPredicate<E> p);
-//    
-//    /**
-//     * Return the {@link IKeyOrder} for the primary index for the relation.
-//     */
-//    IKeyOrder<E> getPrimaryKeyOrder();
-//    
-//    /**
-//     * Return the primary index for the relation.
-//     * 
-//     * @todo how about getIndex(IKeyOrder) instead?
-//     */
-//    IIndex getPrimaryIndex();
-
+    
     /*
      * End new methods.
      */

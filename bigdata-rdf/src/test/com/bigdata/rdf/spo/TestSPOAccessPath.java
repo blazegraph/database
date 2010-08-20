@@ -41,7 +41,7 @@ import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.store.TestTripleStore;
-import com.bigdata.relation.accesspath.AbstractAccessPath;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 
 /**
@@ -53,7 +53,7 @@ import com.bigdata.relation.accesspath.IAccessPath;
  * 
  * FIXME write tests for SLICE where the maximum fully buffered limit is
  * exceeded so we are forced to use the asynchronous iterator on
- * {@link AbstractAccessPath}.
+ * {@link AccessPath}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

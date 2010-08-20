@@ -70,19 +70,24 @@ public class BindingSetSortKeyBuilder implements ISortKeyBuilder<IBindingSet> {
         
     }
     
+    /**
+     * @todo This has RDF specific handling of the IVs and treatment of unbound
+     *       variables as 0L term identifiers.  This needs to be abstracted out
+     *       in order to run against generic relations.
+     */
     public byte[] getSortKey(final IBindingSet bindingSet) {
         
         keyBuilder.reset();
         
         for (int i = 0; i < vars.length; i++) {
             
-            final IVariable var = vars[i];
+            final IVariable<?> var = vars[i];
             
             Object val = bindingSet.get(var);
             if (val == null) {
                 val = Long.valueOf(0);
-            } else if (val instanceof Constant) {
-                val = ((Constant) val).get();
+            } else if (val instanceof Constant<?>) {
+                val = ((Constant<?>) val).get();
             }
 
             if (val instanceof IV) {

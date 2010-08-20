@@ -65,7 +65,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.accesspath.AbstractAccessPath;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.BufferClosedException;
@@ -621,6 +621,7 @@ public class PipelineJoin2 extends AbstractPipelineOp<IBindingSet> implements
             this.variablesToKeep = joinOp.variablesToKeep();
             this.joinNexus = joinNexus;
             this.relation = joinNexus.getTailRelationView(right);
+            this.sink = sink;
             this.partitionId = -1; /*
                                     * FIXME The partition identifier probably
                                     * needs to be passed in at evaluation time
@@ -975,7 +976,7 @@ public class PipelineJoin2 extends AbstractPipelineOp<IBindingSet> implements
 
             try {
 
-                sinkFuture.get();
+//                sinkFuture.get(); FIXME control logic
 
             } catch (Throwable t) {
 
@@ -995,7 +996,7 @@ public class PipelineJoin2 extends AbstractPipelineOp<IBindingSet> implements
 
             sink.reset();
 
-            sinkFuture.cancel(true/* mayInterruptIfRunning */);
+//            sinkFuture.cancel(true/* mayInterruptIfRunning */); FIXME Control logic.
 
         }
 
@@ -1302,7 +1303,7 @@ public class PipelineJoin2 extends AbstractPipelineOp<IBindingSet> implements
             protected void reorderTasks(final AccessPathTask[] tasks) {
 
                 // @todo layered access paths do not expose a fromKey.
-                if (tasks[0].accessPath instanceof AbstractAccessPath<?>) {
+                if (tasks[0].accessPath instanceof AccessPath<?>) {
 
                     // reorder the tasks.
                     Arrays.sort(tasks);
@@ -1453,7 +1454,7 @@ public class PipelineJoin2 extends AbstractPipelineOp<IBindingSet> implements
              */
             protected byte[] getFromKey() {
 
-                return ((AbstractAccessPath<?>) accessPath).getFromKey();
+                return ((AccessPath<?>) accessPath).getFromKey();
 
             }
 

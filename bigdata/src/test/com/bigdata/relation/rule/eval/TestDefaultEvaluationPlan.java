@@ -373,10 +373,6 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
             return null;
         }
 
-        public byte[] getSortKey(ISolution solution) {
-            return null;
-        }
-
         public IConstant fakeBinding(IPredicate predicate, Var var) {
             return null;
         }

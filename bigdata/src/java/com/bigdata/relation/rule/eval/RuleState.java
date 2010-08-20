@@ -31,16 +31,6 @@ public class RuleState implements IRuleState {
     protected static final transient Logger log = Logger.getLogger(RuleState.class);
 
     /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    protected static final transient boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    protected static final transient boolean DEBUG = log.isDebugEnabled();
-
-    /**
      * The {@link Rule} being evaluated.
      */
     final private IRule rule;
@@ -154,7 +144,7 @@ public class RuleState implements IRuleState {
          * The key order that will be used for each join dimension.
          * 
          * @todo Elevate this into the query optimizer so we can handle
-         * extension indices.  Also, make the query optimizer explictly
+         * extension indices.  Also, make the query optimizer explicitly
          * aware of the presence or absence of the bloom filter for the
          * SPO (or other) index.
          */
@@ -162,7 +152,7 @@ public class RuleState implements IRuleState {
         
         this.requiredVars = computeRequiredVarsForEachTail(rule, plan.getOrder());
        
-        if (INFO) {
+        if (log.isInfoEnabled()) {
          
             String[] s = new String[requiredVars.length];
             for (int i = 0; i < requiredVars.length; i++) {
@@ -255,7 +245,7 @@ public class RuleState implements IRuleState {
             final IKeyOrder<?> keyOrder = joinNexus.getTailAccessPath(
                     rel, asBound).getKeyOrder();
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("keyOrder=" + keyOrder + ", orderIndex=" + orderIndex
                         + ", tailIndex=" + orderIndex + ", pred=" + pred
                         + ", bindingSet=" + bindingSet + ", rule=" + rule);
@@ -275,7 +265,7 @@ public class RuleState implements IRuleState {
 
                     final Var<?> var = (Var<?>) t;
 
-                    if (DEBUG) {
+                    if (log.isDebugEnabled()) {
 
                         log.debug("Propagating binding: pred=" + pred
                                         + ", var=" + var + ", bindingSet="
@@ -291,7 +281,7 @@ public class RuleState implements IRuleState {
 
         }
 
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
 
             log.debug("keyOrder[]=" + Arrays.toString(a) + ", nvars="
                     + Arrays.toString(nvars) + ", rule=" + rule);
@@ -405,14 +395,14 @@ public class RuleState implements IRuleState {
             // save results.
             a[tailIndex] = required.toArray(new IVariable[required.size()]);
             
-            if (DEBUG) {
+            if (log.isDebugEnabled()) {
                 log.debug("requiredVars=" + Arrays.toString(a[tailIndex]) + ", orderIndex=" + orderIndex
                         + ", tailIndex=" + orderIndex + ", pred=" + rule.getTail(tailIndex)
                         + ", rule=" + rule);
             }
         }
 
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
 
             String[] s = new String[a.length];
             for (int i = 0; i < a.length; i++) {

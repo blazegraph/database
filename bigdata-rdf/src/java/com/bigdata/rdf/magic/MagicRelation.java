@@ -1,17 +1,13 @@
 package com.bigdata.rdf.magic;
 
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
@@ -26,20 +22,16 @@ import com.bigdata.btree.BloomFilterFactory;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.cache.ConcurrentWeakValueCache;
-import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.rdf.spo.SPOAccessPath;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.AbstractRelation;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
@@ -47,8 +39,6 @@ import com.bigdata.striterator.IKeyOrder;
 public class MagicRelation extends AbstractRelation<IMagicTuple> {
 
     protected static final Logger log = Logger.getLogger(MagicRelation.class);
-    
-    protected static final boolean INFO = log.isInfoEnabled();
 
     private final int arity;
     
@@ -69,6 +59,7 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
         }
         this.arity = Integer.valueOf(arity);
         
+        // @todo should be pregenerated and immutable, not deferred until create().
         this.indexNames = new HashSet<String>();
         
     }
@@ -96,7 +87,7 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
 
             for (MagicKeyOrder keyOrder : keyOrders) {
             
-                if (INFO) {
+                if (log.isInfoEnabled()) {
                     log.info("creating index: " + getFQN(keyOrder));
                 }
                 
@@ -130,7 +121,7 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
             
             for (MagicKeyOrder keyOrder : keyOrders) {
                 
-                if (INFO) {
+                if (log.isInfoEnabled()) {
                     log.info("destroying index: " + getFQN(keyOrder));
                 }
                 
@@ -293,7 +284,9 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
         
     }
 
-    public IAccessPath<IMagicTuple> getAccessPath(IPredicate<IMagicTuple> predicate) {
+    public IAccessPath<IMagicTuple> getAccessPath(
+            final IPredicate<IMagicTuple> predicate) {
+
         if (predicate == null)
             throw new IllegalArgumentException();
         
@@ -338,51 +331,53 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
 
         }
 
-        // test cache for access path.
-        MagicAccessPath accessPath = cache.get(pred);
-
-        if (accessPath != null) {
-
-            return accessPath;
-
-        }
+        IAccessPath<IMagicTuple> accessPath;
+//        // test cache for access path.
+//        IAccessPath<IMagicTuple> accessPath = cache.get(pred);
+//
+//        if (accessPath != null) {
+//
+//            return accessPath;
+//
+//        }
 
         // create an access path instance for that predicate.
         accessPath = _getAccessPath(pred);
 
-        // add to cache.
-        cache.put(pred, accessPath);
+//        // add to cache.
+//        cache.put(pred, accessPath);
         
         return accessPath;
         
     }
 
-    /**
-     * {@link MagicAccessPath} cache.
-     * 
-     * @todo config cache capacity.
-     * 
-     * @todo config concurrency level, e.g., based on maxParallelSubqueries times the
-     * expected concurrency for queries against a given view.
-     */
-//  0.75f// loadFactor
-//  50// concurrencyLevel
-    final private 
-        ConcurrentWeakValueCache<MagicPredicate, MagicAccessPath> cache = 
-        new ConcurrentWeakValueCacheWithTimeout<MagicPredicate, MagicAccessPath>
-            ( 100/* queueCapacity */, TimeUnit.MILLISECONDS.toNanos(60 * 1000)/* timeout */
-              );
+//    /**
+//     * {@link IAccessPath} cache.
+//     * 
+//     * Note: The cache was removed from {@link SPORelation} and should probably
+//     *       be removed here as well. I believe that the motivation for removing
+//     *       the cache was low latency the the access path construction combined
+//     *       with too much retention on the heap and synchronization hotspots
+//     *       with the cache.
+//     */
+////  0.75f// loadFactor
+////  50// concurrencyLevel
+//    final private 
+//        ConcurrentWeakValueCache<MagicPredicate, IAccessPath<IMagicTuple>> cache = 
+//        new ConcurrentWeakValueCacheWithTimeout<MagicPredicate, IAccessPath<IMagicTuple>>
+//            ( 100/* queueCapacity */, TimeUnit.MILLISECONDS.toNanos(60 * 1000)/* timeout */
+//              );
 
     /**
      * Isolates the logic for selecting the {@link SPOKeyOrder} from the
      * {@link SPOPredicate} and then delegates to
      * {@link #getAccessPath(IKeyOrder, IPredicate)}.
      */
-    final private MagicAccessPath _getAccessPath(final IPredicate<IMagicTuple> predicate) {
+    final private IAccessPath<IMagicTuple> _getAccessPath(final IPredicate<IMagicTuple> predicate) {
 
         final MagicKeyOrder keyOrder = getKeyOrder(predicate);
         
-        final MagicAccessPath accessPath = getAccessPath(keyOrder, predicate);
+        final IAccessPath<IMagicTuple> accessPath = getAccessPath(keyOrder, predicate);
 
         if (log.isDebugEnabled())
             log.debug(accessPath.toString());
@@ -397,7 +392,8 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
         
     }
     
-    public MagicAccessPath getAccessPath(
+    @SuppressWarnings("unchecked")
+    public IAccessPath<IMagicTuple> getAccessPath(
             final IKeyOrder<IMagicTuple> keyOrder) {
         
         final IVariableOrConstant<IV>[] terms = 
@@ -409,14 +405,15 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
             
         }
         
-        MagicPredicate predicate = new MagicPredicate(getNamespace(), terms);
-        
-        if (INFO) {
-            
+        final MagicPredicate predicate = new MagicPredicate(getNamespace(),
+                terms);
+
+        if (log.isInfoEnabled()) {
+
             log.info(predicate);
-            
+
         }
-        
+
         return getAccessPath(keyOrder, predicate);
         
     }
@@ -500,7 +497,7 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
      * we need to specify that access path (several things use a temporary
      * triple store with only the SPO access path).
      */
-    public MagicAccessPath getAccessPath(final IKeyOrder<IMagicTuple> keyOrder,
+    public IAccessPath<IMagicTuple> getAccessPath(final IKeyOrder<IMagicTuple> keyOrder,
             final IPredicate<IMagicTuple> predicate) {
 
         if (keyOrder == null)
@@ -535,10 +532,11 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
 
         final int fullyBufferedReadThreshold = container.getFullyBufferedReadThreshold();
         
-        return new MagicAccessPath(this, predicate, keyOrder, ndx, flags,
+        return new AccessPath<IMagicTuple>(this, getIndexManager(),
+                getTimestamp(), predicate, keyOrder, ndx, flags,
                 chunkOfChunksCapacity, chunkCapacity,
                 fullyBufferedReadThreshold).init();
-        
+
     }
     
     /**

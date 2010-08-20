@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation.rule.eval;
 
 import java.io.Serializable;
+import java.util.Properties;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
@@ -53,6 +54,8 @@ import com.bigdata.service.IBigdataFederation;
  */
 public interface IJoinNexusFactory extends Serializable {
 
+    ActionEnum getAction();
+    
     /**
      * The timestamp for the write view of the relation(s).
      */
@@ -69,6 +72,16 @@ public interface IJoinNexusFactory extends Serializable {
      * closure.
      */
     void setReadTimestamp(long readTimestamp);
+    
+    Properties getProperties();
+    
+    int getSolutionFlags();
+    
+    IElementFilter<?> getSolutionFilter();
+
+    IEvaluationPlanFactory getEvaluationPlanFactory();
+    
+    IRuleTaskFactory getDefaultRuleTaskFactory();
     
     /**
      * Singleton factory for an {@link IJoinNexus} instance for the given

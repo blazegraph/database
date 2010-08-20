@@ -31,20 +31,15 @@ package com.bigdata.rdf.rules;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
-import com.bigdata.bop.IConstraint;
-import com.bigdata.bop.IElement;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
@@ -53,17 +48,7 @@ import com.bigdata.btree.keys.DelegateSortKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.ISortKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.config.Configuration;
-import com.bigdata.config.IValidator;
-import com.bigdata.config.IntegerValidator;
-import com.bigdata.config.LongValidator;
-import com.bigdata.io.IStreamSerializer;
-import com.bigdata.io.SerializerUtil;
-import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.Journal;
-import com.bigdata.journal.TemporaryStore;
-import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
@@ -76,44 +61,29 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.spo.SPOSortKeyBuilder;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationFusedView;
-import com.bigdata.relation.accesspath.AbstractAccessPath;
-import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
-import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.IStep;
+import com.bigdata.relation.rule.eval.AbstractJoinNexus;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer;
 import com.bigdata.relation.rule.eval.ActionEnum;
-import com.bigdata.relation.rule.eval.DefaultRangeCountFactory;
 import com.bigdata.relation.rule.eval.EmptyProgramTask;
 import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.relation.rule.eval.IJoinNexusFactory;
-import com.bigdata.relation.rule.eval.IProgramTask;
 import com.bigdata.relation.rule.eval.IRangeCountFactory;
 import com.bigdata.relation.rule.eval.IRuleState;
 import com.bigdata.relation.rule.eval.IRuleStatisticsFactory;
-import com.bigdata.relation.rule.eval.IRuleTaskFactory;
 import com.bigdata.relation.rule.eval.ISolution;
-import com.bigdata.relation.rule.eval.ProgramTask;
 import com.bigdata.relation.rule.eval.RuleStats;
-import com.bigdata.relation.rule.eval.Solution;
-import com.bigdata.relation.rule.eval.SolutionFilter;
-import com.bigdata.service.AbstractScaleOutFederation;
-import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedConvertingIterator;
 import com.bigdata.striterator.DistinctFilter;
@@ -156,33 +126,28 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * thread-safe and that is designed to store a single chunk of elements, e.g.,
  * in an array E[N]).
  * 
- * @todo Factor out an abstract base class for general purpose rule execution
- *       over arbitrary relations with foreign key joins.
- * 
  * @todo add an {@link IBindingSet} serializer and drive through with the
  *       {@link IAsynchronousIterator} when wrapped for RMI.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RDFJoinNexus implements IJoinNexus {
+public class RDFJoinNexus extends AbstractJoinNexus implements IJoinNexus {
 
     protected final static transient Logger log = Logger.getLogger(RDFJoinNexus.class);
     
-    protected final static transient boolean DEBUG = log.isDebugEnabled();
-    
     private final RDFJoinNexusFactory joinNexusFactory;
     
-    private final IIndexManager indexManager;
-    
-    // Note: cached.
-    private final IResourceLocator resourceLocator;
-
-    private final ActionEnum action;
-    
-    private final long writeTimestamp;
-    
-    private final long readTimestamp;
+//    private final IIndexManager indexManager;
+//    
+//    // Note: cached.
+//    private final IResourceLocator<?> resourceLocator;
+//
+//    private final ActionEnum action;
+//    
+//    private final long writeTimestamp;
+//    
+//    private final long readTimestamp;
 
     private final boolean justify;
     
@@ -192,82 +157,82 @@ public class RDFJoinNexus implements IJoinNexus {
      */
     private final boolean backchain;
 
-    private final int chunkCapacity;
-    private final int chunkOfChunksCapacity;
-    private final boolean forceSerialExecution;
-    private final int maxParallelSubqueries;
-    private final int fullyBufferedReadThreshold;
-    private final long chunkTimeout;
-
-    /**
-     * The {@link TimeUnit}s in which the {@link #chunkTimeout} is measured.
-     */
-    private static final TimeUnit chunkTimeoutUnit = TimeUnit.MILLISECONDS;
-
-    public int getChunkOfChunksCapacity() {
-
-        return chunkOfChunksCapacity;
-        
-    }
-
-    public int getChunkCapacity() {
-
-        return chunkCapacity;
-        
-    }
+//    private final int chunkCapacity;
+//    private final int chunkOfChunksCapacity;
+//    private final boolean forceSerialExecution;
+//    private final int maxParallelSubqueries;
+//    private final int fullyBufferedReadThreshold;
+//    private final long chunkTimeout;
+//
+//    /**
+//     * The {@link TimeUnit}s in which the {@link #chunkTimeout} is measured.
+//     */
+//    private static final TimeUnit chunkTimeoutUnit = TimeUnit.MILLISECONDS;
+//
+//    public int getChunkOfChunksCapacity() {
+//
+//        return chunkOfChunksCapacity;
+//        
+//    }
+//
+//    public int getChunkCapacity() {
+//
+//        return chunkCapacity;
+//        
+//    }
+//    
+//    public int getFullyBufferedReadThreshold() {
+//        
+//        return fullyBufferedReadThreshold;
+//        
+//    }
+//
+//    public String getProperty(final String name, final String defaultValue) {
+//
+//        // @todo pass namespace in with the RDFJoinNexusFactory?
+//        return Configuration.getProperty(indexManager,
+//                joinNexusFactory.getProperties(), null/* namespace */, name,
+//                defaultValue);
+//
+//    }
+//
+//    public <T> T getProperty(final String name, final String defaultValue,
+//            final IValidator<T> validator) {
+//
+//        // @todo pass namespace in with the RDFJoinNexusFactory?
+//        return Configuration.getProperty(indexManager,
+//                joinNexusFactory.getProperties(), null/* namespace */, name,
+//                defaultValue, validator);
+//
+//    }
+//
+//    private final int solutionFlags;
+//    
+//    @SuppressWarnings("unchecked")
+//	private final IElementFilter filter;
+//
+//    public IElementFilter<ISolution> getSolutionFilter() {
+//        
+//        return filter == null ? null : new SolutionFilter(filter);
+//        
+//    }
     
-    public int getFullyBufferedReadThreshold() {
-        
-        return fullyBufferedReadThreshold;
-        
-    }
+//    /**
+//     * The default factory for rule evaluation.
+//     */
+////    private final IRuleTaskFactory defaultTaskFactory;
+//
+//    /**
+//     * The factory for rule evaluation plans.
+//     */
+//    private final IEvaluationPlanFactory planFactory;
 
-    public String getProperty(final String name, final String defaultValue) {
-
-        // @todo pass namespace in with the RDFJoinNexusFactory?
-        return Configuration.getProperty(indexManager,
-                joinNexusFactory.properties, null/* namespace */, name,
-                defaultValue);
-
-    }
-
-    public <T> T getProperty(final String name, final String defaultValue,
-            final IValidator<T> validator) {
-
-        // @todo pass namespace in with the RDFJoinNexusFactory?
-        return Configuration.getProperty(indexManager,
-                joinNexusFactory.properties, null/* namespace */, name,
-                defaultValue, validator);
-
-    }
-
-    private final int solutionFlags;
-    
-    @SuppressWarnings("unchecked")
-	private final IElementFilter filter;
-
-    public IElementFilter<ISolution> getSolutionFilter() {
-        
-        return filter == null ? null : new SolutionFilter(filter);
-        
-    }
-    
-    /**
-     * The default factory for rule evaluation.
-     */
-//    private final IRuleTaskFactory defaultTaskFactory;
-
-    /**
-     * The factory for rule evaluation plans.
-     */
-    private final IEvaluationPlanFactory planFactory;
-
-    /**
-     * @todo caching for the same relation and database state shared across join
-     *       nexus instances.
-     */
-    private final IRangeCountFactory rangeCountFactory = new DefaultRangeCountFactory(
-            this);
+//    /**
+//     * @todo caching for the same relation and database state shared across join
+//     *       nexus instances.
+//     */
+//    private final IRangeCountFactory rangeCountFactory = new DefaultRangeCountFactory(
+//            this);
 
     private final IRuleStatisticsFactory ruleStatisticsFactory = new IRuleStatisticsFactory() {
 
@@ -279,7 +244,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
         public RuleStats newInstance(IRuleState ruleState) {
          
-            return new RDFRuleStats(null, readTimestamp, ruleState);
+            return new RDFRuleStats(null, getReadTimestamp(), ruleState);
 
         }
         
@@ -296,9 +261,9 @@ public class RDFJoinNexus implements IJoinNexus {
         public RuleStats newInstancex(IRuleState ruleState) {
             
             return new RDFRuleStats(
-                    (indexManager instanceof IBigdataFederation ? null
+                    (indexManager instanceof IBigdataFederation<?> ? null
                             : indexManager), //
-                        readTimestamp, //
+                        getReadTimestamp(), //
                         ruleState//
                         );
             
@@ -427,142 +392,127 @@ public class RDFJoinNexus implements IJoinNexus {
 	public RDFJoinNexus(final RDFJoinNexusFactory joinNexusFactory,
 			final IIndexManager indexManager) {
 
-        if (joinNexusFactory == null)
-            throw new IllegalArgumentException();
-        
-        if (indexManager == null)
-            throw new IllegalArgumentException();
-
+        super(joinNexusFactory, indexManager);
+	    
         this.joinNexusFactory = joinNexusFactory;
         
-        this.indexManager = indexManager;
-        
-        this.resourceLocator = indexManager.getResourceLocator();
-        
-        this.action = joinNexusFactory.action;
-        
-        this.writeTimestamp = joinNexusFactory.writeTimestamp;
-
-        this.readTimestamp = joinNexusFactory.readTimestamp;
+//        this.indexManager = indexManager;
+//        
+//        this.resourceLocator = indexManager.getResourceLocator();
+//        
+//        this.action = joinNexusFactory.getAction();
+//        
+//        this.writeTimestamp = joinNexusFactory.getWriteTimestamp();
+//
+//        this.readTimestamp = joinNexusFactory.getReadTimestamp();
 
         this.justify = joinNexusFactory.justify;
         
         this.backchain = joinNexusFactory.backchain;
         
-//        this.forceSerialExecution = joinNexusFactory.forceSerialExecution;
-//        
-//        this.maxParallelSubqueries = joinNexusFactory.maxParallelSubqueries;
-//        
-//        this.chunkOfChunksCapacity = joinNexusFactory.chunkOfChunksCapacity;
-//        
-//        this.chunkCapacity = joinNexusFactory.chunkCapacity;
+//        forceSerialExecution = Boolean.parseBoolean(getProperty(
+//                AbstractResource.Options.FORCE_SERIAL_EXECUTION,
+//                AbstractResource.Options.DEFAULT_FORCE_SERIAL_EXECUTION));
 //
-//        this.chunkTimeout = joinNexusFactory.chunkTimeout;
-//        
-//        this.fullyBufferedReadThreshold = joinNexusFactory.fullyBufferedReadThreshold;
-
-        forceSerialExecution = Boolean.parseBoolean(getProperty(
-                AbstractResource.Options.FORCE_SERIAL_EXECUTION,
-                AbstractResource.Options.DEFAULT_FORCE_SERIAL_EXECUTION));
-
-        maxParallelSubqueries = getProperty(
-                AbstractResource.Options.MAX_PARALLEL_SUBQUERIES,
-                AbstractResource.Options.DEFAULT_MAX_PARALLEL_SUBQUERIES,
-                IntegerValidator.GTE_ZERO);
-
-        /*
-         * FIXME You can not override the rule execution model yet
-         * (nestedSubquery vs pipeline). This is currently a separate field on
-         * RDFJoinNexus. However, this will give way to a different approach all
-         * together with the rule execution refactor to support things like star
-         * joins.
-         */
-////        final boolean pipelineIsBetter = (indexManager instanceof IBigdataFederation && ((IBigdataFederation) indexManager)
-////                .isScaleOut());
+//        maxParallelSubqueries = getProperty(
+//                AbstractResource.Options.MAX_PARALLEL_SUBQUERIES,
+//                AbstractResource.Options.DEFAULT_MAX_PARALLEL_SUBQUERIES,
+//                IntegerValidator.GTE_ZERO);
 //
-//        nestedSubquery = Boolean.parseBoolean(getProperty(
-//                AbstractResource.Options.NESTED_SUBQUERY, Boolean.FALSE);
-////        Boolean
-////                        .toString(!pipelineIsBetter)));
-
-        chunkOfChunksCapacity = getProperty(
-                AbstractResource.Options.CHUNK_OF_CHUNKS_CAPACITY,
-                AbstractResource.Options.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY,
-                IntegerValidator.GT_ZERO);
-
-        chunkCapacity = getProperty(AbstractResource.Options.CHUNK_CAPACITY,
-                AbstractResource.Options.DEFAULT_CHUNK_CAPACITY,
-                IntegerValidator.GT_ZERO);
-
-        chunkTimeout = getProperty(AbstractResource.Options.CHUNK_TIMEOUT,
-                AbstractResource.Options.DEFAULT_CHUNK_TIMEOUT,
-                LongValidator.GTE_ZERO);
-
-        fullyBufferedReadThreshold = getProperty(
-                AbstractResource.Options.FULLY_BUFFERED_READ_THRESHOLD,
-                AbstractResource.Options.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD,
-                IntegerValidator.GT_ZERO);
-
-        this.solutionFlags = joinNexusFactory.solutionFlags;
-
-        this.filter = joinNexusFactory.filter;
-        
-//        this.defaultTaskFactory = new DefaultRuleTaskFactory();
-        
-        this.planFactory = joinNexusFactory.planFactory;
+//        /*
+//         * FIXME You can not override the rule execution model yet
+//         * (nestedSubquery vs pipeline). This is currently a separate field on
+//         * RDFJoinNexus. However, this will give way to a different approach all
+//         * together with the rule execution refactor to support things like star
+//         * joins.
+//         */
+//////        final boolean pipelineIsBetter = (indexManager instanceof IBigdataFederation && ((IBigdataFederation) indexManager)
+//////                .isScaleOut());
+////
+////        nestedSubquery = Boolean.parseBoolean(getProperty(
+////                AbstractResource.Options.NESTED_SUBQUERY, Boolean.FALSE);
+//////        Boolean
+//////                        .toString(!pipelineIsBetter)));
+//
+//        chunkOfChunksCapacity = getProperty(
+//                AbstractResource.Options.CHUNK_OF_CHUNKS_CAPACITY,
+//                AbstractResource.Options.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY,
+//                IntegerValidator.GT_ZERO);
+//
+//        chunkCapacity = getProperty(AbstractResource.Options.CHUNK_CAPACITY,
+//                AbstractResource.Options.DEFAULT_CHUNK_CAPACITY,
+//                IntegerValidator.GT_ZERO);
+//
+//        chunkTimeout = getProperty(AbstractResource.Options.CHUNK_TIMEOUT,
+//                AbstractResource.Options.DEFAULT_CHUNK_TIMEOUT,
+//                LongValidator.GTE_ZERO);
+//
+//        fullyBufferedReadThreshold = getProperty(
+//                AbstractResource.Options.FULLY_BUFFERED_READ_THRESHOLD,
+//                AbstractResource.Options.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD,
+//                IntegerValidator.GT_ZERO);
+//
+//        this.solutionFlags = joinNexusFactory.getSolutionFlags();
+//
+//        this.filter = joinNexusFactory.getSolutionFilter();
+//        
+////        this.defaultTaskFactory = new DefaultRuleTaskFactory();
+//        
+//        this.planFactory = joinNexusFactory.getEvaluationPlanFactory();
    
     }
 
-    public IJoinNexusFactory getJoinNexusFactory() {
-        
-        return joinNexusFactory;
-        
-    }
+//    public IJoinNexusFactory getJoinNexusFactory() {
+//        
+//        return joinNexusFactory;
+//        
+//    }
 
+	@Override
     public IRuleStatisticsFactory getRuleStatisticsFactory() {
         
         return ruleStatisticsFactory;
         
     }
     
-    public IRangeCountFactory getRangeCountFactory() {
-        
-        return rangeCountFactory;
-        
-    }
-    
-    final public boolean forceSerialExecution() {
-
-        if (log.isInfoEnabled())
-            log.info("forceSerialExecution="+forceSerialExecution);
-
-        return forceSerialExecution;
-    	
-    }
-    
-    final public int getMaxParallelSubqueries() {
-        
-        return maxParallelSubqueries;
-        
-    }
-    
-    public ActionEnum getAction() {
-        
-        return action;
-        
-    }
-    
-    public long getWriteTimestamp() {
-
-        return writeTimestamp;
-
-    }
-
-    final public long getReadTimestamp() {
-        
-        return readTimestamp;
-        
-    }
+//    public IRangeCountFactory getRangeCountFactory() {
+//        
+//        return rangeCountFactory;
+//        
+//    }
+//    
+//    final public boolean forceSerialExecution() {
+//
+//        if (log.isInfoEnabled())
+//            log.info("forceSerialExecution="+forceSerialExecution);
+//
+//        return forceSerialExecution;
+//    	
+//    }
+//    
+//    final public int getMaxParallelSubqueries() {
+//        
+//        return maxParallelSubqueries;
+//        
+//    }
+//    
+//    public ActionEnum getAction() {
+//        
+//        return action;
+//        
+//    }
+//    
+//    public long getWriteTimestamp() {
+//
+//        return writeTimestamp;
+//
+//    }
+//
+//    final public long getReadTimestamp() {
+//        
+//        return readTimestamp;
+//        
+//    }
     
 //	/**
 //	 * Return <code>true</code> if the <i>relationName</i> is on a
@@ -683,7 +633,7 @@ public class RDFJoinNexus implements IJoinNexus {
         final IRelation relation = (IRelation) resourceLocator.locate(
                 relationName, timestamp);
         
-        if(DEBUG) {
+        if(log.isDebugEnabled()) {
             
             log.debug("predicate: "+pred+", head relation: "+relation);
             
@@ -716,7 +666,7 @@ public class RDFJoinNexus implements IJoinNexus {
             final String relationName = pred.getOnlyRelationName();
 
             relation = (IRelation) resourceLocator.locate(relationName,
-                    readTimestamp);
+                    getReadTimestamp());
                 
         } else if (nsources == 2) {
 
@@ -724,15 +674,11 @@ public class RDFJoinNexus implements IJoinNexus {
 
             final String relationName1 = pred.getRelationName(1);
 
-//            final long timestamp0 = getReadTimestamp(/*relationName0*/);
-//
-//            final long timestamp1 = getReadTimestamp(/*relationName1*/);
-
             final IRelation relation0 = (IRelation) resourceLocator.locate(
-                    relationName0, readTimestamp);//timestamp0);
+                    relationName0, readTimestamp);
 
             final IRelation relation1 = (IRelation) resourceLocator.locate(
-                    relationName1, readTimestamp);//timestamp1);
+                    relationName1, readTimestamp);
 
             relation = new RelationFusedView(relation0, relation1).init();
 
@@ -742,29 +688,29 @@ public class RDFJoinNexus implements IJoinNexus {
 
         }
 
-        if(DEBUG) {
-            
-            log.debug("predicate: "+pred+", tail relation: "+relation);
-            
+        if(log.isDebugEnabled()) {
+
+            log.debug("predicate: " + pred + ", tail relation: " + relation);
+
         }
         
         return relation;
         
     }
 
-    /**
-     * @deprecated by {@link #getTailAccessPath(IRelation, IPredicate)}
-     * 
-     * @see #getTailAccessPath(IRelation, IPredicate).
-     */
-    public IAccessPath getTailAccessPath(final IPredicate predicate) {
-     
-        // Resolve the relation name to the IRelation object.
-        final IRelation relation = getTailRelationView(predicate);
-
-        return getTailAccessPath(relation, predicate);
-
-    }
+//    /**
+//     * @deprecated by {@link #getTailAccessPath(IRelation, IPredicate)}
+//     * 
+//     * @see #getTailAccessPath(IRelation, IPredicate).
+//     */
+//    public IAccessPath getTailAccessPath(final IPredicate predicate) {
+//     
+//        // Resolve the relation name to the IRelation object.
+//        final IRelation relation = getTailRelationView(predicate);
+//
+//        return getTailAccessPath(relation, predicate);
+//
+//    }
 
     /**
      * When {@link #backchain} is <code>true</code> and the tail predicate is
@@ -855,312 +801,105 @@ public class RDFJoinNexus implements IJoinNexus {
 
     }
 
-//    /**
-//     * This handles a request for an access path that is restricted to a
-//     * specific index partition.
-//     * <p>
-//     * Note: This path is used with the scale-out JOIN strategy, which
-//     * distributes join tasks onto each index partition from which it needs to
-//     * read. Those tasks constrain the predicate to only read from the index
-//     * partition which is being serviced by that join task.
-//     * <p>
-//     * Note: Since the relation may materialize the index views for its various
-//     * access paths, and since we are restricted to a single index partition and
-//     * (presumably) an index manager that only sees the index partitions local
-//     * to a specific data service, we create an access path view for an index
-//     * partition without forcing the relation to be materialized.
-//     * <p>
-//     * Note: This method MUST NOT be moved to the {@link SPORelation}!!! The
-//     * issue is that the relation is always resolved using the federation's
-//     * index manager in order to resolve the metadata for the relation against
-//     * the global row store. The {@link RDFJoinNexus} has been specifically
-//     * prepared during scale-out joins such that the {@link #indexManager} is
-//     * the data service's index manager NOT the federation's index manager. This
-//     * gives us access to the local B+Tree views, which are efficient for local
-//     * reads. If this method is moved to the {@link SPORelation} then the
-//     * relation must be handed the desired index manager since the one it
-//     * inherits from its base class will be the federation's index manager, not
-//     * the local data service's index manager.
-//     * 
-//     * FIXME This COULD be moved into the {@link SPORelation} (and hence made
-//     * general purpose) if we passed through the local index manager and used
-//     * it consistently when obtaining the {@link IAccessPath}.
-//     * 
-//     * FIXME This is hardcoded for the {@link SPORelation} (it will not handle
-//     * joins against other relations).
-//     */
-//    private IAccessPath getTailAccessPathForIndexPartition(
-//            final IRelation relation, final IPredicate predicate) {
-//
-//        if (indexManager instanceof IBigdataFederation) {
-//       
-//            /*
-//             * This will happen if you fail to re-create the JoinNexus
-//             * within the target execution environment.
-//             * 
-//             * This is disallowed because the predicate specifies an index
-//             * partition and expects to have access to the local index
-//             * objects for that index partition. However, the index
-//             * partition is only available when running inside of the
-//             * ConcurrencyManager and when using the IndexManager exposed by
-//             * the ConcurrencyManager to its tasks.
-//             */
-//            throw new IllegalStateException(
-//                    "Expecting a local index manager, not: "
-//                            + indexManager.getClass().toString());
-//
-//        }
-//        
-//        final String namespace = predicate.getOnlyRelationName();
-//
-//        /*
-//         * Find the best access path for that predicate.
-//         */
-//        final IKeyOrder keyOrder = SPOKeyOrder.getKeyOrder(predicate,
-//                ((SPORelation) relation).getKeyArity());
-//
-//        // The name of the desired index partition.
-//        final String name = DataService
-//                .getIndexPartitionName(namespace + "."
-//                        + keyOrder.getIndexName(), predicate
-//                        .getPartitionId());
-//        
-//        /*
-//         * @todo whether or not we need both keys and values depends on the
-//         * specific index/predicate.
-//         * 
-//         * Note: We can specify READ_ONLY here since the tail predicates are
-//         * not mutable for rule execution.
-//         */
-//        final int flags = IRangeQuery.KEYS | IRangeQuery.VALS | IRangeQuery.READONLY;
+//    public Iterator<PartitionLocator> locatorScan(
+//            final AbstractScaleOutFederation<?> fed,
+//            final IPredicate<?> predicate) {
 //
 //        final long timestamp = getReadTimestamp();
-//        
-//        final IIndex ndx = indexManager.getIndex(name, timestamp);
-//        
-//        return new SPOAccessPath(indexManager, timestamp, predicate,
-//                keyOrder, ndx, flags, getChunkOfChunksCapacity(),
-//                getChunkCapacity(), getFullyBufferedReadThreshold()).init();
+//
+//        // Note: assumes that we are NOT using a view of two relations.
+//        final IRelation<?> relation = (IRelation<?>) fed.getResourceLocator().locate(
+//                predicate.getOnlyRelationName(), timestamp);
+//
+//        /*
+//         * Find the best access path for the predicate for that relation.
+//         * 
+//         * Note: All we really want is the [fromKey] and [toKey] for that
+//         * predicate and index. In general, that information is available from
+//         * IKeyOrder#getFromKey() and IKeyOrder#getToKey(). However, we also
+//         * need to know whether quads or triples are being used for RDF and that
+//         * information is carried by the AbstractTripleStore container or the
+//         * SPORelation. 
+//         * 
+//         * Note: This MUST NOT layer on expander or backchain access path
+//         * overlays. Those add overhead during construction and the layering
+//         * also hides the [fromKey] and [toKey].
+//         */
+//        @SuppressWarnings("unchecked")
+//        final AbstractAccessPath<?> accessPath = (AbstractAccessPath<?>) relation
+//                .getAccessPath((IPredicate)predicate);
+//
+//        // Note: assumes scale-out (EDS or JDS).
+//        final IClientIndex ndx = (IClientIndex) accessPath.getIndex();
+//
+//        /*
+//         * Note: could also be formed from relationName + "." +
+//         * keyOrder.getIndexName(), which is cheaper unless the index metadata
+//         * is cached.
+//         */
+//        final String name = ndx.getIndexMetadata().getName();
+//
+//        return fed.locatorScan(name, timestamp, accessPath.getFromKey(),
+//                accessPath.getToKey(), false/* reverse */);
 //
 //    }
     
-    public Iterator<PartitionLocator> locatorScan(
-            final AbstractScaleOutFederation fed, final IPredicate predicate) {
-
-        final long timestamp = getReadTimestamp();
-
-        // Note: assumes that we are NOT using a view of two relations.
-        final IRelation relation = (IRelation) fed.getResourceLocator().locate(
-                predicate.getOnlyRelationName(), timestamp);
-
-        /*
-         * Find the best access path for the predicate for that relation.
-         * 
-         * Note: All we really want is the [fromKey] and [toKey] for that
-         * predicate and index. In general, that information is available from
-         * IKeyOrder#getFromKey() and IKeyOrder#getToKey(). However, we also
-         * need to know whether quads or triples are being used for RDF and that
-         * information is carried by the AbstractTripleStore container or the
-         * SPORelation. 
-         * 
-         * Note: This MUST NOT layer on expander or backchain access path
-         * overlays. Those add overhead during construction and the layering
-         * also hides the [fromKey] and [toKey].
-         */
-        final AbstractAccessPath accessPath = (AbstractAccessPath) relation
-                .getAccessPath(predicate);
-
-        // Note: assumes scale-out (EDS or JDS).
-        final IClientIndex ndx = (IClientIndex) accessPath.getIndex();
-
-        /*
-         * Note: could also be formed from relationName + "." +
-         * keyOrder.getIndexName(), which is cheaper unless the index metadata
-         * is cached.
-         */
-        final String name = ndx.getIndexMetadata().getName();
-
-        return fed.locatorScan(name, timestamp, accessPath.getFromKey(),
-                accessPath.getToKey(), false/* reverse */);
-
-    }
-    
-    public IIndexManager getIndexManager() {
-        
-        return indexManager;
-        
-    }
-    
-    @SuppressWarnings("unchecked")
-    public boolean bind(final IRule rule, final int index, final Object e,
-            final IBindingSet bindings) {
-
-        // propagate bindings from the visited object into the binding set.
-        copyValues((IElement) e, rule.getTail(index), bindings);
-
-        // verify constraints.
-        return rule.isConsistent(bindings);
-
-    }
-    
-    public boolean bind(final IPredicate<?> pred, final IConstraint constraint,
-            final Object e, final IBindingSet bindings) {
-
-        // propagate bindings from the visited object into the binding set.
-        copyValues((IElement) e, pred, bindings);
-
-        if (constraint != null) {
-
-            // verify constraint.
-            return constraint.accept(bindings);
-        
-        }
-        
-        // no constraint.
-        return true;
-        
-    }
-    
-    @SuppressWarnings("unchecked")
-    private void copyValues(final IElement e, final IPredicate<?> pred,
-            final IBindingSet bindingSet) {
-
-        for (int i = 0; i < pred.arity(); i++) {
-
-            final IVariableOrConstant<?> t = pred.get(i);
-
-            if (t.isVar()) {
-
-                final IVariable<?> var = (IVariable<?>) t;
-
-                final Constant<?> newval = new Constant(e.get(i));
-
-                bindingSet.set(var, newval);
-
-            }
-
-        }
-
-    }
+//    public IIndexManager getIndexManager() {
+//        
+//        return indexManager;
+//        
+//    }
+//    
+//    @SuppressWarnings("unchecked")
+//    public boolean bind(final IRule rule, final int index, final Object e,
+//            final IBindingSet bindings) {
+//
+//        // propagate bindings from the visited object into the binding set.
+//        copyValues((IElement) e, rule.getTail(index), bindings);
+//
+//        // verify constraints.
+//        return rule.isConsistent(bindings);
+//
+//    }
+//    
+//    public boolean bind(final IPredicate<?> pred, final IConstraint constraint,
+//            final Object e, final IBindingSet bindings) {
+//
+//        // propagate bindings from the visited object into the binding set.
+//        copyValues((IElement) e, pred, bindings);
+//
+//        if (constraint != null) {
+//
+//            // verify constraint.
+//            return constraint.accept(bindings);
+//        
+//        }
+//        
+//        // no constraint.
+//        return true;
+//        
+//    }
     
 //    @SuppressWarnings("unchecked")
-//    private void copyValues(final Object e, final IPredicate predicate,
+//    private void copyValues(final IElement e, final IPredicate<?> pred,
 //            final IBindingSet bindingSet) {
 //
-//        if (e == null)
-//            throw new IllegalArgumentException();
-//        
-//        if (predicate == null)
-//            throw new IllegalArgumentException();
-//        
-//        if (bindingSet == null)
-//            throw new IllegalArgumentException();
-//        
-//        if (e instanceof SPO) {
-//        
-//            copyValues((SPO) e, (IPredicate<ISPO>) predicate, bindingSet);
-//            
-//        } else {
-//
-//            copyValues((MagicTuple) e, 
-//                    (IPredicate<IMagicTuple>) predicate, bindingSet);
-//            
-//        }
-//        
-//    }
-//    
-//    @SuppressWarnings("unchecked")
-//    private void copyValues(final SPO spo, final IPredicate<ISPO> predicate,
-//            final IBindingSet bindingSet) {
-//    
-//        {
-//
-//            final IVariableOrConstant<IV> t = predicate.get(0);
-//            
-//            if(t.isVar()) {
-//
-//                final IVariable<IV> var = (IVariable<IV>)t;
-//                
-//                final Constant newval = new Constant<IV>(spo.s);
-//
-//                bindingSet.set(var, newval);
-//                
-//            }
-//
-//        }
-//
-//        {
-//
-//            final IVariableOrConstant<IV> t = predicate.get(1);
-//            
-//            if(t.isVar()) {
-//
-//                final IVariable<IV> var = (IVariable<IV>)t;
-//
-//                final Constant newval = new Constant<IV>(spo.p);
-//
-//                bindingSet.set(var, newval);
-//                
-//            }
-//
-//        }
-//
-//        {
-//
-//            final IVariableOrConstant<IV> t = predicate.get(2);
-//            
-//            if(t.isVar()) {
-//
-//                final IVariable<IV> var = (IVariable<IV>)t;
-//
-//                final Constant newval = new Constant<IV>(spo.o);
-//
-//                bindingSet.set(var, newval);
-//                
-//            }
-//
-//        }
-//        
-//        /*if (predicate.arity() == 4)*/ {
-//
-//            // context position / statement identifier.
-//
-//            final IVariableOrConstant<IV> t = predicate.get(3);
-//            
-//            if (t != null && t.isVar()) {
-//
-//                final IVariable<IV> var = (IVariable<IV>) t;
-//
-//                final Constant newval = new Constant<IV>(spo.c());
-//
-//                bindingSet.set(var, newval);
-//
-//            }
-//
-//        }
-//        
-//    }
-//
-//    @SuppressWarnings("unchecked")
-//    private void copyValues(final MagicTuple tuple, 
-//            final IPredicate<IMagicTuple> pred, final IBindingSet bindingSet) {
-//    
 //        for (int i = 0; i < pred.arity(); i++) {
-//            
-//            final IVariableOrConstant<IV> t = pred.get(i);
-//            
-//            if(t.isVar()) {
 //
-//                final IVariable<IV> var = (IVariable<IV>)t;
-//                
-//                final Constant newval = new Constant<IV>(tuple.getTerm(i));
+//            final IVariableOrConstant<?> t = pred.get(i);
+//
+//            if (t.isVar()) {
+//
+//                final IVariable<?> var = (IVariable<?>) t;
+//
+//                final Constant<?> newval = new Constant(e.get(i));
 //
 //                bindingSet.set(var, newval);
-//                
+//
 //            }
 //
 //        }
-//        
+//
 //    }
 
     public IConstant fakeBinding(IPredicate pred, Var var) {
@@ -1172,25 +911,25 @@ public class RDFJoinNexus implements IJoinNexus {
     final private static transient IConstant<IV> fakeTermId = 
         new Constant<IV>(new TermId(VTE.URI, -1L));
 
-    public ISolution newSolution(final IRule rule, final IBindingSet bindingSet) {
-
-        final Solution solution = new Solution(this, rule, bindingSet);
-        
-        if(DEBUG) {
-            
-            log.debug(solution.toString());
-            
-        }
-
-        return solution;
-
-    }
+//    public ISolution newSolution(final IRule rule, final IBindingSet bindingSet) {
+//
+//        final Solution solution = new Solution(this, rule, bindingSet);
+//        
+//        if(log.isDebugEnabled()) {
+//            
+//            log.debug(solution.toString());
+//            
+//        }
+//
+//        return solution;
+//
+//    }
     
-    public int solutionFlags() {
-        
-        return solutionFlags;
-        
-    }
+//    public int solutionFlags() {
+//        
+//        return solutionFlags;
+//        
+//    }
 
     /**
      * FIXME unit tests for DISTINCT with a head and ELEMENT, with bindings and
@@ -1236,155 +975,155 @@ public class RDFJoinNexus implements IJoinNexus {
 
         }
 
+        // @todo this class has RDF specific stuff in it.
         return new BindingSetSortKeyBuilder(keyBuilder, vars);
         
     }
     
-    /**
-     * FIXME Custom serialization for solution sets, especially since there
-     * tends to be a lot of redudency in the data arising from how bindings are
-     * propagated during JOINs.
-     * 
-     * @todo We can sort the {@link ISolution}s much like we already do for
-     *       DISTINCT or intend to do for SORT and use the equivilent of leading
-     *       key compression to reduce IO costs (or when they are SORTed we
-     *       could leverage that to produce a more compact serialization).
-     * 
-     * @see SPOSolutionSerializer (needs to be written).
-     */
-    public IStreamSerializer<ISolution[]> getSolutionSerializer() {
-        
-        return SerializerUtil.STREAMS;
-        
-    }
-
-    /**
-     * FIXME Custom serialization for binding sets, especially since there tends
-     * to be a lot of redudency in the data arising from how bindings are
-     * propagated during JOINs.
-     * 
-     * @todo We can sort the {@link ISolution}s much like we already do for
-     *       DISTINCT or intend to do for SORT and use the equivilent of leading
-     *       key compression to reduce IO costs (or when they are SORTed we
-     *       could leverage that to produce a more compact serialization).
-     * 
-     * @see SPOBindingSetSerializer, which has not been finished.
-     */
-    public IStreamSerializer<IBindingSet[]> getBindingSetSerializer() {
-        
-        return SerializerUtil.STREAMS;
-        
-    }
-
-    public IBindingSet newBindingSet(final IRule rule) {
-
-        final IBindingSet constants = rule.getConstants();
-
-        final int nconstants = constants.size();
-        
-        final IBindingSet bindingSet = new ArrayBindingSet(rule
-                .getVariableCount()
-                + nconstants);
-
-        if (nconstants > 0) {
-        
-            /*
-             * Bind constants declared by the rule before returning the binding
-             * set to the caller.
-             */
-            
-            final Iterator<Map.Entry<IVariable, IConstant>> itr = constants
-                    .iterator();
-            
-            while(itr.hasNext()) {
-                
-                final Map.Entry<IVariable,IConstant> entry = itr.next();
-                
-                bindingSet.set(entry.getKey(), entry.getValue());
-                
-            }
-            
-        }
-        
-        return bindingSet;
-        
-    }
-
-    public IRuleTaskFactory getRuleTaskFactory(final boolean parallel,
-            final IRule rule) {
-
-        if (rule == null)
-            throw new IllegalArgumentException();
-
-        // is there a task factory override?
-        IRuleTaskFactory taskFactory = rule.getTaskFactory();
-
-        if (taskFactory == null) {
-
-            // no, use the default factory.
-            taskFactory = joinNexusFactory.defaultRuleTaskFactory;
-
-        }
-        
-        /*
-         * Note: Now handled by the MutationTask itself.
-         */
-//        if (getAction().isMutation() && (!parallel || forceSerialExecution())) {
+//    /**
+//     * FIXME Custom serialization for solution sets, especially since there
+//     * tends to be a lot of redundancy in the data arising from how bindings are
+//     * propagated during JOINs.
+//     * 
+//     * @todo We can sort the {@link ISolution}s much like we already do for
+//     *       DISTINCT or intend to do for SORT and use the equivalent of leading
+//     *       key compression to reduce IO costs (or when they are SORTed we
+//     *       could leverage that to produce a more compact serialization).
+//     * 
+//     * @see SPOSolutionSerializer (needs to be written).
+//     */
+//    public IStreamSerializer<ISolution[]> getSolutionSerializer() {
+//        
+//        return SerializerUtil.STREAMS;
+//        
+//    }
 //
+//    /**
+//     * FIXME Custom serialization for binding sets, especially since there tends
+//     * to be a lot of redundancy in the data arising from how bindings are
+//     * propagated during JOINs.
+//     * 
+//     * @todo We can sort the {@link ISolution}s much like we already do for
+//     *       DISTINCT or intend to do for SORT and use the equivalent of leading
+//     *       key compression to reduce IO costs (or when they are SORTed we
+//     *       could leverage that to produce a more compact serialization).
+//     * 
+//     * @see SPOBindingSetSerializer, which has not been finished.
+//     */
+//    public IStreamSerializer<IBindingSet[]> getBindingSetSerializer() {
+//        
+//        return SerializerUtil.STREAMS;
+//        
+//    }
+
+//    public IBindingSet newBindingSet(final IRule rule) {
+//
+//        final IBindingSet constants = rule.getConstants();
+//
+//        final int nconstants = constants.size();
+//        
+//        final IBindingSet bindingSet = new ArrayBindingSet(rule
+//                .getVariableCount()
+//                + nconstants);
+//
+//        if (nconstants > 0) {
+//        
 //            /*
-//             * Tasks for sequential mutation steps are always wrapped to ensure
-//             * that the thread-safe buffer is flushed onto the mutable relation
-//             * after each rule executes. This is necessary in order for the
-//             * results of one rule in a sequential program to be visible to the
-//             * next rule in that sequential program.
+//             * Bind constants declared by the rule before returning the binding
+//             * set to the caller.
 //             */
 //            
-//            taskFactory = new RunRuleAndFlushBufferTaskFactory(taskFactory);
+//            final Iterator<Map.Entry<IVariable, IConstant>> itr = constants
+//                    .iterator();
+//            
+//            while(itr.hasNext()) {
+//                
+//                final Map.Entry<IVariable,IConstant> entry = itr.next();
+//                
+//                bindingSet.set(entry.getKey(), entry.getValue());
+//                
+//            }
+//            
+//        }
+//        
+//        return bindingSet;
+//        
+//    }
+
+//    public IRuleTaskFactory getRuleTaskFactory(final boolean parallel,
+//            final IRule rule) {
+//
+//        if (rule == null)
+//            throw new IllegalArgumentException();
+//
+//        // is there a task factory override?
+//        IRuleTaskFactory taskFactory = rule.getTaskFactory();
+//
+//        if (taskFactory == null) {
+//
+//            // no, use the default factory.
+//            taskFactory = joinNexusFactory.getDefaultRuleTaskFactory();
 //
 //        }
+//        
+//        /*
+//         * Note: Now handled by the MutationTask itself.
+//         */
+////        if (getAction().isMutation() && (!parallel || forceSerialExecution())) {
+////
+////            /*
+////             * Tasks for sequential mutation steps are always wrapped to ensure
+////             * that the thread-safe buffer is flushed onto the mutable relation
+////             * after each rule executes. This is necessary in order for the
+////             * results of one rule in a sequential program to be visible to the
+////             * next rule in that sequential program.
+////             */
+////            
+////            taskFactory = new RunRuleAndFlushBufferTaskFactory(taskFactory);
+////
+////        }
+//
+//        return taskFactory;
+//
+//    }
 
-        return taskFactory;
+//    public IEvaluationPlanFactory getPlanFactory() {
+//        
+//        return planFactory;
+//        
+//    }
+//    
+//    public IResourceLocator getRelationLocator() {
+//        
+//        return resourceLocator;
+//        
+//    }
 
-    }
-
-    public IEvaluationPlanFactory getPlanFactory() {
-        
-        return planFactory;
-        
-    }
+//    public IBuffer<ISolution> newUnsynchronizedBuffer(
+//            final IBuffer<ISolution[]> targetBuffer, final int chunkCapacity) {
+//
+//        // MAY be null.
+//        final IElementFilter<ISolution> filter = getSolutionFilter();
+//        
+//        return new UnsynchronizedArrayBuffer<ISolution>(targetBuffer,
+//                chunkCapacity, filter);
+//        
+//    }
     
-    public IResourceLocator getRelationLocator() {
-        
-        return resourceLocator;
-//        return indexManager.getResourceLocator();
-        
-    }
-
-    public IBuffer<ISolution> newUnsynchronizedBuffer(
-            final IBuffer<ISolution[]> targetBuffer, final int chunkCapacity) {
-
-        // MAY be null.
-        final IElementFilter<ISolution> filter = getSolutionFilter();
-        
-        return new UnsynchronizedArrayBuffer<ISolution>(targetBuffer,
-                chunkCapacity, filter);
-        
-    }
-    
-    /**
-     * Note: {@link ISolution} (not relation elements) will be written on the
-     * buffer concurrently by different rules so there is no natural order for
-     * the elements in the buffer.
-     */
-    public IBlockingBuffer<ISolution[]> newQueryBuffer() {
-
-        if (getAction().isMutation())
-            throw new IllegalStateException();
-        
-        return new BlockingBuffer<ISolution[]>(chunkOfChunksCapacity,
-                chunkCapacity, chunkTimeout, chunkTimeoutUnit);
-        
-    }
+//    /**
+//     * Note: {@link ISolution} (not relation elements) will be written on the
+//     * buffer concurrently by different rules so there is no natural order for
+//     * the elements in the buffer.
+//     */
+//    public IBlockingBuffer<ISolution[]> newQueryBuffer() {
+//
+//        if (getAction().isMutation())
+//            throw new IllegalStateException();
+//        
+//        return new BlockingBuffer<ISolution[]>(chunkOfChunksCapacity,
+//                chunkCapacity, chunkTimeout, chunkTimeoutUnit);
+//        
+//    }
     
     /**
      * Buffer writes on {@link IMutableRelation#insert(IChunkedIterator)} when it is
@@ -1447,7 +1186,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
             final int n = chunk.length;
             
-            if(DEBUG) 
+            if(log.isDebugEnabled()) 
                 log.debug("chunkSize="+n);
             
             final long begin = System.currentTimeMillis();
@@ -1458,7 +1197,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
             for(int i=0; i<chunk.length; i++) {
                 
-                if(DEBUG) {
+                if(log.isDebugEnabled()) {
                     
                     log.debug("chunk["+i+"] = "+chunk[i]);
                     
@@ -1551,7 +1290,7 @@ public class RDFJoinNexus implements IJoinNexus {
         if (getAction() != ActionEnum.Insert)
             throw new IllegalStateException();
 
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
 
             log.debug("relation=" + relation);
             
@@ -1591,7 +1330,7 @@ public class RDFJoinNexus implements IJoinNexus {
         if (getAction() != ActionEnum.Delete)
             throw new IllegalStateException();
 
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
 
             log.debug("relation=" + relation);
 
@@ -1713,154 +1452,154 @@ public class RDFJoinNexus implements IJoinNexus {
 
     }
     
-    public long runMutation(final IStep step) throws Exception {
-
-        if (step == null)
-            throw new IllegalArgumentException();
-
-        if (!action.isMutation())
-            throw new IllegalStateException();
-
-        if (step.isRule() && ((IRule) step).getHead() == null) {
-
-            throw new IllegalArgumentException("No head for this rule: " + step);
-
-        }
-        
-        if(log.isInfoEnabled())
-            log.info("action=" + action + ", program=" + step.getName());
-        
-        if(isEmptyProgram(step)) {
-
-            log.warn("Empty program");
-
-            return (Long) new EmptyProgramTask(action, step).call();
-
-        }
-        
-        return (Long) runProgram(action, step);
-
-    }
-    
-    /**
-     * Return true iff the <i>step</i> is an empty {@link IProgram}.
-     * 
-     * @param step
-     *            The step.
-     */
-    protected boolean isEmptyProgram(final IStep step) {
-
-        if (!step.isRule() && ((IProgram) step).stepCount() == 0) {
-
-            return true;
-
-        }
-
-        return false;
-
-    }
-
-    /**
-     * Core impl. This handles the logic required to execute the program either
-     * on a target {@link DataService} (highly efficient) or within the client
-     * using the {@link IClientIndex} to submit operations to the appropriate
-     * {@link DataService}(s) (not very efficient, even w/o RMI).
-     * 
-     * @return Either an {@link IChunkedOrderedIterator} (query) or {@link Long}
-     *         (mutation count).
-     */
-    protected Object runProgram(final ActionEnum action, final IStep step)
-            throws Exception {
-
-        if (action == null)
-            throw new IllegalArgumentException();
-
-        if (step == null)
-            throw new IllegalArgumentException();
-
-        final IIndexManager indexManager = getIndexManager();
-
-        if (indexManager instanceof IBigdataFederation<?>) {
-
-            // distributed program execution.
-            return runDistributedProgram((IBigdataFederation<?>) indexManager,
-                    action, step);
-
-        } else {
-            
-            // local Journal or TemporaryStore execution.
-            return runLocalProgram(action, step);
-
-        }
-
-    }
-
-    /**
-     * This variant handles both local indices on a {@link TemporaryStore} or
-     * {@link Journal} WITHOUT concurrency controls (fast).
-     */
-    protected Object runLocalProgram(final ActionEnum action, final IStep step)
-            throws Exception {
-
-        if (log.isInfoEnabled())
-            log.info("Running local program: action=" + action + ", program="
-                    + step.getName());
-
-        final IProgramTask innerTask = new ProgramTask(action, step,
-                getJoinNexusFactory(), getIndexManager());
-
-        return innerTask.call();
-
-    }
-
-    /**
-     * Runs a distributed {@link IProgram} (key-range partitioned indices, RMI,
-     * and multi-machine).
-     */
-    protected Object runDistributedProgram(final IBigdataFederation fed,
-            final ActionEnum action, final IStep step) throws Exception {
-
-        if (log.isInfoEnabled()) {
-
-            log.info("Running distributed program: action=" + action
-                    + ", program=" + step.getName());
-
-        }
-
-        final IProgramTask innerTask = new ProgramTask(action, step,
-                getJoinNexusFactory(), getIndexManager());
-
-        return innerTask.call();
-
-    }
-
-    /**
-     * This variant is submitted and executes the rules from inside of the
-     * {@link ConcurrencyManager} on the {@link LocalDataServiceImpl} (fast).
-     * <p>
-     * Note: This can only be done if all indices for the relation(s) are (a)
-     * unpartitioned; and (b) located on the SAME {@link DataService}. This is
-     * <code>true</code> for {@link LocalDataServiceFederation}. All other
-     * {@link IBigdataFederation} implementations are scale-out (use key-range
-     * partitioned indices).
-     */
-    protected Object runDataServiceProgram(final DataService dataService,
-            final ActionEnum action, final IStep step)
-            throws InterruptedException, ExecutionException {
-
-        if (log.isInfoEnabled()) {
-
-            log.info("Submitting program to data service: action=" + action
-                    + ", program=" + step.getName() + ", dataService="
-                    + dataService);
-
-        }
-        
-        final IProgramTask innerTask = new ProgramTask(action, step,
-                getJoinNexusFactory());
-
-        return dataService.submit(innerTask).get();
-
-    }
+//    public long runMutation(final IStep step) throws Exception {
+//
+//        if (step == null)
+//            throw new IllegalArgumentException();
+//
+//        if (!action.isMutation())
+//            throw new IllegalStateException();
+//
+//        if (step.isRule() && ((IRule) step).getHead() == null) {
+//
+//            throw new IllegalArgumentException("No head for this rule: " + step);
+//
+//        }
+//        
+//        if(log.isInfoEnabled())
+//            log.info("action=" + action + ", program=" + step.getName());
+//        
+//        if(isEmptyProgram(step)) {
+//
+//            log.warn("Empty program");
+//
+//            return (Long) new EmptyProgramTask(action, step).call();
+//
+//        }
+//        
+//        return (Long) runProgram(action, step);
+//
+//    }
+//    
+//    /**
+//     * Return true iff the <i>step</i> is an empty {@link IProgram}.
+//     * 
+//     * @param step
+//     *            The step.
+//     */
+//    protected boolean isEmptyProgram(final IStep step) {
+//
+//        if (!step.isRule() && ((IProgram) step).stepCount() == 0) {
+//
+//            return true;
+//
+//        }
+//
+//        return false;
+//
+//    }
+//
+//    /**
+//     * Core impl. This handles the logic required to execute the program either
+//     * on a target {@link DataService} (highly efficient) or within the client
+//     * using the {@link IClientIndex} to submit operations to the appropriate
+//     * {@link DataService}(s) (not very efficient, even w/o RMI).
+//     * 
+//     * @return Either an {@link IChunkedOrderedIterator} (query) or {@link Long}
+//     *         (mutation count).
+//     */
+//    protected Object runProgram(final ActionEnum action, final IStep step)
+//            throws Exception {
+//
+//        if (action == null)
+//            throw new IllegalArgumentException();
+//
+//        if (step == null)
+//            throw new IllegalArgumentException();
+//
+//        final IIndexManager indexManager = getIndexManager();
+//
+//        if (indexManager instanceof IBigdataFederation<?>) {
+//
+//            // distributed program execution.
+//            return runDistributedProgram((IBigdataFederation<?>) indexManager,
+//                    action, step);
+//
+//        } else {
+//            
+//            // local Journal or TemporaryStore execution.
+//            return runLocalProgram(action, step);
+//
+//        }
+//
+//    }
+//
+//    /**
+//     * This variant handles both local indices on a {@link TemporaryStore} or
+//     * {@link Journal} WITHOUT concurrency controls (fast).
+//     */
+//    protected Object runLocalProgram(final ActionEnum action, final IStep step)
+//            throws Exception {
+//
+//        if (log.isInfoEnabled())
+//            log.info("Running local program: action=" + action + ", program="
+//                    + step.getName());
+//
+//        final IProgramTask innerTask = new ProgramTask(action, step,
+//                getJoinNexusFactory(), getIndexManager());
+//
+//        return innerTask.call();
+//
+//    }
+//
+//    /**
+//     * Runs a distributed {@link IProgram} (key-range partitioned indices, RMI,
+//     * and multi-machine).
+//     */
+//    protected Object runDistributedProgram(final IBigdataFederation<?> fed,
+//            final ActionEnum action, final IStep step) throws Exception {
+//
+//        if (log.isInfoEnabled()) {
+//
+//            log.info("Running distributed program: action=" + action
+//                    + ", program=" + step.getName());
+//
+//        }
+//
+//        final IProgramTask innerTask = new ProgramTask(action, step,
+//                getJoinNexusFactory(), getIndexManager());
+//
+//        return innerTask.call();
+//
+//    }
+//
+//    /**
+//     * This variant is submitted and executes the rules from inside of the
+//     * {@link ConcurrencyManager} on the {@link LocalDataServiceImpl} (fast).
+//     * <p>
+//     * Note: This can only be done if all indices for the relation(s) are (a)
+//     * unpartitioned; and (b) located on the SAME {@link DataService}. This is
+//     * <code>true</code> for {@link LocalDataServiceFederation}. All other
+//     * {@link IBigdataFederation} implementations are scale-out (use key-range
+//     * partitioned indices).
+//     */
+//    protected Object runDataServiceProgram(final DataService dataService,
+//            final ActionEnum action, final IStep step)
+//            throws InterruptedException, ExecutionException {
+//
+//        if (log.isInfoEnabled()) {
+//
+//            log.info("Submitting program to data service: action=" + action
+//                    + ", program=" + step.getName() + ", dataService="
+//                    + dataService);
+//
+//        }
+//        
+//        final IProgramTask innerTask = new ProgramTask(action, step,
+//                getJoinNexusFactory());
+//
+//        return dataService.submit(innerTask).get();
+//
+//    }
 
 }

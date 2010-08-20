@@ -33,7 +33,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.relation.accesspath.AbstractAccessPath;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
@@ -44,12 +44,12 @@ import com.bigdata.striterator.IKeyOrder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPOAccessPath extends AbstractAccessPath<ISPO> {
+public class SPOAccessPath extends AccessPath<ISPO> {
 
-    private SPOTupleSerializer          tupleSer;
+//    private SPOTupleSerializer          tupleSer;
 
-    /** Relation (resolved lazily if not specified to the ctor). */
-    private SPORelation                 relation;
+//    /** Relation (resolved lazily if not specified to the ctor). */
+//    private SPORelation                 relation;
 
     /**
      * Variant when the {@link SPORelation} has already been materialized.
@@ -70,11 +70,9 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
             final IIndex ndx, final int flags, final int chunkOfChunksCapacity,
             final int chunkCapacity, final int fullyBufferedReadThreshold) {
 
-        this(relation.getIndexManager(), relation.getTimestamp(), predicate,
-                keyOrder, ndx, flags, chunkOfChunksCapacity, chunkCapacity,
-                fullyBufferedReadThreshold);
-
-        this.relation = relation;
+        super(relation, relation.getIndexManager(), relation.getTimestamp(),
+                predicate, keyOrder, ndx, flags, chunkOfChunksCapacity,
+                chunkCapacity, fullyBufferedReadThreshold);
 
     }
 
@@ -99,8 +97,8 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
             final int chunkOfChunksCapacity, final int chunkCapacity,
             final int fullyBufferedReadThreshold) {
 
-        super(indexManager, timestamp, predicate, keyOrder, ndx, flags,
-                chunkOfChunksCapacity, chunkCapacity,
+        super(null/* relation */, indexManager, timestamp, predicate, keyOrder,
+                ndx, flags, chunkOfChunksCapacity, chunkCapacity,
                 fullyBufferedReadThreshold);
 
     }
@@ -125,18 +123,18 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
 
     }
 
-    protected SPOTupleSerializer getTupleSerializer() {
-
-        if (tupleSer == null) {
-
-            tupleSer = (SPOTupleSerializer) ndx.getIndexMetadata()
-                    .getTupleSerializer();
-
-        }
-
-        return tupleSer;
-
-    }
+//    protected SPOTupleSerializer getTupleSerializer() {
+//
+//        if (tupleSer == null) {
+//
+//            tupleSer = (SPOTupleSerializer) ndx.getIndexMetadata()
+//                    .getTupleSerializer();
+//
+//        }
+//
+//        return tupleSer;
+//
+//    }
 
     /**
      * Strengthens the return type.
@@ -157,20 +155,32 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
 
     }
 
+//    /**
+//     * Resolved lazily if not specified to the ctor.
+//     */
+//    synchronized
+//    public SPORelation getRelation() {
+//
+//        if (relation == null) {
+//
+//            relation = (SPORelation) indexManager.getResourceLocator().locate(
+//                    predicate.getOnlyRelationName(), timestamp);
+//
+//        }
+//
+//        return relation;
+//
+//    }
+
     /**
-     * Resolved lazily if not specified to the ctor.
+     * Strengthened return type.
+     * <p>
+     * {@inheritDoc}
      */
-    synchronized
+    @Override
     public SPORelation getRelation() {
 
-        if (relation == null) {
-
-            relation = (SPORelation) indexManager.getResourceLocator().locate(
-                    predicate.getOnlyRelationName(), timestamp);
-
-        }
-
-        return relation;
+        return (SPORelation) super.getRelation();
 
     }
 
@@ -190,6 +200,11 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
 
     }
 
+    /**
+     * Strengthened return type.
+     * <p>
+     * {@inheritDoc}
+     */
     @Override
     public SPOPredicate getPredicate() {
 
@@ -221,16 +236,20 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
     }
 
     /**
-     * Return a new {@link SPOAccessPath} where the given position has been bound to the specified constant. The given position MUST be a variable. All
-     * instances of that variable will be replaced by the specified constant.
+     * Return a new {@link SPOAccessPath} where the given position has been
+     * bound to the specified constant. The given position MUST be a variable.
+     * All instances of that variable will be replaced by the specified
+     * constant.
      * <p>
-     * Note: The added constraint may mean that a different index provides more efficient traversal. For scale-out, this means that the data may be on different
-     * index partition.
+     * Note: The added constraint may mean that a different index provides more
+     * efficient traversal. For scale-out, this means that the data may be on
+     * different index partition.
      * 
      * @param position
      *            The position to replace.
      * @param v
-     *            The constant value to which the variable at the given position is to be set
+     *            The constant value to which the variable at the given position
+     *            is to be set
      * 
      * @return The constrained {@link IAccessPath}.
      */

@@ -527,6 +527,9 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
         final IRelation<E> relation = joinNexus
                 .getTailRelationView(this/* predicate */);
 
+        if (relation == null)
+            throw new RuntimeException("Not found: " + getOnlyRelationName());
+
         return joinNexus.getTailAccessPath(relation, this/* predicate */)
                 .iterator();
 
