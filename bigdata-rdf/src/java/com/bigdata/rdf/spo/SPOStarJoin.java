@@ -29,7 +29,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Set;
-
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
@@ -71,9 +70,13 @@ public class SPOStarJoin extends SPOPredicate
      */
     public SPOStarJoin(final SPOPredicate pred) {
         
-        this(pred.relationName, pred.partitionId, pred.s(), Var.var(), 
-                Var.var(), pred.c(), pred.isOptional(), 
-                pred.getConstraint(), pred.getSolutionExpander());
+        this(new String[] { pred.getOnlyRelationName() }, pred.getPartitionId(), 
+                pred.s(), // s 
+                (IVariableOrConstant<IV>) Var.var(), // p 
+                (IVariableOrConstant<IV>) Var.var(), // o
+                pred.c(), // c
+                pred.isOptional(), pred.getConstraint(), 
+                pred.getSolutionExpander());
         
     }
     
@@ -88,10 +91,12 @@ public class SPOStarJoin extends SPOPredicate
     public SPOStarJoin(final String relationName,
             final IVariableOrConstant<IV> s) {
 
-        this(new String[] { relationName }, -1/* partitionId */, s, 
-                Var.var(), Var.var(),
-                null/* c */, false/* optional */, null/* constraint */, 
-                null/* expander */);
+        this(new String[] { relationName }, -1/* partitionId */, 
+                s, 
+                (IVariableOrConstant<IV>) Var.var(), // p 
+                (IVariableOrConstant<IV>) Var.var(), // o
+                null, // c 
+                false/* optional */, null/* constraint */, null/* expander */);
 
     }
     
@@ -186,43 +191,29 @@ public class SPOStarJoin extends SPOPredicate
     @Override
     public SPOPredicate asBound(IBindingSet bindingSet) {
         
-        SPOPredicate pred = super.asBound(bindingSet);
-        
-        SPOStarJoin starJoin = new SPOStarJoin(pred.relationName, 
-                pred.partitionId, pred.s, pred.p, pred.o, pred.c, pred.optional, 
-                pred.constraint, pred.expander);
-        
+        final SPOStarJoin starJoin = (SPOStarJoin) super.asBound(bindingSet);
         for (IStarConstraint starConstraint : starConstraints) {
-            
             starJoin.addStarConstraint(starConstraint.asBound(bindingSet));
-            
         }
-        
         return starJoin;
         
     }
     
-    protected StringBuilder toStringBuilder(final IBindingSet bindingSet) {
+    @Override
+    public String toString(final IBindingSet bindingSet) {
         
-        StringBuilder sb = super.toStringBuilder(bindingSet);
+        final StringBuilder sb = new StringBuilder(super.toString(bindingSet));
         
         if (starConstraints.size() > 0) {
-    
             sb.append("star[");
-            
             for (IStarConstraint sc : starConstraints) {
-                
                 sb.append(sc);
-                
                 sb.append(",");
-                
             }
-            
             sb.setCharAt(sb.length()-1, ']');
-            
         }
         
-        return sb;
+        return sb.toString();
         
     }
     
