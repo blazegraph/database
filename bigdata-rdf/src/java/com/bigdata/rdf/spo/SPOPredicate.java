@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.spo;
 
-import com.bigdata.bop.AbstractBOp;
 import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -106,15 +105,19 @@ public class SPOPredicate extends Predicate<ISPO> {
      */
     private static final long serialVersionUID = 1L;
 
-//    /**
-//     * The arity is 3 unless the context position was given (as either a
-//     * variable or bound to a constant) in which case it is 4.
-//     */
-//    public final int arity() {
-//        
-//        return args[3/*c*/] == null ? 3 : 4;
-//        
-//    }
+    /**
+     * The arity is 3 unless the context position was given (as either a
+     * variable or bound to a constant) in which case it is 4.
+     * 
+     * @todo rather than having a conditional arity, modify the SPOPredicate
+     *       constructor to pass on either args[3] or args[3] depending on
+     *       whether we are using triples or quads.
+     */
+    public final int arity() {
+        
+        return args[3/*c*/] == null ? 3 : 4;
+        
+    }
 
     /**
      * Partly specified ctor. The context will be <code>null</code>. The
@@ -266,9 +269,13 @@ public class SPOPredicate extends Predicate<ISPO> {
             final ISolutionExpander<ISPO> expander//
             ) {
         
-        super((c == null ? new IVariableOrConstant[] { s, p, o }
-                : new IVariableOrConstant[] { s, p, o, c }), relationName[0],
-                partitionId, optional, constraint, expander);
+        super(
+//                (c == null ? new IVariableOrConstant[] { s, p, o }
+//                : new IVariableOrConstant[] { s, p, o, c }), 
+                
+                new IVariableOrConstant[] { s, p, o, c },
+                
+        relationName[0], partitionId, optional, constraint, expander);
 
 //        if (relationName == null)
 //            throw new IllegalArgumentException();

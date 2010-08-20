@@ -105,7 +105,7 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
             final ISolutionExpander<E> expander) {
 
         super(values, NV.asMap(new NV[] {//
-                new NV(Annotations.RELATION_NAME,relationName),//
+                new NV(Annotations.RELATION_NAME,new String[]{relationName}),//
                 new NV(Annotations.PARTITION_ID,partitionId),//
                 new NV(Annotations.OPTIONAL,optional),//
                 new NV(Annotations.CONSTRAINT,constraint),//
@@ -125,20 +125,43 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
     
     public String getOnlyRelationName() {
         
-//        if (relationName.length != 1)
-//            throw new IllegalStateException();
+        final String[] relationName = (String[]) annotations.get(Annotations.RELATION_NAME);
+        
+        if (relationName.length != 1)
+            throw new IllegalStateException();
 
-        return (String) annotations.get(Annotations.RELATION_NAME);
+        return relationName[0];
         
     }
     
     public String getRelationName(final int index) {
+
+        final String[] relationName = (String[]) annotations.get(Annotations.RELATION_NAME);
+
+        return relationName[index];
         
-//        return relationName[index];
-        
-        throw new UnsupportedOperationException();
+//        throw new UnsupportedOperationException();
         
     }
+
+    public int getRelationCount() {
+        
+        final String[] relationName = (String[]) annotations.get(Annotations.RELATION_NAME);
+      
+        return relationName.length;
+        
+    }
+
+    public Predicate<E> setRelationName(final String[] relationName) {
+        
+//      throw new UnsupportedOperationException();
+      final Predicate<E> tmp = this.clone();
+
+      tmp.annotations.put(Annotations.RELATION_NAME, relationName);
+
+      return tmp;
+      
+  }
 
     public int getPartitionId() {
         
@@ -146,12 +169,6 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
         
     }
     
-    public int getRelationCount() {
-        
-        return 1;//relationName.length;
-        
-    }
-
     @SuppressWarnings("unchecked")
     public IVariableOrConstant get(final int index) {
         
@@ -276,7 +293,17 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
 
         for (int i = 0; i < args.length; i++) {
 
-            if (((IVariableOrConstant<?>) args[i]).isConstant())
+            final IVariableOrConstant<?> t = (IVariableOrConstant<?>) args[i];
+
+            if (t == null) {
+                /*
+                 * Note: t != null handles the case where the [c] position of an
+                 * SPO is allowed to be null.
+                 */
+                continue;
+            }
+
+            if (t.isConstant())
                 continue;
 
             final IVariable<?> var = (IVariable<?>) args[i];
@@ -317,13 +344,6 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
 
         return c == null ? null : c.get();
 
-    }
-
-    public Predicate<E> setRelationName(final String[] relationName) {
-
-        throw new UnsupportedOperationException();
-//        return new Predicate<E>(this, relationName);
-        
     }
 
     @SuppressWarnings("unchecked")
@@ -379,9 +399,9 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
 
             final IVariableOrConstant<?> v = get(i);
 
-            sb.append(v.isConstant() ? v.toString()
-                    : (v + "=" + (bindingSet == null ? null : bindingSet
-                            .get((IVariable<?>) v))));
+            sb.append(v == null ? null : v.isConstant() ? v.toString() : (v
+                    + "=" + (bindingSet == null ? null : bindingSet
+                    .get((IVariable<?>) v))));
 
         }
 

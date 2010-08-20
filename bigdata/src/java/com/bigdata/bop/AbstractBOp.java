@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
@@ -95,6 +94,15 @@ abstract public class AbstractBOp implements BOp {
      * 
      * @todo This will deep copy {@link BOp} structures but does not do a deep
      *       copy of other kinds of embedded structures.
+     * 
+     *       FIXME Object#clone() is copying the reference to the {@link #args}
+     *       [] rather than allocating a new array. Likewise, it is copying the
+     *       reference to the {@link #annotations} {@link Map} references. I am
+     *       working on a deep copy constructor (below). clone() will have to be
+     *       modified to use the deep copy constructor, which means resolving
+     *       the right constructor by reflection given the specific {@link BOp}
+     *       class -or- implementing clone() on each concrete Bop class and
+     *       having it apply the deep copy constructor for itself.
      */
     public AbstractBOp clone() {
         try {
@@ -125,6 +133,34 @@ abstract public class AbstractBOp implements BOp {
     }
 
     /**
+     * Deep copy constructor.
+     * 
+     * @param op
+     * 
+     * @todo This will deep copy {@link BOp} structures (both operands and
+     *       annotations) but does not do a deep copy of other kinds of embedded
+     *       structures.
+     */
+    protected AbstractBOp(final AbstractBOp op) {
+        args = new BOp[op.args.length];
+        for (int i = 0; i < args.length; i++) {
+            args[i] = op.args[i].clone();
+        }
+        annotations = new LinkedHashMap<String, Object>(op.annotations.size());
+        // deep copy the annotations.
+        {
+            final Iterator<Map.Entry<String, Object>> itr = op.annotations
+                    .entrySet().iterator();
+            while (itr.hasNext()) {
+                final Map.Entry<String, Object> e = itr.next();
+                if (e.getValue() instanceof BOp) {
+                    annotations.put(e.getKey(), ((BOp) e.getValue()).clone());
+                }
+            }
+        }
+    }
+    
+    /**
      * @param args
      *            The arguments to the operator.
      */
@@ -148,14 +184,6 @@ abstract public class AbstractBOp implements BOp {
         
         checkArgs(args);
         
-        final ArrayList<BOp> tmp = new ArrayList<BOp>(args.length);
-        
-        for (int i = 0; i < args.length; i++) {
-        
-            tmp.add(args[i]);
-            
-        }
-        
         this.args = args;
         
         this.annotations = (annotations == null ? new LinkedHashMap<String, Object>()
@@ -175,7 +203,7 @@ abstract public class AbstractBOp implements BOp {
         
     }
     
-    final public int arity() {
+    public int arity() {
         
         return args.length;
         
