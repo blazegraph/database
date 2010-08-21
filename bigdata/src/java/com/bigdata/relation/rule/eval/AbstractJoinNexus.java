@@ -42,6 +42,8 @@ import com.bigdata.bop.IElement;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.btree.keys.DelegateSortKeyBuilder;
+import com.bigdata.btree.keys.ISortKeyBuilder;
 import com.bigdata.config.Configuration;
 import com.bigdata.config.IValidator;
 import com.bigdata.config.IntegerValidator;
@@ -52,9 +54,11 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
+import com.bigdata.relation.RelationFusedView;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -70,6 +74,8 @@ import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ndx.IClientIndex;
+import com.bigdata.striterator.ChunkedConvertingIterator;
+import com.bigdata.striterator.DistinctFilter;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
@@ -305,9 +311,6 @@ abstract public class AbstractJoinNexus implements IJoinNexus {
      */
     public IRelation getHeadRelationView(final IPredicate pred) {
         
-//        if (pred == null)
-//            throw new IllegalArgumentException();
-        
         if (pred.getRelationCount() != 1)
             throw new IllegalArgumentException();
         
@@ -316,77 +319,37 @@ abstract public class AbstractJoinNexus implements IJoinNexus {
         final long timestamp = (getAction().isMutation() ? getWriteTimestamp()
                 : getReadTimestamp(/*relationName*/));
 
-        final IRelation relation = (IRelation) resourceLocator.locate(
-                relationName, timestamp);
-        
-        if(log.isDebugEnabled()) {
-            
-            log.debug("predicate: "+pred+", head relation: "+relation);
-            
-        }
-        
-        return relation;
-        
+        return (IRelation<?>) resourceLocator.locate(relationName, timestamp);
+
     }
 
-//    /**
-//     * The tail relations are the views from which we read. This method depends
-//     * solely on the name(s) of the relation(s) and the timestamp of interest
-//     * for the view.
-//     * 
-//     * @todo we can probably get rid of the cache used by this method now that
-//     *       calling this method has been factored out of the join loops.
-//     */
-//    @SuppressWarnings("unchecked")
-//    public IRelation getTailRelationView(final IPredicate pred) {
-//
-////        if (pred == null)
-////            throw new IllegalArgumentException();
-//        
-//        final int nsources = pred.getRelationCount();
-//
-//        final IRelation relation;
-//        
-//        if (nsources == 1) {
-//
-//            final String relationName = pred.getOnlyRelationName();
-//
-//            relation = (IRelation) resourceLocator.locate(relationName,
-//                    readTimestamp);
-//                
-//        } else if (nsources == 2) {
-//
-//            final String relationName0 = pred.getRelationName(0);
-//
-//            final String relationName1 = pred.getRelationName(1);
-//
-////            final long timestamp0 = getReadTimestamp(/*relationName0*/);
-////
-////            final long timestamp1 = getReadTimestamp(/*relationName1*/);
-//
-//            final IRelation relation0 = (IRelation) resourceLocator.locate(
-//                    relationName0, readTimestamp);//timestamp0);
-//
-//            final IRelation relation1 = (IRelation) resourceLocator.locate(
-//                    relationName1, readTimestamp);//timestamp1);
-//
-//            relation = new RelationFusedView(relation0, relation1).init();
-//
-//        } else {
-//
-//            throw new UnsupportedOperationException();
-//
-//        }
-//
-//        if(log.isDebugEnabled()) {
-//            
-//            log.debug("predicate: "+pred+", tail relation: "+relation);
-//            
-//        }
-//        
-//        return relation;
-//        
-//    }
+    @SuppressWarnings("unchecked")
+    public IRelation getTailRelationView(final IPredicate pred) {
+
+        final int nsources = pred.getRelationCount();
+
+        if (nsources == 1) {
+
+            return (IRelation) resourceLocator.locate(pred
+                    .getOnlyRelationName(), getReadTimestamp());
+
+        } else if (nsources == 2) {
+
+            final IRelation<?> relation0 = (IRelation) resourceLocator.locate(
+                    pred.getRelationName(0), readTimestamp);
+
+            final IRelation<?> relation1 = (IRelation) resourceLocator.locate(
+                    pred.getRelationName(1), readTimestamp);
+
+            return new RelationFusedView(relation0, relation1).init();
+
+        } else {
+
+            throw new UnsupportedOperationException();
+
+        }
+
+    }
 
     /**
      * @deprecated by {@link #getTailAccessPath(IRelation, IPredicate)}
@@ -402,94 +365,43 @@ abstract public class AbstractJoinNexus implements IJoinNexus {
 
     }
 
-//    /**
-//     * When {@link #backchain} is <code>true</code> and the tail predicate is
-//     * reading on the {@link SPORelation}, then the {@link IAccessPath} is
-//     * wrapped so that the iterator will visit the backchained inferences as
-//     * well. On the other hand, if {@link IPredicate#getPartitionId()} is
-//     * defined (not <code>-1</code>) then the returned access path will be for
-//     * the specified shard using the data service local index manager (
-//     * {@link #indexManager} MUST be the data service local index manager for
-//     * this case) and expanders WILL NOT be applied (they require a view of the
-//     * total relation, not just a shard).
-//     * 
-//     * @see InferenceEngine
-//     * @see BackchainAccessPath
-//     * 
-//     * @todo consider encapsulating the {@link IRangeCountFactory} in the
-//     *       returned access path for non-exact range count requests. this will
-//     *       make it slightly harder to write the unit tests for the
-//     *       {@link IEvaluationPlanFactory}
-//     */
-//    public IAccessPath getTailAccessPath(final IRelation relation,
-//            final IPredicate predicate) {
-//
-//        if (predicate.getPartitionId() != -1) {
-//
-//            /*
-//             * Note: This handles a read against a local index partition. For
-//             * scale-out, the [indexManager] will be the data service's local
-//             * index manager.
-//             * 
-//             * Note: Expanders ARE NOT applied in this code path. Expanders
-//             * require a total view of the relation, which is not available
-//             * during scale-out pipeline joins. Likewise, the [backchain]
-//             * property will be ignored since it is handled by an expander.
-//             * 
-//             * @todo If getAccessPathForIndexPartition() is raised into the
-//             * IRelation interface, then we can get rid of the cast to the
-//             * SPORelation implementation.
-//             */
-//
-//            return ((SPORelation) relation).getAccessPathForIndexPartition(
-//                    indexManager, predicate);
-//
-//        }
-//
-////        // Find the best access path for the predicate for that relation.
-//        IAccessPath accessPath = relation.getAccessPath(predicate);
-////
-////        if (predicate.getPartitionId() != -1) {
-////
-////            /*
-////             * Note: The expander can not run against a shard since it assumes
-////             * access to the full key range of the index. Expanders are
-////             * convenient and work well for stand alone indices, but they should
-////             * be replaced by rule rewrites for scale-out.
-////             */
-////
-////            return accessPath;
-////            
-////        }
-//        
+    public IAccessPath getTailAccessPath(final IRelation relation,
+            final IPredicate predicate) {
+
+        if (predicate.getPartitionId() != -1) {
+
+            /*
+             * Note: This handles a read against a local index partition. For
+             * scale-out, the [indexManager] will be the data service's local
+             * index manager.
+             * 
+             * Note: Expanders ARE NOT applied in this code path. Expanders
+             * require a total view of the relation, which is not available
+             * during scale-out pipeline joins. Likewise, the [backchain]
+             * property will be ignored since it is handled by an expander.
+             */
+
+            return ((AbstractRelation<?>) relation)
+                    .getAccessPathForIndexPartition(indexManager, predicate);
+
+        }
+
+        // Find the best access path for the predicate for that relation.
+        final IAccessPath<?> accessPath = relation.getAccessPath(predicate);
+        
+        // Note: No expander's for bops, at least not right now.
 //        final ISolutionExpander expander = predicate.getSolutionExpander();
 //        
 //        if (expander != null) {
 //            
-//            // allow the predicate to wrap the access path : @todo caching on AP?
+//            // allow the predicate to wrap the access path
 //            accessPath = expander.getAccessPath(accessPath);
 //            
 //        }
-//        
-//        if(backchain && relation instanceof SPORelation) {
-//
-//            if (expander == null || expander.backchain()) {
-//            
-//                final SPORelation spoRelation = (SPORelation)relation;
-//            
-//                accessPath = new BackchainAccessPath(
-//                        spoRelation.getContainer(), accessPath,
-//                        joinNexusFactory.isOwlSameAsUsed ? Boolean.TRUE
-//                                : Boolean.FALSE);
-//                
-//            }
-//            
-//        }
-//        
-//        // return that access path.
-//        return accessPath;
-//
-//    }
+        
+        // return that access path.
+        return accessPath;
+    }
 
     public Iterator<PartitionLocator> locatorScan(
             final AbstractScaleOutFederation<?> fed,
@@ -505,15 +417,8 @@ abstract public class AbstractJoinNexus implements IJoinNexus {
          * Find the best access path for the predicate for that relation.
          * 
          * Note: All we really want is the [fromKey] and [toKey] for that
-         * predicate and index. In general, that information is available from
-         * IKeyOrder#getFromKey() and IKeyOrder#getToKey(). However, we also
-         * need to know whether quads or triples are being used for RDF and that
-         * information is carried by the AbstractTripleStore container or the
-         * SPORelation. 
-         * 
-         * Note: This MUST NOT layer on expander or backchain access path
-         * overlays. Those add overhead during construction and the layering
-         * also hides the [fromKey] and [toKey].
+         * predicate and index. This MUST NOT layer on expanders since the
+         * layering also hides the [fromKey] and [toKey].
          */
         @SuppressWarnings("unchecked")
         final AccessPath<?> accessPath = (AccessPath<?>) relation
@@ -614,54 +519,6 @@ abstract public class AbstractJoinNexus implements IJoinNexus {
 
     }
 
-//    /**
-//     * FIXME unit tests for DISTINCT with a head and ELEMENT, with bindings and
-//     * a head, with bindings but no head, and with a head but no bindings
-//     * (error). See {@link #runQuery(IStep)}
-//     * 
-//     * FIXME unit tests for SORT with and without DISTINCT and with the various
-//     * combinations used in the unit tests for DISTINCT. Note that SORT, unlike
-//     * DISTINCT, requires that all solutions are materialized before any
-//     * solutions can be returned to the caller. A lot of optimization can be
-//     * done for SORT implementations, including merge sort of large blocks (ala
-//     * map/reduce), using compressed sort keys or word sort keys with 2nd stage
-//     * disambiguation, etc.
-//     * 
-//     * FIXME Add property for sort {ascending,descending,none} to {@link IRule}.
-//     * The sort order can also be specified in terms of a sequence of variables.
-//     * The choice of the variable order should be applied here.
-//     * 
-//     * FIXME The properties that govern the Unicode collator for the generated
-//     * sort keys should be configured by the {@link RDFJoinNexusFactory}. In
-//     * particular, Unicode should be handled however it is handled for the
-//     * {@link LexiconRelation}.
-//     */
-//    public ISortKeyBuilder<IBindingSet> newBindingSetSortKeyBuilder(final IRule rule) {
-//
-//        final IKeyBuilder keyBuilder = KeyBuilder.newUnicodeInstance();
-//        
-//        final int nvars = rule.getVariableCount();
-//        
-//        final IVariable[] vars = new IVariable[nvars];
-//        
-//        {
-//
-//            final Iterator<IVariable> itr = rule.getVariables();
-//
-//            int i = 0;
-//
-//            while (itr.hasNext()) {
-//
-//                vars[i++] = itr.next();
-//                
-//            }
-//
-//        }
-//
-//        return new BindingSetSortKeyBuilder(keyBuilder, vars);
-//        
-//    }
-    
     /**
      * FIXME Custom serialization for solution sets, especially since there
      * tends to be a lot of redundancy in the data arising from how bindings are
@@ -807,201 +664,38 @@ abstract public class AbstractJoinNexus implements IJoinNexus {
         
     }
     
-//    /**
-//     * Buffer writes on {@link IMutableRelation#insert(IChunkedIterator)} when it is
-//     * {@link #flush() flushed}.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     * @param <E>
-//     */
-//    public static class InsertSPOAndJustificationBuffer<E> extends AbstractSolutionBuffer<E> {
-//        
-//        /**
-//         * @param capacity
-//         * @param relation
-//         */
-//        public InsertSPOAndJustificationBuffer(final int capacity,
-//                final IMutableRelation<E> relation) {
-//
-//            super(capacity, relation);
-//            
-//        }
-//
-//        @Override
-//        protected long flush(final IChunkedOrderedIterator<ISolution<E>> itr) {
-//
-//            try {
-//
-//                /*
-//                 * The mutation count is the #of SPOs written (there is one
-//                 * justification written per solution generated, but the
-//                 * mutation count does not reflect duplicate justifications -
-//                 * only duplicate statements).
-//                 * 
-//                 * Note: the optional filter for the ctor was already applied.
-//                 * If an element/solution was rejected, then it is not in the
-//                 * buffer and we will never see it during flush().
-//                 */
-//                
-//                long mutationCount = 0;
-//                
-//                while (itr.hasNext()) {
-//
-//                    final ISolution<E>[] chunk = itr.nextChunk();
-//
-//                    mutationCount += writeChunk(chunk);
-//                    
-//                }
-//                
-//                return mutationCount;
-//                
-//            } finally {
-//
-//                itr.close();
-//
-//            }
-//            
-//        }
-//        
-//        private long writeChunk(final ISolution<E>[] chunk) {
-//
-//            final int n = chunk.length;
-//            
-//            if(log.isDebugEnabled()) 
-//                log.debug("chunkSize="+n);
-//            
-//            final long begin = System.currentTimeMillis();
-//
-//            final SPO[] a = new SPO[ n ];
-//
-//            final Justification[] b = new Justification[ n ];
-//
-//            for(int i=0; i<chunk.length; i++) {
-//                
-//                if(log.isDebugEnabled()) {
-//                    
-//                    log.debug("chunk["+i+"] = "+chunk[i]);
-//                    
-//                }
-//                
-//                final ISolution<SPO> solution = (ISolution<SPO>) chunk[i];
-//                
-//                a[i] = solution.get();
-//                
-//                b[i] = new Justification(solution);
-//                                
-//            }
-//            
-//            final SPORelation r = (SPORelation) (IMutableRelation) getRelation();
-//
-//            /*
-//             * Use a thread pool to write out the statement and the
-//             * justifications concurrently. This drammatically reduces the
-//             * latency when also writing justifications.
-//             */
-//
-//            final List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(2);
-//
-//            /*
-//             * Note: we reject using the filter before stmts or justifications
-//             * make it into the buffer so we do not need to apply the filter
-//             * again here.
-//             */
-//
-//            tasks.add(new Callable<Long>(){
-//                public Long call() {
-//                    return r.insert(a,a.length,null/*filter*/);
-//                }
-//            });
-//            
-//            tasks.add(new Callable<Long>(){
-//                public Long call() {
-//                    return r
-//                            .addJustifications(new ChunkedArrayIterator<Justification>(
-//                                    b.length, b, null/* keyOrder */));
-//                }
-//            });
-//            
-//            final List<Future<Long>> futures;
-//
-//            /*
-//             * @todo The timings for the tasks that we run here are not being
-//             * reported up to this point.
-//             */
-//            final long mutationCount;
-//            try {
-//
-//                futures = r.getExecutorService().invokeAll(tasks);
-//
-//                mutationCount = futures.get(0).get();
-//
-//                                futures.get(1).get();
-//
-//            } catch (InterruptedException ex) {
-//
-//                throw new RuntimeException(ex);
-//
-//            } catch (ExecutionException ex) {
-//
-//                throw new RuntimeException(ex);
-//
-//            }
-//
-//            final long elapsed = System.currentTimeMillis() - begin;
-//
-//            if (log.isInfoEnabled())
-//                log.info("Wrote " + mutationCount
-//                                + " statements and justifications in "
-//                                + elapsed + "ms");
-//
-//            return mutationCount;
-//
-//        }
-//
-//    }
-    
-//    /**
-//     * Note: {@link #getSolutionFilter()} is applied by
-//     * {@link #newUnsynchronizedBuffer(IBuffer, int)} and NOT by the buffer
-//     * returned by this method.
-//     */
-//    @SuppressWarnings("unchecked")
-//    public IBuffer<ISolution[]> newInsertBuffer(final IMutableRelation relation) {
-//
-//        if (getAction() != ActionEnum.Insert)
-//            throw new IllegalStateException();
-//
-//        if (log.isDebugEnabled()) {
-//
-//            log.debug("relation=" + relation);
-//            
-//        }
-//        
-//        if(justify) {
-//
-//            /*
-//             * Buffer knows how to write the computed elements on the statement
-//             * indices and the computed binding sets on the justifications
-//             * indices.
-//             */
-//            
-//            return new InsertSPOAndJustificationBuffer(chunkOfChunksCapacity,
-//                    relation);
-//
-//        }
-//
-//        /*
-//         * Buffer resolves the computed elements and writes them on the
-//         * statement indices.
-//         */
-//
-//        return new AbstractSolutionBuffer.InsertSolutionBuffer(
-//                chunkOfChunksCapacity, relation);
-//
-//    }
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: {@link #getSolutionFilter()} is applied by
+     * {@link #newUnsynchronizedBuffer(IBuffer, int)} and NOT by the buffer
+     * returned by this method.
+     */
+    @SuppressWarnings("unchecked")
+    public IBuffer<ISolution[]> newInsertBuffer(final IMutableRelation relation) {
+
+        if (getAction() != ActionEnum.Insert)
+            throw new IllegalStateException();
+
+        if (log.isDebugEnabled()) {
+
+            log.debug("relation=" + relation);
+            
+        }
+
+        /*
+         * Buffer resolves the computed elements and writes them on the
+         * statement indices.
+         */
+
+        return new AbstractSolutionBuffer.InsertSolutionBuffer(
+                chunkOfChunksCapacity, relation);
+
+    }
 
     /**
+     * {@inheritDoc}
+     * <p>
      * Note: {@link #getSolutionFilter()} is applied by
      * {@link #newUnsynchronizedBuffer(IBuffer, int)} and NOT by the buffer
      * returned by this method.
@@ -1023,116 +717,124 @@ abstract public class AbstractJoinNexus implements IJoinNexus {
 
     }
 
-//    @SuppressWarnings("unchecked")
-//    public IChunkedOrderedIterator<ISolution> runQuery(final IStep step)
-//            throws Exception {
-//
-//        if (step == null)
-//            throw new IllegalArgumentException();
-//
-//        if(log.isInfoEnabled())
-//            log.info("program="+step.getName());
-//
-//        if(isEmptyProgram(step)) {
-//
-//            log.warn("Empty program");
-//
-//            return (IChunkedOrderedIterator<ISolution>) new EmptyProgramTask(
-//                    ActionEnum.Query, step).call();
-//
-//        }
-//
-//        final IChunkedOrderedIterator<ISolution> itr = (IChunkedOrderedIterator<ISolution>) runProgram(
-//                ActionEnum.Query, step);
-//
-//        if (step.isRule() && ((IRule) step).getQueryOptions().isDistinct()) {
-//
-//            /*
-//             * Impose a DISTINCT constraint based on the variable bindings
-//             * selected by the head of the rule. The DistinctFilter will be
-//             * backed by a TemporaryStore if more than one chunk of solutions is
-//             * generated. That TemporaryStore will exist on the client where
-//             * this method (runQuery) was executed. The TemporaryStore will be
-//             * finalized and deleted when it is no longer referenced.
-//             */
-//
-//            final ISortKeyBuilder<ISolution> sortKeyBuilder;
-//
-//            if (((IRule) step).getHead() != null
-//                    && (solutionFlags & ELEMENT) != 0) {
-//
-//                /*
-//                 * Head exists and elements are requested, so impose DISTINCT
-//                 * based on the materialized elements.
-//                 * 
-//                 * FIXME The SPOSortKeyBuilder should be obtained from the head
-//                 * relation. Of course there is one sort key for each access
-//                 * path, but for the purposes of DISTINCT we want the sort key
-//                 * to correspond to the notion of a "primary key" (the
-//                 * distinctions that matter) and it does not matter which sort
-//                 * order but the SPO sort order probably has the least factor of
-//                 * "surprise".
-//                 */
-//                
-//                final int arity = ((IRule)step).getHead().arity();
-//                
-//                sortKeyBuilder = new DelegateSortKeyBuilder<ISolution, ISPO>(
-//                        new SPOSortKeyBuilder(arity)) {
-//
-//                    protected ISPO resolve(ISolution solution) {
-//
-//                        return (ISPO) solution.get();
-//
-//                    }
-//
-//                };
-//
-//            } else {
-//
-//                if ((solutionFlags & BINDINGS) != 0) {
-//
-//                    /*
-//                     * Bindings were requested so impose DISTINCT based on those
-//                     * bindings.
-//                     */
-//                    
-//                    sortKeyBuilder = new DelegateSortKeyBuilder<ISolution, IBindingSet>(
-//                            newBindingSetSortKeyBuilder((IRule) step)) {
-//
-//                        protected IBindingSet resolve(ISolution solution) {
-//
-//                            return solution.getBindingSet();
-//
-//                        }
-//
-//                    };
-//
-//                } else {
-//
-//                    throw new UnsupportedOperationException(
-//                            "You must specify BINDINGS since the rule does not have a head: "
-//                                    + step);
-//
-//                }
-//
-//            }
-//            
-//            return new ChunkedConvertingIterator<ISolution, ISolution>(itr,
-//                    new DistinctFilter<ISolution>(indexManager) {
-//
-//                protected byte[] getSortKey(ISolution e) {
-//                    
-//                    return sortKeyBuilder.getSortKey(e);
-//                    
-//                }
-//                
-//            });
-//
-//        }
-//
-//        return itr;
-//
-//    }
+    /**
+     * Return the {@link ISortKeyBuilder} used to impose DISTINCT on the
+     * solutions generated by a query.
+     * 
+     * @param head
+     *            The head of the rule.
+     *            
+     * @return The {@link ISortKeyBuilder}.
+     * 
+     * @todo This should be based on bop annotations and a hash table for
+     *       distinct unless it is very high volume and you can wait for the
+     *       first result, in which case a SORT should be selected. For high
+     *       volume with low latency to the first result, use a persistent hash
+     *       table on a temporary store.
+     */
+    abstract protected ISortKeyBuilder<?> newSortKeyBuilder(
+            final IPredicate<?> head);
+    
+    @SuppressWarnings("unchecked")
+    public IChunkedOrderedIterator<ISolution> runQuery(final IStep step)
+            throws Exception {
+
+        if (step == null)
+            throw new IllegalArgumentException();
+
+        if(log.isInfoEnabled())
+            log.info("program="+step.getName());
+
+        if(isEmptyProgram(step)) {
+
+            log.warn("Empty program");
+
+            return (IChunkedOrderedIterator<ISolution>) new EmptyProgramTask(
+                    ActionEnum.Query, step).call();
+
+        }
+
+        final IChunkedOrderedIterator<ISolution> itr = (IChunkedOrderedIterator<ISolution>) runProgram(
+                ActionEnum.Query, step);
+
+        if (step.isRule() && ((IRule) step).getQueryOptions().isDistinct()) {
+
+            /*
+             * Impose a DISTINCT constraint based on the variable bindings
+             * selected by the head of the rule. The DistinctFilter will be
+             * backed by a TemporaryStore if more than one chunk of solutions is
+             * generated. That TemporaryStore will exist on the client where
+             * this method (runQuery) was executed. The TemporaryStore will be
+             * finalized and deleted when it is no longer referenced.
+             */
+
+            final ISortKeyBuilder<ISolution> sortKeyBuilder;
+
+            if (((IRule) step).getHead() != null
+                    && (solutionFlags & ELEMENT) != 0) {
+
+                /*
+                 * Head exists and elements are requested, so impose DISTINCT
+                 * based on the materialized elements.
+                 */
+                
+                sortKeyBuilder = new DelegateSortKeyBuilder(
+                        newSortKeyBuilder(((IRule) step).getHead())) {
+
+                    protected Object resolve(Object solution) {
+
+                        return ((ISolution) solution).get();
+
+                    }
+
+                };
+
+            } else {
+
+                if ((solutionFlags & BINDINGS) != 0) {
+
+                    /*
+                     * Bindings were requested so impose DISTINCT based on those
+                     * bindings.
+                     */
+                    
+                    sortKeyBuilder = new DelegateSortKeyBuilder<ISolution, IBindingSet>(
+                            newBindingSetSortKeyBuilder((IRule) step)) {
+
+                        protected IBindingSet resolve(ISolution solution) {
+
+                            return solution.getBindingSet();
+
+                        }
+
+                    };
+
+                } else {
+
+                    throw new UnsupportedOperationException(
+                            "You must specify BINDINGS since the rule does not have a head: "
+                                    + step);
+
+                }
+
+            }
+            
+            return new ChunkedConvertingIterator<ISolution, ISolution>(itr,
+                    new DistinctFilter<ISolution>(indexManager) {
+
+                protected byte[] getSortKey(ISolution e) {
+                    
+                    return sortKeyBuilder.getSortKey(e);
+                    
+                }
+                
+            });
+
+        }
+
+        return itr;
+
+    }
     
     final public long runMutation(final IStep step) throws Exception {
 
@@ -1283,5 +985,102 @@ abstract public class AbstractJoinNexus implements IJoinNexus {
 //        return dataService.submit(innerTask).get();
 //
 //    }
+
+//  /**
+//  * Return <code>true</code> if the <i>relationName</i> is on a
+//  * {@link TempTripleStore}
+//  * 
+//  * @todo Rather than parsing the relation name, it would be better to have
+//  *       the temporary store UUIDs explicitly declared.
+//  */
+//   protected boolean isTempStore(String relationName) {
+//      
+//     /* This is a typical UUID-based temporary store relation name.
+//      * 
+//        *           1         2         3
+//        * 01234567890123456789012345678901234567
+//        * 81ad63b9-2172-45dc-bd97-03b63dfe0ba0kb.spo
+//        */
+//       
+//       if (relationName.length() > 37) {
+//        
+//           /*
+//            * Could be a relation on a temporary store.
+//            */
+//           if (       relationName.charAt( 8) == '-' //
+//                   && relationName.charAt(13) == '-' //
+//                   && relationName.charAt(18) == '-' //
+//                   && relationName.charAt(23) == '-' //
+//                   && relationName.charAt(38) == '.' //
+//           ) {
+//               
+//               /*
+//                * Pretty certain to be a relation on a temporary store.
+//                */
+//               
+//               return true;
+//               
+//           }
+//           
+//       }
+//       
+//       return false;
+//
+//   }
+
+////   /**
+////    * A per-relation reentrant read-write lock allows either concurrent readers
+////    * or an writer on the unisolated view of a relation. When we use this lock
+////    * we also use {@link ITx#UNISOLATED} reads and writes and
+////    * {@link #makeWriteSetsVisible()} is a NOP.
+////    */
+////   final private static boolean useReentrantReadWriteLockAndUnisolatedReads = true;
+//   
+//   public long getReadTimestamp(String relationName) {
+//
+////       if (useReentrantReadWriteLockAndUnisolatedReads) {
+//
+////           if (action.isMutation()) {
+////               
+////               assert readTimestamp == ITx.UNISOLATED : "readTimestamp="+readTimestamp;
+////               
+////           }
+//
+//           return readTimestamp;
+//
+////       } else {
+////
+////           /*
+////            * When the relation is the focusStore choose {@link ITx#UNISOLATED}.
+////            * Otherwise choose whatever was specified to the
+////            * {@link RDFJoinNexusFactory}. This is because we avoid doing a
+////            * commit on the focusStore and instead just its its UNISOLATED
+////            * indices. This is more efficient since they are already buffered
+////            * and since we can avoid touching disk at all for small data sets.
+////            */
+////           
+////           if (isTempStore(relationName)) {
+////
+////               return ITx.UNISOLATED;
+////
+////           }
+////
+////           if (lastCommitTime != 0L && action.isMutation()) {
+////
+////               /*
+////                * Note: This advances the read-behind timestamp for a local
+////                * Journal configuration without the ConcurrencyManager (the
+////                * only scenario where we do an explicit commit).
+////                */
+////
+////               return TimestampUtility.asHistoricalRead(lastCommitTime);
+////
+////           }
+////
+////           return readTimestamp;
+////
+////       }
+//       
+//   }
 
 }

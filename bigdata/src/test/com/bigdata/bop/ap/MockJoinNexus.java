@@ -33,17 +33,10 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.Var;
 import com.bigdata.btree.keys.ISortKeyBuilder;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.relation.IMutableRelation;
-import com.bigdata.relation.IRelation;
-import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.eval.AbstractJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
-import com.bigdata.relation.rule.eval.ISolution;
-import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Mock object.
@@ -53,22 +46,14 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  */
 class MockJoinNexus extends AbstractJoinNexus implements IJoinNexus {
 
-    protected MockJoinNexus(IJoinNexusFactory joinNexusFactory,
-            IIndexManager indexManager) {
+    protected MockJoinNexus(final IJoinNexusFactory joinNexusFactory,
+            final IIndexManager indexManager) {
+     
         super(joinNexusFactory, indexManager);
+        
     }
 
     public IConstant fakeBinding(IPredicate predicate, Var var) {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    public IAccessPath getTailAccessPath(IRelation relation, IPredicate pred) {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    public IRelation getTailRelationView(IPredicate pred) {
         // TODO Auto-generated method stub
         return null;
     }
@@ -78,15 +63,10 @@ class MockJoinNexus extends AbstractJoinNexus implements IJoinNexus {
         return null;
     }
 
-    public IBuffer<ISolution[]> newInsertBuffer(IMutableRelation relation) {
+    @Override
+    protected ISortKeyBuilder<?> newSortKeyBuilder(IPredicate<?> head) {
         // TODO Auto-generated method stub
         return null;
     }
-
-    public IChunkedOrderedIterator<ISolution> runQuery(IStep step)
-            throws Exception {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
+    
 }
