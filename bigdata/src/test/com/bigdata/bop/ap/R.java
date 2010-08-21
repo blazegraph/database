@@ -36,13 +36,10 @@ import java.util.UUID;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.IMutableRelation;
-import com.bigdata.relation.accesspath.AccessPath;
-import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.striterator.AbstractKeyOrder;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -161,6 +158,12 @@ public class R extends AbstractRelation<E> implements IMutableRelation<E> {
         
     }
     
+    public IKeyOrder<E> getKeyOrder(final IPredicate<E> p) {
+
+        return primaryKeyOrder;
+        
+    }
+
     /**
      * Simple insert procedure works fine for a local journal.
      */
@@ -216,29 +219,6 @@ public class R extends AbstractRelation<E> implements IMutableRelation<E> {
         }
 
         return n;
-
-    }
-
-    public IAccessPath<E> getAccessPath(final IPredicate<E> predicate) {
-
-        // assume the key order (there is only one) vs looking @ predicate.
-        final IKeyOrder<E> keyOrder = primaryKeyOrder;
-
-        // get the corresponding index.
-        final IIndex ndx = getIndex(keyOrder);
-
-        // default flags.
-        final int flags = IRangeQuery.DEFAULT;
-
-        final AccessPath<E> accessPath = new AccessPath<E>(
-                this/* relation */, getIndexManager(), getTimestamp(),
-                predicate, keyOrder, ndx, flags, getChunkOfChunksCapacity(),
-                getChunkCapacity(), getFullyBufferedReadThreshold()) {
-        };
-
-        accessPath.init();
-
-        return accessPath;
 
     }
 

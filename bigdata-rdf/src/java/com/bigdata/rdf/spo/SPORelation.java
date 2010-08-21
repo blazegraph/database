@@ -1031,7 +1031,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      */
     final private SPOAccessPath _getAccessPath(final IPredicate<ISPO> predicate) {
 
-        final SPOKeyOrder keyOrder = SPOKeyOrder.getKeyOrder(predicate, keyArity);
+        final SPOKeyOrder keyOrder = getKeyOrder(predicate);
         
         final SPOAccessPath accessPath = getAccessPath(keyOrder, predicate);
 
@@ -1041,6 +1041,12 @@ public class SPORelation extends AbstractRelation<ISPO> {
         //            System.err.println("new access path: pred="+predicate);
 
         return accessPath;
+
+    }
+    
+    public SPOKeyOrder getKeyOrder(final IPredicate<ISPO> predicate) {
+        
+        return SPOKeyOrder.getKeyOrder(predicate, keyArity);
 
     }
 
@@ -1067,7 +1073,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
      *            This MUST be the data service local index manager so that the
      *            returned access path will read against the local shard.
      * @param predicate
-     *            The predicate.
+     *            The predicate. {@link IPredicate#getPartitionId()} MUST return
+     *            a valid index partition identifier.
      * 
      * @throws IllegalArgumentException
      *             if either argument is <code>null</code>.
@@ -1078,14 +1085,22 @@ public class SPORelation extends AbstractRelation<ISPO> {
      *             unless the predicate identifies a specific shard using
      *             {@link IPredicate#getPartitionId()}.
      * 
-     * @todo Raise this method into the {@link IRelation} interface.
+     * @todo Raise this method into the {@link IRelation} interface?
      */
+    @Override
     public IAccessPath<ISPO> getAccessPathForIndexPartition(
             final IIndexManager indexManager, //
             final IPredicate<ISPO> predicate//
             ) {
 
-// Note: This is the federation's index manager _always_.
+        /*
+         * Note: getIndexManager() _always_ returns the federation's index
+         * manager because that is how we materialize an ILocatableResource when
+         * we locate it. However, the federation's index manager can not be used
+         * here because it addresses the scale-out indices. Instead, the caller
+         * must pass in the IIndexManager which has access to the local index
+         * objects so we can directly read on the shard.
+         */
 //        final IIndexManager indexManager = getIndexManager();
 
         if (indexManager == null)
@@ -1119,7 +1134,10 @@ public class SPORelation extends AbstractRelation<ISPO> {
         if (partitionId == -1) // must be a valid partition identifier.
             throw new IllegalArgumentException();
 
-        // @todo This condition should probably be an error since the expander will be ignored.
+        /*
+         * @todo This condition should probably be an error since the expander
+         * will be ignored.
+         */
 //        if (predicate.getSolutionExpander() != null)
 //            throw new IllegalArgumentException();
 
@@ -1131,9 +1149,12 @@ public class SPORelation extends AbstractRelation<ISPO> {
              * index partition.
              * 
              * @todo In fact, we could allow a view here as long as all parts of
-             * the view are local. That would be relevant when the other view
+             * the view are local. That could be relevant when the other view
              * component was a shard of a focusStore for parallel decomposition
-             * of RDFS closure, etc.
+             * of RDFS closure, etc. The best way to handle such views when the
+             * components are not local is to use a UNION of the JOIN. When both
+             * parts are local we can do better using a UNION of the
+             * IAccessPath.
              */
             
             throw new IllegalStateException();
@@ -1145,8 +1166,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
         /*
          * Find the best access path for that predicate.
          */
-        final SPOKeyOrder keyOrder = SPOKeyOrder.getKeyOrder(predicate,
-                keyArity);
+        final SPOKeyOrder keyOrder = getKeyOrder(predicate);
 
         // The name of the desired index partition.
         final String name = DataService.getIndexPartitionName(namespace + "."

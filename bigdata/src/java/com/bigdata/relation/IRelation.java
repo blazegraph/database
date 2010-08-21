@@ -61,13 +61,84 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
     /**
      * The {@link IIndexManager} for the {@link IRelation}.
      */
-    public IIndexManager getIndexManager();
+    IIndexManager getIndexManager();
 
     /**
      * The service used to run asynchronous or parallel tasks for the
      * {@link IRelation}.
      */
-    public ExecutorService getExecutorService();
+    ExecutorService getExecutorService();
+
+    /**
+     * Return the class for the generic type of this relation. This information
+     * is used to dynamically create arrays of that generic type.
+     */
+    Class<E> getElementClass();
+    
+    /**
+     * Create and return a new element. The element is constructed from the
+     * predicate given the bindings. Typically, this is used when generating an
+     * {@link ISolution} for an {@link IRule} during either a query or mutation
+     * operations. The element is NOT inserted into the relation.
+     * 
+     * @param predicate
+     *            The predicate that is the head of some {@link IRule}.
+     * @param bindingSet
+     *            A set of bindings for that {@link IRule}.
+     * 
+     * @return The new element.
+     * 
+     * @throws IllegalArgumentException
+     *             if any parameter is <code>null</code>.
+     * @throws IllegalStateException
+     *             if the predicate is not fully bound given those bindings.
+     */
+    E newElement(IPredicate<E> predicate, IBindingSet bindingSet);
+
+    /**
+     * Return the {@link IKeyOrder} for the primary index for the relation.
+     */
+    IKeyOrder<E> getPrimaryKeyOrder();
+
+    /**
+     * Return the fully qualified name of each index maintained by this
+     * relation.
+     * 
+     * @return An immutable set of the index names for the relation.
+     * 
+     * @deprecated Replace with getKeyOrders() (see below).
+     */
+    Set<String> getIndexNames();
+
+//    /**
+//     * Return the {@link IKeyOrder}s corresponding to the registered indices for
+//     * this relation. [rather than getIndexNames?]
+//     */
+//    Iterator<IKeyOrder<E>> getKeyOrders();
+
+    /**
+     * Return the {@link IKeyOrder} for the predicate corresponding to the
+     * perfect access path. A perfect access path is one where the bound values
+     * in the predicate form a prefix in the key space of the corresponding
+     * index.
+     * 
+     * @param p
+     *            The predicate.
+     * 
+     * @return The {@link IKeyOrder} for the perfect access path -or-
+     *         <code>null</code> if there is no index which provides a perfect
+     *         access path for that predicate.
+     * 
+     * @todo What about "best" versus "perfect"? Perfect is more a concept from
+     *       RDF with covering indices. For other schemas we will often just
+     *       have "best".  If you only have one index then it is always "best".
+     *       <p>
+     *       Note that one of the main uses for this is query optimization.
+     *       However, runtime query optimization can just work through the
+     *       possible indices and join orders and get to a "best" query plan
+     *       given the actual indices and foreign keys.
+     */
+    IKeyOrder<E> getKeyOrder(IPredicate<E> p);
 
     /**
      * Return the best {@link IAccessPath} for a relation given a predicate with
@@ -104,7 +175,11 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
      */
     IAccessPath<E> getAccessPath(IPredicate<E> predicate);
 
-    // @todo raise this method into this interface. 
+    /*
+     * @todo raise this method into this interface. it is currently implemented
+     * by AbstractRelation and overridden by SPORelation to handle the different
+     * index families for triples versus quads.
+     */
 //    IAccessPath<E> getAccessPathForIndexPartition(IIndexManager indexManager, IPredicate<E> predicate);
 
     /**
@@ -130,74 +205,5 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
      * @see #getIndex(String)
      */
     IIndex getIndex(IKeyOrder<? extends E> keyOrder);
-    
-    /**
-     * Return the fully qualified name of each index maintained by this
-     * relation.
-     * 
-     * @return An immutable set of the index names for the relation.
-     * 
-     * @todo replace with getKeyOrders()?
-     */
-    Set<String> getIndexNames();
-
-    /*
-     * New methods.
-     */
-    
-    /**
-     * Return the {@link IKeyOrder} for the primary index for the relation.
-     */
-    IKeyOrder<E> getPrimaryKeyOrder();
-
-//    /**
-//     * Return the {@link IKeyOrder}s corresponding to the registered indices for
-//     * this relation. [rather than getIndexNames?]
-//     */
-//    Iterator<IKeyOrder<E>> getKeyOrders();
-//
-//    /**
-//     * Return the {@link IKeyOrder} for the predicate corresponding to the
-//     * perfect (best?) access path. A perfect access path is one where the bound values
-//     * in the predicate form a prefix in the key space of the corresponding
-//     * index.
-//     * 
-//     * @param p
-//     *            The predicate.
-//     * @return The {@link IKeyOrder} for the perfect access path -or-
-//     *         <code>null</code> if there is no index which provides a perfect
-//     *         access path for that predicate.
-//     */
-//    IKeyOrder<E> getKeyOrder(IPredicate<E> p);
-    
-    /*
-     * End new methods.
-     */
-    
-    /**
-     * Create and return a new element. The element is constructed from the
-     * predicate given the bindings. Typically, this is used when generating an
-     * {@link ISolution} for an {@link IRule} during either a query or mutation
-     * operations. The element is NOT inserted into the relation.
-     * 
-     * @param predicate
-     *            The predicate that is the head of some {@link IRule}.
-     * @param bindingSet
-     *            A set of bindings for that {@link IRule}.
-     * 
-     * @return The new element.
-     * 
-     * @throws IllegalArgumentException
-     *             if any parameter is <code>null</code>.
-     * @throws IllegalStateException
-     *             if the predicate is not fully bound given those bindings.
-     */
-    E newElement(IPredicate<E> predicate, IBindingSet bindingSet);
-
-    /**
-     * Return the class for the generic type of this relation. This information
-     * is used to dynamically create arrays of that generic type.
-     */
-    Class<E> getElementClass();
     
 }

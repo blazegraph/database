@@ -2707,5 +2707,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         return lexiconConfiguration;
         
     }
-    
+
+    public IKeyOrder<BigdataValue> getKeyOrder(final IPredicate<BigdataValue> p) {
+        if (p.get(0/* term */).isConstant()) {
+            return LexiconKeyOrder.TERM2ID;
+        } else if (p.get(1/* id */).isConstant()) {
+            return LexiconKeyOrder.ID2TERM;
+        }
+        return null;
+    }
+
 }

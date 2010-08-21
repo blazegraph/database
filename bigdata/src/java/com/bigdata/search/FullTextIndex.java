@@ -253,16 +253,6 @@ public class FullTextIndex extends AbstractRelation {
     final protected static transient Logger log = Logger
             .getLogger(FullTextIndex.class);
 
-//    /**
-//     * True iff the {@link #log} level is INFO or less.
-//     */
-//    final protected static boolean INFO = log.isInfoEnabled();
-//
-//    /**
-//     * True iff the {@link #log} level is DEBUG or less.
-//     */
-//    final protected static boolean DEBUG = log.isDebugEnabled();
-    
     /**
      * The backing index.
      */
@@ -1376,5 +1366,9 @@ public class FullTextIndex extends AbstractRelation {
     public IKeyOrder getPrimaryKeyOrder() {
         throw new UnsupportedOperationException();
     }
-        
+
+    public IKeyOrder getKeyOrder(IPredicate p) {
+        throw new UnsupportedOperationException();
+    }
+
 }

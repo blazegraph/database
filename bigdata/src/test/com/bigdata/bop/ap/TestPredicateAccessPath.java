@@ -224,10 +224,6 @@ public class TestPredicateAccessPath extends TestCase2 {
                  * (we can join with an incoming binding set easily enough using
                  * only a single primary index), distincts, selecting only
                  * certain columns, etc.
-                 * 
-                 * @todo This is failing because the MockJoinNexus does not have
-                 * the necessary stuff to resolve the relation.  Is it time to
-                 * clean IJoinNexus up?
                  */
                 {
 

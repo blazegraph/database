@@ -204,4 +204,8 @@ public class RelationFusedView<E> implements IRelation<E> {
         throw new UnsupportedOperationException();
     }
 
+    public IKeyOrder<E> getKeyOrder(IPredicate<E> p) {
+        throw new UnsupportedOperationException();
+    }
+
 }
