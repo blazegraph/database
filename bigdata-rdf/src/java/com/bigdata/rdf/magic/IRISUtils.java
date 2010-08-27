@@ -509,13 +509,13 @@ type (triple vs. NOT_EQUAL for example).
                 }
                 if (head instanceof MagicPredicate) {
                     
-                    MagicPredicate p = (MagicPredicate) head;
+                    final MagicPredicate p = (MagicPredicate) head;
                     // get the proper relation for this predicate
-                    IResourceLocator locator = 
+                    IResourceLocator<?> locator = 
                         focusStore.getIndexManager().getResourceLocator();
-                    MagicRelation relation = (MagicRelation) locator.locate(
+                    final MagicRelation relation = (MagicRelation) locator.locate(
                             p.getOnlyRelationName(), focusStore.getTimestamp());
-                    MagicTuple tuple = new MagicTuple(p);
+                    final MagicTuple tuple = new MagicTuple(p);
                     if (INFO) log.info("inserting magic tuple: " + tuple);
                     long numInserted = relation.insert(
                             new IMagicTuple[] { tuple }, 1);
@@ -523,8 +523,8 @@ type (triple vs. NOT_EQUAL for example).
                     
                 } else {
                     
-                    SPOPredicate p = (SPOPredicate) head;
-                    SPO spo = new SPO(p);
+                    final SPOPredicate p = (SPOPredicate) head;
+                    final SPO spo = new SPO(p);
                     if (INFO) log.info("inserting spo: " + spo);
                     long numInserted = focusStore.addStatements(
                             new SPO[] { spo }, 1);

@@ -1,0 +1,125 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
+/*
+ * Created on Aug 26, 2010
+ */
+
+package com.bigdata.bop.engine;
+
+import java.io.Serializable;
+
+import com.bigdata.bop.BOp;
+import com.bigdata.counters.CAT;
+
+/**
+ * Statistics associated with the evaluation of a {@link BOp}. These statistics
+ * are per {@link BOp}. The top-level {@link BOp} will reflect the throughput
+ * for the entire pipeline.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
+public class BOpStats implements Serializable {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+
+//    /**
+//     * The timestamp (milliseconds) associated with the start of execution for
+//     * the join dimension. This is not aggregated. It should only be used to
+//     * compute the elapsed time for the operator.
+//     */
+//    private final long startTime;
+    
+//    /**
+//     * The index partition for which these statistics were collected or -1
+//     * if the statistics are aggregated across index partitions.
+//     */
+//    public final int partitionId;
+
+    /**
+     * #of chunks in.
+     */
+    final public CAT chunksIn = new CAT();
+
+    /**
+     * #of units sets in (tuples, elements, binding sets, etc).
+     */
+    final public CAT unitsIn = new CAT();
+
+    /**
+     * #of chunks out.
+     */
+    final public CAT chunksOut = new CAT();
+
+    /**
+     * #of units sets in (tuples, elements, binding sets, etc).
+     */
+    final public CAT unitsOut = new CAT();
+
+    /**
+     * Constructor.
+     */
+    public BOpStats() {
+        
+    }
+
+    /**
+     * Combine the statistics (addition).
+     * 
+     * @param o
+     *            Another statistics object.
+     */
+    public void add(final BOpStats o) {
+        chunksIn.add(o.chunksIn.get());
+        unitsIn.add(o.unitsIn.get());
+        unitsOut.add(o.unitsOut.get());
+        chunksOut.add(o.chunksIn.get());
+    }
+    
+    public String toString() {
+        final StringBuilder sb = new StringBuilder();
+        sb.append(getClass().getName());
+        sb.append("{chunksIn=" + chunksIn.estimate_get());
+        sb.append(",unitsIn=" + unitsIn.estimate_get());
+        sb.append(",chunksOut=" + chunksOut.estimate_get());
+        sb.append(",unitsIn=" + unitsOut.estimate_get());
+        toString(sb);
+        sb.append("}");
+        return sb.toString();
+    }
+
+    /**
+     * Extension hook for {@link #toString()}.
+     * 
+     * @param sb
+     *            Where to write the additional state.
+     */
+    protected void toString(final StringBuilder sb) {
+
+    }
+
+}

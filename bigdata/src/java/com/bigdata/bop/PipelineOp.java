@@ -27,20 +27,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop;
 
-import java.util.concurrent.Callable;
-import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 
-import com.bigdata.btree.ILocalBTreeView;
-import com.bigdata.journal.IIndexManager;
+import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.IDataService;
 
 /**
+ * An pipeline operator reads from a source and writes on a sink.
+ * 
+ * @param <E>
+ *            The generic type of the objects processed by the operator.
+ *            
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -57,7 +56,7 @@ public interface PipelineOp<E> extends BOp {
          * Note that partial chunks may be combined into full chunks whose
          * nominal capacity is specified by {@link #CHUNK_CAPACITY}.
          */
-        String CHUNK_OF_CHUNKS_CAPACITY = BlockingBuffer.class.getName()
+        String CHUNK_OF_CHUNKS_CAPACITY = PipelineOp.class.getName()
                 + ".chunkOfChunksCapacity";
 
         /**
@@ -72,7 +71,7 @@ public interface PipelineOp<E> extends BOp {
          * 
          * @see #CHUNK_OF_CHUNKS_CAPACITY
          */
-        String CHUNK_CAPACITY = IBuffer.class.getName() + ".chunkCapacity";
+        String CHUNK_CAPACITY = PipelineOp.class.getName() + ".chunkCapacity";
 
         /**
          * Default for {@link #CHUNK_CAPACITY}
@@ -85,7 +84,7 @@ public interface PipelineOp<E> extends BOp {
          * the current chunk (default {@value #DEFAULT_CHUNK_TIMEOUT}). This may
          * be ZERO (0) to disable the chunk combiner.
          */
-        String CHUNK_TIMEOUT = BlockingBuffer.class.getName() + ".chunkTimeout";
+        String CHUNK_TIMEOUT = PipelineOp.class.getName() + ".chunkTimeout";
 
         /**
          * The default for {@link #CHUNK_TIMEOUT}.
@@ -97,8 +96,15 @@ public interface PipelineOp<E> extends BOp {
     }
 
     /**
-     * Instantiate a buffer to serve as the sink for this operator.  The buffer
-     * will be provisioned based on the {@link Annotations}.
+     * Return a new object which can be used to collect statistics on the
+     * operator evaluation (this may be overridden to return a more specific
+     * class depending on the operator).
+     */
+    BOpStats newStats();
+
+    /**
+     * Instantiate a buffer suitable as a sink for this operator. The buffer
+     * will be provisioned based on the operator annotations.
      * 
      * @return The buffer.
      */
@@ -106,37 +112,13 @@ public interface PipelineOp<E> extends BOp {
 
     /**
      * Initiate execution for the operator, returning a {@link Future} which for
-     * that evaluation. Operator evaluation may be halted using
-     * {@link Future#cancel(boolean)}.
-     * <p>
-     * Note: The use of the {@link Future} interface rather than
-     * {@link Runnable} or {@link Callable} makes it possible to execute
-     * operators against either an {@link Executor} or a {@link ForkJoinPool}.
+     * that evaluation.
      * 
-     * @param fed
-     *            The {@link IBigdataFederation} IFF the operator is being
-     *            evaluated on an {@link IBigdataFederation}. When evaluating
-     *            operations against an {@link IBigdataFederation}, this
-     *            reference provides access to the scale-out view of the indices
-     *            and to other bigdata services.
-     * @param joinNexus
-     *            An evaluation context with hooks for the <em>local</em>
-     *            execution environment. When evaluating operators against an
-     *            {@link IBigdataFederation} the {@link IJoinNexus} MUST be
-     *            formulated with the {@link IIndexManager} of the local
-     *            {@link IDataService} order perform efficient reads against the
-     *            shards views as {@link ILocalBTreeView}s. It is an error if
-     *            the {@link IJoinNexus#getIndexManager()} returns the
-     *            {@link IBigdataFederation} since each read would use RMI. This
-     *            condition should be checked by the operator implementation.
-     * @param sink
-     *            Where to write the output of the operator.
+     * @param context
+     *            The evaluation context.
      * 
      * @return The {@link Future} for the operator's evaluation.
-     * 
-     * @todo return the execution statistics here? Return Void?
      */
-    Future<Void> eval(IBigdataFederation<?> fed, IJoinNexus joinNexus,
-            IBlockingBuffer<E[]> sink);
+    Future<Void> eval(BOpContext<E> context);
 
 }

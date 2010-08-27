@@ -33,6 +33,7 @@ import junit.framework.TestCase2;
 import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.EmptyBindingSet;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
@@ -150,9 +151,98 @@ public class TestPredicate extends TestCase2 {
     }
     
     /**
-     * @todo write unit tests for both asBound methods.
+     * Unit tests for {@link Predicate#asBound(com.bigdata.bop.IBindingSet)}
      */
-    public void test_asBound() {
+    public void test_asBound_1() {
+
+        final Var<Long> u = Var.var("u");
+
+        final IPredicate<?> p1 = new Predicate(new IVariableOrConstant[] { u, c1, c2 },
+                relation);
+        
+        assertEquals("arity", 3, p1.arity());
+
+        // verify variables versus constants.
+        assertTrue(p1.get(0).isVar());
+        assertTrue(p1.get(1).isConstant());
+        assertTrue(p1.get(2).isConstant());
+        
+        // verify object references.
+        assertTrue(u == p1.get(0));
+        assertTrue(c1 == p1.get(1));
+        assertTrue(c2 == p1.get(2));
+
+        // already bound on the predicate, not found in the binding set.
+        doAsBoundTest(p1, EmptyBindingSet.INSTANCE);
+        
+        // already bound on predicate, but has different value in binding set.
+        doAsBoundTest(p1, new ArrayBindingSet(new IVariable[] { u },
+                new IConstant[] { c3 }));
+
+        // not bound on the predicate, found in the binding set.
+        doAsBoundTest(p1, new ArrayBindingSet(new IVariable[] { u },
+                new IConstant[] { c3 }));
+
+        // correct rejection tests.
+        try {
+            p1.asBound(null);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+        }
+        
+    }
+
+    private void doAsBoundTest(final IPredicate<?> p1,
+            final IBindingSet bindingSet) {
+        final IPredicate<?> p2 = p1.asBound(bindingSet);
+        // distinct reference
+        assertTrue(p1 != p2);
+        // same arity.
+        assertEquals(p1.arity(), p2.arity());
+        // verify same data, but different references.
+        for (int i = 0; i < p1.arity(); i++) {
+            if(p1.get(i).isVar()) {
+                /*
+                 * A variable might have become bound so check the binding set
+                 * for that variable.
+                 */
+                final IConstant<?> c = bindingSet.get((IVariable<?>) p1.get(i));
+                if (c != null) {
+                    /*
+                     * The variable should have been bound to a copy of that
+                     * constant.
+                     */
+                    assertTrue("i=" + i, p2.get(i).isConstant());
+                    // equals (same data)
+                    assertEquals("i=" + i, c, p2.get(i));
+                    // but not the same ref (deep copy).
+                    assertTrue("i=" + i, c != p2.get(i));
+                } else {
+                    // p2 should still be a variable.
+                    assertTrue("i=" + i, p2.get(i).isVar());
+                    // the variable should be unchanged (same reference).
+                    assertTrue("i=" + i, p1.get(i) == p2.get(i));
+                }
+            } else {
+                /*
+                 * Since not a variable in p1, the asBound variable is a (deep
+                 * copy of a) constant.
+                 */
+                assertTrue("i=" + i, p2.get(i).isConstant());
+                // copy as equals.
+                assertEquals("i=" + i, p1.get(i), p2.get(i));
+                // but not the same references (deep copy).
+                assertTrue("i=" + i, p1.get(i) != p2.get(i));
+            }
+        }
+    }
+    
+    /**
+     * Unit tests for {@link Predicate#asBound(int, com.bigdata.bop.IBindingSet)}
+     */
+    public void test_asBound_2() {
 
         final Var<Long> u = Var.var("u");
 

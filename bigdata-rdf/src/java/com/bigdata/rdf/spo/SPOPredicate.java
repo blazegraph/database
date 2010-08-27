@@ -23,7 +23,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.spo;
 
+import java.util.Map;
+
 import com.bigdata.bop.ArrayBindingSet;
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
@@ -43,63 +46,6 @@ import com.bigdata.relation.rule.ISolutionExpander;
  */
 public class SPOPredicate extends Predicate<ISPO> {
 
-//    public SPOPredicate copy() {
-//        
-//        return new SPOPredicate(this, relationName);
-//        
-//    }
-    
-//    /**
-//     * 
-//     */
-//    private static final long serialVersionUID = 1396017399712849975L;
-
-//    protected final String[] relationName;
-//
-//    protected final int partitionId;
-//    
-//    protected final IVariableOrConstant<IV> s;
-//
-//    protected final IVariableOrConstant<IV> p;
-//
-//    protected final IVariableOrConstant<IV> o;
-//
-//    /** The context position MAY be <code>null</code>. */
-//    protected final IVariableOrConstant<IV> c;
-//
-//    protected final boolean optional;
-//    
-//    protected final IElementFilter<ISPO> constraint;
-//
-//    protected final ISolutionExpander<ISPO> expander;
-//
-//    public String getOnlyRelationName() {
-//        
-//        if (relationName.length != 1)
-//            throw new IllegalStateException();
-//        
-//        return relationName[0];
-//        
-//    }
-//    
-//    public String getRelationName(final int index) {
-//        
-//        return relationName[index];
-//        
-//    }
-//    
-//    final public int getRelationCount() {
-//        
-//        return relationName.length;
-//        
-//    }
-//
-//    final public int getPartitionId() {
-//        
-//        return partitionId;
-//        
-//    }
-
     /**
      * 
      */
@@ -115,8 +61,22 @@ public class SPOPredicate extends Predicate<ISPO> {
      */
     public final int arity() {
         
-        return args[3/*c*/] == null ? 3 : 4;
+        return get(3/*c*/) == null ? 3 : 4;
         
+    }
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public SPOPredicate(final BOp[] values, final Map<String, Object> annotations) {
+        super(values, annotations);
+    }
+
+    /**
+     * Required deep copy constructor.
+     */
+    public SPOPredicate(final SPOPredicate op) {
+        super(op);
     }
 
     /**
@@ -442,25 +402,21 @@ public class SPOPredicate extends Predicate<ISPO> {
 
         final SPOPredicate tmp = this.clone();
 
+        // bound from the binding set.
+//        try {
+//            final Field f = tmp.getClass().getField("args");
+//            f.setAccessible(true);
+//            final BOp[] targs = (BOp[]) f.get(tmp);
+//            targs[3] = c;
+//        } catch (Exception ex) {
+//            throw new RuntimeException(ex);
+//        }
         tmp.args[3/*c*/] = c;
         
         return tmp;
 
-//        return new SPOPredicate(//
-//                relationName, //
-//                partitionId, //
-//                s,//
-//                p,//
-//                o,//
-//                c, // override.
-//                optional, //
-//                constraint,//
-//                expander//
-//        );
-
     }
     
-    @SuppressWarnings("unchecked")
     public SPOPredicate clone() {
 
         return (SPOPredicate) super.clone();
@@ -606,25 +562,25 @@ public class SPOPredicate extends Predicate<ISPO> {
 
     final public IVariableOrConstant<IV> s() {
         
-        return (IVariableOrConstant<IV>) args[0/* s */];
+        return (IVariableOrConstant<IV>) get(0/* s */);
         
     }
     
     final public IVariableOrConstant<IV> p() {
         
-        return (IVariableOrConstant<IV>) args[1/* p */];
+        return (IVariableOrConstant<IV>) get(1/* p */);
         
     }
 
     final public IVariableOrConstant<IV> o() {
         
-        return (IVariableOrConstant<IV>) args[2/* o */];
+        return (IVariableOrConstant<IV>) get(2/* o */);
         
     }
     
     final public IVariableOrConstant<IV> c() {
         
-        return (IVariableOrConstant<IV>) args[3/* c */];
+        return (IVariableOrConstant<IV>) get(3/* c */);
         
     }
 

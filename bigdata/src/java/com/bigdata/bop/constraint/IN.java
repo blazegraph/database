@@ -49,8 +49,9 @@ package com.bigdata.bop.constraint;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Map;
 
-import com.bigdata.bop.AbstractBOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpList;
 import com.bigdata.bop.IBindingSet;
@@ -75,7 +76,7 @@ import com.bigdata.rdf.spo.InGraphHashSetFilter;
  *       {@link InGraphHashSetFilter} and also with the use of an in-memory join
  *       against the incoming binding sets to handle SPARQL data sets.
  */
-public class IN<T> extends AbstractBOp implements IConstraint {
+public class IN<T> extends BOpBase implements IConstraint {
 
 //    /**
 //     * 
@@ -99,6 +100,23 @@ public class IN<T> extends AbstractBOp implements IConstraint {
      */
     private transient volatile T[] set;
     
+    /**
+     * Deep copy constructor.
+     */
+    public IN(final IN<T> op) {
+        super(op);
+    }
+
+    /**
+     * Shallow copy constructor.
+     */
+    public IN(final BOp[] args, final Map<String, Object> annotations) {
+
+        // @todo validate args?
+        super(args, annotations);
+        
+    }
+
     /**
      * 
      * @param x
@@ -151,13 +169,13 @@ public class IN<T> extends AbstractBOp implements IConstraint {
         
         if(set == null) {
 
-            set = sort((BOpList) args[1]);
+            set = sort((BOpList) get(1));
             
         }
         
         // get binding for "x".
         @SuppressWarnings("unchecked")
-        final IConstant<T> x = bindingSet.get((IVariable<?>) args[0]/* x */);
+        final IConstant<T> x = bindingSet.get((IVariable<?>) get(0)/* x */);
 
         if (x == null) {
 

@@ -24,7 +24,6 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
-import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.SPOKeyOrder;
@@ -292,92 +291,22 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
         
         checkPredicate(predicate);
         
-        final MagicPredicate pred = (MagicPredicate) predicate;
-
-        // skip the cache for now
-        
-        if (true) {
-            
-            return _getAccessPath(pred);
-            
-        }
-        
-        /*
-         * FIXME This was hacked in attempt to track down a nagging issue. There
-         * were two symptoms. First, some access paths were failing to deliver
-         * the correct results for joins. Second, the kb lost track of what was
-         * an inference and was treating everything as explicit. NOTE: The
-         * problem would go away on a restart, which is what led us to consider
-         * a stateful / cache effect. The data on disk was correct.
-         * 
-         * It is possible that the join problem is related to the cache because
-         * the AbstractAccessPath is stateful for historical reads and it is
-         * within the grasp of reason that the logic there was failing and was
-         * keeping state for the UNISOLATED view as well.
-         * 
-         * Note: I have no idea how the the cache could cause the kb to loose
-         * track of what is inferred and what was explicit. This may be a red
-         * herring.
-         * 
-         * Note: The cache semantics for put() were actually putIfAbsent() when
-         * this problem was noticed. Perhaps the problem was related to those
-         * semantics since the access path in the cache would not be replaced if
-         * there was already an entry for a given predicate?
-         */
-        if (getTimestamp() == ITx.UNISOLATED) {
-
-            // create an access path instance for that predicate.
-            return _getAccessPath(pred);
-
-        }
-
-        IAccessPath<IMagicTuple> accessPath;
-//        // test cache for access path.
-//        IAccessPath<IMagicTuple> accessPath = cache.get(pred);
-//
-//        if (accessPath != null) {
-//
-//            return accessPath;
-//
-//        }
-
-        // create an access path instance for that predicate.
-        accessPath = _getAccessPath(pred);
-
-//        // add to cache.
-//        cache.put(pred, accessPath);
-        
-        return accessPath;
+        return _getAccessPath(predicate);
         
     }
-
-//    /**
-//     * {@link IAccessPath} cache.
-//     * 
-//     * Note: The cache was removed from {@link SPORelation} and should probably
-//     *       be removed here as well. I believe that the motivation for removing
-//     *       the cache was low latency the the access path construction combined
-//     *       with too much retention on the heap and synchronization hotspots
-//     *       with the cache.
-//     */
-////  0.75f// loadFactor
-////  50// concurrencyLevel
-//    final private 
-//        ConcurrentWeakValueCache<MagicPredicate, IAccessPath<IMagicTuple>> cache = 
-//        new ConcurrentWeakValueCacheWithTimeout<MagicPredicate, IAccessPath<IMagicTuple>>
-//            ( 100/* queueCapacity */, TimeUnit.MILLISECONDS.toNanos(60 * 1000)/* timeout */
-//              );
 
     /**
      * Isolates the logic for selecting the {@link SPOKeyOrder} from the
      * {@link SPOPredicate} and then delegates to
      * {@link #getAccessPath(IKeyOrder, IPredicate)}.
      */
-    final private IAccessPath<IMagicTuple> _getAccessPath(final IPredicate<IMagicTuple> predicate) {
+    final private IAccessPath<IMagicTuple> _getAccessPath(
+            final IPredicate<IMagicTuple> predicate) {
 
         final MagicKeyOrder keyOrder = getKeyOrder(predicate);
-        
-        final IAccessPath<IMagicTuple> accessPath = getAccessPath(keyOrder, predicate);
+
+        final IAccessPath<IMagicTuple> accessPath = getAccessPath(keyOrder,
+                predicate);
 
         if (log.isDebugEnabled())
             log.debug(accessPath.toString());
@@ -385,7 +314,7 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
         return accessPath;
 
     }
-    
+
     public MagicKeyOrder getPrimaryKeyOrder() {
         
         return getKeyOrders()[0];
@@ -404,24 +333,16 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
             terms[i] = Var.var("v"+i);
             
         }
-        
-        final MagicPredicate predicate = new MagicPredicate(getNamespace(),
-                terms);
 
-        if (log.isInfoEnabled()) {
-
-            log.info(predicate);
-
-        }
-
-        return getAccessPath(keyOrder, predicate);
+        return getAccessPath(keyOrder, new MagicPredicate(getNamespace(),
+                terms));
         
     }
 
     private void checkPredicate(final IPredicate<IMagicTuple> predicate) {
         
         if (predicate.arity() != this.arity) {
-            StringBuilder sb = new StringBuilder();
+            final StringBuilder sb = new StringBuilder();
             sb.append("bad predicate:\n");
             sb.append("relation: " + getNamespace()).append("\n");
             sb.append("arity: " + getArity()).append("\n");

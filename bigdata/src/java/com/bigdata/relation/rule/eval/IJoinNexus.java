@@ -33,6 +33,7 @@ import java.util.Iterator;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
@@ -229,8 +230,8 @@ public interface IJoinNexus {
      * 
      * @param pred
      *            The {@link IPredicate} from which the element was read.
-     * @param constraint
-     *            A constraint which must be satisfied (optional).
+     * @param constraints
+     *            An array of constraints which must be satisfied (optional).
      * @param e
      *            An element materialized by the {@link IAccessPath} for that
      *            {@link IPredicate}.
@@ -244,7 +245,7 @@ public interface IJoinNexus {
      * @throws NullPointerException
      *             if an argument is <code>null</code>.
      */
-    boolean bind(IPredicate<?> pred, IConstraint constraint, Object e,
+    boolean bind(IPredicate<?> pred, IConstraint[] constraints, Object e,
             IBindingSet bindings);
 
     /**
@@ -350,7 +351,7 @@ public interface IJoinNexus {
      * @return A new binding set suitable for that rule.
      */
     IBindingSet newBindingSet(IRule rule);
-   
+
     /**
      * Return the effective {@link IRuleTaskFactory} for the rule. When the rule
      * is a step of a sequential program writing on one or more
@@ -374,6 +375,9 @@ public interface IJoinNexus {
      * 
      * @see RunRuleAndFlushBufferTaskFactory
      * @see RunRuleAndFlushBufferTask
+     * 
+     * @deprecated by annotations on individual {@link BOp}s which specify which
+     *             join operator is to be used on a join by join basis.
      */
     IRuleTaskFactory getRuleTaskFactory(boolean parallel, IRule rule);
     
@@ -495,7 +499,7 @@ public interface IJoinNexus {
      * Used to locate indices, relations and relation containers.
      */
     IIndexManager getIndexManager();
- 
+
     /**
      * Run as a query.
      * 
@@ -508,6 +512,13 @@ public interface IJoinNexus {
      *             unless this is an {@link ActionEnum#Query}.
      * @throws IllegalArgumentException
      *             if either argument is <code>null</code>.
+     * 
+     * @todo ISolution is only used when constructing entailments for which we
+     *       also need to know the rule which licensed the entailment in order
+     *       to generate the justification chain. This should all be done by a
+     *       CONSTRUCT operator. The {@link #solutionFlags()} should also go
+     *       away, including {@link #BINDINGS}, {@link #ELEMENT}, {@link #RULE},
+     *       and {@link #ALL}.
      */
     IChunkedOrderedIterator<ISolution> runQuery(IStep step) throws Exception;
 

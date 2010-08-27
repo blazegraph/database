@@ -4,13 +4,12 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
+import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.service.IBigdataFederation;
 
 /**
  * Sampling operator for a shard view.
@@ -34,18 +33,17 @@ public class SampleLocalShard<E> extends AbstractSampleIndex<E> {
     /*
      * Note: This is done at evaluation time, local to the data. 
      */
-    public Future<Void> eval(final IBigdataFederation<?> fed,
-            final IJoinNexus joinNexus, final IBlockingBuffer<E[]> buffer) {
+    public Future<Void> eval(final BOpContext<E> context) {
 
-        if (pred().getPartitionId() == -1) {
+        if (context.getPartitionId() == -1) {
             // Must be specific to a shard.
             throw new UnsupportedOperationException();
         }
-        
-        final FutureTask<Void> ft = new FutureTask<Void>(new LocalShardSampleTask(
-                joinNexus, buffer));
 
-        joinNexus.getIndexManager().getExecutorService().execute(ft);
+        final FutureTask<Void> ft = new FutureTask<Void>(
+                new LocalShardSampleTask(context));
+
+        context.getIndexManager().getExecutorService().execute(ft);
 
         return ft;
 
@@ -56,15 +54,14 @@ public class SampleLocalShard<E> extends AbstractSampleIndex<E> {
      */
     private class LocalShardSampleTask implements Callable<Void> {
 
-        private final IJoinNexus joinNexus;
-        private final IBlockingBuffer<E[]> buffer;
+        private final BOpContext<E> context;
+        private final IBlockingBuffer<E[]> sink;
 
-        LocalShardSampleTask(final IJoinNexus joinNexus,
-                final IBlockingBuffer<E[]> buffer) {
+        LocalShardSampleTask(final BOpContext<E> context) {
 
-            this.joinNexus = joinNexus;
+            this.context = context;
             
-            this.buffer = buffer;
+            this.sink = context.getSink();
 
         }
 
@@ -72,7 +69,7 @@ public class SampleLocalShard<E> extends AbstractSampleIndex<E> {
 
             final IPredicate<E> pred = pred();
             
-            final IRelation<E> view = joinNexus.getTailRelationView(pred);
+            final IRelation<E> view = context.getReadRelation(pred);
 
             final IAccessPath<E> accessPath = view.getAccessPath(pred);
 

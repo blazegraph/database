@@ -458,22 +458,57 @@ abstract public class AbstractJoinNexus implements IJoinNexus {
     }
 
     final public boolean bind(final IPredicate<?> pred,
-            final IConstraint constraint, final Object e,
+            final IConstraint[] constraints, final Object e,
             final IBindingSet bindings) {
 
         // propagate bindings from the visited object into the binding set.
         copyValues((IElement) e, pred, bindings);
 
-        if (constraint != null) {
+        if (constraints != null) {
 
             // verify constraint.
-            return constraint.accept(bindings);
+            return isConsistent(constraints, bindings);
         
         }
         
         // no constraint.
         return true;
         
+    }
+    
+    /**
+     * Check constraints.
+     * 
+     * @param constraints
+     * @param bindingSet
+     * 
+     * @return <code>true</code> iff the constraints are satisfied.
+     */
+    private boolean isConsistent(final IConstraint[] constraints,
+            final IBindingSet bindingSet) {
+
+        for (int i = 0; i < constraints.length; i++) {
+
+            final IConstraint constraint = constraints[i];
+
+            if (!constraint.accept(bindingSet)) {
+
+                if (log.isDebugEnabled()) {
+
+                    log.debug("Rejected by "
+                            + constraint.getClass().getSimpleName() + " : "
+                            + bindingSet);
+
+                }
+
+                return false;
+
+            }
+
+        }
+
+        return true;
+
     }
     
     @SuppressWarnings("unchecked")

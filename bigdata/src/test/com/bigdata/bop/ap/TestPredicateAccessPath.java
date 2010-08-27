@@ -265,7 +265,7 @@ public class TestPredicateAccessPath extends TestCase2 {
                 
             }
 
-            fail("implement");
+            fail("extend this test");
             
         } finally {
 

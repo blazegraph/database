@@ -24,7 +24,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.bop.constraint;
 
-import com.bigdata.bop.AbstractBOp;
+import java.util.Map;
+
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -37,21 +39,27 @@ import com.bigdata.bop.IVariable;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class NEConstant extends AbstractBOp implements IConstraint {
+public class NEConstant extends BOpBase implements IConstraint {
     
-//    /**
-//     * 
-//     */
-//    private static final long serialVersionUID = -2267584965908057945L;
-//    
-//    private final IVariable<?> var;
-//    private final IConstant<?> val;
-
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
+    /**
+     * Required deep copy constructor.
+     */
+    public NEConstant(final BOp[] args, final Map<String, Object> annotations) {
+        super(args, annotations);
+    }
+
+    /**
+     * Required deep copy constructor.
+     */
+    public NEConstant(final NEConstant op) {
+        super(op);
+    }
+    
     public NEConstant(final IVariable<?> var, final IConstant<?> val) {
 
         super(new BOp[] { var, val });
@@ -61,22 +69,18 @@ public class NEConstant extends AbstractBOp implements IConstraint {
         
         if (val == null)
             throw new IllegalArgumentException();
-
-//        this.var = var;
-//
-//        this.val = val;
         
     }
     
     public boolean accept(final IBindingSet s) {
         
         // get binding for the variable.
-        final IConstant<?> tmp = s.get((IVariable<?>) args[0]/* var */);
+        final IConstant<?> tmp = s.get((IVariable<?>) get(0)/* var */);
     
         if (tmp == null)
             return true; // not yet bound.
     
-        return !tmp.equals(args[1]/* val */);
+        return !tmp.equals(get(1)/* val */);
 
    }
 

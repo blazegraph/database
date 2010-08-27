@@ -29,6 +29,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Set;
+
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
@@ -52,11 +54,28 @@ public class SPOStarJoin extends SPOPredicate
      * generated serial version UID 
      */
     private static final long serialVersionUID = 981603459301801862L;
-    
+
     /**
      * The star constraints for this star join.
+     * 
+     * @todo {@link IStarConstraint} should probably be a {@link BOp} and this
+     *       should probably be an annotation.
      */
     protected final Collection<IStarConstraint<ISPO>> starConstraints;
+
+//    /**
+//     * Required shallow copy constructor.
+//     */
+//    public SPOStarJoin(final BOp[] values, final Map<String, Object> annotations) {
+//        super(values, annotations);
+//    }
+//
+//    /**
+//     * Required deep copy constructor.
+//     */
+//    public SPOStarJoin(final SPOStarJoin op) {
+//        super(op);
+//    }
 
     /**
      * Construct an SPO star join from a normal SPO predicate.  The star join

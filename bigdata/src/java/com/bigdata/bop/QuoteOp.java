@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop;
 
+import java.util.Map;
+
 /**
  * Operator quotes its operand (in the Lisp sense) and returns its operand when
  * it is evaluated. The purpose of quoting another operator is to prevent its
@@ -41,13 +43,27 @@ package com.bigdata.bop;
  *       own evaluation semantics. Alternatively, we could add
  *       <code>eval():Op</code> using an appropriate evaluation interface.
  */
-public class QuoteOp extends AbstractBOp {
+public class QuoteOp extends BOpBase {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
+    /**
+     * Required deep copy constructor.
+     */
+    public QuoteOp(final BOp[] args, final Map<String, Object> annotations) {
+        super(args, annotations);
+    }
+
+    /**
+     * Required deep copy constructor.
+     */
+    public QuoteOp(final QuoteOp op) {
+        super(op);
+    }
+    
     /**
      * Quote an operator.
      * 

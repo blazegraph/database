@@ -24,6 +24,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.constraints;
 
+import java.util.Map;
+
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 
@@ -33,6 +36,20 @@ import com.bigdata.rdf.internal.IV;
 public class InlineNE extends AbstractInlineConstraint {
 
     private static final long serialVersionUID = 3591067418669630647L;
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public InlineNE(final BOp[] values, final Map<String, Object> annotations) {
+        super(values, annotations);
+    }
+
+    /**
+     * Required deep copy constructor.
+     */
+    public InlineNE(final InlineNE op) {
+        super(op);
+    }
 
     public InlineNE(final IVariable<IV> v, final IV iv) {
         

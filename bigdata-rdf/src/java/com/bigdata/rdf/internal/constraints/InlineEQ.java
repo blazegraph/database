@@ -24,7 +24,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.constraints;
 
+import java.util.Map;
+
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.ap.Predicate;
 import com.bigdata.rdf.internal.IV;
 
 /**
@@ -33,6 +37,20 @@ import com.bigdata.rdf.internal.IV;
 public class InlineEQ extends AbstractInlineConstraint {
 
     private static final long serialVersionUID = -859713006378534024L;
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public InlineEQ(final BOp[] values, final Map<String, Object> annotations) {
+        super(values, annotations);
+    }
+
+    /**
+     * Required deep copy constructor.
+     */
+    public InlineEQ(final InlineEQ op) {
+        super(op);
+    }
 
     public InlineEQ(final IVariable<IV> v, final IV iv) {
         

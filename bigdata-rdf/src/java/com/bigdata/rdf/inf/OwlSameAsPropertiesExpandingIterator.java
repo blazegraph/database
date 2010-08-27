@@ -4,7 +4,7 @@ import java.util.Arrays;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.bop.AbstractBOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
@@ -495,23 +495,20 @@ public class OwlSameAsPropertiesExpandingIterator implements
         }
     };
 
-    private class RejectSameAsSelf extends AbstractBOp implements IConstraint {
-
-//        private IVariableOrConstant<IV> _s, _p, _o;
+    private class RejectSameAsSelf extends BOpBase implements IConstraint {
 
         public RejectSameAsSelf(final IVariableOrConstant<IV> _s,
                 final IVariableOrConstant<IV> _p,
                 final IVariableOrConstant<IV> _o) {
+
             super(new BOp[] { _s, _p, _o });
-//            this._s = _s;
-//            this._p = _p;
-//            this._o = _o;
+            
         }
 
         public boolean accept(final IBindingSet bindings) {
-            final IV sVal = getValue((IVariableOrConstant)args[0/*_s*/], bindings);
-            final IV pVal = getValue((IVariableOrConstant)args[1/*_p*/], bindings);
-            final IV oVal = getValue((IVariableOrConstant)args[2/*_o*/], bindings);
+            final IV sVal = getValue((IVariableOrConstant)get(0/*_s*/), bindings);
+            final IV pVal = getValue((IVariableOrConstant)get(1/*_p*/), bindings);
+            final IV oVal = getValue((IVariableOrConstant)get(2/*_o*/), bindings);
             // not fully bound yet, just ignore for now
             if (sVal == null || pVal == null || oVal == null) {
                 return true;

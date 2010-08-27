@@ -252,7 +252,7 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
             
         }
        
-        public boolean bind(IPredicate<?> pred, IConstraint constraint,
+        public boolean bind(IPredicate<?> pred, IConstraint constraint[],
                 Object e, IBindingSet bindings) {
 
             return false;

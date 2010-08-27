@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop;
 
-import java.util.Arrays;
 import java.util.Map;
 
 /**
@@ -36,35 +35,31 @@ import java.util.Map;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BOpList extends AbstractBOp {
+public class BOpList extends BOpBase {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    public BOpList(final BOp[] args) {
-        super(args);
+    /**
+     * Deep copy constructor.
+     */
+    public BOpList(final BOpList op) {
+        super(op);
     }
 
+    /**
+     * Shallow copy constructor.
+     */
     public BOpList(final BOp[] args, final Map<String, Object> annotations) {
      
         super(args, annotations);
         
     }
 
-    public BOp[] toArray() {
-        return args.clone();
-    }
-
-    @SuppressWarnings("unchecked")
-    public <T> T[] toArray(final T[] a) {
-        if (a.length < args.length)
-            return (T[]) Arrays.copyOf(args, args.length, a.getClass());
-        System.arraycopy(args, 0, a, 0, args.length);
-        if (a.length > args.length)
-            a[args.length] = null;
-        return a;
+    public BOpList(final BOp[] args) {
+        super(args);
     }
 
 }

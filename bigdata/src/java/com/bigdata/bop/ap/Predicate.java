@@ -31,6 +31,7 @@ package com.bigdata.bop.ap;
 import java.util.Map;
 
 import com.bigdata.bop.AbstractChunkedOrderedIteratorOp;
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -65,7 +66,21 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
     public interface Annotations extends IPredicate.Annotations {
         
     }
-    
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public Predicate(final BOp[] values, final Map<String, Object> annotations) {
+        super(values, annotations);
+    }
+
+    /**
+     * Required deep copy constructor.
+     */
+    public Predicate(final Predicate<E> op) {
+        super(op);
+    }
+
     /**
      * Simplified ctor.
      * 
@@ -83,7 +98,6 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
     }
 
     /**
-     * Fully specified ctor.
      * 
      * @param relationName
      *            The namespace of the relation.
@@ -104,7 +118,7 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
             final boolean optional, final IElementFilter<E> constraint,
             final ISolutionExpander<E> expander) {
 
-        super(values, NV.asMap(new NV[] {//
+        this(values, NV.asMap(new NV[] {//
                 new NV(Annotations.RELATION_NAME,new String[]{relationName}),//
                 new NV(Annotations.PARTITION_ID,partitionId),//
                 new NV(Annotations.OPTIONAL,optional),//
@@ -172,7 +186,7 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
     @SuppressWarnings("unchecked")
     public IVariableOrConstant get(final int index) {
         
-        return (IVariableOrConstant<?>) args[index];
+        return (IVariableOrConstant<?>) super.get(index);
         
     }
 
@@ -206,10 +220,12 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
     final public int getVariableCount() {
 
         int nvars = 0;
+        
+        final int arity = arity();
 
-        for (int i = 0; i < args.length; i++) {
+        for (int i = 0; i < arity; i++) {
 
-            if (args[i] instanceof IVariable<?>)
+            if (get(i) instanceof IVariable<?>)
                 nvars++;
             
         }
@@ -217,17 +233,6 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
         return nvars;
 
     }
-
-//    /**
-//     * {@inheritDoc}
-//     * 
-//     * @deprecated by {@link #isFullyBound()}
-//     */
-//    final public boolean isFullyBound() {
-//
-//        return nvars == 0;
-//
-//    }
 
     final public boolean isFullyBound(final IKeyOrder<E> keyOrder) {
         
@@ -247,53 +252,23 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
         }
         return nunbound;
     }
-
-//    /**
-//     * Returns an ordered array of the values for this predicate with the given
-//     * bindings overriding any unbound variables.
-//     * 
-//     * @param bindingSet
-//     *            The bindings (optional).
-//     * 
-//     * @return
-//     */
-//    @SuppressWarnings("unchecked")
-//    public IVariableOrConstant[] toArray(final IBindingSet bindingSet) {
-//
-//        final IVariableOrConstant<?>[] values = new IVariableOrConstant[args.length];
-//
-//        for (int i = 0; i < args.length; i++) {
-//
-//            final IVariableOrConstant<?> v = values[i];
-//
-//            if (v.isVar() && bindingSet != null
-//                    && bindingSet.isBound((IVariable<?>) v)) {
-//
-//                values[i] = new Constant(bindingSet.get((IVariable<?>) v));
-//
-//            } else {
-//
-//                values[i] = (IVariableOrConstant<?>) args[i];
-//                
-//            }
-//            
-//        }
-//
-//        return values;
-//        
-//    }
     
     public Predicate<E> asBound(final IBindingSet bindingSet) {
 
+        if (bindingSet == null)
+            throw new IllegalArgumentException();
+        
         final Predicate<E> tmp = this.clone();
 
         /*
          * Now override any unbound variables for which we were giving bindings.
          */
 
-        for (int i = 0; i < args.length; i++) {
+        final int arity = arity();
+        
+        for (int i = 0; i < arity; i++) {
 
-            final IVariableOrConstant<?> t = (IVariableOrConstant<?>) args[i];
+            final IVariableOrConstant<?> t = (IVariableOrConstant<?>) get(i);
 
             if (t == null) {
                 /*
@@ -306,7 +281,7 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
             if (t.isConstant())
                 continue;
 
-            final IVariable<?> var = (IVariable<?>) args[i];
+            final IVariable<?> var = (IVariable<?>) t;
 
             final IConstant<?> val = bindingSet.get(var);
 
@@ -316,7 +291,15 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
             }
 
             // bound from the binding set.
-            tmp.args[i] = val;
+//            try {
+//                final Field f = tmp.getClass().getField("args");
+//                f.setAccessible(true);
+//                final BOp[] targs = (BOp[]) f.get(tmp);
+//                targs[i] = val.clone();
+//            } catch (Exception ex) {
+//                throw new RuntimeException(ex);
+//            }
+            tmp.args[i] = val.clone();
 
         }
         
@@ -388,11 +371,13 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
     
     public String toString(final IBindingSet bindingSet) {
 
+        final int arity = arity();
+        
         final StringBuilder sb = new StringBuilder();
 
         sb.append("(");
 
-        for (int i = 0; i < args.length; i++) {
+        for (int i = 0; i < arity; i++) {
 
             if (i > 0)
                 sb.append(", ");
@@ -419,57 +404,6 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
             sb.append("]");
         }
         
-//        final String relationName = getOnlyRelationName();
-//        final boolean optional = isOptional();
-//        final IElementFilter<E> constraint = getConstraint();
-//        final ISolutionExpander<E> solutionExpander = getSolutionExpander();
-//        final int partitionId = getPartitionId();
-//        
-//        if (optional || constraint != null || solutionExpander != null
-//                || partitionId != -1) {
-//
-//            /*
-//             * Something special, so do all this stuff.
-//             */
-//
-//            boolean first = true;
-//
-//            sb.append("[");
-//
-//            sb.append(getOnlyRelationName());
-//            
-//            if (isOptional()) {
-//                if (!first)
-//                    sb.append(", ");
-//                sb.append("optional");
-//                first = false;
-//            }
-//
-//            if (getConstraint() != null) {
-//                if (!first)
-//                    sb.append(", ");
-//                sb.append(getConstraint().toString());
-//                first = false;
-//            }
-//
-//            if (getSolutionExpander() != null) {
-//                if (!first)
-//                    sb.append(", ");
-//                sb.append(getSolutionExpander().toString());
-//                first = false;
-//            }
-//
-//            if (getPartitionId() != -1) {
-//                if (!first)
-//                    sb.append(", ");
-//                sb.append("partitionId=" + getPartitionId());
-//                first = false;
-//            }
-//
-//            sb.append("]");
-//
-//        }
-
         return sb.toString();
 
     }
@@ -540,11 +474,12 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
      *       associated with the {@link IPredicate} and there is no way to
      *       specify the {@link IRangeQuery} flags.
      */
+    @SuppressWarnings("unchecked")
     public IChunkedOrderedIterator<E> eval(final IBigdataFederation<?> fed,
             final IJoinNexus joinNexus) {
 
         // Resolve the relation name to the IRelation object.
-        final IRelation<E> relation = joinNexus
+        final IRelation<E> relation = (IRelation<E>) joinNexus
                 .getTailRelationView(this/* predicate */);
 
         if (relation == null)

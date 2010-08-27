@@ -28,9 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.spo;
 
+import java.util.Map;
 import java.util.Properties;
 
 import com.bigdata.bop.ArrayBindingSet;
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -156,6 +158,20 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
     }
     
     protected static class P extends SPOPredicate {
+
+        /**
+         * Required shallow copy constructor.
+         */
+        public P(final BOp[] values, final Map<String, Object> annotations) {
+            super(values, annotations);
+        }
+
+        /**
+         * Required deep copy constructor.
+         */
+        public P(final P op) {
+            super(op);
+        }
 
         /**
          * @param relation

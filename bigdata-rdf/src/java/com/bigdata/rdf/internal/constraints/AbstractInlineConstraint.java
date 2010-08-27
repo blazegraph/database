@@ -24,7 +24,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.constraints;
 
-import com.bigdata.bop.AbstractBOp;
+import java.util.Map;
+
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
@@ -39,16 +41,28 @@ import com.bigdata.rdf.internal.IVUtility;
  * <p>
  * @see {@link IVUtility#numericalCompare(IV, IV)}. 
  */
-public abstract class AbstractInlineConstraint extends AbstractBOp implements
+public abstract class AbstractInlineConstraint extends BOpBase implements
         IConstraint {
 
-//    private final IVariable<IV> v;
-//    private final IV iv;
-    
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
+
+    /**
+     * Required shallow copy constructor.
+     */
+    public AbstractInlineConstraint(final BOp[] values,
+            final Map<String, Object> annotations) {
+        super(values, annotations);
+    }
+
+    /**
+     * Required deep copy constructor.
+     */
+    public AbstractInlineConstraint(final AbstractInlineConstraint op) {
+        super(op);
+    }
 
     protected AbstractInlineConstraint(final IVariable<IV> v, final IV iv) {
         
@@ -60,24 +74,20 @@ public abstract class AbstractInlineConstraint extends AbstractBOp implements
         if (!IVUtility.canNumericalCompare(iv))
             throw new IllegalArgumentException();
         
-//        this.v = v;
-//        
-//        this.iv = iv;
-        
     }
     
     public boolean accept(final IBindingSet s) {
         
         // get binding for "x".
-        final IConstant<IV> c = s.get((IVariable<IV>) args[0]/* v */);
+        final IConstant<IV> c = s.get((IVariable<IV>) get(0)/* v */);
        
         if (c == null)
             return true; // not yet bound.
 
         final IV term = c.get();
 
-        final IV iv = ((IConstant<IV>) args[1]/* iv */).get();
-        
+        final IV iv = ((IConstant<IV>) get(1)/* iv */).get();
+
         final int compare = IVUtility.numericalCompare(term, iv);
         
         return _accept(compare);

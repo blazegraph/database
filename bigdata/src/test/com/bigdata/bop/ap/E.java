@@ -36,7 +36,7 @@ import com.bigdata.bop.IElement;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-class E implements IElement, Serializable {
+public class E implements IElement, Serializable {
 
     /**
      * 
