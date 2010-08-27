@@ -247,7 +247,7 @@ public class TestQueryEngine extends TestCase2 {
         assertEquals(1L, stats.chunksOut.get());
         
         // Verify no results.
-        final IChunkedIterator<IBindingSet> itr = runningQuery.iterator();
+        final IAsynchronousIterator<IBindingSet[]> itr = runningQuery.iterator();
         try {
             if (itr.hasNext())
                 fail("Not expecting any solutions");
@@ -323,14 +323,18 @@ public class TestQueryEngine extends TestCase2 {
                         -1, //partitionId
                         newBindingSetIterator(EmptyBindingSet.INSTANCE)));
 
-        final IChunkedIterator<IBindingSet> itr = runningQuery.iterator();
+        final IAsynchronousIterator<IBindingSet[]> itr = runningQuery.iterator();
         try {
             int n = 0;
             while (itr.hasNext()) {
-                final IBindingSet e = itr.next();
+                final IBindingSet[] e = itr.next();
                 if (log.isInfoEnabled())
-                    log.info(n + " : " + e);
-                assertEquals(expected[n], e);
+                    log.info(n + " : chunkSize=" + e.length);
+                for (int i = 0; i < e.length; i++) {
+                    if (log.isInfoEnabled())
+                        log.info(n + " : " + e[i]);
+                    assertEquals(expected[n], e[i]);
+                }
                 n++;
             }
         } finally {

@@ -32,7 +32,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.AbstractPipelineOp;
@@ -233,14 +232,10 @@ public class JoinGraph extends AbstractPipelineOp<IBindingSet> implements
 
     }
 
-    public Future<Void> eval(final BOpContext<IBindingSet> context) {
+    public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
-        final FutureTask<Void> ft = new FutureTask<Void>(new JoinGraphTask(context));
+        return new FutureTask<Void>(new JoinGraphTask(context));
 
-        context.getIndexManager().getExecutorService().execute(ft);
-
-        return ft;
-        
     }
 
     /**

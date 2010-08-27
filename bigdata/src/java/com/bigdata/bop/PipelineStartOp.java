@@ -71,13 +71,9 @@ public class PipelineStartOp extends AbstractPipelineOp<IBindingSet> implements
         super(args, annotations);
     }
 
-    public Future<Void> eval(final BOpContext<IBindingSet> context) {
+    public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
-        final FutureTask<Void> ft = new FutureTask<Void>(new CopyTask(context));
-
-        context.getIndexManager().getExecutorService().execute(ft);
-
-        return ft;
+        return new FutureTask<Void>(new CopyTask(context));
         
     }
 
