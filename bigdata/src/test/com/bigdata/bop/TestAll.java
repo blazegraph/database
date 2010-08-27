@@ -23,8 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.bop;
 
-
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -69,11 +67,11 @@ public class TestAll extends TestCase {
         // test binding set impls.
         suite.addTestSuite(TestBindingSet.class);
 
-        // @todo unit tests for things like deep copy.
-//        suite.addTest(TestAbstractBOp.class);
-        
-        // @todo counting variables, etc.
-//        suite.addTest(TestBOpUtility.class);
+        // unit tests for ctor existence and deep copy semantics
+        suite.addTestSuite(TestDeepCopy.class);
+
+        // counting variables, etc.
+        suite.addTestSuite(TestBOpUtility.class);
 
         // constraint operators (EQ, NE, etc).
         suite.addTest(com.bigdata.bop.constraint.TestAll.suite());
@@ -86,6 +84,9 @@ public class TestAll extends TestCase {
 
         // join operators.
         suite.addTest(com.bigdata.bop.join.TestAll.suite());
+
+        // query engine.
+        suite.addTest(com.bigdata.bop.engine.TestAll.suite());
 
         // high level query optimization and evaluation.
         suite.addTest(com.bigdata.bop.eval.TestAll.suite());

@@ -6,7 +6,7 @@ import java.util.Comparator;
 /**
  * Comparator for {@link E elements}.
  */
-class EComparator implements Comparator<E>, Serializable {
+public class EComparator implements Comparator<E>, Serializable {
     
     private static final long serialVersionUID = 1L;
 

@@ -33,7 +33,7 @@ import com.bigdata.bop.AbstractChunkedOrderedIteratorOp;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.ChunkedOrderedIteratorOp;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.fed.MapBindingSetsOverShards;
+import com.bigdata.bop.engine.MapBindingSetsOverShards;
 import com.bigdata.rdf.rules.TMUtility;
 import com.bigdata.relation.RelationFusedView;
 import com.bigdata.relation.rule.eval.IJoinNexus;
@@ -117,12 +117,12 @@ public class Union<E> extends AbstractChunkedOrderedIteratorOp<E> {
 
     @SuppressWarnings("unchecked")
     protected ChunkedOrderedIteratorOp<E> left() {
-        return (ChunkedOrderedIteratorOp<E>)args[0];
+        return (ChunkedOrderedIteratorOp<E>)get(0);
     }
     
     @SuppressWarnings("unchecked")
     protected ChunkedOrderedIteratorOp<E> right() {
-        return (ChunkedOrderedIteratorOp<E>)args[1];
+        return (ChunkedOrderedIteratorOp<E>)get(1);
     }
 
     @SuppressWarnings("unchecked")

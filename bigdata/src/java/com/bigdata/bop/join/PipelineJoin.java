@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
-import java.io.IOException;
-import java.nio.channels.ClosedByInterruptException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
@@ -36,79 +34,93 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.TimeUnit;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.AbstractPipelineOp;
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BindingSetPipelineOp;
-import com.bigdata.bop.ChunkedOrderedIteratorOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.join.PipelineJoin.JoinTask.AccessPathTask;
-import com.bigdata.bop.join.PipelineJoin.JoinTask.ChunkTask;
+import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.engine.Haltable;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.journal.AbstractTask;
-import com.bigdata.journal.ConcurrencyManager;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.counters.CAT;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.IIndexStore;
-import com.bigdata.journal.IJournal;
-import com.bigdata.journal.ITx;
-import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStarJoin;
 import com.bigdata.relation.rule.IStarJoin.IStarConstraint;
-import com.bigdata.relation.rule.eval.ChunkTrace;
-import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.pipeline.DistributedJoinTask;
-import com.bigdata.relation.rule.eval.pipeline.IJoinMaster;
 import com.bigdata.relation.rule.eval.pipeline.JoinMasterTask;
-import com.bigdata.relation.rule.eval.pipeline.JoinStats;
-import com.bigdata.relation.rule.eval.pipeline.JoinTaskFactoryTask;
 import com.bigdata.service.DataService;
-import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.IDataService;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
-import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
 /**
- * Pipelined join operator. In order to support pipelining, query plans need to
- * be arranged in a "left-deep" manner.
+ * Pipelined join operator for online (selective) queries. The pipeline join
+ * accepts chunks of binding sets from its left operand, combines each binding
+ * set in turn with the right operand to produce an "asBound" predicate, and
+ * then executes a nested indexed subquery against that asBound predicate,
+ * writing out a new binding set for each element returned by the asBound
+ * predicate which satisfies the join constraint.
+ * <p>
+ * Note: In order to support pipelining, query plans need to be arranged in a
+ * "left-deep" manner and there may not be intervening operators between the
+ * pipeline join operator and the {@link IPredicate} on which it will read.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo There is only one source, even if scale-out, and the {@link JoinTask}
+ *       runs only for the duration of that source. The termination conditions
+ *       for query evaluation are handled outside of the operator
+ *       implementation.
+ *       <p>
+ *       The first join dimension always has a single source - the
+ *       initialBindingSet established by the {@link JoinMasterTask}. Downstream
+ *       join dimensions read from {@link IAsynchronousIterator} (s) from the
+ *       upstream join dimension. When the {@link IIndexManager} allows
+ *       key-range partitions, then the fan-in for the sources may be larger
+ *       than one as there will be one {@link JoinTask} for each index partition
+ *       touched by each join dimension.
+ * @todo provide more control over the access path (fully buffered read thresholds).
+ * @todo Do we need to hook the source and sink {@link Future}s?
+ * 
+ * @todo Break the star join logic out into its own join operator.
+ * 
+ * @todo Implement operator at a time or mega-chunk pipeline operators for high
+ *       volume query. These will differ by running across the entire shard on
+ *       the right hand operator using multi-block IO each time they process a
+ *       (mega-)chunk of bindings from the left hand operator.
  */
 public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
         BindingSetPipelineOp {
 
-    static protected final Logger log = Logger.getLogger(PipelineJoin.class);
+    static private final Logger log = Logger.getLogger(PipelineJoin.class);
 
     /**
      * 
@@ -116,17 +128,141 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
     private static final long serialVersionUID = 1L;
 
     /**
+     * @todo Declare annotations for joins. There will need to be an interface
+     *       for join operators where we can declare this stuff.
+     *       <p>
+     *       An operator-at-a-time or mega-chunk join operator might have
+     *       additional annotations.
+     *       <p>
+     *       Declare maxParallel, variablesToKeep (or null for all).
+     */
+    public interface Annotations extends BindingSetPipelineOp.Annotations {
+
+        /**
+         * An optional {@link IVariable}[] identifying the variables to be
+         * retained in the {@link IBindingSet}s written out by the operator.
+         * All variables are retained unless this annotation is specified.
+         */
+        String SELECT = PipelineJoin.class.getName() + ".constraints";
+        
+        /**
+         * An optional {@link IConstraint}[] which places restrictions on the
+         * legal patterns in the variable bindings.
+         */
+        String CONSTRAINTS = PipelineJoin.class.getName() + ".constraints";
+
+        /**
+         * Marks the join as "optional" in the SPARQL sense. Binding sets which
+         * fail the join will be routed to the alternative sink as specified by
+         * {@link BindingSetPipelineOp.Annotations#ALT_SINK_REF}.
+         */
+        String OPTIONAL = PipelineJoin.class.getName() + ".optional";
+
+    }
+
+    /**
+     * Extended statistics for the join operator.
+     */
+    public static class PipelineJoinStats extends BOpStats {
+
+        private static final long serialVersionUID = 1L;
+        
+        /**
+         * The #of duplicate access paths which were detected and filtered out.
+         */
+        public final CAT accessPathDups = new CAT();
+        /**
+         * The #of access paths which were evaluated.
+         */
+        public final CAT accessPathCount = new CAT();
+        
+        /**
+         * The #of chunks read from an {@link IAccessPath}.
+         */
+        public final CAT chunkCount = new CAT();
+        
+        /**
+         * The #of elements read from an {@link IAccessPath}.
+         */
+        public final CAT elementCount = new CAT();
+
+        /**
+         * The maximum observed fan in for this join dimension (maximum #of
+         * sources observed writing on any join task for this join dimension).
+         * Since join tasks may be closed and new join tasks re-opened for the
+         * same query, join dimension and index partition, and since each join
+         * task for the same join dimension could, in principle, have a
+         * different fan in based on the actual binding sets propagated this is
+         * not necessarily the "actual" fan in for the join dimension. You would
+         * have to track the #of distinct partitionId values to track that.
+         */
+        public int fanIn;
+
+        /**
+         * The maximum observed fan out for this join dimension (maximum #of
+         * sinks on which any join task is writing for this join dimension).
+         * Since join tasks may be closed and new join tasks re-opened for the
+         * same query, join dimension and index partition, and since each join
+         * task for the same join dimension could, in principle, have a
+         * different fan out based on the actual binding sets propagated this is
+         * not necessarily the "actual" fan out for the join dimension.
+         */
+        public int fanOut;
+
+        public void add(final BOpStats o) {
+
+            super.add(o);
+            
+            if (o instanceof PipelineJoinStats) {
+
+                /*
+                 * @todo Should there be an AccessPathStats object which just
+                 * gets passed into each access path evaluation?
+                 */
+                final PipelineJoinStats t = (PipelineJoinStats) o;
+
+                accessPathDups.add(t.accessPathDups.get());
+
+                accessPathCount.add(t.accessPathCount.get());
+
+                chunkCount.add(t.chunkCount.get());
+
+                elementCount.add(t.elementCount.get());
+
+                if (t.fanIn > this.fanIn) {
+                    // maximum reported fanIn for this join dimension.
+                    this.fanIn = t.fanIn;
+                }
+                if (t.fanOut > this.fanOut) {
+                    // maximum reported fanOut for this join dimension.
+                    this.fanOut += t.fanOut;
+                }
+
+            }
+            
+        }
+        
+        @Override
+        protected void toString(final StringBuilder sb) {
+            sb.append(",accessPathDups=" + accessPathDups.estimate_get());
+            sb.append(",accessPathCount=" + accessPathCount.estimate_get());
+            sb.append(",chunkCount=" + chunkCount.estimate_get());
+            sb.append(",elementCount=" + elementCount.estimate_get());
+        }
+        
+    }
+    
+    /**
      * @param left
      *            The left operand, which must be an {@link IBindingSet}
      *            pipeline operator, such as another {@link PipelineJoin}.
      * @param right
-     *            The right operand, which must be an "element" pipeline
-     *            operator, such as an {@link IPredicate}.
+     *            The right operand, which must be an {@link IPredicate}.
+     * 
      * @param annotations
      */
-    protected PipelineJoin(final BindingSetPipelineOp left,
-            final ChunkedOrderedIteratorOp<?> right,
-            final Map<String, Object> annotations) {
+    public PipelineJoin(final BindingSetPipelineOp left,
+            final IPredicate<?> right, final Map<String, Object> annotations) {
 
         super(new BOp[] { left, right }, annotations);
 
@@ -138,257 +274,227 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
     }
 
-    public Future<Void> eval(IBigdataFederation<?> fed, IJoinNexus joinNexus,
-            IBlockingBuffer<IBindingSet[]> buffer) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException();
+    protected BindingSetPipelineOp left() {
+
+        return (BindingSetPipelineOp) get(0);
+
+    }
+
+    protected IPredicate<?> right() {
+
+        return (IPredicate<?>) get(1);
+
     }
 
     /**
-     * Consumes {@link IBindingSet} chunks from the previous join dimension.
-     * <p>
-     * Note: Instances of this class MUST be created on the {@link IDataService}
-     * that is host to the index partition on the task will read and they MUST run
-     * inside of an {@link AbstractTask} on the {@link ConcurrencyManager} in order
-     * to have access to the local index object for the index partition.
-     * <p>
-     * This class is NOT serializable.
-     * <p>
-     * For a rule with 2 predicates, there will be two {@link JoinTask}s. The
-     * {@link #orderIndex} is ZERO (0) for the first {@link JoinTask} and ONE (1)
-     * for the second {@link JoinTask}. The first {@link JoinTask} will have a
-     * single initialBinding from the {@link JoinMasterTask} and will read on the
-     * {@link IAccessPath} for the first {@link IPredicate} in the evaluation
-     * {@link #order}. The second {@link JoinTask} will read chunks of
-     * {@link IBindingSet}s containing partial solutions from the first
-     * {@link JoinTask} and will obtain and read on an {@link IAccessPath} for the
-     * second predicate in the evaluation order for every partial solution. Since
-     * there are only two {@link IPredicate}s in the {@link IRule}, the second and
-     * last {@link JoinTask} will write on the {@link ISolution} buffer obtained
-     * from {@link JoinMasterTask#getSolutionBuffer()}. Each {@link JoinTask} will
-     * report its {@link JoinStats} to the master, which aggregates those
-     * statistics.
-     * <p>
-     * Note: {@link ITx#UNISOLATED} requests will deadlock if the same query uses
-     * the same access path for two predicates! This is because the first such join
-     * dimension in the evaluation order will obtain an exclusive lock on an index
-     * partition making it impossible for another {@link JoinTask} to obtain an
-     * exclusive lock on the same index partition. This is not a problem if you are
-     * using read-consistent timestamps!
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * @todo Allow the access paths to be consumed in parallel. this would let us
-     *       use more threads for join dimensions that had to test more source
-     *       binding sets.
-     *       <p>
-     *       Parallel {@link AccessPathTask} processing is useful when each
-     *       {@link AccessPathTask} consumes only a small chunk and there are a
-     *       large #of source binding sets to be processed. In this case,
-     *       parallelism reduces the overall latency by allowing threads to progress
-     *       as soon as the data can be materialized from the index.
-     *       {@link AccessPathTask} parallelism is realized by submitting each
-     *       {@link AccessPathTask} to a service imposing a parallelism limit on the
-     *       shared {@link IIndexStore#getExecutorService()}. Since the
-     *       {@link AccessPathTask}s are concurrent, each one requires its own
-     *       {@link UnsynchronizedOutputBuffer} on which it will place any accepted
-     *       {@link IBindingSet}s. Once an {@link AccessPathTask} completes, its
-     *       buffer may be reused by the next {@link AccessPathTask} assigned to a
-     *       worker thread (this reduces heap churn and allows us to assemble full
-     *       chunks when each {@link IAccessPath} realizes only a few accepted
-     *       {@link IBindingSet}s). For an {@link ExecutorService} with a
-     *       parallelism limit of N, there are therefore N
-     *       {@link UnsynchronizedOutputBuffer}s. Those buffers must be flushed when
-     *       the {@link JoinTask} exhausts its source(s). If the same set of threads
-     *       is not known to be reused for each {@link AccessPathTask} then the
-     *       actual #of buffers will be the #of distinct threads used. To reduce the
-     *       potential memory demand. striped locks could be used to protect a pool
-     *       of {@link UnsynchronizedArrayBuffer}s, but could lead to deadlock if
-     *       the buffer reference was exposed to the task (as opposed to adding the
-     *       object to the buffer within a private method, which hides that
-     *       reference) since there more than one thread demanding access to the
-     *       same buffer.
-     * 
-     * @todo Parallel {@link ChunkTask} processing may be useful when an
-     *       {@link AccessPathTask} will consume a large #of chunks. Since the
-     *       {@link IAccessPath#iterator()} is NOT thread-safe, reads on the
-     *       {@link IAccessPath} must be sequential, but the chunks read from the
-     *       {@link IAccessPath} can be placed onto a queue and parallel
-     *       {@link ChunkTask}s can drain that queue, consuming the chunks. This can
-     *       help by reducing the latency to materialize any given chunk.
-     *       <p>
-     *       The required change is to have a per-thread
-     *       {@link UnsynchronizedArrayBuffer} feeding a thread-safe
-     *       {@link UnsyncDistributedOutputBuffer} (potentially via a queue) which
-     *       maps each generated binding set across the index partition(s) for the
-     *       sink {@link JoinTask}s.
+     * @see Annotations#CONSTRAINTS
      */
-    abstract public class JoinTask implements Callable<Void> {
+    protected IConstraint[] constraints() {
 
-        /** The rule that is being evaluated. */
-        final protected IRule<?> rule;
+        return getProperty(Annotations.CONSTRAINTS, null/* defaultValue */);
 
-        /**
-         * The #of predicates in the tail of that rule.
-         */
-        final protected int tailCount;
+    }
 
-        /**
-         * The index partition on which this {@link JoinTask} is reading -or-
-         * <code>-1</code> if the deployment does not support key-range
-         * partitioned indices.
-         */
-        final protected int partitionId;
+    /**
+     * @see Annotations#OPTIONAL
+     */
+    protected boolean isOptional() {
 
-        /**
-         * The tail index in the rule for the predicate on which we are reading
-         * for this join dimension.
-         */
-        final protected int tailIndex;
+        return getProperty(Annotations.OPTIONAL, Boolean.FALSE);
 
-        /**
-         * The {@link IPredicate} on which we are reading for this join
-         * dimension.
-         */
-        final protected IPredicate<?> predicate;
+    }
 
-        /**
-         * The {@link IRelation} view on which we are reading for this join
-         * dimensions.
-         */
-        final protected IRelation<?> relation;
+    /**
+     * @see Annotations#SELECT
+     */
+    protected IVariable<?>[] variablesToKeep() {
 
-        /**
-         * The index into the evaluation {@link #order} for the predicate on
-         * which we are reading for this join dimension.
-         */
-        final protected int orderIndex;
+        return getProperty(Annotations.SELECT, null/* defaultValue */);
 
-        /**
-         * <code>true</code> iff this is the last join dimension in the
-         * evaluation order.
-         */
-        final protected boolean lastJoin;
+    }
 
-        /**
-         * A proxy for the remote {@link JoinMasterTask}.
-         */
-        final protected IJoinMaster masterProxy;
+    @Override
+    public PipelineJoinStats newStats() {
 
-        final protected UUID masterUUID;
+        return new PipelineJoinStats();
+        
+    }
+    
+    public Future<Void> eval(final BOpContext<IBindingSet> context) {
+
+        final FutureTask<Void> ft = new FutureTask<Void>(new JoinTask(this,
+                context));
+
+        context.getIndexManager().getExecutorService().execute(ft);
+
+        return ft;
+        
+    }
+
+    /**
+     * Pipeline join impl.
+     */
+    private static class JoinTask extends Haltable<Void> implements Callable<Void> {
+
+//        /**
+//         * The federation reference is passed along when we evaluate the
+//         * {@link #left} operand.
+//         */
+//        final protected IBigdataFederation<?> fed;
         
         /**
-         * A list of variables required for each tail, by tailIndex. Used to filter 
-         * downstream variable binding sets.  
+         * The join that is being executed.
          */
-        final protected IVariable<?>[][] requiredVars;
+        final protected PipelineJoin joinOp;
+
+        /**
+         * The constraint (if any) specified for the join operator.
+         */
+        final IConstraint[] constraints;
+
+        /**
+         * True iff the {@link #right} operand is an optional pattern (aka if
+         * this is a SPARQL style left join).
+         */
+        final boolean optional;
+
+        /**
+         * The alternative sink to use when the join is {@link #optional} but
+         * the failed joined needs to jump out of a join group rather than
+         * routing directly to the ancestor in the operator tree.
+         * 
+         * @todo Support for the {@link #optionalSink} is not finished. When the
+         *       optional target is not simply the direct ancestor in the
+         *       operator tree then we need to have a separate thread local
+         *       buffering in front of the optional sink for the join task. This
+         *       means that we need to use two {@link #threadLocalBufferFactory}
+         *       s, one for the optional path. All of this only matters when the
+         *       binding sets are being routed out of an optional join group.
+         *       When the tails are independent optionals then the target is the
+         *       same as the target for binding sets which do join.
+         */
+        final IBlockingBuffer<IBindingSet[]> optionalSink;
         
         /**
-         * The {@link IJoinNexus} for the local {@link IIndexManager}, which
-         * will be the live {@link IJournal}. This {@link IJoinNexus} MUST have
-         * access to the local index objects, which means that class MUST be run
-         * inside of the {@link ConcurrencyManager}. The {@link #joinNexus} is
-         * created from the {@link #joinNexusFactory} once the task begins to
-         * execute.
+         * The variables to be retained by the join operator. Variables not
+         * appearing in this list will be stripped before writing out the
+         * binding set onto the {@link #sink}.
          */
-        protected IJoinNexus joinNexus;
+        final IVariable<?>[] variablesToKeep;
 
         /**
-         * Volatile flag is set <code>true</code> if the {@link JoinTask}
-         * (including any tasks executing on its behalf) should halt. This flag
-         * is monitored by the {@link BindingSetConsumerTask}, the
-         * {@link AccessPathTask}, and the {@link ChunkTask}. It is set by any
-         * of those tasks if they are interrupted or error out.
-         * 
-         * @todo review handling of this flag. Should an exception always be
-         *       thrown if the flag is set wrapping the {@link #firstCause}?
-         *       Are there any cases where the behavior should be different?
-         *       If not, then replace tests with halt() and encapsulate the
-         *       logic in that method.
+         * The source for the binding sets.
          */
-        volatile protected boolean halt = false;
+        final BindingSetPipelineOp left;
 
         /**
-         * Set by {@link BindingSetConsumerTask}, {@link AccessPathTask}, and
-         * {@link ChunkTask} if they throw an error. Tasks are required to use
-         * an {@link AtomicReference#compareAndSet(Object, Object)} and must
-         * specify <code>null</code> as the expected value. This ensures that
-         * only the first cause is recorded by this field.
+         * The source for the elements to be joined.
          */
-        final protected AtomicReference<Throwable> firstCause = new AtomicReference<Throwable>(
-                null);
+        final IPredicate<?> right;
 
         /**
-         * Indicate that join processing should halt.  This method is written
-         * defensively and will not throw anything.
-         * 
-         * @param cause
-         *            The cause.
+         * The relation associated with the {@link #right} operand.
          */
-        protected void halt(final Throwable cause) {
-
-            halt = true;
-
-            final boolean isFirstCause = firstCause.compareAndSet(null/* expect */, cause);
-
-            if (log.isEnabledFor(Level.WARN))
-
-                try {
-
-                    if (!InnerCause.isInnerCause(cause, InterruptedException.class)
-                            && !InnerCause.isInnerCause(cause,
-                                    CancellationException.class)
-                            && !InnerCause.isInnerCause(cause,
-                                    ClosedByInterruptException.class)
-                            && !InnerCause.isInnerCause(cause,
-                                    RejectedExecutionException.class)
-                            && !InnerCause.isInnerCause(cause,
-                                    BufferClosedException.class)) {
-
-                        /*
-                         * This logs all unexpected causes, not just the first one
-                         * to be reported for this join task.
-                         * 
-                         * Note: The master will log the firstCause that it receives
-                         * as an error.
-                         */
-
-                        log.warn("orderIndex=" + orderIndex + ", partitionId="
-                                + partitionId + ", isFirstCause=" + isFirstCause
-                                + " : " + cause.getLocalizedMessage(), cause);
-
-                    }
-
-                } catch (Throwable ex) {
-
-                    // error in logging system - ignore.
-
-                }
-
-        }
-
+        final IRelation<?> relation;
+        
         /**
-         * The evaluation order. {@link #orderIndex} is the index into this
-         * array. The {@link #orderIndex} is zero (0) for the first join
-         * dimension and is incremented by one for each subsequent join
-         * dimension. The value at <code>order[orderIndex]</code> is the index
-         * of the tail predicate that will be evaluated at a given
-         * {@link #orderIndex}.
+         * The partition identifier -or- <code>-1</code> if we are not reading
+         * on an index partition.
          */
-        final int[] order;
+        final int partitionId;
+        
+        /**
+         * The evaluation context.
+         */
+        final protected BOpContext<IBindingSet> context;
+
+//        /**
+//         * Volatile flag is set <code>true</code> if the {@link JoinTask}
+//         * (including any tasks executing on its behalf) should halt. This flag
+//         * is monitored by the {@link BindingSetConsumerTask}, the
+//         * {@link AccessPathTask}, and the {@link ChunkTask}. It is set by any
+//         * of those tasks if they are interrupted or error out.
+//         * 
+//         * @todo review handling of this flag. Should an exception always be
+//         *       thrown if the flag is set wrapping the {@link #firstCause}? Are
+//         *       there any cases where the behavior should be different? If not,
+//         *       then replace tests with halt() and encapsulate the logic in
+//         *       that method.
+//         */
+//        volatile protected boolean halt = false;
+//
+//        /**
+//         * Set by {@link BindingSetConsumerTask}, {@link AccessPathTask}, and
+//         * {@link ChunkTask} if they throw an error. Tasks are required to use
+//         * an {@link AtomicReference#compareAndSet(Object, Object)} and must
+//         * specify <code>null</code> as the expected value. This ensures that
+//         * only the first cause is recorded by this field.
+//         */
+//        final protected AtomicReference<Throwable> firstCause = new AtomicReference<Throwable>(
+//                null);
+//
+//        /**
+//         * Indicate that join processing should halt. This method is written
+//         * defensively and will not throw anything.
+//         * 
+//         * @param cause
+//         *            The cause.
+//         */
+//        protected void halt(final Throwable cause) {
+//
+//            halt = true;
+//
+//            final boolean isFirstCause = firstCause.compareAndSet(
+//                    null/* expect */, cause);
+//
+//            if (log.isEnabledFor(Level.WARN))
+//
+//                try {
+//
+//                    if (!InnerCause.isInnerCause(cause,
+//                            InterruptedException.class)
+//                            && !InnerCause.isInnerCause(cause,
+//                                    CancellationException.class)
+//                            && !InnerCause.isInnerCause(cause,
+//                                    ClosedByInterruptException.class)
+//                            && !InnerCause.isInnerCause(cause,
+//                                    RejectedExecutionException.class)
+//                            && !InnerCause.isInnerCause(cause,
+//                                    BufferClosedException.class)) {
+//
+//                        /*
+//                         * This logs all unexpected causes, not just the first
+//                         * one to be reported for this join task.
+//                         * 
+//                         * Note: The master will log the firstCause that it
+//                         * receives as an error.
+//                         */
+//
+//                        log.warn("joinOp=" + joinOp + ", isFirstCause="
+//                                + isFirstCause + " : "
+//                                + cause.getLocalizedMessage(), cause);
+//
+//                    }
+//
+//                } catch (Throwable ex) {
+//
+//                    // error in logging system - ignore.
+//
+//                }
+//
+//        }
 
         /**
          * The statistics for this {@link JoinTask}.
          */
-        final JoinStats stats;
+        final PipelineJoinStats stats;
 
         /**
-         * A factory pattern for per-thread objects whose life cycle is tied to some
-         * container. For example, there may be an instance of this pool for a
-         * {@link JoinTask} or an {@link AbstractBTree}. The pool can be torn down
-         * when the container is torn down, which prevents its thread-local
-         * references from escaping.
+         * A factory pattern for per-thread objects whose life cycle is tied to
+         * some container. For example, there may be an instance of this pool
+         * for a {@link JoinTask} or an {@link AbstractBTree}. The pool can be
+         * torn down when the container is torn down, which prevents its
+         * thread-local references from escaping.
          * 
          * @author thompsonbry@users.sourceforge.net
          * @param <T>
@@ -398,10 +504,11 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
          *       abstract base class: one based on a private
          *       {@link ConcurrentHashMap} and the other on striped locks. The
          *       advantage of the {@link ConcurrentHashMap} is approximately 3x
-         *       higher concurrency. The advantage of striped locks is that you can
-         *       directly manage the #of buffers when when the threads using those
-         *       buffers is unbounded. However, doing so could lead to deadlock
-         *       since two threads can be hashed onto the same buffer object.
+         *       higher concurrency. The advantage of striped locks is that you
+         *       can directly manage the #of buffers when when the threads using
+         *       those buffers is unbounded. However, doing so could lead to
+         *       deadlock since two threads can be hashed onto the same buffer
+         *       object.
          */
         abstract public class ThreadLocalFactory<T extends IBuffer<E>, E> {
 
@@ -411,13 +518,13 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
             private final ConcurrentHashMap<Thread, T> map;
 
             /**
-             * A list of all objects visible to the caller. This is used to ensure
-             * that any objects allocated by the factory are visited.
+             * A list of all objects visible to the caller. This is used to
+             * ensure that any objects allocated by the factory are visited.
              * 
-             * <p>Note: Since the
-             * collection is not thread-safe, synchronization is required when
-             * adding to the collection and when visiting the elements of the
-             * collection.
+             * <p>
+             * Note: Since the collection is not thread-safe, synchronization is
+             * required when adding to the collection and when visiting the
+             * elements of the collection.
              */
             private final LinkedList<T> list = new LinkedList<T>();
 
@@ -430,8 +537,8 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
             protected ThreadLocalFactory(final int initialCapacity,
                     final float loadFactor, final int concurrencyLevel) {
 
-                map = new ConcurrentHashMap<Thread, T>(initialCapacity, loadFactor,
-                        concurrencyLevel);
+                map = new ConcurrentHashMap<Thread, T>(initialCapacity,
+                        loadFactor, concurrencyLevel);
 
             }
 
@@ -453,7 +560,7 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
              * @throws IllegalStateException
              *             if the factory is asynchronously closed.
              */
-            public void add(E e) {
+            public void add(final E e) {
 
                 get().add(e);
 
@@ -473,19 +580,18 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
                 if (tmp == null) {
                     if (map.put(t, tmp = initialValue()) != null) {
                         /*
-                         * Note: Since the key is the thread it is not possible for
-                         * there to be a concurrent put of an entry under the same
-                         * key so we do not have to use putIfAbsent().
+                         * Note: Since the key is the thread it is not possible
+                         * for there to be a concurrent put of an entry under
+                         * the same key so we do not have to use putIfAbsent().
                          */
                         throw new AssertionError();
                     }
                     // Add to list.
-                    synchronized(list) {
+                    synchronized (list) {
                         list.add(tmp);
                     }
                 }
-                if (halt)
-                    throw new RuntimeException(firstCause.get());
+                halted();
                 return tmp;
             }
 
@@ -501,8 +607,7 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
                     int n = 0;
                     long m = 0L;
                     for (T b : list) {
-                        if (halt)
-                            throw new RuntimeException(firstCause.get());
+                        halted();
                         // #of elements to be flushed.
                         final int size = b.size();
                         // flush, returning total #of elements written onto this
@@ -510,10 +615,10 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
                         final long counter = b.flush();
                         m += counter;
                         if (log.isDebugEnabled())
-                            log.debug("Flushed buffer: size=" + size + ", counter="
-                                    + counter);
+                            log.debug("Flushed buffer: size=" + size
+                                    + ", counter=" + counter);
                     }
-                    if (log.isDebugEnabled())
+                    if (log.isInfoEnabled())
                         log.info("Flushed " + n
                                 + " unsynchronized buffers totalling " + m
                                 + " elements");
@@ -524,8 +629,8 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
              * Reset each of the synchronized buffers, discarding their buffered
              * writes.
              * <p>
-             * Note: This method is used during error processing, therefore it DOES
-             * NOT check {@link JoinTask#halt}.
+             * Note: This method is used during error processing, therefore it
+             * DOES NOT check {@link JoinTask#halt}.
              */
             public void reset() {
                 synchronized (list) {
@@ -543,22 +648,24 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
                 }
             }
 
-//          /**
-//           * Reset the per-{@link Thread} unsynchronized output buffers (used as
-//           * part of error handling for the {@link JoinTask}).
-//           */
-//          final protected void resetUnsyncBuffers() throws Exception {
-        //
-//              final int n = threadLocalBufferFactory.reset();
-//                      .close(new Visitor<AbstractUnsynchronizedArrayBuffer<IBindingSet>>() {
-        //
-//                          @Override
-//                          public void meet(
-//                                  final AbstractUnsynchronizedArrayBuffer<IBindingSet> b)
-//                                  throws Exception {
-        //
-        //
-//          }
+            // /**
+            // * Reset the per-{@link Thread} unsynchronized output buffers
+            // (used as
+            // * part of error handling for the {@link JoinTask}).
+            // */
+            // final protected void resetUnsyncBuffers() throws Exception {
+            //
+            // final int n = threadLocalBufferFactory.reset();
+            // .close(new
+            // Visitor<AbstractUnsynchronizedArrayBuffer<IBindingSet>>() {
+            //
+            // @Override
+            // public void meet(
+            // final AbstractUnsynchronizedArrayBuffer<IBindingSet> b)
+            // throws Exception {
+            //
+            //
+            // }
 
             /**
              * Create and return a new object.
@@ -577,61 +684,38 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
             }
         };
-        
-        /**
-         * A method used by the {@link #threadLocalBufferFactory} to create new
-         * output buffer as required. The output buffer will be used to
-         * aggregate {@link IBindingSet}s generated by this {@link JoinTask}.
-         * <p>
-         * Note: A different implementation class must be used depending on
-         * whether or not this is the last join dimension for the query (when it
-         * is, then we write on the solution buffer) and whether or not the
-         * target join index is key-range partitioned (when it is, each binding
-         * set is mapped across the sink {@link JoinTask}(s)).
-         */
-        abstract protected AbstractUnsynchronizedArrayBuffer<IBindingSet> newUnsyncOutputBuffer();
-
-        /**
-         * The buffer on which the last predicate in the evaluation order will
-         * write its {@link ISolution}s.
-         * 
-         * @return The buffer.
-         * 
-         * @throws IllegalStateException
-         *             unless {@link #lastJoin} is <code>true</code>.
-         */
-        abstract protected IBuffer<ISolution[]> getSolutionBuffer();
-
-        /**
-         * Return the index of the tail predicate to be evaluated at the given
-         * index in the evaluation order.
-         * 
-         * @param orderIndex
-         *            The evaluation order index.
-         * 
-         * @return The tail index to be evaluated at that index in the
-         *         evaluation order.
-         */
-        final protected int getTailIndex(final int orderIndex) {
-
-            assert order != null;
-
-            final int tailIndex = order[orderIndex];
-
-            assert orderIndex >= 0 && orderIndex < tailCount : "orderIndex="
-                    + orderIndex + ", rule=" + rule;
-
-            return tailIndex;
-
-        }
 
         public String toString() {
 
-            return getClass().getName() + "{ orderIndex=" + orderIndex
-                    + ", partitionId=" + partitionId + ", lastJoin=" + lastJoin
-                    + ", masterUUID=" + masterUUID + "}";
+            return getClass().getName() + "{ joinOp=" + joinOp + "}";
 
         }
+
+        /**
+         * The source from which we read the binding set chunks.
+         * <p>
+         * Note: In keeping with the top-down evaluation of the operator tree
+         * the source should not be set until we begin to execute the
+         * {@link #left} operand and that should not happen until we are in
+         * {@link #call()} in order to ensure that the producer will be
+         * terminated if there is a problem setting up this join. Given that, it
+         * might need to be an atomic reference or volatile or the like.
+         */
+        final private IAsynchronousIterator<IBindingSet[]> source;
+
+        /**
+         * Where the join results are written.
+         * <p>
+         * Chunks of bindingSets are written pre-Thread unsynchronized buffers
+         * by {@link ChunkTask}. Those unsynchronized buffers overflow onto the
+         * per-JoinTask {@link #sink}, which is a thread-safe
+         * {@link IBlockingBuffer}. The downstream pipeline operator drains that
+         * {@link IBlockingBuffer} using its iterator(). When the {@link #sink}
+         * is closed and everything in it has been drained, then the downstream
+         * operator will conclude that no more bindingSets are available and it
+         * will terminate.
+         */
+        final private IBlockingBuffer<IBindingSet[]> sink;
 
         /**
          * Instances of this class MUST be created in the appropriate execution
@@ -639,62 +723,45 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
          * the joinNexus references are both correct and so that it has access
          * to the local index object for the specified index partition.
          * 
-         * @param concurrencyManager
-         * @param indexName
-         * @param rule
+         * @param joinOp
          * @param joinNexus
-         * @param order
-         * @param orderIndex
-         * @param partitionId
-         *            The index partition identifier and <code>-1</code> if
-         *            the deployment does not support key-range partitioned
-         *            indices.
-         * @param masterProxy
-         * 
-         * @see JoinTaskFactoryTask
+         * @param sink
+         *            The sink on which the {@link IBindingSet} chunks are
+         *            written.
+         * @param requiredVars
          */
-        public JoinTask(/*final String indexName,*/ final IRule rule,
-                final IJoinNexus joinNexus, final int[] order,
-                final int orderIndex, final int partitionId,
-                final IJoinMaster masterProxy, final UUID masterUUID,
-                final IVariable[][] requiredVars) {
+        public JoinTask(//
+                final PipelineJoin joinOp,//
+                final BOpContext<IBindingSet> context
+                ) {
 
-            if (rule == null)
+            if (joinOp == null)
                 throw new IllegalArgumentException();
-            if (joinNexus == null)
-                throw new IllegalArgumentException();
-            final int tailCount = rule.getTailCount();
-            if (order == null)
-                throw new IllegalArgumentException();
-            if (order.length != tailCount)
-                throw new IllegalArgumentException();
-            if (orderIndex < 0 || orderIndex >= tailCount)
-                throw new IllegalArgumentException();
-            if (masterProxy == null)
-                throw new IllegalArgumentException();
-            if (masterUUID == null)
-                throw new IllegalArgumentException();
-            if (requiredVars == null)
+            if (context == null)
                 throw new IllegalArgumentException();
 
-            this.rule = rule;
-            this.partitionId = partitionId;
-            this.tailCount = tailCount;
-            this.orderIndex = orderIndex;
-            this.joinNexus = joinNexus;
-            this.order = order; // note: assign before using getTailIndex()
-            this.tailIndex = getTailIndex(orderIndex);
-            this.lastJoin = ((orderIndex + 1) == tailCount);
-            this.predicate = rule.getTail(tailIndex);
-            this.relation = joinNexus.getTailRelationView(predicate);
-            this.stats = new JoinStats(partitionId, orderIndex);
-            this.masterProxy = masterProxy;
-            this.masterUUID = masterUUID;
-            this.requiredVars = requiredVars;
+//            this.fed = context.getFederation();
+            this.joinOp = joinOp;
+            this.left = joinOp.left();
+            this.right = joinOp.right();
+            this.constraints = joinOp.constraints();
+            this.optional = joinOp.isOptional();
+            this.variablesToKeep = joinOp.variablesToKeep();
+            this.context = context;
+            /*
+             * FIXME Carefully review which index manager (local versus fed) is
+             * being used to resolve the relation. Also note that we used to
+             * cache the resourceLocator.
+             */
+            this.relation = context.getReadRelation(right);
+            this.source = context.getSource();
+            this.sink = context.getSink();
+            this.optionalSink = context.getSink2();
+            this.partitionId = context.getPartitionId();
+            this.stats = (PipelineJoinStats) context.getStats();
 
             if (log.isDebugEnabled())
-                log.debug("orderIndex=" + orderIndex + ", partitionId="
-                        + partitionId);
+                log.debug("joinOp=" + joinOp);
 
         }
 
@@ -706,34 +773,27 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
         public Void call() throws Exception {
 
             if (log.isDebugEnabled())
-                log.debug("orderIndex=" + orderIndex + ", partitionId="
-                        + partitionId);
+                log.debug("joinOp=" + joinOp);
 
             try {
 
                 /*
                  * Consume bindingSet chunks from the source JoinTask(s).
                  */
-                consumeSources();
+                consumeSource();
 
                 /*
-                 * Flush and close output buffers and wait for all sink
-                 * JoinTasks to complete.
+                 * Flush and close the thread-local output buffers.
                  */
-
-                // flush the unsync buffers.
-//                flushUnsyncBuffers();
                 threadLocalBufferFactory.flush();
 
-                // flush the sync buffer and await the sink JoinTasks
+                // flush the sync buffer
                 flushAndCloseBuffersAndAwaitSinks();
 
                 if (log.isDebugEnabled())
-                    log.debug("JoinTask done: orderIndex=" + orderIndex
-                            + ", partitionId=" + partitionId + ", halt=" + halt
-                            + "firstCause=" + firstCause.get());
-                if (halt)
-                    throw new RuntimeException(firstCause.get());
+                    log.debug("JoinTask done: joinOp=" + joinOp);
+
+                halted();
 
                 return null;
 
@@ -744,7 +804,7 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
                 } catch (Throwable t2) {
                     log.error(t2.getLocalizedMessage(), t2);
                 }
-                
+
                 /*
                  * This is used for processing errors and also if this task is
                  * interrupted (because a SLICE has been satisfied).
@@ -765,7 +825,7 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
                 // reset the unsync buffers.
                 try {
-//                    resetUnsyncBuffers();
+                    // resetUnsyncBuffers();
                     threadLocalBufferFactory.reset();
                 } catch (Throwable t2) {
                     log.error(t2.getLocalizedMessage(), t2);
@@ -778,12 +838,12 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
                     log.error(t2.getLocalizedMessage(), t2);
                 }
 
-                // report join stats _before_ we close our source(s).
-                try {
-                    reportOnce();
-                } catch (Throwable t2) {
-                    log.error(t2.getLocalizedMessage(), t2);
-                }
+//                // report join stats _before_ we close our source(s).
+//                try {
+//                    reportOnce();
+//                } catch (Throwable t2) {
+//                    log.error(t2.getLocalizedMessage(), t2);
+//                }
 
                 /*
                  * Close source iterators, which will cause any source JoinTasks
@@ -801,269 +861,270 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
             } finally {
 
-                // report join stats iff they have not already been reported.
-                reportOnce();
+//                // report join stats iff they have not already been reported.
+//                reportOnce();
 
             }
 
         }
 
         /**
-         * Method is used to log the primary exception thrown by {@link #call()}.
-         * The default implementation does nothing and the exception will be logged
-         * by the {@link JoinMasterTask}. However, this method is overridden by
-         * {@link DistributedJoinTask} so that the exception can be logged on the
-         * host and {@link DataService} where it originates. This appears to be
-         * necessary in order to trace back the cause of an exception which can
-         * otherwise be obscured (or even lost?) in a deeply nested RMI stack trace.
+         * Method is used to log the primary exception thrown by {@link #call()}
+         * . The default implementation does nothing and the exception will be
+         * logged by the {@link JoinMasterTask}. However, this method is
+         * overridden by {@link DistributedJoinTask} so that the exception can
+         * be logged on the host and {@link DataService} where it originates.
+         * This appears to be necessary in order to trace back the cause of an
+         * exception which can otherwise be obscured (or even lost?) in a deeply
+         * nested RMI stack trace.
          * 
          * @param o
          * @param t
          */
         protected void logCallError(Throwable t) {
-            
-        }
-
-        /**
-         * Method reports {@link JoinStats} to the {@link JoinMasterTask}, but
-         * only if they have not already been reported. This "report once"
-         * constraint is used to make it safe to invoke during error handling
-         * before actions which could cause the source {@link JoinTask}s (and
-         * hence the {@link JoinMasterTask}) to terminate.
-         */
-        protected void reportOnce() {
-
-            if (!didReport) {
-
-                didReport = true;
-
-                try {
-
-                    // report statistics to the master.
-                    masterProxy.report(stats);
-
-                } catch (IOException ex) {
-
-                    log.warn("Could not report statistics to the master", ex);
-
-                }
-
-            }
 
         }
 
-        private boolean didReport = false;
+//        /**
+//         * Method reports {@link JoinStats} to the {@link JoinMasterTask}, but
+//         * only if they have not already been reported. This "report once"
+//         * constraint is used to make it safe to invoke during error handling
+//         * before actions which could cause the source {@link JoinTask}s (and
+//         * hence the {@link JoinMasterTask}) to terminate.
+//         */
+//        protected void reportOnce() {
+//
+//            if (didReport.compareAndSet(false/* expect */, true/* update */)) {
+//
+////                try {
+////
+//////                     @todo report statistics to the master.
+////                     masterProxy.report(stats);
+////
+////                } catch (IOException ex) {
+////
+////                    log.warn("Could not report statistics to the master", ex);
+////
+////                }
+//
+//            }
+//
+//        }
+//
+//        private final AtomicBoolean didReport = new AtomicBoolean(false);
 
-//        static private AtomicBoolean firstJoin = new AtomicBoolean(false);
-        
         /**
-         * Consume {@link IBindingSet} chunks from source(s). The first join
-         * dimension always has a single source - the initialBindingSet
-         * established by the {@link JoinMasterTask}. Downstream join
-         * dimensions read from {@link IAsynchronousIterator}(s) from the
-         * upstream join dimension. When the {@link IIndexManager} allows
-         * key-range partitions, then the fan-in for the sources may be larger
-         * than one as there will be one {@link JoinTask} for each index
-         * partition touched by each join dimension.
+         * Consume {@link IBindingSet} chunks from the {@link #sink}.
          * 
          * @throws Exception
          * @throws BufferClosedException
-         *             if there is an attempt to output a chunk of
-         *             {@link IBindingSet}s or {@link ISolution}s and the
-         *             output buffer is an {@link IBlockingBuffer} (true for all
-         *             join dimensions exception the lastJoin and also true for
-         *             query on the lastJoin) and that {@link IBlockingBuffer}
-         *             has been closed.
+         *             if there is an attempt to output a chunk the sink has
+         *             been closed.
          */
-        protected void consumeSources() throws Exception {
-
-            if (log.isInfoEnabled())
-                log.info(toString());
+        protected void consumeSource() throws Exception {
 
             /*
              * The maximum parallelism with which the {@link JoinTask} will
              * consume the source {@link IBindingSet}s.
              * 
-             * Note: When ZERO (0), everything will run in the caller's
-             * {@link Thread}. When GT ZERO (0), tasks will run on an
-             * {@link ExecutorService} with the specified maximum parallelism.
+             * Note: When ZERO (0), everything will run in the caller's {@link
+             * Thread}. When GT ZERO (0), tasks will run on an {@link
+             * ExecutorService} with the specified maximum parallelism.
              * 
              * Note: even when maxParallel is zero there will be one thread per
              * join dimension. For many queries that may be just fine.
              * 
-             * FIXME parallel execution requires some thread-local unsynchronized
-             * buffers -- see my notes elsewhere in this class for what has to be
-             * done to support this (actually, it all appears to work just fine).
+             * @todo Raise this into an annotation?
+             * 
+             * @todo There is probably no reason to use multiple threads to
+             * drain the source. It is going to be local, even in scale-out, and
+             * draining the source is flyweight. Assembling the access paths for
+             * the source might include some parallelism as it can touch the
+             * disk.
              */
             final int maxParallel = 0;
-//            final int maxParallel = joinNexus.getMaxParallelSubqueries();
-//            final int maxParallel = 10;
+            // final int maxParallel = joinNexus.getMaxParallelSubqueries();
+            // final int maxParallel = 10;
 
             /*
-             * Note: There is no reason for parallelism in the first join dimension
-             * as there will be only a single source bindingSet and hence a single
-             * AccessPathTask so the Executor is just overhead.
+             * Note: There is no reason for parallelism in the first join
+             * dimension as there will be only a single source bindingSet and
+             * hence a single AccessPathTask so the Executor is just overhead.
              * 
-             * @todo this will not be true when we support binding set joins as the
-             * input could be a stream of binding sets (basically, when the first
-             * join dimension is a subrule, it can have lots of access path tasks).
+             * @todo this will not be true when we support binding set joins as
+             * the input could be a stream of binding sets (basically, when the
+             * first join dimension is a subrule, it can have lots of access
+             * path tasks).
              */
-            if (orderIndex > 0 && maxParallel > 0) {
-
-//              /*
-//               * Setup parallelism limited executor that will be used to run the
-//               * access path tasks.
-//               */
-//              if(firstJoin.compareAndSet(false/*expect*/,true/*update*/)) {
-//                  System.err.println("maxParallel=" + maxParallel);
-//              }
+            final Executor service;
+            if (/* orderIndex > 0 && */maxParallel > 0) {
 
                 // the sharedService.
-                final ExecutorService sharedService = joinNexus.getIndexManager()
-                        .getExecutorService();
+                final ExecutorService sharedService = context
+                        .getIndexManager().getExecutorService();
 
-//              final ExecutorService limitedService = Executors
-//                .newFixedThreadPool(maxParallel, new DaemonThreadFactory
-    // (getClass().getName()+".joinService"));
-
-                final Executor limitedService = new LatchedExecutor(sharedService,
-                        maxParallel);
-
-                /*
-                 * consume chunks until done (using caller's thread to consume and
-                 * service to run subtasks).
-                 */
-                new BindingSetConsumerTask(limitedService).call();
-
-                if (halt)
-                    throw new RuntimeException(firstCause.get());
+                service = new LatchedExecutor(sharedService, maxParallel);
 
             } else {
+                // run in the caller's thread.
+                service = null;
+            }
+
+            IBindingSet[] chunk;
+
+            while (!isDone() && (chunk = nextChunk()) != null) {
 
                 /*
-                 * consume chunks until done using the caller's thread and run
-                 * subtasks in the caller's thread as well.
+                 * consume chunks until done (using caller's thread to consume
+                 * and service to run subtasks).
                  */
-                new BindingSetConsumerTask(null/* noService */).call();
-
+                new BindingSetConsumerTask(service, chunk).call();
+                
             }
 
         }
 
         /**
-         * Close any source {@link IAsynchronousIterator}(s). This method is
-         * invoked when a {@link JoinTask} fails.
+         * Closes the {@link #source} specified to the ctor.
          */
-        abstract void closeSources();
+        protected void closeSources() {
 
-//        /**
-//         * Flush the per-{@link Thread} unsynchronized output buffers (they
-//         * write onto the thread-safe output buffer).
-//         */
-//        final protected void flushUnsyncBuffers() throws Exception {
-    //
-//          final int n = threadLocalBufferFactory.flush();
+            if (log.isInfoEnabled())
+                log.info(toString());
 
-//          close(new Visitor<AbstractUnsynchronizedArrayBuffer<IBindingSet>>() {
-    //
-//                      public void meet(
-//                              final AbstractUnsynchronizedArrayBuffer<IBindingSet> b) {
-    //
-//                          // unless halted
-//                          if (halt)
-//                              throw new RuntimeException(firstCause.get());
-    //
-//                          // #of elements to be flushed.
-//                          final int size = b.size();
-    //
-//                          // flush, returning total #of elements written onto this
-//                          // buffer.
-//                          final long counter = b.flush();
-    //
-//                          if (DEBUG)
-//                              log.debug("Flushed buffer: size=" + size
-//                                      + ", counter=" + counter);
-    //
-//                      }
-    //
-//                  });
-    //
-//          if (INFO)
-//              log.info("Flushed " + n + " unsynchronized buffers");
-    //
-    //  }
+            source.close();
 
-//        /**
-//         * Reset the per-{@link Thread} unsynchronized output buffers (used as
-//         * part of error handling for the {@link JoinTask}).
-//         */
-//        final protected void resetUnsyncBuffers() throws Exception {
-    //
-//          final int n = threadLocalBufferFactory.reset();
-//                  .close(new Visitor<AbstractUnsynchronizedArrayBuffer<IBindingSet>>() {
-    //
-//                      @Override
-//                      public void meet(
-//                              final AbstractUnsynchronizedArrayBuffer<IBindingSet> b)
-//                              throws Exception {
-    //
-//                          // #of elements in the buffer before reset().
-//                          final int size = b.size();
-    //
-//                          // flush the buffer.
-//                          b.reset();
-    //
-//                          if (DEBUG)
-//                              log.debug("Reset buffer: size=" + size);
-//                      }
-//                  });
-    //
-//          if (INFO)
-//              log.info("Reset " + n + " unsynchronized buffers");
-    //
-    //  }
+        }
 
         /**
-         * Flush and close all output buffers and await sink {@link JoinTask}(s).
+         * A method used by the {@link #threadLocalBufferFactory} to create new
+         * output buffer as required. The output buffer will be used to
+         * aggregate {@link IBindingSet}s generated by this {@link JoinTask}.
+         */
+        final protected AbstractUnsynchronizedArrayBuffer<IBindingSet> newUnsyncOutputBuffer() {
+
+            /*
+             * The index is not key-range partitioned. This means that there is
+             * ONE (1) JoinTask per predicate in the rule. The bindingSets are
+             * aggregated into chunks by this buffer. On overflow, the buffer
+             * writes onto a BlockingBuffer. The sink JoinTask reads from that
+             * BlockingBuffer's iterator.
+             */
+
+            // flushes to the syncBuffer.
+            return new UnsyncLocalOutputBuffer<IBindingSet>(stats, joinOp
+                    .getChunkCapacity(), sink);
+
+        }
+
+        /**
+         * Flush and close all output buffers and await sink {@link JoinTask}
+         * (s).
          * <p>
          * Note: You MUST close the {@link BlockingBuffer} from which each sink
-         * reads <em>before</em> invoking this method in order for those sinks to
-         * terminate. Otherwise the source {@link IAsynchronousIterator}(s) on which
-         * the sink is reading will remain open and the sink will never decide that
-         * it has exhausted its source(s).
+         * reads <em>before</em> invoking this method in order for those sinks
+         * to terminate. Otherwise the source {@link IAsynchronousIterator}(s)
+         * on which the sink is reading will remain open and the sink will never
+         * decide that it has exhausted its source(s).
          * 
          * @throws InterruptedException
          * @throws ExecutionException
          */
-        abstract protected void flushAndCloseBuffersAndAwaitSinks()
-                throws InterruptedException, ExecutionException;
+        protected void flushAndCloseBuffersAndAwaitSinks()
+                throws InterruptedException, ExecutionException {
+
+            if (log.isDebugEnabled())
+                log.debug("joinOp=" + joinOp);
+
+            /*
+             * Close the thread-safe output buffer. For any JOIN except the
+             * last, this buffer will be the source for one or more sink
+             * JoinTasks for the next join dimension. Once this buffer is
+             * closed, the asynchronous iterator draining the buffer will
+             * eventually report that there is nothing left for it to process.
+             * 
+             * Note: This is a BlockingBuffer. BlockingBuffer#flush() is a NOP.
+             */
+
+            sink.flush();
+            sink.close();
+            
+        }
 
         /**
          * Cancel sink {@link JoinTask}(s).
          */
-        abstract protected void cancelSinks();
+        protected void cancelSinks() {
+
+            if (log.isDebugEnabled())
+                log.debug("joinOp=" + joinOp);
+
+            sink.reset();
+
+            if (sink.getFuture() != null) {
+
+                sink.getFuture().cancel(true/* mayInterruptIfRunning */);
+                
+            }
+
+        }
 
         /**
-         * Return a chunk of {@link IBindingSet}s from the
-         * {@link IAsynchronousIterator}s. The 1st join dimension is always fed
-         * by the {@link JoinMasterTask}. The nth+1 join dimension is always
-         * fed by the nth {@link JoinTask}(s).
+         * Return a chunk of {@link IBindingSet}s from source.
          * 
-         * @return The next available chunk of {@link IBindingSet}s -or-
-         *         <code>null</code> IFF all known source(s) are exhausted.
+         * @return The next chunk -or- <code>null</code> iff the source is
+         *         exhausted.
          */
-        abstract protected IBindingSet[] nextChunk() throws InterruptedException;
+        protected IBindingSet[] nextChunk() throws InterruptedException {
+
+            if (log.isDebugEnabled())
+                log.debug("joinOp=" + joinOp);
+
+            while (!source.isExhausted()) {
+
+                halted();
+
+                // note: uses timeout to avoid blocking w/o testing [halt].
+                if (source.hasNext(10, TimeUnit.MILLISECONDS)) {
+
+                    // read the chunk.
+                    final IBindingSet[] chunk = source.next();
+
+                    stats.chunksIn.increment();
+                    stats.unitsIn.add(chunk.length);
+
+                    if (log.isDebugEnabled())
+                        log.debug("Read chunk from source: chunkSize="
+                                + chunk.length + ", joinOp=" + joinOp);
+
+                    return chunk;
+
+                }
+
+            }
+
+            /*
+             * Termination condition: the source is exhausted.
+             */
+
+            if (log.isDebugEnabled())
+                log.debug("Source exhausted: joinOp=" + joinOp);
+
+            return null;
+
+        }
 
         /**
-         * Class consumes chunks from the source(s) until canceled,
-         * interrupted, or all source(s) are exhausted. For each
-         * {@link IBindingSet} in each chunk, an {@link AccessPathTask} is
-         * created which will consume that {@link IBindingSet}. The
-         * {@link AccessPathTask} for a given source chunk are sorted based on
-         * their <code>fromKey</code> so as to order the execution of those
-         * tasks in a manner that will maximize the efficiency of index reads.
-         * The ordered {@link AccessPathTask}s are then submitted to the
-         * caller's {@link Executor}.
+         * Class consumes a chunk of binding set executing a nested indexed join
+         * until canceled, interrupted, or all the binding sets are exhausted.
+         * For each {@link IBindingSet} in the chunk, an {@link AccessPathTask}
+         * is created which will consume that {@link IBindingSet}. The
+         * {@link AccessPathTask}s are sorted based on their
+         * <code>fromKey</code> so as to order the execution of those tasks in a
+         * manner that will maximize the efficiency of index reads. The ordered
+         * {@link AccessPathTask}s are then submitted to the caller's
+         * {@link Executor} or run in the caller's thread if the executor is
+         * <code>null</code>.
          * 
          * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
          *         Thompson</a>
@@ -1072,32 +1133,41 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
         protected class BindingSetConsumerTask implements Callable<Void> {
 
             private final Executor executor;
+            private final IBindingSet[] chunk;
 
             /**
              * 
              * @param executor
              *            The service that will execute the generated
-             *            {@link AccessPathTask}s -or- <code>null</code> IFF
-             *            you want the {@link AccessPathTask}s to be executed
-             *            in the caller's thread.
+             *            {@link AccessPathTask}s -or- <code>null</code> IFF you
+             *            want the {@link AccessPathTask}s to be executed in the
+             *            caller's thread.
+             * @param chunk
+             *            A chunk of binding sets from the upstream producer.
              */
-            public BindingSetConsumerTask(final Executor executor) {
+            public BindingSetConsumerTask(final Executor executor,
+                    final IBindingSet[] chunk) {
 
+                if (chunk == null)
+                    throw new IllegalArgumentException();
+                
                 this.executor = executor;
+                
+                this.chunk = chunk;
 
             }
 
             /**
-             * Read chunks from one or more sources until canceled,
-             * interrupted, or all sources are exhausted and submits
-             * {@link AccessPathTask}s to the caller's {@link ExecutorService}
-             * -or- executes those tasks in the caller's thread if no
-             * {@link ExecutorService} was provided to the ctor.
+             * Read chunks from one or more sources until canceled, interrupted,
+             * or all sources are exhausted and submits {@link AccessPathTask}s
+             * to the caller's {@link ExecutorService} -or- executes those tasks
+             * in the caller's thread if no {@link ExecutorService} was provided
+             * to the ctor.
              * <p>
-             * Note: When running with an {@link ExecutorService}, the caller
-             * is responsible for waiting on that {@link ExecutorService} until
-             * the {@link AccessPathTask}s to complete and must verify all
-             * tasks completed successfully.
+             * Note: When running with an {@link ExecutorService}, the caller is
+             * responsible for waiting on that {@link ExecutorService} until the
+             * {@link AccessPathTask}s to complete and must verify all tasks
+             * completed successfully.
              * 
              * @return <code>null</code>
              * 
@@ -1113,58 +1183,30 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
                 try {
 
-                    if (log.isDebugEnabled())
-                        log.debug("begin: orderIndex=" + orderIndex
-                                + ", partitionId=" + partitionId);
+                    /*
+                     * Aggregate the source bindingSets that license the same
+                     * asBound predicate.
+                     */
+                    final Map<IPredicate<?>, Collection<IBindingSet>> map = combineBindingSets(chunk);
 
-                    IBindingSet[] chunk;
+                    /*
+                     * Generate an AccessPathTask from each distinct asBound
+                     * predicate that will consume all of the source bindingSets
+                     * in the chunk which resulted in the same asBound
+                     * predicate.
+                     */
+                    final AccessPathTask[] tasks = getAccessPathTasks(map);
 
-                    while (!halt && (chunk = nextChunk()) != null) {
-                        
-                        /*
-                         * @todo ChunkTrace for bindingSet chunks in as well as
-                         * access path chunks consumed.
-                         */
-                        
-                        if (log.isDebugEnabled())
-                            log.debug("Read chunk of bindings: chunkSize="
-                                    + chunk.length + ", orderIndex=" + orderIndex
-                                    + ", partitionId=" + partitionId);
+                    /*
+                     * Reorder those tasks for better index read performance.
+                     */
+                    reorderTasks(tasks);
 
-                        /*
-                         * Aggregate the source bindingSets that license the
-                         * same asBound predicate.
-                         */
-                        final Map<IPredicate<?>, Collection<IBindingSet>> map = combineBindingSets(chunk);
-
-                        /*
-                         * Generate an AccessPathTask from each distinct
-                         * asBound predicate that will consume all of the source
-                         * bindingSets in the chunk which resulted in the same
-                         * asBound predicate.
-                         */
-                        final AccessPathTask[] tasks = getAccessPathTasks(map);
-
-                        /*
-                         * Reorder those tasks for better index read
-                         * performance.
-                         */
-                        reorderTasks(tasks);
-
-                        /*
-                         * Execute the tasks (either in the caller's thread or
-                         * on the supplied service).
-                         */
-                        executeTasks(tasks);
-
-                    }
-
-                    if (halt)
-                        throw new RuntimeException(firstCause.get());
-
-                    if (log.isDebugEnabled())
-                        log.debug("done: orderIndex=" + orderIndex
-                                + ", partitionId=" + partitionId);
+                    /*
+                     * Execute the tasks (either in the caller's thread or on
+                     * the supplied service).
+                     */
+                    executeTasks(tasks);
 
                     return null;
 
@@ -1177,7 +1219,7 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
                 }
 
             }
-
+            
             /**
              * Populates a map of asBound predicates paired to a set of
              * bindingSets.
@@ -1200,30 +1242,29 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
                 if (log.isDebugEnabled())
                     log.debug("chunkSize=" + chunk.length);
 
-                final int tailIndex = getTailIndex(orderIndex);
+                //                final int tailIndex = getTailIndex(orderIndex);
 
                 final Map<IPredicate<?>, Collection<IBindingSet>> map = new LinkedHashMap<IPredicate<?>, Collection<IBindingSet>>(
                         chunk.length);
 
                 for (IBindingSet bindingSet : chunk) {
 
-                    if (halt)
-                        throw new RuntimeException(firstCause.get());
+                    halted();
 
                     // constrain the predicate to the given bindings.
-                    IPredicate<?> predicate = rule.getTail(tailIndex).asBound(
-                            bindingSet);
+                    IPredicate<?> predicate = right.asBound(bindingSet);
 
                     if (partitionId != -1) {
 
                         /*
-                         * Constrain the predicate to the desired index partition.
+                         * Constrain the predicate to the desired index
+                         * partition.
                          * 
                          * Note: we do this for scale-out joins since the access
-                         * path will be evaluated by a JoinTask dedicated to this
-                         * index partition, which is part of how we give the
-                         * JoinTask to gain access to the local index object for an
-                         * index partition.
+                         * path will be evaluated by a JoinTask dedicated to
+                         * this index partition, which is part of how we give
+                         * the JoinTask to gain access to the local index object
+                         * for an index partition.
                          */
 
                         predicate = predicate.setPartitionId(partitionId);
@@ -1248,8 +1289,9 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
                     } else {
 
-                        // more than one bindingSet will use the same access path.
-                        stats.accessPathDups++;
+                        // more than one bindingSet will use the same access
+                        // path.
+                        stats.accessPathDups.increment();
 
                     }
 
@@ -1300,13 +1342,13 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
                 while (itr.hasNext()) {
 
-                    if (halt)
-                        throw new RuntimeException(firstCause.get());
+                    halted();
 
                     final Map.Entry<IPredicate<?>, Collection<IBindingSet>> entry = itr
                             .next();
 
-                    tasks[i++] = new AccessPathTask(entry.getKey(), entry.getValue());
+                    tasks[i++] = new AccessPathTask(entry.getKey(), entry
+                            .getValue());
 
                 }
 
@@ -1353,7 +1395,7 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
                     /*
                      * No Executor, so run each task in the caller's thread.
                      */
-                    
+
                     for (AccessPathTask task : tasks) {
 
                         task.call();
@@ -1365,18 +1407,19 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
                 }
 
                 /*
-                 * Build list of FutureTasks. This list is used to check all tasks
-                 * for errors and ensure that any running tasks are cancelled.
+                 * Build list of FutureTasks. This list is used to check all
+                 * tasks for errors and ensure that any running tasks are
+                 * cancelled.
                  */
-                
+
                 final List<FutureTask<Void>> futureTasks = new LinkedList<FutureTask<Void>>();
-                
+
                 for (AccessPathTask task : tasks) {
-                
+
                     final FutureTask<Void> ft = new FutureTask<Void>(task);
-                    
+
                     futureTasks.add(ft);
-                    
+
                 }
 
                 try {
@@ -1386,9 +1429,8 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
                      */
                     for (FutureTask<Void> ft : futureTasks) {
 
-                        if (halt)
-                            throw new RuntimeException(firstCause.get());
-
+                        halted();
+                        
                         // Queue for execution.
                         executor.execute(ft);
 
@@ -1396,31 +1438,31 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
                     /*
                      * Wait for each task. If any task throws an exception, then
-                     * [halt] will become true and any running tasks will error out
-                     * quickly. Once [halt := true], we do not wait for any more
-                     * tasks, but proceed to cancel all tasks in the finally {}
-                     * clause below.
+                     * [halt] will become true and any running tasks will error
+                     * out quickly. Once [halt := true], we do not wait for any
+                     * more tasks, but proceed to cancel all tasks in the
+                     * finally {} clause below.
                      */
                     for (FutureTask<Void> ft : futureTasks) {
 
                         // Wait for a task.
-                        if (!halt)
+                        if (!isDone())
                             ft.get();
 
                     }
-                    
+
                 } finally {
 
                     /*
-                     * Ensure that all tasks are cancelled, regardless of whether
-                     * they were started or have already finished.
+                     * Ensure that all tasks are cancelled, regardless of
+                     * whether they were started or have already finished.
                      */
                     for (FutureTask<Void> ft : futureTasks) {
 
                         ft.cancel(true/* mayInterruptIfRunning */);
-                        
+
                     }
-                    
+
                 }
 
             }
@@ -1444,8 +1486,8 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
             /**
              * The {@link IBindingSet}s from the source join dimension to be
-             * combined with each element visited on the {@link #accessPath}.
-             * If there is only a single source {@link IBindingSet} in a given
+             * combined with each element visited on the {@link #accessPath}. If
+             * there is only a single source {@link IBindingSet} in a given
              * chunk of source {@link IBindingSet}s that results in the same
              * asBound {@link IPredicate} then this will be a collection with a
              * single member. However, if multiple source {@link IBindingSet}s
@@ -1468,17 +1510,18 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
              * Return the <em>fromKey</em> for the {@link IAccessPath} generated
              * from the {@link IBindingSet} for this task.
              * 
-             * @todo layered access paths do not expose a fromKey. This information
-             *       is always available from the {@link SPOKeyOrder} and that
-             *       method will be raised into the {@link IKeyOrder}.
-             *       Unfortunately, for RDF we also need to know if triples or quads
-             *       are being used, which is a property on the container or the
-             *       relation.
+             * @todo Layered access paths do not expose a fromKey. However,
+             *       information is always available
+             *       {@link IKeyOrder#getFromKey(IKeyBuilder, IPredicate)}.
              */
             protected byte[] getFromKey() {
 
                 return ((AccessPath<?>) accessPath).getFromKey();
 
+            }
+            
+            public int hashCode() {
+                return super.hashCode();
             }
 
             /**
@@ -1492,21 +1535,26 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
              * 
              * @return if the as bound predicate is equals().
              */
-            public boolean equals(final AccessPathTask o) {
+            public boolean equals(final Object o) {
 
-                return accessPath.getPredicate()
-                        .equals(o.accessPath.getPredicate());
+                if (this == o)
+                    return true;
+                
+                if (!(o instanceof AccessPathTask))
+                    return false;
+
+                return accessPath.getPredicate().equals(
+                        ((AccessPathTask) o).accessPath.getPredicate());
 
             }
 
             /**
              * Evaluate an {@link IBindingSet} for the join dimension. When the
              * task runs, it will pair each element visited on the
-             * {@link IAccessPath} with the asBound {@link IPredicate}. For
-             * each element visited, if the binding is acceptable for the
-             * constraints on the asBound {@link IPredicate}, then the task
-             * will emit one {@link IBindingSet} for each source
-             * {@link IBindingSet}.
+             * {@link IAccessPath} with the asBound {@link IPredicate}. For each
+             * element visited, if the binding is acceptable for the constraints
+             * on the asBound {@link IPredicate}, then the task will emit one
+             * {@link IBindingSet} for each source {@link IBindingSet}.
              * 
              * @param predicate
              *            The asBound {@link IPredicate}.
@@ -1538,12 +1586,12 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
                 if (n == 0)
                     throw new IllegalArgumentException();
 
-                this.accessPath = joinNexus.getTailAccessPath(relation, predicate);
+                this.accessPath = context.getAccessPath(relation,
+                        predicate);
 
                 if (log.isDebugEnabled())
-                    log.debug("orderIndex=" + orderIndex + ", tailIndex="
-                            + tailIndex + ", tail=" + rule.getTail(tailIndex)
-                            + ", #bindingSets=" + n + ", accessPath=" + accessPath);
+                    log.debug("joinOp=" + joinOp + ", #bindingSets=" + n
+                            + ", accessPath=" + accessPath);
 
                 // convert to array for thread-safe traversal.
                 this.bindingSets = bindingSets.toArray(new IBindingSet[n]);
@@ -1552,15 +1600,14 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
             public String toString() {
 
-                return JoinTask.this.getClass().getSimpleName() + "{ orderIndex="
-                        + orderIndex + ", partitionId=" + partitionId
-                        + ", #bindingSets=" + bindingSets.length + "}";
+                return JoinTask.this.getClass().getSimpleName() + "{ joinOp="
+                        + joinOp + ", #bindingSets=" + bindingSets.length + "}";
 
             }
 
             /**
-             * Evaluate the {@link #accessPath} against the {@link #bindingSets}.
-             * If nothing is accepted and {@link IPredicate#isOptional()} then
+             * Evaluate the {@link #accessPath} against the {@link #bindingSets}
+             * . If nothing is accepted and {@link IPredicate#isOptional()} then
              * the {@link #bindingSets} is output anyway (this implements the
              * semantics of OPTIONAL).
              * 
@@ -1576,30 +1623,29 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
              */
             public Void call() throws Exception {
 
-                if (halt)
-                    throw new RuntimeException(firstCause.get());
+                halted();
 
-                stats.accessPathCount++;
+                stats.accessPathCount.increment();
 
                 if (accessPath.getPredicate() instanceof IStarJoin<?>) {
-                    
+
                     handleStarJoin();
-                    
+
                 } else {
-                    
+
                     handleJoin();
-                    
+
                 }
 
                 return null;
-                
+
             }
-            
+
             /**
              * A vectored pipeline join (chunk at a time processing).
              */
             protected void handleJoin() {
-                
+
                 boolean nothingAccepted = true;
 
                 // Obtain the iterator for the current join dimension.
@@ -1608,9 +1654,9 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
                 try {
 
                     /*
-                     * @todo In order to run the chunks on a thread pool, pass in
-                     * [null] for the unsyncBuffer and each chunk will get its own
-                     * buffer.
+                     * @todo In order to run the chunks on a thread pool, pass
+                     * in [null] for the unsyncBuffer and each chunk will get
+                     * its own buffer.
                      */
                     final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer = threadLocalBufferFactory
                             .get();
@@ -1619,7 +1665,7 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
                         final Object[] chunk = itr.nextChunk();
 
-                        stats.chunkCount++;
+                        stats.chunkCount.increment();
 
                         // process the chunk in the caller's thread.
                         final boolean somethingAccepted = new ChunkTask(
@@ -1634,7 +1680,7 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
                     } // next chunk.
 
-                    if (nothingAccepted && predicate.isOptional()) {
+                    if (nothingAccepted && optional) {
 
                         /*
                          * Note: when NO binding sets were accepted AND the
@@ -1670,7 +1716,8 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
                 IBindingSet[] solutions = this.bindingSets;
 
-                final IStarJoin starJoin = (IStarJoin) accessPath.getPredicate();
+                final IStarJoin starJoin = (IStarJoin) accessPath
+                        .getPredicate();
 
                 final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer = threadLocalBufferFactory
                         .get();
@@ -1685,8 +1732,8 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
                     /*
                      * Note: The fast range count would give us an upper bound,
-                     * unless expanders are used, in which case there can be more
-                     * elements visited.
+                     * unless expanders are used, in which case there can be
+                     * more elements visited.
                      */
                     final Object[] elements;
                     {
@@ -1702,11 +1749,11 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
                             // add to list of chunks.
                             chunks.add(chunk);
-                            
+
                             numElements += chunk.length;
 
-                            stats.chunkCount++;
-                            
+                            stats.chunkCount.increment();
+
                             nchunks++;
 
                         } // next chunk.
@@ -1728,117 +1775,124 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
                                 int n = 0;
                                 for (Object[] chunk : chunks) {
 
-                                    System.arraycopy(chunk/* src */, 0/* srcPos */,
-                                            elements/* dst */, n/* dstPos */,
-                                            chunk.length/* len */);
+                                    System
+                                            .arraycopy(chunk/* src */,
+                                                    0/* srcPos */,
+                                                    elements/* dst */,
+                                                    n/* dstPos */, chunk.length/* len */);
 
                                     n += chunk.length;
                                 }
                             }
-                        } 
-                        stats.elementCount += numElements;
+                        }
+                        stats.elementCount.add(numElements);
 
                     }
 
                     if (numElements > 0) {
-                        
-                        final Iterator<IStarConstraint<?>> it = 
-                            starJoin.getStarConstraints();
-                        
+
+                        final Iterator<IStarConstraint<?>> it = starJoin
+                                .getStarConstraints();
+
                         boolean constraintFailed = false;
-                        
+
                         while (it.hasNext()) {
-                            
+
                             final IStarConstraint constraint = it.next();
-                            
+
                             Collection<IBindingSet> constraintSolutions = null;
-                            
+
                             int numVars = constraint.getNumVars();
-                            
+
                             for (int i = 0; i < numElements; i++) {
 
                                 Object e = elements[i];
-                                
+
                                 if (constraint.isMatch(e)) {
 
                                     /*
-                                     * For each match for the constraint, we clone
-                                     * the old solutions and create a new solutions
-                                     * that appends the variable bindings from this
-                                     * match.
+                                     * For each match for the constraint, we
+                                     * clone the old solutions and create a new
+                                     * solutions that appends the variable
+                                     * bindings from this match.
                                      * 
                                      * At the end, we set the old solutions
-                                     * collection to the new solutions collection.
-                                     */ 
-                                    
+                                     * collection to the new solutions
+                                     * collection.
+                                     */
+
                                     if (constraintSolutions == null) {
-                                        
-                                        constraintSolutions = 
-                                            new LinkedList<IBindingSet>();
-                                        
+
+                                        constraintSolutions = new LinkedList<IBindingSet>();
+
                                     }
-                                    
+
                                     for (IBindingSet bs : solutions) {
-                                    
+
                                         if (numVars > 0) {
-                                            
+
                                             bs = bs.clone();
-                                            
+
                                             constraint.bind(bs, e);
 
                                         }
-                                        
+
                                         constraintSolutions.add(bs);
 
                                     }
-                                    
+
                                     // no reason to keep testing SPOs, there can
                                     // be only one
                                     if (numVars == 0) {
-                                        
+
                                         break;
-                                        
+
                                     }
-                                    
+
                                 }
-                                
+
                             }
-                            
+
                             if (constraintSolutions == null) {
-                                
-                                // we did not find any matches to this constraint
-                                // that is ok, as long it's optional
+
+                                /*
+                                 * We did not find any matches to this
+                                 * constraint. That is ok, as long it's
+                                 * optional.
+                                 */
                                 if (constraint.isOptional() == false) {
-                                    
+
                                     constraintFailed = true;
-                                    
+
                                     break;
-                                    
+
                                 }
-                                
+
                             } else {
-                                
-                                // set the old solutions to the new solutions, and
+
+                                // set the old solutions to the new solutions,
+                                // and
                                 // move on to the next constraint
-                                solutions = constraintSolutions.toArray(
-                                        new IBindingSet[constraintSolutions.size()]);
-                                
+                                solutions = constraintSolutions
+                                        .toArray(new IBindingSet[constraintSolutions
+                                                .size()]);
+
                             }
-                            
+
                         }
-                        
+
                         if (!constraintFailed) {
-                            
+
                             for (IBindingSet bs : solutions) {
-                                
+
                                 unsyncBuffer.add(bs);
-                                
+
                             }
-                            
+
                         }
-                        
+
                     }
-                    
+
                     return;
 
                 } catch (Throwable t) {
@@ -1852,7 +1906,7 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
                     itr.close();
 
                 }
-                
+
             }
 
             /**
@@ -1886,16 +1940,16 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
          */
         protected class ChunkTask implements Callable<Boolean> {
 
-            /**
-             * The index of the predicate for the access path that is being
-             * consumed.
-             */
-            private final int tailIndex;
+//            /**
+//             * The index of the predicate for the access path that is being
+//             * consumed.
+//             */
+//            private final int tailIndex;
 
             /**
-             * The {@link IBindingSet}s which the each element in the chunk
-             * will be paired to create {@link IBindingSet}s for the downstream
-             * join dimension.
+             * The {@link IBindingSet}s which the each element in the chunk will
+             * be paired to create {@link IBindingSet}s for the downstream join
+             * dimension.
              */
             private final IBindingSet[] bindingSets;
 
@@ -1916,18 +1970,18 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
             /**
              * 
              * @param bindingSet
-             *            The bindings with which the each element in the chunk will
-             *            be paired to create the bindings for the downstream join
-             *            dimension.
+             *            The bindings with which the each element in the chunk
+             *            will be paired to create the bindings for the
+             *            downstream join dimension.
              * @param unsyncBuffer
-             *            A per-{@link Thread} buffer used to accumulate chunks of
-             *            generated {@link IBindingSet}s (optional). When the
+             *            A per-{@link Thread} buffer used to accumulate chunks
+             *            of generated {@link IBindingSet}s (optional). When the
              *            {@link ChunkTask} will be run in its own thread, pass
              *            <code>null</code> and the buffer will be obtained in
              *            {@link #call()}.
              * @param chunk
-             *            A chunk of elements read from the {@link IAccessPath} for
-             *            the current join dimension.
+             *            A chunk of elements read from the {@link IAccessPath}
+             *            for the current join dimension.
              */
             public ChunkTask(
                     final IBindingSet[] bindingSet,
@@ -1938,13 +1992,13 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
                     throw new IllegalArgumentException();
 
                 // Allow null!
-//                if (unsyncBuffer == null)
-//                    throw new IllegalArgumentException();
+                // if (unsyncBuffer == null)
+                // throw new IllegalArgumentException();
 
                 if (chunk == null)
                     throw new IllegalArgumentException();
 
-                this.tailIndex = getTailIndex(orderIndex);
+//                this.tailIndex = getTailIndex(orderIndex);
 
                 this.bindingSets = bindingSet;
 
@@ -1972,7 +2026,7 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
                 try {
 
-                    ChunkTrace.chunk(orderIndex, chunk);
+//                    ChunkTrace.chunk(orderIndex, chunk);
 
                     boolean nothingAccepted = true;
 
@@ -1983,57 +2037,30 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
                     for (Object e : chunk) {
 
-                        if (halt)
+                        if (isDone())
                             return nothingAccepted;
 
                         // naccepted for the current element (trace only).
                         int naccepted = 0;
 
-                        stats.elementCount++;
+                        stats.elementCount.increment();
 
                         for (IBindingSet bset : bindingSets) {
 
-                            final IVariable<?>[] variablesToKeep = requiredVars[tailIndex];
-                            
-                            if (log.isInfoEnabled()) {
-                                log.info("tailIndex: " + tailIndex);
-                                log.info("bset before: " + bset);
-                            }
-                            
                             /*
                              * Clone the binding set since it is tested for each
                              * element visited.
                              */
                             bset = bset.clone();
 
-                            if (log.isInfoEnabled()) {
-                                log.info("tailIndex: " + tailIndex);
-                                log.info("bset after: " + bset);
-                                log.info("element: " + e);
-                            }
-                            
                             // propagate bindings from the visited element.
-                            if (joinNexus.bind(rule, tailIndex, e, bset)) {
+                            if (context.bind(right, constraints, e, bset)) {
 
-                                bset = bset.copy(variablesToKeep);
+                                // optionally strip off unnecessary variables.
+                                bset = variablesToKeep == null ? bset : bset
+                                        .copy(variablesToKeep);
 
-                                /*
-                                 * Accept this binding set.
-                                 * 
-                                 * @todo This is the place to intervene for
-                                 * scale-out default graph queries. Instead of
-                                 * directly accepting the bset, place the (bset,e)
-                                 * pair on a queue which targets a distributed hash
-                                 * map imposing distinct on [e] and only insert into
-                                 * the unsyncBuffer those [bset]s which pass the
-                                 * filter.
-                                 * 
-                                 * The life cycle of that filter needs to be
-                                 * protected with a latch or zlock. Each JoinTask
-                                 * must wait until the filter has answered each of
-                                 * its queued (bset,e) pairs, which could be done
-                                 * using a latch.
-                                 */
+                                // Accept this binding set.
                                 unsyncBuffer.add(bset);
 
                                 naccepted++;
@@ -2045,16 +2072,14 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
                         }
 
                         if (log.isDebugEnabled())
-                            log.debug("Accepted element for " + naccepted + " of "
-                                    + bindingSets.length
+                            log.debug("Accepted element for " + naccepted
+                                    + " of " + bindingSets.length
                                     + " possible bindingSet combinations: "
-                                    + e.toString() + ", orderIndex=" + orderIndex
-                                    + ", lastJoin=" + lastJoin + ", rule="
-                                    + rule.getName());
+                                    + e.toString() + ", joinOp=" + joinOp);
                     }
 
                     // if something is accepted in the chunk return true.
-                    return nothingAccepted ? Boolean.FALSE: Boolean.TRUE;
+                    return nothingAccepted ? Boolean.FALSE : Boolean.TRUE;
 
                 } catch (Throwable t) {
 
@@ -2066,8 +2091,8 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
             }
 
-        }
+        }// class ChunkTask
 
-    }// JoinTask
+    }// class JoinTask
 
 }

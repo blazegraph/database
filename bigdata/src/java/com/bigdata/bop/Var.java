@@ -33,7 +33,7 @@ import com.bigdata.relation.rule.Rule;
  *       limit the binding patterns across the rule.  (In fact, variables can be
  *       "named" by their index into the binding set for most purposes.)
  */
-final public class Var<E> extends AbstractBOp implements IVariable<E>,
+final public class Var<E> extends BOpBase implements IVariable<E>,
         Comparable<IVariable<E>> {
 
     private static final long serialVersionUID = -7100443208125002485L;
@@ -69,7 +69,8 @@ final public class Var<E> extends AbstractBOp implements IVariable<E>,
 
     /**
      * Clone is overridden to prevent variables from becoming aliased (this is
-     * part of the canonicalizing mapping).
+     * part of the canonicalizing mapping). Because we override clone we do not
+     * need to provide the deep copy constructor (it is never invoked).
      */
     final public Var<E> clone() {
 

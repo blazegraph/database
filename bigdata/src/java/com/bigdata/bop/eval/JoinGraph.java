@@ -37,16 +37,13 @@ import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.AbstractPipelineOp;
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
-import com.bigdata.relation.IRelation;
-import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.rule.Rule;
-import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.service.IBigdataFederation;
 
 /**
  * A join graph with annotations for estimated cardinality and other details in
@@ -236,16 +233,11 @@ public class JoinGraph extends AbstractPipelineOp<IBindingSet> implements
 
     }
 
-    public Future<Void> eval(final IBigdataFederation<?> fed,
-            final IJoinNexus joinNexus,
-            final IBlockingBuffer<IBindingSet[]> buffer) {
+    public Future<Void> eval(final BOpContext<IBindingSet> context) {
 
-        final FutureTask<Void> ft = new FutureTask<Void>(new JoinGraphTask(
-                joinNexus, buffer));
+        final FutureTask<Void> ft = new FutureTask<Void>(new JoinGraphTask(context));
 
-        buffer.setFuture(ft);
-        
-        joinNexus.getIndexManager().getExecutorService().execute(ft);
+        context.getIndexManager().getExecutorService().execute(ft);
 
         return ft;
         
@@ -259,38 +251,20 @@ public class JoinGraph extends AbstractPipelineOp<IBindingSet> implements
      */
     private class JoinGraphTask implements Callable<Void> {
 
-        private final IJoinNexus joinNexus;
+        private final BOpContext<IBindingSet> context;
 
-        private final IBlockingBuffer<IBindingSet[]> buffer;
+        JoinGraphTask(final BOpContext<IBindingSet> context) {
 
-        JoinGraphTask(final IJoinNexus joinNexus,
-                final IBlockingBuffer<IBindingSet[]> buffer) {
-
-            if (joinNexus == null)
+            if (context == null)
                 throw new IllegalArgumentException();
 
-            if (buffer == null)
-                throw new IllegalArgumentException();
-
-            this.joinNexus = joinNexus;
-
-            this.buffer = buffer;
+            this.context = context;
 
         }
 
         public Void call() throws Exception {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException();
-        }
-
-        public IRelation<?> getRelation(final String v) {
-
-            return (IRelation<?>) joinNexus.getIndexManager()
-                    .getResourceLocator().locate(v/* namespace */,
-                            joinNexus.getReadTimestamp());
-
-            // return joinNexus.getTailRelationView(pred)
-
         }
 
     }

@@ -192,7 +192,7 @@ public class NanoSparqlServer extends AbstractHTTPD {
      * has established a connection but the query is not running because the
      * {@link #queryService} is blocking).
      */
-    private final ConcurrentHashMap<Long,RunningQuery> queries = new ConcurrentHashMap<Long,RunningQuery>();
+    private final ConcurrentHashMap<Long/* queryId */, RunningQuery> queries = new ConcurrentHashMap<Long, RunningQuery>();
 
     /**
      * Factory for the query identifiers.

@@ -33,7 +33,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.BOp.Annotations;
 import com.bigdata.btree.IIndex;
 import com.bigdata.relation.accesspath.IAccessPath;
 
@@ -94,7 +93,7 @@ abstract public class AbstractSampleIndex<E> extends AbstractPipelineOp<E> {
     @SuppressWarnings("unchecked")
     public IPredicate<E> pred() {
         
-        return (IPredicate<E>) args[0];
+        return (IPredicate<E>) get(0);
         
     }
 

@@ -25,9 +25,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 18, 2010
  */
 
-package com.bigdata.bop.fed;
+package com.bigdata.bop.engine;
 
-import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
@@ -40,22 +39,18 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.AbstractPipelineOp;
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.QuoteOp;
 import com.bigdata.mdi.PartitionLocator;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.pipeline.DistributedJoinTask;
-import com.bigdata.relation.rule.eval.pipeline.JoinStats;
 import com.bigdata.relation.rule.eval.pipeline.JoinTask;
 import com.bigdata.relation.rule.eval.pipeline.JoinTaskFactoryTask;
 import com.bigdata.relation.rule.eval.pipeline.JoinTaskSink;
-import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.AbstractScaleOutFederation;
-import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.util.concurrent.Computable;
 import com.bigdata.util.concurrent.Memoizer;
@@ -100,7 +95,7 @@ import cutthecrap.utils.striterators.Striterator;
 public class MapBindingSetsOverShards extends AbstractPipelineOp<IBindingSet>
         implements BindingSetPipelineOp {
 
-    static protected final transient Logger log = Logger
+    static private final transient Logger log = Logger
             .getLogger(MapBindingSetsOverShards.class);
 
     /**
@@ -131,7 +126,7 @@ public class MapBindingSetsOverShards extends AbstractPipelineOp<IBindingSet>
      */
     protected BindingSetPipelineOp sourceOp() {
 
-        return (BindingSetPipelineOp) args[0];
+        return (BindingSetPipelineOp) get(0);
 
     }
 
@@ -141,7 +136,7 @@ public class MapBindingSetsOverShards extends AbstractPipelineOp<IBindingSet>
     protected IPredicate<?> targetPred() {
 
         // This unquote's the target predicate.
-        return (IPredicate<?>) args[1].get(0);
+        return (IPredicate<?>) get(1).get(0);
 
     }
 
@@ -159,11 +154,9 @@ public class MapBindingSetsOverShards extends AbstractPipelineOp<IBindingSet>
         
     }
     
-    public Future<Void> eval(final IBigdataFederation<?> fed,
-            final IJoinNexus joinNexus,
-            final IBlockingBuffer<IBindingSet[]> buffer) {
+    public Future<Void> eval(final BOpContext<IBindingSet> context) {
 
-        if (fed == null) {
+        if (context.getFederation() == null) {
 
             /*
              * When not running against a federation, delegate evaluation to the
@@ -172,17 +165,17 @@ public class MapBindingSetsOverShards extends AbstractPipelineOp<IBindingSet>
              * out of line.
              */
 
-            return sourceOp().eval(fed, joinNexus, buffer);
+            return sourceOp().eval(context);
 
         }
 
         /*
          * Note: The caller's BlockingBuffer is ignored.
          */
-        final FutureTask<Void> ft = new FutureTask<Void>(new MapShardsTask(fed,
-                joinNexus, sourceOp(), targetPred()));
+        final FutureTask<Void> ft = new FutureTask<Void>(new MapShardsTask(
+                context, sourceOp(), targetPred()));
 
-        joinNexus.getIndexManager().getExecutorService().execute(ft);
+        context.getIndexManager().getExecutorService().execute(ft);
 
         return ft;
 
@@ -196,7 +189,7 @@ public class MapBindingSetsOverShards extends AbstractPipelineOp<IBindingSet>
      */
     static private class MapShardsTask implements Callable<Void> {
 
-        private final IJoinNexus joinNexus;
+        private final BOpContext<IBindingSet> context;
 
         /**
          * The federation is used to obtain locator scans for the access paths.
@@ -220,16 +213,13 @@ public class MapBindingSetsOverShards extends AbstractPipelineOp<IBindingSet>
          */
         final private String nextScaleOutIndexName;
 
-        MapShardsTask(final IBigdataFederation<?> fed,
-                final IJoinNexus joinNexus,
+        MapShardsTask(final BOpContext<IBindingSet> context,
                 final BindingSetPipelineOp sourceOp,
                 final IPredicate<?> targetPred) {
 
-            this.fed = (AbstractScaleOutFederation<?>) fed;
+            this.fed = (AbstractScaleOutFederation<?>) context.getFederation();
 
-            this.joinNexus = joinNexus;
-
-            // this.buffer = buffer;
+            this.context = context;
 
             this.sourceOp = sourceOp;
 
@@ -246,37 +236,37 @@ public class MapBindingSetsOverShards extends AbstractPipelineOp<IBindingSet>
 
         public Void call() throws Exception {
 
-            final IBlockingBuffer<IBindingSet[]> sourceBuffer = sourceOp
-                    .newBuffer();
-
-            final Future<Void> sourceFuture = sourceOp.eval(fed, joinNexus,
-                    sourceBuffer);
-
-            try {
-
-                /*
-                 * Map the binding sets from the source against the asBound
-                 * target predicate.
-                 */
-
-                final IAsynchronousIterator<IBindingSet[]> itr = sourceBuffer
-                        .iterator();
-                
-                while (itr.hasNext()) {
-
-                    // FIXME handleChunk().
-//                    handleChunk(itr.next());
-                    throw new UnsupportedOperationException();
-
-                }
-
+//            final IBlockingBuffer<IBindingSet[]> sourceBuffer = sourceOp
+//                    .newBuffer();
+//
+//            final Future<Void> sourceFuture = sourceOp.eval(fed, context,
+//                    sourceBuffer);
+//
+//            try {
+//
+//                /*
+//                 * Map the binding sets from the source against the asBound
+//                 * target predicate.
+//                 */
+//
+//                final IAsynchronousIterator<IBindingSet[]> itr = sourceBuffer
+//                        .iterator();
+//                
+//                while (itr.hasNext()) {
+//
+//                    // FIXME handleChunk().
+////                    handleChunk(itr.next());
+//                    throw new UnsupportedOperationException();
+//
+//                }
+//
                 return null;
-                
-            } finally {
-
-                sourceFuture.cancel(true/* mayInterruptIfRunning */);
-
-            }
+//                
+//            } finally {
+//
+//                sourceFuture.cancel(true/* mayInterruptIfRunning */);
+//
+//            }
 
         }
 

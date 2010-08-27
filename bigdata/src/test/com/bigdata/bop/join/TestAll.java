@@ -61,6 +61,7 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("join operators");
 
+        // @todo test each kind of join operator against a standalone db.
         suite.addTestSuite(TestPipelineJoin.class);
 
         return suite;

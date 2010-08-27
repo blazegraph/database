@@ -30,9 +30,8 @@ package com.bigdata.bop;
 
 import java.io.Serializable;
 
-
 /**
- * An interface for specifying constraints the allowable states of an
+ * An interface for specifying constraints on the allowable states of an
  * {@link IBindingSet}. For example, you can impose the constraint that two
  * variables must have distinct bindings the constraint that a binding must be
  * (or must not be) a particular value type, or that the binding must take on

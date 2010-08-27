@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.bop;
 
+import java.util.Map;
+
 
 /**
  * A constant.
@@ -30,7 +32,7 @@ package com.bigdata.bop;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-final public class Constant<E/* extends Comparable<E> */> extends AbstractBOp
+final public class Constant<E/* extends Comparable<E> */> extends BOpBase
         implements IConstant<E> {
 
     /**
@@ -52,6 +54,26 @@ final public class Constant<E/* extends Comparable<E> */> extends AbstractBOp
         
     }
 
+//    /**
+//     * Required shallow copy constructor.
+//     * 
+//     * @param op
+//     */
+//    public Constant(final BOp[] args, final Map<String,Object> ann) {
+//        super(args,ann);
+//        this.value = null;
+//    }
+
+    /**
+     * Required deep copy constructor.
+     * 
+     * @param op
+     */
+    public Constant(final Constant<E> op) {
+        super(op);
+        this.value = op.value;
+    }
+    
     public Constant(final E value) {
         
         super(new BOp[]{});

@@ -419,7 +419,7 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
         
         long tx = 0L;
         try {
-        if (indexManager instanceof IBigdataFederation) {
+        if (indexManager instanceof IBigdataFederation<?>) {
 
             /*
              * Advance the read-consistent timestamp so that any writes from the
@@ -448,7 +448,7 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
                  * use ITx.READ_COMMITTED rather that explicitly looking up the
                  * lastCommitTime.
                  */
-                    tx = ((IBigdataFederation) indexManager)
+                    tx = ((IBigdataFederation<?>) indexManager)
                         .getTransactionService().newTx(lastCommitTime);
             } catch (IOException ex) {
                 throw new RuntimeException(ex);
@@ -538,7 +538,7 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
             if (tx != 0L) {
                 // terminate the read-only tx (releases the read-lock).
                 try {
-                    ((IBigdataFederation) indexManager).getTransactionService()
+                    ((IBigdataFederation<?>) indexManager).getTransactionService()
                             .abort(tx);
                 } catch (IOException ex) {
                     throw new RuntimeException(ex);

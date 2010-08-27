@@ -25,25 +25,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 18, 2010
  */
 
-package com.bigdata.bop.fed;
+package com.bigdata.bop.engine;
 
 import java.util.Map;
 import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.AbstractPipelineOp;
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.mdi.PartitionLocator;
-import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
-import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.relation.rule.eval.pipeline.JoinTask;
-import com.bigdata.service.IBigdataFederation;
 
 /**
  * Operator receives binding sets across a network boundary.
@@ -77,15 +70,13 @@ public class ReceiveBindingSets extends AbstractPipelineOp<IBindingSet> {
      */
     protected BindingSetPipelineOp sourceOp() {
 
-        return (BindingSetPipelineOp) args[0];
+        return (BindingSetPipelineOp) get(0);
 
     }
 
-    public Future<Void> eval(final IBigdataFederation<?> fed,
-            final IJoinNexus joinNexus,
-            final IBlockingBuffer<IBindingSet[]> buffer) {
+    public Future<Void> eval(final BOpContext<IBindingSet> context) {
 
-        if (fed == null) {
+        if (context.getFederation() == null) {
 
             /*
              * When not running against a federation, delegate evaluation to the
@@ -94,7 +85,7 @@ public class ReceiveBindingSets extends AbstractPipelineOp<IBindingSet> {
              * of line.
              */
 
-            return sourceOp().eval(fed, joinNexus, buffer);
+            return sourceOp().eval(context);
 
         }
 

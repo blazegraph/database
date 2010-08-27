@@ -49,14 +49,18 @@ final public class EmptyBindingSet implements IBindingSet, Serializable {
     private static final long serialVersionUID = 4270590461117389862L;
     
     /**
-     * Singleton.
+     * Immutable singleton.
      */
     public static transient final EmptyBindingSet INSTANCE = new EmptyBindingSet();
     
     private EmptyBindingSet() {
         
     }
-    
+
+    /**
+     * @todo Clone returns the same object, which is immutable. Since we use
+     *       clone when binding, it might be better to return a mutable object.
+     */
     public EmptyBindingSet clone() {
         
         return this;

@@ -27,14 +27,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.constraint;
 
+import junit.framework.TestCase2;
+
 import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
-
-import junit.framework.TestCase2;
 
 /**
  * Test suite for {@link EQ}.
@@ -59,7 +59,7 @@ public class TestEQ extends TestCase2 {
 
     public void test_ctor() {
         try {
-            new EQ(null/*x*/, null/*y*/);
+            new EQ((IVariable<?>)null/*x*/, (IVariable<?>)null/*y*/);
             fail("Excepting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             if (log.isInfoEnabled())

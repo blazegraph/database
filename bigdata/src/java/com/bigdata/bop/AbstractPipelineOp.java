@@ -30,6 +30,7 @@ package com.bigdata.bop;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
@@ -37,7 +38,7 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractPipelineOp<E> extends AbstractBOp implements
+abstract public class AbstractPipelineOp<E> extends BOpBase implements
         PipelineOp<E> {
 
     /**
@@ -45,11 +46,24 @@ abstract public class AbstractPipelineOp<E> extends AbstractBOp implements
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends BindingSetPipelineOp.Annotations {
+    public interface Annotations extends PipelineOp.Annotations {
         
     }
-    
+
     /**
+     * Deep copy constructor.
+     * 
+     * @param op
+     */
+    protected AbstractPipelineOp(final AbstractPipelineOp<E> op) {
+
+        super(op);
+
+    }
+
+    /**
+     * Shallow copy constructor.
+     * 
      * @param args
      * @param annotations
      */
@@ -60,21 +74,21 @@ abstract public class AbstractPipelineOp<E> extends AbstractBOp implements
 
     }
 
-    protected int getChunkCapacity() {
+    public int getChunkCapacity() {
         
         return getProperty(Annotations.CHUNK_CAPACITY,
                 Annotations.DEFAULT_CHUNK_CAPACITY);
 
     }
 
-    protected int getChunkOfChunksCapacity() {
+    public int getChunkOfChunksCapacity() {
 
         return getProperty(Annotations.CHUNK_OF_CHUNKS_CAPACITY,
                 Annotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY);
 
     }
 
-    protected long getChunkTimeout() {
+    public long getChunkTimeout() {
         
         return getProperty(Annotations.CHUNK_TIMEOUT,
                 Annotations.DEFAULT_CHUNK_TIMEOUT);
@@ -85,6 +99,12 @@ abstract public class AbstractPipelineOp<E> extends AbstractBOp implements
      * The {@link TimeUnit}s in which the {@link #chunkTimeout} is measured.
      */
     protected static transient final TimeUnit chunkTimeoutUnit = TimeUnit.MILLISECONDS;
+
+    public BOpStats newStats() {
+
+        return new BOpStats();
+
+    }
 
     public IBlockingBuffer<E[]> newBuffer() {
 

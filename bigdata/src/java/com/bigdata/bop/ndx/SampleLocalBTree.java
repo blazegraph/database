@@ -4,11 +4,10 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
+import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.service.IBigdataFederation;
 
 /**
  * Sampling operator for an {@link AbstractBTree}.
@@ -29,18 +28,17 @@ public class SampleLocalBTree<E> extends AbstractSampleIndex<E> {
 
     }
 
-    public Future<Void> eval(final IBigdataFederation<?> fed,
-            final IJoinNexus joinNexus, final IBlockingBuffer<E[]> buffer) {
+    public Future<Void> eval(final BOpContext<E> context) {
 
-        if (pred().getPartitionId() != -1) {
+        if (context.getPartitionId() != -1) {
             // Must not be specific to a shard.
             throw new UnsupportedOperationException();
         }
 
-        final FutureTask<Void> ft = new FutureTask<Void>(new LocalBTreeSampleTask(
-                joinNexus, buffer));
+        final FutureTask<Void> ft = new FutureTask<Void>(
+                new LocalBTreeSampleTask(context));
 
-        joinNexus.getIndexManager().getExecutorService().execute(ft);
+        context.getIndexManager().getExecutorService().execute(ft);
 
         return ft;
 
@@ -52,16 +50,15 @@ public class SampleLocalBTree<E> extends AbstractSampleIndex<E> {
     private class LocalBTreeSampleTask implements
             Callable<Void> {
         
-        private final IJoinNexus joinNexus;
+        private final BOpContext<E> context;
 
-        private final IBlockingBuffer<E[]> buffer;
+        private final IBlockingBuffer<E[]> sink;
 
-        LocalBTreeSampleTask(final IJoinNexus joinNexus,
-                final IBlockingBuffer<E[]> buffer) {
+        LocalBTreeSampleTask(final BOpContext<E> context) {
 
-            this.joinNexus = joinNexus;
+            this.context = context;
 
-            this.buffer = buffer;
+            this.sink = context.getSink();
                 
         }
 

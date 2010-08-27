@@ -418,7 +418,7 @@ public class ArrayBindingSet implements IBindingSet {
         
     }
 
-    public boolean equals(IBindingSet o) {
+    public boolean equals(final IBindingSet o) {
         
         if (o == this)
             return true;

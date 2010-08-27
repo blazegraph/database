@@ -30,11 +30,13 @@ package com.bigdata.bop;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.bop.ap.Predicate;
+
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractChunkedOrderedIteratorOp<E> extends AbstractBOp
+abstract public class AbstractChunkedOrderedIteratorOp<E> extends BOpBase
         implements ChunkedOrderedIteratorOp<E> {
 
     /**
@@ -54,6 +56,8 @@ abstract public class AbstractChunkedOrderedIteratorOp<E> extends AbstractBOp
     }
 
     /**
+     * Required shallow copy constructor.
+     * 
      * @param args
      * @param annotations
      */
@@ -62,6 +66,16 @@ abstract public class AbstractChunkedOrderedIteratorOp<E> extends AbstractBOp
 
         super(args, annotations);
 
+    }
+
+    /**
+     * Required deep copy constructor.
+     * 
+     * @param op
+     */
+    public AbstractChunkedOrderedIteratorOp(
+            final AbstractChunkedOrderedIteratorOp<E> op) {
+        super(op);
     }
 
     protected int getChunkCapacity() {

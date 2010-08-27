@@ -45,8 +45,10 @@ import java.util.Map;
  * set of variables which are selected by a join or distributed hash table), or
  * those shared by all operators (such as a cost model).
  * <p>
- * Operators are immutable, {@link Serializable} to facilitate distributed
- * computing, and {@link Cloneable} to facilitate non-destructive tree rewrites.
+ * Operators are effectively immutable (mutation APIs always return a deep copy
+ * of the operator to which the mutation has been applied), {@link Serializable}
+ * to facilitate distributed computing, and {@link Cloneable} to facilitate
+ * non-destructive tree rewrites.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -73,10 +75,46 @@ public interface BOp extends Cloneable, Serializable {
      */
     List<BOp> args();
 
+    /** A shallow copy of the operator's arguments. */
+    BOp[] toArray();
+
+    /**
+     * A shallow copy of the operator's arguments using the generic type of the
+     * caller's array. If the array has sufficient room, then the arguments are
+     * copied into the caller's array. If there is space remaining, a
+     * <code>null</code> is appended to mark the end of the data.
+     */
+    <T> T[] toArray(final T[] a);
+    
     /**
      * The operator's annotations.
      */
     Map<String,Object> annotations();
+
+    /**
+     * Return the value of the named annotation.
+     * 
+     * @param name
+     *            The name of the annotation.
+     * @param defaultValue
+     *            The default value.
+     * @return The annotation value -or- the <i>defaultValue</i> if the
+     *         annotation was not bound.
+     * @param <T>
+     *            The generic type of the annotation value.
+     */
+    <T> T getProperty(final String name, final T defaultValue);
+
+    /**
+     * Return the value of the named annotation.
+     * 
+     * @param name
+     *            The name of the annotation.
+     *            
+     * @return The value of the annotation and <code>null</code> if the
+     *         annotation is not bound.
+     */
+    Object getProperty(final String name);
 
     /**
      * Deep copy clone of the operator.
@@ -87,12 +125,13 @@ public interface BOp extends Cloneable, Serializable {
      * Interface declaring well known annotations.
      */
     public interface Annotations {
-        
-        /**
-         * The unique identifier for a query. This is used to collect all
-         * runtime state for a query within the session on a node.
-         */
-        String QUERY_ID = "queryId";
+
+//        /**
+//         * A cross reference to the query identifier. This is required on
+//         * operators which associate distributed state with a query. [We can
+//         * probably get this from the evaluation context.]
+//         */
+//        String QUERY_REF = "queryRef";
 
         /**
          * The unique identifier within a query for a specific {@link BOp}. The

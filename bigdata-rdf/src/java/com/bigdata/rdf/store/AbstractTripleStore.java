@@ -3759,7 +3759,7 @@ abstract public class AbstractTripleStore extends
                 
             }
 
-            if( getIndexManager() instanceof IBigdataFederation) {
+            if (getIndexManager() instanceof IBigdataFederation<?>) {
 
                 /*
                  * Use historical reads.

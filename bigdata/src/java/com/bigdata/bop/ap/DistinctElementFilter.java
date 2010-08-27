@@ -4,7 +4,7 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.bigdata.bop.AbstractBOp;
+import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpList;
 import com.bigdata.bop.IBindingSet;
@@ -43,7 +43,7 @@ import com.bigdata.striterator.MergeFilter;
  *       solutions) and {@link MergeFilter} (handles comparables).
  */
 public class DistinctElementFilter<E> 
-extends AbstractBOp
+extends BOpBase
 //extends AbstractChunkedIteratorOp<E>
 //implements IElementFilter<E>,
 //        implements IConstraint, 
@@ -67,8 +67,8 @@ extends AbstractBOp
 
     public DistinctElementFilter(final IVariable<?>[] distinctList, final UUID masterUUID) {
 
-        super(distinctList, NV.asMap(new NV[] { new NV(Annotations.QUERY_ID,
-                masterUUID),
+        super(distinctList, NV.asMap(new NV[] {
+//                new NV(Annotations.QUERY_ID, masterUUID),
         // new NV(Annotations.BOP_ID, bopId)
                 }));
 
@@ -110,7 +110,7 @@ extends AbstractBOp
             
             this.buffer = buffer;
 
-            final IVariable<?>[] vars = ((BOpList) args[0/* distinctList */])
+            final IVariable<?>[] vars = ((BOpList) get(0/* distinctList */))
                     .toArray(new IVariable[0]);
 
             this.sortKeyBuilder = new BindingSetSortKeyBuilder(KeyBuilder
