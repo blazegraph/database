@@ -154,7 +154,7 @@ public class MapBindingSetsOverShards extends AbstractPipelineOp<IBindingSet>
         
     }
     
-    public Future<Void> eval(final BOpContext<IBindingSet> context) {
+    public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         if (context.getFederation() == null) {
 
@@ -169,15 +169,8 @@ public class MapBindingSetsOverShards extends AbstractPipelineOp<IBindingSet>
 
         }
 
-        /*
-         * Note: The caller's BlockingBuffer is ignored.
-         */
-        final FutureTask<Void> ft = new FutureTask<Void>(new MapShardsTask(
-                context, sourceOp(), targetPred()));
-
-        context.getIndexManager().getExecutorService().execute(ft);
-
-        return ft;
+        return new FutureTask<Void>(new MapShardsTask(context, sourceOp(),
+                targetPred()));
 
     }
 

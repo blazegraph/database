@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.join;
 
 import java.util.Properties;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 
 import junit.framework.TestCase2;
 
@@ -189,8 +191,10 @@ public class TestPipelineJoin extends TestCase2 {
      *      (T2, B3) // T2:(Paul loves Leon) with B3:[A=Leon, B=Paul, ...].
      *      (T3, B2) // T3:(Leon loves Leon) with T2:[A=Paul, B=Leon, ...].
      * </pre>
+     * @throws ExecutionException 
+     * @throws InterruptedException 
      */
-    public void test_pipelineJoin() {
+    public void test_pipelineJoin() throws InterruptedException, ExecutionException {
 
         final int startId = 1;
         final int joinId = 2;
@@ -241,7 +245,11 @@ public class TestPipelineJoin extends TestCase2 {
                 ITx.UNISOLATED/* writeTimestamp */, -1/* partitionId */, stats,
                 source, sink, null/* sink2 */);
 
-        query.eval(context);
+        // get task.
+        final FutureTask<Void> ft = query.eval(context);
+        
+        // execute task.
+        jnl.getExecutorService().execute(ft);
 
         final IAsynchronousIterator<IBindingSet[]> itr = sink.iterator();
         try {
@@ -268,6 +276,10 @@ public class TestPipelineJoin extends TestCase2 {
         assertEquals(1L, stats.accessPathCount.get());
         assertEquals(1L, stats.chunkCount.get());
         assertEquals(1L, stats.elementCount.get());
+        
+        assertTrue(ft.isDone());
+        assertFalse(ft.isCancelled());
+        ft.get(); // verify nothing thrown.
 
     }
 

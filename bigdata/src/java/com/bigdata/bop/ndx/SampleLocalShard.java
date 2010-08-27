@@ -33,19 +33,14 @@ public class SampleLocalShard<E> extends AbstractSampleIndex<E> {
     /*
      * Note: This is done at evaluation time, local to the data. 
      */
-    public Future<Void> eval(final BOpContext<E> context) {
+    public FutureTask<Void> eval(final BOpContext<E> context) {
 
         if (context.getPartitionId() == -1) {
             // Must be specific to a shard.
             throw new UnsupportedOperationException();
         }
 
-        final FutureTask<Void> ft = new FutureTask<Void>(
-                new LocalShardSampleTask(context));
-
-        context.getIndexManager().getExecutorService().execute(ft);
-
-        return ft;
+        return new FutureTask<Void>(new LocalShardSampleTask(context));
 
     }
 

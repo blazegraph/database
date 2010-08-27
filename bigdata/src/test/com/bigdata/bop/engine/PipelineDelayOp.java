@@ -2,8 +2,9 @@ package com.bigdata.bop.engine;
 
 import java.util.Map;
 import java.util.concurrent.Callable;
-import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+
+import junit.framework.AssertionFailedError;
 
 import com.bigdata.bop.AbstractPipelineOp;
 import com.bigdata.bop.BOp;
@@ -12,8 +13,8 @@ import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 
 /**
- * This operator is used to feed the first join in the pipeline. The operator
- * should have no children but may be decorated with annotations as necessary.
+ * Operator block evaluation for the specified {@link Annotations#DELAY} and
+ * then throws an {@link AssertionFailedError}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -66,20 +67,14 @@ public class PipelineDelayOp extends AbstractPipelineOp<IBindingSet> implements
         return delay.longValue();
     }
 
-    /**
-     * Blocks for the specified {@link Annotations#DELAY}. 
-     */
-    public Future<Void> eval(final BOpContext<IBindingSet> context) {
+    public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         final FutureTask<Void> ft = new FutureTask<Void>(new Callable<Void>() {
             public Void call() throws Exception {
                 Thread.sleep(delayMillis());
-                TestQueryEngine.fail();
-                return null;
+                throw new AssertionFailedError();
             }
         });
-        
-        context.getIndexManager().getExecutorService().execute(ft);
         
         return ft;
 

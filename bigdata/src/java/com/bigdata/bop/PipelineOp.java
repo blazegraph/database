@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop;
 
-import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -111,14 +111,17 @@ public interface PipelineOp<E> extends BOp {
     IBlockingBuffer<E[]> newBuffer();
 
     /**
-     * Initiate execution for the operator, returning a {@link Future} which for
-     * that evaluation.
+     * Return a {@link FutureTask} which computes the operator against the
+     * evaluation context. The caller is responsible for executing the
+     * {@link FutureTask} (this gives them the ability to hook the completion of
+     * the computation).
      * 
      * @param context
      *            The evaluation context.
      * 
-     * @return The {@link Future} for the operator's evaluation.
+     * @return The {@link FutureTask} which will compute the operator's
+     *         evaluation.
      */
-    Future<Void> eval(BOpContext<E> context);
+    FutureTask<Void> eval(BOpContext<E> context);
 
 }

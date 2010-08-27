@@ -320,14 +320,9 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
         
     }
     
-    public Future<Void> eval(final BOpContext<IBindingSet> context) {
+    public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
-        final FutureTask<Void> ft = new FutureTask<Void>(new JoinTask(this,
-                context));
-
-        context.getIndexManager().getExecutorService().execute(ft);
-
-        return ft;
+        return new FutureTask<Void>(new JoinTask(this, context));
         
     }
 

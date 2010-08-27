@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.engine;
 
 import java.util.Map;
-import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Logger;
 
@@ -74,7 +74,7 @@ public class ReceiveBindingSets extends AbstractPipelineOp<IBindingSet> {
 
     }
 
-    public Future<Void> eval(final BOpContext<IBindingSet> context) {
+    public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         if (context.getFederation() == null) {
 

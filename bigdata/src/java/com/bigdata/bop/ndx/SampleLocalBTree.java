@@ -1,7 +1,6 @@
 package com.bigdata.bop.ndx;
 
 import java.util.concurrent.Callable;
-import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.BOpContext;
@@ -28,19 +27,14 @@ public class SampleLocalBTree<E> extends AbstractSampleIndex<E> {
 
     }
 
-    public Future<Void> eval(final BOpContext<E> context) {
+    public FutureTask<Void> eval(final BOpContext<E> context) {
 
         if (context.getPartitionId() != -1) {
             // Must not be specific to a shard.
             throw new UnsupportedOperationException();
         }
 
-        final FutureTask<Void> ft = new FutureTask<Void>(
-                new LocalBTreeSampleTask(context));
-
-        context.getIndexManager().getExecutorService().execute(ft);
-
-        return ft;
+        return new FutureTask<Void>(new LocalBTreeSampleTask(context));
 
     }
 

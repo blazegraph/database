@@ -59,7 +59,6 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
@@ -429,10 +428,12 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         private final Map<Integer,BOp> bopIndex;
 
         /**
-         * A collection of the currently executing futures.  {@link Future}s are
-         * added to this collection
+         * A collection of the currently executing futures. {@link Future}s are
+         * added to this collection by {@link #newChunkTask(BindingSetChunk)}.
+         * They are removed when they are {@link Future#isDone()}.
+         * {@link Future}s are cancelled if the {@link RunningQuery} is halted.
          */
-        private final ConcurrentHashMap<Future<?>,Future<?>> futures = new ConcurrentHashMap<Future<?>, Future<?>>();
+        private final ConcurrentHashMap<Future<?>, Future<?>> futures = new ConcurrentHashMap<Future<?>, Future<?>>();
         
         /**
          * 
@@ -458,6 +459,19 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
             this.bopIndex = BOpUtility.getIndex(query);
         }
 
+        /**
+         * Create a {@link BindingSetChunk} from a sink and add it to the queue.
+         * 
+         * @param sinkId
+         * @param sink
+         * 
+         * @todo In scale-out, this is where we need to map the binding sets
+         *       over the shards for the target operator.
+         */
+        private void add(final int sinkId, final IBlockingBuffer<?> sink) {
+            throw new UnsupportedOperationException();
+        }
+        
         /**
          * Make a chunk of binding sets available for consumption by the query.
          * 
@@ -508,6 +522,9 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
              * nodes).
              * 
              * @todo If eval of the chunk fails, halt() the query.
+             * 
+             * @todo evaluation of element[] pipelines might run into type
+             * problems with the [queryBuffer].
              */
             final BOp bop = bopIndex.get(chunk.bopId);
             if (bop == null) {
@@ -517,18 +534,47 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
                 throw new UnsupportedOperationException(bop.getClass()
                         .getName());
             }
+            // sink
+            final Integer sinkId = null;// @todo from annotation (it is the parent).
             final IBlockingBuffer<?> sink = ((PipelineOp<?>) bop).newBuffer();
+            // altSink
             final Integer altSinkId = (Integer) bop
                     .getProperty(BindingSetPipelineOp.Annotations.ALT_SINK_REF);
             if (altSinkId != null && !bopIndex.containsKey(altSinkId)) {
                 throw new NoSuchBOpException(altSinkId);
             }
-            final IBlockingBuffer<?> sink2 = altSinkId == null ? null
+            final IBlockingBuffer<?> altSink = altSinkId == null ? null
                     : ((PipelineOp<?>) bop).newBuffer();
+            // context
             final BOpContext context = new BOpContext(queryEngine.fed,
                     queryEngine.indexManager, readTimestamp, writeTimestamp,
-                    chunk.partitionId, stats, chunk.source, sink, sink2);
-            return ((PipelineOp)bop).eval(context);
+                    chunk.partitionId, stats, chunk.source, sink, altSink);
+            // FutureTask for operator execution (not running yet).
+            final FutureTask<Void> f = ((PipelineOp)bop).eval(context);
+            // Hook the FutureTask.
+            final Runnable r = new Runnable() {
+                public void run() {
+                    try {
+                        f.run(); // run
+                        f.get(); // verify success
+                        add(sinkId, sink); // handle output chunk.
+                        if (altSink != null) // handle alt sink output chunk.
+                            add(altSinkId, altSink);
+                    } catch (Throwable t) {
+                        // operator failed on this chunk.
+                        RunningQuery.this
+                                .cancel(true/* mayInterruptIfRunning */);
+                        log.error("queryId=" + queryId + ",bopId="
+                                + chunk.bopId + ",partitionId="
+                                + chunk.partitionId + " : " + t);
+                    }
+                }
+            };
+            // wrap runnable.
+            final FutureTask<Void> f2 = new FutureTask(r, null/* result */);
+            // add to list of active futures.
+            futures.put(f2, f2);
+            return f;
         }
         
         /**
@@ -541,8 +587,8 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
          * @todo Do all queries produce solutions (mutation operations might
          *       return a mutation count, but they do not return solutions).
          */
-        public IChunkedIterator<IBindingSet> iterator() {
-            throw new UnsupportedOperationException();
+        public IAsynchronousIterator<IBindingSet[]> iterator() {
+            return queryBuffer.iterator();
         }
 
         /*
@@ -553,7 +599,10 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
          * query.
          */
 
-        final public boolean cancel(boolean mayInterruptIfRunning) {
+        final public boolean cancel(final boolean mayInterruptIfRunning) {
+            for (Future<?> f : futures.keySet()) {
+                f.cancel(mayInterruptIfRunning);
+            }
             return future.cancel(mayInterruptIfRunning);
         }
 
