@@ -5,10 +5,6 @@ import java.rmi.RemoteException;
 import java.util.UUID;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IPredicate;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.striterator.IChunkedIterator;
 
 /**
  * Interface for a client executing queries.
@@ -76,30 +72,69 @@ public interface IQueryClient extends IQueryPeer, Remote {
     public BOp getQuery(long queryId) throws RemoteException;
 
     /**
-     * Notify the client that execution has started for some query,
-     * operator, node, and index partition.
+     * Notify the client that execution has started for some query, operator,
+     * node, and index partition.
      * 
      * @param queryId
+     *            The query identifier.
      * @param opId
-     * @param serviceId
+     *            The operator identifier.
      * @param partitionId
+     *            The index partition identifier.
+     * @param serviceId
+     *            The node on which the operator will execute.
+     * @param nchunks
+     *            The #of chunks which form the input to that operator (for the
+     *            atomic termination condition decision).
      */
-    public void startOp(long queryId, int opId, UUID serviceId,
-            int partitionId) throws RemoteException;
+    public void startOp(long queryId, int opId, int partitionId, UUID serviceId, final int nchunks)
+            throws RemoteException;
 
     /**
      * Notify the client that execution has halted for some query, operator,
-     * node and index partition. If execution halted abnormally, then the
-     * cause is sent as well.
+     * node and index partition. If execution halted abnormally, then the cause
+     * is sent as well.
      * 
      * @param queryId
+     *            The query identifier.
      * @param opId
-     * @param serviceId
+     *            The operator whose execution phase has terminated for a
+     *            specific index partition and input chunk.
      * @param partitionId
+     *            The index partition against which the operator was executed.
+     * @param serviceId
+     *            The node which executed the operator.
      * @param cause
      *            <code>null</code> unless execution halted abnormally.
+     * @param nchunks
+     *            The #of chunks which were output by the operator (for the
+     *            atomic termination decision). This is ONE (1) for scale-up.
+     *            For scale-out, this is one per index partition over which the
+     *            intermediate results were mapped.
+     * @param taskStats
+     *            The statistics for the execution of that bop on that shard and
+     *            service.
      */
-    public void haltOp(long queryId, int opId, UUID serviceId,
-            int partitionId, Throwable cause) throws RemoteException;
+    public void haltOp(long queryId, int opId, int partitionId, UUID serviceId,
+            Throwable cause, int nchunks, BOpStats taskStats)
+            throws RemoteException;
 
+//    /**
+//     * Notify the query controller that a chunk of intermediate results is
+//     * available for the query.
+//     * 
+//     * @param queryId
+//     *            The query identifier.
+//     */
+//    public void addChunk(long queryId) throws RemoteException;
+//
+//    /**
+//     * Notify the query controller that a chunk of intermediate results was
+//     * taken for processing by the query.
+//     * 
+//     * @param queryId
+//     *            The query identifier.
+//     */
+//    public void takeChunk(long queryId) throws RemoteException;
+    
 }

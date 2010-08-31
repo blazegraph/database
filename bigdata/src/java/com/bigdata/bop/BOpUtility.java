@@ -395,4 +395,51 @@ public class BOpUtility {
         return map;
     }
 
+    /**
+     * Return the parent of the operator in the operator tree (this does not
+     * search the annotations, just the children).
+     * <p>
+     * Note that {@link Var} is a singleton pattern for each distinct variable
+     * node, so there can be multiple parents for a {@link Var}.
+     * 
+     * @param root
+     *            The root of the operator tree (or at least a known ancestor of
+     *            the operator).
+     * @param op
+     *            The operator.
+     * 
+     * @return The parent -or- <code>null</code> if <i>op</i> is not found in
+     *         the operator tree.
+     * 
+     * @throws IllegalArgumentException
+     *             if either argument is <code>null</code>.
+     */
+    static public BOp getParent(final BOp root, final BOp op) {
+
+        if (root == null)
+            throw new IllegalArgumentException();
+
+        if (op == null)
+            throw new IllegalArgumentException();
+
+        final Iterator<BOp> itr = root.args().iterator();
+
+        while (itr.hasNext()) {
+
+            final BOp current = itr.next();
+
+            if (current == op)
+                return root;
+
+            final BOp found = getParent(current, op);
+
+            if (found != null)
+                return found;
+            
+        }
+
+        return null;
+
+    }
+
 }

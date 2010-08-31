@@ -1081,11 +1081,17 @@ public class DefaultGraphSolutionExpander implements ISolutionExpander<ISPO> {
         public IChunkedOrderedIterator<ISPO> iterator(final long offset,
                 final long limit, final int capacity) {
 
+            if (sourceAccessPath.rangeCount(false/* exact */) == 1L) {
+                // do not wrap since must be distinct.
+                return sourceAccessPath.iterator(offset, limit, capacity);
+            }
+
             final ICloseableIterator<ISPO> src = sourceAccessPath.iterator(
                     offset, limit, capacity);
 
             return new ChunkedWrappedIterator<ISPO>(sourceAccessPath
-                    .getRelation().distinctSPOIterator(src));
+                    .getRelation().distinctSPOIterator(src), sourceAccessPath
+                    .getChunkCapacity(), sourceAccessPath.getKeyOrder(), null/* filter */);
 
         }
         

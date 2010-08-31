@@ -107,7 +107,10 @@ import com.bigdata.util.concurrent.LatchedExecutor;
  *       key-range partitions, then the fan-in for the sources may be larger
  *       than one as there will be one {@link JoinTask} for each index partition
  *       touched by each join dimension.
- * @todo provide more control over the access path (fully buffered read thresholds).
+ * 
+ * @todo provide more control over the access path (fully buffered read
+ *       thresholds).
+ * 
  * @todo Do we need to hook the source and sink {@link Future}s?
  * 
  * @todo Break the star join logic out into its own join operator.

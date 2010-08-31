@@ -305,4 +305,24 @@ public class BOpBase implements BOp {
 
     }
 
+    public String toString() {
+        
+        final StringBuilder sb = new StringBuilder();
+        sb.append(getClass().getName());
+        sb.append("(");
+        for (int i = 0; i < args.length; i++) {
+            final BOp t = args[i];
+            if (i > 0)
+                sb.append(',');
+            sb.append(t.getClass().getSimpleName());
+        }
+        sb.append(")[");
+        final Integer id = (Integer) annotations.get(Annotations.BOP_ID);
+        if (id != null)
+            sb.append("Annotations.BOP_ID=" + id);
+        sb.append("]");
+        return sb.toString();
+
+    }
+
 }
