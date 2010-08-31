@@ -417,8 +417,6 @@ public class TestBOpUtility extends TestCase2 {
 
     /**
      * Unit test for {@link BOpUtility#getIndex(BOp)}.
-     * 
-     * @todo test for correct detection of duplicates.
      */
     public void test_getIndex() {
 
@@ -505,6 +503,64 @@ public class TestBOpUtility extends TestCase2 {
             BOpUtility.getIndex(root);
             fail("Expecting: " + BadBOpIdTypeException.class);
         } catch (BadBOpIdTypeException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+        }
+
+    }
+
+    /**
+     * Unit test for {@link BOpUtility#getParent(BOp, BOp)}.
+     */
+    public void test_getParent() {
+        
+        final BOp a1 = new BOpBase(new BOp[]{Var.var("a")},NV.asMap(new NV[]{//
+                new NV(BOp.Annotations.BOP_ID,1),//
+        }));
+        final BOp a2 = new BOpBase(new BOp[]{Var.var("b")},NV.asMap(new NV[]{//
+                new NV(BOp.Annotations.BOP_ID,2),//
+        }));
+        // Note: [a3] tests recursion (annotations of annotations).
+        final BOp a3 = new BOpBase(new BOp[] { Var.var("z") , a1}, NV
+                .asMap(
+                        new NV[] { //
+                                new NV("baz", a2),//
+                                new NV("baz2", "skip")//
+                                }//
+                        ));
+        
+        final BOp op2 = new BOpBase(new BOp[] { Var.var("x") , a3 }, NV.asMap(new NV[]{//
+                new NV("foo1",a1),//
+                new NV("foo3", "skip"),//
+                new NV(BOp.Annotations.BOP_ID,3),//
+        }));
+
+        // root
+        final BOp root = new BOpBase(new BOp[] { // root args[]
+                new Constant<String>("12"), Var.var("y"), op2 }, NV.asMap(new NV[]{//
+                        new NV(BOp.Annotations.BOP_ID, 4),//
+                        }));
+
+        assertTrue(root == BOpUtility.getParent(root, op2));
+
+        assertTrue(op2 == BOpUtility.getParent(root, Var.var("x")));
+
+        assertTrue(op2 == BOpUtility.getParent(root, a3));
+
+        assertTrue(a3 == BOpUtility.getParent(root, a1));
+
+        try {
+            BOpUtility.getParent(null/* root */, op2);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+        }
+
+        try {
+            BOpUtility.getParent(root, null/* op */);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }

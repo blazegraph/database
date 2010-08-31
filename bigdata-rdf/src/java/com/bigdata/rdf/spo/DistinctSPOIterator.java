@@ -87,9 +87,10 @@ public class DistinctSPOIterator implements ICloseableIterator<ISPO> {
      * @todo configuration parameter (via the constructor). Low memory JVMs
      *       might want to use a smaller threshold, but the hash set is much
      *       faster (10x or better). Large memory JVMs might want to use an even
-     *       larger threshold.
+     *       larger threshold. [I've set this to MAX_VALUE since the BTree is a
+     *       huge performance hit.]
      */
-    static final int MAX_HASH_SET_CAPACITY = 100000;
+    static final int MAX_HASH_SET_CAPACITY = Integer.MAX_VALUE;//100000;
 
     /**
      * 
@@ -165,14 +166,17 @@ public class DistinctSPOIterator implements ICloseableIterator<ISPO> {
             /*
              * Allocate hash set.
              * 
-             * Note: using a linked hash set for faster iterator if we have
-             * to convert to a B+Tree.
+             * Note: using a linked hash set for faster iterator if we have to
+             * convert to a B+Tree.
              * 
-             * Note: the initial capacity is the default since most access
-             * paths have low cardinality.
+             * Note: the initial capacity is the default since most access paths
+             * have low cardinality.
              * 
-             * @todo if the caller knows the range count (upper bound) then
-             * we could plan the hash set capacity more accurately.
+             * @todo if the caller knows the range count (upper bound) then we
+             * could plan the hash set capacity more accurately.
+             * 
+             * @todo defer hashSet creation until 2nd distinct SPO shows up to
+             * reduce the object allocation.
              */
 
             hashSet = new LinkedHashSet<ISPO>();

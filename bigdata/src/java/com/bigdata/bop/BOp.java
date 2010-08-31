@@ -141,6 +141,18 @@ public interface BOp extends Cloneable, Serializable {
          */
         String BOP_ID = "bopId";
         
+        /**
+         * The timeout for the operator evaluation (milliseconds).
+         * 
+         * @see #DEFAULT_TIMEOUT
+         */
+        String TIMEOUT = "timeout";
+        
+        /**
+         * The default timeout for operator evaluation.
+         */
+        long DEFAULT_TIMEOUT = Long.MAX_VALUE;
+        
     }
     
 }

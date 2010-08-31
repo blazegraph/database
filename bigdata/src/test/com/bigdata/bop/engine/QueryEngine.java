@@ -30,36 +30,23 @@ package com.bigdata.bop.engine;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.rmi.RemoteException;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.NoSuchBOpException;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * A class managing execution of concurrent queries against a local
@@ -201,15 +188,13 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     private final static transient Logger log = Logger
             .getLogger(QueryEngine.class);
 
-//    public static class Config {
-//        
-//        public int nIOThreads = 10;
-//
-//        public int maxBuffers = (int) Runtime.getRuntime().maxMemory() / 2
-//                / DirectBufferPool.INSTANCE.getBufferCapacity();
-//        
-//    }
-  
+    /**
+     * The {@link IBigdataFederation} iff running in scale-out.
+     * <p>
+     * Note: The {@link IBigdataFederation} is required in scale-out in order to
+     * perform shard locator scans when mapping binding sets across the next
+     * join in a query plan.
+     */
     private final IBigdataFederation<?> fed;
     
     /**
@@ -219,7 +204,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * locks. The {@link QueryEngine} is intended to run only against committed
      * index views for which no locks are required.
      */
-    private final IIndexManager indexManager;
+    private final IIndexManager localIndexManager;
 
     /**
      * A service used to expose {@link ByteBuffer}s and managed index resources
@@ -260,370 +245,43 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 //    private final ForkJoinPool fjpool;
 
     /**
-     * A chunk of intermediate results which are ready to be consumed by some
-     * {@link BOp} in a specific query.
+     * The {@link UUID} of the service in which this {@link QueryEngine} is
+     * running.
+     * 
+     * @return The {@link UUID} of the service in which this {@link QueryEngine}
+     *         is running -or- <code>null</code> if the {@link QueryEngine} is
+     *         not running against an {@link IBigdataFederation}.
      */
-    public static class BindingSetChunk {
+    protected UUID getServiceId() {
 
-        /**
-         * The target {@link BOp}.
-         */
-        final int bopId;
-
-        /**
-         * The index partition which is being targetted for that {@link BOp}.
-         */
-        final int partitionId;
+        return fed == null ? null : fed.getServiceUUID();
         
-        /**
-         * The binding sets to be consumed by that {@link BOp}.
-         */
-        final IAsynchronousIterator<IBindingSet[]> source;
-
-        public BindingSetChunk(final int bopId, final int partitionId,
-                final IAsynchronousIterator<IBindingSet[]> source) {
-            if (source == null)
-                throw new IllegalArgumentException();
-            this.bopId = bopId;
-            this.partitionId = partitionId;
-            this.source = source;
-        }
-       
     }
 
     /**
-     * Metadata about running queries.
-     * 
-     * @todo Cache any resources materialized for the query on this node (e.g.,
-     *       temporary graphs materialized from a peer or the client). A bop
-     *       should be able to demand those data from the cache and otherwise
-     *       have them be materialized.
-     * 
-     * @todo metadata for priority queues (e.g., time remaining or priority).
-     *       [metadata about resource allocations is part of the query plan.]
-     * 
-     * @todo HA aspects of running queries?
-     * 
-     * @todo Cancelled queries must reject or drop new chunks, etc. Halted
-     *       queries must release all of their resources.
+     * The {@link IBigdataFederation} iff running in scale-out.
+     * <p>
+     * Note: The {@link IBigdataFederation} is required in scale-out in order to
+     * perform shard locator scans when mapping binding sets across the next
+     * join in a query plan.
      */
-    public static class RunningQuery<V extends BOpStats> implements Future<V> {
-
-        /**
-         * The run state of the query and the result of the computation iff it
-         * completes execution normally (without being interrupted, cancelled,
-         * etc).
-         */
-        final private Haltable<V> future = new Haltable<V>();
-
-        /**
-         * The runtime statistics for the query.
-         * 
-         * @todo This has to be per-{@link BOp}.
-         */
-        @SuppressWarnings("unchecked")
-        final private V stats = (V) new BOpStats();
+    public IBigdataFederation<?> getFederation() {
         
-        /**
-         * The class executing the query on this node.
-         */
-        final QueryEngine queryEngine;
+        return fed;
         
-        /** The unique identifier for this query. */
-        final long queryId;
-
-        /**
-         * The timestamp or transaction identifier against which the query 
-         * is reading.
-         */
-        final long readTimestamp;
-
-        /**
-         * The timestamp or transaction identifier against which the query 
-         * is writing.
-         */
-        final long writeTimestamp;
+    }
+    
+    /**
+     * Access to the indices.
+     * <p>
+     * Note: You MUST NOT use unisolated indices without obtaining the necessary
+     * locks. The {@link QueryEngine} is intended to run only against committed
+     * index views for which no locks are required.
+     */
+    public IIndexManager getLocalIndexManager() {
         
-        /**
-         * The timestamp when the query was accepted by this node (ns).
-         * 
-         * @todo add a [deadline] field, which is when the query is due.
-         */
-        final long begin;
-
-        /**
-         * The client executing this query.
-         */
-        final IQueryClient clientProxy;
+        return localIndexManager;
         
-        /** The query iff materialized on this node. */
-        final AtomicReference<BOp> queryRef;
-
-        /**
-         * The buffer used for the overall output of the query pipeline.
-         * 
-         * @todo How does the pipeline get attached to this buffer? Via a
-         *       special operator?  Or do we just target the coordinating
-         *       {@link QueryEngine} as the sink of the last operator so
-         *       we can use NIO transfers?
-         */
-        final IBlockingBuffer<IBindingSet[]> queryBuffer;
-        
-        /**
-         * A map associating resources with running queries. When a query halts,
-         * the resources listed in its resource map are released. Resources can
-         * include {@link ByteBuffer}s backing either incoming or outgoing
-         * {@link BindingSetChunk}s, temporary files associated with the query,
-         * hash tables, etc.
-         * 
-         * @todo only use the values in the map for transient objects, such as a
-         *       hash table which is not backed by the disk. For
-         *       {@link ByteBuffer}s we want to make the references go through
-         *       the {@link BufferService}. For files, through the
-         *       {@link ResourceManager}.
-         * 
-         * @todo We need to track the resources in use by the query so they can
-         *       be released when the query terminates. This includes: buffers;
-         *       joins for which there is a chunk of binding sets that are
-         *       currently being executed; downstream joins (they depend on the
-         *       source joins to notify them when they are complete in order to
-         *       decide their own termination condition); local hash tables
-         *       which are part of a DHT (especially when they are persistent);
-         *       buffers and disk resources allocated to N-way merge sorts, etc.
-         * 
-         * @todo The set of buffers having data which has been accepted for this
-         *       query.
-         * 
-         * @todo The set of buffers having data which has been generated for
-         *       this query.
-         * 
-         * @todo The counter for each open join of the #of active sources. This
-         *       must be coordinated with the client to decide when a join is
-         *       done. This decision determines when the sinks of the join will
-         *       be notified that a given source is done and hence when the sink
-         *       joins will decide that they are done. [Think this through more
-         *       in terms of the client coordination for optional gotos.]
-         */
-        private final ConcurrentHashMap<UUID, Object> resourceMap = new ConcurrentHashMap<UUID, Object>();
-
-        /**
-         * The chunks available for immediate processing.
-         */
-        private final BlockingQueue<BindingSetChunk> chunksIn = new LinkedBlockingDeque<BindingSetChunk>();
-
-        /**
-         * The chunks generated by this query.
-         * 
-         * @todo remove chucks from this queue when they are consumed, whether
-         *       by a local process or by transferring the data to a remote
-         *       service. When the data are transferred from a managed
-         *       {@link ByteBuffer} to a remote service, release the
-         *       {@link ByteBuffer} back to the {@link BufferService}.
-         */
-        private final BlockingQueue<BindingSetChunk> chunksOut = new LinkedBlockingDeque<BindingSetChunk>();
-
-        /**
-         * An index from the {@link BOp.Annotations#BOP_ID} to the {@link BOp}.
-         */
-        private final Map<Integer,BOp> bopIndex;
-
-        /**
-         * A collection of the currently executing futures. {@link Future}s are
-         * added to this collection by {@link #newChunkTask(BindingSetChunk)}.
-         * They are removed when they are {@link Future#isDone()}.
-         * {@link Future}s are cancelled if the {@link RunningQuery} is halted.
-         */
-        private final ConcurrentHashMap<Future<?>, Future<?>> futures = new ConcurrentHashMap<Future<?>, Future<?>>();
-        
-        /**
-         * 
-         * @param queryId
-         * @param begin
-         * @param clientProxy 
-         * @param query
-         *            The query (optional).
-         */
-        public RunningQuery(final QueryEngine queryEngine, final long queryId,
-                final long readTimestamp, final long writeTimestamp,
-                final long begin, final IQueryClient clientProxy,
-                final BOp query,
-                final IBlockingBuffer<IBindingSet[]> queryBuffer) {
-            this.queryEngine = queryEngine;
-            this.queryId = queryId;
-            this.readTimestamp = readTimestamp;
-            this.writeTimestamp = writeTimestamp;
-            this.begin = begin;
-            this.clientProxy = clientProxy;
-            this.queryRef = new AtomicReference<BOp>(query);
-            this.queryBuffer = queryBuffer;
-            this.bopIndex = BOpUtility.getIndex(query);
-        }
-
-        /**
-         * Create a {@link BindingSetChunk} from a sink and add it to the queue.
-         * 
-         * @param sinkId
-         * @param sink
-         * 
-         * @todo In scale-out, this is where we need to map the binding sets
-         *       over the shards for the target operator.
-         */
-        private void add(final int sinkId, final IBlockingBuffer<?> sink) {
-            throw new UnsupportedOperationException();
-        }
-        
-        /**
-         * Make a chunk of binding sets available for consumption by the query.
-         * 
-         * @param chunk
-         *            The chunk.
-         */
-        public void add(final BindingSetChunk chunk) {
-            if (chunk == null)
-                throw new IllegalArgumentException();
-            future.halted();
-            chunksIn.add(chunk);
-            queryEngine.priorityQueue.add(this);
-        }
-
-        /**
-         * Return the current statistics for the query.
-         */
-        public BOpStats getStats() {
-            return stats;
-        }
-
-        /**
-         * Return a {@link FutureTask} which will consume the binding set chunk.
-         * 
-         * @param chunk
-         * 
-         *            FIXME The chunk task should notice if the {@link Haltable}
-         *            on the {@link RunningQuery} is halted and should terminate
-         *            eagerly. There can be more than one chunk task running at
-         *            a time for the same query and even for the same
-         *            {@link BOp} for a given query. We need to keep those
-         *            {@link Future}s in a collection so we can cancel them if
-         *            the query is halted.
-         */
-        @SuppressWarnings("unchecked")
-        protected Future<Void> newChunkTask(final BindingSetChunk chunk) {
-            /*
-             * Look up the BOp in the index, create the BOpContext for that BOp,
-             * and return the value returned by BOp.eval(context).
-             * 
-             * @todo We have to provide for the sink, which can be a backed by
-             * one, or many, NIO buffers for high volume query and which will be
-             * just a transient blocking buffer otherwise.
-             * 
-             * @todo When eval of that chunk is done, the sink gets wrapped as a
-             * chunk for the next bop (by its bopId) and submitted back to the
-             * query engine (in scale-out, it gets mapped over the shards or
-             * nodes).
-             * 
-             * @todo If eval of the chunk fails, halt() the query.
-             * 
-             * @todo evaluation of element[] pipelines might run into type
-             * problems with the [queryBuffer].
-             */
-            final BOp bop = bopIndex.get(chunk.bopId);
-            if (bop == null) {
-                throw new NoSuchBOpException(chunk.bopId);
-            }
-            if (!(bop instanceof PipelineOp<?>)) {
-                throw new UnsupportedOperationException(bop.getClass()
-                        .getName());
-            }
-            // sink
-            final Integer sinkId = null;// @todo from annotation (it is the parent).
-            final IBlockingBuffer<?> sink = ((PipelineOp<?>) bop).newBuffer();
-            // altSink
-            final Integer altSinkId = (Integer) bop
-                    .getProperty(BindingSetPipelineOp.Annotations.ALT_SINK_REF);
-            if (altSinkId != null && !bopIndex.containsKey(altSinkId)) {
-                throw new NoSuchBOpException(altSinkId);
-            }
-            final IBlockingBuffer<?> altSink = altSinkId == null ? null
-                    : ((PipelineOp<?>) bop).newBuffer();
-            // context
-            final BOpContext context = new BOpContext(queryEngine.fed,
-                    queryEngine.indexManager, readTimestamp, writeTimestamp,
-                    chunk.partitionId, stats, chunk.source, sink, altSink);
-            // FutureTask for operator execution (not running yet).
-            final FutureTask<Void> f = ((PipelineOp)bop).eval(context);
-            // Hook the FutureTask.
-            final Runnable r = new Runnable() {
-                public void run() {
-                    try {
-                        f.run(); // run
-                        f.get(); // verify success
-                        add(sinkId, sink); // handle output chunk.
-                        if (altSink != null) // handle alt sink output chunk.
-                            add(altSinkId, altSink);
-                    } catch (Throwable t) {
-                        // operator failed on this chunk.
-                        RunningQuery.this
-                                .cancel(true/* mayInterruptIfRunning */);
-                        log.error("queryId=" + queryId + ",bopId="
-                                + chunk.bopId + ",partitionId="
-                                + chunk.partitionId + " : " + t);
-                    }
-                }
-            };
-            // wrap runnable.
-            final FutureTask<Void> f2 = new FutureTask(r, null/* result */);
-            // add to list of active futures.
-            futures.put(f2, f2);
-            return f;
-        }
-        
-        /**
-         * Return an iterator which will drain the solutions from the query. The
-         * query will be cancelled if the iterator is
-         * {@link ICloseableIterator#close() closed}.
-         * 
-         * @return
-         * 
-         * @todo Do all queries produce solutions (mutation operations might
-         *       return a mutation count, but they do not return solutions).
-         */
-        public IAsynchronousIterator<IBindingSet[]> iterator() {
-            return queryBuffer.iterator();
-        }
-
-        /*
-         * Future
-         * 
-         * Note: This is implemented using delegation to the Haltable so we can
-         * hook various methods in order to clean up the state of a completed
-         * query.
-         */
-
-        final public boolean cancel(final boolean mayInterruptIfRunning) {
-            for (Future<?> f : futures.keySet()) {
-                f.cancel(mayInterruptIfRunning);
-            }
-            return future.cancel(mayInterruptIfRunning);
-        }
-
-        final public V get() throws InterruptedException, ExecutionException {
-            return future.get();
-        }
-
-        final public V get(long arg0, TimeUnit arg1)
-                throws InterruptedException, ExecutionException,
-                TimeoutException {
-            return future.get(arg0, arg1);
-        }
-
-        final public boolean isCancelled() {
-            return future.isCancelled();
-        }
-
-        final public boolean isDone() {
-            return future.isDone();
-        }
-
     }
 
     /**
@@ -638,18 +296,18 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * have not yet been demanded. Once we receive notice that a query has been
      * cancelled it is removed from this collection.
      * 
-     * @todo if a query is halted, it needs to be removed from this collection.
-     * 
-     * @todo a race is possible where a query is cancelled on a node where the
-     *       node receives notice to start the query after the cancelled message
-     *       has arrived. to avoid having such queries linger, we should have a
-     *       a concurrent hash set with an approximate LRU policy containing the
-     *       identifiers for queries which have been cancelled, possibly paired
-     *       with the cause (null if normal execution). That will let us handle
-     *       any reasonable concurrent indeterminism between cancel and start
-     *       notices for a query.
+     * @todo If a query is halted, it needs to be removed from this collection.
      *       <p>
-     *       another way in which this might be addressed in involving the
+     *       However, a race is possible where a query is cancelled on a node
+     *       where the node receives notice to start the query after the
+     *       cancelled message has arrived. to avoid having such queries linger,
+     *       we should have a a concurrent hash set with an approximate LRU
+     *       policy containing the identifiers for queries which have been
+     *       cancelled, possibly paired with the cause (null if normal
+     *       execution). That will let us handle any reasonable concurrent
+     *       indeterminism between cancel and start notices for a query.
+     *       <p>
+     *       Another way in which this might be addressed in involving the
      *       client each time a query start is propagated to a node. if we
      *       notify the client that the query will start on the node first, then
      *       the client can always issue the cancel notices [unless the client
@@ -661,13 +319,13 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      *       active queries (their statistics) and administrative operations to
      *       kill a query.
      */
-    private final ConcurrentHashMap<Long/* queryId */, RunningQuery<?>> runningQueries = new ConcurrentHashMap<Long, RunningQuery<?>>();
+    final ConcurrentHashMap<Long/* queryId */, RunningQuery> runningQueries = new ConcurrentHashMap<Long, RunningQuery>();
 
     /**
      * A priority queue of {@link RunningQuery}s having binding set chunks
      * available for consumption.
      */
-    private final PriorityBlockingQueue<RunningQuery<?>> priorityQueue = new PriorityBlockingQueue<RunningQuery<?>>();
+    final private PriorityBlockingQueue<RunningQuery> priorityQueue = new PriorityBlockingQueue<RunningQuery>();
 
     /**
      * 
@@ -676,13 +334,9 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * @param indexManager
      *            The <em>local</em> index manager.
      * @param bufferService
-     * @param nThreads
-     * 
-     * @todo nThreads is not used right now since tasks are being run against
-     *       the index manager's executor service.  
      */
     public QueryEngine(final IBigdataFederation<?> fed, final IIndexManager indexManager,
-            final ManagedBufferService bufferService, final int nThreads) {
+            final ManagedBufferService bufferService) {
 
         if (indexManager == null)
             throw new IllegalArgumentException();
@@ -690,7 +344,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
             throw new IllegalArgumentException();
         
         this.fed = fed; // MAY be null.
-        this.indexManager = indexManager;
+        this.localIndexManager = indexManager;
         this.bufferService = bufferService;
 //        this.iopool = new LatchedExecutor(indexManager.getExecutorService(),
 //                nThreads);
@@ -712,7 +366,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         
         if (engineFuture.compareAndSet(null/* expect */, ft)) {
         
-            indexManager.getExecutorService().execute(ft);
+            localIndexManager.getExecutorService().execute(ft);
             
         } else {
             
@@ -730,16 +384,35 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     /**
      * Volatile flag is set for normal termination.
      */
-    private volatile boolean shutdown = false; 
-    
+    private volatile boolean shutdown = false;
+
     /**
      * Runnable submits chunks available for evaluation against running queries.
+     * 
+     * @todo Handle priority for selective queries based on the time remaining
+     *       until the timeout.
+     *       <p>
+     *       Handle priority for unselective queries based on the order in which
+     *       they are submitted?
+     * @todo The approach taken by the {@link QueryEngine} executes one task per
+     *       pipeline bop per chunk. Outside of how the tasks are scheduled,
+     *       this corresponds closely to the historical pipeline query
+     *       evaluation. The other difference is that there is less opportunity
+     *       for concatenation of chunks. However, chunk concatenation could be
+     *       performed here if we (a) mark the BindingSetChunk with a flag to
+     *       indicate when it has been accepted; and (b) rip through the
+     *       incoming chunks for the query for the target bop and combine them
+     *       to feed the task. Chunks which have already been assigned would be
+     *       dropped when take() discovers them above. [The chunk combination
+     *       could also be done when we output the chunk if the sink has not
+     *       been taken, e.g., by combining the chunk into the same target
+     *       ByteBuffer, or when we add the chunk to the RunningQuery.]
      */
     private class QueryEngineTask implements Runnable {
         public void run() {
             try {
                 while (true) {
-                    final RunningQuery<?> q = priorityQueue.take();
+                    final RunningQuery q = priorityQueue.take();
                     if (q.isCancelled())
                         continue;
                     final BindingSetChunk chunk = q.chunksIn.poll();
@@ -750,39 +423,13 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
                         continue;
                     }
                     if (log.isTraceEnabled())
-                        log.trace("Accepted chunk: queryId=" + q.queryId);
+                        log.trace("Accepted chunk: queryId=" + q.queryId
+                                + ", bopId=" + chunk.bopId);
                     try {
-                        /*
-                         * @todo The approach taken by the {@link QueryEngine}
-                         * executes one task per pipeline bop per chunk. Outside
-                         * of how the tasks are scheduled, this corresponds
-                         * closely to the historical pipeline query evaluation.
-                         * The other difference is that there is less
-                         * opportunity for concatenation of chunks. However,
-                         * chunk concatenation could be performed here if we (a)
-                         * mark the BindingSetChunk with a flag to indicate when
-                         * it has been accepted; and (b) rip through the
-                         * incoming chunks for the query for the target bop and
-                         * combine them to feed the task. Chunks which have
-                         * already been assigned would be dropped when take()
-                         * discovers them above. [The chunk combination could
-                         * also be done when we output the chunk if the sink has
-                         * not been taken, e.g., by combining the chunk into the
-                         * same target ByteBuffer, or when we add the chunk to
-                         * the RunningQuery.]
-                         * 
-                         * Note: newChunkTask() returns a Future which is
-                         * already executing against a thread pool.
-                         * 
-                         * @todo Do we need to watch the futures? [Yes, since we
-                         * need to mark the RunningQuery as halted if the Future
-                         * reports an error.  It would be best to do that using
-                         * a hook on the Future.]
-                         */
-                        final Future<?> ft = q.newChunkTask(chunk);
-//                        iopool.execute(ft);
-                        if (log.isDebugEnabled())
-                            log.debug("Running chunk: queryId=" + q.queryId);
+                        // create task.
+                        final FutureTask<?> ft = q.newChunkTask(chunk);
+                        // execute task.
+                        localIndexManager.getExecutorService().execute(ft);
                     } catch (RejectedExecutionException ex) {
                         // shutdown of the pool (should be an unbounded pool).
                         log.warn("Dropping chunk: queryId=" + q.queryId);
@@ -799,6 +446,32 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
             }
         }
     } // QueryEngineTask
+
+    /**
+     * Add a chunk of intermediate results for consumption by some query. The
+     * chunk will be attached to the query and the query will be scheduled for
+     * execution.
+     * 
+     * @param chunk
+     *            A chunk of intermediate results.
+     */
+    void add(final BindingSetChunk chunk) {
+        
+        if (chunk == null)
+            throw new IllegalArgumentException();
+
+        final RunningQuery q = runningQueries.get(chunk.queryId);
+        
+        if(q == null)
+            throw new IllegalStateException();
+        
+        // add chunk to the query's input queue on this node.
+        q.add(chunk);
+        
+        // add query to the engine's task queue.
+        priorityQueue.add(q);
+        
+    }
     
     /**
      * Do not accept new queries, but run existing queries to completion.
@@ -829,13 +502,22 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
             f.cancel(true/* mayInterruptIfRunning */);
     }
 
+    /**
+     * @todo SCALEOUT: Override in scale-out to release buffers associated with
+     *       chunks buffered for this query (buffers may be for received chunks
+     *       or chunks which are awaiting transfer to another node).
+     */
+    protected void releaseResources(final RunningQuery q) {
+        
+    }
+    
     /*
      * IQueryPeer
      */
     
     public void bufferReady(IQueryClient clientProxy,
             InetSocketAddress serviceAddr, long queryId, int bopId) {
-        // TODO Auto-generated method stub
+        // TODO SCALEOUT
         
     }
     
@@ -843,33 +525,36 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * IQueryClient
      */
 
-    public BOp getQuery(long queryId) throws RemoteException {
-        // TODO Auto-generated method stub
+    /**
+     * @todo Define the behavior for these methods if the queryId is not found
+     *       whether because the caller has the wrong value or because the query
+     *       has terminated.
+     */
+    public BOp getQuery(final long queryId) throws RemoteException {
+        final RunningQuery q = runningQueries.get(queryId);
+        if (q != null) {
+            return q.queryRef.get();
+        }
         return null;
     }
 
-    public void startOp(long queryId, int opId, UUID serviceId, int partitionId)
+    public void startOp(final long queryId, final int opId,
+            final int partitionId, final UUID serviceId, final int nchunks)
             throws RemoteException {
-        // TODO Auto-generated method stub
-
+        final RunningQuery q = runningQueries.get(queryId);
+        if (q != null) {
+            q.startOp(opId, partitionId, serviceId, nchunks);
+        }
     }
 
-    public void haltOp(long queryId, int opId, UUID serviceId, int partitionId,
-            Throwable cause) throws RemoteException {
-        // TODO Auto-generated method stub
-        
+    public void haltOp(final long queryId, final int opId,
+            final int partitionId, final UUID serviceId, final Throwable cause,
+            final int nchunks, final BOpStats taskStats) throws RemoteException {
+        final RunningQuery q = runningQueries.get(queryId);
+        if (q != null) {
+            q.haltOp(opId, partitionId, serviceId, cause, nchunks, taskStats);
+        }
     }
-
-//    public IChunkedIterator<?> eval(final long queryId, final long timestamp,
-//            final BOp query) throws Exception {
-//
-//        runningQueries.put(queryId, new RunningQuery(queryId,
-//                System.nanoTime()/* begin */, this/* clientProxy */, query,
-//                null/* source */));
-//
-//        return null;
-//
-//    }
 
     /**
      * Evaluate a query which visits {@link IBindingSet}s, such as a join. This
@@ -894,18 +579,27 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      *       annotations. Closure would then rewrite the query plan for each
      *       pass, replacing the readTimestamp with the new read-behind
      *       timestamp.
+     * 
+     * @todo The initial binding set used to declare the variables used by a
+     *       rule. With this refactor we should pay attention instead to the
+     *       binding sets output by each {@link BOp} and compressed
+     *       representations of those binding sets.
      */
-    public RunningQuery<?> eval(final long queryId, final long readTimestamp,
+    public RunningQuery eval(final long queryId, final long readTimestamp,
             final long writeTimestamp, final BindingSetPipelineOp query)
             throws Exception {
 
         if (query == null)
             throw new IllegalArgumentException();
-        
-        @SuppressWarnings("unchecked")
-        final RunningQuery<?> runningQuery = new RunningQuery(this, queryId,
-                readTimestamp, writeTimestamp, System.nanoTime()/* begin */,
-                this/* clientProxy */, query, newQueryBuffer(query));
+
+        final long timeout = query.getProperty(BOp.Annotations.TIMEOUT,
+                BOp.Annotations.DEFAULT_TIMEOUT);
+
+        final RunningQuery runningQuery = new RunningQuery(this, queryId,
+                readTimestamp, writeTimestamp,
+                System.currentTimeMillis()/* begin */, timeout,
+                true/* controller */, this/* clientProxy */, query,
+                newQueryBuffer(query));
 
         runningQueries.put(queryId, runningQuery);
 

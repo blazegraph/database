@@ -157,6 +157,9 @@ public class AccessPath<R> implements IAccessPath<R> {
      * The maximum <em>limit</em> that is allowed for a fully-buffered read.
      * The {@link #asynchronousIterator(Iterator)} will always be used above
      * this limit.
+     * 
+     * @todo This should probably be close to the branching factor or chunk
+     * capacity.
      */
     protected static final int MAX_FULLY_BUFFERED_READ_LIMIT = 250000;
     

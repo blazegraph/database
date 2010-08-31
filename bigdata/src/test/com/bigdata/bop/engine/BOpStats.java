@@ -106,7 +106,7 @@ public class BOpStats implements Serializable {
         sb.append("{chunksIn=" + chunksIn.estimate_get());
         sb.append(",unitsIn=" + unitsIn.estimate_get());
         sb.append(",chunksOut=" + chunksOut.estimate_get());
-        sb.append(",unitsIn=" + unitsOut.estimate_get());
+        sb.append(",unitsOut=" + unitsOut.estimate_get());
         toString(sb);
         sb.append("}");
         return sb.toString();

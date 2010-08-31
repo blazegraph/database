@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.engine;
 
+import java.util.Map;
 import java.util.Properties;
 
 import junit.framework.TestCase2;
@@ -35,7 +36,6 @@ import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.Constant;
-import com.bigdata.bop.EmptyBindingSet;
 import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -47,10 +47,8 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
-import com.bigdata.bop.ap.TestPredicateAccessPath;
-import com.bigdata.bop.engine.QueryEngine.BindingSetChunk;
-import com.bigdata.bop.engine.QueryEngine.RunningQuery;
 import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.bop.join.TestPipelineJoin;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -59,7 +57,6 @@ import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.striterator.ChunkedArrayIterator;
-import com.bigdata.striterator.IChunkedIterator;
 
 /**
  * Test suite for the {@link QueryEngine} against a local database instance.
@@ -72,19 +69,7 @@ import com.bigdata.striterator.IChunkedIterator;
  *       operations including: JOIN (selective and unselective), DISTINCT access
  *       path, DISTINCT solutions, GROUP BY, ORDER BY.
  * 
- * @todo test suite for join evaluation against a {@link Journal} [One of the
- *       big open questions for me is how we will handle purely local evaluation
- *       versus evaluation against a distributed cluster. I can see two
- *       approaches. One is to do a IQueryEngine interface and an implementation
- *       of that interface for a Journal which is purely local and either uses
- *       BlockingBuffers (or BlockingQueue) to transfer data (effectively just
- *       buffering the data in on the Java heap as normal objects). I think that
- *       it will be better in the long run if we can have the same evaluation
- *       mechanisms in place for standalone and distributed query processing as
- *       long as we do not have to marshall binding sets when we are not going
- *       across a network boundary since we will otherwise benefit from having
- *       identical APIs for evaluation of local and distributed query
- *       operations.
+ * @todo test suite for join evaluation against a {@link Journal}.
  * 
  * @todo test suite for join evaluation against an {@link EmbeddedFederation}
  *       with 1DS.
@@ -122,8 +107,6 @@ public class TestQueryEngine extends TestCase2 {
         
     }
 
-    static private final int nThreads = 10;
-
     static private final String namespace = "ns";
     Journal jnl;
     ManagedBufferService bufferService;
@@ -137,8 +120,7 @@ public class TestQueryEngine extends TestCase2 {
         
         bufferService = new ManagedBufferService();
 
-        queryEngine = new QueryEngine(null/* fed */, jnl, bufferService,
-                nThreads);
+        queryEngine = new QueryEngine(null/* fed */, jnl, bufferService);
         
         queryEngine.init();
 
@@ -228,31 +210,46 @@ public class TestQueryEngine extends TestCase2 {
         final long queryId = 1L;
         final long readTimestamp = ITx.READ_COMMITTED;
         final long writeTimestamp = ITx.UNISOLATED;
-        final RunningQuery<?> runningQuery = queryEngine.eval(queryId,
+        final RunningQuery runningQuery = queryEngine.eval(queryId,
                 readTimestamp, writeTimestamp, query);
 
-        runningQuery
-                .add(new BindingSetChunk(
+        runningQuery.startQuery(new BindingSetChunk(
+                        queryId,
                         startId,//
                         -1, //partitionId
                         new ThickAsynchronousIterator<IBindingSet[]>(
                                 new IBindingSet[][] { new IBindingSet[] { new HashBindingSet()} })));
 
         // Wait until the query is done.
-        final BOpStats stats = runningQuery.get();
+        final Map<Integer, BOpStats> statsMap = runningQuery.get();
+        {
+            // validate the stats map.
+            assertNotNull(statsMap);
+            assertEquals(1, statsMap.size());
+            System.err.println(statsMap.toString());
+        }
 
-        assertEquals(1L, stats.chunksIn.get());
-        assertEquals(0L, stats.unitsIn.get());
-        assertEquals(0L, stats.unitsOut.get());
-        assertEquals(1L, stats.chunksOut.get());
-        
-        // Verify no results.
-        final IAsynchronousIterator<IBindingSet[]> itr = runningQuery.iterator();
-        try {
-            if (itr.hasNext())
-                fail("Not expecting any solutions");
-        } finally {
-            itr.close();
+        // validate the query solution stats.
+        {
+            final BOpStats stats = statsMap.get(startId);
+            assertNotNull(stats);
+            System.err.println(stats.toString());
+
+            // query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(1L, stats.unitsIn.get());
+            assertEquals(1L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+
+        // Verify results.
+        {
+            // the expected solution (just one empty binding set).
+            final IBindingSet[] expected = new IBindingSet[] {//
+            new HashBindingSet() //
+            };
+
+            assertSolutions(expected, runningQuery.iterator());
         }
         
     }
@@ -260,8 +257,9 @@ public class TestQueryEngine extends TestCase2 {
     /**
      * Test the ability run a simple join. There are three operators. One feeds
      * an empty binding set[] into the join, another is the predicate for the
-     * access path on which the join will read, and the third is the join
-     * itself.
+     * access path on which the join will read (it probes the index once for
+     * "Mary" and bindings "Paul" when it does so), and the third is the join
+     * itself (there is one solution, which is "value=Paul").
      * 
      * @throws Exception
      * 
@@ -269,9 +267,7 @@ public class TestQueryEngine extends TestCase2 {
      *       with an incoming binding set easily enough using only a single
      *       primary index), distincts, selecting only certain columns, etc.
      * 
-     * @todo Add asserts for the statistics reported for the query.
-     * 
-     * @see TestPredicateAccessPath
+     * @see TestPipelineJoin
      */
     public void test_query_join1() throws Exception {
 
@@ -314,40 +310,74 @@ public class TestQueryEngine extends TestCase2 {
         final long queryId = 1L;
         final long readTimestamp = ITx.READ_COMMITTED;
         final long writeTimestamp = ITx.UNISOLATED;
-        final RunningQuery<?> runningQuery = queryEngine.eval(queryId,
+        final RunningQuery runningQuery = queryEngine.eval(queryId,
                 readTimestamp, writeTimestamp, query);
 
-        runningQuery
-                .add(new BindingSetChunk(
-                        startId,//
-                        -1, //partitionId
-                        newBindingSetIterator(EmptyBindingSet.INSTANCE)));
+        runningQuery.startQuery(new BindingSetChunk(queryId, startId,//
+                -1, // partitionId
+                newBindingSetIterator(new HashBindingSet())));
 
-        final IAsynchronousIterator<IBindingSet[]> itr = runningQuery.iterator();
-        try {
-            int n = 0;
-            while (itr.hasNext()) {
-                final IBindingSet[] e = itr.next();
-                if (log.isInfoEnabled())
-                    log.info(n + " : chunkSize=" + e.length);
-                for (int i = 0; i < e.length; i++) {
-                    if (log.isInfoEnabled())
-                        log.info(n + " : " + e[i]);
-                    assertEquals(expected[n], e[i]);
-                }
-                n++;
-            }
-        } finally {
-            itr.close();
-        }
+        // verify solutions.
+        assertSolutions(expected, runningQuery.iterator());
 
         // Wait until the query is done.
-        final BOpStats stats = runningQuery.get();
+        final Map<Integer,BOpStats> statsMap = runningQuery.get();
+        {
+            // validate the stats map.
+            assertNotNull(statsMap);
+            assertEquals(2, statsMap.size());
+            System.err.println(statsMap.toString());
+        }
 
-        assertEquals(1L, stats.chunksIn.get());
-        assertEquals(4L, stats.unitsIn.get());
-        assertEquals(1L, stats.unitsOut.get());
-        assertEquals(1L, stats.chunksOut.get());
+        // validate the stats for the start operator.
+        {
+            final BOpStats stats = statsMap.get(startId);
+            assertNotNull(stats);
+            System.err.println("start: "+stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(1L, stats.unitsIn.get());
+            assertEquals(1L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+
+//        // validate the stats for the access path.
+//        {
+//            final BOpStats stats = statsMap.get(predId);
+//            assertNotNull(stats);
+//            System.err.println("pred : "+stats.toString());
+//
+//            // verify query solution stats details.
+//            assertEquals(1L, stats.chunksIn.get());
+//            assertEquals(1L, stats.unitsIn.get());
+//            assertEquals(1L, stats.unitsOut.get());
+//            assertEquals(1L, stats.chunksOut.get());
+//        }
+
+        // validate the stats for the join operator.
+        {
+            final BOpStats stats = statsMap.get(joinId);
+            assertNotNull(stats);
+            System.err.println("join : "+stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(1L, stats.unitsIn.get());
+            assertEquals(1L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+
+    }
+
+    /**
+     * @todo Test the ability close the iterator draining a result set before
+     *       the query has finished executing and verify that the query is
+     *       correctly terminated.
+     */
+    public void test_query_closeIterator() {
+
+        fail("write test");
 
     }
 
@@ -374,11 +404,159 @@ public class TestQueryEngine extends TestCase2 {
     }
 
     /**
-     * @todo Test the ability run a query requiring two joins.
+     * Test the ability run a query requiring two joins.
+     * 
+     * @todo Verify join constraints (e.g., x == y or x != y).
+     * 
+     * @todo run with different initial bindings (x=Mary, x is unbound, etc).
      */
-    public void test_query_join2() {
+    public void test_query_join2() throws Exception {
+
+        final int startId = 1;
+        final int joinId1 = 2;
+        final int predId1 = 3;
+        final int joinId2 = 4;
+        final int predId2 = 5;
         
-        fail("write test");
+        final BindingSetPipelineOp startOp = new PipelineStartOp(new BOp[] {},
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, startId),//
+                        }));
+        
+        final Predicate<?> pred1Op = new Predicate<E>(new IVariableOrConstant[] {
+                Var.var("x"), Var.var("y") }, NV
+                .asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.PARTITION_ID,
+                                Integer.valueOf(-1)),//
+                        new NV(Predicate.Annotations.OPTIONAL,
+                                Boolean.FALSE),//
+                        new NV(Predicate.Annotations.CONSTRAINT, null),//
+                        new NV(Predicate.Annotations.EXPANDER, null),//
+                        new NV(Predicate.Annotations.BOP_ID, predId1),//
+                }));
+        
+        final Predicate<?> pred2Op = new Predicate<E>(new IVariableOrConstant[] {
+                Var.var("y"), Var.var("z") }, NV
+                .asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.PARTITION_ID,
+                                Integer.valueOf(-1)),//
+                        new NV(Predicate.Annotations.OPTIONAL,
+                                Boolean.FALSE),//
+                        new NV(Predicate.Annotations.CONSTRAINT, null),//
+                        new NV(Predicate.Annotations.EXPANDER, null),//
+                        new NV(Predicate.Annotations.BOP_ID, predId2),//
+                }));
+        
+        final BindingSetPipelineOp join1Op = new PipelineJoin(startOp, pred1Op,
+                NV.asMap(new NV[] { new NV(Predicate.Annotations.BOP_ID,
+                        joinId1),//
+                        }));
+
+        final BindingSetPipelineOp join2Op = new PipelineJoin(join1Op, pred2Op,
+                NV.asMap(new NV[] { new NV(Predicate.Annotations.BOP_ID,
+                        joinId2),//
+                        }));
+        
+        final BindingSetPipelineOp query = join2Op;
+
+        final long queryId = 1L;
+        final long readTimestamp = ITx.READ_COMMITTED;
+        final long writeTimestamp = ITx.UNISOLATED;
+        final RunningQuery runningQuery = queryEngine.eval(queryId,
+                readTimestamp, writeTimestamp, query);
+
+        // start the query.
+        {
+         
+            final IBindingSet initialBindings = new HashBindingSet();
+            
+            initialBindings.set(Var.var("x"), new Constant<String>("Mary"));
+
+            runningQuery.startQuery(new BindingSetChunk(queryId, startId,//
+                    -1, // partitionId
+                    newBindingSetIterator(initialBindings)));
+        }
+
+        // verify solutions.
+        {
+
+            // the expected solution (just one).
+            final IBindingSet[] expected = new IBindingSet[] {//
+            new ArrayBindingSet(//
+                    new IVariable[] { Var.var("x"), Var.var("y"), Var.var("z") },//
+                    new IConstant[] { new Constant<String>("Mary"),
+                            new Constant<String>("Paul"),
+                            new Constant<String>("Leon") }//
+            ) };
+
+            assertSolutions(expected, runningQuery.iterator());
+        
+        }
+
+        // Wait until the query is done.
+        final Map<Integer, BOpStats> statsMap = runningQuery.get();
+        {
+            // validate the stats map.
+            assertNotNull(statsMap);
+            assertEquals(3, statsMap.size());
+            System.err.println(statsMap.toString());
+        }
+
+        // validate the stats for the start operator.
+        {
+            final BOpStats stats = statsMap.get(startId);
+            assertNotNull(stats);
+            System.err.println("start: " + stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(1L, stats.unitsIn.get());
+            assertEquals(1L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+
+        // // validate the stats for the access path.
+        // {
+        // final BOpStats stats = statsMap.get(predId);
+        // assertNotNull(stats);
+        // System.err.println("pred : "+stats.toString());
+        //
+        // // verify query solution stats details.
+        // assertEquals(1L, stats.chunksIn.get());
+        // assertEquals(1L, stats.unitsIn.get());
+        // assertEquals(1L, stats.unitsOut.get());
+        // assertEquals(1L, stats.chunksOut.get());
+        // }
+
+        // validate the stats for the 1st join operator.
+        {
+            final BOpStats stats = statsMap.get(joinId1);
+            assertNotNull(stats);
+            System.err.println("join1: " + stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(1L, stats.unitsIn.get());
+            assertEquals(1L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+
+        // validate the stats for the 2nd join operator.
+        {
+            final BOpStats stats = statsMap.get(joinId2);
+            assertNotNull(stats);
+            System.err.println("join2: " + stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(1L, stats.unitsIn.get());
+            assertEquals(1L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
 
     }
 
@@ -416,6 +594,35 @@ public class TestQueryEngine extends TestCase2 {
 
         fail("write test");
 
+    }
+
+    /**
+     * Verify the expected solutions.
+     * 
+     * @param expected
+     * @param itr
+     */
+    protected void assertSolutions(final IBindingSet[] expected,
+            final IAsynchronousIterator<IBindingSet[]> itr) {
+        try {
+            int n = 0;
+            while (itr.hasNext()) {
+                final IBindingSet[] e = itr.next();
+                if (log.isInfoEnabled())
+                    log.info(n + " : chunkSize=" + e.length);
+                for (int i = 0; i < e.length; i++) {
+                    if (log.isInfoEnabled())
+                        log.info(n + " : " + e[i]);
+                    if (!expected[n].equals(e[i])) {
+                        fail("n=" + n + ", expected=" + expected[n]
+                                + ", actual=" + e[i]);
+                    }
+                }
+                n++;
+            }
+        } finally {
+            itr.close();
+        }
     }
 
 }
