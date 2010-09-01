@@ -2615,10 +2615,11 @@ public class RWStore implements IStore {
 			Long freeTime = m_transactionService.tryCallWithLock(new Callable<Long>() {
 	
 				public Long call() throws Exception {
+					long now = System.currentTimeMillis();
 					if (m_transactionService.getActiveCount() == 0) {
-						return System.currentTimeMillis();
+						return now;
 					} else {
-						return m_transactionService.getEarliestTxStartTime();
+						return now - m_transactionService.getMinReleaseAge(); // getEarliestTxStartTime();
 					}
 				}
 				
