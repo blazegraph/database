@@ -26,6 +26,8 @@ package com.bigdata.rwstore;
 
 import java.io.File;
 
+import com.bigdata.journal.IAllocationContext;
+
 /************************************************************************************************
  * The IStore interface provides persistent file-backed storage.
  *  It can be used as a standalone utility, but has been primarily designed
@@ -76,7 +78,7 @@ public interface IStore {
 	 *
 	 * @return the allocated address
 	 **/
-	public long alloc(byte buf[], int size);
+	public long alloc(byte buf[], int size, IAllocationContext context);
 	
 	/**************************************************************
 	 * frees allocated storage

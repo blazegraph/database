@@ -862,12 +862,13 @@ public class Node extends AbstractNode<Node> implements INodeData {
                 // Clear the old key.
                 data.childAddr[i] = NULL;
 
-                if(btree.storeCache!=null) {
+                if (btree.storeCache!=null) {
                     // remove from cache.
                 	btree.storeCache.remove(oldChildAddr);
                 }
                 // free the oldChildAddr if the Strategy supports it
-                btree.store.delete(oldChildAddr);
+                if (true) btree.store.delete(oldChildAddr);
+                // System.out.println("Deleting " + oldChildAddr);
 
                 // Stash reference to the new child.
                 // childRefs[i] = btree.newRef(newChild);

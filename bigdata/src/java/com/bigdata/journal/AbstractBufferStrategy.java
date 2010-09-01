@@ -677,4 +677,8 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
 	public void setTransactionManager(AbstractLocalTransactionManager localTransactionManager) {
 		// NOP
 	}
+    
+	public void setCommitRecordIndex(CommitRecordIndex commitRecordIndex) {
+		// NOP
+	}
 }

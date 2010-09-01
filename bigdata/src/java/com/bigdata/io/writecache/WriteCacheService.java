@@ -1436,7 +1436,7 @@ abstract public class WriteCacheService implements IWriteCache {
 			final WriteCache cache = acquireForWriter();
 
 			try {
-				debugAddrs(offset, 0, 'A');
+				debugAddrs(offset, data.remaining(), 'A');
 
 				// write on the cache.
 				if (cache.write(offset, data, chk, useChecksum)) {
@@ -1982,7 +1982,7 @@ abstract public class WriteCacheService implements IWriteCache {
 			}
 			if (addrsUsed[i] == paddr) {
 				ret.append(addrActions[i]);
-				if (addrActions[i]=='W') {
+				if (addrActions[i]=='A') {
 					ret.append("[" + addrLens[i] + "]");
 				}
 			}

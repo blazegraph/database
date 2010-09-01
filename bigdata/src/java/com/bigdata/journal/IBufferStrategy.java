@@ -270,4 +270,17 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
      */
 	public void setTransactionManager(AbstractLocalTransactionManager localTransactionManager);
 
+
+    /**
+     * Needed to enable transaction support for standalone buffer strategies.
+     * 
+     * The WORMStrategy does not need this since no data is ever deleted, but
+     * the RWStrategy must manage deletions and needs access to the historical
+     * commitRecords which reference the blocks of deferred deleted addresses.
+     * 
+     * @param commitRecordIndex
+     * 	The CommitRecordIndex for the owning Journal
+     */
+	public void setCommitRecordIndex(CommitRecordIndex commitRecordIndex);
+
 }

@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import java.util.Iterator;
+
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -111,4 +113,24 @@ public interface IAtomicStore extends IRawStore {
      */
     public ICommitRecord getCommitRecord(long timestamp);
 
+	/**
+	 * Return the root block view associated with the commitRecord for the
+	 * provided commit time.  This requires accessing the next commit record
+	 * since it is the previous root block that is referenced from each record.
+	 * 
+	 * @param commitTime
+	 *            A commit time.
+	 * 
+	 * @return The root block view -or- <code>null</code> if there is no commit
+	 *         record for that commitTime.
+	 */
+	public IRootBlockView getRootBlock(final long commitTime);
+	
+	/**
+	 * 
+	 * @param startTime from which to begin iteration
+	 * 
+	 * @return an iterator over the committed root blocks
+	 */
+	public Iterator<IRootBlockView> getRootBlocks(final long startTime);
 }

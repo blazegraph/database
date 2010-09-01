@@ -43,8 +43,10 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.JournalShadow;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.accesspath.ChunkConsumerIterator;
@@ -503,6 +505,11 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
 				 * the mutation task will read.
 				 */
 				tx = jnl.newTx(lastCommitTime);
+				
+				/*
+				 * Create the shadow journal to define the allocation context
+				 */
+				indexManager = new JournalShadow(jnl);
 
 				// the timestamp that we will read on for this step.
 				joinNexusFactory.setReadTimestamp(TimestampUtility

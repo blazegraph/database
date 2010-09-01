@@ -20,13 +20,14 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
+ */
 
 package com.bigdata.rwstore;
 
 import java.util.ArrayList;
 
 import com.bigdata.io.writecache.WriteCacheService;
+import com.bigdata.journal.IAllocationContext;
 
 /**
  * Bit maps for an allocator. The allocator is a bit map managed as int[]s.
@@ -58,6 +59,11 @@ public class AllocBlock {
 	 */
 	int m_commit[];
 	/**
+	 * If used as a shadow allocator, then the _commit is saved to m_saveCommit
+	 * and m_transients is copied to m_commit.
+	 */
+	int m_saveCommit[];
+	/**
 	 * Just the newly allocated bits. This will be copied onto {@link #m_commit}
 	 * when the current native transaction commits.
 	 */
@@ -73,113 +79,152 @@ public class AllocBlock {
 	 */
 	private final RWWriteCacheService m_writeCache;
 
-  AllocBlock(final int addrIsUnused, final int bitSize, final RWWriteCacheService cache) {
-  	m_writeCache = cache;
-    m_ints = bitSize;
-    m_commit = new int[bitSize];
-    m_bits = new int[bitSize];
-    m_transients = new int[bitSize];
-  }
-
-  public boolean verify(final int addr, final int size) {
-    if (addr < m_addr || addr >= (m_addr + (size * 32 * m_ints))) {
-      return false;
-    }
-
-		// Now check to see if it allocated
-    final int bit = (addr - m_addr) / size;
-
-    return RWStore.tstBit(m_bits, bit);
-  }
-
-  public boolean addressInRange(final int addr, final int size) {
-    return (addr >= m_addr && addr <= (m_addr + (size * 32 * m_ints)));
-  }
-  	
-  public boolean free(final int addr, final int size) {
-    if (addr < m_addr || addr >= (m_addr + (size * 32 * m_ints))) {
-      return false;
-    }
-
-    freeBit((addr - m_addr) / size, addr);
-
-    return true;
-  }
-
-  public boolean freeBit(final int bit, final long addr) {
-    // Allocation optimization - if bit NOT set in committed memory then clear
-    //  the transient bit to permit reallocation within this transaction.
-    //
-    // Note that with buffered IO there is also an opportunity to avoid output to
-    //  the file by removing any pending write to the now freed address.  On large
-    //  transaction scopes this may be significant.
-    RWStore.clrBit(m_bits, bit);
-    
-    if (!RWStore.tstBit(m_commit, bit)) {
-      // Should not be cleared here!
-      // m_writeCache.clearWrite(addr);
-
-      RWStore.clrBit(m_transients, bit);
-      
-      return true;
-    } else {
-    	return false;
-    }
-  }
-
-  public int alloc(final int size) {
-    if (size < 0) {
-      throw new Error("Storage allocation error : negative size passed");
-    }
-
-    final int bit = RWStore.fndBit(m_transients, m_ints);
-
-    if (bit != -1) {
-      RWStore.setBit(m_bits, bit);
-      RWStore.setBit(m_transients, bit);
-
-      return bit;
-    } else {
-      return -1;
-    }
-  }
-
-  public boolean hasFree() {
-    for (int i = 0; i < m_ints; i++) {
-      if (m_bits[i] != 0xFFFFFFFF) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-	public int getAllocBits() {
-    int total = m_ints * 32;
-    int allocBits = 0;
-    for (int i = 0; i < total; i++) {
-      if (RWStore.tstBit(m_bits, i)) {
-        allocBits++;
-      }
-    }
-    
-    return allocBits;
+	AllocBlock(final int addrIsUnused, final int bitSize, final RWWriteCacheService cache) {
+		m_writeCache = cache;
+		m_ints = bitSize;
+		m_commit = new int[bitSize];
+		m_bits = new int[bitSize];
+		m_transients = new int[bitSize];
 	}
 
-  public String getStats() {
-    final int total = m_ints * 32;
-    final int allocBits = getAllocBits();
+	public boolean verify(final int addr, final int size) {
+		if (addr < m_addr || addr >= (m_addr + (size * 32 * m_ints))) {
+			return false;
+		}
 
-    return "Addr : " + m_addr + " [" + allocBits + "::" + total + "]";
-  }
+		// Now check to see if it allocated
+		final int bit = (addr - m_addr) / size;
 
-  public void addAddresses(final ArrayList addrs, final int rootAddr) {
-    final int total = m_ints * 32;
-    
-    for (int i = 0; i < total; i++) {
-      if (RWStore.tstBit(m_bits, i)) {
-        addrs.add(new Integer(rootAddr - i));
-      }
-    }
-  }
+		return RWStore.tstBit(m_bits, bit);
+	}
+
+	public boolean addressInRange(final int addr, final int size) {
+		return (addr >= m_addr && addr <= (m_addr + (size * 32 * m_ints)));
+	}
+
+	public boolean free(final int addr, final int size) {
+		if (addr < m_addr || addr >= (m_addr + (size * 32 * m_ints))) {
+			return false;
+		}
+
+		freeBit((addr - m_addr) / size);
+
+		return true;
+	}
+
+	public boolean freeBit(final int bit) {
+		if (!RWStore.tstBit(m_bits, bit)) {
+			throw new IllegalArgumentException("Freeing bit not set");
+		}
+		
+		// Allocation optimization - if bit NOT set in committed memory then
+		// clear
+		// the transient bit to permit reallocation within this transaction.
+		//
+		// Note that with buffered IO there is also an opportunity to avoid
+		// output to
+		// the file by removing any pending write to the now freed address. On
+		// large
+		// transaction scopes this may be significant.
+		RWStore.clrBit(m_bits, bit);
+
+		if (!RWStore.tstBit(m_commit, bit)) {
+			RWStore.clrBit(m_transients, bit);
+
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	/**
+	 * The shadow, if non-null defines the context for this request.
+	 * 
+	 * If an existing shadow is registered, then the allocation fails
+	 * immediately.
+	 * 
+	 * If no existing shadow is registered, and a new allocation can be made
+	 * then this AllocBlock is registered with the shadow.
+	 * 
+	 * Note that when shadows are used, an allocator on a free list may not have
+	 * allocations available for all contexts, so the assumption that presence
+	 * on the free list implies availability is not assertable.
+	 */
+
+	public int alloc(final int size) {
+		if (size < 0) {
+			throw new Error("Storage allocation error : negative size passed");
+		}
+
+		final int bit = RWStore.fndBit(m_transients, m_ints);
+
+		if (bit != -1) {
+			RWStore.setBit(m_bits, bit);
+			RWStore.setBit(m_transients, bit);
+
+			return bit;
+		} else {
+			return -1;
+		}
+	}
+
+	public boolean hasFree() {
+		for (int i = 0; i < m_ints; i++) {
+			if (m_bits[i] != 0xFFFFFFFF) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	public int getAllocBits() {
+		int total = m_ints * 32;
+		int allocBits = 0;
+		for (int i = 0; i < total; i++) {
+			if (RWStore.tstBit(m_bits, i)) {
+				allocBits++;
+			}
+		}
+
+		return allocBits;
+	}
+
+	public String getStats() {
+		final int total = m_ints * 32;
+		final int allocBits = getAllocBits();
+
+		return "Addr : " + m_addr + " [" + allocBits + "::" + total + "]";
+	}
+
+	public void addAddresses(final ArrayList addrs, final int rootAddr) {
+		final int total = m_ints * 32;
+
+		for (int i = 0; i < total; i++) {
+			if (RWStore.tstBit(m_bits, i)) {
+				addrs.add(new Integer(rootAddr - i));
+			}
+		}
+	}
+
+	/**
+	 * Store m_commit bits in m_saveCommit then duplicate transients to m_commit.
+	 * 
+	 * This ensures, that while shadowed, the allocator will not re-use storage
+	 * that was allocated prior to the shadow creation.
+	 */
+	public void shadow() {
+		m_saveCommit = m_commit;
+		m_commit = m_transients.clone();
+	}
+
+	/**
+	 * The transient bits will have been added to correctly, we now just need to
+	 * restore the commit bits from the m_saveCommit, to allow re-allocation
+	 * of non-committed storage.
+	 */
+	public void deshadow() {
+		m_commit = m_saveCommit;
+		m_saveCommit = null;
+	}
 }

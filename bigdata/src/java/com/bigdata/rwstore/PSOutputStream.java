@@ -33,6 +33,8 @@ import java.util.ArrayList;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.journal.IAllocationContext;
+
 /************************************************************************
  * PSOutputStream
  *
@@ -82,7 +84,7 @@ public class PSOutputStream extends OutputStream {
 	static Integer m_lock = new Integer(42);
 	static int m_streamCount = 0;
 	
-	public static PSOutputStream getNew(IStore store, int maxAlloc) {
+	public static PSOutputStream getNew(IStore store, int maxAlloc, IAllocationContext context) {
 		synchronized (m_lock) {
 			PSOutputStream ret = m_poolHead;
 			if (ret != null) {
@@ -96,7 +98,7 @@ public class PSOutputStream extends OutputStream {
 				ret = new PSOutputStream();
 			}
 			
-			ret.init(store, maxAlloc);
+			ret.init(store, maxAlloc, context);
 			
 			return ret;
 		}
@@ -139,6 +141,8 @@ public class PSOutputStream extends OutputStream {
 	int m_blobThreshold = 0;
 	IStore m_store;
 	
+	IAllocationContext m_context = null;
+	
 	private PSOutputStream m_next = null;
 
 	private int m_blobHdrIdx;
@@ -154,7 +158,7 @@ public class PSOutputStream extends OutputStream {
 	/****************************************************************
 	 * resets private state variables for reuse of stream
 	 **/
-	void init(IStore store, int maxAlloc) {
+	void init(IStore store, int maxAlloc, IAllocationContext context) {
 		m_isSaved = false;
 		
 		m_headAddr = 0;
@@ -169,6 +173,8 @@ public class PSOutputStream extends OutputStream {
 		
 		m_blobHeader = null;
 		m_blobHdrIdx = 0;
+		
+		m_context = context;
 
 		
 		// FIXME: if autocommit then we should provide start/commit via init and save
@@ -199,7 +205,7 @@ public class PSOutputStream extends OutputStream {
   			m_blobHdrIdx = 0;
   		}
   		
-  		int curAddr = (int) m_store.alloc(m_buf, m_count);
+  		int curAddr = (int) m_store.alloc(m_buf, m_count, m_context);
   		m_blobHeader[m_blobHdrIdx++] = curAddr;
   		
   		m_count = 0;
@@ -296,7 +302,7 @@ public class PSOutputStream extends OutputStream {
   		return 0;
   	}
   	
-  	int addr = (int) m_store.alloc(m_buf, m_count);
+  	int addr = (int) m_store.alloc(m_buf, m_count, m_context);
   	
   	if (m_blobHeader != null) {
   		m_blobHeader[m_blobHdrIdx++] = addr;
@@ -307,7 +313,7 @@ public class PSOutputStream extends OutputStream {
 	  		for (int i = 0; i < m_blobHdrIdx; i++) {
 					writeInt(m_blobHeader[i]);
 	 		}
-	  		addr = (int) m_store.alloc(m_buf, m_count);
+	  		addr = (int) m_store.alloc(m_buf, m_count, m_context);
 	  		
 	  		if (m_blobHdrIdx != ((m_blobThreshold - 1 + m_bytesWritten - m_count)/m_blobThreshold)) {	  		
 	  			throw new IllegalStateException("PSOutputStream.save at : " + addr + ", bytes: "+ m_bytesWritten + ", blocks: " + m_blobHdrIdx + ", last alloc: " + precount);

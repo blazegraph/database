@@ -2240,4 +2240,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
     }
 
+	public void setCommitRecordIndex(CommitRecordIndex commitRecordIndex) {
+		// NOP		
+	}
+
 }

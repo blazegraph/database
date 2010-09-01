@@ -28,6 +28,8 @@ import java.io.DataInputStream;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.bigdata.journal.IAllocationContext;
+
 public interface Allocator extends Comparable {
   public int getBlockSize();
   public void setIndex(int index);
@@ -35,7 +37,7 @@ public interface Allocator extends Comparable {
   public long getStartAddr();
   public boolean addressInRange(int addr);
   public boolean free(int addr, int size);
-  public int alloc(RWStore store, int size);
+  public int alloc(RWStore store, int size, IAllocationContext context);
   public int getDiskAddr();
   public void setDiskAddr(int addr);
   public long getPhysicalAddress(int offset);
@@ -46,10 +48,10 @@ public interface Allocator extends Comparable {
   public boolean hasFree();
   public void setFreeList(ArrayList list);
   public String getStats(AtomicLong counter);
-  public void preserveSessionData();
   public void addAddresses(ArrayList addrs);
   public int getRawStartAddr();
   public int getIndex();
   public void appendShortStats(StringBuffer str);
+  public boolean canImmediatelyFree(int addr, int size, IAllocationContext context);
 }
 	

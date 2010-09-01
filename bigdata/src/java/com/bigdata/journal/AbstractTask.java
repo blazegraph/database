@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -2483,8 +2484,31 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         }
 
 		public void delete(long addr) {
-			// void
-			
+            delegate.delete(addr);
+		}
+
+		public IRootBlockView getRootBlock(long commitTime) {
+			return delegate.getRootBlock(commitTime);
+		}
+
+		public Iterator<IRootBlockView> getRootBlocks(long startTime) {
+			return delegate.getRootBlocks(startTime);
+		}
+
+		public void delete(long addr, IAllocationContext context) {
+			delegate.delete(addr, context);
+		}
+
+		public long write(ByteBuffer data, IAllocationContext context) {
+			return delegate.write(data, context);
+		}
+
+		public long write(ByteBuffer data, long oldAddr, IAllocationContext context) {
+			return delegate.write(data, oldAddr, context);
+		}
+
+		public void detachContext(IAllocationContext context) {
+			delegate.detachContext(context);
 		}
 
     }
@@ -2859,6 +2883,30 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 		public void delete(long addr) {
 			// TODO Auto-generated method stub
 			
+		}
+
+		public IRootBlockView getRootBlock(long commitTime) {
+			return delegate.getRootBlock(commitTime);
+		}
+
+		public Iterator<IRootBlockView> getRootBlocks(long startTime) {
+			return delegate.getRootBlocks(startTime);
+		}
+
+		public void delete(long addr, IAllocationContext context) {
+            throw new UnsupportedOperationException();
+		}
+
+		public long write(ByteBuffer data, IAllocationContext context) {
+            throw new UnsupportedOperationException();
+		}
+
+		public long write(ByteBuffer data, long oldAddr, IAllocationContext context) {
+            throw new UnsupportedOperationException();
+		}
+
+		public void detachContext(IAllocationContext context) {
+			delegate.detachContext(context);
 		}
 
     }

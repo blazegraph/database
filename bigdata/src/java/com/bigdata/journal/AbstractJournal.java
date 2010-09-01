@@ -37,6 +37,7 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
+import java.util.Iterator;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -220,6 +221,18 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * store.
 	 */
 	public static transient final int ROOT_NAME2ADDR = 0;
+
+	/**
+	 * The index of the address where the root block copy from the previous
+	 * commit is stored
+	 */
+	public static transient final int PREV_ROOTBLOCK = 1;
+
+	/**
+	 * The index of the address of the delete blocks associated with
+	 * this transaction
+	 */
+	public static transient final int DELETEBLOCK = 2;
 
 	/**
 	 * A clone of the properties used to initialize the {@link Journal}.
@@ -517,6 +530,73 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 		return new ReadOnlyIndex(getIndex(checkpointAddr));
 
+	}
+
+	/**
+	 * Return the root block view associated with the commitRecord for the
+	 * provided commit time.  This requires accessing the next commit record
+	 * since the previous root block is stored with each record.
+	 * 
+	 * @param commitTime
+	 *            A commit time.
+	 * 
+	 * @return The root block view -or- <code>null</code> if there is no commit
+	 *         record for that commitTime.
+	 * 
+	 */
+	public IRootBlockView getRootBlock(final long commitTime) {
+
+		final ICommitRecord commitRecord = getCommitRecordIndex().findNext(commitTime);
+
+		if (commitRecord == null) {
+			return null;
+		}
+
+		final long rootBlockAddr = commitRecord.getRootAddr(PREV_ROOTBLOCK);
+		
+		if (rootBlockAddr == 0) {
+			return null;
+		} else {
+			ByteBuffer bb = read(rootBlockAddr);
+			
+			return new RootBlockView(true /* rb0 - WTH */, bb, checker);
+		}
+
+	}
+	
+	/**
+	 * 
+	 * @param startTime from which to begin iteration
+	 * 
+	 * @return an iterator over the committed root blocks
+	 */
+	public Iterator<IRootBlockView> getRootBlocks(final long startTime) {
+		return new Iterator<IRootBlockView>() {
+			ICommitRecord commitRecord = getCommitRecordIndex().findNext(startTime);
+
+			public boolean hasNext() {
+				return commitRecord != null;
+			}
+			
+			public IRootBlockView next() {
+				final long rootBlockAddr = commitRecord.getRootAddr(PREV_ROOTBLOCK);
+				
+				commitRecord = getCommitRecordIndex().findNext(commitRecord.getTimestamp());
+				
+				if (rootBlockAddr == 0) {
+					return null;
+				} else {
+					ByteBuffer bb = read(rootBlockAddr);
+					
+					return new RootBlockView(true /* rb0 - WTH */, bb, checker);
+				}
+			}
+
+			public void remove() {
+				throw new UnsupportedOperationException();
+			}
+			
+		};
 	}
 
 	/**
@@ -905,6 +985,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 					_bufferStrategy = new RWStrategy(fileMetadata, quorum);
 
 					this._rootBlock = fileMetadata.rootBlock;
+					
+					setCommitter(DELETEBLOCK, new DeleteBlockCommitter((RWStrategy) _bufferStrategy));
 
 					break;
 
@@ -961,6 +1043,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			// report event.
 			ResourceManager.openJournal(getFile() == null ? null : getFile().toString(), size(), getBufferStrategy()
 					.getBufferMode());
+			
+			this._bufferStrategy.setCommitRecordIndex(_commitRecordIndex);
 
 		} finally {
 
@@ -2017,6 +2101,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 			// clear reference and reload from the store.
 			_commitRecordIndex = _getCommitRecordIndex();
+			
+			_bufferStrategy.setCommitRecordIndex(_commitRecordIndex);
 
 			// clear the array of committers.
 			_committers = new ICommitter[_committers.length];
@@ -2509,7 +2595,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
     
     public long write(final ByteBuffer data) {
 
-        assertCanRead();
+        assertCanWrite();
 
         return _bufferStrategy.write(data);
 	
@@ -2524,13 +2610,33 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         
     }
 
-    // Note: NOP for WORM. Used by RW for eventual recycle protocol.
+	public long write(ByteBuffer data, final long oldAddr, IAllocationContext context) {
+        return _bufferStrategy.write(data, oldAddr, context);
+	}
+
+	public long write(ByteBuffer data, IAllocationContext context) {
+        return _bufferStrategy.write(data, context);
+	}
+
+	// Note: NOP for WORM. Used by RW for eventual recycle protocol.
     public void delete(final long addr) {
 
         assertCanWrite();
 
         _bufferStrategy.delete(addr);
 
+    }
+
+    public void delete(final long addr, IAllocationContext context) {
+
+        assertCanWrite();
+
+        _bufferStrategy.delete(addr, context);
+
+    }
+    
+    public void detachContext(IAllocationContext context) {
+        _bufferStrategy.detachContext(context);
     }
 
 	final public long getRootAddr(final int index) {
@@ -2660,6 +2766,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 */
 
 			setupName2AddrBTree(getRootAddr(ROOT_NAME2ADDR));
+			
+			/**
+			 * Register committer to write previous root block
+			 */
+			setCommitter(PREV_ROOTBLOCK, new RootBlockCommitter(this));
 
 		}
 
