@@ -38,7 +38,7 @@ import java.nio.ByteBuffer;
 public class RootBlockCommitter implements ICommitter {
 	final AbstractJournal journal;
 	
-	public RootBlockCommitter(AbstractJournal journal) {
+	public RootBlockCommitter(final AbstractJournal journal) {
 		this.journal = journal;
 	}
 	
@@ -46,9 +46,16 @@ public class RootBlockCommitter implements ICommitter {
 	 * Write the current root block to the Journal and return its address
 	 * to be stored in the CommitRecord.
 	 */
-	public long handleCommit(long commitTime) {
-		ByteBuffer rbv = journal.getRootBlockView().asReadOnlyBuffer();
-
+	public long handleCommit(final long commitTime) {
+		final ByteBuffer rbv = journal.getRootBlockView().asReadOnlyBuffer();
+		/*
+		 * FIXME There is an API issue with the RWStore which does not allow
+		 * us to pass in a read-only buffer.  Write unit tests for this on
+		 * the core IRawStore test suite and fix the RWStore.  Also write
+		 * unit tests when the array backing the ByteBuffer can be accessed
+		 * but has a non-zero array offset (a mutable slice of a ByteBuffer).
+		 */
+//		return journal.write(rbv);
 		ByteBuffer bb = ByteBuffer.allocate(rbv.capacity());
 		for (int i = 0; i < rbv.capacity(); i++) {
 			bb.put(rbv.get());

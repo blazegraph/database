@@ -253,11 +253,12 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 			throw new IllegalArgumentException();
 		}
 		
-		try {
-			long rwaddr = m_store.alloc(data.array(), nbytes, context);
+		try { /* FIXME [data] is not always backed by an array, the array may not be visible (read-only), the array offset may not be zero, etc.  Try to drive the ByteBuffer into the RWStore.alloc() method instead. */
+		    if(data.hasArray()&&data.arrayOffset()!=0)throw new AssertionError();
+			final long rwaddr = m_store.alloc(data.array(), nbytes, context);
 			data.position(nbytes); // update position to end of buffer
 	
-			long retaddr =  encodeAddr(rwaddr, nbytes);
+			final long retaddr =  encodeAddr(rwaddr, nbytes);
 
 			return retaddr;
 		} catch (RuntimeException re) {
@@ -305,7 +306,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	}
 
 	public void delete(long addr) {
-		if (true) delete(addr, null);
+		delete(addr, null);
 	}
 
 	/**

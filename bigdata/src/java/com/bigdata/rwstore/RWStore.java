@@ -1084,6 +1084,7 @@ public class RWStore implements IStore {
 	 * @param sze 
 	 */
 	public void free(final long laddr, final int sze, final IAllocationContext context) {
+//	    if (true) return;
 		final int addr = (int) laddr;
 
 		switch (addr) {
@@ -1118,7 +1119,7 @@ public class RWStore implements IStore {
 		
 	}
 
-	public void immediateFree(final int addr, final int sze) {
+	private void immediateFree(final int addr, final int sze) {
 		switch (addr) {
 		case 0:
 		case -1:
@@ -2621,7 +2622,7 @@ public class RWStore implements IStore {
 					
 					if (m_transactionService.getActiveCount() == 0) {
 						return aged;
-					} else {						
+					} else {
 						return aged < earliest ? aged : earliest;
 					}
 				}
