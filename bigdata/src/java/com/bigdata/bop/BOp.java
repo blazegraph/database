@@ -152,6 +152,16 @@ public interface BOp extends Cloneable, Serializable {
          * The default timeout for operator evaluation.
          */
         long DEFAULT_TIMEOUT = Long.MAX_VALUE;
+
+        /**
+         * For hash partitioned operators, this is the set of the member nodes
+         * for the operator.
+         * <p>
+         * This annotation is required for such operators since the set of known
+         * nodes of a given type (such as all data services) can otherwise
+         * change at runtime.
+         */
+        String MEMBER_SERVICES = "memberServices";
         
     }
     

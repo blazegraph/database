@@ -29,7 +29,11 @@ package com.bigdata.bop;
 
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp.Annotations;
 import com.bigdata.btree.AbstractNode;
@@ -44,12 +48,11 @@ import cutthecrap.utils.striterators.Striterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo In general recursive traversal iterators do not protect against loops
- *       in the operator tree, but see {@link #getIndex(BOp)}.
  */
 public class BOpUtility {
 
+    private static final Logger log = Logger.getLogger(BOpUtility.class);
+    
     /**
      * Pre-order recursive visitation of the operator tree (arguments only, no
      * annotations).
@@ -361,36 +364,53 @@ public class BOpUtility {
      * Return an index from the {@link BOp.Annotations#BOP_ID} to the
      * {@link BOp} for each spanned {@link BOp} (including annotations).
      * {@link BOp}s without identifiers are not indexed.
+     * <p>
+     * {@link BOp}s should form directed acyclic graphs, but this is not
+     * strictly enforced. The recursive traversal iterators declared by this
+     * class do not protect against loops in the operator tree. However,
+     * {@link #getIndex(BOp)} detects and report loops based on duplicate
+     * {@link Annotations#BOP_ID}s -or- duplicate {@link BOp} references.
      * 
      * @param op
      *            A {@link BOp}.
      * 
      * @return The index.
      * 
-     * @todo define recursive striterator for {@link BOp}s (as top-level method)
-     *       and then layer on an expander for the {@link BOp} annotations.
-     *       Finally, layer in a filter for the presence of the bopId. The
-     *       {@link BOp}s visited by the iterator should be inserted into the
-     *       indexed. [it is an error if there is a duplicate bopId.]
+     * @throws DuplicateBOpIdException
+     *             if there are two or more {@link BOp}s having the same
+     *             {@link Annotations#BOP_ID}.
+     * @throws BadBOpIdTypeException
+     *             if the {@link Annotations#BOP_ID} is not an {@link Integer}.
+     * @throws DuplicateBOpException
+     *             if the same {@link BOp} appears more once in the operator
+     *             tree and it is neither an {@link IVariable} nor an
+     *             {@link IConstant}.
      */
     static public Map<Integer,BOp> getIndex(final BOp op) {
         final LinkedHashMap<Integer, BOp> map = new LinkedHashMap<Integer, BOp>();
+        final LinkedHashSet<BOp> distinct = new LinkedHashSet<BOp>();
         final Iterator<BOp> itr = preOrderIteratorWithAnnotations(op);
         while (itr.hasNext()) {
             final BOp t = itr.next();
             final Object x = t.getProperty(Annotations.BOP_ID);
-            if (x == null) {
-                continue;
+            if (x != null) {
+                if (!(x instanceof Integer)) {
+                    throw new BadBOpIdTypeException("Must be Integer, not: "
+                            + x.getClass() + ": " + Annotations.BOP_ID);
+                }
+                final Integer id = (Integer) t.getProperty(Annotations.BOP_ID);
+                final BOp conflict = map.put(id, t);
+                if (conflict != null)
+                    throw new DuplicateBOpIdException("duplicate id=" + id
+                            + " for " + conflict + " and " + t);
             }
-            if (!(x instanceof Integer)) {
-                throw new BadBOpIdTypeException("Must be Integer, not: "
-                        + x.getClass() + ": " + Annotations.BOP_ID);
+            if (!distinct.add(t) && !(t instanceof IVariableOrConstant<?>)) {
+                /*
+                 * BOp appears more than once. This is only allowed for
+                 * constants and variables.
+                 */
+                throw new DuplicateBOpException(t.toString());
             }
-            final Integer id = (Integer) t.getProperty(Annotations.BOP_ID);
-            final BOp conflict = map.put(id, t);
-            if (conflict != null)
-                throw new DuplicateBOpIdException("duplicate id=" + id + " for "
-                        + conflict + " and " + t);
         }
         return map;
     }

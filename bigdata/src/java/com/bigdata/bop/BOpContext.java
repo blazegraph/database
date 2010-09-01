@@ -30,29 +30,29 @@ package com.bigdata.bop;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.IRelation;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.IJoinNexus;
+import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * The evaluation context for the operator (NOT serializable).
  * 
  * @param <E>
  *            The generic type of the objects processed by the operator.
- * 
- * @todo Make it easy to obtain another {@link BOpContext} in which the source
- *       or sink are different? E.g., for the evaluation of the right operand in
- *       a join.
  */
 public class BOpContext<E> {
 
@@ -189,6 +189,9 @@ public class BOpContext<E> {
      * @throws IllegalArgumentException
      *             if the <i>indexManager</i> is <code>null</code>
      * @throws IllegalArgumentException
+     *             if the <i>indexManager</i> is is not a <em>local</em> index
+     *             manager.
+     * @throws IllegalArgumentException
      *             if the <i>readTimestamp</i> is {@link ITx#UNISOLATED}
      *             (queries may not read on the unisolated indices).
      * @throws IllegalArgumentException
@@ -210,6 +213,16 @@ public class BOpContext<E> {
             final IBlockingBuffer<E[]> sink, final IBlockingBuffer<E[]> sink2) {
         if (indexManager == null)
             throw new IllegalArgumentException();
+        if (indexManager instanceof IBigdataFederation<?>) {
+            /*
+             * This is disallowed because the predicate specifies an index
+             * partition and expects to have access to the local index objects
+             * for that index partition.
+             */
+            throw new IllegalArgumentException(
+                    "Expecting a local index manager, not: "
+                            + indexManager.getClass().toString());
+        }
         if (readTimestamp == ITx.UNISOLATED)
             throw new IllegalArgumentException();
         if (TimestampUtility.isReadOnly(writeTimestamp))
@@ -263,7 +276,6 @@ public class BOpContext<E> {
     }
 
     /**
-    /**
      * Obtain an access path reading from relation for the specified predicate
      * (from the tail of some rule).
      * <p>
@@ -282,12 +294,44 @@ public class BOpContext<E> {
      * 
      * @return The access path.
      * 
-     * @todo replaces {@link IJoinNexus#getTailAccessPath(IRelation, IPredicate)}.
+     * @todo replaces
+     *       {@link IJoinNexus#getTailAccessPath(IRelation, IPredicate)}.
      */
     @SuppressWarnings("unchecked")
     public IAccessPath<?> getAccessPath(final IRelation<?> relation,
             final IPredicate<?> predicate) {
 
+        if (relation == null)
+            throw new IllegalArgumentException();
+
+        if (predicate == null)
+            throw new IllegalArgumentException();
+
+        final IKeyOrder keyOrder = relation.getKeyOrder((IPredicate) predicate);
+
+        if (keyOrder == null)
+            throw new RuntimeException("No access path: " + predicate);
+
+        final int partitionId = predicate.getPartitionId();
+
+        final int flags = predicate.getProperty(
+                PipelineOp.Annotations.FLAGS,
+                PipelineOp.Annotations.DEFAULT_FLAGS)
+                | (TimestampUtility.isReadOnly(getReadTimestamp()) ? IRangeQuery.READONLY
+                        : 0);
+        
+        final int chunkOfChunksCapacity = predicate.getProperty(
+                PipelineOp.Annotations.CHUNK_OF_CHUNKS_CAPACITY,
+                PipelineOp.Annotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY);
+
+        final int chunkCapacity = predicate.getProperty(
+                PipelineOp.Annotations.CHUNK_CAPACITY,
+                PipelineOp.Annotations.DEFAULT_CHUNK_CAPACITY);
+
+        final int fullyBufferedReadThreshold = predicate.getProperty(
+                PipelineOp.Annotations.FULLY_BUFFERED_READ_THRESHOLD,
+                PipelineOp.Annotations.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD);
+        
         if (predicate.getPartitionId() != -1) {
 
             /*
@@ -299,18 +343,64 @@ public class BOpContext<E> {
              * require a total view of the relation, which is not available
              * during scale-out pipeline joins. Likewise, the [backchain]
              * property will be ignored since it is handled by an expander.
+             * 
+             * @todo Replace this with IRelation#getAccessPathForIndexPartition()
              */
+//            return ((AbstractRelation<?>) relation)
+//                    .getAccessPathForIndexPartition(indexManager,
+//                            (IPredicate) predicate);
+            /*
+             * @todo This condition should probably be an error since the expander
+             * will be ignored.
+             */
+//            if (predicate.getSolutionExpander() != null)
+//                throw new IllegalArgumentException();
+            
+            final String namespace = relation.getNamespace();//predicate.getOnlyRelationName();
 
-            return ((AbstractRelation<?>) relation)
-                    .getAccessPathForIndexPartition(indexManager,
-                            (IPredicate) predicate);
+            // The name of the desired index partition.
+            final String name = DataService.getIndexPartitionName(namespace
+                    + "." + keyOrder.getIndexName(), partitionId);
+
+            // MUST be a local index view.
+            final ILocalBTreeView ndx = (ILocalBTreeView) indexManager
+                    .getIndex(name, readTimestamp);
+
+            return new AccessPath(relation, indexManager, readTimestamp,
+                    predicate, keyOrder, ndx, flags, chunkOfChunksCapacity,
+                    chunkCapacity, fullyBufferedReadThreshold).init();
 
         }
 
-        // Find the best access path for the predicate for that relation.
-        final IAccessPath<?> accessPath = relation
-                .getAccessPath((IPredicate) predicate);
+        /*
+         * Find the best access path for the predicate for that relation.
+         * 
+         * @todo Replace this with IRelation#getAccessPath(IPredicate) once the
+         * bop conversion is done. It is the same logic.
+         */
+        IAccessPath accessPath;
+        {
 
+//          accessPath = relation.getAccessPath((IPredicate) predicate);
+
+            final IIndex ndx = relation.getIndex(keyOrder);
+
+            if (ndx == null) {
+            
+                throw new IllegalArgumentException("no index? relation="
+                        + relation.getNamespace() + ", timestamp="
+                        + readTimestamp + ", keyOrder=" + keyOrder + ", pred="
+                        + predicate + ", indexManager=" + getIndexManager());
+
+            }
+
+            accessPath = new AccessPath((IRelation) relation, indexManager,
+                    readTimestamp, (IPredicate) predicate,
+                    (IKeyOrder) keyOrder, ndx, flags, chunkOfChunksCapacity,
+                    chunkCapacity, fullyBufferedReadThreshold).init();
+
+        }
+        
         /*
          * @todo No expander's for bops, at least not right now. They could be
          * added in easily enough, which would support additional features for

@@ -416,7 +416,7 @@ public class TestBOpUtility extends TestCase2 {
     }
 
     /**
-     * Unit test for {@link BOpUtility#getIndex(BOp)}.
+     * Unit test for {@link BOpUtility#getIndex(BOp)} using valid inputs.
      */
     public void test_getIndex() {
 
@@ -489,7 +489,7 @@ public class TestBOpUtility extends TestCase2 {
 
     /**
      * Unit test for {@link BOpUtility#getIndex(BOp)} in which we verify that it
-     * rejects operator trees operator ids which are not {@link Integer}s.
+     * rejects operator trees with operator ids which are not {@link Integer}s.
      */
     public void test_getIndex_rejectsNonIntegerIds() {
 
@@ -505,6 +505,65 @@ public class TestBOpUtility extends TestCase2 {
         } catch (BadBOpIdTypeException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
+        }
+
+    }
+
+    /**
+     * Unit test for {@link BOpUtility#getIndex(BOp)} in which we verify that it
+     * rejects operator trees in which the same {@link BOp} reference appears
+     * more than once but allows duplicate {@link IVariable}s and
+     * {@link IConstant}s.
+     */
+    public void test_getIndex_duplicateBOps() {
+
+        final IConstant<Long> c1 = new Constant<Long>(12L);
+        final IVariable<?> v1 = Var.var("y");
+
+        /*
+         * Operator tree with duplicate variable and duplicate constant refs.
+         */
+        {
+            // root
+            final BOp root = new BOpBase(new BOp[] { // root args[]
+                    c1, v1 }, NV.asMap(new NV[] {//
+                            new NV(BOp.Annotations.BOP_ID, 4),//
+                                    new NV("foo", v1), // duplicate variable.
+                                    new NV("bar", c1) // duplicate variable.
+                            }));
+
+            // should be Ok.
+            final Map<Integer, BOp> map = BOpUtility.getIndex(root);
+
+            assertTrue(root == map.get(4));
+            
+        }
+
+        /*
+         * Operator tree with duplicate bop which is neither a var nor or a
+         * constant.
+         */
+        {
+
+            /*
+             * bop w/o bopId is used to verify correct detection of duplicate
+             * references.
+             */
+            final BOp op2 = new BOpBase(new BOp[]{}, null/*annotations*/);
+            
+            // root
+            final BOp root = new BOpBase(new BOp[] { // root args[]
+                    op2, op2 }, NV.asMap(new NV[] {//
+                            new NV(BOp.Annotations.BOP_ID, 4),//
+                            }));
+
+            try {
+                BOpUtility.getIndex(root);
+                fail("Expecting: " + DuplicateBOpException.class);
+            } catch (DuplicateBOpException ex) {
+                if (log.isInfoEnabled())
+                    log.info("Ignoring expected exception: " + ex);
+            }
         }
 
     }
