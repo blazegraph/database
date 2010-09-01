@@ -85,7 +85,7 @@ public class Test extends RepositoryCreator {
             hostname = NicUtil.getIpAddress("default.nic", "default", false);
         } catch(Throwable t) {//for now, maintain same failure logic as used previously
             t.printStackTrace();
-            s = NicUtil.getIpAddressByLocalHost();
+            hostname = NicUtil.getIpAddressByLocalHost();
         }
         QUERY_TEST_RESULT_FILE = hostname + "-result.txt";
     	} else {
