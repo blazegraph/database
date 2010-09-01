@@ -44,7 +44,9 @@ import com.bigdata.journal.AbstractMROWTestCase;
 import com.bigdata.journal.AbstractRestartSafeTestCase;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.DiskOnlyStrategy;
+import com.bigdata.journal.IAllocationContext;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.JournalShadow;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.TestJournalBasics;
 import com.bigdata.journal.Journal.Options;
@@ -380,10 +382,10 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 RWStore rw = bufferStrategy.getRWStore();
                 ArrayList<Integer> sizes = new ArrayList<Integer>();
                 TreeMap<Long, Integer> paddrs = new TreeMap<Long, Integer>();
-                for (int i = 0; i < 1000000; i++) {
+                for (int i = 0; i < 100000; i++) {
                 	int s = r.nextInt(250);
                 	sizes.add(s);
-                	int a = rw.alloc(s);
+                	int a = rw.alloc(s, null);
                 	long pa = rw.physicalAddress(a);
                 	assertTrue(paddrs.get(pa) == null);
                 	paddrs.put(pa, a);
@@ -392,7 +394,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 for (int i = 0; i < 50; i++) {
                 	int s = r.nextInt(500);
                 	sizes.add(s);
-                	int a = rw.alloc(s);
+                	int a = rw.alloc(s, null);
                 	long pa = rw.physicalAddress(a);
                 	paddrs.put(pa, a);
                 }
@@ -442,9 +444,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
         }
         
         long allocBatch(RWStore rw, int bsize, int asze, int ainc) {
-	        long curAddress = rw.physicalAddress(rw.alloc(asze));
+	        long curAddress = rw.physicalAddress(rw.alloc(asze, null));
 	        for (int i = 1; i < bsize; i++) {
-	        	int a = rw.alloc(asze);
+	        	int a = rw.alloc(asze, null);
 	        	long nxt = rw.physicalAddress(a);
 	        	assertTrue("Problem with index: " + i, (curAddress+ainc) == nxt || (nxt % 8192 == 0));
 	        	curAddress = nxt;
@@ -460,7 +462,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
             r.nextBytes(batchBuffer);
 	        for (int i = 0; i < bsize; i++) {
 	        	int as = base + r.nextInt(scope);
-	        	retaddrs[i] = (int) rw.alloc(batchBuffer, as);
+	        	retaddrs[i] = (int) rw.alloc(batchBuffer, as, null);
 	        }
 	        
 	        return retaddrs;
@@ -499,12 +501,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
         private long reallocBatch(RWStore rw, int tsts, int sze, int grp) {
         	long[] addr = new long[grp];
         	for (int i = 0; i < grp; i++) {
-        		addr[i] = rw.alloc(sze);
+        		addr[i] = rw.alloc(sze, null);
         	}
         	for (int t = 0; t < tsts; t++) {
             	for (int i = 0; i < grp; i++) {
             		long old = addr[i];
-            		addr[i] = rw.alloc(sze);
+            		addr[i] = rw.alloc(sze, null);
             		rw.free(old, sze);
             	}       		
         	}
@@ -711,7 +713,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				showStore(store);
 				
 				store.close();
-				System.out.println("Re-open Journal");
 				
 				store = (Journal) getStore();
 				showStore(store);
@@ -843,11 +844,15 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 // now delete the memory
                 bs.delete(faddr);
                 
+                // since deferred frees, we must commit in order to ensure the
+                //	address in invalid, indicating it is available for
+                bs.commit();
+                
                 try {
                 	rdBuf = bs.read(faddr); // should fail with illegal state
                 	throw new RuntimeException("Fail");
                 } catch (Exception ise) {
-                	assertTrue("Expected IllegalStateException", ise instanceof IllegalStateException);
+                	assertTrue("Expected IllegalStateException reading from " + (faddr >> 32) + " instead got: " + ise, ise instanceof IllegalStateException);
                 }
 
             } finally {
@@ -932,8 +937,96 @@ public class TestRWJournal extends AbstractJournalTestCase {
             	store.destroy();
             }
         }
+        
+        static class DummyAllocationContext implements IAllocationContext {
+        	static int s_id = 23;
+        	
+        	int m_id = s_id++;
 
-        public void test_stressAlloc() {
+			public int compareTo(Object o) {
+				if (o instanceof DummyAllocationContext) {
+					return m_id - ((DummyAllocationContext) o).m_id;
+				} else {
+					return -1;
+				}
+			}
+
+			public long minimumReleaseTime() {
+				return 0; // indicates immediate release
+			}
+        	
+        }
+
+        /**
+         * From a RWStore, creates multiple AllocationContexts to isolate
+         * updates, re-allocate storage and protect against by concurrent
+         * Contexts.  This is the core functionality required to support
+         * Transactions.
+         * 
+         * If an allocation is made for an AllocationContext then this will
+         * result in a ContextAllocation object being created in the RWStore
+         * within which "shadow" allocations can be made.  If such a shadow
+         * allocation is deleted, within the AllocationContext, then this
+         * can be removed immediately. 
+         * 
+         * @throws IOException
+         */
+        public void test_allocationContexts() throws IOException {
+            Journal store = (Journal) getStore();
+
+            RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+
+            RWStore rw = bs.getRWStore();
+            
+            // JournalShadow shadow = new JournalShadow(store);
+
+            // Create a couple of contexts
+            IAllocationContext allocContext1 = new DummyAllocationContext();
+            IAllocationContext allocContext2 = new DummyAllocationContext();
+            
+            int sze = 650;
+            byte[] buf = new byte[sze+4]; // extra for checksum
+            r.nextBytes(buf);
+            
+            long addr1a = bs.write(ByteBuffer.wrap(buf), allocContext1);
+            long addr1b = bs.write(ByteBuffer.wrap(buf), allocContext1);
+            rw.detachContext(allocContext1);
+            
+            
+            long addr2a = bs.write(ByteBuffer.wrap(buf), allocContext2);
+            long addr2b = bs.write(ByteBuffer.wrap(buf), allocContext2);
+            rw.detachContext(allocContext2);           
+ 
+            // Re-establish context
+            long addr1c = bs.write(ByteBuffer.wrap(buf), allocContext1);
+            
+            // By detaching contexts we end up using the same allocator
+            assertTrue("allocator re-use", bs.getPhysicalAddress(addr1c) > bs.getPhysicalAddress(addr2b));
+            
+            // Now, prior to commit, try deleting an uncommitted allocation
+            bs.delete(addr1c, allocContext1);
+            // and re-allocating it from the same context
+            long addr1d = bs.write(ByteBuffer.wrap(buf), allocContext1);
+
+            assertTrue("re-allocation", addr1c==addr1d);
+
+            rw.detachContext(allocContext1);
+            
+            // Now commit
+            store.commit();
+            
+            // now try deleting and re-allocating again, but in a global context
+            bs.delete(addr1d); // this should call deferFree
+            long addr1e = bs.write(ByteBuffer.wrap(buf), allocContext1);
+            
+            assertTrue("deferred-delete", addr1e != addr1d);
+            
+            // Now commit
+            store.commit();
+
+        }
+        
+       public void test_stressAlloc() {
             
             Journal store = (Journal) getStore();
 
