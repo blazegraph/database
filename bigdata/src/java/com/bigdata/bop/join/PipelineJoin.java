@@ -35,7 +35,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -54,7 +53,6 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.Haltable;
-import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.counters.CAT;
@@ -66,7 +64,6 @@ import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStarJoin;
 import com.bigdata.relation.rule.IStarJoin.IStarConstraint;
@@ -385,192 +382,7 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
          */
         final PipelineJoinStats stats;
 
-        /**
-         * A factory pattern for per-thread objects whose life cycle is tied to
-         * some container. For example, there may be an instance of this pool
-         * for a {@link JoinTask} or an {@link AbstractBTree}. The pool can be
-         * torn down when the container is torn down, which prevents its
-         * thread-local references from escaping.
-         * 
-         * @author thompsonbry@users.sourceforge.net
-         * @param <T>
-         *            The generic type of the thread-local object.
-         * 
-         * @todo There should be two implementations of a common interface or
-         *       abstract base class: one based on a private
-         *       {@link ConcurrentHashMap} and the other on striped locks. The
-         *       advantage of the {@link ConcurrentHashMap} is approximately 3x
-         *       higher concurrency. The advantage of striped locks is that you
-         *       can directly manage the #of buffers when when the threads using
-         *       those buffers is unbounded. However, doing so could lead to
-         *       deadlock since two threads can be hashed onto the same buffer
-         *       object.
-         */
-        abstract public class ThreadLocalFactory<T extends IBuffer<E>, E> {
-
-            /**
-             * The thread-local queues.
-             */
-            private final ConcurrentHashMap<Thread, T> map;
-
-            /**
-             * A list of all objects visible to the caller. This is used to
-             * ensure that any objects allocated by the factory are visited.
-             * 
-             * <p>
-             * Note: Since the collection is not thread-safe, synchronization is
-             * required when adding to the collection and when visiting the
-             * elements of the collection.
-             */
-            private final LinkedList<T> list = new LinkedList<T>();
-
-            protected ThreadLocalFactory() {
-
-                this(16/* initialCapacity */, .75f/* loadFactor */, 16/* concurrencyLevel */);
-
-            }
-
-            protected ThreadLocalFactory(final int initialCapacity,
-                    final float loadFactor, final int concurrencyLevel) {
-
-                map = new ConcurrentHashMap<Thread, T>(initialCapacity,
-                        loadFactor, concurrencyLevel);
-
-            }
-
-            /**
-             * Return the #of thread-local objects.
-             */
-            final public int size() {
-
-                return map.size();
-
-            }
-
-            /**
-             * Add the element to the thread-local buffer.
-             * 
-             * @param e
-             *            An element.
-             * 
-             * @throws IllegalStateException
-             *             if the factory is asynchronously closed.
-             */
-            public void add(final E e) {
-
-                get().add(e);
-
-            }
-
-            /**
-             * Return a thread-local buffer
-             * 
-             * @return The thread-local buffer.
-             * 
-             * @throws RuntimeException
-             *             if the join is halted.
-             */
-            final private T get() {
-                final Thread t = Thread.currentThread();
-                T tmp = map.get(t);
-                if (tmp == null) {
-                    if (map.put(t, tmp = initialValue()) != null) {
-                        /*
-                         * Note: Since the key is the thread it is not possible
-                         * for there to be a concurrent put of an entry under
-                         * the same key so we do not have to use putIfAbsent().
-                         */
-                        throw new AssertionError();
-                    }
-                    // Add to list.
-                    synchronized (list) {
-                        list.add(tmp);
-                    }
-                }
-                halted();
-                return tmp;
-            }
-
-            /**
-             * Flush each of the unsynchronized buffers onto their backing
-             * synchronized buffer.
-             * 
-             * @throws RuntimeException
-             *             if the join is halted.
-             */
-            public void flush() {
-                synchronized (list) {
-                    int n = 0;
-                    long m = 0L;
-                    for (T b : list) {
-                        halted();
-                        // #of elements to be flushed.
-                        final int size = b.size();
-                        // flush, returning total #of elements written onto this
-                        // buffer.
-                        final long counter = b.flush();
-                        m += counter;
-                        if (log.isDebugEnabled())
-                            log.debug("Flushed buffer: size=" + size
-                                    + ", counter=" + counter);
-                    }
-                    if (log.isInfoEnabled())
-                        log.info("Flushed " + n
-                                + " unsynchronized buffers totalling " + m
-                                + " elements");
-                }
-            }
-
-            /**
-             * Reset each of the synchronized buffers, discarding their buffered
-             * writes.
-             * <p>
-             * Note: This method is used during error processing, therefore it
-             * DOES NOT check {@link JoinTask#halt}.
-             */
-            public void reset() {
-                synchronized (list) {
-                    int n = 0;
-                    for (T b : list) {
-                        // #of elements in the buffer before reset().
-                        final int size = b.size();
-                        // reset the buffer.
-                        b.reset();
-                        if (log.isDebugEnabled())
-                            log.debug("Reset buffer: size=" + size);
-                    }
-                    if (log.isInfoEnabled())
-                        log.info("Reset " + n + " unsynchronized buffers");
-                }
-            }
-
-            // /**
-            // * Reset the per-{@link Thread} unsynchronized output buffers
-            // (used as
-            // * part of error handling for the {@link JoinTask}).
-            // */
-            // final protected void resetUnsyncBuffers() throws Exception {
-            //
-            // final int n = threadLocalBufferFactory.reset();
-            // .close(new
-            // Visitor<AbstractUnsynchronizedArrayBuffer<IBindingSet>>() {
-            //
-            // @Override
-            // public void meet(
-            // final AbstractUnsynchronizedArrayBuffer<IBindingSet> b)
-            // throws Exception {
-            //
-            //
-            // }
-
-            /**
-             * Create and return a new object.
-             */
-            abstract protected T initialValue();
-
-        }
-
-        final private ThreadLocalFactory<AbstractUnsynchronizedArrayBuffer<IBindingSet>, IBindingSet> threadLocalBufferFactory = new ThreadLocalFactory<AbstractUnsynchronizedArrayBuffer<IBindingSet>, IBindingSet>() {
+        final private ThreadLocalBufferFactory<AbstractUnsynchronizedArrayBuffer<IBindingSet>, IBindingSet> threadLocalBufferFactory = new ThreadLocalBufferFactory<AbstractUnsynchronizedArrayBuffer<IBindingSet>, IBindingSet>() {
 
             @Override
             protected AbstractUnsynchronizedArrayBuffer<IBindingSet> initialValue() {
@@ -579,6 +391,14 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
                 return newUnsyncOutputBuffer();
 
             }
+            
+            @Override
+            protected void halted() {
+                
+                JoinTask.this.halted();
+                
+            }
+            
         };
 
         public String toString() {
