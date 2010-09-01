@@ -153,14 +153,20 @@ public class TestQueryEngine extends TestCase2 {
 
     public void tearDown() throws Exception {
 
-        if (queryEngine != null)
+        if (queryEngine != null) {
             queryEngine.shutdownNow();
+            queryEngine = null;
+        }
 
-        if (bufferService != null)
+        if (bufferService != null) {
             bufferService.shutdownNow();
+            bufferService = null;
+        }
 
-        if (jnl != null)
+        if (jnl != null) {
             jnl.destroy();
+            jnl = null;
+        }
 
     }
 
@@ -573,7 +579,7 @@ public class TestQueryEngine extends TestCase2 {
      * @param expected
      * @param itr
      */
-    protected void assertSolutions(final IBindingSet[] expected,
+    static public void assertSolutions(final IBindingSet[] expected,
             final IAsynchronousIterator<IBindingSet[]> itr) {
         try {
             int n = 0;
@@ -588,9 +594,10 @@ public class TestQueryEngine extends TestCase2 {
                         fail("n=" + n + ", expected=" + expected[n]
                                 + ", actual=" + e[i]);
                     }
+                    n++;
                 }
-                n++;
             }
+            assertEquals("Wrong number of solutions", expected.length, n);
         } finally {
             itr.close();
         }

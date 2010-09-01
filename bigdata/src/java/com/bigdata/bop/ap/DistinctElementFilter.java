@@ -10,8 +10,10 @@ import com.bigdata.bop.BOpList;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.aggregation.DistinctBindingSetOp;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.relation.rule.BindingSetSortKeyBuilder;
+import com.bigdata.rdf.spo.DistinctSPOIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.ISolution;
@@ -23,7 +25,8 @@ import com.bigdata.striterator.MergeFilter;
  * A DISTINCT operator based on a hash table.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
+ *          thompsonbry $
  * @param <E>
  * 
  * @todo could have an implementation backed by a persistent hash map using an
@@ -40,7 +43,8 @@ import com.bigdata.striterator.MergeFilter;
  *       increase the map concurrency level, etc.
  * 
  * @todo Reconcile with {@link IChunkConverter}, {@link DistinctFilter} (handles
- *       solutions) and {@link MergeFilter} (handles comparables).
+ *       solutions) and {@link MergeFilter} (handles comparables),
+ *       {@link DistinctSPOIterator}, {@link DistinctBindingSetOp}, etc.
  */
 public class DistinctElementFilter<E> 
 extends BOpBase
@@ -62,14 +66,15 @@ extends BOpBase
         String LOAD_FACTOR = "loadFactor";
 
         String CONCURRENCY_LEVEL = "concurrencyLevel";
-        
+
     }
 
-    public DistinctElementFilter(final IVariable<?>[] distinctList, final UUID masterUUID) {
+    public DistinctElementFilter(final IVariable<?>[] distinctList,
+            final UUID masterUUID) {
 
         super(distinctList, NV.asMap(new NV[] {
-//                new NV(Annotations.QUERY_ID, masterUUID),
-        // new NV(Annotations.BOP_ID, bopId)
+        // new NV(Annotations.QUERY_ID, masterUUID),
+                // new NV(Annotations.BOP_ID, bopId)
                 }));
 
         if (masterUUID == null)

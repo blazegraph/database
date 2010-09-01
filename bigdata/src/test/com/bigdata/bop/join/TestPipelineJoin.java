@@ -50,6 +50,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
+import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.bop.join.PipelineJoin.PipelineJoinStats;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -143,8 +144,13 @@ public class TestPipelineJoin extends TestCase2 {
 
     public void tearDown() throws Exception {
 
-        if (jnl != null)
+        if (jnl != null) {
+
             jnl.destroy();
+         
+            jnl = null;
+            
+        }
 
     }
 
@@ -252,20 +258,22 @@ public class TestPipelineJoin extends TestCase2 {
         // execute task.
         jnl.getExecutorService().execute(ft);
 
-        final IAsynchronousIterator<IBindingSet[]> itr = sink.iterator();
-        try {
-            int n = 0;
-            while (itr.hasNext()) {
-                final IBindingSet[] chunk = itr.next();
-                if (log.isInfoEnabled())
-                    log.info(n + " : chunkSize=" + chunk.length);
-                for (int i = 0; i < chunk.length; i++) {
-                    assertTrue(expected[n++].equals(chunk[i]));
-                }
-            }
-        } finally {
-            itr.close();
-        }
+        TestQueryEngine.assertSolutions(expected, sink.iterator());
+//        final IAsynchronousIterator<IBindingSet[]> itr = sink.iterator();
+//        try {
+//            int n = 0;
+//            while (itr.hasNext()) {
+//                final IBindingSet[] chunk = itr.next();
+//                if (log.isInfoEnabled())
+//                    log.info(n + " : chunkSize=" + chunk.length);
+//                for (int i = 0; i < chunk.length; i++) {
+//                    assertTrue(expected[n++].equals(chunk[i]));
+//                }
+//            }
+//            assertEquals(n, expected.length);
+//        } finally {
+//            itr.close();
+//        }
 
         // join task
         assertEquals(1L, stats.chunksIn.get());
@@ -366,6 +374,7 @@ public class TestPipelineJoin extends TestCase2 {
 //                    assertTrue(expected[n++].equals(chunk[i]));
 //                }
 //            }
+//        assertEquals(n, expected.length);
 //        } finally {
 //            itr.close();
 //        }

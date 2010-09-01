@@ -56,6 +56,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NoSuchBOpException;
+import com.bigdata.bop.aggregation.DistinctBindingSetOp;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -187,10 +188,12 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>> {
      * <p>
      * This is guarded by the {@link #runningStateLock}.
      * 
-     * FIXME {@link IConstraint}s for {@link PipelineJoin}, distinct elements
-     * and other filters for {@link IPredicate}s, conditional routing for
-     * binding sets in the pipeline (to route around an optional join group
-     * based on an {@link IConstraint}), and then buffer management for s/o.
+     * FIXME {@link IConstraint}s for {@link PipelineJoin}, non-distributed
+     * filters for {@link IPredicate}s, distinct element filter for
+     * {@link IPredicate} which is capable of distributed operations,
+     * conditional routing for binding sets in the pipeline (to route around an
+     * optional join group based on an {@link IConstraint}), SPARQL to BOP
+     * translation, and then buffer management for s/o.
      * 
      * @todo SCALEOUT: Life cycle management of the operators and the query
      *       implies both a per-query bop:NodeList map on the query coordinator

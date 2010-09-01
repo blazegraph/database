@@ -66,10 +66,31 @@ public class HashBindingSet implements IBindingSet {
      * 
      * @param src
      */
-    protected HashBindingSet(HashBindingSet src) {
+    protected HashBindingSet(final HashBindingSet src) {
         
         map = new LinkedHashMap<IVariable, IConstant>(src.map);
         
+    }
+
+    /**
+     * Copy constructor.
+     * 
+     * @param src
+     */
+    public HashBindingSet(final IBindingSet src) {
+
+        map = new LinkedHashMap<IVariable, IConstant>(src.size());
+
+        final Iterator<Map.Entry<IVariable, IConstant>> itr = src.iterator();
+
+        while (itr.hasNext()) {
+
+            final Map.Entry<IVariable, IConstant> e = itr.next();
+
+            map.put(e.getKey(), e.getValue());
+
+        }
+
     }
     
     public boolean isBound(IVariable var) {
@@ -119,7 +140,7 @@ public class HashBindingSet implements IBindingSet {
 
     public String toString() {
         
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
         
         sb.append("{ ");
 
