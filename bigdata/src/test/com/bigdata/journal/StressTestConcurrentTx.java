@@ -130,6 +130,8 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
      */
     public void test_concurrentClients() throws InterruptedException {
 
+    	new Float("123.23");
+    	
         final Properties properties = getProperties();
 
         final Journal journal = new Journal(properties);
@@ -150,14 +152,13 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
 
             doConcurrentClientTest(//
                     journal, //
-                    10,// timeout
+                    30,// timeout
                     20,// nclients
-                    1000, // ntrials
+                    500, // ntrials
                     3,// keylen
                     100,// nops
                     .10// abortRate
             );
-
         } finally {
 
             journal.destroy();
@@ -337,7 +338,15 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
             }
             
         }
-        
+               
+        // Now test rootBlocks
+        int rootBlockCount = 0;
+        Iterator<IRootBlockView> rbvs = journal.getRootBlocks(10); // cannot use 0
+        while (rbvs.hasNext()) {
+        	IRootBlockView rbv = rbvs.next();
+        	rootBlockCount++;           	
+        }
+
         // immediately terminate any tasks that are still running.
         log.warn("Shutting down now!");
         journal.shutdownNow();
@@ -357,6 +366,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         ret.put("naborted",""+naborted);
         ret.put("ncommitted",""+ncommitted);
         ret.put("nuncommitted", ""+nuncommitted);
+        ret.put("rootBlocks found", ""+rootBlockCount);
         ret.put("elapsed(ms)", ""+elapsed);
         ret.put("tps", ""+(ncommitted * 1000 / elapsed));
         ret.put("bytesWritten", ""+bytesWritten);

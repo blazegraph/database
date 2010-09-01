@@ -28,7 +28,6 @@ import java.io.DataInputStream;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.bigdata.journal.IAllocationContext;
 
 public interface Allocator extends Comparable {
   public int getBlockSize();

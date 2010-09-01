@@ -30,7 +30,6 @@ import java.io.*;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.journal.IAllocationContext;
 import com.bigdata.util.ChecksumUtility;
 
 /**

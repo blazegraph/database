@@ -44,9 +44,7 @@ import com.bigdata.journal.AbstractMROWTestCase;
 import com.bigdata.journal.AbstractRestartSafeTestCase;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.DiskOnlyStrategy;
-import com.bigdata.journal.IAllocationContext;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.JournalShadow;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.TestJournalBasics;
 import com.bigdata.journal.Journal.Options;
@@ -939,22 +937,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
         }
         
         static class DummyAllocationContext implements IAllocationContext {
-        	static int s_id = 23;
-        	
-        	int m_id = s_id++;
-
-			public int compareTo(Object o) {
-				if (o instanceof DummyAllocationContext) {
-					return m_id - ((DummyAllocationContext) o).m_id;
-				} else {
-					return -1;
-				}
-			}
-
-			public long minimumReleaseTime() {
-				return 0; // indicates immediate release
-			}
-        	
         }
 
         /**

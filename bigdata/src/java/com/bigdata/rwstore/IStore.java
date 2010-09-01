@@ -26,7 +26,6 @@ package com.bigdata.rwstore;
 
 import java.io.File;
 
-import com.bigdata.journal.IAllocationContext;
 
 /************************************************************************************************
  * The IStore interface provides persistent file-backed storage.

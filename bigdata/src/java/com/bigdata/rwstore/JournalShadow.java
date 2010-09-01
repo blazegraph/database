@@ -22,10 +22,15 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
-package com.bigdata.journal;
+package com.bigdata.rwstore;
 
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
+
+import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IJournal;
+import com.bigdata.journal.JournalDelegate;
+import com.bigdata.journal.RWStrategy;
 
 /**
  * A JournalShadow wraps a Journal as a JournalDelegate but provides itself
@@ -42,7 +47,7 @@ public class JournalShadow extends JournalDelegate implements IAllocationContext
 	static AtomicLong s_idCounter = new AtomicLong(23);
 	int m_id = (int) s_idCounter.incrementAndGet();
 	
-	public JournalShadow(IJournal source) {
+	private JournalShadow(AbstractJournal source) {
 		super(source);
 	}
 
@@ -81,5 +86,22 @@ public class JournalShadow extends JournalDelegate implements IAllocationContext
 	 */
 	public void detach() {
 		delegate.detachContext(this);
+	}
+
+	/**
+	 * This factory pattern creates a shadow for a RWStrategy-backed Journal
+	 * to support protected allocations while allowing for deletion and 
+	 * re-allocation where possible.  If the Journal is not backed by a
+	 * RWStrategy, then the original Journal is returned.
+	 * 
+	 * @param journal - the journal to be shadowed
+	 * @return the shadowed journal if necessary
+	 */
+	public static IJournal newShadow(AbstractJournal journal) {
+		if (journal.getBufferStrategy() instanceof RWStrategy) {
+			return new JournalShadow(journal);
+		} else {
+			return journal;
+		}
 	}
 }

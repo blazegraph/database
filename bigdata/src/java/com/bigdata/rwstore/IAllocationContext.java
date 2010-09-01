@@ -22,7 +22,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
-package com.bigdata.journal;
+package com.bigdata.rwstore;
 
 /**
  * An IAllocationContext defines a shadow environment which may be
@@ -31,11 +31,6 @@ package com.bigdata.journal;
  * @author Martyn Cutcher
  *
  */
-public interface IAllocationContext extends Comparable {
-
-	/**
-	 * @return the minimum release time for any freed allocations
-	 */
-	long minimumReleaseTime();
+public interface IAllocationContext {
 
 }

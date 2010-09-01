@@ -35,6 +35,7 @@ import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
@@ -53,7 +54,6 @@ import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.ForceEnum;
-import com.bigdata.journal.IAllocationContext;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.JournalTransactionService;
@@ -2728,9 +2728,8 @@ public class RWStore implements IStore {
 		m_allocationLock.lock();
 		try {
 			int addrs = strBuf.readInt();
-			System.out.println("Freeing deferred deletes: " + addrs);
 			
-			while (addrs-- > 0) {
+			while (addrs-- > 0) { // while (false && addrs-- > 0) {
 				int nxtAddr = strBuf.readInt();
 				
 				Allocator alloc = getBlock(nxtAddr);
@@ -2873,8 +2872,8 @@ public class RWStore implements IStore {
 		}
 	}
 
-	private TreeMap<IAllocationContext, ContextAllocation> m_contexts = 
-		new TreeMap<IAllocationContext, ContextAllocation>();
+	private HashMap<IAllocationContext, ContextAllocation> m_contexts = 
+		new HashMap<IAllocationContext, ContextAllocation>();
 	
 	ContextAllocation establishContextAllocation(IAllocationContext context) {
 		ContextAllocation ret = m_contexts.get(context);

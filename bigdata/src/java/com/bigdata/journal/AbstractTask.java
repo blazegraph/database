@@ -71,6 +71,7 @@ import com.bigdata.resources.NoSuchStoreException;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.resources.StaleLocatorReason;
+import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.InnerCause;
@@ -2891,22 +2892,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
 		public Iterator<IRootBlockView> getRootBlocks(long startTime) {
 			return delegate.getRootBlocks(startTime);
-		}
-
-		public void delete(long addr, IAllocationContext context) {
-            throw new UnsupportedOperationException();
-		}
-
-		public long write(ByteBuffer data, IAllocationContext context) {
-            throw new UnsupportedOperationException();
-		}
-
-		public long write(ByteBuffer data, long oldAddr, IAllocationContext context) {
-            throw new UnsupportedOperationException();
-		}
-
-		public void detachContext(IAllocationContext context) {
-			delegate.detachContext(context);
 		}
 
     }

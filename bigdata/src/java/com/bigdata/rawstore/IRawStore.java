@@ -37,8 +37,8 @@ import com.bigdata.cache.IGlobalLRU;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.io.IByteArrayBuffer;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.IAllocationContext;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.rwstore.IAllocationContext;
 
 /**
  * <p>
@@ -124,45 +124,7 @@ public interface IRawStore extends IAddressManager {
      */
     public long write(ByteBuffer data);
     
-    /**
-     * Write the data (unisolated).
-     * 
-     * @param data
-     *            The data. The bytes from the current
-     *            {@link ByteBuffer#position()} to the
-     *            {@link ByteBuffer#limit()} will be written and the
-     *            {@link ByteBuffer#position()} will be advanced to the
-     *            {@link ByteBuffer#limit()} . The caller may subsequently
-     *            modify the contents of the buffer without changing the state
-     *            of the store (i.e., the data are copied into the store).
-     * 
-     * @param context defines teh shadow AllocationContext from which this call 
-     * 			was made
-	 *
-     * @return A long integer formed that encodes both the offset from which the
-     *         data may be read and the #of bytes to be read. See
-     *         {@link IAddressManager}.
-     * 
-     * @throws IllegalArgumentException
-     *             if <i>data</i> is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             if <i>data</i> has zero bytes {@link ByteBuffer#remaining()}.
-     * @throws IllegalStateException
-     *             if the store is not open.
-     * @throws IllegalStateException
-     *             if the store does not allow writes.
-     * 
-     * @todo define exception if the maximum extent would be exceeded.
-     * 
-     * @todo the addresses need to reflect the ascending offset at which the
-     *       data are written, at least for a class of append only store. some
-     *       stores, such as the Journal, also have an offset from the start of
-     *       the file to the start of the data region (in the case of the
-     *       Journal it is used to hold the root blocks).
-     */
-	public long write(ByteBuffer data, IAllocationContext context);
-
-	/**
+ 	/**
      * 
      * @param data
      *            The data. The bytes from the current
@@ -179,25 +141,6 @@ public interface IRawStore extends IAddressManager {
      *         {@link IAddressManager}.
      */
     public long write(ByteBuffer data, long oldAddr);
-
-	/**
-     * 
-     * @param data
-     *            The data. The bytes from the current
-     *            {@link ByteBuffer#position()} to the
-     *            {@link ByteBuffer#limit()} will be written and the
-     *            {@link ByteBuffer#position()} will be advanced to the
-     *            {@link ByteBuffer#limit()} . The caller may subsequently
-     *            modify the contents of the buffer without changing the state
-     *            of the store (i.e., the data are copied into the store).
-     * @param oldAddr as returned from a previous write of the same object, or zero if a new write
-     * @param context defines the shadow AllocationContext from which this call is made
-     * 
-     * @return  A long integer formed that encodes both the offset from which the
-     *         data may be read and the #of bytes to be read. See
-     *         {@link IAddressManager}.
-     */
-	public long write(ByteBuffer data, long oldAddr, IAllocationContext context);
 
     /**
      * Delete the data (unisolated).
@@ -225,48 +168,6 @@ public interface IRawStore extends IAddressManager {
      */
     public void delete(long addr);
     
-    /**
-     * Delete the data (unisolated).
-     * <p>
-     * After this operation subsequent reads on the address MAY fail and the
-     * caller MUST NOT depend on the ability to read at that address.
-     * 
-     * @param addr
-     *            A long integer formed using {@link Addr} that encodes both the
-     *            offset at which the data was written and the #of bytes that
-     *            were written.
-     * 
-     * @param context
-     *            Defines the shadow AllocationContext from which this call is
-     *            made.  For RWStore this can be used to immediately free the
-     *            allocation if it can be determined to have orignally have
-     *            been requested from the same context.
-     * 
-     * @exception IllegalArgumentException
-     *                If the address is known to be invalid (never written or
-     *                deleted). Note that the address 0L is always invalid.
-     * 
-     * It is only applicable in the
-     * context of a garbage collection strategy. With an append only
-     * store and with eviction of btrees into index segments there
-     * is no reason to delete anything on the store - and nothing to
-     * keep track of the delete.
-     * 
-     * However, with a Read-Write store it is a requirement, and a void
-     * implementation is provided for other stores.
-     */
-	public void delete(long addr, IAllocationContext context);
-
-	/**
-	 * 
-	 * @param context
-     *            Defines the shadow AllocationContext that may have been used
-     *            to allocate or delete storage.  The RWStore assigns
-     *            Allocation areas to specific contexts and these must be
-     *            released for use by others.
-	 */
-	public void detachContext(IAllocationContext context);
-
     /**
      * Read the data (unisolated).
      * 

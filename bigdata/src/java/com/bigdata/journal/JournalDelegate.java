@@ -38,12 +38,13 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.relation.locator.IResourceLocator;
+import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.sparse.SparseRowStore;
 
 public class JournalDelegate implements IJournal {
-	final IJournal delegate;
+	protected final AbstractJournal delegate;
 	
-	public JournalDelegate(final IJournal source) {
+	public JournalDelegate(final AbstractJournal source) {
 		this.delegate = source;
 	}
 
@@ -225,21 +226,5 @@ public class JournalDelegate implements IJournal {
 
 	public TemporaryStore getTempStore() {
 		return delegate.getTempStore();
-	}
-
-	public void delete(long addr, IAllocationContext context) {
-		delegate.delete(addr, context);
-	}
-
-	public long write(ByteBuffer data, IAllocationContext context) {
-		return delegate.write(data, context);
-	}
-
-	public long write(ByteBuffer data, long oldAddr, IAllocationContext context) {
-		return delegate.write(data, oldAddr, context);
-	}
-
-	public void detachContext(IAllocationContext context) {
-		delegate.detachContext(context);
 	}
 }
