@@ -112,9 +112,17 @@ public interface IRootBlockView {
      * The root block version number.
      */
     public int getVersion();
-    
+
     /**
      * The next offset at which a data item would be written on the store.
+     * 
+     * FIXME The RWStore has different semantics for this field. Document those
+     * semantics and modify {@link AbstractJournal} so we can directly decide
+     * how many bytes were "written" (for the WORM) or were "allocated" (for the
+     * RWStore, in which case it should probably be the net of the bytes
+     * allocated and released). Update all the locations in the code which rely
+     * on {@link #getNextOffset()} to compute the #of bytes written onto the
+     * store.
      */
     public long getNextOffset();
 
