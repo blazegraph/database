@@ -2559,5 +2559,9 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 	public void setNextOffset(long lastOffset) {
 		// void for standard Disk strategy
 	}
+
+	public void setCommitRecordIndex(CommitRecordIndex commitRecordIndex) {
+		// NOP
+	}
     
 }

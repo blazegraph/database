@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.bigdata.journal.IAllocationContext;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -35,6 +36,8 @@ public class BlobAllocator implements Allocator {
 	public BlobAllocator(RWStore store, int sortAddr) {
 		m_store = store;
 		m_sortAddr = sortAddr;
+		
+		System.out.println("New BlobAllocator");
 	}
 	
 	public void addAddresses(ArrayList addrs) {
@@ -46,7 +49,7 @@ public class BlobAllocator implements Allocator {
 		return false;
 	}
 
-	public int alloc(RWStore store, int size) {
+	public int alloc(RWStore store, int size, IAllocationContext context) {
 		assert size > m_store.m_maxFixedAlloc;
 		
 		return 0;
@@ -91,6 +94,40 @@ public class BlobAllocator implements Allocator {
 		}
 		
 		return false;
+	}
+	
+	public int getFirstFixedForBlob(int addr, int sze) {
+		if (sze < m_store.m_maxFixedAlloc)
+			throw new IllegalArgumentException("Unexpected address size");
+
+		int alloc = m_store.m_maxFixedAlloc-4;
+		int blcks = (alloc - 1 + sze)/alloc;		
+		
+		int hdr_idx = (-addr) & RWStore.OFFSET_BITS_MASK;
+		if (hdr_idx > m_hdrs.length)
+			throw new IllegalArgumentException("free BlobAllocation problem, hdr offset: " + hdr_idx + ", avail:" + m_hdrs.length);
+		
+		int hdr_addr = m_hdrs[hdr_idx];
+		
+		if (hdr_addr == 0) {
+			throw new IllegalArgumentException("getFirstFixedForBlob called with unallocated address");
+		}
+		
+		// read in header block, then free each reference
+		byte[] hdr = new byte[(blcks+1) * 4 + 4]; // add space for checksum
+		m_store.getData(hdr_addr, hdr);
+		
+		try {
+			DataInputStream instr = new DataInputStream(
+					new ByteArrayInputStream(hdr, 0, hdr.length-4) );
+			int nallocs = instr.readInt();
+			int faddr = instr.readInt();
+			
+			return faddr;
+			
+		} catch (IOException ioe) {
+			throw new RuntimeException("Unable to retrieve first fixed address", ioe);
+		}
 	}
 
 	public int getBlockSize() {
@@ -267,6 +304,24 @@ public class BlobAllocator implements Allocator {
 
 	public boolean isAllocated(int offset) {
 		return m_hdrs[offset] != 0;
+	}
+
+	/**
+	 * This is okay as a NOP. The true allocation is managed by the 
+	 * FixedAllocators.
+	 */
+	public void detachContext(IAllocationContext context) {
+		// NOP
+	}
+
+	/**
+	 * Since the real allocation is in the FixedAllocators, this should delegate
+	 * to the first address, in which case 
+	 */
+	public boolean canImmediatelyFree(int addr, int size, IAllocationContext context) {
+		int faddr = this.getFirstFixedForBlob(addr, size);
+		
+		return m_store.getBlockByAddress(faddr).canImmediatelyFree(faddr, 0, context);
 	}
 
 }

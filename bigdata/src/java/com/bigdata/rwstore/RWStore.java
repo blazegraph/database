@@ -37,7 +37,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -48,7 +50,11 @@ import org.apache.log4j.Logger;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.WriteCache;
+import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.ForceEnum;
+import com.bigdata.journal.IAllocationContext;
+import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.JournalTransactionService;
 import com.bigdata.journal.Options;
@@ -163,43 +169,12 @@ import com.bigdata.util.ChecksumUtility;
  * 
  * Deferred Free List
  * 
- * In order to provide support for read-only transactions across store
- * mutations, storage that is free'd in the mutation cannot be free'd immediately.
+ * The prevous implentation has been amended to associate a single set of
+ * deferredFree blocks with each CommitRecord.  The CommitRecordIndex will
+ * then provide access to the CommitRecords to support the deferred freeing
+ * of allocations based on age/earliestTxReleaseTime.
  * 
- * The deferredFreeList is effectively a table of txReleaseTimes and
- * and addresses to data with lists of addresses to be freed.
- * 
- * OTOH, if in general we only ever free store "in the next transaction" then
- * the big advantage of storage reallocation in bulk upload is lost.  The logic
- * should hold that if we can be sure that no read-only transaction can be
- * active then we can free immediately, otherwise we should defer call to
- * complete the free until the commit point of any current transaction has
- * been passed.
- * 
- * The logic of determining whether to call free or deferFree is left to the
- * client and whatever transaction management policy they follow.  The support
- * assmumes that a safety-first policy of always calling deferFree should not
- * cause performance or resource problems.
- * 
- * Since there is a cost of synchronizing with the transaction service to check
- * the transaction state, the check is only made either prior to commit or
- * after every so many deferFree requests.
- * 
- * The management of the deferredFreeList is via a management block referenced
- * from the metaAllocation data.  This contains a reference to a block of
- * addresses that each reference a block of deferred frees.
- * 
- * At runtime, this list includes the txnReleaseTime when the allocation was
- * "freed".
- * 
- * The release times stored are the last commit time at the time of the
- * original free request.  The current transaction environment covers a window
- * of first release time and the current commit time.  When the stored release
- * time is before the current first release time then that allocation can
- * be safely freed.
- * 
- * When a store is opened this window is not needed and any deferred frees can 
- * be immediately freed since no transactions will be active.
+ * The last release time processed is held with the MetaAllocation data
  */
 
 public class RWStore implements IStore {
@@ -259,7 +234,7 @@ public class RWStore implements IStore {
 //	protected int m_transactionCount;
 //	private boolean m_committing;
 
-	private boolean m_preserveSession = false;
+	boolean m_preserveSession = true;
 	private boolean m_readOnly;
 
     /**
@@ -272,10 +247,10 @@ public class RWStore implements IStore {
 	private final ArrayList<Allocator> m_allocs;
 
 	// lists of free alloc blocks
-	private ArrayList m_freeFixed[];
+	private ArrayList<FixedAllocator> m_freeFixed[];
 	
 	// lists of free blob allocators
-	private final ArrayList m_freeBlobs;
+	private final ArrayList<BlobAllocator> m_freeBlobs;
 
 	// lists of blocks requiring commitment
 	private final ArrayList m_commitList;
@@ -344,10 +319,7 @@ public class RWStore implements IStore {
 	 * the same txReleaseTime.
 	 */
 	private static final int MAX_DEFERRED_FREE = 4094; // fits in 16k block
-	final ArrayList<Long> m_deferredFreeList = new ArrayList<Long>();
-	volatile int m_deferredFreeListAddr = 0;
-	volatile int m_deferredFreeListEntries = 0;
-	volatile long m_lastTxReleaseTime = 0;
+	volatile long m_lastDeferredReleaseTime = 23; // zero is invalid time
 	final ArrayList<Integer> m_currentTxnFreeList = new ArrayList<Integer>();
 	
 	volatile long deferredFreeCount = 0;
@@ -488,7 +460,7 @@ public class RWStore implements IStore {
 				m_freeFixed = new ArrayList[numFixed];
 
 				for (int i = 0; i < numFixed; i++) {
-					m_freeFixed[i] = new ArrayList();
+					m_freeFixed[i] = new ArrayList<FixedAllocator>();
 				}
 
 				m_fileSize = convertFromAddr(m_fd.length());
@@ -516,6 +488,8 @@ public class RWStore implements IStore {
 				m_maxFixedAlloc = m_allocSizes[m_allocSizes.length-1]*64;
 				m_minFixedAlloc = m_allocSizes[0]*64;
 			}
+			
+			assert m_maxFixedAlloc > 0;
 			
 		} catch (IOException e) {
 			throw new StorageTerminalError("Unable to initialize store", e);
@@ -557,9 +531,9 @@ public class RWStore implements IStore {
 																					// file
 		}
 		
-		if (log.isInfoEnabled()) {
+		if (log.isTraceEnabled()) {
 			int commitRecordAddr = (int) (rbv.getCommitRecordAddr() >> 32);
-			log.info("CommitRecord " + rbv.getCommitRecordAddr() + " at physical address: " + physicalAddress(commitRecordAddr));
+			log.trace("CommitRecord " + rbv.getCommitRecordAddr() + " at physical address: " + physicalAddress(commitRecordAddr));
 		}
 		
 		final long commitCounter = rbv.getCommitCounter();
@@ -567,8 +541,8 @@ public class RWStore implements IStore {
 		final int metaStartAddr = (int) -(metaAddr >> 32); // void
 		final int fileSize = (int) -(metaAddr & 0xFFFFFFFF);
 
-		if (log.isDebugEnabled())
-			log.debug("m_allocation: " + nxtalloc + ", m_metaBitsAddr: "
+		if (log.isTraceEnabled())
+			log.trace("m_allocation: " + nxtalloc + ", m_metaBitsAddr: "
 					+ metaBitsAddr + ", m_commitCounter: " + commitCounter);
 		
 		/**
@@ -610,7 +584,6 @@ public class RWStore implements IStore {
 		}
 
 		final long metaAddr = m_rb.getMetaStartAddr();
-		// m_metaStartAddr = (int) -(metaAddr >> 32);
 		m_fileSize = (int) -(metaAddr & 0xFFFFFFFF);
 
 		long rawmbaddr = m_rb.getMetaBitsAddr();
@@ -623,15 +596,12 @@ public class RWStore implements IStore {
 	
 			// RWStore now restore metabits
 			final byte[] buf = new byte[metaBitsStore * 4];
-			//m_raf.seek(rawmbaddr);
-			//m_raf.read(buf);
-			// m_raf.getChannel().read(ByteBuffer.wrap(buf), rawmbaddr);
+
 			FileChannelUtility.readAll(m_reopener, ByteBuffer.wrap(buf), rawmbaddr);
 	
 			final DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
 			
-			final int deferredFreeListAddr = strBuf.readInt();
-			final int deferredFreeListEntries = strBuf.readInt();
+			m_lastDeferredReleaseTime = strBuf.readLong();
 			
 			int allocBlocks = strBuf.readInt();
 			m_allocSizes = new int[allocBlocks];
@@ -660,7 +630,7 @@ public class RWStore implements IStore {
 	
 			readAllocationBlocks();
 			
-			clearOutstandingDeferrels(deferredFreeListAddr, deferredFreeListEntries);
+			// clearOutstandingDeferrels(deferredFreeListAddr, deferredFreeListEntries);
 
 			if (log.isTraceEnabled()) {
 				final StringBuffer str = new StringBuffer();
@@ -693,7 +663,11 @@ public class RWStore implements IStore {
 	private void clearOutstandingDeferrels(final int deferredAddr, final int deferredCount) {
 		if (deferredAddr != 0) {
 			assert deferredCount != 0;
-			final int sze = deferredCount * 8 + 4; // include spce fo checksum
+			final int sze = deferredCount * 8 + 4; // include space for checksum
+			
+			if (log.isDebugEnabled())
+				log.debug("Clearing Outstanding Deferrals: " + deferredCount);
+			
 			byte[] buf = new byte[sze];
 			getData(deferredAddr, buf);
 			
@@ -771,7 +745,7 @@ public class RWStore implements IStore {
 						while (fixedSize < allocSize)
 							fixedSize = 64 * m_allocSizes[++index];
 
-						allocator = new FixedAllocator(allocSize, m_preserveSession, m_writeCache);
+						allocator = new FixedAllocator(this, allocSize, m_writeCache);
 
 						freeList = m_freeFixed[index];
 					} else {
@@ -796,6 +770,33 @@ public class RWStore implements IStore {
 		Collections.sort(m_allocs);
 		for (int index = 0; index < m_allocs.size(); index++) {
 			((Allocator) m_allocs.get(index)).setIndex(index);
+		}
+	}
+	
+	/**
+	 * Called from ContextAllocation when no free FixedAllocator is immediately
+	 * available. First the free list will be checked to see if one is
+	 * available, otherwise it will be created.  When the calling 
+	 * ContextAllocation is released, its allocators will be added to the 
+	 * global free lists.
+	 * 
+	 * @param block - the index of the Fixed size alloction
+	 * @return the FixedAllocator
+	 */
+	FixedAllocator establishFreeFixedAllocator(int block) {
+		ArrayList<FixedAllocator> list = m_freeFixed[block];
+
+		if (list.size() == 0) {
+			final int allocSize = 64 * m_allocSizes[block];
+	
+			FixedAllocator allocator = new FixedAllocator(this, allocSize, m_writeCache);		
+			allocator.setIndex(m_allocs.size());
+			
+			m_allocs.add(allocator);
+			
+			return allocator;
+		} else {
+			return list.remove(0);
 		}
 	}
 
@@ -901,6 +902,8 @@ public class RWStore implements IStore {
 				try {
 					int alloc = m_maxFixedAlloc-4;
 					int nblocks = (alloc - 1 + (length-4))/alloc;
+					if (nblocks < 0) throw new IllegalStateException("Allocation error, m_maxFixedAlloc: "+ m_maxFixedAlloc);
+					
 					byte[] hdrbuf = new byte[4 * (nblocks + 1) + 4]; // plus 4 bytes for checksum
 					BlobAllocator ba = (BlobAllocator) getBlock((int) addr);
 					getData(ba.getBlobHdrAddress(getOffset((int) addr)), hdrbuf); // read in header 
@@ -936,8 +939,11 @@ public class RWStore implements IStore {
 			try {
 				long paddr = physicalAddress((int) addr);
 				if (paddr == 0) {
+					assertAllocators();
+					
 					log.warn("Address " + addr + " did not resolve to physical address");
-					throw new IllegalArgumentException();
+					
+					throw new IllegalArgumentException("Address " + addr + " did not resolve to physical address");
 				}
 
 				/**
@@ -947,12 +953,19 @@ public class RWStore implements IStore {
 				 * value, so the cached data is 4 bytes less than the
 				 * buffer size.
 				 */
-				ByteBuffer bbuf = m_writeCache.read(paddr);
+				ByteBuffer bbuf = null;
+				try {
+					bbuf = m_writeCache.read(paddr);
+				} catch (Throwable t) {
+					throw new IllegalStateException("Error reading from WriteCache addr: " + paddr + " length: " + (length-4) + ", writeCacheDebug: " + m_writeCache.addrDebugInfo(paddr), t);
+				}
 				if (bbuf != null) {
 					byte[] in = bbuf.array(); // reads in with checksum - no need to check if in cache
 					if (in.length != length-4) {
-						throw new IllegalStateException("Incompatible buffer size for addr: " + addr + ", " + in.length
-								+ " != " + length);
+						assertAllocators();
+						
+						throw new IllegalStateException("Incompatible buffer size for addr: " + paddr + ", " + in.length
+								+ " != " + (length-4) + " writeCacheDebug: " + m_writeCache.addrDebugInfo(paddr));
 					}
 					for (int i = 0; i < length-4; i++) {
 						buf[offset+i] = in[i];
@@ -965,6 +978,8 @@ public class RWStore implements IStore {
 					int chk = ChecksumUtility.getCHK().checksum(buf, offset, length-4); // read checksum
 					int tstchk = bb.getInt(offset + length-4);
 					if (chk != tstchk) {
+						assertAllocators();
+						
 						String cacheDebugInfo = m_writeCache.addrDebugInfo(paddr);
 						log.warn("Invalid data checksum for addr: " + paddr 
 								+ ", chk: " + chk + ", tstchk: " + tstchk + ", length: " + length
@@ -972,7 +987,7 @@ public class RWStore implements IStore {
 								+ ", at last extend: " + m_readsAtExtend + ", cacheReads: " + m_cacheReads
 								+ ", writeCacheDebug: " + cacheDebugInfo);
 						
-						throw new IllegalStateException("Invalid data checksum");
+						throw new IllegalStateException("Invalid data checksum from address: " + paddr + ", size: " + (length-4));
 					}
 					
 					m_diskReads++;
@@ -987,7 +1002,16 @@ public class RWStore implements IStore {
 		}
 	}
 
-	  static final char[] HEX_CHAR_TABLE = {
+	private void assertAllocators() {
+		for (int i = 0; i < m_allocs.size(); i++) {
+			if (m_allocs.get(i).getIndex() != i) {
+				throw new IllegalStateException("Allocator at invalid index: " + i + ", index  stored as: "
+						+ m_allocs.get(i).getIndex());
+			}
+		}
+	}
+
+	static final char[] HEX_CHAR_TABLE = {
 		   '0', '1','2','3',
 		   '4','5','6','7',
 		   '8','9','a','b',
@@ -1043,6 +1067,10 @@ public class RWStore implements IStore {
 		return 0;
 	}
 
+	public void free(final long laddr, final int sze) {
+		free(laddr, sze, null); // call with null AlocationContext
+	}
+
 	/**
 	 * free
 	 * 
@@ -1055,7 +1083,7 @@ public class RWStore implements IStore {
 	 * 
 	 * @param sze 
 	 */
-	public void free(final long laddr, final int sze) {
+	public void free(final long laddr, final int sze, final IAllocationContext context) {
 		final int addr = (int) laddr;
 
 		switch (addr) {
@@ -1064,7 +1092,40 @@ public class RWStore implements IStore {
 		case -2:
 			return;
 		}
+		m_allocationLock.lock();
+		try {
+			final Allocator alloc = getBlockByAddress(addr);
+			/*
+			 * There are a few conditions here.  If the context owns the
+			 * allocator and the allocation was made by this context then
+			 * it can be freed immediately.
+			 * The problem comes when the context is null and the allocator
+			 * is NOT owned, BUT there are active AllocationContexts, in this
+			 * situation, the free must ALWAYS be deferred.
+			 */
+			boolean alwaysDefer = context == null && m_contexts.size() > 0;
+			if (alwaysDefer)
+				if (log.isDebugEnabled())
+					log.debug("Should defer " + physicalAddress(addr));
+			if (/*alwaysDefer ||*/ !alloc.canImmediatelyFree(addr, sze, context)) {
+				deferFree(addr, sze);
+			} else {
+				immediateFree(addr, sze);
+			}
+		} finally {
+			m_allocationLock.unlock();
+		}
 		
+	}
+
+	public void immediateFree(final int addr, final int sze) {
+		switch (addr) {
+		case 0:
+		case -1:
+		case -2:
+			return;
+		}
+
 		m_allocationLock.lock();
 		try {
 			final Allocator alloc = getBlockByAddress(addr);
@@ -1073,7 +1134,7 @@ public class RWStore implements IStore {
 			alloc.free(addr, sze);
 			// must clear after free in case is a blobHdr that requires reading!
 			// the allocation lock protects against a concurrent re-allocation
-			//	of the address before the cache has been cleared
+			// of the address before the cache has been cleared
 			assert pa != 0;
 			m_writeCache.clearWrite(pa);
 			m_frees++;
@@ -1086,7 +1147,7 @@ public class RWStore implements IStore {
 		} finally {
 			m_allocationLock.unlock();
 		}
-		
+
 	}
 
 	/**
@@ -1107,25 +1168,25 @@ public class RWStore implements IStore {
 	 * or 16GB, which is larger than MAXINT (we use an int to store allocation
 	 * size in the address).
 	 * 
-	 * TODO: For BigData we need an additional set of "special" blocks to
-	 * support storage of objects such as Bloom filters. These could be upto
-	 * 1Mb, so we'd need to allocate a set (not necessarily 32), of these
-	 * objects and provide an enhanced interface.
+	 * The use of a IAllocationContext adds some complexity to the previous
+	 * simple freelist management.  The problem is two-fold.
 	 * 
-	 * TODO: Alternatively, and more generally, a BLOB mechanism would allocate
-	 * an array of blocks and store/write into a master block.
+	 * Firstly it is okay for an Allocator on the free list to return a null
+	 * address, since it may be managing  storage for a specific context.
 	 * 
-	 * TODO: Remove use of synchronized and replace with lock.  The synchronized
-	 * guarded reads from file extensions caused by allocations, but the new
-	 * extensionFile lock fulfills this requirement, while a separate lock
-	 * could be used to protect multi-threaded allocations (which is separate
-	 * from file extension).
+	 * Secondly we must try and ensure that Allocators used by a specific
+	 * context can be found again.  For example, if allocator#1 is assigned to
+	 * context#1 and allocator#2 to context#2, when context#1 is detached we
+	 * want context#2 to first find allocator#2.  This is further complicated
+	 * by the finer granularity of the AllocBlocks within a FixedAllocator.
 	 */
 
 	private volatile long m_maxAllocation = 0;
 	private volatile long m_spareAllocation = 0;
+
+	private CommitRecordIndex m_commitRecordIndex;
 	
-	public int alloc(final int size) {
+	public int alloc(final int size, IAllocationContext context) {
 		if (size > m_maxFixedAlloc) {
 			throw new IllegalArgumentException("Allocation size to big: " + size);
 		}
@@ -1133,61 +1194,48 @@ public class RWStore implements IStore {
 		m_allocationLock.lock();
 		try {
 			try {
-				if (size > m_maxAllocation) {
-					m_maxAllocation = size;
-				}
-
 				ArrayList list;
 				Allocator allocator = null;
-				int i = 0;
-				int addr = 0;
-
-				int cmp = m_minFixedAlloc;
-				while (size > cmp) {
-					i++;
-					cmp = 64 * m_allocSizes[i];
-				}
-				m_spareAllocation += (cmp - size); // Isn't adjusted by frees!
-				
-				list = m_freeFixed[i];
-				if (list.size() == 0) {
-
-					allocator = new FixedAllocator(cmp, m_preserveSession, m_writeCache);
-					allocator.setFreeList(list);
-					allocator.setIndex(m_allocs.size());
-
-					addr = allocator.alloc(this, size);
-
-					if (log.isTraceEnabled())
-						log.trace("New FixedAllocator for " + cmp + " byte allocations at " + addr);
-
-					m_allocs.add(allocator);
+				final int i = fixedAllocatorIndex(size);
+				if (context != null) {
+					allocator = establishContextAllocation(context).getFreeFixed(i);
 				} else {
-					// Verify free list only has allocators with free bits
-					if (log.isDebugEnabled()){
-						int tsti = 0;
-						Iterator<Allocator> allocs = list.iterator();
-						while (allocs.hasNext()) {
-							Allocator tstAlloc = allocs.next();
-							if (!tstAlloc.hasFree()) {
-								throw new IllegalStateException("Free list contains full allocator, " + tsti + " of " + list.size());
+					final int block = 64 * m_allocSizes[i];
+					m_spareAllocation += (block - size); // Isn't adjusted by frees!
+					
+					list = m_freeFixed[i];
+					if (list.size() == 0) {
+
+						allocator = new FixedAllocator(this, block, m_writeCache);
+						allocator.setFreeList(list);
+						allocator.setIndex(m_allocs.size());
+
+						if (log.isTraceEnabled())
+							log.trace("New FixedAllocator for " + block);
+
+						m_allocs.add(allocator);
+					} else {
+						// Verify free list only has allocators with free bits
+						if (log.isDebugEnabled()){
+							int tsti = 0;
+							Iterator<Allocator> allocs = list.iterator();
+							while (allocs.hasNext()) {
+								Allocator tstAlloc = allocs.next();
+								if (!tstAlloc.hasFree()) {
+									throw new IllegalStateException("Free list contains full allocator, " + tsti + " of " + list.size());
+								}
+								tsti++;
 							}
-							tsti++;
 						}
+						allocator = (Allocator) list.get(0);
 					}
-					allocator = (Allocator) list.get(0);
-					addr = allocator.alloc(this, size);
-					if (addr == 0) {
-						throw new IllegalStateException("Allocator " + allocator + " from FreeList allocating null address");
-					}
+					
 				}
+				
+				final int addr = allocator.alloc(this, size, context);
 
 				if (!m_commitList.contains(allocator)) {
 					m_commitList.add(allocator);
-				}
-
-				if (!allocator.hasFree()) {
-					list.remove(allocator);
 				}
 
 				m_recentAlloc = true;
@@ -1210,6 +1258,18 @@ public class RWStore implements IStore {
 			m_allocationLock.unlock();
 		}
 	}
+	
+	int fixedAllocatorIndex(int size) {
+		int i = 0;
+
+		int cmp = m_minFixedAlloc;
+		while (size > cmp) {
+			i++;
+			cmp = 64 * m_allocSizes[i];
+		}
+		
+		return i;
+	}
 
 	/****************************************************************************
 	 * The base realloc method that returns a stream for writing to rather than
@@ -1218,7 +1278,7 @@ public class RWStore implements IStore {
 	public PSOutputStream realloc(final long oldAddr, final int size) {
 		free(oldAddr, size);
 
-		return PSOutputStream.getNew(this, m_maxFixedAlloc);
+		return PSOutputStream.getNew(this, m_maxFixedAlloc, null);
 	}
 	
 	/****************************************************************************
@@ -1231,7 +1291,7 @@ public class RWStore implements IStore {
 	 * TODO: Instead of using PSOutputStream instead manage allocations written
 	 * to the WriteCacheService, building BlobHeader as you go.
 	 **/
-	public long alloc(final byte buf[], final int size) {
+	public long alloc(final byte buf[], final int size, final IAllocationContext context) {
 		if (size > (m_maxFixedAlloc-4)) {
 			if (size > (BLOB_FIXED_ALLOCS * (m_maxFixedAlloc-4)))
 				throw new IllegalArgumentException("Allocation request beyond maximum BLOB");
@@ -1239,7 +1299,7 @@ public class RWStore implements IStore {
 			if (log.isTraceEnabled())
 				log.trace("BLOB ALLOC: " + size);
 
-			final PSOutputStream psout = PSOutputStream.getNew(this, m_maxFixedAlloc);
+			final PSOutputStream psout = PSOutputStream.getNew(this, m_maxFixedAlloc, context);
 			try {
 				int i = 0;
 				final int lsize = size - 512;
@@ -1256,7 +1316,7 @@ public class RWStore implements IStore {
 
 		}
 
-		final int newAddr = alloc(size + 4); // allow size for checksum
+		final int newAddr = alloc(size + 4, context); // allow size for checksum
 
 		final int chk = ChecksumUtility.getCHK().checksum(buf, size);
 
@@ -1335,6 +1395,9 @@ public class RWStore implements IStore {
 	// Similar to rollbackTransaction but will force a re-initialization if transactions are not being
 	//	used - update w/o commit protocol.
 	public void reset() {
+		if (log.isInfoEnabled()) {
+			log.info("RWStore Reset");
+		}
 	    m_allocationLock.lock();
 		try {
 			m_commitList.clear();
@@ -1360,7 +1423,7 @@ public class RWStore implements IStore {
 		} catch (Exception e) {
 			throw new IllegalStateException("Unable reset the store", e);
 		} finally {
-		    m_allocationLock.lock();
+		    m_allocationLock.unlock();
 		}
 	}
 
@@ -1376,20 +1439,17 @@ public class RWStore implements IStore {
 	 * @throws IOException
 	 */
 	private void writeMetaBits() throws IOException {
-		// the metabits is now prefixed by two ints representing the
-		//	deferred frees - the address and number of defer block addresses
-		//	to be found there
+		// the metabits is now prefixed by a long specifying the lastTxReleaseTime
+		// used to free the deferedFree allocations.  This is used to determine
+		//	which commitRecord to access to process the nextbatch of deferred
+		//	frees.
 	    final int len = 4 * (2 + 1 + m_allocSizes.length + m_metaBits.length);
 		final byte buf[] = new byte[len];
 
 		final FixedOutputStream str = new FixedOutputStream(buf);
 		
-		saveDeferrals();
-		
-		str.writeInt(m_deferredFreeListAddr);
-		str.writeInt(m_deferredFreeListEntries);
-		
-		
+		str.writeLong(m_lastDeferredReleaseTime);
+				
 		str.writeInt(m_allocSizes.length);
 		for (int i = 0; i < m_allocSizes.length; i++) {
 			str.writeInt(m_allocSizes[i]);
@@ -1480,46 +1540,19 @@ public class RWStore implements IStore {
 	}
 
 	public void commitChanges() {
-		if (log.isDebugEnabled())
-			log.debug("checking meta data save");
-
 		checkCoreAllocations();
 
 		// take allocation lock to prevent other threads allocating during commit
 		m_allocationLock.lock();
 		
 		try {
-//				m_committing = true;
-
-//				if (m_commitCallback != null) {
-//					m_commitCallback.commitCallback();
-//				}
 			
-				checkDeferredFrees();
+				checkDeferredFrees(true); // free now if possible
 
-				// save deferredFree data
-				if (m_deferredFreeList.size() > 0) {
-					final int oldDeferredFreeListAddr = m_deferredFreeListAddr;
-					// list contains txReleaseTime,addr of addrs to be freed
-					final int addrs = m_deferredFreeList.size() / 2;
-					final int addrSize = addrs*8;
-					byte[] deferBuf = new byte[addrSize]; // each addr is a long
-					ByteBuffer bb = ByteBuffer.wrap(deferBuf);
-					for (int i = 0; i < addrs; i++) {
-						bb.putLong(m_deferredFreeList.get(1 + (i*2)));
-					}
-					bb.flip();
-					m_deferredFreeListAddr = (int) alloc(deferBuf, addrSize);
-					m_deferredFreeListEntries = addrs;
-					free(oldDeferredFreeListAddr, 0);
-				} else {
-					m_deferredFreeListAddr = 0;
-					m_deferredFreeListEntries = 0;
-				}
 				// Allocate storage for metaBits
 				long oldMetaBits = m_metaBitsAddr;
 				int oldMetaBitsSize = (m_metaBits.length + m_allocSizes.length + 1) * 4;
-				m_metaBitsAddr = alloc(getRequiredMetaBitsStorage());
+				m_metaBitsAddr = alloc(getRequiredMetaBitsStorage(), null);
 
 				// DEBUG SANITY CHECK!
 				if (physicalAddress(m_metaBitsAddr) == 0) {
@@ -1538,8 +1571,8 @@ public class RWStore implements IStore {
 					final int naddr = metaAlloc();
 					allocator.setDiskAddr(naddr);
 					
-					if (log.isDebugEnabled())
-						log.debug("Update allocator " + allocator.getIndex() + ", old addr: " + old + ", new addr: "
+					if (log.isTraceEnabled())
+						log.trace("Update allocator " + allocator.getIndex() + ", old addr: " + old + ", new addr: "
 								+ naddr);
 
 					try {
@@ -1580,32 +1613,38 @@ public class RWStore implements IStore {
 
 		checkCoreAllocations();
 
-		if (log.isInfoEnabled())
-			log.info("commitChanges for: " + m_nextAllocation + ", " + m_metaBitsAddr);
+		if (log.isTraceEnabled())
+			log.trace("commitChanges for: " + m_nextAllocation + ", " + m_metaBitsAddr + ", active contexts: " + m_contexts.size());
 	}
 
 	/**
 	 * Called prior to commit, so check whether storage can be freed and then
 	 * whether the deferredheader needs to be saved.
 	 */
-	private void checkDeferredFrees() {
-		checkFreeable();
+	private void checkDeferredFrees(boolean freeNow) {
+		if (freeNow) checkFreeable();
 		
-		this.m_deferredFreeListEntries = m_deferredFreeList.size();
-		if (m_deferredFreeListEntries > 0) {
-			int bufSize = 4 + m_deferredFreeListEntries*8;
-			byte[] buf = new byte[bufSize];
-			ByteBuffer bb = ByteBuffer.wrap(buf);
-			bb.putInt(m_deferredFreeListEntries);
-			for (int i = 0; i < m_deferredFreeListEntries; i++) {
-				bb.putLong(m_deferredFreeList.get(i));
-			}
-			m_deferredFreeListAddr = (int) alloc(buf, bufSize);
-		} else {
-			this.m_deferredFreeListAddr = 0;
+		// Commit can be called prior to Journal initialisation, in which case
+		// the commitRecordIndex will not be set.
+		if (m_commitRecordIndex == null) {
+			return;
 		}
+		
+		long latestReleasableTime = System.currentTimeMillis();
+		
+		if (m_transactionService != null) {
+			latestReleasableTime -= m_transactionService.getMinReleaseAge();
+		}
+		
+		Iterator<ICommitRecord> records = m_commitRecordIndex.getCommitRecords(m_lastDeferredReleaseTime, latestReleasableTime);
+		
+		freeDeferrals(records);
 	}
 
+
+	public void setCommitRecordIndex(CommitRecordIndex commitRecordIndex) {
+		m_commitRecordIndex = commitRecordIndex;
+	}
 	/**
 	 * 
 	 * @return conservative requirement for metabits storage, mindful that the
@@ -1668,8 +1707,8 @@ public class RWStore implements IStore {
 
 		checkCoreAllocations();
 
-		if (log.isDebugEnabled())
-			log.debug("allocation created at " + convertAddr(allocAddr) + " for " + convertAddr(-size));
+		if (log.isTraceEnabled())
+			log.trace("allocation created at " + convertAddr(allocAddr) + " for " + convertAddr(-size));
 
 		return allocAddr;
 	}
@@ -2078,7 +2117,7 @@ public class RWStore implements IStore {
 	 * handle dual address format, if addr is positive then it is the physical
 	 * address, so the Allocators must be searched.
 	 **/
-	private Allocator getBlockByAddress(int addr) {
+	Allocator getBlockByAddress(int addr) {
 		if (addr < 0) {
 			return getBlock(addr);
 		}
@@ -2141,10 +2180,6 @@ public class RWStore implements IStore {
 	public boolean preserveSessionData() {
 		m_preserveSession = true;
 
-		Iterator allocs = m_allocs.iterator();
-		while (allocs.hasNext()) {
-			((Allocator) allocs.next()).preserveSessionData();
-		}
 		return true;
 	}
 
@@ -2153,7 +2188,7 @@ public class RWStore implements IStore {
 	 * data within this session.
 	 **/
 	protected boolean isSessionPreserved() {
-		return m_preserveSession;
+		return m_preserveSession || m_contexts.size() > 0;
 	}
 
 //	/*********************************************************************
@@ -2300,8 +2335,8 @@ public class RWStore implements IStore {
 		int metaBitsSize = 2 + m_metaBits.length + m_allocSizes.length + 1;
 		ret += metaBitsSize;
 		
-		if (log.isInfoEnabled())
-			log.info("Returning metabitsAddr: " + ret + ", for " + m_metaBitsAddr + " - " + m_metaBits.length + ", " + metaBitsSize);
+		if (log.isTraceEnabled())
+			log.trace("Returning metabitsAddr: " + ret + ", for " + m_metaBitsAddr + " - " + m_metaBits.length + ", " + metaBitsSize);
 
 		return ret;
 	}
@@ -2324,8 +2359,8 @@ public class RWStore implements IStore {
 		ret <<= 32;
 		ret += -m_metaBitsAddr;
 
-		if (log.isDebugEnabled())
-			log.debug("Returning nextOffset: " + ret + ", for " + m_metaBitsAddr);
+		if (log.isTraceEnabled())
+			log.trace("Returning nextOffset: " + ret + ", for " + m_metaBitsAddr);
 
 		return ret;
 	}
@@ -2542,9 +2577,6 @@ public class RWStore implements IStore {
 	/*
 	 * Adds the address for later freeing to the deferred free list.
 	 * 
-	 * This is maintained in a set of chained 4K buffers, with the head and
-	 * tail referenced from the meta allocation block.
-	 * 
 	 * If the allocation is for a BLOB then the sze is also stored
 	 * 
 	 * The deferred list is checked on AllocBlock and prior to commit.
@@ -2554,31 +2586,19 @@ public class RWStore implements IStore {
 	 * will be deferred and the earliest tx start time against which we
 	 * can check to see if
 	 */
-	public void deferFree(int rwaddr, int sze, long currentCommitTime) {
-
+	public void deferFree(int rwaddr, int sze) {
 		m_deferFreeLock.lock();
 		try {
 			deferredFreeCount++;
-			if (currentCommitTime != m_lastTxReleaseTime) {
-				assert m_lastTxReleaseTime == 0;
-				
-				m_lastTxReleaseTime = currentCommitTime;
-			}
 			m_currentTxnFreeList.add(rwaddr);
 
 			final Allocator alloc = getBlockByAddress(rwaddr);
 			if (alloc instanceof BlobAllocator) {
 				m_currentTxnFreeList.add(sze);
 			}
-			if (m_currentTxnFreeList.size() >= MAX_DEFERRED_FREE) {
-				// Save current list and clear
-				saveDeferrals();
-				
-				assert m_currentTxnFreeList.size() == 0;
-			}
 			
 			// every so many deferrals, check for free
-			if (deferredFreeCount % 100 == 0) {
+			if (false && deferredFreeCount % 1000 == 0) {
 				checkFreeable();				
 			}
 		} finally {
@@ -2587,23 +2607,26 @@ public class RWStore implements IStore {
 	}
 	
 	private void checkFreeable() {
-		if (transactionService == null) {
+		if (m_transactionService == null) {
 			return;
 		}
 		
 		try {
-			transactionService.callWithLock(new Callable<Object>() {
+			Long freeTime = m_transactionService.tryCallWithLock(new Callable<Long>() {
 	
-				public Object call() throws Exception {
-					if (transactionService.getActiveCount() == 0) {
-						freeAllDeferrals(Long.MAX_VALUE);
+				public Long call() throws Exception {
+					if (m_transactionService.getActiveCount() == 0) {
+						return System.currentTimeMillis();
 					} else {
-						freeAllDeferrals(transactionService.getEarliestTxStartTime());
+						return m_transactionService.getEarliestTxStartTime();
 					}
-					return null;
 				}
 				
-			});
+			}, 5L, TimeUnit.MILLISECONDS);
+			
+			if (false) freeAllDeferrals(freeTime);
+		} catch (RuntimeException e) {
+			// fine, will try again later
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -2617,29 +2640,30 @@ public class RWStore implements IStore {
 	 * @param txnRelease - the max release time
 	 */
 	protected void freeAllDeferrals(long txnRelease) {
-		final Iterator<Long> defers = m_deferredFreeList.iterator();
-		while (defers.hasNext() && defers.next() < txnRelease) {
-			if (txnRelease != Long.MAX_VALUE) {
-				System.out.println("Freeing deferrals"); // FIXME remove debug
-			}
-			defers.remove();
-			freeDeferrals(defers.next());
-			defers.remove();
-		}
-		if (m_lastTxReleaseTime < txnRelease) {
-			final Iterator<Integer> curdefers = m_currentTxnFreeList.iterator();
-			while (curdefers.hasNext()) {
-				final int rwaddr = curdefers.next();
-				Allocator alloc = getBlock(rwaddr);
-				if (alloc instanceof BlobAllocator) {
-					assert curdefers.hasNext();
-					
-					free(rwaddr, curdefers.next());
-				} else {
-					free(rwaddr, 0); // size ignored for FreeAllocators
+		System.out.println("freeAllDeferrals");
+		
+		m_deferFreeLock.lock();
+		try {
+			if (m_lastDeferredReleaseTime <= txnRelease) {
+				final Iterator<Integer> curdefers = m_currentTxnFreeList.iterator();
+				while (curdefers.hasNext()) {
+					final int rwaddr = curdefers.next();
+					Allocator alloc = getBlock(rwaddr);
+					if (alloc instanceof BlobAllocator) {
+						// if this is a Blob then the size is required
+						assert curdefers.hasNext();
+						
+						immediateFree(rwaddr, curdefers.next());
+					} else {
+						immediateFree(rwaddr, 0); // size ignored for FixedAllocators
+					}
 				}
+				m_currentTxnFreeList.clear();
+				
+				m_lastDeferredReleaseTime = txnRelease;
 			}
-			m_currentTxnFreeList.clear();
+		} finally {
+			m_deferFreeLock.unlock();
 		}
 	}
 
@@ -2651,50 +2675,52 @@ public class RWStore implements IStore {
 	 * 
 	 * @return the address of the deferred addresses saved on the store
 	 */
-	private void saveDeferrals() {
-		int addrCount = m_currentTxnFreeList.size();
-		
-		if (addrCount == 0) {
-			return;
-		}
-		
-		byte[] buf = new byte[4 * (addrCount+1)];
-		ByteBuffer out = ByteBuffer.wrap(buf);
-		out.putInt(addrCount);
-		for (int i = 0; i < addrCount; i++) {
-			out.putInt(m_currentTxnFreeList.get(i));
-		}
-		
-		// now we've saved it to the store, clear the list
-		m_currentTxnFreeList.clear();
+	public long saveDeferrals() {
+		final byte[] buf;
+		m_deferFreeLock.lock();
+		try {
+			int addrCount = m_currentTxnFreeList.size();
 
-		long rwaddr = alloc(buf, buf.length);
-		long paddr = physicalAddress((int) rwaddr);
+			if (addrCount == 0) {
+				return 0L;
+			}
+
+			buf = new byte[4 * (addrCount + 1)];
+			ByteBuffer out = ByteBuffer.wrap(buf);
+			out.putInt(addrCount);
+			for (int i = 0; i < addrCount; i++) {
+				out.putInt(m_currentTxnFreeList.get(i));
+			}
+
+			// now we've saved it to the store, clear the list
+			m_currentTxnFreeList.clear();
+
+		} finally {
+			m_deferFreeLock.unlock();
+		}
 		
+		long rwaddr = alloc(buf, buf.length, null);
+		if (log.isTraceEnabled()) {
+			long paddr = physicalAddress((int) rwaddr);
+			log.trace("Saving deferred free block at " + paddr);
+		}
+
 		rwaddr <<= 32;
 		rwaddr += buf.length;
-		
-		if (log.isTraceEnabled())
-			log.trace("saveDeferrals: " + paddr + ", size: " + buf.length);
-		
-		// Now add the reference of this block
-		m_deferredFreeList.add(m_lastTxReleaseTime);
-		m_deferredFreeList.add(rwaddr);
-		
-		
-		
+
+		return rwaddr;
 	}
 
 	/**
 	 * Provided with the address of a block of addresses to be freed
 	 * @param blockAddr
 	 */
-	protected void freeDeferrals(long blockAddr) {
+	protected void freeDeferrals(long blockAddr, long lastReleaseTime) {
 		int addr = (int) (blockAddr >> 32);
 		int sze = (int) blockAddr & 0xFFFFFF;
 		
 		if (log.isTraceEnabled())
-			log.trace("freeDeferrals at " + physicalAddress(addr) + ", size: " + sze);
+			log.trace("freeDeferrals at " + physicalAddress(addr) + ", size: " + sze + " releaseTime: " + lastReleaseTime);
 		
 		byte[] buf = new byte[sze+4]; // allow for checksum
 		getData(addr, buf);
@@ -2702,27 +2728,162 @@ public class RWStore implements IStore {
 		m_allocationLock.lock();
 		try {
 			int addrs = strBuf.readInt();
+			System.out.println("Freeing deferred deletes: " + addrs);
+			
 			while (addrs-- > 0) {
 				int nxtAddr = strBuf.readInt();
+				
 				Allocator alloc = getBlock(nxtAddr);
 				if (alloc instanceof BlobAllocator) {
 					assert addrs > 0; // a Blob address MUST have a size
 					--addrs;
-					free(nxtAddr, strBuf.readInt());
+					immediateFree(nxtAddr, strBuf.readInt());
 				} else {
-					free(nxtAddr, 0); // size ignored for FreeAllocators
+					immediateFree(nxtAddr, 0); // size ignored for FreeAllocators
 				}
 			}
+			m_lastDeferredReleaseTime = lastReleaseTime;
 		} catch (IOException e) {
 			throw new RuntimeException("Problem freeing deferrals", e);
 		} finally {
 			m_allocationLock.unlock();
 		}
 	}
-
-	private JournalTransactionService transactionService = null;
-	public void setTransactionService(final JournalTransactionService transactionService) {
-		this.transactionService = transactionService;
+	
+	/**
+	 * Provided with an iterator of CommitRecords, process each and free
+	 * any deferred deletes associated with each.
+	 * 
+	 * @param commitRecords
+	 */
+	public void freeDeferrals(Iterator<ICommitRecord> commitRecords) {
+		while (commitRecords.hasNext()) {
+			ICommitRecord record = commitRecords.next();
+			long blockAddr = record.getRootAddr(AbstractJournal.DELETEBLOCK);
+			if (blockAddr != 0) {
+				freeDeferrals(blockAddr, record.getTimestamp());
+			}
+		}
 	}
 
+	private JournalTransactionService m_transactionService = null;
+	public void setTransactionService(final JournalTransactionService transactionService) {
+		this.m_transactionService = transactionService;
+	}
+
+	/**
+	 * The ContextAllocation object manages a freeList of associated allocators
+	 * and an overall list of allocators.  When the context is detached, all
+	 * allocators must be released and any that has available capacity will
+	 * be assigned to the global free lists.
+	 * 
+	 * @param context
+	 * 		The context to be released from all FixedAllocators.
+	 */
+	public void detachContext(IAllocationContext context) {
+		m_allocationLock.lock();
+		try {
+			ContextAllocation alloc = m_contexts.remove(context);
+			
+			if (alloc != null) {
+				alloc.release();			
+			}
+		} finally {
+			m_allocationLock.unlock();
+		}
+	}
+	
+	/**
+	 * The ContextAllocation class manages a set of Allocators.
+	 * 
+	 * A ContextAllocation can have a parent ContextAllocation such that when
+	 * it is released it will transfer its Allocators to its parent.
+	 * 
+	 * 
+	 * 
+	 * @author Martyn Cutcher
+	 *
+	 */
+	class ContextAllocation {
+		private final ArrayList<FixedAllocator> m_freeFixed[];
+		
+		private final ArrayList<FixedAllocator> m_allFixed;
+		
+		// lists of free blob allocators
+//		private final ArrayList<BlobAllocator> m_freeBlobs;
+		
+		private final ContextAllocation m_parent;
+		private final IAllocationContext m_context;
+		
+		ContextAllocation(int fixedBlocks, ContextAllocation parent, IAllocationContext acontext) {
+			m_parent = parent;
+			m_context = acontext;
+			
+			m_freeFixed = new ArrayList[fixedBlocks];
+			for (int i = 0; i < m_freeFixed.length; i++) {
+				m_freeFixed[i] = new ArrayList<FixedAllocator>();
+			}
+			
+			m_allFixed = new ArrayList<FixedAllocator>();
+			
+//			m_freeBlobs = new ArrayList<BlobAllocator>();
+			
+		}
+		
+		void release() {
+			ArrayList<FixedAllocator> freeFixed[] = 
+				m_parent != null ? m_parent.m_freeFixed : RWStore.this.m_freeFixed;
+			
+			IAllocationContext pcontext = m_parent == null ? null : m_parent.m_context;
+			
+			for (FixedAllocator f : m_allFixed) {
+				f.setAllocationContext(pcontext);
+			}
+			
+			for (int i = 0; i < m_freeFixed.length; i++) {
+				freeFixed[i].addAll(m_freeFixed[i]);
+			}
+			
+//			freeBlobs.addAll(m_freeBlobs);
+		}
+		
+		FixedAllocator getFreeFixed(int i) {
+			ArrayList<FixedAllocator> free = m_freeFixed[i];
+			if (free.size() == 0) {
+				FixedAllocator falloc = establishFixedAllocator(i);
+				falloc.setAllocationContext(m_context);
+				free.add(falloc);
+				m_allFixed.add(falloc);
+			}
+			
+			return free.get(0); // take first in list
+		}
+		
+		/**
+		 * 
+		 * @param i - the block-index for the allocator required
+		 * @return
+		 */
+		FixedAllocator establishFixedAllocator(int i) {
+			if (m_parent == null) {
+				 return RWStore.this.establishFreeFixedAllocator(i);
+			} else {
+				return m_parent.establishFixedAllocator(i);
+			}
+		}
+	}
+
+	private TreeMap<IAllocationContext, ContextAllocation> m_contexts = 
+		new TreeMap<IAllocationContext, ContextAllocation>();
+	
+	ContextAllocation establishContextAllocation(IAllocationContext context) {
+		ContextAllocation ret = m_contexts.get(context);
+		if (ret == null) {
+			ret = new ContextAllocation(m_freeFixed.length, null, context);
+			
+			m_contexts.put(context, ret);
+		}
+		
+		return ret;
+	}
 }

@@ -81,6 +81,8 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	
 	final private FileMetadataView m_fmv = new FileMetadataView();
 	
+	private volatile boolean m_open = false;
+	
 	private volatile IRootBlockView m_rb;
 	private volatile IRootBlockView m_rb0;
 	private volatile IRootBlockView m_rb1;
@@ -110,6 +112,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		m_rb = fileMetadata.rootBlock;
 		
 		m_store = new RWStore(m_fmv, false, quorum); // not read-only for now
+		m_open = true;
 		
 		m_rb0 = copyRootBlock(true);
 		m_rb1 = copyRootBlock(false);
@@ -233,6 +236,10 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	}
 
 	public long write(ByteBuffer data) {
+		return write(data, null);
+	}
+
+	public long write(ByteBuffer data, IAllocationContext context) {
 		checkReopen();
 		
 		if (data == null) {
@@ -246,7 +253,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		}
 		
 		try {
-			long rwaddr = m_store.alloc(data.array(), nbytes);
+			long rwaddr = m_store.alloc(data.array(), nbytes, context);
 			data.position(nbytes); // update position to end of buffer
 	
 			long retaddr =  encodeAddr(rwaddr, nbytes);
@@ -296,29 +303,26 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		return (int) (addr & 0xFFFFFFFF);
 	}
 
+	public void delete(long addr) {
+		if (true) delete(addr, null);
+	}
+
 	/**
 	 * Must check whether there are existing transactions which may access
 	 * this data, and if not free immediately, otherwise defer.
 	 */
-	public void delete(long addr) {
-		final JournalTransactionService service = (JournalTransactionService) (localTransactionManager == null ? null
-				: localTransactionManager.getTransactionService());
+	public void delete(long addr, IAllocationContext context) {
 		
 		final int rwaddr = decodeAddr(addr);
 		final int sze = decodeSize(addr);
 		
-		// FIXME: need to decide on correct way to handle transaction oriented
-		//	allocations
-		if (true || service == null) {
-			m_store.free(rwaddr, sze);
-		} else {
-			/*
-			 * May well be better to always defer and then free in batch,
-			 * but for now need to confirm transaction logic
-			 */
-			m_store.deferFree(rwaddr, sze, m_rb.getLastCommitTime());
-		}
+		m_store.free(rwaddr, sze, context);
 	}
+	
+	public void detachContext(IAllocationContext context) {
+		m_store.detachContext(context);
+	}
+
 
 	public static class RWAddressManager implements IAddressManager {
 
@@ -428,8 +432,8 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		try {
 			m_store.checkRootBlock(rootBlock);
 			
-			if (log.isInfoEnabled()) {
-				log.info("Writing new rootblock with commitCounter: " 
+			if (log.isTraceEnabled()) {
+				log.trace("Writing new rootblock with commitCounter: " 
 						+ rootBlock.getCommitCounter()
 						+ ", commitRecordAddr: " + rootBlock.getCommitRecordAddr()
 						+ ", commitRecordIndexAddr: " + rootBlock.getCommitRecordIndexAddr());
@@ -461,6 +465,8 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 			throw new IllegalStateException();
 		}
 		try {
+			m_open = false;
+			
 			m_store.close();
 			m_fileMetadata.raf.close();
 			m_fileMetadata.raf = null;
@@ -563,6 +569,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 			m_fileMetadata.raf = new RandomAccessFile(m_fileMetadata.file, m_fileMetadata.fileMode);
 			m_store = new RWStore(m_fmv, false, m_environment); // never read-only for now
 			m_needsReopen = false;
+			m_open = true;
 		} catch (Throwable t) {
 			t.printStackTrace();
 			
@@ -593,7 +600,8 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	}
 
 	public boolean isOpen() {
-		return m_fileMetadata.raf != null && m_fileMetadata.raf.getChannel().isOpen();
+		// return m_fileMetadata.raf != null && m_fileMetadata.raf.getChannel().isOpen();
+		return m_open;
 	}
 
 	public boolean isReadOnly() {
@@ -712,6 +720,27 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	public void setTransactionManager(AbstractLocalTransactionManager localTransactionManager) {
 		this.localTransactionManager = localTransactionManager;
 		m_store.setTransactionService((JournalTransactionService) localTransactionManager.getTransactionService());
+	}
+
+	public long getPhysicalAddress(long addr) {
+		int rwaddr = decodeAddr(addr);		
+		
+		return m_store.physicalAddress(rwaddr);
+	}
+
+	/**
+	 * Saves the current list of delete blocks, returning the address allocated.
+	 * This can be used later to retrieve the addresses of allocations to be
+	 * freed.
+	 * 
+	 * @return the address of the delete blocks, or zero if none
+	 */
+	public long saveDeleteBlocks() {
+		return m_store.saveDeferrals();
+	}
+
+	public void setCommitRecordIndex(CommitRecordIndex commitRecordIndex) {
+		m_store.setCommitRecordIndex(commitRecordIndex);
 	}
 
 }

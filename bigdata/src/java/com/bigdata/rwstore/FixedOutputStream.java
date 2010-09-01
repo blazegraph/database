@@ -53,4 +53,9 @@ public class FixedOutputStream extends OutputStream {
 		
 		m_count += len;
   }
+
+	public void writeLong(long txReleaseTime) {
+		writeInt((int) (txReleaseTime >> 32));
+		writeInt((int) txReleaseTime & 0xFFFFFFFF);
+	}
 }

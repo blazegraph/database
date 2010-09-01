@@ -30,6 +30,7 @@ import java.io.*;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.journal.IAllocationContext;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -47,18 +48,12 @@ public class FixedAllocator implements Allocator {
 	private int m_diskAddr;
 	int m_index;
 
-	protected boolean m_preserveSession = false;
-
 	public void setIndex(int index) {
 		AllocBlock fb = (AllocBlock) m_allocBlocks.get(0);
 		if (log.isDebugEnabled())
 			log.debug("Restored index " + index + " with " + getStartAddr() + "[" + fb.m_bits[0] + "] from " + m_diskAddr);
 
 		m_index = index;
-	}
-
-	public void preserveSessionData() {
-		m_preserveSession = true;
 	}
 
 	public long getStartAddr() {
@@ -125,9 +120,31 @@ public class FixedAllocator implements Allocator {
 		}
 	}
 
+	volatile private IAllocationContext m_context;
+	public void setAllocationContext(IAllocationContext context) {
+		if (context == null && m_context != null) {
+			// restore commit bits in AllocBlocks
+			for (AllocBlock allocBlock : m_allocBlocks) {
+				allocBlock.deshadow();
+			}
+		} else if (context != null & m_context == null) {
+			// restore commit bits in AllocBlocks
+			for (AllocBlock allocBlock : m_allocBlocks) {
+				allocBlock.shadow();
+			}
+		}
+		m_context = context;
+	}
+
+	/**
+	 * write called on commit, so this is the point when "transient frees" - the
+	 * freeing of previously committed memory can be made available since we
+	 * are creating a new commit point - the condition being that m_freeBits
+	 * was zero and m_freeTransients not.
+	 */
 	public byte[] write() {
 		try {
-			final AllocBlock fb = (AllocBlock) m_allocBlocks.get(0);
+			final AllocBlock fb = m_allocBlocks.get(0);
 			if (log.isDebugEnabled())
 				log.debug("writing allocator " + m_index + " for " + getStartAddr() + " with " + fb.m_bits[0]);
 			final byte[] buf = new byte[1024];
@@ -144,17 +161,29 @@ public class FixedAllocator implements Allocator {
 					str.writeInt(block.m_bits[i]);
 				}
 
-				if (!m_preserveSession) {
-					block.m_transients = (int[]) block.m_bits.clone();
+				if (!m_store.isSessionPreserved()) {
+					block.m_transients = block.m_bits.clone();
 				}
 
-				block.m_commit = (int[]) block.m_bits.clone();
+				/**
+				 * If this allocator is shadowed then copy the new
+				 * committed state to m_saveCommit
+				 */
+				if (m_context != null) {
+					assert block.m_saveCommit != null;
+					
+					block.m_saveCommit = block.m_bits.clone();
+				} else if (m_store.isSessionPreserved()) {
+					block.m_commit = block.m_transients.clone();
+				} else {
+					block.m_commit = block.m_bits.clone();
+				}
 			}
 			// add checksum
 			final int chk = ChecksumUtility.getCHK().checksum(buf, str.size());
 			str.writeInt(chk);
 
-			if (!m_preserveSession) {
+			if (!m_store.isSessionPreserved()) {
 				m_freeBits += m_freeTransients;
 
 				// Handle re-addition to free list once transient frees are
@@ -234,6 +263,8 @@ public class FixedAllocator implements Allocator {
 
 	private final ArrayList<AllocBlock> m_allocBlocks;
 
+	private RWStore m_store;
+
 	/**
 	 * Calculating the number of ints (m_bitSize) cannot rely on a power of 2.  Previously this
 	 * assumption was sufficient to guarantee a rounding on to an 64k boundary.  However, now
@@ -248,8 +279,9 @@ public class FixedAllocator implements Allocator {
 	 * @param preserveSessionData
 	 * @param cache
 	 */
-	FixedAllocator(final int size, final boolean preserveSessionData, final RWWriteCacheService cache) {
+	FixedAllocator(final RWStore store, final int size, final RWWriteCacheService cache) {
 		m_diskAddr = 0;
+		m_store = store;
 
 		m_size = size;
 
@@ -289,8 +321,6 @@ public class FixedAllocator implements Allocator {
 
 		m_freeTransients = 0;
 		m_freeBits = 32 * m_bitSize * numBlocks;
-
-		m_preserveSession = preserveSessionData;
 	}
 
 	public String getStats(final AtomicLong counter) {
@@ -351,7 +381,7 @@ public class FixedAllocator implements Allocator {
 			final int block = offset/nbits;
 			
 			if (((AllocBlock) m_allocBlocks.get(block))
-					.freeBit(offset % nbits, getPhysicalAddress(offset + 3))) { // bit adjust
+					.freeBit(offset % nbits)) { // bit adjust
 				if (m_freeBits++ == 0) {
 					m_freeList.add(this);
 				}
@@ -376,7 +406,14 @@ public class FixedAllocator implements Allocator {
 		return false;
 	}
 
-	public int alloc(final RWStore store, final int size) {
+	/**
+	 * The introduction of IAllocationContexts has added some complexity to
+	 * the older concept of a free list.  With AllocationContexts it is
+	 * possibly for allocator to have free space available but this being
+	 * restricted to a specific AllocaitonContext.  The RWStore alloc method
+	 * must therefore handle the 
+	 */
+	public int alloc(final RWStore store, final int size, final IAllocationContext context) {
 		int addr = -1;
 
 		final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
@@ -416,8 +453,8 @@ public class FixedAllocator implements Allocator {
 
 			return value;
 		} else {
-    		if (log.isInfoEnabled())
-    			log.info("FixedAllocator returning null address");
+    		if (log.isTraceEnabled())
+    			log.trace("FixedAllocator returning null address");
     		
 			return 0;
 		}
@@ -511,5 +548,30 @@ public class FixedAllocator implements Allocator {
 		int bit = offset % allocBlockRange;
 		
 		return RWStore.tstBit(block.m_bits, bit);
+	}
+
+	public boolean isCommitted(int offset) {
+	  	offset -= 3;
+
+		int allocBlockRange = 32 * m_bitSize;
+
+		AllocBlock block = (AllocBlock) m_allocBlocks.get(offset / allocBlockRange);
+		int bit = offset % allocBlockRange;
+		
+		return RWStore.tstBit(block.m_commit, bit);
+	}
+
+	/**
+	 * If the context is this allocators context AND it is not in the commit bits
+	 * then we can immediately free.
+	 */
+	public boolean canImmediatelyFree(int addr, int size, IAllocationContext context) {
+		if (context == m_context) {
+			final int offset = ((-addr) & RWStore.OFFSET_BITS_MASK); // bit adjust
+
+			return !isCommitted(offset);
+		} else {
+			return false;
+		}
 	}
 }
