@@ -34,6 +34,7 @@ import junit.framework.TestCase2;
 
 import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
@@ -48,7 +49,6 @@ import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
 import com.bigdata.bop.join.PipelineJoin;
-import com.bigdata.bop.join.TestPipelineJoin;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -262,12 +262,6 @@ public class TestQueryEngine extends TestCase2 {
      * itself (there is one solution, which is "value=Paul").
      * 
      * @throws Exception
-     * 
-     * @todo setup and run bops against it w/ filters, sorts, joins (we can join
-     *       with an incoming binding set easily enough using only a single
-     *       primary index), distincts, selecting only certain columns, etc.
-     * 
-     * @see TestPipelineJoin
      */
     public void test_query_join1() throws Exception {
 
@@ -373,7 +367,9 @@ public class TestQueryEngine extends TestCase2 {
     /**
      * @todo Test the ability close the iterator draining a result set before
      *       the query has finished executing and verify that the query is
-     *       correctly terminated.
+     *       correctly terminated [this is difficult to test without having
+     *       significant data scale since there is an implicit race between the
+     *       consumer and the producer to close out the query evaluation].
      */
     public void test_query_closeIterator() {
 
@@ -397,7 +393,7 @@ public class TestQueryEngine extends TestCase2 {
      *       DISTINCT filter is a different from most other access path filters
      *       since it stateful and is applied across all chunks on all shards).
      */
-    public void test_query_join1_distinct() {
+    public void test_query_join1_distinctAccessPath() {
         
         fail("write test");
         
@@ -561,35 +557,10 @@ public class TestQueryEngine extends TestCase2 {
     }
 
     /**
-     * @todo Test optional joins (left joins in which the join succeeds even if
-     *       the constraint fails). Optional joins designate an "optional"
-     *       target (also known as an optional "goto"), which is the operator to
-     *       which the source binding set is relayed if the join does not
-     *       succeed.
-     * 
-     * @todo The target for the optional may be another join or a non-join
-     *       ancestor of the current join, such as a DISTINCT, SORT, GROUP_BY
-     *       operator. When there is no such operator, should the binding set be
-     *       relayed to the client running the query or should we create a
-     *       operator which stands in for the total query? [The former I think
-     *       since it is more direct and we can assign a reserved id for the
-     *       client.]
-     * 
-     * @todo The use optional gotos are in use introduces a race condition for
-     *       per join chunk task processing. This race condition is probably
-     *       present in standalone query execution, but it is most clearly a
-     *       problem in scale-out. If the #of active tasks for a given join is
-     *       not correctly coordinated with the client there is the danger that
-     *       a query may terminate too early (because the optional goto target
-     *       is done with the binding sets routed directly to it before it
-     *       receives binding sets which route through the intermediate joins).
-     *       There is also a danger that the query may not terminate cleanly
-     *       (because the optional goto target may receive a chunk of binding
-     *       sets after the query was terminated). These issues will be
-     *       difficult to detect without carefully crafted stress tests.
-     *       Luckily, the BSBM query mixes are reasonably well suited to bring
-     *       out such problems.
-     */
+     * @todo Write unit tests for optional joins, including where an alternative
+     *       sink is specified in the {@link BOpContext} and is used when the
+     *       join fails.
+     * */
     public void test_query_join2_optionals() {
 
         fail("write test");

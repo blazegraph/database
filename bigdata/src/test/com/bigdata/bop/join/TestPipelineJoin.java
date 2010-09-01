@@ -40,6 +40,7 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
@@ -73,9 +74,8 @@ import com.bigdata.striterator.ChunkedArrayIterator;
  *       is really difficult to test this outside of a stress test. BSBM is a
  *       good way to validate this (run the qualification trials).
  * 
- * @todo Write unit tests for joins where the right operand is optional.
- * 
- * @todo Write unit tests for star-joins (in their own test suite).
+ * @todo Write unit tests for star-joins (in their own test suite and ideally
+ *       factor them out from the standard {@link PipelineJoin} operator).
  */
 public class TestPipelineJoin extends TestCase2 {
 
@@ -105,6 +105,7 @@ public class TestPipelineJoin extends TestCase2 {
     }
 
     static private final String namespace = "ns";
+    
     Journal jnl;
     
     public void setUp() throws Exception {
@@ -283,4 +284,121 @@ public class TestPipelineJoin extends TestCase2 {
 
     }
 
+    /**
+     * Unit tests for optional joins. For an optional join, an alternative sink
+     * may be specified in the {@link BOpContext}. When specified, it is used if
+     * the join fails (if not specified, the binding sets which do not join are
+     * forwarded to the primary sink). Binding sets which join go to the primary
+     * sink regardless.
+     * 
+     * @throws ExecutionException 
+     * @throws InterruptedException 
+     * 
+     * @todo write a unit test for an {@link IConstraint} first.
+     * 
+     * @todo test w/ and w/o the alternative sink.
+     */
+    public void test_optionalJoin() throws InterruptedException, ExecutionException {
+        
+//        final int startId = 1;
+//        final int joinId = 2;
+//        final int predId = 3;
+//        final PipelineJoin query = new PipelineJoin(
+//        // left
+//                new PipelineStartOp(new BOp[] {}, NV.asMap(new NV[] {//
+//                        new NV(Predicate.Annotations.BOP_ID, startId),//
+//                        })),
+//                // right
+//                new Predicate<E>(new IVariableOrConstant[] {
+//                        new Constant<String>("Mary"), Var.var("value") }, NV
+//                        .asMap(new NV[] {//
+//                                new NV(Predicate.Annotations.RELATION_NAME,
+//                                        new String[] { namespace }),//
+//                                new NV(Predicate.Annotations.PARTITION_ID,
+//                                        Integer.valueOf(-1)),//
+//                                new NV(Predicate.Annotations.OPTIONAL,
+//                                        Boolean.FALSE),//
+//                                new NV(Predicate.Annotations.CONSTRAINT, null),//
+//                                new NV(Predicate.Annotations.EXPANDER, null),//
+//                                new NV(Predicate.Annotations.BOP_ID, predId),//
+//                        })),
+//                // join annotations
+//                NV.asMap(new NV[] {//
+//                        new NV(PipelineJoin.Annotations.BOP_ID, joinId),//
+//                        new NV(PipelineJoin.Annotations.OPTIONAL, Boolean.TRUE),//
+//                        })//
+//        );
+//
+//        // the expected solution (just one).
+//        final IBindingSet[] expected = new IBindingSet[] {//
+//        new ArrayBindingSet(//
+//                new IVariable[] { Var.var("value") },//
+//                new IConstant[] { new Constant<String>("Paul") }//
+//        ) };
+//
+//        final PipelineJoinStats stats = query.newStats();
+//
+//        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+//                new IBindingSet[][] { new IBindingSet[] { new HashBindingSet()} });
+//
+//        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer();
+//
+//        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+//                null/* fed */, jnl/* indexManager */,
+//                ITx.READ_COMMITTED/* readTimestamp */,
+//                ITx.UNISOLATED/* writeTimestamp */, -1/* partitionId */, stats,
+//                source, sink, null/* sink2 */);
+//
+//        // get task.
+//        final FutureTask<Void> ft = query.eval(context);
+//        
+//        // execute task.
+//        jnl.getExecutorService().execute(ft);
+//
+//        final IAsynchronousIterator<IBindingSet[]> itr = sink.iterator();
+//        try {
+//            int n = 0;
+//            while (itr.hasNext()) {
+//                final IBindingSet[] chunk = itr.next();
+//                if (log.isInfoEnabled())
+//                    log.info(n + " : chunkSize=" + chunk.length);
+//                for (int i = 0; i < chunk.length; i++) {
+//                    assertTrue(expected[n++].equals(chunk[i]));
+//                }
+//            }
+//        } finally {
+//            itr.close();
+//        }
+//
+//        // join task
+//        assertEquals(1L, stats.chunksIn.get());
+//        assertEquals(1L, stats.unitsIn.get());
+//        assertEquals(1L, stats.unitsOut.get());
+//        assertEquals(1L, stats.chunksOut.get());
+//        // access path
+//        assertEquals(0L, stats.accessPathDups.get());
+//        assertEquals(1L, stats.accessPathCount.get());
+//        assertEquals(1L, stats.chunkCount.get());
+//        assertEquals(1L, stats.elementCount.get());
+//        
+//        assertTrue(ft.isDone());
+//        assertFalse(ft.isCancelled());
+//        ft.get(); // verify nothing thrown.
+
+        fail("write test");
+        
+    }
+    
+    public void test_joinConstraint() {
+        fail("write test");
+    }
+    
+    public void test_joinDistinctFilter() {
+        fail("write test");
+    }
+    
+    public void test_joinOtherFilter() {
+        fail("write test");
+    }
+    
 }

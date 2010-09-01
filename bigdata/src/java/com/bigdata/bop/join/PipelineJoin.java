@@ -39,7 +39,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 
@@ -59,7 +58,6 @@ import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.counters.CAT;
-import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.AccessPath;
@@ -73,8 +71,6 @@ import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStarJoin;
 import com.bigdata.relation.rule.IStarJoin.IStarConstraint;
 import com.bigdata.relation.rule.eval.ISolution;
-import com.bigdata.relation.rule.eval.pipeline.DistributedJoinTask;
-import com.bigdata.relation.rule.eval.pipeline.JoinMasterTask;
 import com.bigdata.service.DataService;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
@@ -95,30 +91,14 @@ import com.bigdata.util.concurrent.LatchedExecutor;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo There is only one source, even if scale-out, and the {@link JoinTask}
- *       runs only for the duration of that source. The termination conditions
- *       for query evaluation are handled outside of the operator
- *       implementation.
- *       <p>
- *       The first join dimension always has a single source - the
- *       initialBindingSet established by the {@link JoinMasterTask}. Downstream
- *       join dimensions read from {@link IAsynchronousIterator} (s) from the
- *       upstream join dimension. When the {@link IIndexManager} allows
- *       key-range partitions, then the fan-in for the sources may be larger
- *       than one as there will be one {@link JoinTask} for each index partition
- *       touched by each join dimension.
- * 
- * @todo provide more control over the access path (fully buffered read
- *       thresholds).
- * 
- * @todo Do we need to hook the source and sink {@link Future}s?
- * 
  * @todo Break the star join logic out into its own join operator.
  * 
  * @todo Implement operator at a time or mega-chunk pipeline operators for high
  *       volume query. These will differ by running across the entire shard on
  *       the right hand operator using multi-block IO each time they process a
  *       (mega-)chunk of bindings from the left hand operator.
+ * 
+ * @todo Support SLICE via annotations.
  */
 public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
         BindingSetPipelineOp {
@@ -334,12 +314,6 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
      */
     private static class JoinTask extends Haltable<Void> implements Callable<Void> {
 
-//        /**
-//         * The federation reference is passed along when we evaluate the
-//         * {@link #left} operand.
-//         */
-//        final protected IBigdataFederation<?> fed;
-        
         /**
          * The join that is being executed.
          */
@@ -361,15 +335,15 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
          * the failed joined needs to jump out of a join group rather than
          * routing directly to the ancestor in the operator tree.
          * 
-         * @todo Support for the {@link #optionalSink} is not finished. When the
-         *       optional target is not simply the direct ancestor in the
-         *       operator tree then we need to have a separate thread local
-         *       buffering in front of the optional sink for the join task. This
-         *       means that we need to use two {@link #threadLocalBufferFactory}
-         *       s, one for the optional path. All of this only matters when the
-         *       binding sets are being routed out of an optional join group.
-         *       When the tails are independent optionals then the target is the
-         *       same as the target for binding sets which do join.
+         * FIXME Support for the {@link #optionalSink} is not finished. When the
+         * optional target is not simply the direct ancestor in the operator
+         * tree then we need to have a separate thread local buffering in front
+         * of the optional sink for the join task. This means that we need to
+         * use two {@link #threadLocalBufferFactory} s, one for the optional
+         * path. All of this only matters when the binding sets are being routed
+         * out of an optional join group. When the tails are independent
+         * optionals then the target is the same as the target for binding sets
+         * which do join.
          */
         final IBlockingBuffer<IBindingSet[]> optionalSink;
         
@@ -405,82 +379,6 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
          * The evaluation context.
          */
         final protected BOpContext<IBindingSet> context;
-
-//        /**
-//         * Volatile flag is set <code>true</code> if the {@link JoinTask}
-//         * (including any tasks executing on its behalf) should halt. This flag
-//         * is monitored by the {@link BindingSetConsumerTask}, the
-//         * {@link AccessPathTask}, and the {@link ChunkTask}. It is set by any
-//         * of those tasks if they are interrupted or error out.
-//         * 
-//         * @todo review handling of this flag. Should an exception always be
-//         *       thrown if the flag is set wrapping the {@link #firstCause}? Are
-//         *       there any cases where the behavior should be different? If not,
-//         *       then replace tests with halt() and encapsulate the logic in
-//         *       that method.
-//         */
-//        volatile protected boolean halt = false;
-//
-//        /**
-//         * Set by {@link BindingSetConsumerTask}, {@link AccessPathTask}, and
-//         * {@link ChunkTask} if they throw an error. Tasks are required to use
-//         * an {@link AtomicReference#compareAndSet(Object, Object)} and must
-//         * specify <code>null</code> as the expected value. This ensures that
-//         * only the first cause is recorded by this field.
-//         */
-//        final protected AtomicReference<Throwable> firstCause = new AtomicReference<Throwable>(
-//                null);
-//
-//        /**
-//         * Indicate that join processing should halt. This method is written
-//         * defensively and will not throw anything.
-//         * 
-//         * @param cause
-//         *            The cause.
-//         */
-//        protected void halt(final Throwable cause) {
-//
-//            halt = true;
-//
-//            final boolean isFirstCause = firstCause.compareAndSet(
-//                    null/* expect */, cause);
-//
-//            if (log.isEnabledFor(Level.WARN))
-//
-//                try {
-//
-//                    if (!InnerCause.isInnerCause(cause,
-//                            InterruptedException.class)
-//                            && !InnerCause.isInnerCause(cause,
-//                                    CancellationException.class)
-//                            && !InnerCause.isInnerCause(cause,
-//                                    ClosedByInterruptException.class)
-//                            && !InnerCause.isInnerCause(cause,
-//                                    RejectedExecutionException.class)
-//                            && !InnerCause.isInnerCause(cause,
-//                                    BufferClosedException.class)) {
-//
-//                        /*
-//                         * This logs all unexpected causes, not just the first
-//                         * one to be reported for this join task.
-//                         * 
-//                         * Note: The master will log the firstCause that it
-//                         * receives as an error.
-//                         */
-//
-//                        log.warn("joinOp=" + joinOp + ", isFirstCause="
-//                                + isFirstCause + " : "
-//                                + cause.getLocalizedMessage(), cause);
-//
-//                    }
-//
-//                } catch (Throwable ex) {
-//
-//                    // error in logging system - ignore.
-//
-//                }
-//
-//        }
 
         /**
          * The statistics for this {@link JoinTask}.
@@ -797,26 +695,9 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
             } catch (Throwable t) {
 
-                try {
-                    logCallError(t);
-                } catch (Throwable t2) {
-                    log.error(t2.getLocalizedMessage(), t2);
-                }
-
                 /*
                  * This is used for processing errors and also if this task is
-                 * interrupted (because a SLICE has been satisfied).
-                 * 
-                 * @todo For a SLICE, consider that the query solution buffer
-                 * proxy could return the #of solutions added so far so that we
-                 * can halt each join task on the last join dimension in a
-                 * relatively timely manner producing no more than one chunk too
-                 * many (actually, it might not be that timely since some index
-                 * partitions might not produce any solutions; this suggests
-                 * that the master might need a fatter API than a Future for the
-                 * JoinTask so that it can directly notify the JoinTasks for the
-                 * first predicate and they can propagate that notice downstream
-                 * to their sinks). This will be an issue when fanOut GT ONE.
+                 * interrupted (because the sink has been closed).
                  */
 
                 halt(t);
@@ -836,13 +717,6 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
                     log.error(t2.getLocalizedMessage(), t2);
                 }
 
-//                // report join stats _before_ we close our source(s).
-//                try {
-//                    reportOnce();
-//                } catch (Throwable t2) {
-//                    log.error(t2.getLocalizedMessage(), t2);
-//                }
-
                 /*
                  * Close source iterators, which will cause any source JoinTasks
                  * that are still executing to throw a CancellationException
@@ -857,59 +731,9 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
                 throw new RuntimeException(t);
 
-            } finally {
-
-//                // report join stats iff they have not already been reported.
-//                reportOnce();
-
             }
 
         }
-
-        /**
-         * Method is used to log the primary exception thrown by {@link #call()}
-         * . The default implementation does nothing and the exception will be
-         * logged by the {@link JoinMasterTask}. However, this method is
-         * overridden by {@link DistributedJoinTask} so that the exception can
-         * be logged on the host and {@link DataService} where it originates.
-         * This appears to be necessary in order to trace back the cause of an
-         * exception which can otherwise be obscured (or even lost?) in a deeply
-         * nested RMI stack trace.
-         * 
-         * @param o
-         * @param t
-         */
-        protected void logCallError(Throwable t) {
-
-        }
-
-//        /**
-//         * Method reports {@link JoinStats} to the {@link JoinMasterTask}, but
-//         * only if they have not already been reported. This "report once"
-//         * constraint is used to make it safe to invoke during error handling
-//         * before actions which could cause the source {@link JoinTask}s (and
-//         * hence the {@link JoinMasterTask}) to terminate.
-//         */
-//        protected void reportOnce() {
-//
-//            if (didReport.compareAndSet(false/* expect */, true/* update */)) {
-//
-////                try {
-////
-//////                     @todo report statistics to the master.
-////                     masterProxy.report(stats);
-////
-////                } catch (IOException ex) {
-////
-////                    log.warn("Could not report statistics to the master", ex);
-////
-////                }
-//
-//            }
-//
-//        }
-//
-//        private final AtomicBoolean didReport = new AtomicBoolean(false);
 
         /**
          * Consume {@link IBindingSet} chunks from the {@link #sink}.

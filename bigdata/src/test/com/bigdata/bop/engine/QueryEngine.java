@@ -517,7 +517,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     
     public void bufferReady(IQueryClient clientProxy,
             InetSocketAddress serviceAddr, long queryId, int bopId) {
-        // TODO SCALEOUT
+        // @todo SCALEOUT notify peer when a buffer is ready.
         
     }
     
@@ -538,22 +538,28 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         return null;
     }
 
-    public void startOp(final long queryId, final int opId,
-            final int partitionId, final UUID serviceId, final int nchunks)
-            throws RemoteException {
-        final RunningQuery q = runningQueries.get(queryId);
+    public void startOp(final StartOpMessage msg) throws RemoteException {
+        
+        final RunningQuery q = runningQueries.get(msg.queryId);
+        
         if (q != null) {
-            q.startOp(opId, partitionId, serviceId, nchunks);
+        
+            q.startOp(msg);
+            
         }
+
     }
 
-    public void haltOp(final long queryId, final int opId,
-            final int partitionId, final UUID serviceId, final Throwable cause,
-            final int nchunks, final BOpStats taskStats) throws RemoteException {
-        final RunningQuery q = runningQueries.get(queryId);
+    public void haltOp(final HaltOpMessage msg) throws RemoteException {
+        
+        final RunningQuery q = runningQueries.get(msg.queryId);
+        
         if (q != null) {
-            q.haltOp(opId, partitionId, serviceId, cause, nchunks, taskStats);
+            
+            q.haltOp(msg);
+            
         }
+        
     }
 
     /**

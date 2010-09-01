@@ -61,7 +61,11 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("query engine");
 
+        // test suite for a non-Callable/Runnable Future.
         suite.addTestSuite(TestHaltable.class);
+
+        // test suite for some pipeline evaluation utility methods.
+        suite.addTestSuite(TestPipelineUtility.class);
 
         /*
          * test suites for receiving buffers and files from a remote service in
@@ -74,8 +78,11 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestReceiveBuffer.class);
         suite.addTestSuite(TestReceiveFile.class);
         
-        // test suite for query evaluation.
+        // test suite for query evaluation (basic JOINs).
         suite.addTestSuite(TestQueryEngine.class);
+
+        // test suite for query evaluation (DISTINCT, ORDER BY, GROUP BY).
+        suite.addTestSuite(TestQueryEngine2.class);
 
         return suite;
         
