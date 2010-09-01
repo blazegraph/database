@@ -2616,10 +2616,13 @@ public class RWStore implements IStore {
 	
 				public Long call() throws Exception {
 					long now = System.currentTimeMillis();
+					long earliest =  m_transactionService.getEarliestTxStartTime();
+					long aged = now - m_transactionService.getMinReleaseAge();
+					
 					if (m_transactionService.getActiveCount() == 0) {
-						return now;
-					} else {
-						return now - m_transactionService.getMinReleaseAge(); // getEarliestTxStartTime();
+						return aged;
+					} else {						
+						return aged < earliest ? aged : earliest;
 					}
 				}
 				
