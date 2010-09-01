@@ -33,7 +33,6 @@ import java.util.ArrayList;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.journal.IAllocationContext;
 
 /************************************************************************
  * PSOutputStream

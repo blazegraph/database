@@ -88,6 +88,7 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.IBigdataClient;
@@ -986,8 +987,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 					this._rootBlock = fileMetadata.rootBlock;
 					
-					setCommitter(DELETEBLOCK, new DeleteBlockCommitter((RWStrategy) _bufferStrategy));
-
 					break;
 
 				}
@@ -2611,11 +2610,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
     }
 
 	public long write(ByteBuffer data, final long oldAddr, IAllocationContext context) {
-        return _bufferStrategy.write(data, oldAddr, context);
+        return ((RWStrategy)_bufferStrategy).write(data, oldAddr, context);
 	}
 
 	public long write(ByteBuffer data, IAllocationContext context) {
-        return _bufferStrategy.write(data, context);
+        return ((RWStrategy)_bufferStrategy).write(data, context);
 	}
 
 	// Note: NOP for WORM. Used by RW for eventual recycle protocol.
@@ -2631,12 +2630,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         assertCanWrite();
 
-        _bufferStrategy.delete(addr, context);
+        ((RWStrategy)_bufferStrategy).delete(addr, context);
 
     }
     
     public void detachContext(IAllocationContext context) {
-        _bufferStrategy.detachContext(context);
+    	((RWStrategy)_bufferStrategy).detachContext(context);
     }
 
 	final public long getRootAddr(final int index) {
@@ -2771,6 +2770,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 * Register committer to write previous root block
 			 */
 			setCommitter(PREV_ROOTBLOCK, new RootBlockCommitter(this));
+			
+			/**
+			 * If the strategy is a RWStrategy, then register the delete
+			 * block committer to store the deferred deletes for each
+			 * commit record.
+			 */
+			if (_bufferStrategy instanceof RWStrategy)
+				setCommitter(DELETEBLOCK, new DeleteBlockCommitter((RWStrategy) _bufferStrategy));
+
+
 
 		}
 

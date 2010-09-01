@@ -319,11 +319,11 @@ abstract public class WriteCacheService implements IWriteCache {
 	 * 
 	 * Toggle comment appropriately to activate/deactivate
 	 */
-//	final long[] addrsUsed = new long[4024 * 1024];
-//	int addrsUsedCurs = 0;
-//	final char[] addrActions = new char[addrsUsed.length];
-//	final int[] addrLens = new int[addrsUsed.length];
-	final long[] addrsUsed = null;
+/*	final long[] addrsUsed = new long[4024 * 1024];
+	int addrsUsedCurs = 0;
+	final char[] addrActions = new char[addrsUsed.length];
+	final int[] addrLens = new int[addrsUsed.length];
+*/	final long[] addrsUsed = null;
 	int addrsUsedCurs = 0;
 	final char[] addrActions = null;
 	final int[] addrLens = null;

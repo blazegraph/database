@@ -27,7 +27,6 @@ package com.bigdata.rwstore;
 import java.util.ArrayList;
 
 import com.bigdata.io.writecache.WriteCacheService;
-import com.bigdata.journal.IAllocationContext;
 
 /**
  * Bit maps for an allocator. The allocator is a bit map managed as int[]s.

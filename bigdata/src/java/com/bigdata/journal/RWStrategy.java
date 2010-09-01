@@ -42,6 +42,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IAddressManager;
+import com.bigdata.rwstore.IAllocationContext;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.ChecksumUtility;

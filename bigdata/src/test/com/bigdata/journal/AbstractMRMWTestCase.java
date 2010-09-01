@@ -235,7 +235,7 @@ abstract public class AbstractMRMWTestCase
 
             final long timeout = 20;
 
-            final int ntrials = 10000;
+            final int ntrials = 2000;
 
             final int nclients = 20;
 

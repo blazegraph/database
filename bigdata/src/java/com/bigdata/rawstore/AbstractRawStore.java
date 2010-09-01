@@ -30,7 +30,7 @@ package com.bigdata.rawstore;
 import java.nio.ByteBuffer;
 
 import com.bigdata.LRUNexus;
-import com.bigdata.journal.IAllocationContext;
+import com.bigdata.rwstore.IAllocationContext;
 
 /**
  * Abstract base class for {@link IRawStore} implementations. This class uses a

@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.bigdata.journal.IAllocationContext;
 import com.bigdata.util.ChecksumUtility;
 
 /**
