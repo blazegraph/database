@@ -50,17 +50,7 @@ public class ArrayBindingSet implements IBindingSet {
 
     private static final long serialVersionUID = -6468905602211956490L;
     
-    protected static final Logger log = Logger.getLogger(ArrayBindingSet.class);
-    
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    protected static final boolean DEBUG = log.isDebugEnabled();
+    private static final Logger log = Logger.getLogger(ArrayBindingSet.class);
 
     /**
      * A dense array of the bound variables.
@@ -77,7 +67,7 @@ public class ArrayBindingSet implements IBindingSet {
     /**
      * Copy constructor.
      */
-    protected ArrayBindingSet(ArrayBindingSet bindingSet) {
+    protected ArrayBindingSet(final ArrayBindingSet bindingSet) {
         
         if (bindingSet == null)
             throw new IllegalArgumentException();
@@ -100,17 +90,16 @@ public class ArrayBindingSet implements IBindingSet {
      * @param vals
      *            Their bound values.
      */
-    public ArrayBindingSet(IVariable[] vars, IConstant[] vals) {
+    public ArrayBindingSet(final IVariable[] vars, final IConstant[] vals) {
 
-//        if (vars == null)
-//            throw new IllegalArgumentException();
-//
-//        if (vals == null)
-//            throw new IllegalArgumentException();
+        if (vars == null)
+            throw new IllegalArgumentException();
 
-        assert vars != null;
-        assert vals != null;
-        assert vars.length == vals.length;
+        if (vals == null)
+            throw new IllegalArgumentException();
+
+        if(vars.length != vals.length)
+            throw new IllegalArgumentException();
 
         // for (int i = 0; i < vars.length; i++) {
         //            
@@ -139,7 +128,7 @@ public class ArrayBindingSet implements IBindingSet {
      * @throws IllegalArgumentException
      *             if the <i>capacity</i> is negative.
      */
-    public ArrayBindingSet(int capacity) {
+    public ArrayBindingSet(final int capacity) {
 
         if (capacity < 0)
             throw new IllegalArgumentException();
@@ -244,7 +233,7 @@ public class ArrayBindingSet implements IBindingSet {
      * Since the array is dense (no gaps), {@link #clear(IVariable)} requires
      * that we copy down any remaining elements in the array by one position.
      */
-    public void clear(IVariable var) {
+    public void clear(final IVariable var) {
 
         if (var == null)
             throw new IllegalArgumentException();
@@ -282,7 +271,7 @@ public class ArrayBindingSet implements IBindingSet {
 
     }
 
-    public IConstant get(IVariable var) {
+    public IConstant get(final IVariable var) {
 
         if (var == null)
             throw new IllegalArgumentException();
@@ -301,7 +290,7 @@ public class ArrayBindingSet implements IBindingSet {
         
     }
 
-    public boolean isBound(IVariable var) {
+    public boolean isBound(final IVariable var) {
         
         return get(var) != null;
         
@@ -315,10 +304,11 @@ public class ArrayBindingSet implements IBindingSet {
         if (val == null)
             throw new IllegalArgumentException();
 
-        if(DEBUG) {
-            
-            log.debug("var=" + var + ", val=" + val + ", nbound=" + nbound+", capacity="+vars.length);
-            
+        if (log.isTraceEnabled()) {
+
+            log.trace("var=" + var + ", val=" + val + ", nbound=" + nbound
+                    + ", capacity=" + vars.length);
+
         }
         
         for (int i = 0; i < nbound; i++) {
@@ -343,7 +333,7 @@ public class ArrayBindingSet implements IBindingSet {
 
     public String toString() {
         
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
         
         sb.append("{");
 

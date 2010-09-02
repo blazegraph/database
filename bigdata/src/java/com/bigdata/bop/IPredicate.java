@@ -30,7 +30,7 @@ package com.bigdata.bop;
 
 import java.io.Serializable;
 
-import com.bigdata.bop.ap.Union;
+import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
@@ -85,6 +85,8 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
         /**
          * <code>true</code> iff the predicate is optional (the right operand of
          * a left join).
+         * 
+         * @deprecated This flag is being moved to the join operator.
          */
         String OPTIONAL = "optional";
 
@@ -131,8 +133,8 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      * @param index
      *            The index into the array of relation names in the view.
      * 
-     * @deprecated Unions of predicates must be handled explicitly. See
-     *             {@link Union}.
+     * @deprecated Unions of predicates must be handled explicitly as a union of
+     *             pipeline operators reading against the different predicate.
      */
     public String getRelationName(int index);
     

@@ -50,16 +50,17 @@ public interface IElementFilter<E> extends // BOp,
     public boolean accept(E e);
 
     /**
-     * Return true iff this this filter can be used on the specified
-     * object (filter on the object class). 
+     * Return true iff this this filter can be used on the specified object
+     * (filter on the object class).
      * <p>
-     * Note: This was added
-     * by MikeP to filter out cases where the runtime type system was
-     * throwing a {@link ClassCastException} in the {@link
-     * #accept(Object)} implementation.
+     * Note: This was added to make it possible filter out cases where the
+     * runtime type system was throwing a {@link ClassCastException} in the
+     * {@link #accept(Object)} implementation.
      * 
      * @param o
-     * @return
+     *            An object of some type.
+     *            
+     * @return <code>true</code> if the element can be inspected by this filter.
      */
     public boolean canAccept(Object o);
     

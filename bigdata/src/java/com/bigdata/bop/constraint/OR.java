@@ -37,7 +37,7 @@ import com.bigdata.bop.IConstraint;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class OR extends BOpBase implements IConstraint {
+public class OR extends BOpConstraint {
 
     /**
      * 
@@ -60,7 +60,7 @@ public class OR extends BOpBase implements IConstraint {
 
     public OR(final IConstraint x, final IConstraint y) {
 
-        super(new BOp[] { x, y });
+        super(new BOp[] { x, y }, null/*annocations*/);
 
         if (x == null || y == null)
             throw new IllegalArgumentException();

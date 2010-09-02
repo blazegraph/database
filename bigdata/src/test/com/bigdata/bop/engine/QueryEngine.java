@@ -41,8 +41,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.bop.BOp;
 import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IBlockingBuffer;

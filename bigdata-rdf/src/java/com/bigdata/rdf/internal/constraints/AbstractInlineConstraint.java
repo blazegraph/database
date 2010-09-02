@@ -26,23 +26,21 @@ package com.bigdata.rdf.internal.constraints;
 
 import java.util.Map;
 
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
-import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.constraint.BOpConstraint;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 
 /**
  * Use inline terms to perform numerical comparison operations.
- * <p>
- * @see {@link IVUtility#numericalCompare(IV, IV)}. 
+ * 
+ * @see IVUtility#numericalCompare(IV, IV) 
  */
-public abstract class AbstractInlineConstraint extends BOpBase implements
-        IConstraint {
+public abstract class AbstractInlineConstraint extends BOpConstraint {
 
     /**
      * 
@@ -66,7 +64,7 @@ public abstract class AbstractInlineConstraint extends BOpBase implements
 
     protected AbstractInlineConstraint(final IVariable<IV> v, final IV iv) {
         
-        super(new BOp[] { v, new Constant<IV>(iv) });
+        super(new BOp[] { v, new Constant<IV>(iv) }, null/*annotations*/);
         
         if (v == null)
             throw new IllegalArgumentException();

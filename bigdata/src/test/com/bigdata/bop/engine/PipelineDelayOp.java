@@ -6,10 +6,9 @@ import java.util.concurrent.FutureTask;
 
 import junit.framework.AssertionFailedError;
 
-import com.bigdata.bop.AbstractPipelineOp;
+import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 
 /**
@@ -19,15 +18,14 @@ import com.bigdata.bop.IBindingSet;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class PipelineDelayOp extends AbstractPipelineOp<IBindingSet> implements
-        BindingSetPipelineOp {
+public class PipelineDelayOp extends BindingSetPipelineOp {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends AbstractPipelineOp.Annotations {
+    public interface Annotations extends BindingSetPipelineOp.Annotations {
 
         /**
          * The delay imposed by the operator (milliseconds).

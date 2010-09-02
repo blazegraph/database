@@ -26,11 +26,9 @@ package com.bigdata.bop.constraint;
 
 import java.util.Map;
 
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
-import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 
 /**
@@ -39,7 +37,7 @@ import com.bigdata.bop.IVariable;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EQ extends BOpBase implements IConstraint {
+public class EQ extends BOpConstraint {
 
     private static final long serialVersionUID = 1L;
 

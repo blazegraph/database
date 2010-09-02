@@ -59,7 +59,10 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("distinct, sort, and aggregation operators");
+        final TestSuite suite = new TestSuite("binding set union, distinct, sort, and aggregation operators");
+
+        // test distinct operator for binding sets.
+        suite.addTestSuite(TestUnionBindingSets.class);
 
         // test distinct operator for binding sets.
         suite.addTestSuite(TestDistinctBindingSets.class);

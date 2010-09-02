@@ -37,10 +37,9 @@ import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.bop.AbstractPipelineOp;
+import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.QuoteOp;
@@ -92,8 +91,7 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class MapBindingSetsOverShards extends AbstractPipelineOp<IBindingSet>
-        implements BindingSetPipelineOp {
+public class MapBindingSetsOverShards extends BindingSetPipelineOp {
 
     static private final transient Logger log = Logger
             .getLogger(MapBindingSetsOverShards.class);

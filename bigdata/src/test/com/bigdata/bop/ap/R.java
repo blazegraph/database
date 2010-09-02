@@ -35,8 +35,10 @@ import java.util.UUID;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.IMutableRelation;
@@ -69,17 +71,17 @@ public class R extends AbstractRelation<E> implements IMutableRelation<E> {
          * There is only one component in the key.
          */
         public int getKeyArity() {
-            return 1;
+            return 2;
         }
 
         /**
-         * The [name] attribute is used to generate the key. It is at index zero
-         * in the element record.
+         * The [name] and [value] attributes are used to generate the key.
+         * [name] is at index zero in the key. [value] is at index 1.
          */
         public int getKeyOrder(final int keyPos) {
-            if (keyPos != 0)
+            if (keyPos < 0 || keyPos > 1)
                 throw new IndexOutOfBoundsException();
-            return 0;
+            return keyPos;
         }
 
     }
@@ -173,20 +175,35 @@ public class R extends AbstractRelation<E> implements IMutableRelation<E> {
 
         final IIndex ndx = getIndex(primaryKeyOrder);
 
+        final IKeyBuilder keyBuilder = ndx.getIndexMetadata().getKeyBuilder();
+        
         while (itr.hasNext()) {
 
             final E e = itr.next();
 
-            if (!ndx.contains(e.name)) {
+            // @todo this is not declarative!
+            final byte[] key = keyBuilder.reset().append(e.name)
+                    .append(e.value).getKey();
+
+            if (!ndx.contains(key)) {
 
                 /*
-                 * Note: the entire record is associated with the key, not just
+                 * Note: The key is formed from both the name and the value.
+                 * This makes it possible to have a many-to-many association
+                 * pattern.
+                 * 
+                 * Note: The entire record is associated with the key, not just
                  * the value. This makes it possible for us to extract the
                  * record in cases where the key can not be decoded (such as
                  * Unicode key components).
-                 */ 
-                ndx.insert(e.name, e);
+                 */
+                ndx.insert(key, e);
 
+//                if (log.isTraceEnabled())
+//                    log.trace
+                    System.err.println("insert: element=" + e + ", key="
+                            + BytesUtil.toString(key));
+                
                 n++;
 
             }

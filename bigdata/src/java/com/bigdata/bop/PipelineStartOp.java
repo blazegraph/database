@@ -29,7 +29,6 @@ package com.bigdata.bop;
 
 import java.util.Map;
 import java.util.concurrent.Callable;
-import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.engine.BOpStats;
@@ -44,8 +43,7 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class PipelineStartOp extends AbstractPipelineOp<IBindingSet> implements
-        BindingSetPipelineOp {
+public class PipelineStartOp extends BindingSetPipelineOp {
 
     /**
      * 
@@ -82,8 +80,6 @@ public class PipelineStartOp extends AbstractPipelineOp<IBindingSet> implements
      */
     static private class CopyTask implements Callable<Void> {
 
-//        private final BOpContext<IBindingSet> context;
-
         private final BOpStats stats;
         
         private final IAsynchronousIterator<IBindingSet[]> source;
@@ -91,8 +87,6 @@ public class PipelineStartOp extends AbstractPipelineOp<IBindingSet> implements
         private final IBlockingBuffer<IBindingSet[]> sink;
 
         CopyTask(final BOpContext<IBindingSet> context) {
-
-//            this.context = context;
         
             stats = context.getStats();
             
