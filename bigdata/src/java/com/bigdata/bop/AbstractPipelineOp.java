@@ -35,6 +35,9 @@ import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 /**
+ * Abstract base class for pipelined operators regardless of the type of data
+ * moving along the pipeline.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

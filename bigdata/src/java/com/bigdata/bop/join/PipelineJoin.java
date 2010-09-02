@@ -43,7 +43,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.bop.AbstractPipelineOp;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BindingSetPipelineOp;
@@ -89,16 +88,8 @@ import com.bigdata.util.concurrent.LatchedExecutor;
  * @version $Id$
  * 
  * @todo Break the star join logic out into its own join operator.
- * 
- * @todo Implement operator at a time or mega-chunk pipeline operators for high
- *       volume query. These will differ by running across the entire shard on
- *       the right hand operator using multi-block IO each time they process a
- *       (mega-)chunk of bindings from the left hand operator.
- * 
- * @todo Support SLICE via annotations.
  */
-public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
-        BindingSetPipelineOp {
+public class PipelineJoin extends BindingSetPipelineOp {
 
     static private final Logger log = Logger.getLogger(PipelineJoin.class);
 
@@ -108,13 +99,7 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
     private static final long serialVersionUID = 1L;
 
     /**
-     * @todo Declare annotations for joins. There will need to be an interface
-     *       for join operators where we can declare this stuff.
-     *       <p>
-     *       An operator-at-a-time or mega-chunk join operator might have
-     *       additional annotations.
-     *       <p>
-     *       Declare maxParallel, variablesToKeep (or null for all).
+     * @todo Declare SLICE annotation and support SLICE in the {@link JoinTask}.
      */
     public interface Annotations extends BindingSetPipelineOp.Annotations {
 
@@ -123,7 +108,7 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
          * retained in the {@link IBindingSet}s written out by the operator.
          * All variables are retained unless this annotation is specified.
          */
-        String SELECT = PipelineJoin.class.getName() + ".constraints";
+        String SELECT = PipelineJoin.class.getName() + ".select";
         
         /**
          * An optional {@link IConstraint}[] which places restrictions on the
@@ -135,9 +120,29 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
          * Marks the join as "optional" in the SPARQL sense. Binding sets which
          * fail the join will be routed to the alternative sink as specified by
          * {@link BindingSetPipelineOp.Annotations#ALT_SINK_REF}.
+         * 
+         * @see #DEFAULT_OPTIONAL
          */
         String OPTIONAL = PipelineJoin.class.getName() + ".optional";
 
+        boolean DEFAULT_OPTIONAL = false;
+
+        /**
+         * The maximum parallelism with which the pipeline will consume the
+         * source {@link IBindingSet}[] chunk.
+         * <p>
+         * Note: When ZERO (0), everything will run in the caller's
+         * {@link Thread}, but there will still be one thread per pipeline join
+         * task which is executing concurrently against different source chunks.
+         * When GT ZERO (0), tasks will run on an {@link ExecutorService} with
+         * the specified maximum parallelism.
+         * 
+         * @see #DEFAULT_MAX_PARALLEL
+         */
+        String MAX_PARALLEL = PipelineJoin.class.getName() + ".maxParallel";
+
+        int DEFAULT_MAX_PARALLEL = 0;
+        
     }
 
     /**
@@ -195,10 +200,6 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
             
             if (o instanceof PipelineJoinStats) {
 
-                /*
-                 * @todo Should there be an AccessPathStats object which just
-                 * gets passed into each access path evaluation?
-                 */
                 final PipelineJoinStats t = (PipelineJoinStats) o;
 
                 accessPathDups.add(t.accessPathDups.get());
@@ -280,7 +281,16 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
      */
     protected boolean isOptional() {
 
-        return getProperty(Annotations.OPTIONAL, Boolean.FALSE);
+        return getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
+
+    }
+
+    /**
+     * @see Annotations#MAX_PARALLEL
+     */
+    protected int getMaxParallel() {
+
+        return getProperty(Annotations.MAX_PARALLEL, Annotations.DEFAULT_MAX_PARALLEL);
 
     }
 
@@ -322,6 +332,21 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
         final IConstraint[] constraints;
 
         /**
+         * The maximum parallelism with which the {@link JoinTask} will
+         * consume the source {@link IBindingSet}s.
+         * 
+         * @see Annotations#MAX_PARALLEL
+         */
+        final int maxParallel;
+
+        /**
+         * The service used for executing subtasks (optional).
+         * 
+         * @see #maxParallel
+         */
+        final Executor service;
+
+        /**
          * True iff the {@link #right} operand is an optional pattern (aka if
          * this is a SPARQL style left join).
          */
@@ -334,13 +359,13 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
          * 
          * FIXME Support for the {@link #optionalSink} is not finished. When the
          * optional target is not simply the direct ancestor in the operator
-         * tree then we need to have a separate thread local buffering in front
-         * of the optional sink for the join task. This means that we need to
-         * use two {@link #threadLocalBufferFactory} s, one for the optional
-         * path. All of this only matters when the binding sets are being routed
-         * out of an optional join group. When the tails are independent
-         * optionals then the target is the same as the target for binding sets
-         * which do join.
+         * tree then we need to have a separate thread local buffer in front of
+         * the optional sink for the join task. This means that we need to use
+         * two {@link #threadLocalBufferFactory}s, one for the default sink and
+         * one for the alternative sink. All of this only matters when the
+         * binding sets are being routed out of an optional join group. When the
+         * tails are independent optionals then the target is the same as the
+         * target for binding sets which do join.
          */
         final IBlockingBuffer<IBindingSet[]> optionalSink;
         
@@ -461,6 +486,15 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
             this.left = joinOp.left();
             this.right = joinOp.right();
             this.constraints = joinOp.constraints();
+            this.maxParallel = joinOp.getMaxParallel();
+            if (maxParallel > 0) {
+                // shared service.
+                service = new LatchedExecutor(context.getIndexManager()
+                        .getExecutorService(), maxParallel);
+            } else {
+                // run in the caller's thread.
+                service = null;
+            }
             this.optional = joinOp.isOptional();
             this.variablesToKeep = joinOp.variablesToKeep();
             this.context = context;
@@ -556,71 +590,40 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
         }
 
         /**
-         * Consume {@link IBindingSet} chunks from the {@link #sink}.
+         * Consume {@link IBindingSet} chunks from the {@link #source}.
          * 
          * @throws Exception
-         * @throws BufferClosedException
-         *             if there is an attempt to output a chunk the sink has
-         *             been closed.
          */
         protected void consumeSource() throws Exception {
-
-            /*
-             * The maximum parallelism with which the {@link JoinTask} will
-             * consume the source {@link IBindingSet}s.
-             * 
-             * Note: When ZERO (0), everything will run in the caller's {@link
-             * Thread}. When GT ZERO (0), tasks will run on an {@link
-             * ExecutorService} with the specified maximum parallelism.
-             * 
-             * Note: even when maxParallel is zero there will be one thread per
-             * join dimension. For many queries that may be just fine.
-             * 
-             * @todo Raise this into an annotation?
-             * 
-             * @todo There is probably no reason to use multiple threads to
-             * drain the source. It is going to be local, even in scale-out, and
-             * draining the source is flyweight. Assembling the access paths for
-             * the source might include some parallelism as it can touch the
-             * disk.
-             */
-            final int maxParallel = 0;
-            // final int maxParallel = joinNexus.getMaxParallelSubqueries();
-            // final int maxParallel = 10;
-
-            /*
-             * Note: There is no reason for parallelism in the first join
-             * dimension as there will be only a single source bindingSet and
-             * hence a single AccessPathTask so the Executor is just overhead.
-             * 
-             * @todo this will not be true when we support binding set joins as
-             * the input could be a stream of binding sets (basically, when the
-             * first join dimension is a subrule, it can have lots of access
-             * path tasks).
-             */
-            final Executor service;
-            if (/* orderIndex > 0 && */maxParallel > 0) {
-
-                // the sharedService.
-                final ExecutorService sharedService = context
-                        .getIndexManager().getExecutorService();
-
-                service = new LatchedExecutor(sharedService, maxParallel);
-
-            } else {
-                // run in the caller's thread.
-                service = null;
-            }
 
             IBindingSet[] chunk;
 
             while (!isDone() && (chunk = nextChunk()) != null) {
 
                 /*
-                 * consume chunks until done (using caller's thread to consume
-                 * and service to run subtasks).
+                 * Consume the chunk until done using either the caller's thread
+                 * or the executor service as appropriate to run subtasks.
                  */
-                new BindingSetConsumerTask(service, chunk).call();
+                if (chunk.length <= 1) {
+              
+                    /*
+                     * Run on the caller's thread anyway since there is just one
+                     * binding set to be consumed.
+                     */
+                    
+                    new BindingSetConsumerTask(null/* service */, chunk).call();
+                    
+                } else {
+                    
+                    /*
+                     * Run subtasks on either the caller's thread or the shared
+                     * executed service depending on the configured value of
+                     * [maxParallel].
+                     */
+                    
+                    new BindingSetConsumerTask(service, chunk).call();
+                    
+                }
                 
             }
 
@@ -883,8 +886,6 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
                 if (log.isDebugEnabled())
                     log.debug("chunkSize=" + chunk.length);
-
-                //                final int tailIndex = getTailIndex(orderIndex);
 
                 final Map<IPredicate<?>, Collection<IBindingSet>> map = new LinkedHashMap<IPredicate<?>, Collection<IBindingSet>>(
                         chunk.length);
@@ -1152,8 +1153,8 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
              * Return the <em>fromKey</em> for the {@link IAccessPath} generated
              * from the {@link IBindingSet} for this task.
              * 
-             * @todo Layered access paths do not expose a fromKey. However,
-             *       information is always available
+             * @todo Layered access paths do not expose a fromKey, but the
+             *       information we need is available
              *       {@link IKeyOrder#getFromKey(IKeyBuilder, IPredicate)}.
              */
             protected byte[] getFromKey() {
@@ -1295,11 +1296,7 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
                 try {
 
-                    /*
-                     * @todo In order to run the chunks on a thread pool, pass
-                     * in [null] for the unsyncBuffer and each chunk will get
-                     * its own buffer.
-                     */
+                    // Each thread gets its own buffer.
                     final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer = threadLocalBufferFactory
                             .get();
 
@@ -1512,9 +1509,10 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
 
                             } else {
 
-                                // set the old solutions to the new solutions,
-                                // and
-                                // move on to the next constraint
+                                /*
+                                 * Set the old solutions to the new solutions,
+                                 * and move on to the next constraint.
+                                 */
                                 solutions = constraintSolutions
                                         .toArray(new IBindingSet[constraintSolutions
                                                 .size()]);
@@ -1581,12 +1579,6 @@ public class PipelineJoin extends AbstractPipelineOp<IBindingSet> implements
          * @version $Id$
          */
         protected class ChunkTask implements Callable<Boolean> {
-
-//            /**
-//             * The index of the predicate for the access path that is being
-//             * consumed.
-//             */
-//            private final int tailIndex;
 
             /**
              * The {@link IBindingSet}s which the each element in the chunk will

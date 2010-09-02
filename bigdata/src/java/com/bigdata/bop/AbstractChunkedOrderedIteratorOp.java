@@ -30,8 +30,6 @@ package com.bigdata.bop;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.bop.ap.Predicate;
-
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

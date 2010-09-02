@@ -48,18 +48,14 @@ Modifications:
 package com.bigdata.bop.constraint;
 
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpList;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
-import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.spo.InGraphBinarySearchFilter;
-import com.bigdata.rdf.spo.InGraphHashSetFilter;
+import com.bigdata.bop.NV;
 
 /**
  * A constraint that a variable may only take on the bindings enumerated by some
@@ -68,24 +64,11 @@ import com.bigdata.rdf.spo.InGraphHashSetFilter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo This uses binary search, which is thread-safe. It could also use a
- *       {@link HashSet}, but the {@link HashSet} needs to be thread-safe since
- *       the filter could be applied concurrently during evaluation.
+ * @todo unit tests.
  * 
- *       FIXME Reconcile this with {@link InGraphBinarySearchFilter} and
- *       {@link InGraphHashSetFilter} and also with the use of an in-memory join
- *       against the incoming binding sets to handle SPARQL data sets.
+ * @todo variant based on a {@link ConcurrentHashMap}.
  */
-public class IN<T> extends BOpBase implements IConstraint {
-
-//    /**
-//     * 
-//     */
-//    private static final long serialVersionUID = 5805883429399100605L;
-//
-//    private final IVariable<T> x;
-//    
-//    private final T[] set;
+public class INBinarySearch<T> extends INConstraint<T> {
 
     /**
      * 
@@ -93,28 +76,33 @@ public class IN<T> extends BOpBase implements IConstraint {
     private static final long serialVersionUID = 1L;
 
     /**
+     * The variable (cached).
+     * <p>
+     * Note: This cache is not serialized and is compiled on demand when the
+     * operator is used.
+     */
+    private transient volatile IVariable<T> var;
+    
+    /**
      * The sorted data (cached).
      * <p>
-     * Note: This cache is redundant with the 2nd argument to the operator. It
-     * is not serialized and is compiled on demand when the operator is used.
+     * Note: This cache is not serialized and is compiled on demand when the
+     * operator is used.
      */
     private transient volatile T[] set;
     
     /**
      * Deep copy constructor.
      */
-    public IN(final IN<T> op) {
+    public INBinarySearch(final INBinarySearch<T> op) {
         super(op);
     }
 
     /**
      * Shallow copy constructor.
      */
-    public IN(final BOp[] args, final Map<String, Object> annotations) {
-
-        // @todo validate args?
+    public INBinarySearch(final BOp[] args, final Map<String, Object> annotations) {
         super(args, annotations);
-        
     }
 
     /**
@@ -125,27 +113,24 @@ public class IN<T> extends BOpBase implements IConstraint {
      *            A set of legal term identifiers providing a constraint on the
      *            allowable values for that variable.
      */
-    public IN(final IVariable<T> x, final IConstant<T>[] set) {
+    public INBinarySearch(final IVariable<T> x, final IConstant<T>[] set) {
 
-        super(new BOp[] { x, new BOpList(set) });
-        
-        if (x == null || set == null)
-            throw new IllegalArgumentException();
-
-        if (set.length == 0)
-            throw new IllegalArgumentException();
+        super(new BOp[] {}, NV.asMap(new NV[] {//
+                new NV(Annotations.VARIABLE, x),//
+                new NV(Annotations.SET, set),//
+                }));
         
     }
 
     @SuppressWarnings("unchecked")
-    static private <T> T[] sort(final BOpList set) {
+    static private <T> T[] sort(final IConstant<T>[] set) {
 
-        final int n = set.arity();
+        final int n = set.length;
         
         if (n == 0)
             throw new IllegalArgumentException();
         
-        final T firstValue = ((IConstant<T>) set.get(0)).get();
+        final T firstValue = set[0].get();
         
         // allocate an array of the correct type.
         final T[] tmp = (T[]) java.lang.reflect.Array.newInstance(firstValue
@@ -154,7 +139,7 @@ public class IN<T> extends BOpBase implements IConstraint {
         for (int i = 0; i < n; i++) {
 
             // dereference the constants to their bound values.
-            tmp[i] = ((IConstant<T>) set.get(i)).get();
+            tmp[i] = set[i].get();
             
         }
         
@@ -164,22 +149,39 @@ public class IN<T> extends BOpBase implements IConstraint {
         return tmp;
 
     }
+
+    private void init() {
+
+        var = getVariable();
+
+        set = sort(getSet());
+
+    }
     
     public boolean accept(final IBindingSet bindingSet) {
         
-        if(set == null) {
+        if (var == null) {
 
-            set = sort((BOpList) get(1));
-            
+            synchronized (this) {
+
+                if (var == null) {
+
+                    // init() is guarded by double-checked locking pattern.
+                    init();
+                    
+                }
+
+            }
+
         }
-        
+
         // get binding for "x".
         @SuppressWarnings("unchecked")
-        final IConstant<T> x = bindingSet.get((IVariable<?>) get(0)/* x */);
+        final IConstant<T> x = bindingSet.get(var);
 
         if (x == null) {
 
-            // not yet bound.
+            // not yet bound : @todo should this reject an unbound variable?
             return true;
             
         }
@@ -188,9 +190,11 @@ public class IN<T> extends BOpBase implements IConstraint {
 
         // lookup the bound value in the set of values.
         final int pos = Arrays.binarySearch(set, v);
-        
+
         // true iff the bound value was found in the set.
-        return pos >= 0;
+        final boolean found = pos >= 0;
+
+        return found;
 
     }
 

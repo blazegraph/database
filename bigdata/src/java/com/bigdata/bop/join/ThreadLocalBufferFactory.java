@@ -166,6 +166,7 @@ abstract public class ThreadLocalBufferFactory<T extends IBuffer<E>, E> {
                 // buffer.
                 final long counter = b.flush();
                 m += counter;
+                n++;
                 if (log.isDebugEnabled())
                     log.debug("Flushed buffer: size=" + size + ", counter="
                             + counter);

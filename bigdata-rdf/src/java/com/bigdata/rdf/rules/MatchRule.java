@@ -8,7 +8,7 @@ import org.openrdf.model.vocabulary.RDFS;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.constraint.IN;
+import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.SPO;
@@ -55,7 +55,7 @@ public class MatchRule extends Rule<SPO> {
                                 .getConstant(RDFS.SUBCLASSOF), cls) //
                 },
             new IConstraint[] {
-                new IN(var("p"), preds) // p IN preds
+                new INBinarySearch(var("p"), preds) // p IN preds
                 });
 
     }

@@ -39,7 +39,7 @@ import com.bigdata.bop.IVariable;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class NE extends BOpBase implements IConstraint {
+public class NE extends BOpConstraint {
 
     /**
      * 
@@ -62,7 +62,7 @@ public class NE extends BOpBase implements IConstraint {
     
     public NE(final IVariable<?> x, final IVariable<?> y) {
 
-        super(new BOp[] { x, y }, null);
+        super(new BOp[] { x, y }, null/*annotations*/);
         
         if (x == null || y == null)
             throw new IllegalArgumentException();

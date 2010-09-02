@@ -61,8 +61,16 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("constraints");
 
-        // @todo unit tests for all of these operations (EQ,NE,OR,etc).
         suite.addTestSuite(TestEQ.class);
+        suite.addTestSuite(TestNE.class);
+        suite.addTestSuite(TestEQConstant.class);
+        suite.addTestSuite(TestNEConstant.class);
+
+        suite.addTestSuite(TestOR.class);
+
+        // unit tests for IN filters.
+        suite.addTestSuite(TestInBinarySearch.class);
+        suite.addTestSuite(TestInHashMap.class);
 
         return suite;
         

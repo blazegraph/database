@@ -41,7 +41,7 @@ import junit.framework.TestCase2;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.constraint.EQ;
 import com.bigdata.bop.constraint.EQConstant;
-import com.bigdata.bop.constraint.IN;
+import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.constraint.OR;
@@ -93,7 +93,7 @@ public class TestDeepCopy extends TestCase2 {
             EQConstant.class,//
             NEConstant.class,//
             OR.class,//
-            IN.class,//
+            INBinarySearch.class,//
             // com.bigdata.rdf.spo
             SPOPredicate.class,//
             SPOStarJoin.class,//

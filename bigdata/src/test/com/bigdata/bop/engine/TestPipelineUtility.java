@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BindingSetPipelineOp;

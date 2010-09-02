@@ -32,15 +32,20 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
-
 
 /**
  * {@link IBindingSet} backed by a {@link HashMap}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo Since {@link Var}s allow reference testing, a faster implementation
+ *       could be written based on a {@link LinkedList}. Just scan the list
+ *       until the entry is found with the desired {@link Var} reference and
+ *       then return it.
  */
 public class HashBindingSet implements IBindingSet {
 
@@ -93,7 +98,28 @@ public class HashBindingSet implements IBindingSet {
 
     }
     
-    public boolean isBound(IVariable var) {
+    public HashBindingSet(final IVariable[] vars, final IConstant[] vals) {
+
+        if (vars == null)
+            throw new IllegalArgumentException();
+
+        if (vals == null)
+            throw new IllegalArgumentException();
+
+        if (vars.length != vals.length)
+            throw new IllegalArgumentException();
+
+        map = new LinkedHashMap<IVariable, IConstant>(vars.length);
+
+        for (int i = 0; i < vars.length; i++) {
+
+            map.put(vars[i], vals[i]);
+
+        }
+        
+    }
+    
+    public boolean isBound(final IVariable var) {
      
         if (var == null)
             throw new IllegalArgumentException();
@@ -102,7 +128,7 @@ public class HashBindingSet implements IBindingSet {
         
     }
     
-    public IConstant get(IVariable var) {
+    public IConstant get(final IVariable var) {
    
         if (var == null)
             throw new IllegalArgumentException();
@@ -111,7 +137,7 @@ public class HashBindingSet implements IBindingSet {
         
     }
 
-    public void set(IVariable var, IConstant val) {
+    public void set(final IVariable var, final IConstant val) {
         
         if (var == null)
             throw new IllegalArgumentException();
@@ -123,7 +149,7 @@ public class HashBindingSet implements IBindingSet {
         
     }
 
-    public void clear(IVariable var) {
+    public void clear(final IVariable var) {
         
         if (var == null)
             throw new IllegalArgumentException();

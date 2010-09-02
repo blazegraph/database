@@ -32,10 +32,10 @@ import java.util.Properties;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;

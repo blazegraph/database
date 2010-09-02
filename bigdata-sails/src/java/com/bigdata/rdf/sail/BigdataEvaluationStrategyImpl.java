@@ -57,7 +57,7 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.constraint.EQ;
 import com.bigdata.bop.constraint.EQConstant;
-import com.bigdata.bop.constraint.IN;
+import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.constraint.OR;
@@ -183,7 +183,7 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * {@link IPredicate} in the generated native {@link IRule}. Some filters are
  * essentially JOINs against the {@link LexiconRelation}. Those can be handled
  * either as JOINs (generating an additional {@link IPredicate} in the
- * {@link IRule}) or as an {@link IN} constraint, where the inclusion set is
+ * {@link IRule}) or as an {@link INBinarySearch} constraint, where the inclusion set is
  * pre-populated by some operation on the {@link LexiconRelation}.
  * <dl>
  * <dt>EQ</dt>
@@ -191,7 +191,7 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * <dt>NE</dt>
  * <dd>Translated into an {@link NE} constraint on an {@link IPredicate}.</dd>
  * <dt>IN</dt>
- * <dd>Translated into an {@link IN} constraint on an {@link IPredicate}.</dd>
+ * <dd>Translated into an {@link INBinarySearch} constraint on an {@link IPredicate}.</dd>
  * <dt>OR</dt>
  * <dd>Translated into an {@link OR} constraint on an {@link IPredicate}.</dd>
  * <dt></dt>
@@ -203,7 +203,7 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * position is bound to a constant, the magic predicate is evaluated once and
  * the result is used to generate a set of term identifiers that are matches for
  * the token(s) extracted from the {@link Literal} in the object position. Those
- * term identifiers are then used to populate an {@link IN} constraint. The
+ * term identifiers are then used to populate an {@link INBinarySearch} constraint. The
  * object position in the {@link BD#SEARCH} MUST be bound to a constant.
  * </p>
  * 

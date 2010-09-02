@@ -56,7 +56,7 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.constraint.EQ;
 import com.bigdata.bop.constraint.EQConstant;
-import com.bigdata.bop.constraint.IN;
+import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.constraint.OR;
@@ -307,8 +307,8 @@ public class IRISUtils {
             return convertToIRISLiteral((EQ) constraint);
         } else if (constraint instanceof EQConstant) {
             return convertToIRISLiteral((EQConstant) constraint);
-        } else if (constraint instanceof IN) {
-            return convertToIRISLiteral((IN) constraint);
+        } else if (constraint instanceof INBinarySearch) {
+            return convertToIRISLiteral((INBinarySearch) constraint);
         } else if (constraint instanceof OR) {
             return convertToIRISLiteral((OR) constraint);
         }  
@@ -424,7 +424,7 @@ public class IRISUtils {
      * @return
      *                  the IRIS literal
      */
-    private static ILiteral convertToIRISLiteral(IN constraint) {
+    private static ILiteral convertToIRISLiteral(INBinarySearch constraint) {
 
         throw new UnsupportedOperationException("not yet implemented");
         

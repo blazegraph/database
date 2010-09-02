@@ -32,7 +32,6 @@ import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.bop.AbstractPipelineOp;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BindingSetPipelineOp;
@@ -44,7 +43,7 @@ import com.bigdata.bop.IBindingSet;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ReceiveBindingSets extends AbstractPipelineOp<IBindingSet> {
+public class ReceiveBindingSets extends BindingSetPipelineOp {
 
     protected static final Logger log = Logger
             .getLogger(ReceiveBindingSets.class);

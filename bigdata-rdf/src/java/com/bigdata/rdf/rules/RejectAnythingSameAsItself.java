@@ -26,12 +26,11 @@ package com.bigdata.rdf.rules;
 
 import java.util.Map;
 
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
-import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.constraint.BOpConstraint;
 
 /**
  * Rejects (x y z) iff x==z and y==owl:sameAs, where x, y, and z are variables.
@@ -39,8 +38,7 @@ import com.bigdata.bop.IVariable;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RejectAnythingSameAsItself extends BOpBase implements
-        IConstraint {
+public class RejectAnythingSameAsItself extends BOpConstraint {
 
     /**
      * 
@@ -73,7 +71,7 @@ public class RejectAnythingSameAsItself extends BOpBase implements
             final IVariable<Long> p, final IVariable<Long> o,
             final IConstant<Long> owlSameAs) {
 
-        super(new BOp[] { s, p, o, owlSameAs });
+        super(new BOp[] { s, p, o, owlSameAs }, null/*annotations*/);
         
         if (s == null || p == null || o == null || owlSameAs == null)
             throw new IllegalArgumentException();

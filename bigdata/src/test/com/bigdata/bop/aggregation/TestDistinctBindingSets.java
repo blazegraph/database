@@ -59,6 +59,8 @@ import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo write a unit test in which some variables are unbound.
  */
 public class TestDistinctBindingSets extends TestCase2 {
 
@@ -166,8 +168,9 @@ public class TestDistinctBindingSets extends TestCase2 {
      * @throws ExecutionException 
      * @throws InterruptedException 
      */
-    public void test_distinct() throws InterruptedException, ExecutionException {
-        
+    public void test_distinctBindingSets() throws InterruptedException,
+            ExecutionException {
+
         final Var<?> x = Var.var("x");
 //        final Var<?> y = Var.var("y");
         

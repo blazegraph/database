@@ -4,7 +4,6 @@ import java.util.Arrays;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.bop.BOpBase;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
@@ -14,6 +13,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.constraint.BOpConstraint;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.rdf.internal.IV;
@@ -495,13 +495,13 @@ public class OwlSameAsPropertiesExpandingIterator implements
         }
     };
 
-    private class RejectSameAsSelf extends BOpBase implements IConstraint {
+    private class RejectSameAsSelf extends BOpConstraint {
 
         public RejectSameAsSelf(final IVariableOrConstant<IV> _s,
                 final IVariableOrConstant<IV> _p,
                 final IVariableOrConstant<IV> _o) {
 
-            super(new BOp[] { _s, _p, _o });
+            super(new BOp[] { _s, _p, _o }, null/*annotations*/);
             
         }
 

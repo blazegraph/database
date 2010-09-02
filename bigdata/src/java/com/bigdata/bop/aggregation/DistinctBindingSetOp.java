@@ -7,10 +7,10 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.FutureTask;
 
-import com.bigdata.bop.AbstractPipelineOp;
-import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
@@ -25,14 +25,14 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
  *          thompsonbry $
  */
-public class DistinctBindingSetOp extends AbstractPipelineOp<IBindingSet>{
+public class DistinctBindingSetOp extends BindingSetPipelineOp {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends BOp.Annotations {
+    public interface Annotations extends BindingSetPipelineOp.Annotations {
 
         /**
          * The initial capacity of the {@link ConcurrentHashMap} used to impose
@@ -40,7 +40,7 @@ public class DistinctBindingSetOp extends AbstractPipelineOp<IBindingSet>{
          * 
          * @see #DEFAULT_INITIAL_CAPACITY
          */
-        String INITIAL_CAPACITY = "initialCapacity";
+        String INITIAL_CAPACITY = DistinctBindingSetOp.class.getName()+".initialCapacity";
 
         int DEFAULT_INITIAL_CAPACITY = 16;
 
@@ -50,7 +50,7 @@ public class DistinctBindingSetOp extends AbstractPipelineOp<IBindingSet>{
          * 
          * @see #DEFAULT_LOAD_FACTOR
          */
-        String LOAD_FACTOR = "loadFactor";
+        String LOAD_FACTOR = DistinctBindingSetOp.class.getName()+".loadFactor";
 
         float DEFAULT_LOAD_FACTOR = .75f;
 
@@ -60,7 +60,7 @@ public class DistinctBindingSetOp extends AbstractPipelineOp<IBindingSet>{
          * 
          * @see #DEFAULT_CONCURRENCY_LEVEL
          */
-        String CONCURRENCY_LEVEL = "concurrencyLevel";
+        String CONCURRENCY_LEVEL = DistinctBindingSetOp.class.getName()+".concurrencyLevel";
 
         int DEFAULT_CONCURRENCY_LEVEL = 16;
         
@@ -170,7 +170,7 @@ public class DistinctBindingSetOp extends AbstractPipelineOp<IBindingSet>{
             if (vals.length != t.vals.length)
                 return false;
             for (int i = 0; i < vals.length; i++) {
-                // @todo allow for nulls.
+                // @todo verify that this allows for nulls with a unit test.
                 if (vals[i] == t.vals[i])
                     continue;
                 if (vals[i] == null)
@@ -185,7 +185,7 @@ public class DistinctBindingSetOp extends AbstractPipelineOp<IBindingSet>{
     /**
      * Task executing on the node.
      */
-    private class DistinctTask implements Callable<Void> {
+    static private class DistinctTask implements Callable<Void> {
 
         private final BOpContext<IBindingSet> context;
 
@@ -209,8 +209,8 @@ public class DistinctBindingSetOp extends AbstractPipelineOp<IBindingSet>{
             this.vars = op.getVariables();
 
             this.map = new ConcurrentHashMap<Solution, Solution>(
-                    getInitialCapacity(), getLoadFactor(),
-                    getConcurrencyLevel());
+                    op.getInitialCapacity(), op.getLoadFactor(),
+                    op.getConcurrencyLevel());
 
         }
 
@@ -230,15 +230,12 @@ public class DistinctBindingSetOp extends AbstractPipelineOp<IBindingSet>{
 
             for (int i = 0; i < vars.length; i++) {
 
-                if ((r[i] = bset.get(vars[i])) == null) {
-
-                    /*
-                     * @todo probably allow nulls, but write a unit test for it.
-                     */
-
-                    throw new RuntimeException("Not bound: " + vars[i]);
-
-                }
+                /*
+                 * Note: This allows null's.
+                 * 
+                 * @todo write a unit test when some variables are not bound.
+                 */
+                r[i] = bset.get(vars[i]);
 
             }
 
@@ -283,14 +280,7 @@ public class DistinctBindingSetOp extends AbstractPipelineOp<IBindingSet>{
 //                            System.err.println("accepted: "
 //                                    + Arrays.toString(vals));
 
-                            /*
-                             * @todo This may cause problems since the
-                             * ArrayBindingSet does not allow mutation with
-                             * variables not declared up front. In that case use
-                             * new HashBindingSet( new ArrayBindingSet(...)).
-                             */
-                            
-                            accepted.add(new ArrayBindingSet(vars, vals));
+                            accepted.add(new HashBindingSet(vars, vals));
 
                             naccepted++;
 

@@ -56,10 +56,11 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NoSuchBOpException;
-import com.bigdata.bop.aggregation.DistinctBindingSetOp;
+import com.bigdata.bop.aggregation.Union;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -188,12 +189,27 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>> {
      * <p>
      * This is guarded by the {@link #runningStateLock}.
      * 
-     * FIXME {@link IConstraint}s for {@link PipelineJoin}, non-distributed
-     * filters for {@link IPredicate}s, distinct element filter for
-     * {@link IPredicate} which is capable of distributed operations,
-     * conditional routing for binding sets in the pipeline (to route around an
-     * optional join group based on an {@link IConstraint}), SPARQL to BOP
-     * translation, and then buffer management for s/o.
+     * FIXME Declarative generation of a key for an index from an element (see
+     * {@link R}).
+     * 
+     * FIXME Unit tests for non-distinct {@link IElementFilter}s on an
+     * {@link IPredicate}, unit tests for distinct element filter on an
+     * {@link IPredicate} which is capable of distributed operations, handling
+     * the {@link Union} of binding sets, conditional routing for binding sets
+     * in the pipeline (to route around an optional join group based on an
+     * {@link IConstraint})
+     * 
+     * FIXME SPARQL to BOP translation
+     * 
+     * FIXME buffer management for s/o, including binding sets movement, element
+     * chunk movement for DHT on access path, and on demand materialization of
+     * large query resources for large data sets, parallel closure, etc.;
+     * grouping operators which will run locally (such as a pipeline join plus a
+     * conditional routing operator) so we do not marshell binding sets between
+     * operators when they will not cross a network boundary. Also, handle
+     * mutation, programs and closure operators. Expander patterns will continue
+     * to exist until we handle the standalone backchainers in a different
+     * manner for scale-out so add support for those for now.
      * 
      * @todo SCALEOUT: Life cycle management of the operators and the query
      *       implies both a per-query bop:NodeList map on the query coordinator
