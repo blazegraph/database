@@ -7,7 +7,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.striterator.AbstractKeyOrder;
 import com.bigdata.striterator.IKeyOrder;
 
-public class MagicKeyOrder extends AbstractKeyOrder<IMagicTuple> implements IKeyOrder<IMagicTuple>, Serializable {
+public class MagicKeyOrder extends AbstractKeyOrder<IMagicTuple> implements Serializable {
 
     /**
      * Generated serialization version.

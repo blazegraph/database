@@ -19,7 +19,7 @@ import com.bigdata.striterator.IKeyOrder;
  * @todo define a BigdataValuePredicate that interoperates with this class to
  *       support joins against the lexicon.
  */
-public class LexiconKeyOrder extends AbstractKeyOrder<BigdataValue> implements IKeyOrder<BigdataValue> {
+public class LexiconKeyOrder extends AbstractKeyOrder<BigdataValue> {
 
     /*
      * Note: these constants make it possible to use switch(index())

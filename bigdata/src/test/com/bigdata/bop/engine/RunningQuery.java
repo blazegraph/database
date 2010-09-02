@@ -58,6 +58,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NoSuchBOpException;
 import com.bigdata.bop.aggregation.Union;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.bop.ap.R;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -188,9 +189,6 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>> {
      * release all resources associated with that bop.
      * <p>
      * This is guarded by the {@link #runningStateLock}.
-     * 
-     * FIXME Declarative generation of a key for an index from an element (see
-     * {@link R}).
      * 
      * FIXME Unit tests for non-distinct {@link IElementFilter}s on an
      * {@link IPredicate}, unit tests for distinct element filter on an

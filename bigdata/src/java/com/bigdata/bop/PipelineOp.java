@@ -65,8 +65,11 @@ public interface PipelineOp<E> extends BOp {
 
         /**
          * Default for {@link #CHUNK_OF_CHUNKS_CAPACITY}
+         * 
+         * @todo was 100. dialed down to reduce heap consumption for arrays.
+         *       test performance @ 100 and 1000.
          */
-        int DEFAULT_CHUNK_OF_CHUNKS_CAPACITY = 1000;
+        int DEFAULT_CHUNK_OF_CHUNKS_CAPACITY = 100;
 
         /**
          * Sets the capacity of the {@link IBuffer}s used to accumulate a chunk

@@ -73,16 +73,44 @@ public interface IKeyOrder<E> {
     /*
      * New methods.
      */
-    
+
+    /**
+     * Return the key for an element of the relation.
+     * 
+     * @param keyBuilder
+     *            The object which will be used to construct the key.
+     * @param element
+     *            An element for the associated relation.
+     *            
+     * @return The key for the index associated with this {@link IKeyOrder}.
+     */
+    byte[] getKey(IKeyBuilder keyBuilder, E element);
+
     /**
      * Return the inclusive lower bound which would be used for a query against
      * this {@link IKeyOrder} for the given {@link IPredicate}.
+     * 
+     * @param keyBuilder
+     *            The object which will be used to construct the key.
+     * @param predicate
+     *            A predicate describing bound and unbound fields for the key.
+     * 
+     * @return The key corresponding to the inclusive lower bound for a query
+     *         against that {@link IPredicate}.
      */
     byte[] getFromKey(IKeyBuilder keyBuilder, IPredicate<E> predicate);
 
     /**
      * Return the exclusive upper bound which would be used for a query against
      * this {@link IKeyOrder} for the given {@link IPredicate}.
+     * 
+     * @param keyBuilder
+     *            The object which will be used to construct the key.
+     * @param predicate
+     *            A predicate describing bound and unbound fields for the key.
+     * 
+     * @return The key corresponding to the exclusive upper bound for a query
+     *         against that {@link IPredicate}.
      */
     byte[] getToKey(IKeyBuilder keyBuilder, IPredicate<E> predicate);
 
