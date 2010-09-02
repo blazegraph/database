@@ -58,7 +58,7 @@ import com.bigdata.striterator.IKeyOrder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements IKeyOrder<ISPO>, Serializable {
+public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable {
 
     /**
      * 

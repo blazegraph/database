@@ -590,6 +590,10 @@ public class TestQueryEngine extends TestCase2 {
                 for (int i = 0; i < e.length; i++) {
                     if (log.isInfoEnabled())
                         log.info(n + " : " + e[i]);
+                    if (n >= expected.length) {
+                        fail("Willing to deliver too many solutions: n=" + n
+                                + " : " + e[i]);
+                    }
                     if (!expected[n].equals(e[i])) {
                         fail("n=" + n + ", expected=" + expected[n]
                                 + ", actual=" + e[i]);

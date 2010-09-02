@@ -87,7 +87,8 @@ import com.bigdata.util.concurrent.LatchedExecutor;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo Break the star join logic out into its own join operator.
+ * @todo Break the star join logic out into its own join operator and test
+ *       suite.
  */
 public class PipelineJoin extends BindingSetPipelineOp {
 
@@ -324,12 +325,12 @@ public class PipelineJoin extends BindingSetPipelineOp {
         /**
          * The join that is being executed.
          */
-        final protected PipelineJoin joinOp;
+        final private PipelineJoin joinOp;
 
         /**
          * The constraint (if any) specified for the join operator.
          */
-        final IConstraint[] constraints;
+        final private IConstraint[] constraints;
 
         /**
          * The maximum parallelism with which the {@link JoinTask} will
@@ -337,100 +338,58 @@ public class PipelineJoin extends BindingSetPipelineOp {
          * 
          * @see Annotations#MAX_PARALLEL
          */
-        final int maxParallel;
+        final private int maxParallel;
 
         /**
          * The service used for executing subtasks (optional).
          * 
          * @see #maxParallel
          */
-        final Executor service;
+        final private Executor service;
 
         /**
          * True iff the {@link #right} operand is an optional pattern (aka if
          * this is a SPARQL style left join).
          */
-        final boolean optional;
+        final private boolean optional;
 
-        /**
-         * The alternative sink to use when the join is {@link #optional} but
-         * the failed joined needs to jump out of a join group rather than
-         * routing directly to the ancestor in the operator tree.
-         * 
-         * FIXME Support for the {@link #optionalSink} is not finished. When the
-         * optional target is not simply the direct ancestor in the operator
-         * tree then we need to have a separate thread local buffer in front of
-         * the optional sink for the join task. This means that we need to use
-         * two {@link #threadLocalBufferFactory}s, one for the default sink and
-         * one for the alternative sink. All of this only matters when the
-         * binding sets are being routed out of an optional join group. When the
-         * tails are independent optionals then the target is the same as the
-         * target for binding sets which do join.
-         */
-        final IBlockingBuffer<IBindingSet[]> optionalSink;
-        
         /**
          * The variables to be retained by the join operator. Variables not
          * appearing in this list will be stripped before writing out the
-         * binding set onto the {@link #sink}.
+         * binding set onto the output sink(s).
          */
-        final IVariable<?>[] variablesToKeep;
+        final private IVariable<?>[] variablesToKeep;
 
-        /**
-         * The source for the binding sets.
-         */
-        final BindingSetPipelineOp left;
+//        /**
+//         * The source for the binding sets.
+//         */
+//        final BindingSetPipelineOp left;
 
         /**
          * The source for the elements to be joined.
          */
-        final IPredicate<?> right;
+        final private IPredicate<?> right;
 
         /**
          * The relation associated with the {@link #right} operand.
          */
-        final IRelation<?> relation;
+        final private IRelation<?> relation;
         
         /**
          * The partition identifier -or- <code>-1</code> if we are not reading
          * on an index partition.
          */
-        final int partitionId;
+        final private int partitionId;
         
         /**
          * The evaluation context.
          */
-        final protected BOpContext<IBindingSet> context;
+        final private BOpContext<IBindingSet> context;
 
         /**
          * The statistics for this {@link JoinTask}.
          */
-        final PipelineJoinStats stats;
-
-        final private ThreadLocalBufferFactory<AbstractUnsynchronizedArrayBuffer<IBindingSet>, IBindingSet> threadLocalBufferFactory = new ThreadLocalBufferFactory<AbstractUnsynchronizedArrayBuffer<IBindingSet>, IBindingSet>() {
-
-            @Override
-            protected AbstractUnsynchronizedArrayBuffer<IBindingSet> initialValue() {
-
-                // new buffer created by the concrete JoinClass impl.
-                return newUnsyncOutputBuffer();
-
-            }
-            
-            @Override
-            protected void halted() {
-                
-                JoinTask.this.halted();
-                
-            }
-            
-        };
-
-        public String toString() {
-
-            return getClass().getName() + "{ joinOp=" + joinOp + "}";
-
-        }
+        final private PipelineJoinStats stats;
 
         /**
          * The source from which we read the binding set chunks.
@@ -459,17 +418,36 @@ public class PipelineJoin extends BindingSetPipelineOp {
         final private IBlockingBuffer<IBindingSet[]> sink;
 
         /**
+         * The alternative sink to use when the join is {@link #optional} AND
+         * {@link BOpContext#getSink2()} returns a distinct buffer for the
+         * alternative sink. The binding sets from the source are copied onto the
+         * alternative sink for an optional join if the join fails. Normally the
+         * {@link BOpContext#getSink()} can be used for both the joins which
+         * succeed and those which fail. The alternative sink is only necessary
+         * when the failed join needs to jump out of a join group rather than
+         * routing directly to the ancestor in the operator tree.
+         */
+        final private IBlockingBuffer<IBindingSet[]> sink2;
+        
+        /**
+         * The thread-local buffer factory for the default sink. 
+         */
+        final private TLBFactory threadLocalBufferFactory;
+        
+        /**
+         * The thread-local buffer factory for the optional sink (iff the
+         * optional sink is defined).
+         */
+        final private TLBFactory threadLocalBufferFactory2;
+
+        /**
          * Instances of this class MUST be created in the appropriate execution
          * context of the target {@link DataService} so that the federation and
          * the joinNexus references are both correct and so that it has access
          * to the local index object for the specified index partition.
          * 
          * @param joinOp
-         * @param joinNexus
-         * @param sink
-         *            The sink on which the {@link IBindingSet} chunks are
-         *            written.
-         * @param requiredVars
+         * @param context
          */
         public JoinTask(//
                 final PipelineJoin joinOp,//
@@ -483,7 +461,7 @@ public class PipelineJoin extends BindingSetPipelineOp {
 
 //            this.fed = context.getFederation();
             this.joinOp = joinOp;
-            this.left = joinOp.left();
+//            this.left = joinOp.left();
             this.right = joinOp.right();
             this.constraints = joinOp.constraints();
             this.maxParallel = joinOp.getMaxParallel();
@@ -506,12 +484,23 @@ public class PipelineJoin extends BindingSetPipelineOp {
             this.relation = context.getReadRelation(right);
             this.source = context.getSource();
             this.sink = context.getSink();
-            this.optionalSink = context.getSink2();
+            this.sink2 = context.getSink2();
             this.partitionId = context.getPartitionId();
             this.stats = (PipelineJoinStats) context.getStats();
 
+            this.threadLocalBufferFactory = new TLBFactory(sink);
+            
+            this.threadLocalBufferFactory2 = sink2 == null ? null
+                    : new TLBFactory(sink2);
+
             if (log.isDebugEnabled())
                 log.debug("joinOp=" + joinOp);
+
+        }
+
+        public String toString() {
+
+            return getClass().getName() + "{ joinOp=" + joinOp + "}";
 
         }
 
@@ -536,6 +525,8 @@ public class PipelineJoin extends BindingSetPipelineOp {
                  * Flush and close the thread-local output buffers.
                  */
                 threadLocalBufferFactory.flush();
+                if (threadLocalBufferFactory2 != null)
+                    threadLocalBufferFactory2.flush();
 
                 // flush the sync buffer
                 flushAndCloseBuffersAndAwaitSinks();
@@ -560,6 +551,8 @@ public class PipelineJoin extends BindingSetPipelineOp {
                 try {
                     // resetUnsyncBuffers();
                     threadLocalBufferFactory.reset();
+                    if (threadLocalBufferFactory2 != null)
+                        threadLocalBufferFactory2.reset();
                 } catch (Throwable t2) {
                     log.error(t2.getLocalizedMessage(), t2);
                 }
@@ -642,27 +635,6 @@ public class PipelineJoin extends BindingSetPipelineOp {
         }
 
         /**
-         * A method used by the {@link #threadLocalBufferFactory} to create new
-         * output buffer as required. The output buffer will be used to
-         * aggregate {@link IBindingSet}s generated by this {@link JoinTask}.
-         */
-        final protected AbstractUnsynchronizedArrayBuffer<IBindingSet> newUnsyncOutputBuffer() {
-
-            /*
-             * The index is not key-range partitioned. This means that there is
-             * ONE (1) JoinTask per predicate in the rule. The bindingSets are
-             * aggregated into chunks by this buffer. On overflow, the buffer
-             * writes onto a BlockingBuffer. The sink JoinTask reads from that
-             * BlockingBuffer's iterator.
-             */
-
-            // flushes to the syncBuffer.
-            return new UnsyncLocalOutputBuffer<IBindingSet>(stats, joinOp
-                    .getChunkCapacity(), sink);
-
-        }
-
-        /**
          * Flush and close all output buffers and await sink {@link JoinTask}
          * (s).
          * <p>
@@ -694,6 +666,11 @@ public class PipelineJoin extends BindingSetPipelineOp {
             sink.flush();
             sink.close();
             
+            if(sink2!=null) {
+                sink2.flush();
+                sink2.close();
+            }
+            
         }
 
         /**
@@ -709,6 +686,18 @@ public class PipelineJoin extends BindingSetPipelineOp {
             if (sink.getFuture() != null) {
 
                 sink.getFuture().cancel(true/* mayInterruptIfRunning */);
+
+            }
+
+            if (sink2 != null) {
+                
+                sink2.reset();
+
+                if (sink2.getFuture() != null) {
+
+                    sink2.getFuture().cancel(true/* mayInterruptIfRunning */);
+
+                }
                 
             }
 
@@ -1300,6 +1289,10 @@ public class PipelineJoin extends BindingSetPipelineOp {
                     final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer = threadLocalBufferFactory
                             .get();
 
+                    // Thread-local buffer iff optional sink is in use.
+                    final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer2 = threadLocalBufferFactory2 == null ? null
+                            : threadLocalBufferFactory2.get();
+                    
                     while (itr.hasNext()) {
 
                         final Object[] chunk = itr.nextChunk();
@@ -1329,7 +1322,13 @@ public class PipelineJoin extends BindingSetPipelineOp {
 
                         for (IBindingSet bs : this.bindingSets) {
 
-                            unsyncBuffer.add(bs);
+                            if (unsyncBuffer2 == null) {
+                                // use the default sink.
+                                unsyncBuffer.add(bs);
+                            } else {
+                                // use the alternative sink.
+                                unsyncBuffer2.add(bs);
+                            }
 
                         }
 
@@ -1358,6 +1357,10 @@ public class PipelineJoin extends BindingSetPipelineOp {
                 final IStarJoin starJoin = (IStarJoin) accessPath
                         .getPredicate();
 
+                /*
+                 * FIXME The star join does not handle the alternative sink yet.
+                 * See the ChunkTask for the normal join.
+                 */
                 final AbstractUnsynchronizedArrayBuffer<IBindingSet> unsyncBuffer = threadLocalBufferFactory
                         .get();
 
@@ -1726,6 +1729,54 @@ public class PipelineJoin extends BindingSetPipelineOp {
             }
 
         }// class ChunkTask
+
+        /**
+         * Concrete implementation with hooks to halt a join.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+         */
+        private class TLBFactory
+                extends
+                ThreadLocalBufferFactory<AbstractUnsynchronizedArrayBuffer<IBindingSet>, IBindingSet> {
+
+            final private IBlockingBuffer<IBindingSet[]> sink;
+
+            /**
+             * 
+             * @param sink
+             *            The thread-safe buffer onto which the thread-local
+             *            buffer overflow.
+             */
+            public TLBFactory(final IBlockingBuffer<IBindingSet[]> sink) {
+    
+                if (sink == null)
+                    throw new IllegalArgumentException();
+                
+                this.sink = sink;
+                
+            }
+
+            @Override
+            protected AbstractUnsynchronizedArrayBuffer<IBindingSet> initialValue() {
+
+                /*
+                 * Wrap the buffer provider to the constructor with a thread
+                 * local buffer.
+                 */
+
+                return new UnsyncLocalOutputBuffer<IBindingSet>(stats, joinOp
+                        .getChunkCapacity(), sink);
+
+            }
+
+            @Override
+            protected void halted() {
+
+                JoinTask.this.halted();
+
+            }
+
+        } // class TLBFactory
 
     }// class JoinTask
 

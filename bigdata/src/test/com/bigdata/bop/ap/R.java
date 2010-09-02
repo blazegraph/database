@@ -181,9 +181,7 @@ public class R extends AbstractRelation<E> implements IMutableRelation<E> {
 
             final E e = itr.next();
 
-            // @todo this is not declarative!
-            final byte[] key = keyBuilder.reset().append(e.name)
-                    .append(e.value).getKey();
+            final byte[] key = primaryKeyOrder.getKey(keyBuilder, e);
 
             if (!ndx.contains(key)) {
 

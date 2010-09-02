@@ -208,4 +208,9 @@ public class RelationFusedView<E> implements IRelation<E> {
         throw new UnsupportedOperationException();
     }
 
+    public IAccessPath<E> getAccessPathForIndexPartition(
+            IIndexManager indexManager, IPredicate<E> predicate) {
+        throw new UnsupportedOperationException();        
+    }
+
 }

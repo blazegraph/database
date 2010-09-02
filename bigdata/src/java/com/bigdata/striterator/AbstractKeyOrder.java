@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.striterator;
 
+import com.bigdata.bop.IElement;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -42,13 +43,36 @@ import com.bigdata.btree.keys.SuccessorUtil;
 abstract public class AbstractKeyOrder<E> implements IKeyOrder<E> {
 
     /**
-     * This implementation should work fine unless you need to override the
-     * manner in which a bound value in the {@link IPredicate} is converted into
-     * a key.
-     * <p>
      * {@inheritDoc}
+     * 
+     * @todo While you can override
+     *       {@link #appendKeyComponent(IKeyBuilder, int, Object)} to use a
+     *       different encoding, this does not really let you handle something
+     *       which does not implement {@link IElement} without overriding
+     *       {@link #getKey(IKeyBuilder, Object)} as well.
      */
-    public byte[] getFromKey(final IKeyBuilder keyBuilder,
+    public byte[] getKey(final IKeyBuilder keyBuilder, final E element) {
+        
+        keyBuilder.reset();
+
+        final int keyArity = getKeyArity(); // use the key's "arity".
+
+        for (int i = 0; i < keyArity; i++) {
+
+            /*
+             * Note: If you need to override the default IKeyBuilder behavior do
+             * it in the invoked method.
+             */
+            appendKeyComponent(keyBuilder, i, ((IElement) element)
+                    .get(getKeyOrder(i)));
+
+        }
+
+        return keyBuilder.getKey();
+        
+    }
+
+    final public byte[] getFromKey(final IKeyBuilder keyBuilder,
             final IPredicate<E> predicate) {
 
         keyBuilder.reset();
@@ -67,7 +91,7 @@ abstract public class AbstractKeyOrder<E> implements IKeyOrder<E> {
 
             /*
              * Note: If you need to override the default IKeyBuilder behavior do
-             * it here.
+             * it in the invoked method.
              */
             appendKeyComponent(keyBuilder, i, term.get());
 
@@ -76,6 +100,15 @@ abstract public class AbstractKeyOrder<E> implements IKeyOrder<E> {
         }
 
         return noneBound ? null : keyBuilder.getKey();
+
+    }
+
+    final public byte[] getToKey(final IKeyBuilder keyBuilder,
+            final IPredicate<E> predicate) {
+
+        final byte[] from = getFromKey(keyBuilder, predicate);
+
+        return from == null ? null : SuccessorUtil.successor(from);
 
     }
 
@@ -88,15 +121,6 @@ abstract public class AbstractKeyOrder<E> implements IKeyOrder<E> {
             final int index, final Object keyComponent) {
 
         keyBuilder.append(keyComponent);
-
-    }
-    
-    public byte[] getToKey(final IKeyBuilder keyBuilder,
-            final IPredicate<E> predicate) {
-
-        final byte[] from = getFromKey(keyBuilder, predicate);
-
-        return from == null ? null : SuccessorUtil.successor(from);
 
     }
 

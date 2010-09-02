@@ -209,41 +209,13 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
     }
 
     /**
-     * This handles a request for an access path that is restricted to a
-     * specific index partition.
-     * <p>
-     * Note: This path is used with the scale-out JOIN strategy, which
-     * distributes join tasks onto each index partition from which it needs to
-     * read. Those tasks constrain the predicate to only read from the index
-     * partition which is being serviced by that join task.
+     * {@inheritDoc}
      * <p>
      * Note: Since the relation may materialize the index views for its various
      * access paths, and since we are restricted to a single index partition and
      * (presumably) an index manager that only sees the index partitions local
      * to a specific data service, we create an access path view for an index
      * partition without forcing the relation to be materialized.
-     * <p>
-     * Note: Expanders ARE NOT applied in this code path. Expanders require a
-     * total view of the relation, which is not available during scale-out
-     * pipeline joins.
-     * 
-     * @param indexManager
-     *            This MUST be the data service local index manager so that the
-     *            returned access path will read against the local shard.
-     * @param predicate
-     *            The predicate. {@link IPredicate#getPartitionId()} MUST return
-     *            a valid index partition identifier.
-     * 
-     * @throws IllegalArgumentException
-     *             if either argument is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             unless the {@link IIndexManager} is a <em>local</em> index
-     *             manager providing direct access to the specified shard.
-     * @throws IllegalArgumentException
-     *             unless the predicate identifies a specific shard using
-     *             {@link IPredicate#getPartitionId()}.
-     * 
-     * @todo Raise this method into the {@link IRelation} interface.
      */
     public IAccessPath<E> getAccessPathForIndexPartition(
             final IIndexManager indexManager, //
