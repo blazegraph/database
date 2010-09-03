@@ -134,20 +134,28 @@ abstract public class WriteCache implements IWriteCache {
 	 */
 	final private ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
-	/**
-	 * Return the backing {@link ByteBuffer}. The caller may read or write on
-	 * the buffer. Once they are done, the caller MUST call {@link #release()}.
-	 * This uses the read lock to allow concurrent read/write operations on the
-	 * backing buffer. Note that at most one write operation may execute
-	 * concurrently in order to avoid side effects on the buffers position when
-	 * copying data onto the buffer.
-	 * 
-	 * @return The {@link ByteBuffer}.
-	 * 
-	 * @throws InterruptedException
-	 * @throws IllegalStateException
-	 *             if the {@link WriteCache} is closed.
-	 */
+    /**
+     * Return the backing {@link ByteBuffer}. The caller may read or write on
+     * the buffer, but MUST NOT have a side effect on the
+     * {@link ByteBuffer#position()} without first synchronizing on the
+     * {@link ByteBuffer}. Once they are done, the caller MUST call
+     * {@link #release()}.
+     * <p>
+     * Note: This uses the read lock to allow concurrent read/write operations
+     * on the backing buffer.
+     * <p>
+     * Note: <strong>At most one write operation may execute concurrently in
+     * order to avoid side effects on the buffers position when copying data
+     * onto the buffer. This constraint must be imposed by the caller using a
+     * <code>synchronized(buf){}</code> block during the critical sections where
+     * the buffer position will be updated by a write. </strong>
+     * 
+     * @return The {@link ByteBuffer}.
+     * 
+     * @throws InterruptedException
+     * @throws IllegalStateException
+     *             if the {@link WriteCache} is closed.
+     */
 	private ByteBuffer acquire() throws InterruptedException, IllegalStateException {
 
 		final Lock readLock = lock.readLock();
@@ -668,12 +676,15 @@ abstract public class WriteCache implements IWriteCache {
 			if (remaining == 0)
 				throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_EMPTY);
 
-			/*
-			 * Note: We need to be synchronized on the ByteBuffer here since
-			 * this operation relies on the position() being stable.
-			 * 
-			 * Note: No other code adjust touch the buffer's position() !!!
-			 */
+            /*
+             * Note: We need to be synchronized on the ByteBuffer here since
+             * this operation relies on the position() being stable.
+             * 
+             * Note: Also see clearAddrMap(long) which is synchronized on the
+             * acquired ByteBuffer in the same manner to protect it during
+             * critical sections which have a side effect on the buffer
+             * position.
+             */
 			final int pos;
 			synchronized (tmp) {
 
@@ -730,7 +741,7 @@ abstract public class WriteCache implements IWriteCache {
 				counters.naccept++;
 				counters.bytesAccepted += nwrite;
 
-			}
+			} // synchronized(tmp)
 
 			/*
 			 * Add metadata for the record so it can be read back from the
@@ -1737,21 +1748,26 @@ abstract public class WriteCache implements IWriteCache {
 			// }
 			final ByteBuffer tmp = acquire();
 			try {
-				if (tmp.remaining() >= 12) {
-					// We must synchronize
-					synchronized (tmp) {
-						int spos = tmp.position();
-						tmp.putLong(addr);
-						tmp.putInt(0);
-						if (checker != null) {
-							// update the checksum (no side-effects on [data])
-							ByteBuffer chkBuf = tmp.asReadOnlyBuffer();
-							chkBuf.position(spos);
-							chkBuf.limit(tmp.position());
-							checker.update(chkBuf);
-						}
-					}
-				}
+                if (tmp.remaining() >= 12) {
+                    /*
+                     * Note: We must synchronize before having a side effect on
+                     * position. Also see write(...) which is synchronized on
+                     * the buffer during critical sections which have a side
+                     * effect on the buffer position.
+                     */
+                    synchronized (tmp) {
+                        final int spos = tmp.position();
+                        tmp.putLong(addr);
+                        tmp.putInt(0);
+                        if (checker != null) {
+                            // update the checksum (no side-effects on [data])
+                            final ByteBuffer chkBuf = tmp.asReadOnlyBuffer();
+                            chkBuf.position(spos);
+                            chkBuf.limit(tmp.position());
+                            checker.update(chkBuf);
+                        }
+                    } // synchronized(tmp)
+                }
 			} finally {
 				release();
 			}
