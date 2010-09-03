@@ -139,6 +139,18 @@ final public class Var<E> extends BOpBase implements IVariable<E>,
 
     }
 
+    public E get(final IBindingSet bindingSet) {
+
+        if (bindingSet == null)
+            throw new IllegalArgumentException();
+
+        @SuppressWarnings("unchecked")
+        final IConstant<E> c = bindingSet.get(this);
+
+        return c == null ? null : c.get();
+
+    }
+    
     public String getName() {
 
         return name;

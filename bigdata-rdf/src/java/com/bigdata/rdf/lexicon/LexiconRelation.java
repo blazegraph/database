@@ -56,6 +56,7 @@ import org.openrdf.model.Value;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
@@ -804,13 +805,17 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * 
      * @throws UnsupportedOperationException
      */
-    public BigdataValue newElement(IPredicate<BigdataValue> predicate,
+//    public BigdataValue newElement(IPredicate<BigdataValue> predicate,
+//            IBindingSet bindingSet) {
+//
+//        throw new UnsupportedOperationException();
+//
+//    }
+    public BigdataValue newElement(List<IVariableOrConstant<?>> a,
             IBindingSet bindingSet) {
-
         throw new UnsupportedOperationException();
-
     }
-
+    
     public Class<BigdataValue> getElementClass() {
 
         return BigdataValue.class;

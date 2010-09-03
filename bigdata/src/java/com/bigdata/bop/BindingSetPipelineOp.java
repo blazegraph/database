@@ -37,14 +37,14 @@ import java.util.Map;
  * @version $Id$
  */
 abstract public class BindingSetPipelineOp extends
-        AbstractPipelineOp<IBindingSet> {
+        PipelineOp<IBindingSet> {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends AbstractPipelineOp.Annotations {
+    public interface Annotations extends PipelineOp.Annotations {
 
         /**
          * The value of the annotation is the {@link BOp.Annotations#BOP_ID} of
@@ -61,7 +61,7 @@ abstract public class BindingSetPipelineOp extends
      * 
      * @param op
      */
-    protected BindingSetPipelineOp(AbstractPipelineOp<IBindingSet> op) {
+    protected BindingSetPipelineOp(PipelineOp<IBindingSet> op) {
         super(op);
     }
 

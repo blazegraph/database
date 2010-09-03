@@ -29,19 +29,20 @@ package com.bigdata.bop.ap;
 
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.AbstractRelation;
-import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.striterator.AbstractKeyOrder;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -52,7 +53,7 @@ import com.bigdata.striterator.IKeyOrder;
  * <p>
  * Note: This has to be public in order to be an {@link ILocatableResource}.
  */
-public class R extends AbstractRelation<E> implements IMutableRelation<E> {
+public class R extends AbstractRelation<E> {
 
     /**
      * Metadata about the index orders for this relation.
@@ -134,16 +135,27 @@ public class R extends AbstractRelation<E> implements IMutableRelation<E> {
 
     }
 
-    public E newElement(final IPredicate<E> predicate,
+//    public E newElement(final IPredicate<E> predicate,
+//            final IBindingSet bindingSet) {
+//
+//        final String name = (String) predicate.asBound(0, bindingSet);
+//
+//        final String value = (String) predicate.asBound(1, bindingSet);
+//
+//        return new E(name, value);
+//    }
+
+    public E newElement(final List<IVariableOrConstant<?>> a,
             final IBindingSet bindingSet) {
 
-        final String name = (String) predicate.asBound(0, bindingSet);
+        final String name = (String) a.get(0).get(bindingSet);
 
-        final String value = (String) predicate.asBound(1, bindingSet);
-
-        return new E(name, value);
+        final String value = (String) a.get(1).get(bindingSet);
+        
+        return new E(name,value);
+        
     }
-
+    
     public Set<String> getIndexNames() {
 
         final Set<String> tmp = new HashSet<String>();

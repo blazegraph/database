@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.locator;
 
+import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
@@ -38,6 +39,7 @@ import junit.framework.TestCase2;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.BufferMode;
@@ -227,7 +229,8 @@ public class TestDefaultResourceLocator extends TestCase2 {
 
     private static class MockRelation extends AbstractRelation {
 
-        final private String indexName = "foo";
+        static final private String indexName = "foo";
+        
         private IIndex ndx;
         
         /**
@@ -324,11 +327,16 @@ public class TestDefaultResourceLocator extends TestCase2 {
             return null;
         }
 
-        public Object newElement(IPredicate predicate, IBindingSet bindingSet) {
+//        public Object newElement(IPredicate predicate, IBindingSet bindingSet) {
+//            // TODO Auto-generated method stub
+//            return null;
+//        }
+        
+        public Object newElement(List a, IBindingSet bindingSet) {
             // TODO Auto-generated method stub
             return null;
         }
-        
+    
         public Class<ISPO> getElementClass() {
 
             return null;
@@ -344,7 +352,7 @@ public class TestDefaultResourceLocator extends TestCase2 {
             // TODO Auto-generated method stub
             return null;
         }
-    
+
     }
     
 }

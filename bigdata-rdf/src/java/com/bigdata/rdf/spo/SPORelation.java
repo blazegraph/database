@@ -1494,32 +1494,69 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     }
 
+//    /**
+//     * @todo This implementation was written early on and works for creating new
+//     *       SPOs licensed by inference against a triple store. It does not
+//     *       allow us to specify the statement type, which is always set to
+//     *       [inferred]. It also does not capture the context if one exists, but
+//     *       that could be done by inspection of the arity of the predicate. It
+//     *       might be better to have an explicit "CONSTRUCT" operator rather
+//     *       than having this implicit relationship between the head of a rule
+//     *       and the element created from that rule. For example, that might let
+//     *       us capture the distinction of inferred versus explicit within the
+//     *       CONSTRUCT operator.
+//     */
+//    public SPO newElement(final IPredicate<ISPO> predicate,
+//            final IBindingSet bindingSet) {
+//
+//        if (predicate == null)
+//            throw new IllegalArgumentException();
+//        
+//        if (bindingSet == null)
+//            throw new IllegalArgumentException();
+//
+//        final IV s = (IV) predicate.asBound(0, bindingSet);
+//
+//        final IV p = (IV) predicate.asBound(1, bindingSet);
+//
+//        final IV o = (IV) predicate.asBound(2, bindingSet);
+//
+//        final SPO spo = new SPO(s, p, o, StatementEnum.Inferred);
+//        
+//        if(log.isDebugEnabled())
+//            log.debug(spo.toString());
+//        
+//        return spo;
+//        
+//    }
+
     /**
-     * @todo This implementation was written early on and works for creating new
-     *       SPOs licensed by inference against a triple store. It does not
-     *       allow us to specify the statement type, which is always set to
-     *       [inferred]. It also does not capture the context if one exists, but
-     *       that could be done by inspection of the arity of the predicate. It
-     *       might be better to have an explicit "CONSTRUCT" operator rather
-     *       than having this implicit relationship between the head of a rule
-     *       and the element created from that rule. For example, that might let
-     *       us capture the distinction of inferred versus explicit within the
-     *       CONSTRUCT operator.
+     * @todo This works for creating new SPOs licensed by inference against a
+     *       triple store. However, it does not allow us to specify the
+     *       statement type, which is always set to [inferred]. It also does not
+     *       capture the context if one exists, but that could be done by
+     *       inspection of the arity of the predicate. It might be better to
+     *       have an explicit "CONSTRUCT" operator rather than having this
+     *       implicit relationship between the head of a rule and the element
+     *       created from that rule. For example, that might let us capture the
+     *       distinction of inferred versus explicit within the CONSTRUCT
+     *       operator.
      */
-    public SPO newElement(final IPredicate<ISPO> predicate,
+    @SuppressWarnings("unchecked")
+    public SPO newElement(final List<IVariableOrConstant<?>> a,
             final IBindingSet bindingSet) {
 
-        if (predicate == null)
+        if (a == null)
             throw new IllegalArgumentException();
         
         if (bindingSet == null)
             throw new IllegalArgumentException();
 
-        final IV s = (IV) predicate.asBound(0, bindingSet);
+        final IV s = (IV) a.get(0).get(bindingSet);
 
-        final IV p = (IV) predicate.asBound(1, bindingSet);
+        final IV p = (IV) a.get(1).get(bindingSet);
 
-        final IV o = (IV) predicate.asBound(2, bindingSet);
+        final IV o = (IV) a.get(2).get(bindingSet);
 
         final SPO spo = new SPO(s, p, o, StatementEnum.Inferred);
         
@@ -1529,7 +1566,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
         return spo;
         
     }
-
+    
     public Class<ISPO> getElementClass() {
 
         return ISPO.class;

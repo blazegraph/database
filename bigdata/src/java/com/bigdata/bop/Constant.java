@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.bop;
 
-import java.util.Map;
 
 
 /**
@@ -153,13 +152,19 @@ final public class Constant<E/* extends Comparable<E> */> extends BOpBase
 //        
 //    }
 
-    public E get() {
+    final public E get() {
         
         return value;
         
     }
 
-    public String getName() {
+    final public E get(final IBindingSet bindingSet) {
+        
+        return value;
+
+    }
+
+    final public String getName() {
      
         throw new UnsupportedOperationException();
         

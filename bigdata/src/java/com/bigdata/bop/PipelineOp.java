@@ -27,7 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop;
 
-import java.util.concurrent.FutureTask;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.IRangeQuery;
@@ -37,20 +38,22 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 
 /**
- * An pipeline operator reads from a source and writes on a sink.
+ * An pipeline operator reads from a source and writes on a sink. This is an
+ * abstract base class for pipelined operators regardless of the type of data
+ * moving along the pipeline.
  * 
  * @param <E>
  *            The generic type of the objects processed by the operator.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo It is too confusion to have an interface hierarchy which is separate
- *       from the class hierarchy for the operators. Therefore roll this
- *       interface into {@link AbstractPipelineOp} and then rename that class to
- *       {@link PipelineOp}
  */
-public interface PipelineOp<E> extends BOp {
+abstract public class PipelineOp<E> extends BOpBase implements IPipelineOp<E> {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
 
     /**
      * Well known annotations pertaining to the binding set pipeline.
@@ -147,36 +150,70 @@ public interface PipelineOp<E> extends BOp {
          */
         final int DEFAULT_FLAGS = IRangeQuery.KEYS | IRangeQuery.VALS
                 | IRangeQuery.PARALLEL;
+
+    }
+
+    /**
+     * Deep copy constructor.
+     * 
+     * @param op
+     */
+    protected PipelineOp(final PipelineOp<E> op) {
+
+        super(op);
+
+    }
+
+    /**
+     * Shallow copy constructor.
+     * 
+     * @param args
+     * @param annotations
+     */
+    protected PipelineOp(final BOp[] args,
+            final Map<String, Object> annotations) {
+
+        super(args, annotations);
+
+    }
+
+    public int getChunkCapacity() {
+        
+        return getProperty(Annotations.CHUNK_CAPACITY,
+                Annotations.DEFAULT_CHUNK_CAPACITY);
+
+    }
+
+    public int getChunkOfChunksCapacity() {
+
+        return getProperty(Annotations.CHUNK_OF_CHUNKS_CAPACITY,
+                Annotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY);
+
+    }
+
+    public long getChunkTimeout() {
+        
+        return getProperty(Annotations.CHUNK_TIMEOUT,
+                Annotations.DEFAULT_CHUNK_TIMEOUT);
         
     }
 
     /**
-     * Return a new object which can be used to collect statistics on the
-     * operator evaluation (this may be overridden to return a more specific
-     * class depending on the operator).
+     * The {@link TimeUnit}s in which the {@link #chunkTimeout} is measured.
      */
-    BOpStats newStats();
+    protected static transient final TimeUnit chunkTimeoutUnit = TimeUnit.MILLISECONDS;
 
-    /**
-     * Instantiate a buffer suitable as a sink for this operator. The buffer
-     * will be provisioned based on the operator annotations.
-     * 
-     * @return The buffer.
-     */
-    IBlockingBuffer<E[]> newBuffer();
+    public BOpStats newStats() {
 
-    /**
-     * Return a {@link FutureTask} which computes the operator against the
-     * evaluation context. The caller is responsible for executing the
-     * {@link FutureTask} (this gives them the ability to hook the completion of
-     * the computation).
-     * 
-     * @param context
-     *            The evaluation context.
-     * 
-     * @return The {@link FutureTask} which will compute the operator's
-     *         evaluation.
-     */
-    FutureTask<Void> eval(BOpContext<E> context);
+        return new BOpStats();
+
+    }
+
+    public IBlockingBuffer<E[]> newBuffer() {
+
+        return new BlockingBuffer<E[]>(getChunkOfChunksCapacity(),
+                getChunkCapacity(), getChunkTimeout(), chunkTimeoutUnit);
+
+    }
 
 }

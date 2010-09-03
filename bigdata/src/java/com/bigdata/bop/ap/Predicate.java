@@ -309,23 +309,25 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
 
     public Object asBound(final int index, final IBindingSet bindingSet) {
 
-        if (bindingSet == null)
-            throw new IllegalArgumentException();
+        return get(index).get(bindingSet);
 
-        final IVariableOrConstant<?> t = get(index);
-
-        final IConstant<?> c;
-        if (t.isVar()) {
-
-            c = bindingSet.get((IVariable<?>) t);
-
-        } else {
-
-            c = (IConstant<?>) t;
-
-        }
-
-        return c == null ? null : c.get();
+//        if (bindingSet == null)
+//            throw new IllegalArgumentException();
+//        
+//        final IVariableOrConstant<?> t = get(index);
+//
+//        final IConstant<?> c;
+//        if (t.isVar()) {
+//
+//            c = bindingSet.get((IVariable<?>) t);
+//
+//        } else {
+//
+//            c = (IConstant<?>) t;
+//
+//        }
+//
+//        return c == null ? null : c.get();
 
     }
 
