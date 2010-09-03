@@ -2,6 +2,7 @@ package com.bigdata.rdf.magic;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -13,9 +14,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
 import com.bigdata.btree.BloomFilterFactory;
@@ -473,18 +472,44 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
         return indexNames;
     }
 
-    public IMagicTuple newElement(IPredicate<IMagicTuple> predicate,
-            IBindingSet bindingSet) {
+//    public IMagicTuple newElement(IPredicate<IMagicTuple> predicate,
+//            IBindingSet bindingSet) {
+//
+//        if (predicate == null)
+//            throw new IllegalArgumentException();
+//        
+//        if (bindingSet == null)
+//            throw new IllegalArgumentException();
+//        
+//        final IV[] terms = new IV[arity];
+//        for (int i = 0; i < arity; i++) {
+//            terms[i] = asBound(predicate, i, bindingSet);
+//        }
+//        
+//        final MagicTuple magicTuple = new MagicTuple(terms);
+//        
+//        return magicTuple;
+//        
+//    }
 
-        if (predicate == null)
+    @SuppressWarnings("unchecked")
+    public IMagicTuple newElement(final List<IVariableOrConstant<?>> a,
+            final IBindingSet bindingSet) {
+
+        if (a == null)
             throw new IllegalArgumentException();
         
         if (bindingSet == null)
             throw new IllegalArgumentException();
         
         final IV[] terms = new IV[arity];
+
+        final Iterator<IVariableOrConstant<?>> itr = a.iterator();
+        
         for (int i = 0; i < arity; i++) {
-            terms[i] = asBound(predicate, i, bindingSet);
+        
+            terms[i] = (IV) itr.next().get(bindingSet);
+            
         }
         
         final MagicTuple magicTuple = new MagicTuple(terms);
@@ -492,39 +517,39 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
         return magicTuple;
         
     }
-    
+
     public Class<IMagicTuple> getElementClass() {
         
         return IMagicTuple.class;
         
     }
 
-    /**
-     * Extract the bound value from the predicate. When the predicate is not
-     * bound at that index, then extract its binding from the binding set.
-     * 
-     * @param pred
-     *            The predicate.
-     * @param index
-     *            The index into that predicate.
-     * @param bindingSet
-     *            The binding set.
-     *            
-     * @return The bound value.
-     */
-    private IV asBound(final IPredicate<IMagicTuple> predicate, 
-            final int index, final IBindingSet bindingSet) {
-
-        final IVariableOrConstant<IV> t = predicate.get(index);
-        final IConstant<IV> c;
-        if (t.isVar()) {
-            c = bindingSet.get((IVariable) t);
-        } else {
-            c = (IConstant<IV>) t;
-        }
-
-        return c.get();
-
-    }
+//    /**
+//     * Extract the bound value from the predicate. When the predicate is not
+//     * bound at that index, then extract its binding from the binding set.
+//     * 
+//     * @param pred
+//     *            The predicate.
+//     * @param index
+//     *            The index into that predicate.
+//     * @param bindingSet
+//     *            The binding set.
+//     *            
+//     * @return The bound value.
+//     */
+//    private IV asBound(final IPredicate<IMagicTuple> predicate, 
+//            final int index, final IBindingSet bindingSet) {
+//
+//        final IVariableOrConstant<IV> t = predicate.get(index);
+//        final IConstant<IV> c;
+//        if (t.isVar()) {
+//            c = bindingSet.get((IVariable) t);
+//        } else {
+//            c = (IConstant<IV>) t;
+//        }
+//
+//        return c.get();
+//
+//    }
 
 }

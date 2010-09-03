@@ -52,17 +52,25 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.ChunkedOrderedIteratorOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NoSuchBOpException;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bset.Union;
+import com.bigdata.relation.IMutableRelation;
+import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.rule.Program;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.service.ndx.IAsynchronousWriteBufferFactory;
+import com.bigdata.striterator.ChunkedArrayIterator;
+import com.bigdata.striterator.ChunkedOrderedStriterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.concurrent.Haltable;
 
@@ -193,14 +201,69 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>> {
      * 
      * FIXME Unit tests for non-distinct {@link IElementFilter}s on an
      * {@link IPredicate}, unit tests for distinct element filter on an
-     * {@link IPredicate} which is capable of distributed operations
+     * {@link IPredicate} which is capable of distributed operations. Do not use
+     * distinct where not required (SPOC, only one graph, etc).
+     * <p>
+     * It seems like the right way to approach this is by unifying the stackable
+     * CTC striterator pattern with the chunked iterator pattern and passing the
+     * query engine (or the bop context) into the iterator construction process
+     * (or simply requesting that the query engine construct the iterator
+     * stack).
+     * <p>
+     * In terms of harmonization, it is difficult to say which way would work
+     * better. In the short term we could simply allow both and mask the
+     * differences in how we construct the filters, but the conversion to/from
+     * striterators and chunked iterators seems to waste a bit of effort.
+     * <p>
+     * The trickiest part of all of this is to allow a distributed filter
+     * pattern where the filter gets created on a set of nodes identified by the
+     * operator and the elements move among those nodes using the query engine's
+     * buffers.
+     * <p>
+     * To actually implement the distributed distinct filter we need to stack
+     * the following:
+     * 
+     * <pre>
+     * - ITupleIterator
+     * - Resolve ITuple to Element (e.g., SPOC).
+     * - Layer on optional IElementFilter associated with the IPredicate.
+     * - Layer on SameVariableConstraint iff required (done by AccessPath) 
+     * - Resolve SPO to SPO, stripping off the context position.
+     * - Chunk SPOs (SPO[], IKeyOrder), where the key order is from the access path.
+     * - Filter SPO[] using DHT constructed on specified nodes of the cluster.
+     *   The SPO[] chunks should be packaged into NIO buffers and shipped to those
+     *   nodes.  The results should be shipped back as a bit vectors packaged into
+     *   a NIO buffers.
+     * - Dechunk SPO[] to SPO since that is the current expectation for the filter
+     *   stack.
+     * - The result then gets wrapped as a {@link IChunkedOrderedIterator} by
+     *   the AccessPath using a {@link ChunkedArrayIterator}.
+     * </pre>
+     * 
+     * This stack is a bit complex(!). But it is certainly easy enough to
+     * generate the necessary bits programmatically.
      * 
      * FIXME Handling the {@link Union} of binding sets.
      * 
-     * FIXME conditional routing for binding sets in the pipeline (to route
-     * around an optional join group based on an {@link IConstraint}). This
-     * should probably wrap the {@link BindingSetPipelineOp} such that we simply
-     * stream the grouped operator.
+     * FIXME INSERT and DELETE which will construct elements using
+     * {@link IRelation#newElement(java.util.List, IBindingSet)} from a binding
+     * set and then use {@link IMutableRelation#insert(IChunkedOrderedIterator)}
+     * and {@link IMutableRelation#delete(IChunkedOrderedIterator)}. For s/o, we
+     * first need to move the bits into the right places so it makes sense to
+     * unpack the processing of the loop over the elements and move the data
+     * around, writing on each index as necessary. There could be eventually
+     * consistent approaches to this as well. For justifications we need to
+     * update some additional indices, in which case we are stuck going through
+     * {@link IRelation} rather than routing data directly or using the
+     * {@link IAsynchronousWriteBufferFactory}.
+     * 
+     * FIXME Handle {@link Program}s. There are three flavors, which should
+     * probably be broken into three operators: sequence(ops), set(ops), and
+     * closure(op). The 'set' version would be parallelized, or at least have an
+     * annotation for parallel evaluation. These things belong in the same broad
+     * category as the join graph since they are operators which control the
+     * evaluation of other operators (the current pipeline join also has that
+     * characteristic which it uses to do the nested index subqueries).
      * 
      * FIXME SPARQL to BOP translation
      * 

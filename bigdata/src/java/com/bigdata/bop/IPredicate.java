@@ -30,7 +30,6 @@ package com.bigdata.bop;
 
 import java.io.Serializable;
 
-import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;

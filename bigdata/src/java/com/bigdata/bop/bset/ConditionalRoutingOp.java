@@ -32,7 +32,7 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
-import com.bigdata.bop.AbstractPipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BindingSetPipelineOp;
@@ -62,7 +62,7 @@ public class ConditionalRoutingOp extends BindingSetPipelineOp {
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends AbstractPipelineOp.Annotations {
+    public interface Annotations extends PipelineOp.Annotations {
 
         /**
          * An {@link IConstraint} which specifies the condition. When the

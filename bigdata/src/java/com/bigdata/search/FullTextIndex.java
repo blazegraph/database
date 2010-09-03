@@ -66,6 +66,7 @@ import org.apache.lucene.util.Version;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISimpleSplitHandler;
@@ -1354,7 +1355,7 @@ public class FullTextIndex extends AbstractRelation {
     }
 
     @SuppressWarnings("unchecked")
-    public Object newElement(IPredicate predicate,
+    public Object newElement(List a,
             IBindingSet bindingSet) {
         throw new UnsupportedOperationException();
     }

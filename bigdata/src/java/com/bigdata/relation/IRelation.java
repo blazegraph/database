@@ -28,11 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation;
 
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -40,8 +42,6 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.locator.ILocatableResource;
-import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -75,25 +75,45 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
      */
     Class<E> getElementClass();
     
+//    /**
+//     * Create and return a new element. The element is constructed from the
+//     * predicate given the bindings. Typically, this is used when generating an
+//     * {@link ISolution} for an {@link IRule} during either a query or mutation
+//     * operations. The element is NOT inserted into the relation.
+//     * 
+//     * @param predicate
+//     *            The predicate that is the head of some {@link IRule}.
+//     * @param bindingSet
+//     *            A set of bindings for that {@link IRule}.
+//     * 
+//     * @return The new element.
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if any parameter is <code>null</code>.
+//     * @throws IllegalStateException
+//     *             if the predicate is not fully bound given those bindings.
+//     */
+//    E newElement(IPredicate<E> predicate, IBindingSet bindingSet);
+
     /**
      * Create and return a new element. The element is constructed from the
-     * predicate given the bindings. Typically, this is used when generating an
-     * {@link ISolution} for an {@link IRule} during either a query or mutation
-     * operations. The element is NOT inserted into the relation.
+     * ordered list of variables and constants. Variables are replaced using the
+     * given the bindings. The element is NOT inserted into the relation.
      * 
-     * @param predicate
-     *            The predicate that is the head of some {@link IRule}.
+     * @param a
+     *            An ordered list of variables and/or constants.
      * @param bindingSet
-     *            A set of bindings for that {@link IRule}.
+     *            A set of bindings.
      * 
      * @return The new element.
      * 
      * @throws IllegalArgumentException
      *             if any parameter is <code>null</code>.
      * @throws IllegalStateException
-     *             if the predicate is not fully bound given those bindings.
+     *             if there exists a variable which is not bound given those
+     *             bindings.
      */
-    E newElement(IPredicate<E> predicate, IBindingSet bindingSet);
+    E newElement(List<IVariableOrConstant<?>> a, IBindingSet bindingSet);
 
     /**
      * Return the {@link IKeyOrder} for the primary index for the relation.

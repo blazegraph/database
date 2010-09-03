@@ -1,12 +1,14 @@
 package com.bigdata.relation;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.TemporaryStore;
@@ -122,10 +124,17 @@ public class RelationFusedView<E> implements IRelation<E> {
         
     }
     
-    public E newElement(final IPredicate<E> predicate,
+//    public E newElement(final IPredicate<E> predicate,
+//            final IBindingSet bindingSet) {
+//
+//        return relation1.newElement(predicate, bindingSet);
+//
+//    }
+    
+    public E newElement(final List<IVariableOrConstant<?>> a,
             final IBindingSet bindingSet) {
 
-        return relation1.newElement(predicate, bindingSet);
+        return relation1.newElement(a, bindingSet);
 
     }
     

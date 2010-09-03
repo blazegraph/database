@@ -465,6 +465,66 @@ public class BOpContext<E> {
     }
 
     /**
+     * Copy the values for variables in the predicate from the element, applying
+     * them to the caller's {@link IBindingSet}.
+     * 
+     * @param e
+     *            The element.
+     * @param pred
+     *            The predicate.
+     * @param bindingSet
+     *            The binding set, which is modified as a side-effect.
+     */
+    @SuppressWarnings("unchecked")
+    final private void copyValues(final IElement e, final IPredicate<?> pred,
+            final IBindingSet bindingSet) {
+
+        for (int i = 0; i < pred.arity(); i++) {
+
+            final IVariableOrConstant<?> t = pred.get(i);
+
+            if (t.isVar()) {
+
+                final IVariable<?> var = (IVariable<?>) t;
+
+                final Constant<?> newval = new Constant(e.get(i));
+
+                bindingSet.set(var, newval);
+
+            }
+
+        }
+
+    }
+
+    /**
+     * Copy the bound values from the element into a binding set using the
+     * caller's variable names.
+     * 
+     * @param vars
+     *            The ordered list of variables.
+     * @param e
+     *            The element.
+     * @param bindingSet
+     *            The binding set, which is modified as a side-effect.
+     */
+    final public void bind(final IVariable<?>[] vars, final IElement e,
+            final IBindingSet bindingSet) {
+
+        for (int i = 0; i < vars.length; i++) {
+
+            final IVariable<?> var = vars[i];
+
+            @SuppressWarnings("unchecked")
+            final Constant<?> newval = new Constant(e.get(i));
+
+            bindingSet.set(var, newval);
+
+        }
+
+    }
+
+    /**
      * Check constraints.
      * 
      * @param constraints
@@ -499,26 +559,4 @@ public class BOpContext<E> {
 
     }
     
-    @SuppressWarnings("unchecked")
-    final private void copyValues(final IElement e, final IPredicate<?> pred,
-            final IBindingSet bindingSet) {
-
-        for (int i = 0; i < pred.arity(); i++) {
-
-            final IVariableOrConstant<?> t = pred.get(i);
-
-            if (t.isVar()) {
-
-                final IVariable<?> var = (IVariable<?>) t;
-
-                final Constant<?> newval = new Constant(e.get(i));
-
-                bindingSet.set(var, newval);
-
-            }
-
-        }
-
-    }
-
 }

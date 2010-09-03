@@ -101,9 +101,12 @@ public class Solution<E> implements ISolution<E>, Serializable {
 
             // the relation for the head of the rule.
             final IRelation relation = joinNexus.getHeadRelationView(head);
-            
+
             // use the relation's element factory.
-            this.e = (E) relation.newElement(head, bindingSet);
+            this.e = (E) relation.newElement(head.args(), bindingSet);
+            
+//            // use the relation's element factory.
+//            this.e = (E) relation.newElement(head, bindingSet);
 
         } else {
 
