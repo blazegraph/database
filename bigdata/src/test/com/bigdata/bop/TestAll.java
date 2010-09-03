@@ -76,6 +76,9 @@ public class TestAll extends TestCase {
         // constraint operators (EQ, NE, etc).
         suite.addTest(com.bigdata.bop.constraint.TestAll.suite());
 
+        // pure binding set operators.
+        suite.addTest(com.bigdata.bop.bset.TestAll.suite());
+
         // index operators.
         suite.addTest(com.bigdata.bop.ndx.TestAll.suite());
 
@@ -84,6 +87,9 @@ public class TestAll extends TestCase {
 
         // join operators.
         suite.addTest(com.bigdata.bop.join.TestAll.suite());
+
+        // aggregation operators.
+        suite.addTest(com.bigdata.bop.aggregation.TestAll.suite());
 
         // query engine.
         suite.addTest(com.bigdata.bop.engine.TestAll.suite());

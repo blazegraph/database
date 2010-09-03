@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 18, 2010
  */
 
-package com.bigdata.bop.aggregation;
+package com.bigdata.bop.bset;
 
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -34,10 +34,10 @@ import java.util.concurrent.FutureTask;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.engine.Haltable;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.rdf.rules.TMUtility;
 import com.bigdata.relation.RelationFusedView;
+import com.bigdata.util.concurrent.Haltable;
 
 /**
  * The union of two or more {@link BindingSetPipelineOp} operators.

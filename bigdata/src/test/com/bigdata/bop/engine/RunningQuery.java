@@ -56,14 +56,15 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NoSuchBOpException;
-import com.bigdata.bop.aggregation.Union;
 import com.bigdata.bop.ap.Predicate;
-import com.bigdata.bop.ap.R;
+import com.bigdata.bop.bset.Union;
+import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.striterator.ICloseableIterator;
+import com.bigdata.util.concurrent.Haltable;
 
 /**
  * Metadata about running queries.
@@ -192,10 +193,14 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>> {
      * 
      * FIXME Unit tests for non-distinct {@link IElementFilter}s on an
      * {@link IPredicate}, unit tests for distinct element filter on an
-     * {@link IPredicate} which is capable of distributed operations, handling
-     * the {@link Union} of binding sets, conditional routing for binding sets
-     * in the pipeline (to route around an optional join group based on an
-     * {@link IConstraint})
+     * {@link IPredicate} which is capable of distributed operations
+     * 
+     * FIXME Handling the {@link Union} of binding sets.
+     * 
+     * FIXME conditional routing for binding sets in the pipeline (to route
+     * around an optional join group based on an {@link IConstraint}). This
+     * should probably wrap the {@link BindingSetPipelineOp} such that we simply
+     * stream the grouped operator.
      * 
      * FIXME SPARQL to BOP translation
      * 
@@ -205,9 +210,19 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>> {
      * grouping operators which will run locally (such as a pipeline join plus a
      * conditional routing operator) so we do not marshell binding sets between
      * operators when they will not cross a network boundary. Also, handle
-     * mutation, programs and closure operators. Expander patterns will continue
-     * to exist until we handle the standalone backchainers in a different
-     * manner for scale-out so add support for those for now.
+     * mutation, programs and closure operators.
+     * 
+     * @todo I have not yet figured out how to mark this sort of operator to
+     *       prevent its binding sets from being buffered on NIO ByteBuffers
+     *       when running in scale-out, which is what we normally do for the
+     *       output of a join operator. Probably the operator themselves will
+     *       just carry this information either as a Java method or as an
+     *       annotation. This could interact with how we combine
+     *       {@link #chunksIn}.
+     * 
+     * @todo Expander patterns will continue to exist until we handle the
+     *       standalone backchainers in a different manner for scale-out so add
+     *       support for those for now.
      * 
      * @todo SCALEOUT: Life cycle management of the operators and the query
      *       implies both a per-query bop:NodeList map on the query coordinator
@@ -276,6 +291,19 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>> {
      *       materialized locally such that (a) they can be materialized on
      *       demand (flow control); and (b) we can run the operator when there
      *       are sufficient chunks available without taking on too much data.
+     * 
+     * @todo It is likely that we can convert to the use of
+     *       {@link BlockingQueue} instead of {@link BlockingBuffer} in the
+     *       operators and then handle the logic for combining chunks inside of
+     *       the {@link QueryEngine}. E.g., by scanning this list for chunks for
+     *       the same bopId and combining them logically into a single chunk.
+     *       <p>
+     *       For scale-out, chunk combination will naturally occur when the node
+     *       on which the operator will run requests the {@link ByteBuffer}s
+     *       from the source nodes. Those will get wrapped up logically into a
+     *       source for processing. For selective operators, those chunks can be
+     *       combined before we execute the operator. For unselective operators,
+     *       we are going to run over all the data anyway.
      */
     final BlockingQueue<BindingSetChunk> chunksIn = new LinkedBlockingDeque<BindingSetChunk>();
 

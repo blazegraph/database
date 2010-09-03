@@ -39,10 +39,10 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.PipelineStartOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.bop.bset.CopyBindingSetOp;
 import com.bigdata.bop.join.PipelineJoin;
 
 /**
@@ -79,7 +79,7 @@ public class TestPipelineUtility extends TestCase2 {
         
         final String namespace = "ns";
         
-        final BindingSetPipelineOp startOp = new PipelineStartOp(new BOp[] {},
+        final BindingSetPipelineOp startOp = new CopyBindingSetOp(new BOp[] {},
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
                         }));

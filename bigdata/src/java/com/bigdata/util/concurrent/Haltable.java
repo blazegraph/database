@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Apr 15, 2009
  */
 
-package com.bigdata.bop.engine;
+package com.bigdata.util.concurrent;
 
 import java.nio.channels.ClosedByInterruptException;
 import java.util.concurrent.Callable;

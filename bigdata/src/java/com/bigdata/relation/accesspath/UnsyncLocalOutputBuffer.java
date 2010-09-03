@@ -1,9 +1,7 @@
-package com.bigdata.bop.join;
+package com.bigdata.relation.accesspath;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
-import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 /**
  * Wraps the base class to update the caller's {@link BOpStats}.

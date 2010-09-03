@@ -38,10 +38,10 @@ import java.util.Map;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo If we do nothing then {@link QuoteOp} will already prevent the
- *       evaluation of its child operand by the expediency of not defining its
- *       own evaluation semantics. Alternatively, we could add
- *       <code>eval():Op</code> using an appropriate evaluation interface.
+ * @todo I think that we can avoid quoting operators by using annotations (for
+ *       some cases) and through explicit interaction between operators for
+ *       others (such as between a join and a predicate). If that proves to be
+ *       true then this class will be dropped.
  */
 public class QuoteOp extends BOpBase {
 

@@ -162,7 +162,7 @@ public class BOpBase implements BOp {
      * @throws NullPointerException
      *             if the argument is <code>null</code>.
      */
-    protected BOpBase(final BOpBase op) {
+    public BOpBase(final BOpBase op) {
         // deep copy the arguments.
         args = deepCopy(op.args);
         // deep copy the annotations.
@@ -173,7 +173,7 @@ public class BOpBase implements BOp {
      * @param args
      *            The arguments to the operator.
      */
-    protected BOpBase(final BOp[] args) {
+    public BOpBase(final BOp[] args) {
        
         this(args, null/* annotations */);
         
@@ -185,7 +185,7 @@ public class BOpBase implements BOp {
      * @param annotations
      *            The annotations for the operator (optional).
      */
-    protected BOpBase(final BOp[] args,
+    public BOpBase(final BOp[] args,
             final Map<String, Object> annotations) {
 
         if (args == null)

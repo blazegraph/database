@@ -25,17 +25,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Sep 1, 2010
  */
 
-package com.bigdata.bop.join;
+package com.bigdata.relation.accesspath;
 
 import java.util.LinkedList;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.bop.engine.Haltable;
 import com.bigdata.btree.AbstractBTree;
-import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.eval.pipeline.JoinTask;
+import com.bigdata.util.concurrent.Haltable;
 
 /**
  * A factory pattern for per-thread objects whose life cycle is tied to some

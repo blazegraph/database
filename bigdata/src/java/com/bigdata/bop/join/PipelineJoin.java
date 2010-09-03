@@ -51,7 +51,6 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.bop.engine.Haltable;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.counters.CAT;
@@ -63,6 +62,8 @@ import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.relation.accesspath.ThreadLocalBufferFactory;
+import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStarJoin;
 import com.bigdata.relation.rule.IStarJoin.IStarConstraint;
@@ -70,6 +71,7 @@ import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.service.DataService;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
+import com.bigdata.util.concurrent.Haltable;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
 /**

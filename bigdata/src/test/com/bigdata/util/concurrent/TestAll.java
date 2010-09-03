@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.util.concurrent;
 
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -62,6 +63,9 @@ public class TestAll extends TestCase {
         final TestSuite suite = new TestSuite("com.bigdata.util.concurrent");
 
         suite.addTestSuite( TestLatch.class );
+
+        // test suite for a non-Callable/Runnable Future.
+        suite.addTestSuite(TestHaltable.class);
 
         return suite;
         
