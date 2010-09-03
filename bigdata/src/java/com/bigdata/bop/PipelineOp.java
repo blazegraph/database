@@ -41,9 +41,14 @@ import com.bigdata.relation.accesspath.IBuffer;
  * 
  * @param <E>
  *            The generic type of the objects processed by the operator.
- *            
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo It is too confusion to have an interface hierarchy which is separate
+ *       from the class hierarchy for the operators. Therefore roll this
+ *       interface into {@link AbstractPipelineOp} and then rename that class to
+ *       {@link PipelineOp}
  */
 public interface PipelineOp<E> extends BOp {
 

@@ -21,10 +21,8 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.bop.engine;
+package com.bigdata.bop.bset;
 
-
-import com.bigdata.util.concurrent.TestHaltable;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -61,27 +59,16 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("query engine");
+        final TestSuite suite = new TestSuite("binding set operators");
 
-        // test suite for some pipeline evaluation utility methods.
-        suite.addTestSuite(TestPipelineUtility.class);
+        // test simple binding set copy.
+        suite.addTestSuite(TestCopyBindingSets.class);
 
-        /*
-         * test suites for receiving buffers and files from a remote service in
-         * support of distributed query evaluation.
-         * 
-         * @todo The local copy of BufferService and its test suites needs to be
-         * reconciled back into the trunk and also into the HA branch, from
-         * which this version was derived.
-         */
-        suite.addTestSuite(TestReceiveBuffer.class);
-        suite.addTestSuite(TestReceiveFile.class);
-        
-        // test suite for query evaluation (basic JOINs).
-        suite.addTestSuite(TestQueryEngine.class);
+        // test conditional routing of binding sets in a pipeline.
+        suite.addTestSuite(TestConditionalRoutingOp.class);
 
-        // test suite for query evaluation (DISTINCT, ORDER BY, GROUP BY).
-        suite.addTestSuite(TestQueryEngine2.class);
+        // test distinct operator for binding sets.
+        suite.addTestSuite(TestUnionBindingSets.class);
 
         return suite;
         

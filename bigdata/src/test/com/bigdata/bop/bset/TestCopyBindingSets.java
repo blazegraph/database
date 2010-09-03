@@ -25,32 +25,32 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Sep 2, 2010
  */
 
-package com.bigdata.bop.aggregation;
+package com.bigdata.bop.bset;
 
 import junit.framework.TestCase2;
 
 /**
- * Test suite for {@link Union}.
+ * Test suite for {@link CopyBindingSetOp}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestUnionBindingSets extends TestCase2 {
+public class TestCopyBindingSets extends TestCase2 {
 
     /**
      * 
      */
-    public TestUnionBindingSets() {
+    public TestCopyBindingSets() {
     }
 
     /**
      * @param name
      */
-    public TestUnionBindingSets(String name) {
+    public TestCopyBindingSets(String name) {
         super(name);
     }
 
-    public void test_unionBindingSets() {
+    public void test_copyBindingSets() {
 
         fail("write tests");
         

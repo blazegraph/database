@@ -43,11 +43,11 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.PipelineStartOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
+import com.bigdata.bop.bset.CopyBindingSetOp;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -208,7 +208,7 @@ public class TestQueryEngine extends TestCase2 {
     public void test_query_startRun() throws Exception {
 
         final int startId = 1;
-        final BindingSetPipelineOp query = new PipelineStartOp(new BOp[] {}, NV
+        final BindingSetPipelineOp query = new CopyBindingSetOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 }));
@@ -276,7 +276,7 @@ public class TestQueryEngine extends TestCase2 {
         final int predId = 3;
         final BindingSetPipelineOp query = new PipelineJoin(
         // left
-                new PipelineStartOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new CopyBindingSetOp(new BOp[] {}, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
                         })),
                 // right
@@ -420,7 +420,7 @@ public class TestQueryEngine extends TestCase2 {
         final int joinId2 = 4;
         final int predId2 = 5;
         
-        final BindingSetPipelineOp startOp = new PipelineStartOp(new BOp[] {},
+        final BindingSetPipelineOp startOp = new CopyBindingSetOp(new BOp[] {},
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
                         }));

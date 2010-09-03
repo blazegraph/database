@@ -45,11 +45,11 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.PipelineStartOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
+import com.bigdata.bop.bset.CopyBindingSetOp;
 import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.bop.join.PipelineJoin.PipelineJoinStats;
@@ -177,7 +177,7 @@ public class TestPipelineJoin extends TestCase2 {
         final int predId = 3;
         final PipelineJoin query = new PipelineJoin(
         // left
-                new PipelineStartOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new CopyBindingSetOp(new BOp[] {}, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
                         })),
                 // right
@@ -272,7 +272,7 @@ public class TestPipelineJoin extends TestCase2 {
         final int predId = 3;
         final PipelineJoin query = new PipelineJoin(
         // left
-                new PipelineStartOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new CopyBindingSetOp(new BOp[] {}, NV.asMap(new NV[] {//
                         new NV(BOpBase.Annotations.BOP_ID, startId),//
                         })),
                 // right
@@ -377,7 +377,7 @@ public class TestPipelineJoin extends TestCase2 {
         final int predId = 3;
         final PipelineJoin query = new PipelineJoin(
         // left
-                new PipelineStartOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new CopyBindingSetOp(new BOp[] {}, NV.asMap(new NV[] {//
                         new NV(BOpBase.Annotations.BOP_ID, startId),//
                         })),
                 // right
@@ -491,7 +491,7 @@ public class TestPipelineJoin extends TestCase2 {
 
         final PipelineJoin query = new PipelineJoin(
         // left
-                new PipelineStartOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new CopyBindingSetOp(new BOp[] {}, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
                         })),
                 // right
@@ -607,7 +607,7 @@ public class TestPipelineJoin extends TestCase2 {
 
         final PipelineJoin query = new PipelineJoin(
         // left
-                new PipelineStartOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new CopyBindingSetOp(new BOp[] {}, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
                         })),
                 // right

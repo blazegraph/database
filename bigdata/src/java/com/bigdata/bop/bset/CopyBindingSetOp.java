@@ -25,12 +25,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 25, 2010
  */
 
-package com.bigdata.bop;
+package com.bigdata.bop.bset;
 
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -42,8 +46,10 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo unit tests.
  */
-public class PipelineStartOp extends BindingSetPipelineOp {
+public class CopyBindingSetOp extends BindingSetPipelineOp {
 
     /**
      * 
@@ -55,7 +61,7 @@ public class PipelineStartOp extends BindingSetPipelineOp {
      * 
      * @param op
      */
-    public PipelineStartOp(PipelineStartOp op) {
+    public CopyBindingSetOp(CopyBindingSetOp op) {
         super(op);
     }
 
@@ -65,7 +71,7 @@ public class PipelineStartOp extends BindingSetPipelineOp {
      * @param args
      * @param annotations
      */
-    public PipelineStartOp(BOp[] args, Map<String, Object> annotations) {
+    public CopyBindingSetOp(BOp[] args, Map<String, Object> annotations) {
         super(args, annotations);
     }
 
@@ -106,6 +112,7 @@ public class PipelineStartOp extends BindingSetPipelineOp {
                     stats.chunksOut.increment();
                     stats.unitsOut.add(chunk.length);
                 }
+                sink.flush();
                 return null;
             } finally {
                 sink.close();
