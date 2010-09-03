@@ -1944,7 +1944,7 @@ abstract public class WriteCacheService implements IWriteCache {
 			final WriteCache cache = recordMap.remove(offset);
 			if (cache == null)
 				return;
-			acquireForWriter(); // in case current
+			final WriteCache cur = acquireForWriter(); // in case current
 			debugAddrs(offset, 0, 'F');
 			try {
 				cache.clearAddrMap(offset);
