@@ -821,9 +821,9 @@ abstract public class WriteCache implements IWriteCache {
 
 			if (useChecksum) {
 
-				final int chk = tmp.getInt(pos + md.recordLength - 4);
+				final int chk = tmp.getInt(pos + reclen);
 
-				if (chk != ChecksumUtility.threadChk.get().checksum(b, 0/* offset */, b.length)) {
+				if (chk != ChecksumUtility.threadChk.get().checksum(b, 0/* offset */, reclen)) {
 
 					// Note: [offset] is a (possibly relative) file offset.
 					throw new ChecksumError("offset=" + offset);
@@ -1713,6 +1713,9 @@ abstract public class WriteCache implements IWriteCache {
 	 * write also and the buffer will be flushed either on commit or a
 	 * subsequent write.
 	 * 
+	 * A problem previously existed with unsynchronized access to the ByteBuffer.
+	 * Resulting in a conflict over the position() and buffer corruption.
+	 * 
 	 * @param addr
 	 *            The address of a cache entry.
 	 * 
@@ -1735,15 +1738,18 @@ abstract public class WriteCache implements IWriteCache {
 			final ByteBuffer tmp = acquire();
 			try {
 				if (tmp.remaining() >= 12) {
-					int spos = tmp.position();
-					tmp.putLong(addr);
-					tmp.putInt(0);
-					if (checker != null) {
-						// update the checksum (no side-effects on [data])
-						ByteBuffer chkBuf = tmp.asReadOnlyBuffer();
-						chkBuf.position(spos);
-						chkBuf.limit(tmp.position());
-						checker.update(chkBuf);
+					// We must synchronize
+					synchronized (tmp) {
+						int spos = tmp.position();
+						tmp.putLong(addr);
+						tmp.putInt(0);
+						if (checker != null) {
+							// update the checksum (no side-effects on [data])
+							ByteBuffer chkBuf = tmp.asReadOnlyBuffer();
+							chkBuf.position(spos);
+							chkBuf.limit(tmp.position());
+							checker.update(chkBuf);
+						}
 					}
 				}
 			} finally {
