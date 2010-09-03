@@ -60,6 +60,7 @@ import com.bigdata.journal.JournalTransactionService;
 import com.bigdata.journal.Options;
 import com.bigdata.journal.RWStrategy.FileMetadataView;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -1119,7 +1120,9 @@ public class RWStore implements IStore {
 		
 	}
 
+	private long immediateFreeCount = 0;
 	private void immediateFree(final int addr, final int sze) {
+		
 		switch (addr) {
 		case 0:
 		case -1:
@@ -2629,7 +2632,7 @@ public class RWStore implements IStore {
 				
 			}, 5L, TimeUnit.MILLISECONDS);
 			
-			if (false) freeAllDeferrals(freeTime);
+			freeCurrentDeferrals(freeTime);
 		} catch (RuntimeException e) {
 			// fine, will try again later
 		} catch (Exception e) {
@@ -2644,12 +2647,12 @@ public class RWStore implements IStore {
 	 * 
 	 * @param txnRelease - the max release time
 	 */
-	protected void freeAllDeferrals(long txnRelease) {
-		System.out.println("freeAllDeferrals");
+	protected void freeCurrentDeferrals(long txnRelease) {
 		
 		m_deferFreeLock.lock();
 		try {
-			if (m_lastDeferredReleaseTime <= txnRelease) {
+			if (m_rb.getLastCommitTime() <= txnRelease) {
+//				System.out.println("freeCurrentDeferrals");
 				final Iterator<Integer> curdefers = m_currentTxnFreeList.iterator();
 				while (curdefers.hasNext()) {
 					final int rwaddr = curdefers.next();
@@ -2664,8 +2667,6 @@ public class RWStore implements IStore {
 					}
 				}
 				m_currentTxnFreeList.clear();
-				
-				m_lastDeferredReleaseTime = txnRelease;
 			}
 		} finally {
 			m_deferFreeLock.unlock();
