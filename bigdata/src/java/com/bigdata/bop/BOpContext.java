@@ -27,20 +27,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.bop;
 
-import java.util.Iterator;
-
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -49,11 +47,10 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.striterator.IKeyOrder;
+import com.ibm.icu.impl.ByteBuffer;
 
 /**
  * The evaluation context for the operator (NOT serializable).
@@ -65,13 +62,15 @@ public class BOpContext<E> {
 
     static private final Logger log = Logger.getLogger(BOpContext.class);
 
-    private final IBigdataFederation<?> fed;
-
-    private final IIndexManager indexManager;
-
-    private final long readTimestamp;
-
-    private final long writeTimestamp;
+    private final IRunningQuery runningQuery;
+    
+//    private final IBigdataFederation<?> fed;
+//
+//    private final IIndexManager indexManager;
+//
+//    private final long readTimestamp;
+//
+//    private final long writeTimestamp;
 
     private final int partitionId;
 
@@ -84,13 +83,25 @@ public class BOpContext<E> {
     private final IBlockingBuffer<E[]> sink2;
 
     /**
+     * The interface for a running query.
+     * <p>
+     * Note: In scale-out each node will have a distinct {@link IRunningQuery}
+     * object and the query controller will have access to additional state,
+     * such as the aggregation of the {@link BOpStats} for the query on all
+     * nodes.
+     */
+    public IRunningQuery getRunningQuery() {
+        return runningQuery;
+    }
+    
+    /**
      * The {@link IBigdataFederation} IFF the operator is being evaluated on an
      * {@link IBigdataFederation}. When evaluating operations against an
      * {@link IBigdataFederation}, this reference provides access to the
      * scale-out view of the indices and to other bigdata services.
      */
     public IBigdataFederation<?> getFederation() {
-        return fed;
+        return runningQuery.getFederation();
     }
 
     /**
@@ -100,7 +111,7 @@ public class BOpContext<E> {
      * {@link ILocalBTreeView}.
      */
     public final IIndexManager getIndexManager() {
-        return indexManager;
+        return runningQuery.getIndexManager();
     }
 
     /**
@@ -108,7 +119,7 @@ public class BOpContext<E> {
      * reading.
      */
     public final long getReadTimestamp() {
-        return readTimestamp;
+        return runningQuery.getReadTimestamp();
     }
 
     /**
@@ -116,7 +127,7 @@ public class BOpContext<E> {
      * writing.
      */
     public final long getWriteTimestamp() {
-        return writeTimestamp;
+        return runningQuery.getWriteTimestamp();
     }
 
     /**
@@ -137,6 +148,22 @@ public class BOpContext<E> {
 
     /**
      * Where to read the data to be consumed by the operator.
+     * 
+     * @todo Since joins now run from locally materialized data in all cases the
+     *       API could be simplified somewhat given that we know that there will
+     *       be a single "source" chunk of binding sets. Also, the reason for
+     *       the {@link IAsynchronousIterator} here is that a downstream join
+     *       could error (or satisfy a slice) and halt the upstream joins. That
+     *       is being coordinated through the {@link RunningQuery} now.
+     *       <p>
+     *       It is not yet clear what the right API is for the source. The
+     *       iterator model might be just fine, but might not need to be
+     *       asynchronous and does not need to be closeable.
+     *       <p>
+     *       Perhaps the right thing is to expose an object with a richer API
+     *       for obtaining various kinds of iterators or even access to the
+     *       direct {@link ByteBuffer}s backing the data (for high volume joins,
+     *       exernal merge sorts, etc).
      */
     public final IAsynchronousIterator<E[]> getSource() {
         return source;
@@ -194,18 +221,6 @@ public class BOpContext<E> {
      *            failed joins outside of the join group.
      * 
      * @throws IllegalArgumentException
-     *             if the <i>indexManager</i> is <code>null</code>
-     * @throws IllegalArgumentException
-     *             if the <i>indexManager</i> is is not a <em>local</em> index
-     *             manager.
-     * @throws IllegalArgumentException
-     *             if the <i>readTimestamp</i> is {@link ITx#UNISOLATED}
-     *             (queries may not read on the unisolated indices).
-     * @throws IllegalArgumentException
-     *             if the <i>writeTimestamp</i> is neither
-     *             {@link ITx#UNISOLATED} nor a read-write transaction
-     *             identifier.
-     * @throws IllegalArgumentException
      *             if the <i>stats</i> is <code>null</code>
      * @throws IllegalArgumentException
      *             if the <i>source</i> is <code>null</code> (use an empty
@@ -213,37 +228,47 @@ public class BOpContext<E> {
      * @throws IllegalArgumentException
      *             if the <i>sink</i> is <code>null</code>
      */
-    public BOpContext(final IBigdataFederation<?> fed,
-            final IIndexManager indexManager, final long readTimestamp,
-            final long writeTimestamp, final int partitionId,
+//    * @throws IllegalArgumentException
+//    *             if the <i>indexManager</i> is <code>null</code>
+//    * @throws IllegalArgumentException
+//    *             if the <i>indexManager</i> is is not a <em>local</em> index
+//    *             manager.
+//    * @throws IllegalArgumentException
+//    *             if the <i>readTimestamp</i> is {@link ITx#UNISOLATED}
+//    *             (queries may not read on the unisolated indices).
+//    * @throws IllegalArgumentException
+//    *             if the <i>writeTimestamp</i> is neither
+//    *             {@link ITx#UNISOLATED} nor a read-write transaction
+//    *             identifier.
+    public BOpContext(final IRunningQuery runningQuery,final int partitionId,
             final BOpStats stats, final IAsynchronousIterator<E[]> source,
             final IBlockingBuffer<E[]> sink, final IBlockingBuffer<E[]> sink2) {
-        if (indexManager == null)
-            throw new IllegalArgumentException();
-        if (indexManager instanceof IBigdataFederation<?>) {
-            /*
-             * This is disallowed because the predicate specifies an index
-             * partition and expects to have access to the local index objects
-             * for that index partition.
-             */
-            throw new IllegalArgumentException(
-                    "Expecting a local index manager, not: "
-                            + indexManager.getClass().toString());
-        }
-        if (readTimestamp == ITx.UNISOLATED)
-            throw new IllegalArgumentException();
-        if (TimestampUtility.isReadOnly(writeTimestamp))
-            throw new IllegalArgumentException();
+        this.runningQuery = runningQuery;
+//        if (indexManager == null)
+//            throw new IllegalArgumentException();
+//        if (indexManager instanceof IBigdataFederation<?>) {
+//            /*
+//             * This is disallowed because predicates always read on local index
+//             * objects, even in scale-out.
+//             */
+//            throw new IllegalArgumentException(
+//                    "Expecting a local index manager, not: "
+//                            + indexManager.getClass().toString());
+//        }
+//        if (readTimestamp == ITx.UNISOLATED)
+//            throw new IllegalArgumentException();
+//        if (TimestampUtility.isReadOnly(writeTimestamp))
+//            throw new IllegalArgumentException();
         if (stats == null)
             throw new IllegalArgumentException();
         if (source == null)
             throw new IllegalArgumentException();
         if (sink == null)
             throw new IllegalArgumentException();
-        this.fed = fed; // may be null
-        this.indexManager = indexManager;
-        this.readTimestamp = readTimestamp;
-        this.writeTimestamp = writeTimestamp;
+//        this.fed = fed; // may be null
+//        this.indexManager = indexManager;
+//        this.readTimestamp = readTimestamp;
+//        this.writeTimestamp = writeTimestamp;
         this.partitionId = partitionId;
         this.stats = stats;
         this.source = source;
@@ -344,24 +369,28 @@ public class BOpContext<E> {
 
         if (partitionId == -1) {
 
-            if(indexManager instanceof IBigdataFederation<?>)
+            if (getFederation() != null) {
+                // This is scale-out so the partition identifier is required. 
                 throw new UnsupportedOperationException();
+            }
             
             // The index is not partitioned.
-            ndx = (ILocalBTreeView) indexManager.getIndex(namespace + "."
+            ndx = (ILocalBTreeView) getIndexManager().getIndex(namespace + "."
                     + keyOrder.getIndexName(), getWriteTimestamp());
 
         } else {
 
-            if(!(indexManager instanceof IBigdataFederation<?>))
+            if (getFederation() == null) {
+                // This is not scale-out so index partitions are not supported.
                 throw new UnsupportedOperationException();
+            }
 
             // The name of the desired index partition.
             final String name = DataService.getIndexPartitionName(namespace
                     + "." + keyOrder.getIndexName(), partitionId);
 
             // MUST be a local index view.
-            ndx = (ILocalBTreeView) indexManager.getIndex(name,
+            ndx = (ILocalBTreeView) getIndexManager().getIndex(name,
                     getWriteTimestamp());
 
         }
@@ -426,6 +455,10 @@ public class BOpContext<E> {
         final int fullyBufferedReadThreshold = predicate.getProperty(
                 PipelineOp.Annotations.FULLY_BUFFERED_READ_THRESHOLD,
                 PipelineOp.Annotations.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD);
+        
+        final IIndexManager indexManager = getIndexManager();
+        
+        final long readTimestamp = getReadTimestamp();
         
         if (predicate.getPartitionId() != -1) {
 
@@ -669,6 +702,8 @@ public class BOpContext<E> {
      * with that thrown cause.
      */
     public void halt() {
+
+        runningQuery.halt();
         
     }
     

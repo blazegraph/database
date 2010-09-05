@@ -51,6 +51,7 @@ import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
 import com.bigdata.bop.bset.CopyBindingSetOp;
 import com.bigdata.bop.constraint.INBinarySearch;
+import com.bigdata.bop.engine.MockRunningQuery;
 import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.bop.join.PipelineJoin.PipelineJoinStats;
 import com.bigdata.journal.BufferMode;
@@ -215,9 +216,9 @@ public class TestPipelineJoin extends TestCase2 {
         final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer();
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                null/* fed */, jnl/* indexManager */,
+                new MockRunningQuery(null/* fed */, jnl/* indexManager */,
                 ITx.READ_COMMITTED/* readTimestamp */,
-                ITx.UNISOLATED/* writeTimestamp */, -1/* partitionId */, stats,
+                ITx.UNISOLATED/* writeTimestamp */), -1/* partitionId */, stats,
                 source, sink, null/* sink2 */);
 
         // get task.
@@ -312,9 +313,9 @@ public class TestPipelineJoin extends TestCase2 {
         final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer();
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                null/* fed */, jnl/* indexManager */,
+                new MockRunningQuery(null/* fed */, jnl/* indexManager */,
                 ITx.READ_COMMITTED/* readTimestamp */,
-                ITx.UNISOLATED/* writeTimestamp */, -1/* partitionId */, stats,
+                ITx.UNISOLATED/* writeTimestamp */), -1/* partitionId */, stats,
                 source, sink, null/* sink2 */);
 
         // get task.
@@ -435,9 +436,9 @@ public class TestPipelineJoin extends TestCase2 {
         final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer();
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                null/* fed */, jnl/* indexManager */,
+                new MockRunningQuery(null/* fed */, jnl/* indexManager */,
                 ITx.READ_COMMITTED/* readTimestamp */,
-                ITx.UNISOLATED/* writeTimestamp */, -1/* partitionId */, stats,
+                ITx.UNISOLATED/* writeTimestamp */), -1/* partitionId */, stats,
                 source, sink, null/* sink2 */);
 
         // get task.
@@ -553,9 +554,9 @@ public class TestPipelineJoin extends TestCase2 {
         final PipelineJoinStats stats = query.newStats();
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                null/* fed */, jnl/* indexManager */,
+                new MockRunningQuery(null/* fed */, jnl/* indexManager */,
                 ITx.READ_COMMITTED/* readTimestamp */,
-                ITx.UNISOLATED/* writeTimestamp */, -1/* partitionId */, stats,
+                ITx.UNISOLATED/* writeTimestamp */), -1/* partitionId */, stats,
                 source, sink, null/* sink2 */);
 
         // get task.
@@ -675,9 +676,9 @@ public class TestPipelineJoin extends TestCase2 {
         final PipelineJoinStats stats = query.newStats();
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                null/* fed */, jnl/* indexManager */,
+                new MockRunningQuery(null/* fed */, jnl/* indexManager */,
                 ITx.READ_COMMITTED/* readTimestamp */,
-                ITx.UNISOLATED/* writeTimestamp */, -1/* partitionId */, stats,
+                ITx.UNISOLATED/* writeTimestamp */), -1/* partitionId */, stats,
                 source, sink, sink2);
 
         // get task.

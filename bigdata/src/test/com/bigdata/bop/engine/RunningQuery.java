@@ -59,6 +59,8 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NoSuchBOpException;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bset.Union;
+import com.bigdata.bop.solutions.SliceOp;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.IMutableRelation;
@@ -69,8 +71,9 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.Program;
-import com.bigdata.relation.rule.eval.pipeline.DistributedJoinMasterTask;
+import com.bigdata.relation.rule.eval.pipeline.DistributedJoinTask;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ndx.IAsynchronousWriteBufferFactory;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -82,7 +85,7 @@ import com.bigdata.util.concurrent.Haltable;
  * 
  * @todo HA aspects of running queries?  Checkpoints for long running queries?
  */
-public class RunningQuery implements Future<Map<Integer,BOpStats>> {
+public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuery {
 
     private final static transient Logger log = Logger
             .getLogger(RunningQuery.class);
@@ -887,10 +890,8 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>> {
         final IBlockingBuffer<IBindingSet[]> altSink = altSinkId == null ? null
                 : op.newBuffer();
         // context
-        final BOpContext context = new BOpContext(queryEngine.getFederation(),
-                queryEngine.getLocalIndexManager(), readTimestamp,
-                writeTimestamp, chunk.partitionId, op.newStats(), chunk.source,
-                sink, altSink);
+        final BOpContext context = new BOpContext(this, chunk.partitionId, op
+                .newStats(), chunk.source, sink, altSink);
         // FutureTask for operator execution (not running yet).
         final FutureTask<Void> f = op.eval(context);
         // Hook the FutureTask.
@@ -976,9 +977,21 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>> {
      * various methods in order to clean up the state of a completed query.
      */
 
+    public void halt() {
+
+        cancel(true/* mayInterruptIfRunning */);
+
+    }
+
     /**
-     * @todo Cancelled queries must reject or drop new chunks, etc. Queries must
-     *       release all of their resources when they are done().
+     * @todo Cancelled queries must reject or drop new chunks, etc.
+     *       <p>
+     *       Queries must release all of their resources when they are done().
+     *       <p>
+     *       Queries MUST NOT cause the solutions to be discarded before the
+     *       client can consume them. This means that we have to carefully
+     *       integrate/product {@link SliceOp} or just wrap the query buffer to
+     *       impose the slice (simpler).
      */
     final public boolean cancel(final boolean mayInterruptIfRunning) {
         // halt the query.
@@ -1026,6 +1039,22 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>> {
 
         return future.isDone();
         
+    }
+
+    public IBigdataFederation<?> getFederation() {
+        return queryEngine.getFederation();
+    }
+
+    public IIndexManager getIndexManager() {
+        return queryEngine.getLocalIndexManager();
+    }
+
+    public long getReadTimestamp() {
+        return readTimestamp;
+    }
+
+    public long getWriteTimestamp() {
+        return writeTimestamp;
     }
 
 }
