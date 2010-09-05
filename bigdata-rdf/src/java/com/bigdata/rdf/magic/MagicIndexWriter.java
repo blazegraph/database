@@ -51,7 +51,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.LongAggregator;
-import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rdf.magic.MagicIndexWriteProc.IndexWriteProcConstructor;
 import com.bigdata.relation.accesspath.IElementFilter;
 
@@ -209,7 +208,7 @@ public class MagicIndexWriter implements Callable<Long> {
 
         final byte[][] vals = new byte[numTuples][];
 
-        final ByteArrayBuffer vbuf = new ByteArrayBuffer(1+8/*max length*/);
+//        final ByteArrayBuffer vbuf = new ByteArrayBuffer(1+8/*max length*/);
         
         for (int i = 0; i < numTuples; i++) {
 

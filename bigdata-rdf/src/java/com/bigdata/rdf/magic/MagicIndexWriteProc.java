@@ -61,7 +61,6 @@ import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: MagicIndexWriteProc.java 2265 2009-10-26 12:51:06Z thompsonbry
  *          $
- * 
  */
 public class MagicIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
         IParallelizableIndexProcedure, IMutableRelationIndexWriteProcedure, 

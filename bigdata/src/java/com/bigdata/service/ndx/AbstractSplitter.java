@@ -93,6 +93,9 @@ abstract public class AbstractSplitter implements ISplitter {
      * easy for applications to produce unordered data which would then quietly
      * violate this expectation if we relied on asserts.
      * 
+     * @return The list of {@link Split}s. Each {@link Split#pmd} pairs the keys
+     *         in the (fromIndex,toIndex] range with a {@link PartitionLocator}.
+     * 
      * @see Arrays#sort(Object[], int, int, java.util.Comparator)
      * 
      * @see BytesUtil#compareBytes(byte[], byte[])
@@ -105,8 +108,8 @@ abstract public class AbstractSplitter implements ISplitter {
      *       index partition. The only effective cache technique may be an LRU
      *       that scans ~10 caches locators to see if any of them is a match
      *       before reaching out to the remote {@link IMetadataService}. Or
-     *       perhaps the locators can be cached in a local BTree and a miss
-     *       there would result in a read through to the remote
+     *       perhaps the locators can be cached in a local data structure and a
+     *       miss there would result in a read through to the remote
      *       {@link IMetadataService} but then we have the problem of figuring
      *       out when to release locators if the client is long-lived.
      */

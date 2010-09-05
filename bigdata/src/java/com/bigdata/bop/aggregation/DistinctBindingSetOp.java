@@ -88,14 +88,6 @@ public class DistinctBindingSetOp extends BindingSetPipelineOp {
 
         super(args, annotations);
 
-        final IVariable<?>[] vars = getVariables();
-
-        if (vars == null)
-            throw new IllegalArgumentException();
-
-        if (vars.length == 0)
-            throw new IllegalArgumentException();
-
     }
 
     /**
@@ -133,7 +125,7 @@ public class DistinctBindingSetOp extends BindingSetPipelineOp {
      */
     public IVariable<?>[] getVariables() {
 
-        return (IVariable<?>[]) annotations.get(Annotations.VARIABLES);
+        return getRequiredProperty(Annotations.VARIABLES);
         
     }
 
@@ -207,6 +199,12 @@ public class DistinctBindingSetOp extends BindingSetPipelineOp {
             this.context = context;
 
             this.vars = op.getVariables();
+
+            if (vars == null)
+                throw new IllegalArgumentException();
+
+            if (vars.length == 0)
+                throw new IllegalArgumentException();
 
             this.map = new ConcurrentHashMap<Solution, Solution>(
                     op.getInitialCapacity(), op.getLoadFactor(),
@@ -305,12 +303,13 @@ public class DistinctBindingSetOp extends BindingSetPipelineOp {
 
                 }
 
+                sink.flush();
+
                 // done.
                 return null;
                 
             } finally {
 
-                sink.flush();
                 sink.close();
 
                 // discard the map.

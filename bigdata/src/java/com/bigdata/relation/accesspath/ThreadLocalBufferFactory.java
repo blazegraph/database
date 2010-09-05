@@ -32,31 +32,26 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.AbstractBTree;
 import com.bigdata.relation.rule.eval.pipeline.JoinTask;
 import com.bigdata.util.concurrent.Haltable;
 
 /**
  * A factory pattern for per-thread objects whose life cycle is tied to some
- * container. For example, there may be an instance of this pool for a
- * {@link JoinTask} or an {@link AbstractBTree}. The pool can be torn down when
- * the container is torn down, which prevents its thread-local references from
- * escaping.
+ * container. . The pool can be torn down when the container is torn down, which
+ * prevents its thread-local references from escaping.
+ * <p>
+ * Note: This implementation uses a true thread local buffers managed by a
+ * {@link ConcurrentHashMap}. This approach has approximately 3x higher
+ * concurrency than striped locks. The advantage of striped locks is that you
+ * can directly manage the #of buffers when when the threads using those buffers
+ * is unbounded. However, doing so could lead to deadlock since two threads can
+ * be hashed onto the same buffer object.
  * 
  * @author thompsonbry@users.sourceforge.net
- * @version $Id$
+ * @version $Id: ThreadLocalBufferFactory.java 3500 2010-09-03 00:27:45Z
+ *          thompsonbry $
  * @param <T>
  *            The generic type of the thread-local object.
- * 
- * @todo There should be two implementations of a common interface or abstract
- *       base class: one based on a private {@link ConcurrentHashMap} and the
- *       other on striped locks. The advantage of the {@link ConcurrentHashMap}
- *       is approximately 3x higher concurrency. The advantage of striped locks
- *       is that you can directly manage the #of buffers when when the threads
- *       using those buffers is unbounded. However, doing so could lead to
- *       deadlock since two threads can be hashed onto the same buffer object.
- * 
- * @todo refactor into our concurrency package?
  */
 abstract public class ThreadLocalBufferFactory<T extends IBuffer<E>, E> {
 
@@ -197,25 +192,6 @@ abstract public class ThreadLocalBufferFactory<T extends IBuffer<E>, E> {
                 log.info("Reset " + n + " unsynchronized buffers");
         }
     }
-
-    // /**
-    // * Reset the per-{@link Thread} unsynchronized output buffers
-    // (used as
-    // * part of error handling for the {@link JoinTask}).
-    // */
-    // final protected void resetUnsyncBuffers() throws Exception {
-    //
-    // final int n = threadLocalBufferFactory.reset();
-    // .close(new
-    // Visitor<AbstractUnsynchronizedArrayBuffer<IBindingSet>>() {
-    //
-    // @Override
-    // public void meet(
-    // final AbstractUnsynchronizedArrayBuffer<IBindingSet> b)
-    // throws Exception {
-    //
-    //
-    // }
 
     /**
      * Create and return a new object.

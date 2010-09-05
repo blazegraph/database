@@ -31,6 +31,7 @@ package com.bigdata.rdf.magic;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
@@ -38,6 +39,7 @@ import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
+import com.bigdata.striterator.IKeyOrder;
 
 public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,MagicTuple> {
 
@@ -49,7 +51,7 @@ public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,Magi
     /**
      * The natural order for the index.
      */
-    private MagicKeyOrder keyOrder;
+    private IKeyOrder<IMagicTuple> keyOrder;
     
     /**
      * De-serialization constructor.
@@ -64,7 +66,7 @@ public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,Magi
      * @param keyOrder
      *            The access path.
      */
-    public MagicTupleSerializer(MagicKeyOrder keyOrder) {
+    public MagicTupleSerializer(IKeyOrder<IMagicTuple> keyOrder) {
 
         super(new ASCIIKeyBuilderFactory(), 
                 getDefaultLeafKeysCoder(),
@@ -87,7 +89,7 @@ public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,Magi
 
         final int arity = keyOrder.getKeyArity();
         
-        final int[] keyMap = keyOrder.getKeyMap();
+        final int[] keyMap = ((MagicKeyOrder)keyOrder).getKeyMap();
         
         /*
          * Decode the key.
@@ -124,7 +126,7 @@ public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,Magi
 
     public byte[] serializeKey(final MagicTuple magicTuple) {
         
-        return magicTuple2Key(keyOrder, magicTuple);
+        return magicTuple2Key((MagicKeyOrder)keyOrder, magicTuple);
         
     }
 

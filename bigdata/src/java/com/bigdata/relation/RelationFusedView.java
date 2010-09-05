@@ -1,6 +1,7 @@
 package com.bigdata.relation;
 
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -16,6 +17,8 @@ import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.AccessPathFusedView;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.striterator.IKeyOrder;
+
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * A factory for fused views reading from both of the source {@link IRelation}s.
@@ -118,6 +121,23 @@ public class RelationFusedView<E> implements IRelation<E> {
     
     }
 
+    /**
+     * The value for the first relation in the view.
+     */
+    public IKeyOrder<E> getPrimaryKeyOrder() {
+        
+        return relation1.getPrimaryKeyOrder();
+        
+    }
+    
+    @SuppressWarnings("unchecked")
+    public Iterator<IKeyOrder<E>> getKeyOrders() {
+        
+        return new Striterator(relation1.getKeyOrders()).append(relation2
+                .getKeyOrders());
+        
+    }
+
     public ExecutorService getExecutorService() {
         
         return relation1.getExecutorService();
@@ -154,15 +174,6 @@ public class RelationFusedView<E> implements IRelation<E> {
 
     }
 
-    /**
-     * The value for the first relation in the view.
-     */
-    public IKeyOrder<E> getPrimaryKeyOrder() {
-        
-        return relation1.getPrimaryKeyOrder();
-        
-    }
-    
     /*
      * Note: These methods can not be implemented for the fused view.
      */

@@ -85,6 +85,9 @@ public class TestAll extends TestCase {
         // access path operators
         suite.addTest(com.bigdata.bop.ap.TestAll.suite());
 
+        // mutation operators
+        suite.addTest(com.bigdata.bop.mutation.TestAll.suite());
+
         // join operators.
         suite.addTest(com.bigdata.bop.join.TestAll.suite());
 

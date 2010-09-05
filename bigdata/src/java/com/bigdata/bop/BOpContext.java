@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.bop;
 
+import java.util.Iterator;
+
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.engine.BOpStats;
@@ -36,6 +38,7 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -44,8 +47,10 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.IJoinNexus;
+import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -270,11 +275,99 @@ public class BOpContext<E> {
      */
     public IRelation getReadRelation(final IPredicate<?> pred) {
 
+        /*
+         * @todo Cache the resource locator?
+         * 
+         * @todo This should be using the federation as the index manager when
+         * locating a resource for scale-out, right? But s/o reads must use the
+         * local index manager when actually obtaining the index view for the
+         * relation.
+         */
         return (IRelation) getIndexManager().getResourceLocator().locate(
                 pred.getOnlyRelationName(), getReadTimestamp());
 
     }
 
+    /**
+     * Return a writable view of the relation.
+     * 
+     * @param namespace
+     *            The namespace of the relation.
+     *            
+     * @return A writable view of the relation.
+     */
+    public IRelation getWriteRelation(final String namespace) {
+
+        /*
+         * @todo Cache the resource locator?
+         * 
+         * @todo This should be using the federation as the index manager when
+         * locating a resource for scale-out, right?  But s/o writes must use
+         * the local index manager when actually obtaining the index view for
+         * the relation.
+         */
+        return (IRelation) getIndexManager().getResourceLocator().locate(
+                namespace, getWriteTimestamp());
+
+    }
+
+    /**
+     * Return an mutable view of the specified index.
+     * 
+     * @param <T>
+     *            The generic type of the elements in the relation.
+     * @param relation
+     *            The relation.
+     * @param keyOrder
+     *            The key order for that index.
+     * @param partitionId
+     *            The partition identifier and <code>-1</code> unless running
+     *            against an {@link IBigdataFederation}.
+     * 
+     * @return The mutable view of the index.
+     * 
+     * @throws UnsupportedOperationException
+     *             if there is an attempt to read on an index partition when the
+     *             database is not an {@link IBigdataFederation} or when the
+     *             database is an {@link IBigdataFederation} unless the index
+     *             partition was specified.
+     */
+    public <T> ILocalBTreeView getMutableLocalIndexView(
+            final IRelation<T> relation, final IKeyOrder<T> keyOrder,
+            final int partitionId) {
+
+        final String namespace = relation.getNamespace();
+
+        final ILocalBTreeView ndx;
+
+        if (partitionId == -1) {
+
+            if(indexManager instanceof IBigdataFederation<?>)
+                throw new UnsupportedOperationException();
+            
+            // The index is not partitioned.
+            ndx = (ILocalBTreeView) indexManager.getIndex(namespace + "."
+                    + keyOrder.getIndexName(), getWriteTimestamp());
+
+        } else {
+
+            if(!(indexManager instanceof IBigdataFederation<?>))
+                throw new UnsupportedOperationException();
+
+            // The name of the desired index partition.
+            final String name = DataService.getIndexPartitionName(namespace
+                    + "." + keyOrder.getIndexName(), partitionId);
+
+            // MUST be a local index view.
+            ndx = (ILocalBTreeView) indexManager.getIndex(name,
+                    getWriteTimestamp());
+
+        }
+
+        return ndx;
+
+    }
+    
     /**
      * Obtain an access path reading from relation for the specified predicate
      * (from the tail of some rule).
@@ -558,5 +651,56 @@ public class BOpContext<E> {
         return true;
 
     }
-    
+
+/*
+ * I've replaced this with AbstractSplitter for the moment.
+ */
+//    /**
+//     * Return an iterator visiting the {@link PartitionLocator} for the index
+//     * partitions from which an {@link IAccessPath} must read in order to
+//     * materialize all elements which would be visited for that predicate.
+//     * 
+//     * @param predicate
+//     *            The predicate on which the next stage in the pipeline must
+//     *            read, with whatever bindings already applied. This is used to
+//     *            discover the shard(s) which span the key range against which
+//     *            the access path must read.
+//     * 
+//     * @return The iterator.
+//     */
+//    public Iterator<PartitionLocator> locatorScan(final IPredicate<?> predicate) {
+//
+//        final long timestamp = getReadTimestamp();
+//
+//        // Note: assumes that we are NOT using a view of two relations.
+//        final IRelation<?> relation = (IRelation<?>) fed.getResourceLocator()
+//                .locate(predicate.getOnlyRelationName(), timestamp);
+//
+//        /*
+//         * Find the best access path for the predicate for that relation.
+//         * 
+//         * Note: All we really want is the [fromKey] and [toKey] for that
+//         * predicate and index. This MUST NOT layer on expanders since the
+//         * layering also hides the [fromKey] and [toKey].
+//         */
+//        @SuppressWarnings("unchecked")
+//        final AccessPath<?> accessPath = (AccessPath<?>) relation
+//                .getAccessPath((IPredicate) predicate);
+//
+//        // Note: assumes scale-out (EDS or JDS).
+//        final IClientIndex ndx = (IClientIndex) accessPath.getIndex();
+//
+//        /*
+//         * Note: could also be formed from relationName + "." +
+//         * keyOrder.getIndexName(), which is cheaper unless the index metadata
+//         * is cached.
+//         */
+//        final String name = ndx.getIndexMetadata().getName();
+//
+//        return ((AbstractScaleOutFederation<?>) fed).locatorScan(name,
+//                timestamp, accessPath.getFromKey(), accessPath.getToKey(),
+//                false/* reverse */);
+//
+//    }
+
 }

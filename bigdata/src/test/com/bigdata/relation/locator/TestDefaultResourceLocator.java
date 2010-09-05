@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.locator;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -39,7 +40,6 @@ import junit.framework.TestCase2;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.BufferMode;
@@ -327,6 +327,22 @@ public class TestDefaultResourceLocator extends TestCase2 {
             return null;
         }
 
+
+        public IKeyOrder getPrimaryKeyOrder() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public Iterator getKeyOrders() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+        public IKeyOrder getKeyOrder(IPredicate p) {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
 //        public Object newElement(IPredicate predicate, IBindingSet bindingSet) {
 //            // TODO Auto-generated method stub
 //            return null;
@@ -342,17 +358,6 @@ public class TestDefaultResourceLocator extends TestCase2 {
             return null;
 
         }
-
-        public IKeyOrder getPrimaryKeyOrder() {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-        public IKeyOrder getKeyOrder(IPredicate p) {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
     }
     
 }

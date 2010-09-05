@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.engine;
 
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 
@@ -57,6 +58,7 @@ import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.striterator.ChunkedArrayIterator;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Test suite for the {@link QueryEngine} against a local database instance.
@@ -255,7 +257,7 @@ public class TestQueryEngine extends TestCase2 {
             new HashBindingSet() //
             };
 
-            assertSolutions(expected, runningQuery.iterator());
+            assertSameSolutions(expected, runningQuery.iterator());
         }
         
     }
@@ -318,7 +320,7 @@ public class TestQueryEngine extends TestCase2 {
                 newBindingSetIterator(new HashBindingSet())));
 
         // verify solutions.
-        assertSolutions(expected, runningQuery.iterator());
+        assertSameSolutions(expected, runningQuery.iterator());
 
         // Wait until the query is done.
         final Map<Integer,BOpStats> statsMap = runningQuery.get();
@@ -495,7 +497,7 @@ public class TestQueryEngine extends TestCase2 {
                             new Constant<String>("Leon") }//
             ) };
 
-            assertSolutions(expected, runningQuery.iterator());
+            assertSameSolutions(expected, runningQuery.iterator());
         
         }
 
@@ -579,7 +581,7 @@ public class TestQueryEngine extends TestCase2 {
      * @param expected
      * @param itr
      */
-    static public void assertSolutions(final IBindingSet[] expected,
+    static public void assertSameSolutions(final IBindingSet[] expected,
             final IAsynchronousIterator<IBindingSet[]> itr) {
         try {
             int n = 0;
@@ -605,6 +607,84 @@ public class TestQueryEngine extends TestCase2 {
         } finally {
             itr.close();
         }
+    }
+
+    /**
+     * Verifies that the iterator visits the specified objects in some arbitrary
+     * ordering and that the iterator is exhausted once all expected objects
+     * have been visited. The implementation uses a selection without
+     * replacement "pattern".
+     */
+    static public <T> void assertSameSolutionsAnyOrder(final T[] expected,
+            final Iterator<T> actual) {
+
+        assertSameSolutionsAnyOrder("", expected, actual);
+
+    }
+
+    /**
+     * Verifies that the iterator visits the specified objects in some arbitrary
+     * ordering and that the iterator is exhausted once all expected objects
+     * have been visited. The implementation uses a selection without
+     * replacement "pattern".
+     */
+    static public <T> void assertSameSolutionsAnyOrder(final String msg,
+            final T[] expected, final Iterator<T> actual) {
+
+        try {
+        
+        // Populate a map that we will use to realize the match and
+        // selection without replacement logic.
+
+        final int nrange = expected.length;
+
+        final java.util.Map<T,T> range = new java.util.HashMap<T,T>();
+
+        for (int j = 0; j < nrange; j++) {
+
+            range.put(expected[j], expected[j]);
+
+        }
+
+        // Do selection without replacement for the objects visited by
+        // iterator.
+
+        for (int j = 0; j < nrange; j++) {
+
+            if (!actual.hasNext()) {
+
+                fail(msg + ": Index exhausted while expecting more object(s)"
+                        + ": index=" + j);
+
+            }
+
+            final T actualObject = actual.next();
+
+            if (range.remove(actualObject) == null) {
+
+                fail("Object not expected" + ": index=" + j + ", object="
+                        + actualObject);
+
+            }
+
+        }
+
+        if (actual.hasNext()) {
+
+            fail("Iterator will deliver too many objects.");
+
+        }
+        
+        } finally {
+            
+            if (actual instanceof ICloseableIterator<?>) {
+
+                ((ICloseableIterator<T>) actual).close();
+
+            }
+
+        }
+
     }
 
 }

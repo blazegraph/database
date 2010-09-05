@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -39,6 +40,8 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.locator.ILocatableResource;
@@ -116,25 +119,31 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
     E newElement(List<IVariableOrConstant<?>> a, IBindingSet bindingSet);
 
     /**
-     * Return the {@link IKeyOrder} for the primary index for the relation.
-     */
-    IKeyOrder<E> getPrimaryKeyOrder();
-
-    /**
      * Return the fully qualified name of each index maintained by this
      * relation.
      * 
      * @return An immutable set of the index names for the relation.
      * 
-     * @deprecated Replace with getKeyOrders() (see below).
+     * @deprecated by {@link #getKeyOrders()}. However, note that some odd ball
+     *             cases exist such as the free text index of the
+     *             {@link LexiconRelation} and the justifications index of the
+     *             {@link SPORelation}.  These are currently enumerated by
+     *             {@link #getIndexNames()} but they are not enumerated by
+     *             {@link #getKeyOrders()} since they are not a simple 
+     *             transform of the original relation.
      */
     Set<String> getIndexNames();
 
-//    /**
-//     * Return the {@link IKeyOrder}s corresponding to the registered indices for
-//     * this relation. [rather than getIndexNames?]
-//     */
-//    Iterator<IKeyOrder<E>> getKeyOrders();
+    /**
+     * Return the {@link IKeyOrder} for the primary index for the relation.
+     */
+    IKeyOrder<E> getPrimaryKeyOrder();
+
+    /**
+     * Return the {@link IKeyOrder}s corresponding to the registered indices for
+     * this relation. [rather than getIndexNames?]
+     */
+    Iterator<IKeyOrder<E>> getKeyOrders();
 
     /**
      * Return the {@link IKeyOrder} for the predicate corresponding to the

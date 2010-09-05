@@ -127,6 +127,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
             .getLogger(SPORelation.class);
 
     private final Set<String> indexNames;
+    private final List<SPOKeyOrder> keyOrders;
 
     private final int keyArity;
 
@@ -271,6 +272,9 @@ public class SPORelation extends AbstractRelation<ISPO> {
                 if (oneAccessPath) {
 
                     set.add(getFQN(SPOKeyOrder.SPO));
+                    
+                    keyOrders = Collections.unmodifiableList(Arrays
+                            .asList(new SPOKeyOrder[] { SPOKeyOrder.SPO }));
 
                 } else {
 
@@ -279,6 +283,10 @@ public class SPORelation extends AbstractRelation<ISPO> {
                     set.add(getFQN(SPOKeyOrder.POS));
 
                     set.add(getFQN(SPOKeyOrder.OSP));
+
+                    keyOrders = Collections.unmodifiableList(Arrays
+                            .asList(new SPOKeyOrder[] { SPOKeyOrder.SPO,
+                                    SPOKeyOrder.POS, SPOKeyOrder.OSP }));
 
                 }
 
@@ -291,13 +299,22 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
                     set.add(getFQN(SPOKeyOrder.SPOC));
                     
+                    keyOrders = Collections.unmodifiableList(Arrays
+                            .asList(new SPOKeyOrder[] { SPOKeyOrder.SPOC }));
+
                 } else {
 
+                    final List<SPOKeyOrder> tmp = new ArrayList<SPOKeyOrder>(6);
+                    
                     for (int i = SPOKeyOrder.FIRST_QUAD_INDEX; i <= SPOKeyOrder.LAST_QUAD_INDEX; i++) {
 
                         set.add(getFQN(SPOKeyOrder.valueOf(i)));
 
+                        tmp.add(SPOKeyOrder.valueOf(i));
+                        
                     }
+
+                    keyOrders = Collections.unmodifiableList(tmp);
 
                 }
                 
@@ -839,6 +856,13 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         return indexNames;
         
+    }
+
+    @SuppressWarnings("unchecked")
+    public Iterator<IKeyOrder<ISPO>> getKeyOrders() {
+
+        return (Iterator) keyOrders.iterator();
+
     }
 
     /**
@@ -1573,145 +1597,6 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     }
    
-//   /**
-//     * Extract the bound value from the predicate. When the predicate is not
-//     * bound at that index, then extract its binding from the binding set.
-//     * 
-//     * @param pred
-//     *            The predicate.
-//     * @param index
-//     *            The index into that predicate.
-//     * @param bindingSet
-//     *            The binding set.
-//     *            
-//     * @return The bound value.
-//     */
-//    @SuppressWarnings("unchecked")
-//    private IV asBound(final IPredicate<ISPO> pred, final int index,
-//            final IBindingSet bindingSet) {
-//
-//        final IVariableOrConstant<IV> t = pred.get(index);
-//
-//        final IConstant<IV> c;
-//        if(t.isVar()) {
-//            
-//            c = bindingSet.get((IVariable) t);
-//            
-//        } else {
-//            
-//            c = (IConstant<IV>)t;
-//            
-//        }
-//
-//        return c.get();
-//
-//    }
-
-//    /**
-//     * Return a buffer onto which a multi-threaded process may write chunks of
-//     * elements to be written on the relation asynchronously. Chunks will be
-//     * combined by a {@link BlockingBuffer} for greater efficiency. The buffer
-//     * should be {@link BlockingBuffer#close() closed} once no more data will be
-//     * written. This buffer may be used whether or not statement identifiers are
-//     * enabled and will eventually delegate its work to
-//     * {@link AbstractTripleStore#addStatements(AbstractTripleStore, boolean, IChunkedOrderedIterator, IElementFilter)}
-//     * <p>
-//     * The returned {@link BlockingBuffer} is thread-safe and is intended for
-//     * high concurrency use cases such as bulk loading data in which multiple
-//     * threads need to write on the relation concurrently. The use of this
-//     * buffer can substantially increase throughput for such use cases owing to
-//     * its ability to combine chunks together before they are scattered to the
-//     * indices. The effect is most pronounced for scale-out deployments when
-//     * each write would normally be scattered to a large number of index
-//     * partitions. By combining the chunks before they are scattered, the writes
-//     * against the index partitions can be larger. Increased throughput results
-//     * both from issuing fewer RMI requests, each of which must sit in a queue,
-//     * and from having more data in each request which results in more efficient
-//     * ordered writes on each index partition.
-//     * 
-//     * @param chunkSize
-//     *            The desired chunk size for a write operation (this is an
-//     *            explicit parameter since the desirable chunk size for a write
-//     *            can be much larger than the desired chunk size for a read).
-//     * 
-//     * @return A write buffer. The {@link Future} on the blocking buffer is the
-//     *         task draining the buffer and writing on the statement indices. It
-//     *         may be used to wait until the writes are stable on the federation
-//     *         or to cancel any outstanding writes.
-//     */
-//    synchronized public BlockingBuffer<ISPO[]> newWriteBuffer(final int chunkSize) {
-//
-//        final BlockingBuffer<ISPO[]> writeBuffer = new BlockingBuffer<ISPO[]>(
-//                getChunkOfChunksCapacity(), chunkSize/*getChunkCapacity()*/,
-//                getChunkTimeout(), TimeUnit.MILLISECONDS);
-//
-//        final Future<Void> future = getExecutorService().submit(
-//                new ChunkConsumerTask(writeBuffer.iterator()));
-//
-//        writeBuffer.setFuture(future);
-//
-//        return writeBuffer;
-//
-//    }
-//
-//    /**
-//     * Consumes elements from the source iterator, converting them into chunks
-//     * on a {@link BlockingBuffer}. The consumer will drain the chunks from the
-//     * buffer.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    private class ChunkConsumerTask implements Callable<Void> {
-//        
-//        /**
-//         * The source which this task is draining.
-//         * <p>
-//         * Note: DO NOT close this iterator from within {@link #call()} - that
-//         * would cause the task to interrupt itself!
-//         */
-//        private final IAsynchronousIterator<ISPO[]> src;
-//        
-//        public ChunkConsumerTask(final IAsynchronousIterator<ISPO[]> src) {
-//
-//            if (src == null)
-//                throw new IllegalArgumentException();
-//            
-//            this.src = src;
-//
-//        }
-//            
-//        public Void call() throws Exception {
-//
-//            long nchunks = 0;
-//            long nelements = 0;
-//
-//            while (src.hasNext()) {
-//
-//                final ISPO[] chunk = src.next();
-//
-//                nchunks++;
-//                nelements += chunk.length;
-//
-//                if (log.isDebugEnabled())
-//                    log.debug("#chunks=" + nchunks + ", chunkSize="
-//                            + chunk.length + ", nelements=" + nelements);
-//
-//                getContainer()
-//                        .addStatements(chunk, chunk.length, null/* filter */);
-//
-//            }
-//
-//            if (log.isInfoEnabled())
-//                log.info("Done: #chunks=" + nchunks + ", #elements="
-//                        + nelements);
-//
-//            return null;
-//
-//        }
-//
-//    }
-
     /**
      * Inserts {@link SPO}s, writing on the statement indices in parallel.
      * <p>
@@ -1799,7 +1684,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
     }
 
     /**
-     * Deletes {@link SPO}s, writing on the statement indices in parallel.
+     * Inserts {@link SPO}s, writing on the statement indices in parallel.
      * <p>
      * Note: The {@link ISPO#isModified()} flag is set by this method.
      * <p>

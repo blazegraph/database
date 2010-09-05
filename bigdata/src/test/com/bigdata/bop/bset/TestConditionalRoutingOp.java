@@ -223,8 +223,8 @@ public class TestConditionalRoutingOp extends TestCase2 {
         // execute task.
         jnl.getExecutorService().execute(ft);
 
-        TestQueryEngine.assertSolutions(expected, sink.iterator());
-        TestQueryEngine.assertSolutions(expected2, sink2.iterator());
+        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
+        TestQueryEngine.assertSameSolutions(expected2, sink2.iterator());
         
         assertTrue(ft.isDone());
         assertFalse(ft.isCancelled());

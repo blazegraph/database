@@ -26,30 +26,55 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Sep 24, 2008
  */
 
-package com.bigdata.relation.rule;
-
-import java.io.Serializable;
+package com.bigdata.bop.aggregation;
 
 import com.bigdata.bop.IVariable;
 
 /**
- * A variable and an order that will be imposed on the values for that variable.
+ * Default impl.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ISortOrder<E> extends Serializable {
+public class SortOrder<E> implements ISortOrder<E> {
 
     /**
-     * The variable whose values will be sorted.
+     * 
      */
-    IVariable<E> getVariable();
+    private static final long serialVersionUID = -669873421670514139L;
+
+    private final IVariable<E> var;
+    private final boolean asc;
 
     /**
-     * <code>true</code> iff the values will be placed into an ascending sort
-     * and <code>false</code> if the values will be placed into a descending
-     * sort.
+     * 
+     * @param var
+     *            The variable.
+     * @param asc
+     *            <code>true</code> for an ascending sort and
+     *            <code>false</code> for a descending sort.
      */
-    boolean isAscending();
-    
+    public SortOrder(final IVariable<E> var, final boolean asc) {
+
+        if (var == null)
+            throw new IllegalArgumentException();
+
+        this.var = var;
+        
+        this.asc = asc;
+        
+    }
+
+    public IVariable<E> getVariable() {
+        
+        return var;
+        
+    }
+
+    public boolean isAscending() {
+        
+        return asc;
+        
+    }
+
 }

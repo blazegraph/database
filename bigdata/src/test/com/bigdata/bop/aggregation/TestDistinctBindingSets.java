@@ -218,7 +218,7 @@ public class TestDistinctBindingSets extends TestCase2 {
         // execute task.
         jnl.getExecutorService().execute(ft);
 
-        TestQueryEngine.assertSolutions(expected, sink.iterator());
+        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
         
         assertTrue(ft.isDone());
         assertFalse(ft.isCancelled());

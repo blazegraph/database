@@ -30,12 +30,15 @@ package com.bigdata.bop;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp.Annotations;
+import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.AbstractNode;
 
 import cutthecrap.utils.striterators.Expander;
@@ -461,5 +464,66 @@ public class BOpUtility {
         return null;
 
     }
+
+
+    /**
+     * Combine chunks drawn from an iterator into a single chunk.
+     * 
+     * @param itr
+     *            The iterator
+     * @param stats
+     *            {@link BOpStats#chunksIn} and {@link BOpStats#unitsIn} are
+     *            updated.
+     * 
+     * @return A single chunk containing all of the chunks visited by the
+     *         iterator.
+     * 
+     * @todo unit tests.
+     */
+    static public IBindingSet[] toArray(final Iterator<IBindingSet[]> itr,
+            final BOpStats stats) {
+
+        final List<IBindingSet[]> list = new LinkedList<IBindingSet[]>();
+
+        int nchunks = 0, nelements = 0;
+        {
+
+            while (itr.hasNext()) {
+
+                final IBindingSet[] a = itr.next();
+
+                list.add(a);
+
+                nchunks++;
+
+                nelements += a.length;
+
+                list.add(a);
+
+            }
+
+            stats.chunksIn.add(nchunks);
+            stats.unitsIn.add(nelements);
+
+        }
+
+        if (nchunks == 0) {
+            return new IBindingSet[0];
+        } else if (nchunks == 1) {
+            return list.get(0);
+        } else {
+            int n = 0;
+            final IBindingSet[] a = new IBindingSet[nelements];
+            final Iterator<IBindingSet[]> itr2 = list.iterator();
+            while (itr2.hasNext()) {
+                final IBindingSet[] t = itr2.next();
+                System.arraycopy(t/* src */, 0/* srcPos */, a/* dest */,
+                        n/* destPos */, t.length/* length */);
+                n += t.length;
+            }
+            return a;
+        }
+
+    } // toArray()
 
 }
