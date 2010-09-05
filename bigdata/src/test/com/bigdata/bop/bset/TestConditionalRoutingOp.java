@@ -29,7 +29,6 @@ package com.bigdata.bop.bset;
 
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
@@ -47,11 +46,10 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.engine.MockRunningQuery;
 import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.bop.solutions.DistinctBindingSetOp;
-import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
@@ -79,25 +77,25 @@ public class TestConditionalRoutingOp extends TestCase2 {
         super(name);
     }
 
-    @Override
-    public Properties getProperties() {
+//    @Override
+//    public Properties getProperties() {
+//
+//        final Properties p = new Properties(super.getProperties());
+//
+//        p.setProperty(Journal.Options.BUFFER_MODE, BufferMode.Transient
+//                .toString());
+//
+//        return p;
+//        
+//    }
 
-        final Properties p = new Properties(super.getProperties());
-
-        p.setProperty(Journal.Options.BUFFER_MODE, BufferMode.Transient
-                .toString());
-
-        return p;
-        
-    }
-
-    Journal jnl = null;
+//    Journal jnl = null;
 
     List<IBindingSet> data = null;
 
     public void setUp() throws Exception {
 
-        jnl = new Journal(getProperties());
+//        jnl = new Journal(getProperties());
 
         setUpData();
 
@@ -147,10 +145,10 @@ public class TestConditionalRoutingOp extends TestCase2 {
 
     public void tearDown() throws Exception {
 
-        if (jnl != null) {
-            jnl.destroy();
-            jnl = null;
-        }
+//        if (jnl != null) {
+//            jnl.destroy();
+//            jnl = null;
+//        }
         
         // clear reference.
         data = null;
@@ -212,16 +210,18 @@ public class TestConditionalRoutingOp extends TestCase2 {
         final IBlockingBuffer<IBindingSet[]> sink2 = query.newBuffer();
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                null/* fed */, jnl/* indexManager */,
+                new MockRunningQuery(
+                null/* fed */, null/* indexManager */,
                 ITx.READ_COMMITTED/* readTimestamp */,
-                ITx.UNISOLATED/* writeTimestamp */, -1/* partitionId */, stats,
+                ITx.UNISOLATED/* writeTimestamp */), -1/* partitionId */, stats,
                 source, sink, sink2);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);
         
         // execute task.
-        jnl.getExecutorService().execute(ft);
+//        jnl.getExecutorService().execute(ft);
+        ft.run();
 
         TestQueryEngine.assertSameSolutions(expected, sink.iterator());
         TestQueryEngine.assertSameSolutions(expected2, sink2.iterator());

@@ -33,10 +33,10 @@ import java.util.Properties;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
@@ -59,6 +59,7 @@ import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ICloseableIterator;
+import com.ibm.icu.impl.ByteBuffer;
 
 /**
  * Test suite for the {@link QueryEngine} against a local database instance.
@@ -389,8 +390,34 @@ public class TestQueryEngine extends TestCase2 {
      *       the {@link PipelineDelayOp} can be used to impose sufficient
      *       latency on the pipeline that the test can close the query buffer
      *       iterator first].
+     *       <p>
+     *       This must also be tested in scale-out to make sure that the data
+     *       backing the solutions is not discarded before the caller can use
+     *       those data. [This could be handled by materializing binding set
+     *       objects out of a {@link ByteBuffer} rather than using a live decode
+     *       of the data in that {@link ByteBuffer}.]
      */
     public void test_query_closeIterator() {
+
+        fail("write test");
+
+    }
+
+    /**
+     * @todo Test ability to impose a limit/offset slice on a query.
+     *       <p>
+     *       Note: While the logic for visiting only the solutions selected by
+     *       the slice can be tested against a mock object, the integration by
+     *       which a slice halts a query when it is satisfied has to be tested
+     *       against a {@link QueryEngine}.
+     *       <p>
+     *       This must also be tested in scale-out to make sure that the data
+     *       backing the solutions is not discarded before the caller can use
+     *       those data. [This could be handled by materializing binding set
+     *       objects out of a {@link ByteBuffer} rather than using a live decode
+     *       of the data in that {@link ByteBuffer}.]
+     */
+    public void test_query_slice() {
 
         fail("write test");
 

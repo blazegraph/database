@@ -41,10 +41,12 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.service.IBigdataFederation;
 
@@ -580,6 +582,13 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      *         evaluating the query.
      * 
      * @throws Exception
+     * @throws IllegalArgumentException
+     *             if the <i>readTimestamp</i> is {@link ITx#UNISOLATED}
+     *             (queries may not read on the unisolated indices).
+     * @throws IllegalArgumentException
+     *             if the <i>writeTimestamp</i> is neither
+     *             {@link ITx#UNISOLATED} nor a read-write transaction
+     *             identifier.
      * 
      * @todo Consider elevating the read/write timestamps into the query plan as
      *       annotations. Closure would then rewrite the query plan for each
@@ -596,6 +605,10 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
             throws Exception {
 
         if (query == null)
+            throw new IllegalArgumentException();
+        if (readTimestamp == ITx.UNISOLATED)
+            throw new IllegalArgumentException();
+        if (TimestampUtility.isReadOnly(writeTimestamp))
             throw new IllegalArgumentException();
 
         final long timeout = query.getProperty(BOp.Annotations.TIMEOUT,

@@ -101,9 +101,6 @@ public class PipelineJoin extends BindingSetPipelineOp {
      */
     private static final long serialVersionUID = 1L;
 
-    /**
-     * @todo Declare SLICE annotation and support SLICE in the {@link JoinTask}.
-     */
     public interface Annotations extends BindingSetPipelineOp.Annotations {
 
         /**
@@ -478,11 +475,6 @@ public class PipelineJoin extends BindingSetPipelineOp {
             this.optional = joinOp.isOptional();
             this.variablesToKeep = joinOp.variablesToKeep();
             this.context = context;
-            /*
-             * FIXME Carefully review which index manager (local versus fed) is
-             * being used to resolve the relation. Also note that we used to
-             * cache the resourceLocator.
-             */
             this.relation = context.getReadRelation(right);
             this.source = context.getSource();
             this.sink = context.getSink();
