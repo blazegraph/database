@@ -68,12 +68,6 @@ import com.bigdata.striterator.ChunkedArrayIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo Write unit tests where the sink is closed by the consumer while the
- *       join is still running. For this test we need more data, whether in the
- *       source binding sets or in the access path. Joins are pretty quick so it
- *       is really difficult to test this outside of a stress test. BSBM is a
- *       good way to validate this (run the qualification trials).
  */
 public class TestPipelineJoin extends TestCase2 {
 

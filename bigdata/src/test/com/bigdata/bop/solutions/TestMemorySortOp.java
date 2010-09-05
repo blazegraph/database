@@ -25,38 +25,39 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 19, 2010
  */
 
-package com.bigdata.bop.aggregation;
+package com.bigdata.bop.solutions;
 
-import org.openrdf.model.Value;
-import org.openrdf.query.algebra.evaluation.util.ValueComparator;
+import com.bigdata.bop.solutions.ISortOrder;
+import com.bigdata.bop.solutions.MemorySortOp;
 
 import junit.framework.TestCase2;
 
 /**
- * Unit tests for the {@link SparqlBindingSetComparatorOp}.
+ * Unit tests for the {@link MemorySortOp}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestSPARQLBindingSetComparatorOp extends TestCase2 {
+public class TestMemorySortOp extends TestCase2 {
 
     /**
      * 
      */
-    public TestSPARQLBindingSetComparatorOp() {
+    public TestMemorySortOp() {
     }
 
     /**
      * @param name
      */
-    public TestSPARQLBindingSetComparatorOp(String name) {
+    public TestMemorySortOp(String name) {
         super(name);
     }
 
     /**
-     * @todo This test should just focus on the correctness of the binding set
-     *       comparator. We are relying on the {@link ValueComparator} to get
-     *       the SPARQL ordering correct for RDF {@link Value} objects.
+     * @todo unit tests for the in-memory sort operator. These tests should not
+     *       focus on SPARQL semantics. Instead, just test the ability to impose
+     *       the appropriate {@link ISortOrder}[] on some in-memory binding
+     *       sets.
      */
     public void test_something() {
 

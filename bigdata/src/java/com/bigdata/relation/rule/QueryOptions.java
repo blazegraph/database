@@ -30,8 +30,7 @@ package com.bigdata.relation.rule;
 
 import java.util.Arrays;
 
-import com.bigdata.bop.aggregation.ISlice;
-import com.bigdata.bop.aggregation.ISortOrder;
+import com.bigdata.bop.solutions.ISortOrder;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

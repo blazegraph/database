@@ -59,6 +59,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NoSuchBOpException;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bset.Union;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
@@ -317,6 +318,19 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>> {
      * implementations of joins, use an external merge sort, etc).</li>
      * </ul>
      * 
+     * FIXME SPARQL Coverage: Add native support for all SPARQL operators. A lot
+     * of this can be picked up from Sesame. Some things, such as isIRI() can be
+     * done natively against the {@link IV}. Likewise, there is already a set of
+     * comparison methods for {@link IV}s which are inlined values. Add support
+     * for
+     * <ul>
+     * <li></li>
+     * <li></li>
+     * <li></li>
+     * <li></li>
+     * <li></li>
+     * <li></li>
+     * </ul>
      * 
      * FIXME buffer management for s/o, including binding sets movement, element
      * chunk movement for DHT on access path, and on demand materialization of

@@ -81,6 +81,14 @@ import com.bigdata.striterator.ICloseableIterator;
  * 
  * @todo test suite for join evaluation against an {@link JiniFederation} with
  *       2DS.
+ * 
+ * @todo Write unit tests where the query is cancelled (by a slice or by the
+ *       consumer closing the query buffer iterator) while the query is still
+ *       running and verify that the entire query is halted. For this test we
+ *       need more data, whether in the source binding sets or in the access
+ *       path. Joins are pretty quick so it is really difficult to test this
+ *       outside of a stress test. The BSBM (qualification run and benchmark
+ *       run) are a good way to validate this.
  */
 public class TestQueryEngine extends TestCase2 {
 
@@ -377,7 +385,10 @@ public class TestQueryEngine extends TestCase2 {
      *       the query has finished executing and verify that the query is
      *       correctly terminated [this is difficult to test without having
      *       significant data scale since there is an implicit race between the
-     *       consumer and the producer to close out the query evaluation].
+     *       consumer and the producer to close out the query evaluation, but
+     *       the {@link PipelineDelayOp} can be used to impose sufficient
+     *       latency on the pipeline that the test can close the query buffer
+     *       iterator first].
      */
     public void test_query_closeIterator() {
 

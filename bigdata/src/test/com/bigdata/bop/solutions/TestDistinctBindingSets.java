@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 19, 2010
  */
 
-package com.bigdata.bop.bset;
+package com.bigdata.bop.solutions;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -45,7 +45,6 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.bop.solutions.DistinctBindingSetOp;
@@ -64,18 +63,18 @@ import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
  * 
  * @todo write a unit test in which some variables are unbound.
  */
-public class TestConditionalRoutingOp extends TestCase2 {
+public class TestDistinctBindingSets extends TestCase2 {
 
     /**
      * 
      */
-    public TestConditionalRoutingOp() {
+    public TestDistinctBindingSets() {
     }
 
     /**
      * @param name
      */
-    public TestConditionalRoutingOp(String name) {
+    public TestDistinctBindingSets(String name) {
         super(name);
     }
 
@@ -109,37 +108,44 @@ public class TestConditionalRoutingOp extends TestCase2 {
     private void setUpData() {
 
         final Var<?> x = Var.var("x");
+        final Var<?> y = Var.var("y");
 
         data = new LinkedList<IBindingSet>();
             IBindingSet bset = null;
             {
                 bset = new HashBindingSet();
                 bset.set(x, new Constant<String>("John"));
+                bset.set(y, new Constant<String>("Mary"));
                 data.add(bset);
             }
             {
                 bset = new HashBindingSet();
                 bset.set(x, new Constant<String>("Mary"));
+                bset.set(y, new Constant<String>("Paul"));
                 data.add(bset);
             }
             {
                 bset = new HashBindingSet();
                 bset.set(x, new Constant<String>("Mary"));
+                bset.set(y, new Constant<String>("Jane"));
                 data.add(bset);
             }
             {
                 bset = new HashBindingSet();
                 bset.set(x, new Constant<String>("Paul"));
+                bset.set(y, new Constant<String>("Leon"));
                 data.add(bset);
             }
             {
                 bset = new HashBindingSet();
                 bset.set(x, new Constant<String>("Paul"));
+                bset.set(y, new Constant<String>("John"));
                 data.add(bset);
             }
             {
                 bset = new HashBindingSet();
                 bset.set(x, new Constant<String>("Leon"));
+                bset.set(y, new Constant<String>("Paul"));
                 data.add(bset);
             }
 
@@ -158,43 +164,34 @@ public class TestConditionalRoutingOp extends TestCase2 {
     }
 
     /**
-     * Unit test for conditional routing of binding sets.
+     * Unit test for distinct.
      * 
      * @throws ExecutionException 
      * @throws InterruptedException 
      */
-    public void test_conditionalRouting() throws InterruptedException,
+    public void test_distinctBindingSets() throws InterruptedException,
             ExecutionException {
 
         final Var<?> x = Var.var("x");
+//        final Var<?> y = Var.var("y");
         
-        final int bopId = 1;
+        final int distinctId = 1;
         
-        final ConditionalRoutingOp query = new ConditionalRoutingOp(new BOp[]{},
+        final DistinctBindingSetOp query = new DistinctBindingSetOp(new BOp[]{},
                 NV.asMap(new NV[]{//
-                    new NV(BOp.Annotations.BOP_ID,bopId),//
-                    new NV(ConditionalRoutingOp.Annotations.CONDITION,
-                            new EQConstant(x,new Constant<String>("Mary"))),//
+                    new NV(DistinctBindingSetOp.Annotations.BOP_ID,distinctId),//
+                    new NV(DistinctBindingSetOp.Annotations.VARIABLES,new IVariable[]{x}),//
                 }));
         
-        // the expected solutions (default sink).
+        // the expected solutions
         final IBindingSet[] expected = new IBindingSet[] {//
-                new ArrayBindingSet(//
-                        new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Mary") }//
-                ), new ArrayBindingSet(//
-                        new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Mary") }//
-                ), };
-
-        // the expected solutions (alt sink).
-        final IBindingSet[] expected2 = new IBindingSet[] {//
         new ArrayBindingSet(//
                 new IVariable[] { x },//
                 new IConstant[] { new Constant<String>("John") }//
-                ), new ArrayBindingSet(//
+                ),//
+                new ArrayBindingSet(//
                         new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Paul") }//
+                        new IConstant[] { new Constant<String>("Mary") }//
                 ), new ArrayBindingSet(//
                         new IVariable[] { x },//
                         new IConstant[] { new Constant<String>("Paul") }//
@@ -209,13 +206,12 @@ public class TestConditionalRoutingOp extends TestCase2 {
                 new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
 
         final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer();
-        final IBlockingBuffer<IBindingSet[]> sink2 = query.newBuffer();
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 null/* fed */, jnl/* indexManager */,
                 ITx.READ_COMMITTED/* readTimestamp */,
                 ITx.UNISOLATED/* writeTimestamp */, -1/* partitionId */, stats,
-                source, sink, sink2);
+                source, sink, null/* sink2 */);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);
@@ -224,7 +220,6 @@ public class TestConditionalRoutingOp extends TestCase2 {
         jnl.getExecutorService().execute(ft);
 
         TestQueryEngine.assertSameSolutions(expected, sink.iterator());
-        TestQueryEngine.assertSameSolutions(expected2, sink2.iterator());
         
         assertTrue(ft.isDone());
         assertFalse(ft.isCancelled());
@@ -232,8 +227,8 @@ public class TestConditionalRoutingOp extends TestCase2 {
 
         assertEquals(1L, stats.chunksIn.get());
         assertEquals(6L, stats.unitsIn.get());
-        assertEquals(6L, stats.unitsOut.get());
-        assertEquals(2L, stats.chunksOut.get());
+        assertEquals(4L, stats.unitsOut.get());
+        assertEquals(1L, stats.chunksOut.get());
 
     }
     

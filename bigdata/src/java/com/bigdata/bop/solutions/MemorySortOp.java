@@ -1,4 +1,4 @@
-package com.bigdata.bop.aggregation;
+package com.bigdata.bop.solutions;
 
 import java.util.Arrays;
 import java.util.Comparator;

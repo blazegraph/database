@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.bop.aggregation;
+package com.bigdata.bop.solutions;
 
 
 import junit.framework.Test;
@@ -59,7 +59,14 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("binding set distinct, sort, and aggregation operators");
+        final TestSuite suite = new TestSuite("solution modifier operators");
+
+        /*
+         * Slice
+         */
+        
+        // test slice(offset,limit) operator.
+        suite.addTestSuite(TestSliceOp.class);
 
         /*
          * Distinct
