@@ -25,44 +25,44 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Sep 4, 2010
  */
 
-package com.bigdata.bop.aggregation;
+package com.bigdata.bop.solutions;
 
-import java.util.Comparator;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpBase;
+import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.PipelineOp;
 
 /**
- * Base class for operators which impose a sort order on binding sets.
+ * Base class for operators which sort binding sets.  
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class ComparatorOp extends BOpBase implements
-        Comparator<IBindingSet> {
+abstract public class SortOp extends BindingSetPipelineOp {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends BOp.Annotations {
+    public interface Annotations extends BindingSetPipelineOp.Annotations {
 
         /**
-         * An {@link ISortOrder}[] specifying the variables on which the sort
-         * will be imposed and the order (ascending or descending) for each
-         * variable.
+         * The {@link ComparatorOp} which will impose the ordering on the
+         * binding sets.
+         * 
+         * @see ComparatorOp
          */
-        String ORDER = ComparatorOp.class.getName() + ".order";
+        String COMPARATOR = MemorySortOp.class.getName() + ".comparator";
 
     }
 
     /**
      * @param op
      */
-    public ComparatorOp(BOpBase op) {
+    public SortOp(PipelineOp<IBindingSet> op) {
         super(op);
     }
 
@@ -70,8 +70,17 @@ abstract public class ComparatorOp extends BOpBase implements
      * @param args
      * @param annotations
      */
-    public ComparatorOp(BOp[] args, Map<String, Object> annotations) {
+    public SortOp(BOp[] args, Map<String, Object> annotations) {
         super(args, annotations);
     }
 
+    /**
+     * @see Annotations#COMPARATOR
+     */
+    public ComparatorOp getComparator() {
+   
+        return getRequiredProperty(Annotations.COMPARATOR);
+    
+    }
+    
 }

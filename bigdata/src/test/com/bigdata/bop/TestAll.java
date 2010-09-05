@@ -92,7 +92,7 @@ public class TestAll extends TestCase {
         suite.addTest(com.bigdata.bop.join.TestAll.suite());
 
         // aggregation operators.
-        suite.addTest(com.bigdata.bop.aggregation.TestAll.suite());
+        suite.addTest(com.bigdata.bop.solutions.TestAll.suite());
 
         // query engine.
         suite.addTest(com.bigdata.bop.engine.TestAll.suite());

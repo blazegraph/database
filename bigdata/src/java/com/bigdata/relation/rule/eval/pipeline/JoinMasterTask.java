@@ -43,7 +43,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.aggregation.ISlice;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -56,6 +55,7 @@ import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.ISlice;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;

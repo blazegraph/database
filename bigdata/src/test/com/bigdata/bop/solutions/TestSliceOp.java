@@ -22,13 +22,12 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 19, 2010
+ * Created on Sep 5, 2010
  */
 
-package com.bigdata.bop.aggregation;
+package com.bigdata.bop.solutions;
 
-import java.util.LinkedList;
-import java.util.List;
+import java.util.ArrayList;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
@@ -47,6 +46,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.TestQueryEngine;
+import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -55,25 +55,23 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 
 /**
- * Unit tests for {@link DistinctBindingSetOp}.
+ * Unit tests for {@link SliceOp}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo write a unit test in which some variables are unbound.
  */
-public class TestDistinctBindingSets extends TestCase2 {
+public class TestSliceOp extends TestCase2 {
 
     /**
      * 
      */
-    public TestDistinctBindingSets() {
+    public TestSliceOp() {
     }
 
     /**
      * @param name
      */
-    public TestDistinctBindingSets(String name) {
+    public TestSliceOp(String name) {
         super(name);
     }
 
@@ -91,7 +89,7 @@ public class TestDistinctBindingSets extends TestCase2 {
 
     Journal jnl = null;
 
-    List<IBindingSet> data = null;
+    ArrayList<IBindingSet> data;
 
     public void setUp() throws Exception {
 
@@ -109,39 +107,39 @@ public class TestDistinctBindingSets extends TestCase2 {
         final Var<?> x = Var.var("x");
         final Var<?> y = Var.var("y");
 
-        data = new LinkedList<IBindingSet>();
+        data = new ArrayList<IBindingSet>();
             IBindingSet bset = null;
-            {
+            { // 0
                 bset = new HashBindingSet();
                 bset.set(x, new Constant<String>("John"));
                 bset.set(y, new Constant<String>("Mary"));
                 data.add(bset);
             }
-            {
+            { // 1
                 bset = new HashBindingSet();
                 bset.set(x, new Constant<String>("Mary"));
                 bset.set(y, new Constant<String>("Paul"));
                 data.add(bset);
             }
-            {
+            { // 2
                 bset = new HashBindingSet();
                 bset.set(x, new Constant<String>("Mary"));
                 bset.set(y, new Constant<String>("Jane"));
                 data.add(bset);
             }
-            {
+            { // 3
                 bset = new HashBindingSet();
                 bset.set(x, new Constant<String>("Paul"));
                 bset.set(y, new Constant<String>("Leon"));
                 data.add(bset);
             }
-            {
+            { // 4
                 bset = new HashBindingSet();
                 bset.set(x, new Constant<String>("Paul"));
                 bset.set(y, new Constant<String>("John"));
                 data.add(bset);
             }
-            {
+            { // 5
                 bset = new HashBindingSet();
                 bset.set(x, new Constant<String>("Leon"));
                 bset.set(y, new Constant<String>("Paul"));
@@ -163,40 +161,43 @@ public class TestDistinctBindingSets extends TestCase2 {
     }
 
     /**
-     * Unit test for distinct.
+     * Unit test for correct visitation for a variety of offset/limit values.
      * 
      * @throws ExecutionException 
      * @throws InterruptedException 
+     * 
+     * @todo correct rejection tests for bad offset/limit values.
      */
-    public void test_distinctBindingSets() throws InterruptedException,
-            ExecutionException {
+    public void test_slice() throws InterruptedException, ExecutionException {
 
         final Var<?> x = Var.var("x");
-//        final Var<?> y = Var.var("y");
+        final Var<?> y = Var.var("y");
+
+        final int bopId = 1;
         
-        final int distinctId = 1;
-        
-        final DistinctBindingSetOp query = new DistinctBindingSetOp(new BOp[]{},
+        final SliceOp query = new SliceOp(new BOp[]{},
                 NV.asMap(new NV[]{//
-                    new NV(DistinctBindingSetOp.Annotations.BOP_ID,distinctId),//
-                    new NV(DistinctBindingSetOp.Annotations.VARIABLES,new IVariable[]{x}),//
+                    new NV(SliceOp.Annotations.BOP_ID, bopId),//
+                    new NV(SliceOp.Annotations.OFFSET, 1L),//
+                    new NV(SliceOp.Annotations.LIMIT, 3L),//
                 }));
         
         // the expected solutions
         final IBindingSet[] expected = new IBindingSet[] {//
-        new ArrayBindingSet(//
-                new IVariable[] { x },//
-                new IConstant[] { new Constant<String>("John") }//
-                ),//
                 new ArrayBindingSet(//
-                        new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Mary") }//
-                ), new ArrayBindingSet(//
-                        new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Paul") }//
-                ), new ArrayBindingSet(//
-                        new IVariable[] { x },//
-                        new IConstant[] { new Constant<String>("Leon") }//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Mary"),
+                                new Constant<String>("Paul"), }//
+                ),
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Mary"),
+                                new Constant<String>("Jane") }//
+                ),
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Paul"),
+                                new Constant<String>("Leon") }//
                 ), };
 
         final BOpStats stats = query.newStats();
@@ -225,10 +226,10 @@ public class TestDistinctBindingSets extends TestCase2 {
         ft.get(); // verify nothing thrown.
 
         assertEquals(1L, stats.chunksIn.get());
-        assertEquals(6L, stats.unitsIn.get());
-        assertEquals(4L, stats.unitsOut.get());
+        assertEquals(4L, stats.unitsIn.get());
+        assertEquals(3L, stats.unitsOut.get());
         assertEquals(1L, stats.chunksOut.get());
 
     }
-    
+
 }
