@@ -232,7 +232,7 @@ public class TestPipelineJoin extends TestCase2 {
         // execute task.
         jnl.getExecutorService().execute(ft);
 
-        TestQueryEngine.assertSolutions(expected, sink.iterator());
+        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
 
         // join task
         assertEquals(1L, stats.chunksIn.get());
@@ -329,7 +329,7 @@ public class TestPipelineJoin extends TestCase2 {
         // execute task.
         jnl.getExecutorService().execute(ft);
 
-        TestQueryEngine.assertSolutions(expected, sink.iterator());
+        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
 
         // join task
         assertEquals(1L, stats.chunksIn.get());
@@ -452,7 +452,7 @@ public class TestPipelineJoin extends TestCase2 {
         // execute task.
         jnl.getExecutorService().execute(ft);
 
-        TestQueryEngine.assertSolutions(expected, sink.iterator());
+        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
 
         // join task
         assertEquals(1L, stats.chunksIn.get());
@@ -570,7 +570,7 @@ public class TestPipelineJoin extends TestCase2 {
         // execute task.
         jnl.getExecutorService().execute(ft);
 
-        TestQueryEngine.assertSolutions(expected, sink.iterator());
+        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
 
         // join task
         assertEquals(1L, stats.chunksIn.get());
@@ -692,8 +692,8 @@ public class TestPipelineJoin extends TestCase2 {
         // execute task.
         jnl.getExecutorService().execute(ft);
 
-        TestQueryEngine.assertSolutions(expected, sink.iterator());
-        TestQueryEngine.assertSolutions(expected2, sink2.iterator());
+        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
+        TestQueryEngine.assertSameSolutions(expected2, sink2.iterator());
 
         // join task
         assertEquals(1L, stats.chunksIn.get());

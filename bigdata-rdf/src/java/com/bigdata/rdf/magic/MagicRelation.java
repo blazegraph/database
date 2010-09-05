@@ -1,6 +1,7 @@
 package com.bigdata.rdf.magic;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -43,6 +44,7 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
     private final Set<String> indexNames;
     
     private transient MagicKeyOrder[] keyOrders;
+//    private transient IKeyOrder<IMagicTuple>[] keyOrders;
     
     public MagicRelation(final IIndexManager indexManager,
             final String namespace, final Long timestamp,
@@ -83,7 +85,7 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
             // store the key orders somewhere
             // indexManager.getGlobalRowStore().write(RelationSchema.INSTANCE, propertySet);
 
-            for (MagicKeyOrder keyOrder : keyOrders) {
+            for (IKeyOrder<IMagicTuple> keyOrder : keyOrders) {
             
                 if (log.isInfoEnabled()) {
                     log.info("creating index: " + getFQN(keyOrder));
@@ -115,9 +117,9 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
 
             final IIndexManager indexManager = getIndexManager();
 
-            final MagicKeyOrder[] keyOrders = getKeyOrders(); 
+//            final MagicKeyOrder[] keyOrders = getKeyOrders(); 
             
-            for (MagicKeyOrder keyOrder : keyOrders) {
+            for (IKeyOrder<IMagicTuple> keyOrder : keyOrders) {
                 
                 if (log.isInfoEnabled()) {
                     log.info("destroying index: " + getFQN(keyOrder));
@@ -144,7 +146,7 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
      * 
      * @return
      */
-    protected MagicKeyOrder[] getKeyOrders() {
+    public Iterator<IKeyOrder<IMagicTuple>> getKeyOrders() {
         
         if (keyOrders == null) {
             
@@ -152,12 +154,12 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
             
         }
         
-        return keyOrders;
+        return Arrays.asList((IKeyOrder<IMagicTuple>[])keyOrders).iterator();
 
     }
-    
+
     protected IndexMetadata getMagicTupleIndexMetadata(
-            final MagicKeyOrder keyOrder) {
+            final IKeyOrder<IMagicTuple> keyOrder) {
 
         final IndexMetadata metadata = newIndexMetadata(getFQN(keyOrder));
 
@@ -178,10 +180,12 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
 
     }
 
+    //@todo get rid of this and inherit the base class behavior.
     public long delete(IChunkedOrderedIterator<IMagicTuple> itr) {
         throw new UnsupportedOperationException("not implemented yet");
     }
 
+    //@todo get rid of this and inherit the base class behavior.
     public long insert(IChunkedOrderedIterator<IMagicTuple> itr) {
         
         try {
@@ -197,6 +201,7 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
         
     }
 
+    //@todo get rid of this and inherit the base class behavior.
     public long insert(final IMagicTuple[] tuples, final int numTuples) {
 
         if (tuples == null)
@@ -234,11 +239,11 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
         
         final List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
 
-        for (MagicKeyOrder keyOrder : getKeyOrders()) {
+        for (IKeyOrder<IMagicTuple> keyOrder : keyOrders) {
             
-            tasks.add(new MagicIndexWriter(this, tuples, numTuples, 
-                false/*clone*/, keyOrder, null/*filter*/, sortTime, insertTime, 
-                mutationCount));
+            tasks.add(new MagicIndexWriter(this, tuples, numTuples,
+                    false/* clone */, (MagicKeyOrder) keyOrder,
+                    null/* filter */, sortTime, insertTime, mutationCount));
             
         }
 
@@ -314,9 +319,9 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
 
     }
 
-    public MagicKeyOrder getPrimaryKeyOrder() {
+    public IKeyOrder<IMagicTuple> getPrimaryKeyOrder() {
         
-        return getKeyOrders()[0];
+        return keyOrders[0];
         
     }
     
@@ -374,7 +379,7 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
         int[] compact = new int[numBound];
         System.arraycopy(bound, 0, compact, 0, numBound);
         bound = compact;
-        MagicKeyOrder[] keyOrders = getKeyOrders();
+//        MagicKeyOrder[] keyOrders = getKeyOrders();
         if (numBound == 0 || numBound == arity) {
             return keyOrders[0];
         }

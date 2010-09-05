@@ -290,7 +290,7 @@ public abstract class AbstractUnsynchronizedArrayBuffer<E> implements IBuffer<E>
         
         final int n = size;
         
-        // move everthing onto the target buffer.
+        // move everything onto the target buffer.
         overflow();
         
         counter += n;

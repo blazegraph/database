@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -21,45 +21,53 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-/*
- * Created on Aug 19, 2010
- */
+package com.bigdata.bop.mutation;
 
-package com.bigdata.bop.aggregation;
 
-import junit.framework.TestCase2;
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 /**
- * Unit tests for sorting binding sets.
- * 
+ * Aggregates test suites into increasing dependency order.
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestSortBindingSets extends TestCase2 {
+public class TestAll extends TestCase {
 
     /**
      * 
      */
-    public TestSortBindingSets() {
+    public TestAll() {
+        
     }
 
     /**
-     * @param name
+     * @param arg0
      */
-    public TestSortBindingSets(String name) {
-        super(name);
+    public TestAll(String arg0) {
+     
+        super(arg0);
+        
     }
 
     /**
-     * @todo unit tests for in memory sorting.
-     * 
-     * @todo unit tests for local N-way merge sort.
-     * 
-     * @todo unit tests for distributed hash partitioned N-way merge sort.
+     * Returns a test that will run each of the implementation specific test
+     * suites in turn.
      */
-    public void test_something() {
+    public static Test suite()
+    {
 
-        fail("write tests");
+        final TestSuite suite = new TestSuite("mutation operators");
+
+        // test write on a relation/index.
+        suite.addTestSuite(TestInsert.class);
+
+        // test delete on a relation/index.
+        suite.addTestSuite(TestDelete.class);
+
+        return suite;
         
     }
     

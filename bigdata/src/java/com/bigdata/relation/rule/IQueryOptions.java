@@ -30,6 +30,8 @@ package com.bigdata.relation.rule;
 
 import java.io.Serializable;
 
+import com.bigdata.bop.aggregation.ISlice;
+import com.bigdata.bop.aggregation.ISortOrder;
 import com.bigdata.relation.rule.eval.IStepTask;
 import com.bigdata.striterator.DistinctFilter;
 

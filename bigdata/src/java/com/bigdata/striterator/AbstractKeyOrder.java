@@ -30,6 +30,8 @@ package com.bigdata.striterator;
 import com.bigdata.bop.IElement;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
 
@@ -45,11 +47,9 @@ abstract public class AbstractKeyOrder<E> implements IKeyOrder<E> {
     /**
      * {@inheritDoc}
      * 
-     * @todo While you can override
-     *       {@link #appendKeyComponent(IKeyBuilder, int, Object)} to use a
-     *       different encoding, this does not really let you handle something
-     *       which does not implement {@link IElement} without overriding
-     *       {@link #getKey(IKeyBuilder, Object)} as well.
+     *       FIXME This needs to be reconciled with
+     *       {@link ITupleSerializer#serializeKey(Object)}. For example, this
+     *       does not play well with the {@link DefaultTupleSerializer}.
      */
     public byte[] getKey(final IKeyBuilder keyBuilder, final E element) {
         

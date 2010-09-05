@@ -24,9 +24,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.fed;
 
 
-import com.bigdata.service.EmbeddedFederation;
-import com.bigdata.service.IBigdataFederation;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -58,14 +55,6 @@ public class TestAll extends TestCase {
     /**
      * Returns a test that will run each of the implementation specific test
      * suites in turn.
-     * 
-     * @todo I would like to be able to run these tests by instantiating map and
-     *       receive operators in a single JVM without any additional context.
-     *       However, there is a strong dependency right now on the
-     *       {@link IBigdataFederation}. While this means that we have to write
-     *       the operator level unit tests to the {@link EmbeddedFederation}, we
-     *       can write additional test suites which deal solely with the NIO
-     *       communications used by the map/receive operators.
      */
     public static Test suite()
     {
@@ -84,8 +73,11 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestMapBindingSetsOverShards.class);
 
         // unit tests for mapping binding sets over nodes. 
-        suite.addTestSuite(TestMapBindingSetsOverShards.class);
+        suite.addTestSuite(TestMapBindingSetsOverNodes.class);
 
+        // unit tests for the federated query engine.
+        suite.addTestSuite(TestFederatedQueryEngine.class);
+        
         return suite;
         
     }

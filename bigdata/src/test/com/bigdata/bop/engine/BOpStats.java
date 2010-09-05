@@ -39,6 +39,15 @@ import com.bigdata.counters.CAT;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo Add time per bop. This can not be directly aggregated into wall time
+ *       since there are concurrent processes. However, this will be useful
+ *       since we tend to process materialized chunks with the new
+ *       {@link QueryEngine} such that the operator evaluation time now more or
+ *       less directly corresponds to the time it takes to act on local data,
+ *       producing local outputs. The {@link QueryEngine} itself now handles the
+ *       transportation of data between the nodes so that time can be factored
+ *       out of the local aspects of query execution.
  */
 public class BOpStats implements Serializable {
 

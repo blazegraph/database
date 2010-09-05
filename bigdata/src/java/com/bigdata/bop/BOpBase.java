@@ -299,10 +299,21 @@ public class BOpBase implements BOp {
 
     }
 
-    public Object getProperty(final String name) {
+    public <T> T getProperty(final String name) {
 
-        return annotations.get(name);
+        return (T) annotations.get(name);
 
+    }
+
+    public <T> T getRequiredProperty(final String name) {
+
+        final T tmp = (T) annotations.get(name);
+
+        if (tmp == null)
+            throw new IllegalArgumentException("Required property: " + name);
+
+        return tmp;
+        
     }
 
     public String toString() {

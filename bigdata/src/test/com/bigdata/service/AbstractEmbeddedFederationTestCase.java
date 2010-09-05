@@ -78,11 +78,11 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
         super(arg0);
     }
 
-    protected IBigdataClient client;
-    protected IBigdataFederation fed;
-    protected IMetadataService metadataService;
-    protected IDataService dataService0;
-    protected IDataService dataService1;
+    public IBigdataClient<?> client;
+    public IBigdataFederation<?> fed;
+    public IMetadataService metadataService;
+    public IDataService dataService0;
+    public IDataService dataService1;
 
     public Properties getProperties() {
         
@@ -148,13 +148,13 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
         if (log.isInfoEnabled())
             log.info("metadataService: " + metadataService.getServiceUUID());
 
-        dataService0 = ((EmbeddedFederation) fed).getDataService(0);
+        dataService0 = ((EmbeddedFederation<?>) fed).getDataService(0);
         if (log.isInfoEnabled())
             log.info("dataService0   : " + dataService0.getServiceUUID());
 
-        if (((EmbeddedFederation) fed).getDataServiceCount() > 1) {
+        if (((EmbeddedFederation<?>) fed).getDataServiceCount() > 1) {
 
-            dataService1 = ((EmbeddedFederation) fed).getDataService(1);
+            dataService1 = ((EmbeddedFederation<?>) fed).getDataService(1);
             if (log.isInfoEnabled())
                 log.info("dataService1   : " + dataService1.getServiceUUID());
             
@@ -166,6 +166,13 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
     public void tearDown() throws Exception {
 
         client.disconnect(true/*immediateShutdown*/);
+        
+        // clear references.
+        client = null;
+        fed = null;
+        metadataService = null;
+        dataService0 = null;
+        dataService1 = null;
 
         /*
          * Optional cleanup after the test runs, but sometimes its helpful to be
@@ -392,7 +399,7 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
      */
     protected int getPartitionCount(final String name) {
         
-        final ITupleIterator itr = new RawDataServiceTupleIterator(
+        final ITupleIterator<?> itr = new RawDataServiceTupleIterator(
                 fed.getMetadataService(),//
                 MetadataService.getMetadataIndexName(name), //
                 ITx.READ_COMMITTED,//
@@ -410,7 +417,7 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
             
             n++;
          
-            final ITuple tuple = itr.next();
+            final ITuple<?> tuple = itr.next();
             
             if (log.isInfoEnabled())
                 log.info(SerializerUtil.deserialize(tuple.getValue()));

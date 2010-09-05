@@ -61,14 +61,35 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("binding set distinct, sort, and aggregation operators");
 
+        /*
+         * Distinct
+         */
+        
         // test distinct operator for binding sets.
         suite.addTestSuite(TestDistinctBindingSets.class);
 
-        // test sort operators.
-        suite.addTestSuite(TestSortBindingSets.class);
+        /*
+         * Sorting
+         */
+        
+        // unit test for the comparator to impose SPARQL sort order semantics.
+        suite.addTestSuite(TestSPARQLBindingSetComparatorOp.class);
+        
+        /*
+         * test sort operators.
+         * 
+         * @todo unit tests for external N-way merge sort.
+         * 
+         * @todo unit tests for distributed hash partitioned N-way merge sort.
+         */
+        suite.addTestSuite(TestMemorySortOp.class);
+
+        /*
+         * Aggregation
+         */
         
         // @todo test aggregation (rollup) operators.
-//        suite.addTestSuite(TestDistinctBindingSets.class);
+//        suite.addTestSuite(TestXXX.class);
 
         return suite;
         

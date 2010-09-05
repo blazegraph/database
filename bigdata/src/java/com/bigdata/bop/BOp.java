@@ -114,8 +114,21 @@ public interface BOp extends Cloneable, Serializable {
      * @return The value of the annotation and <code>null</code> if the
      *         annotation is not bound.
      */
-    Object getProperty(final String name);
+    <T> T getProperty(final String name);
 
+    /**
+     * Return the value of the named annotation.
+     * 
+     * @param name
+     *            The name of the annotation.
+     * 
+     * @return The value of the annotation.
+     * 
+     * @throws IllegalArgumentException
+     *             if the named annotation is not bound.
+     */
+    <T> T getRequiredProperty(final String name);
+    
     /**
      * Deep copy clone of the operator.
      */

@@ -28,8 +28,14 @@
 
 package com.bigdata.relation;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.IIndex;
@@ -43,10 +49,25 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.JustificationRemover;
+import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOAccessPath;
+import com.bigdata.rdf.spo.SPOIndexRemover;
+import com.bigdata.rdf.spo.SPOIndexWriter;
+import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.rdf.spo.SPORelation;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.InsertSolutionBuffer;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -56,11 +77,6 @@ import com.bigdata.striterator.IKeyOrder;
  * @version $Id$
  * @param <E>
  *            The generic type of the [E]lements of the relation.
- * 
- * @todo It would be interesting to do a GOM relation with its secondary index
- *       support and the addition of clustered indices. We would then get
- *       efficient JOINs via the rules layer for free and a high-level query
- *       language could be mapped onto those JOINs.
  */
 abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>> implements
         IMutableRelation<E> {
@@ -323,5 +339,5 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
                 getChunkCapacity(), getFullyBufferedReadThreshold()).init();
 
     }
-    
+        
 }

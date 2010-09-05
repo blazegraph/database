@@ -29,6 +29,7 @@ package com.bigdata.bop.ap;
 
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -39,14 +40,18 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.locator.ILocatableResource;
+import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.striterator.AbstractKeyOrder;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
+
+import cutthecrap.utils.striterators.SingleValueIterator;
 
 /**
  * Test relation composed of {@link E} elements with a single primary index.
@@ -122,6 +127,25 @@ public class R extends AbstractRelation<E> {
 
     }
 
+    /**
+     * Alternative {@link #create()} method creates the primary index using the
+     * specified separator keys and data services.
+     * 
+     * @see AbstractScaleOutFederation#registerIndex(IndexMetadata, byte[][],
+     *      UUID[])
+     */
+    public void create(final byte[][] separatorKeys, final UUID[] dataServices) {
+
+        super.create();
+
+        final IndexMetadata metadata = new IndexMetadata(
+                getFQN(primaryKeyOrder), UUID.randomUUID());
+
+        ((AbstractScaleOutFederation<?>) getIndexManager()).registerIndex(
+                metadata, separatorKeys, dataServices);
+
+    }
+
     public void destroy() {
 
         // drop indices.
@@ -166,6 +190,13 @@ public class R extends AbstractRelation<E> {
 
     }
 
+    @SuppressWarnings("unchecked")
+    public Iterator<IKeyOrder<E>> getKeyOrders() {
+        
+        return new SingleValueIterator(primaryKeyOrder);
+        
+    }
+    
     public IKeyOrder<E> getPrimaryKeyOrder() {
         
         return primaryKeyOrder;
@@ -187,6 +218,10 @@ public class R extends AbstractRelation<E> {
 
         final IIndex ndx = getIndex(primaryKeyOrder);
 
+        @SuppressWarnings("unchecked")
+        final ITupleSerializer<E, E> tupleSer = ndx.getIndexMetadata()
+                .getTupleSerializer();
+        
         final IKeyBuilder keyBuilder = ndx.getIndexMetadata().getKeyBuilder();
         
         while (itr.hasNext()) {
@@ -207,13 +242,12 @@ public class R extends AbstractRelation<E> {
                  * record in cases where the key can not be decoded (such as
                  * Unicode key components).
                  */
-                ndx.insert(key, e);
+                ndx.insert(key, tupleSer.serializeVal(e));
 
-//                if (log.isTraceEnabled())
-//                    log.trace
-                    System.err.println("insert: element=" + e + ", key="
+                if (log.isTraceEnabled())
+                    log.trace("insert: element=" + e + ", key="
                             + BytesUtil.toString(key));
-                
+
                 n++;
 
             }

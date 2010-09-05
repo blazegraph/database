@@ -1354,6 +1354,10 @@ public class FullTextIndex extends AbstractRelation {
         throw new UnsupportedOperationException();
     }
 
+    public Iterator getKeyOrders() {
+        throw new UnsupportedOperationException();
+    }
+
     @SuppressWarnings("unchecked")
     public Object newElement(List a,
             IBindingSet bindingSet) {

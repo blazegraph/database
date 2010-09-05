@@ -146,6 +146,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     private final Set<String> indexNames;
 
+    private final List<IKeyOrder<BigdataValue>> keyOrders;
+    
     private final AtomicReference<ITextIndexer> viewRef = new AtomicReference<ITextIndexer>();
 
 	@SuppressWarnings("unchecked")
@@ -315,6 +317,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             // @todo add names as registered to base class? but then how to
             // discover?  could be in the global row store.
             this.indexNames = Collections.unmodifiableSet(set);
+
+            this.keyOrders = Arrays
+                    .asList((IKeyOrder<BigdataValue>[]) new IKeyOrder[] {
+                            LexiconKeyOrder.TERM2ID, LexiconKeyOrder.ID2TERM });
 
         }
 
@@ -776,6 +782,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         return indexNames;
 
+    }
+
+    public Iterator<IKeyOrder<BigdataValue>> getKeyOrders() {
+        
+        return keyOrders.iterator();
+        
     }
     
     public LexiconKeyOrder getPrimaryKeyOrder() {

@@ -33,11 +33,11 @@ import java.util.Vector;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.aggregation.ISlice;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.ISlice;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.service.ILoadBalancerService;

@@ -29,6 +29,7 @@ package com.bigdata.striterator;
 
 import java.util.Comparator;
 
+import com.bigdata.bop.IElement;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.keys.IKeyBuilder;
 
@@ -81,8 +82,20 @@ public interface IKeyOrder<E> {
      *            The object which will be used to construct the key.
      * @param element
      *            An element for the associated relation.
-     *            
+     * 
      * @return The key for the index associated with this {@link IKeyOrder}.
+     * 
+     * @todo DDL: This does not really let you handle something which does not
+     *       implement {@link IElement} without overriding
+     *       {@link #getKey(IKeyBuilder, Object)}.
+     *       <p>
+     *       We should have named based access to the "elements" of a relation
+     *       based on a schema (DDL) but also support schema flexible access for
+     *       GOM. (RDF is a fixed schema in this sense with {s,p,o,c}
+     *       properties).
+     *       <p>
+     *       We will also need to support name-based {@link IPredicate}s in
+     *       order to work with GOM.
      */
     byte[] getKey(IKeyBuilder keyBuilder, E element);
 

@@ -221,11 +221,12 @@ public abstract class AbstractScaleOutFederation<T> extends AbstractFederation<T
      *       iterator could be used to merge the iterator results from each
      *       partition into a single totally ordered iterator.
      */
-    public IMetadataIndex getMetadataIndex(String name, long timestamp) {
+    public IMetadataIndex getMetadataIndex(final String name,
+            final long timestamp) {
 
         if (log.isInfoEnabled())
-            log.info("name="+name+" @ "+timestamp);
-        
+            log.info("name=" + name + " @ " + timestamp);
+
         assertOpen();
 
         return getMetadataIndexCache().getIndex(name, timestamp);

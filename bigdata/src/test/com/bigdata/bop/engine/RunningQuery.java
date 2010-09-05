@@ -48,28 +48,30 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
+import alice.tuprolog.Prolog;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BindingSetPipelineOp;
-import com.bigdata.bop.ChunkedOrderedIteratorOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NoSuchBOpException;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bset.Union;
+import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.Program;
+import com.bigdata.relation.rule.eval.pipeline.DistributedJoinMasterTask;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.ndx.IAsynchronousWriteBufferFactory;
 import com.bigdata.striterator.ChunkedArrayIterator;
-import com.bigdata.striterator.ChunkedOrderedStriterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.concurrent.Haltable;
@@ -243,7 +245,9 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>> {
      * This stack is a bit complex(!). But it is certainly easy enough to
      * generate the necessary bits programmatically.
      * 
-     * FIXME Handling the {@link Union} of binding sets.
+     * FIXME Handling the {@link Union} of binding sets. Consider whether the
+     * chunk combiner logic from the {@link DistributedJoinTask} could be
+     * reused.
      * 
      * FIXME INSERT and DELETE which will construct elements using
      * {@link IRelation#newElement(java.util.List, IBindingSet)} from a binding
@@ -255,7 +259,31 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>> {
      * consistent approaches to this as well. For justifications we need to
      * update some additional indices, in which case we are stuck going through
      * {@link IRelation} rather than routing data directly or using the
-     * {@link IAsynchronousWriteBufferFactory}.
+     * {@link IAsynchronousWriteBufferFactory}. For example, we could handle
+     * routing and writing in s/o as follows:
+     * 
+     * <pre>
+     * INSERT(relation,bindingSets) 
+     * 
+     * expands to
+     * 
+     * SEQUENCE(
+     * SELECT(s,p,o), // drop bindings that we do not need
+     * PARALLEL(
+     *   INSERT_INDEX(spo), // construct (s,p,o) elements and insert
+     *   INSERT_INDEX(pos), // construct (p,o,s) elements and insert
+     *   INSERT_INDEX(osp), // construct (o,s,p) elements and insert
+     * ))
+     * 
+     * </pre>
+     * 
+     * The output of the SELECT operator would be automatically mapped against
+     * the shards on which the next operators need to write. Since there is a
+     * nested PARALLEL operator, the mapping will be against the shards of each
+     * of the given indices. (A simpler operator would invoke
+     * {@link SPORelation#insert(IChunkedOrderedIterator)}. Handling
+     * justifications requires that we also formulate the justification chain
+     * from the pattern of variable bindings in the rule).
      * 
      * FIXME Handle {@link Program}s. There are three flavors, which should
      * probably be broken into three operators: sequence(ops), set(ops), and
@@ -266,6 +294,29 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>> {
      * characteristic which it uses to do the nested index subqueries).
      * 
      * FIXME SPARQL to BOP translation
+     * <p>
+     * The initial pass should translate from {@link IRule} to {@link BOp}s so
+     * we can immediately begin running SPARQL queries against the
+     * {@link QueryEngine}. A second pass should explore a rules base
+     * translation from the openrdf SPARQL operator tree into {@link BOp}s,
+     * perhaps using an embedded {@link Prolog} engine. What follows is a
+     * partial list of special considerations for that translation:
+     * <ul>
+     * <li>Distinct can be trivially enforced for default graph queries against
+     * the SPOC index.</li>
+     * <li>Local distinct should wait until there is more than one tuple from
+     * the index since a single tuple does not need to be made distinct using a
+     * hash map.</li>
+     * <li>Low volume distributed queries should use solution modifiers which
+     * evaluate on the query controller node rather than using distributed sort,
+     * distinct, slice, or aggregation operators.</li>
+     * <li></li>
+     * <li></li>
+     * <li></li>
+     * <li>High volume queries should use special operators (different
+     * implementations of joins, use an external merge sort, etc).</li>
+     * </ul>
+     * 
      * 
      * FIXME buffer management for s/o, including binding sets movement, element
      * chunk movement for DHT on access path, and on demand materialization of

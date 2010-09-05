@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Sep 24, 2008
  */
 
-package com.bigdata.relation.rule;
+package com.bigdata.bop.aggregation;
 
 import java.io.Externalizable;
 import java.io.IOException;
