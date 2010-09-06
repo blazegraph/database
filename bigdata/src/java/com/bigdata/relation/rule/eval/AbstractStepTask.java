@@ -319,7 +319,7 @@ abstract public class AbstractStepTask extends DataServiceCallable<RuleStats>
     /**
      * Run <i>this</i> task.
      * <p>
-     * If we are executing on a {@link DataService} then {@link #dataService}
+     * If we are executing on a {@link DataService} then {@link #getDataService()}
      * will have been set automatically and the task will be submitted to the
      * {@link ConcurrencyManager} for that {@link DataService}.
      * <p>

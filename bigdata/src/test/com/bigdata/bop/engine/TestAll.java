@@ -24,6 +24,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.engine;
 
 
+import com.bigdata.service.TestReceiveBuffer;
+import com.bigdata.service.TestReceiveFile;
 import com.bigdata.util.concurrent.TestHaltable;
 
 import junit.framework.Test;
@@ -66,17 +68,6 @@ public class TestAll extends TestCase {
         // test suite for some pipeline evaluation utility methods.
         suite.addTestSuite(TestPipelineUtility.class);
 
-        /*
-         * test suites for receiving buffers and files from a remote service in
-         * support of distributed query evaluation.
-         * 
-         * @todo The local copy of BufferService and its test suites needs to be
-         * reconciled back into the trunk and also into the HA branch, from
-         * which this version was derived.
-         */
-        suite.addTestSuite(TestReceiveBuffer.class);
-        suite.addTestSuite(TestReceiveFile.class);
-        
         // test suite for query evaluation (basic JOINs).
         suite.addTestSuite(TestQueryEngine.class);
 

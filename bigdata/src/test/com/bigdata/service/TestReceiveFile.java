@@ -24,7 +24,7 @@
 /*
  * Created on Jun 18, 2006
  */
-package com.bigdata.bop.engine;
+package com.bigdata.service;
 
 import java.io.File;
 import java.net.InetAddress;
@@ -40,13 +40,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.bop.engine.BufferService.ReadResourceTask;
+import com.bigdata.service.ResourceService.ReadResourceTask;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.config.NicUtil;
 
 /**
  * Test verifies the ability to transmit a file using the
- * {@link BufferService}.
+ * {@link ResourceService}.
  * 
  * @version $Id$
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson
@@ -82,7 +82,7 @@ public class TestReceiveFile extends TestCase3 {
 
         final File tmpFile = File.createTempFile(allowedFile.getName(), ".tmp");
 
-        final BufferService service = new BufferService() {
+        final ResourceService service = new ResourceService() {
 
             @Override
             protected File getResource(UUID uuid) {
@@ -165,7 +165,7 @@ public class TestReceiveFile extends TestCase3 {
         assertTrue("Could not locate file: " + allowedFile, allowedFile
                 .exists());
 
-        final BufferService service = new BufferService() {
+        final ResourceService service = new ResourceService() {
 
             @Override
             protected File getResource(UUID uuid) {

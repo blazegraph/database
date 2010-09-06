@@ -24,7 +24,7 @@
 /*
  * Created on Jun 18, 2006
  */
-package com.bigdata.bop.engine;
+package com.bigdata.service;
 
 import java.io.File;
 import java.io.IOException;
@@ -44,14 +44,14 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import com.bigdata.bop.engine.BufferService.ReadBufferTask;
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.service.ResourceService.ReadBufferTask;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.config.NicUtil;
 
 /**
  * Test verifies the ability to transmit a file using the
- * {@link BufferService}.
+ * {@link ResourceService}.
  * 
  * @version $Id$
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson
@@ -99,7 +99,7 @@ public class TestReceiveBuffer extends TestCase3 {
                 log.info("allowedUUID=" + allowedUUID + ", allowedBuffer: "
                         + allowedBuffer);
 
-            final BufferService service = new BufferService() {
+            final ResourceService service = new ResourceService() {
 
                 @Override
                 protected ByteBuffer getBuffer(final UUID uuid) {
@@ -196,7 +196,7 @@ public class TestReceiveBuffer extends TestCase3 {
 
         final ConcurrentHashMap<UUID, ByteBuffer> buffers = new ConcurrentHashMap<UUID, ByteBuffer>();
         
-        final BufferService service = new BufferService() {
+        final ResourceService service = new ResourceService() {
 
             @Override
             protected ByteBuffer getBuffer(UUID uuid) {

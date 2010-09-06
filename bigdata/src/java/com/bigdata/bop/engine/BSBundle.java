@@ -34,13 +34,13 @@ package com.bigdata.bop.engine;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BOpShard {
+public class BSBundle {
 
     public final int bopId;
 
     public final int shardId;
 
-    public BOpShard(final int bopId, final int shardId) {
+    public BSBundle(final int bopId, final int shardId) {
 
         this.bopId = bopId;
 
@@ -64,11 +64,11 @@ public class BOpShard {
         if (this == o)
             return true;
         
-        if (!(o instanceof BOpShard))
+        if (!(o instanceof BSBundle))
             return false;
         
-        return bopId == ((BOpShard) o).bopId
-                && shardId == ((BOpShard) o).shardId;
+        return bopId == ((BSBundle) o).bopId
+                && shardId == ((BSBundle) o).shardId;
         
     }
 

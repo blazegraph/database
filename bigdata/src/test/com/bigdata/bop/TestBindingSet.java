@@ -28,19 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop;
 
-import com.bigdata.bop.ArrayBindingSet;
-import com.bigdata.bop.Constant;
-import com.bigdata.bop.HashBindingSet;
-import com.bigdata.bop.IConstant;
-import com.bigdata.bop.IVariable;
-import com.bigdata.bop.Var;
-
 import junit.framework.TestCase2;
 
 /**
- * FIXME test both {@link HashBindingSet} and {@link ArrayBindingSet}
- * 
- * @todo especially, test {@link ArrayBindingSet#clear(IVariable)}.
+ * Unit tests for {@link IBindingSet}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -60,6 +51,9 @@ public class TestBindingSet extends TestCase2 {
         super(name);
     }
 
+    /**
+     * Unit test for {@link ArrayBindingSet#copy(IVariable[])}
+     */
     public void test_copy_abs() {
         
         IVariable[] vars = new IVariable[] {
@@ -101,7 +95,10 @@ public class TestBindingSet extends TestCase2 {
         assertFalse(bs2.isBound(Var.var("d")));
         
     }
-    
+
+    /**
+     * Unit test for {@link HashBindingSet#copy(IVariable[])}
+     */
     public void test_copy_hbs() {
         
         IVariable[] vars = new IVariable[] {
@@ -146,5 +143,34 @@ public class TestBindingSet extends TestCase2 {
         assertFalse(bs2.isBound(Var.var("d")));
         
     }
-    
+
+    /**
+     * @todo Write unit tests for equals which verify that binding sets are
+     *       equals iff they have the same variables and those variables have
+     *       the same bindings.
+     */
+    public void test_equals() {
+        fail("write tests");
+    }
+
+    /**
+     * @todo Write unit tests for the hash code which demonstrate that the hash
+     *       code of binding sets with the same bindings on the same variables
+     *       is the same regardless of the order in which those variables
+     *       appear.
+     */
+    public void test_hashCode() {
+        fail("write tests");
+    }
+
+    /**
+     * @todo Write unit tests for the hash code which demonstrate that the hash
+     *       code of the binding sets is invalidated and recomputed when there
+     *       is a mutation to the binding set. Do this for all
+     *       {@link IBindingSet} implementations.
+     */
+    public void test_hashCode_mutations() {
+        fail("write tests");
+    }
+
 }

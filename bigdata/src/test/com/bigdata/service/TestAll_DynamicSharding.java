@@ -22,41 +22,58 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 18, 2010
+ * Created on Sep 6, 2010
  */
 
-package com.bigdata.bop.fed;
+package com.bigdata.service;
 
+import junit.framework.Test;
 import junit.framework.TestCase2;
+import junit.framework.TestSuite;
 
 /**
- * Unit tests for the low-level NIO operations used to transmit data between
- * services whether mapping binding sets over shards, binding sets over nodes,
- * or shipping elements or bit vectors around.
+ * Test suite for dynamic sharding.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo This capability can be built up based on the work in the HA branch for
- *       low-level replication of the write cache buffers.
  */
-public class TestSendReceiveBuffers extends TestCase2 {
+public class TestAll_DynamicSharding extends TestCase2 {
 
     /**
      * 
      */
-    public TestSendReceiveBuffers() {
+    public TestAll_DynamicSharding() {
     }
 
     /**
      * @param name
      */
-    public TestSendReceiveBuffers(String name) {
+    public TestAll_DynamicSharding(String name) {
         super(name);
     }
-    
-    public void test_something() {
-        fail("write tests");
+
+    /**
+     * Returns a test that will run each of the implementation specific test
+     * suites in turn.
+     */
+    public static Test suite() {
+
+        final TestSuite suite = new TestSuite("dynamic sharding");
+
+        // test basic journal overflow scenario.
+        suite.addTestSuite(TestOverflow.class);
+
+        // test split/join (inserts eventually split; deletes eventually join).
+        suite.addTestSuite(TestSplitJoin.class);
+
+        // test scatter splits with 2DS.
+        suite.addTestSuite(TestScatterSplit.class);
+
+        // test journal overflow scenarios (move)
+        suite.addTestSuite(TestMove.class);
+
+        return suite;
+
     }
 
 }

@@ -49,47 +49,28 @@ import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
 import com.bigdata.bop.bset.CopyBindingSetOp;
+import com.bigdata.bop.fed.TestFederatedQueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
-import com.bigdata.service.EmbeddedFederation;
-import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ICloseableIterator;
 import com.ibm.icu.impl.ByteBuffer;
 
 /**
  * Test suite for the {@link QueryEngine} against a local database instance.
+ * <p>
+ * Note: The {@link BOp}s are unit tested separately. This test suite is focused
+ * on interactions when {@link BOp}s are chained together in a query, such as a
+ * sequence of pipeline joins, a slice applied to a query, etc.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo test core implementations of each {@link BOp} separately, but have a
- *       test suite here for distributed execution of potentially distributed
- *       operations including: JOIN (selective and unselective), DISTINCT access
- *       path, DISTINCT solutions, GROUP BY, ORDER BY.
- * 
- * @todo test suite for join evaluation against a {@link Journal}.
- * 
- * @todo test suite for join evaluation against an {@link EmbeddedFederation}
- *       with 1DS.
- * 
- * @todo test suite for join evaluation against an {@link EmbeddedFederation}
- *       with 2DS.
- * 
- * @todo test suite for join evaluation against an {@link JiniFederation} with
- *       2DS.
- * 
- * @todo Write unit tests where the query is cancelled (by a slice or by the
- *       consumer closing the query buffer iterator) while the query is still
- *       running and verify that the entire query is halted. For this test we
- *       need more data, whether in the source binding sets or in the access
- *       path. Joins are pretty quick so it is really difficult to test this
- *       outside of a stress test. The BSBM (qualification run and benchmark
- *       run) are a good way to validate this.
+ * @see TestFederatedQueryEngine
  */
 public class TestQueryEngine extends TestCase2 {
 
@@ -120,7 +101,6 @@ public class TestQueryEngine extends TestCase2 {
 
     static private final String namespace = "ns";
     Journal jnl;
-    ManagedBufferService bufferService;
     QueryEngine queryEngine;
     
     public void setUp() throws Exception {
@@ -129,9 +109,7 @@ public class TestQueryEngine extends TestCase2 {
 
         loadData(jnl);
         
-        bufferService = new ManagedBufferService();
-
-        queryEngine = new QueryEngine(null/* fed */, jnl, bufferService);
+        queryEngine = new QueryEngine(jnl);
         
         queryEngine.init();
 
@@ -167,11 +145,6 @@ public class TestQueryEngine extends TestCase2 {
         if (queryEngine != null) {
             queryEngine.shutdownNow();
             queryEngine = null;
-        }
-
-        if (bufferService != null) {
-            bufferService.shutdownNow();
-            bufferService = null;
         }
 
         if (jnl != null) {
@@ -652,6 +625,10 @@ public class TestQueryEngine extends TestCase2 {
      * ordering and that the iterator is exhausted once all expected objects
      * have been visited. The implementation uses a selection without
      * replacement "pattern".
+     * <p>
+     * Note: If the objects being visited do not correctly implement hashCode()
+     * and equals() then this can fail even if the desired objects would be
+     * visited. When this happens, fix the implementation classes.
      */
     static public <T> void assertSameSolutionsAnyOrder(final T[] expected,
             final Iterator<T> actual) {
@@ -665,56 +642,61 @@ public class TestQueryEngine extends TestCase2 {
      * ordering and that the iterator is exhausted once all expected objects
      * have been visited. The implementation uses a selection without
      * replacement "pattern".
+     * <p>
+     * Note: If the objects being visited do not correctly implement hashCode()
+     * and equals() then this can fail even if the desired objects would be
+     * visited. When this happens, fix the implementation classes.
      */
     static public <T> void assertSameSolutionsAnyOrder(final String msg,
             final T[] expected, final Iterator<T> actual) {
 
         try {
-        
-        // Populate a map that we will use to realize the match and
-        // selection without replacement logic.
 
-        final int nrange = expected.length;
+            // Populate a map that we will use to realize the match and
+            // selection without replacement logic.
 
-        final java.util.Map<T,T> range = new java.util.HashMap<T,T>();
+            final int nrange = expected.length;
 
-        for (int j = 0; j < nrange; j++) {
+            final java.util.Map<T, T> range = new java.util.HashMap<T, T>();
 
-            range.put(expected[j], expected[j]);
+            for (int j = 0; j < nrange; j++) {
 
-        }
-
-        // Do selection without replacement for the objects visited by
-        // iterator.
-
-        for (int j = 0; j < nrange; j++) {
-
-            if (!actual.hasNext()) {
-
-                fail(msg + ": Index exhausted while expecting more object(s)"
-                        + ": index=" + j);
+                range.put(expected[j], expected[j]);
 
             }
 
-            final T actualObject = actual.next();
+            // Do selection without replacement for the objects visited by
+            // iterator.
 
-            if (range.remove(actualObject) == null) {
+            for (int j = 0; j < nrange; j++) {
 
-                fail("Object not expected" + ": index=" + j + ", object="
-                        + actualObject);
+                if (!actual.hasNext()) {
+
+                    fail(msg
+                            + ": Index exhausted while expecting more object(s)"
+                            + ": index=" + j);
+
+                }
+
+                final T actualObject = actual.next();
+
+                if (range.remove(actualObject) == null) {
+
+                    fail("Object not expected" + ": index=" + j + ", object="
+                            + actualObject);
+
+                }
 
             }
 
-        }
+            if (actual.hasNext()) {
 
-        if (actual.hasNext()) {
+                fail("Iterator will deliver too many objects.");
 
-            fail("Iterator will deliver too many objects.");
+            }
 
-        }
-        
         } finally {
-            
+
             if (actual instanceof ICloseableIterator<?>) {
 
                 ((ICloseableIterator<T>) actual).close();

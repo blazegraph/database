@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 25, 2010
  */
 
-package com.bigdata.bop.engine;
+package com.bigdata.service;
 
 import java.io.File;
 import java.io.IOException;
@@ -35,6 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.service.ResourceService;
 
 /**
  * This class manages a pool of direct {@link ByteBuffer}s which are exposed for
@@ -50,7 +51,7 @@ import com.bigdata.io.DirectBufferPool;
  *       concurrent query demand or forcing the query to block until sufficient
  *       resources are available?
  */
-public class ManagedBufferService extends BufferService {
+public class ManagedResourceService extends ResourceService {
 
     /**
      * The pool from which the direct {@link ByteBuffer}s are allocated.
@@ -65,14 +66,14 @@ public class ManagedBufferService extends BufferService {
     /**
      * @throws IOException
      */
-    public ManagedBufferService() throws IOException {
+    public ManagedResourceService() throws IOException {
     }
 
     /**
      * @param port
      * @throws IOException
      */
-    public ManagedBufferService(int port) throws IOException {
+    public ManagedResourceService(int port) throws IOException {
         super(port);
     }
 
@@ -81,7 +82,7 @@ public class ManagedBufferService extends BufferService {
      * @param requestServicePoolSize
      * @throws IOException
      */
-    public ManagedBufferService(int port, int requestServicePoolSize)
+    public ManagedResourceService(int port, int requestServicePoolSize)
             throws IOException {
         super(port, requestServicePoolSize);
     }

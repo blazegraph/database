@@ -146,6 +146,9 @@ public class HashBindingSet implements IBindingSet {
             throw new IllegalArgumentException();
         
         map.put(var,val);
+
+        // clear the hash code.
+        hash = 0;
         
     }
 
@@ -156,12 +159,18 @@ public class HashBindingSet implements IBindingSet {
         
         map.remove(var);
         
+        // clear the hash code.
+        hash = 0;
+
     }
     
     public void clearAll() {
         
         map.clear();
-        
+    
+        // clear the hash code.
+        hash = 0;
+
     }
 
     public String toString() {
@@ -233,11 +242,14 @@ public class HashBindingSet implements IBindingSet {
         
         final HashBindingSet bs = new HashBindingSet();
         
-        for (IVariable var : variablesToKeep) {
+        for (IVariable<?> var : variablesToKeep) {
             
-            IConstant val = map.get(var);
+            final IConstant<?> val = map.get(var);
+            
             if (val != null) {
+                
                 bs.map.put(var, val);
+                
             }
             
         }
@@ -246,11 +258,16 @@ public class HashBindingSet implements IBindingSet {
         
     }
     
-    public boolean equals(final IBindingSet o) {
+    public boolean equals(final Object t) {
         
-        if (o == this)
+        if (this == t)
             return true;
         
+        if(!(t instanceof IBindingSet))
+            return false;
+        
+        final IBindingSet o = (IBindingSet) t;
+
         if (size() != o.size())
             return false;
         
@@ -260,9 +277,9 @@ public class HashBindingSet implements IBindingSet {
 
             final Map.Entry<IVariable,IConstant> entry = itr.next();
             
-            final IVariable var = entry.getKey();
+            final IVariable<?> var = entry.getKey();
             
-            final IConstant val = entry.getValue();
+            final IConstant<?> val = entry.getValue();
             
 //            if (!o.isBound(vars[i]))
 //                return false;
@@ -275,5 +292,28 @@ public class HashBindingSet implements IBindingSet {
         return true;
         
     }
+
+    public int hashCode() {
+
+        if (hash == 0) {
+
+            int result = 0;
+
+            for(IConstant<?> c : map.values()) {
+
+                if (c == null)
+                    continue;
+
+                result ^= c.hashCode();
+
+            }
+
+            hash = result;
+
+        }
+        return hash;
+
+    }
+    private int hash;
 
 }

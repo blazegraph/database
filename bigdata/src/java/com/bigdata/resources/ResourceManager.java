@@ -637,7 +637,7 @@ abstract public class ResourceManager extends OverflowManager implements
                  */
                 final CounterSet tmp2 = tmp.makePath("resourceService");
 
-                tmp2.attach(resourceService.counters.getCounters());
+                tmp2.attach(getResourceService().counters.getCounters());
                 
             }
 

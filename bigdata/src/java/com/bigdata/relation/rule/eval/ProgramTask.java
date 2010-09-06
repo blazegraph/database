@@ -143,8 +143,8 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
      * the target {@link DataService}).
      * <p>
      * Note: the caller MUST submit the {@link ProgramTask} using
-     * {@link DataService#submit(Callable)} in which case {@link #dataService}
-     * field will be set (after the ctor) by the {@link DataService} itself. The
+     * {@link DataService#submit(Callable)} in which case {@link #getDataService()}
+     * will be set (after the ctor) by the {@link DataService} itself. The
      * {@link DataService} will be used to identify an {@link ExecutorService}
      * and the {@link IJoinNexusFactory} will be used to establish access to
      * indices, relations, etc. in the context of the {@link AbstractTask} - see

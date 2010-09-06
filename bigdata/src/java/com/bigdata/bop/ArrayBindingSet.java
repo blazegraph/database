@@ -225,6 +225,9 @@ public class ArrayBindingSet implements IBindingSet {
             
         }
 
+        // clear the hash code.
+        hash = 0;
+        
         assert nbound == 0;
         
     }
@@ -260,6 +263,9 @@ public class ArrayBindingSet implements IBindingSet {
                     vals[i] = null;
 
                 }
+                
+                // clear the hash code.
+                hash = 0;
                 
                 nbound--;
 
@@ -316,7 +322,10 @@ public class ArrayBindingSet implements IBindingSet {
             if (vars[i] == var) {
         
                 vals[i] = val;
-        
+
+                // clear the hash code.
+                hash = 0;
+                
                 return;
                 
             }
@@ -326,6 +335,9 @@ public class ArrayBindingSet implements IBindingSet {
         vars[nbound] = var;
         
         vals[nbound] = val;
+        
+        // clear the hash code.
+        hash = 0;
         
         nbound++;
         
@@ -408,10 +420,15 @@ public class ArrayBindingSet implements IBindingSet {
         
     }
 
-    public boolean equals(final IBindingSet o) {
+    public boolean equals(final Object t) {
         
-        if (o == this)
+        if (this == t)
             return true;
+        
+        if(!(t instanceof IBindingSet))
+            return false;
+        
+        final IBindingSet o = (IBindingSet)t;
         
         if (nbound != o.size())
             return false;
@@ -430,4 +447,27 @@ public class ArrayBindingSet implements IBindingSet {
         
     }
 
+    public int hashCode() {
+
+        if (hash == 0) {
+
+            int result = 0;
+
+            for (int i = 0; i < nbound; i++) {
+
+                if (vals[i] == null)
+                    continue;
+
+                result ^= vals[i].hashCode();
+
+            }
+
+            hash = result;
+
+        }
+        return hash;
+
+    }
+    private int hash;
+    
 }

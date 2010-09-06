@@ -102,10 +102,12 @@ import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
 import com.bigdata.service.EventType;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.ResourceService;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.ibm.icu.impl.ByteBuffer;
 
 /**
  * Class encapsulates logic for managing the store files (journals and index
@@ -637,7 +639,23 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     private final AtomicBoolean starting = new AtomicBoolean(true);
 
-    protected ResourceService resourceService;
+    /**
+     * The service used to send files to other data services and to exchange NIO
+     * {@link ByteBuffer} in support of distributed query processing.
+     */
+    private ManagedResourceService resourceService;
+
+    /**
+     * The service used to send files to other data services and to exchange NIO
+     * {@link ByteBuffer} in support of distributed query processing.
+     */
+    public ManagedResourceService getResourceService() {
+        
+        assertRunning();
+
+        return resourceService;
+        
+    }
     
     /**
      * The port at which you can connect to the {@link ResourceService}. This
@@ -1548,7 +1566,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
             try {
 
-                resourceService = new ResourceService() {
+                resourceService = new ManagedResourceService() {
 
                     @Override
                     protected File getResource(UUID uuid) throws Exception {
