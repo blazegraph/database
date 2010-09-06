@@ -32,7 +32,7 @@ import java.util.Enumeration;
 import java.util.Iterator;
 
 /**
- * Streaming iterator class that supresses generic types. Striterator patterns
+ * Streaming iterator class that suppresses generic types. Striterator patterns
  * are often used to convert the type of the elements visited by the underlying
  * iterator. That and the covarying generics combine to make code using generics
  * and striterators rather ugly.

@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -60,11 +61,6 @@ public class TestAll extends TestCase {
     /**
      * Returns a test that will run each of the implementation specific test
      * suites in turn.
-     * 
-     * FIXME Make the unit tests in this package into proxy unit tests and run
-     * all of the tests in this suite against both the
-     * {@link LocalDataServiceClient} and the {@link EmbeddedClient}. Ideally
-     * the jini module can then re-run the same unit tests.
      */
     public static Test suite() {
 
@@ -77,8 +73,8 @@ public class TestAll extends TestCase {
         // tests of the round-robin aspects of the LBS (isolated behaviors).
         suite.addTestSuite(TestLoadBalancerRoundRobin.class);
 
-        // test utility to read index segments using NIO.
-        suite.addTestSuite(TestResourceService.class);
+        // tests for the ResourceService.
+        suite.addTest(TestAll_ResourceService.suite());
         
         // tests of the metadata index.
         suite.addTestSuite(TestMetadataIndex.class);
@@ -97,19 +93,10 @@ public class TestAll extends TestCase {
         
         // unit tests of single-phase and distributed tx commit protocol.
         suite.addTestSuite(TestDistributedTransactionService.class);
+
+        // test suite for dynamic sharding.
+        suite.addTest(TestAll_DynamicSharding.suite());
         
-        // test basic journal overflow scenario.
-        suite.addTestSuite(TestOverflow.class);
-        
-        // test split/join (inserts eventually split; deletes eventually join).
-        suite.addTestSuite(TestSplitJoin.class);
-
-        // test scatter splits with 2DS.
-        suite.addTestSuite(TestScatterSplit.class);
-
-        // test journal overflow scenarios (move)
-        suite.addTestSuite(TestMove.class);
-
         // test scale-out operator semantics. 
         suite.addTest(com.bigdata.bop.fed.TestAll.suite());
         

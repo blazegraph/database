@@ -38,7 +38,7 @@ import com.bigdata.service.IBigdataFederation;
  * @version $Id$
  */
 public interface IRunningQuery {
-
+    
     /**
      * The {@link IBigdataFederation} IFF the operator is being evaluated on an
      * {@link IBigdataFederation}. When evaluating operations against an

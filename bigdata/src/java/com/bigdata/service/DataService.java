@@ -37,10 +37,13 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.Banner;
+import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.fed.FederatedQueryEngine;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
@@ -52,7 +55,6 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.io.ByteBufferInputStream;
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
@@ -181,13 +183,28 @@ abstract public class DataService extends AbstractService
      * {@link DistributedTransactionService}.
      */
     private DataServiceTransactionManager localTransactionManager;
-    
+
+    /**
+     * Object used to support distributed query.
+     */
+    private final AtomicReference<FederatedQueryEngine> queryEngine = new AtomicReference<FederatedQueryEngine>();
+
     /**
      * The object used to manage the local resources.
      */
     public ResourceManager getResourceManager() {
         
         return resourceManager;
+        
+    }
+    
+    /**
+     * The object used to support distributed query against an
+     * {@link IBigdataFederation}.
+     */
+    public FederatedQueryEngine getQueryEngine() {
+        
+        return queryEngine.get();
         
     }
 
@@ -379,6 +396,23 @@ abstract public class DataService extends AbstractService
                     .setConcurrencyManager(concurrencyManager);
 
         }
+
+        /**
+         * Hook sets up the queryEngine reference once the data service is
+         * running.
+         */
+        getFederation().getExecutorService().execute(new Runnable() {
+            public void run() {
+                final DataService dataService = DataService.this;
+                dataService.getResourceManager().awaitRunning();
+                final FederatedQueryEngine queryEngine = new FederatedQueryEngine(
+                        dataService);
+                queryEngine.init();
+                dataService.queryEngine.set(queryEngine);
+                if (log.isInfoEnabled())
+                    log.info("Setup query engine.");
+            }
+        });
         
         return this;
         
@@ -396,9 +430,13 @@ abstract public class DataService extends AbstractService
     static public class DataServiceFederationDelegate extends
             DefaultServiceFederationDelegate<DataService> {
 
-        public DataServiceFederationDelegate(DataService service) {
+        private final DataService dataService;
+        
+        public DataServiceFederationDelegate(final DataService service) {
 
             super(service);
+            
+            this.dataService = service;
             
         }
         
@@ -420,14 +458,14 @@ abstract public class DataService extends AbstractService
 
             final long elapsed = now - lastReattachMillis;
 
-            if (service.isOpen() && service.resourceManager.isRunning()
+            if (dataService.isOpen() && dataService.resourceManager.isRunning()
                     && elapsed > 5000/* ms */) {
 
             	// inherit base class behavior
             	super.reattachDynamicCounters();
             	
                 // The service's counter set hierarchy.
-                final CounterSet serviceRoot = service.getFederation()
+                final CounterSet serviceRoot = dataService.getFederation()
                         .getServiceCounterSet();
 
                 // The lock manager
@@ -453,7 +491,7 @@ abstract public class DataService extends AbstractService
                         // attach the the new counters.
                         ((CounterSet) tmp
                                 .makePath(IConcurrencyManagerCounters.LockManager))
-                                .attach(service.concurrencyManager
+                                .attach(dataService.concurrencyManager
                                         .getWriteService().getLockManager()
                                         .getCounters());
 
@@ -491,7 +529,7 @@ abstract public class DataService extends AbstractService
                         // attach the current index partition counters.
                         ((CounterSet) tmp
                                 .makePath(IIndexManagerCounters.Indices))
-                                .attach(service.resourceManager
+                                .attach(dataService.resourceManager
                                         .getIndexCounters());
 
                         if (log.isInfoEnabled())
@@ -515,7 +553,7 @@ abstract public class DataService extends AbstractService
 
         public boolean isServiceReady() {
             
-            if(!service.resourceManager.isOpen()) {
+            if(!dataService.resourceManager.isOpen()) {
                 
                 /*
                  * This will happen if the store manager is unable to discover
@@ -527,14 +565,14 @@ abstract public class DataService extends AbstractService
                 log.fatal("Store manager not open - will shutdown.");
 
                 // shutdown the data service.
-                service.shutdownNow();
+                dataService.shutdownNow();
 
                 // collection was not started.
                 return false;
 
             }
 
-            if (!service.resourceManager.isRunning()) {
+            if (!dataService.resourceManager.isRunning()) {
 
                 log.warn("Resource manager is not running yet.");
 
@@ -556,7 +594,7 @@ abstract public class DataService extends AbstractService
 
             setupCounters();
 
-            logHttpdURL(service.getHTTPDURLFile());
+            logHttpdURL(dataService.getHTTPDURLFile());
 
         }
 
@@ -574,7 +612,7 @@ abstract public class DataService extends AbstractService
 
             }
             
-            if(!service.isOpen()) {
+            if(!dataService.isOpen()) {
                 
                 /*
                  * The service has already been closed.
@@ -590,17 +628,17 @@ abstract public class DataService extends AbstractService
              * Service specific counters.
              */
 
-            final CounterSet serviceRoot = service.getFederation()
+            final CounterSet serviceRoot = dataService.getFederation()
                     .getServiceCounterSet();
 
             serviceRoot.makePath(IDataServiceCounters.resourceManager).attach(
-                    service.resourceManager.getCounters());
+                    dataService.resourceManager.getCounters());
 
             serviceRoot.makePath(IDataServiceCounters.concurrencyManager)
-                    .attach(service.concurrencyManager.getCounters());
+                    .attach(dataService.concurrencyManager.getCounters());
 
             serviceRoot.makePath(IDataServiceCounters.transactionManager)
-                    .attach(service.localTransactionManager.getCounters());
+                    .attach(dataService.localTransactionManager.getCounters());
 
             // block API.
             {
@@ -609,7 +647,7 @@ abstract public class DataService extends AbstractService
 
                 tmp.addCounter("Blocks Read", new Instrument<Long>() {
                     public void sample() {
-                        setValue(service.readBlockApiCounters.readBlockCount);
+                        setValue(dataService.readBlockApiCounters.readBlockCount);
                     }
                 });
 
@@ -621,7 +659,7 @@ abstract public class DataService extends AbstractService
 
                                 long secs = TimeUnit.SECONDS
                                         .convert(
-                                                service.readBlockApiCounters.readBlockNanos,
+                                                dataService.readBlockApiCounters.readBlockNanos,
                                                 TimeUnit.NANOSECONDS);
 
                                 final double v;
@@ -629,7 +667,7 @@ abstract public class DataService extends AbstractService
                                 if (secs == 0L)
                                     v = 0d;
                                 else
-                                    v = service.readBlockApiCounters.readBlockCount
+                                    v = dataService.readBlockApiCounters.readBlockCount
                                             / secs;
 
                                 setValue(v);
@@ -651,6 +689,12 @@ abstract public class DataService extends AbstractService
 
         if (!isOpen())
             return;
+
+        final QueryEngine queryEngine = this.queryEngine.get();
+        if (queryEngine != null) {
+            queryEngine.shutdown();
+//            queryEngineManager = null;
+        }
 
         if (concurrencyManager != null) {
             concurrencyManager.shutdown();
@@ -680,6 +724,12 @@ abstract public class DataService extends AbstractService
         if (!isOpen())
             return;
 
+        final QueryEngine queryEngine = this.queryEngine.get();
+        if (queryEngine != null) {
+            queryEngine.shutdownNow();
+//            queryEngineManager = null;
+        }
+        
         if (concurrencyManager != null) {
             concurrencyManager.shutdownNow();
 //            concurrencyManager = null;

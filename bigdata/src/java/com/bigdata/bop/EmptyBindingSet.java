@@ -96,18 +96,32 @@ final public class EmptyBindingSet implements IBindingSet, Serializable {
         return 0;
     }
 
-    public boolean equals(IBindingSet o) {
+    public boolean equals(final Object t) {
         
-        if (this == o)
+        if (this == t)
             return true;
-        
+
+        if (!(t instanceof IBindingSet))
+            return false;
+
+        final IBindingSet o = (IBindingSet) t;
+
         if (o.size() == 0)
             return true;
-        
+
         return false;
 
     }
 
+    /**
+     * The hash code of an empty binding set is always zero.
+     */
+    public int hashCode() {
+
+        return 0;
+        
+    }
+    
     public IConstant get(IVariable var) {
 
         if (var == null)

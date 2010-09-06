@@ -31,7 +31,6 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.rmi.RemoteException;
 import java.util.UUID;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
@@ -41,14 +40,34 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 
+import alice.tuprolog.Prolog;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.bset.Union;
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.view.FusedView;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.spo.SPORelation;
+import com.bigdata.relation.IMutableRelation;
+import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.Program;
+import com.bigdata.relation.rule.eval.pipeline.DistributedJoinTask;
+import com.bigdata.resources.IndexManager;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.ndx.IAsynchronousWriteBufferFactory;
+import com.bigdata.striterator.ChunkedArrayIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * A class managing execution of concurrent queries against a local
@@ -168,16 +187,135 @@ import com.bigdata.service.IBigdataFederation;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo Approach query evaluation piecemeal. Start with predicates (access
- *       paths), joins, and a DHT filter on a predicate. That is nearly
- *       everything anyway. The main remaining pieces for query are distinct
- *       solutions, sorting. Mutation (constructing and sending elements to
- *       shards) and closure (running a program to a fixed point or a limiting
- *       number of iterations) are the remaining key pieces.
- *       <p>
- *       Initially use {@link Callable}s for binding set chunks. That will still
- *       limit the #of threads. Once we prove out the approach we can begin to
- *       write new operators based on a fork/join decomposition.
+ * 
+ * FIXME Unit tests for non-distinct {@link IElementFilter}s on an
+ * {@link IPredicate}, unit tests for distinct element filter on an
+ * {@link IPredicate} which is capable of distributed operations. Do not use
+ * distinct where not required (SPOC, only one graph, etc).
+ * <p>
+ * It seems like the right way to approach this is by unifying the stackable CTC
+ * striterator pattern with the chunked iterator pattern and passing the query
+ * engine (or the bop context) into the iterator construction process (or simply
+ * requesting that the query engine construct the iterator stack).
+ * <p>
+ * In terms of harmonization, it is difficult to say which way would work
+ * better. In the short term we could simply allow both and mask the differences
+ * in how we construct the filters, but the conversion to/from striterators and
+ * chunked iterators seems to waste a bit of effort.
+ * <p>
+ * The trickiest part of all of this is to allow a distributed filter pattern
+ * where the filter gets created on a set of nodes identified by the operator
+ * and the elements move among those nodes using the query engine's buffers.
+ * <p>
+ * To actually implement the distributed distinct filter we need to stack the
+ * following:
+ * 
+ * <pre>
+ * - ITupleIterator
+ * - Resolve ITuple to Element (e.g., SPOC).
+ * - Layer on optional IElementFilter associated with the IPredicate.
+ * - Layer on SameVariableConstraint iff required (done by AccessPath) 
+ * - Resolve SPO to SPO, stripping off the context position.
+ * - Chunk SPOs (SPO[], IKeyOrder), where the key order is from the access path.
+ * - Filter SPO[] using DHT constructed on specified nodes of the cluster.
+ *   The SPO[] chunks should be packaged into NIO buffers and shipped to those
+ *   nodes.  The results should be shipped back as a bit vectors packaged into
+ *   a NIO buffers.
+ * - Dechunk SPO[] to SPO since that is the current expectation for the filter
+ *   stack.
+ * - The result then gets wrapped as a {@link IChunkedOrderedIterator} by
+ *   the AccessPath using a {@link ChunkedArrayIterator}.
+ * </pre>
+ * 
+ * This stack is a bit complex(!). But it is certainly easy enough to generate
+ * the necessary bits programmatically.
+ * 
+ * FIXME Handling the {@link Union} of binding sets. Consider whether the chunk
+ * combiner logic from the {@link DistributedJoinTask} could be reused.
+ * 
+ * FIXME INSERT and DELETE which will construct elements using
+ * {@link IRelation#newElement(java.util.List, IBindingSet)} from a binding set
+ * and then use {@link IMutableRelation#insert(IChunkedOrderedIterator)} and
+ * {@link IMutableRelation#delete(IChunkedOrderedIterator)}. For s/o, we first
+ * need to move the bits into the right places so it makes sense to unpack the
+ * processing of the loop over the elements and move the data around, writing on
+ * each index as necessary. There could be eventually consistent approaches to
+ * this as well. For justifications we need to update some additional indices,
+ * in which case we are stuck going through {@link IRelation} rather than
+ * routing data directly or using the {@link IAsynchronousWriteBufferFactory}.
+ * For example, we could handle routing and writing in s/o as follows:
+ * 
+ * <pre>
+ * INSERT(relation,bindingSets) 
+ * 
+ * expands to
+ * 
+ * SEQUENCE(
+ * SELECT(s,p,o), // drop bindings that we do not need
+ * PARALLEL(
+ *   INSERT_INDEX(spo), // construct (s,p,o) elements and insert
+ *   INSERT_INDEX(pos), // construct (p,o,s) elements and insert
+ *   INSERT_INDEX(osp), // construct (o,s,p) elements and insert
+ * ))
+ * 
+ * </pre>
+ * 
+ * The output of the SELECT operator would be automatically mapped against the
+ * shards on which the next operators need to write. Since there is a nested
+ * PARALLEL operator, the mapping will be against the shards of each of the
+ * given indices. (A simpler operator would invoke
+ * {@link SPORelation#insert(IChunkedOrderedIterator)}. Handling justifications
+ * requires that we also formulate the justification chain from the pattern of
+ * variable bindings in the rule).
+ * 
+ * FIXME Handle {@link Program}s. There are three flavors, which should probably
+ * be broken into three operators: sequence(ops), set(ops), and closure(op). The
+ * 'set' version would be parallelized, or at least have an annotation for
+ * parallel evaluation. These things belong in the same broad category as the
+ * join graph since they are operators which control the evaluation of other
+ * operators (the current pipeline join also has that characteristic which it
+ * uses to do the nested index subqueries).
+ * 
+ * FIXME SPARQL to BOP translation
+ * <p>
+ * The initial pass should translate from {@link IRule} to {@link BOp}s so we
+ * can immediately begin running SPARQL queries against the {@link QueryEngine}.
+ * A second pass should explore a rules base translation from the openrdf SPARQL
+ * operator tree into {@link BOp}s, perhaps using an embedded {@link Prolog}
+ * engine. What follows is a partial list of special considerations for that
+ * translation:
+ * <ul>
+ * <li>Distinct can be trivially enforced for default graph queries against the
+ * SPOC index.</li>
+ * <li>Local distinct should wait until there is more than one tuple from the
+ * index since a single tuple does not need to be made distinct using a hash
+ * map.</li>
+ * <li>Low volume distributed queries should use solution modifiers which
+ * evaluate on the query controller node rather than using distributed sort,
+ * distinct, slice, or aggregation operators.</li>
+ * <li></li>
+ * <li></li>
+ * <li></li>
+ * <li>High volume queries should use special operators (different
+ * implementations of joins, use an external merge sort, etc).</li>
+ * </ul>
+ * 
+ * FIXME SPARQL Coverage: Add native support for all SPARQL operators. A lot of
+ * this can be picked up from Sesame. Some things, such as isIRI() can be done
+ * natively against the {@link IV}. Likewise, there is already a set of
+ * comparison methods for {@link IV}s which are inlined values. Add support for
+ * <ul>
+ * <li></li>
+ * <li></li>
+ * <li></li>
+ * <li></li>
+ * <li></li>
+ * <li></li>
+ * </ul>
+ * 
+ * @todo Expander patterns will continue to exist until we handle the standalone
+ *       backchainers in a different manner for scale-out so add support for
+ *       those for now.
  * 
  * @todo There is a going to be a relationship to recycling of intermediates
  *       (for individual {@link BOp}s or {@link BOp} tree fragments) and a
@@ -191,15 +329,6 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
             .getLogger(QueryEngine.class);
 
     /**
-     * The {@link IBigdataFederation} iff running in scale-out.
-     * <p>
-     * Note: The {@link IBigdataFederation} is required in scale-out in order to
-     * perform shard locator scans when mapping binding sets across the next
-     * join in a query plan.
-     */
-    private final IBigdataFederation<?> fed;
-    
-    /**
      * Access to the indices.
      * <p>
      * Note: You MUST NOT use unisolated indices without obtaining the necessary
@@ -208,16 +337,6 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     private final IIndexManager localIndexManager;
 
-    /**
-     * A service used to expose {@link ByteBuffer}s and managed index resources
-     * for transfer to remote services in support of distributed query
-     * evaluation.
-     * 
-     * @todo Relayer the {@link QueryEngine} w/o a buffer service for standalone
-     *       query and w/ for scale-out query.
-     */
-    private final ManagedBufferService bufferService;
-    
 //    /**
 //     * A pool used to service IO requests (reads on access paths).
 //     * <p>
@@ -256,7 +375,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     protected UUID getServiceId() {
 
-        return fed == null ? null : fed.getServiceUUID();
+        return null;
         
     }
 
@@ -269,18 +388,21 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     public IBigdataFederation<?> getFederation() {
         
-        return fed;
+        return null;
         
     }
-    
+
     /**
-     * Access to the indices.
+     * The <em>local</em> index manager, which provides direct access to local
+     * {@link BTree} and {@link IndexSegment} objects. In scale-out, this is the
+     * {@link IndexManager} inside the {@link IDataService} and provides direct
+     * access to {@link FusedView}s (aka shards).
      * <p>
      * Note: You MUST NOT use unisolated indices without obtaining the necessary
      * locks. The {@link QueryEngine} is intended to run only against committed
      * index views for which no locks are required.
      */
-    public IIndexManager getLocalIndexManager() {
+    public IIndexManager getIndexManager() {
         
         return localIndexManager;
         
@@ -288,38 +410,6 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
     /**
      * The currently executing queries.
-     * <p>
-     * Queries may be in any state, including queries whose {@link BOp} has not
-     * been materialized, queries which have been materialized but for which no
-     * binding sets have been submitted, queries for which binding sets have
-     * been submitted but not yet retrieved, queries which have binding sets
-     * awaiting execution, queries which are actively executing a {@link BOp}
-     * for some binding set chunk, queries which have generated outputs which
-     * have not yet been demanded. Once we receive notice that a query has been
-     * cancelled it is removed from this collection.
-     * 
-     * @todo If a query is halted, it needs to be removed from this collection.
-     *       <p>
-     *       However, a race is possible where a query is cancelled on a node
-     *       where the node receives notice to start the query after the
-     *       cancelled message has arrived. to avoid having such queries linger,
-     *       we should have a a concurrent hash set with an approximate LRU
-     *       policy containing the identifiers for queries which have been
-     *       cancelled, possibly paired with the cause (null if normal
-     *       execution). That will let us handle any reasonable concurrent
-     *       indeterminism between cancel and start notices for a query.
-     *       <p>
-     *       Another way in which this might be addressed in involving the
-     *       client each time a query start is propagated to a node. if we
-     *       notify the client that the query will start on the node first, then
-     *       the client can always issue the cancel notices [unless the client
-     *       dies, in which case we still want to kill the query which could be
-     *       done based on a service disappearing from a jini registry or
-     *       zookeeper.]
-     *       <p>
-     *       This collection should also be the basis for live reporting on the
-     *       active queries (their statistics) and administrative operations to
-     *       kill a query.
      */
     final ConcurrentHashMap<Long/* queryId */, RunningQuery> runningQueries = new ConcurrentHashMap<Long, RunningQuery>();
 
@@ -331,23 +421,16 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
     /**
      * 
-     * @param fed
-     *            The federation iff running in scale-out.
      * @param indexManager
      *            The <em>local</em> index manager.
-     * @param bufferService
      */
-    public QueryEngine(final IBigdataFederation<?> fed, final IIndexManager indexManager,
-            final ManagedBufferService bufferService) {
+    public QueryEngine(final IIndexManager indexManager) {
 
         if (indexManager == null)
             throw new IllegalArgumentException();
-        if (bufferService== null)
-            throw new IllegalArgumentException();
-        
-        this.fed = fed; // MAY be null.
+
         this.localIndexManager = indexManager;
-        this.bufferService = bufferService;
+
 //        this.iopool = new LatchedExecutor(indexManager.getExecutorService(),
 //                nThreads);
 //        this.iopool = Executors.newFixedThreadPool(nThreads,
@@ -384,7 +467,8 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     private final AtomicReference<FutureTask<Void>> engineFuture = new AtomicReference<FutureTask<Void>>();
 
     /**
-     * Volatile flag is set for normal termination.
+     * Volatile flag is set for normal termination.  When set, no new queries
+     * will be accepted but existing queries will run to completion.
      */
     private volatile boolean shutdown = false;
 
@@ -396,6 +480,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      *       <p>
      *       Handle priority for unselective queries based on the order in which
      *       they are submitted?
+     *       
      * @todo The approach taken by the {@link QueryEngine} executes one task per
      *       pipeline bop per chunk. Outside of how the tasks are scheduled,
      *       this corresponds closely to the historical pipeline query
@@ -413,19 +498,21 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     private class QueryEngineTask implements Runnable {
         public void run() {
             try {
+                System.err.println("QueryEngine running: "+this);
                 while (true) {
                     final RunningQuery q = priorityQueue.take();
+                    final long queryId = q.getQueryId();
                     if (q.isCancelled())
                         continue;
                     final BindingSetChunk chunk = q.chunksIn.poll();
                     if (chunk == null) {
                         // not expected, but can't do anything without a chunk.
                         if (log.isDebugEnabled())
-                            log.debug("Dropping chunk: queryId=" + q.queryId);
+                            log.debug("Dropping chunk: queryId=" + queryId);
                         continue;
                     }
                     if (log.isTraceEnabled())
-                        log.trace("Accepted chunk: queryId=" + q.queryId
+                        log.trace("Accepted chunk: queryId=" + queryId
                                 + ", bopId=" + chunk.bopId);
                     try {
                         // create task.
@@ -434,7 +521,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
                         localIndexManager.getExecutorService().execute(ft);
                     } catch (RejectedExecutionException ex) {
                         // shutdown of the pool (should be an unbounded pool).
-                        log.warn("Dropping chunk: queryId=" + q.queryId);
+                        log.warn("Dropping chunk: queryId=" + queryId);
                         continue;
                     } catch (Throwable ex) {
                         // log and continue
@@ -474,43 +561,81 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         priorityQueue.add(q);
         
     }
-    
-    /**
-     * Do not accept new queries, but run existing queries to completion.
-     */
-    public void shutdown() throws InterruptedException {
-        // normal termination.
-        shutdown = true;
-    }
 
     /**
-     * Wait until all running queries are done.
+     * Shutdown the {@link QueryEngine} (blocking). The {@link QueryEngine} will
+     * not accept new queries, but existing queries will run to completion.
      * 
-     * @throws InterruptedException
-     * 
-     * @todo implement awaitTermination
+     * @todo This sleeps until {@link #runningQueries} is empty. It could be
+     *       signaled when that collection becomes empty if we protected the
+     *       collection with a lock for mutation (or if we just notice each time
+     *       a query terminates). However, that would restrict the concurrency
+     *       for query start/stop.
      */
-    public void awaitTermination() throws InterruptedException {
-        throw new UnsupportedOperationException();
+    public void shutdown() {
+
+        // normal termination.
+        shutdown = true;
+
+        while(!runningQueries.isEmpty()) {
+            
+            try {
+                Thread.sleep(100/*ms*/);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            
+        }
+        
     }
 
     /**
      * Do not accept new queries and halt any running binding set chunk tasks.
      */
     public void shutdownNow() {
+        
         shutdown = true;
+        
+        // stop the query engine.
         final Future<?> f = engineFuture.get();
         if (f != null)
             f.cancel(true/* mayInterruptIfRunning */);
+
+        // halt any running queries.
+        for(RunningQuery q : runningQueries.values()) {
+            
+            q.cancel(true/*mayInterruptIfRunning*/);
+            
+        }
+
     }
 
     /**
-     * @todo SCALEOUT: Override in scale-out to release buffers associated with
-     *       chunks buffered for this query (buffers may be for received chunks
-     *       or chunks which are awaiting transfer to another node).
+     * The query is no longer running. Resources associated with the query
+     * should be released.
+     * 
+     * @todo A race is possible where a query is cancelled on a node where the
+     *       node receives notice to start the query after the cancelled message
+     *       has arrived. To avoid having such queries linger, we should have a
+     *       a concurrent hash set with an approximate LRU policy containing the
+     *       identifiers for queries which have been cancelled, possibly paired
+     *       with the cause (null if normal execution). That will let us handle
+     *       any reasonable concurrent indeterminism between cancel and start
+     *       notices for a query.
+     *       <p>
+     *       Another way in which this might be addressed is by involving the
+     *       client each time a query start is propagated to a node. If we
+     *       notify the client that the query will start on the node first, then
+     *       the client can always issue the cancel notices [unless the client
+     *       dies, in which case we still want to kill the query which could be
+     *       done based on a service disappearing from a jini registry or
+     *       zookeeper.]
      */
-    protected void releaseResources(final RunningQuery q) {
-        
+    protected void halt(final RunningQuery q) {
+
+        // remove from the set of running queries.
+        runningQueries.remove(q.getQueryId(), q);
+
     }
     
     /*
@@ -519,8 +644,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     
     public void bufferReady(IQueryClient clientProxy,
             InetSocketAddress serviceAddr, long queryId, int bopId) {
-        // @todo SCALEOUT notify peer when a buffer is ready.
-        
+        // NOP
     }
     
     /*
@@ -533,11 +657,17 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      *       has terminated.
      */
     public BOp getQuery(final long queryId) throws RemoteException {
+        
         final RunningQuery q = runningQueries.get(queryId);
+        
         if (q != null) {
-            return q.queryRef.get();
+            
+            return q.getQuery();
+        
         }
+        
         return null;
+        
     }
 
     public void startOp(final StartOpMessage msg) throws RemoteException {
@@ -581,7 +711,6 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * @return An iterator visiting {@link IBindingSet}s which result from
      *         evaluating the query.
      * 
-     * @throws Exception
      * @throws IllegalArgumentException
      *             if the <i>readTimestamp</i> is {@link ITx#UNISOLATED}
      *             (queries may not read on the unisolated indices).
@@ -589,16 +718,15 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      *             if the <i>writeTimestamp</i> is neither
      *             {@link ITx#UNISOLATED} nor a read-write transaction
      *             identifier.
+     * @throws IllegalStateException
+     *             if the {@link QueryEngine} has been {@link #shutdown()}.
+     * @throws Exception
      * 
      * @todo Consider elevating the read/write timestamps into the query plan as
      *       annotations. Closure would then rewrite the query plan for each
      *       pass, replacing the readTimestamp with the new read-behind
-     *       timestamp.
-     * 
-     * @todo The initial binding set used to declare the variables used by a
-     *       rule. With this refactor we should pay attention instead to the
-     *       binding sets output by each {@link BOp} and compressed
-     *       representations of those binding sets.
+     *       timestamp. [This is related to how we will handle sequences of
+     *       steps, parallel steps, and closure of steps.]
      */
     public RunningQuery eval(final long queryId, final long readTimestamp,
             final long writeTimestamp, final BindingSetPipelineOp query)
@@ -606,23 +734,46 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
         if (query == null)
             throw new IllegalArgumentException();
+        
         if (readTimestamp == ITx.UNISOLATED)
             throw new IllegalArgumentException();
+        
         if (TimestampUtility.isReadOnly(writeTimestamp))
             throw new IllegalArgumentException();
 
         final long timeout = query.getProperty(BOp.Annotations.TIMEOUT,
                 BOp.Annotations.DEFAULT_TIMEOUT);
 
-        final RunningQuery runningQuery = new RunningQuery(this, queryId,
+        final RunningQuery runningQuery = newRunningQuery(this, queryId,
                 readTimestamp, writeTimestamp,
                 System.currentTimeMillis()/* begin */, timeout,
-                true/* controller */, this/* clientProxy */, query,
-                newQueryBuffer(query));
+                true/* controller */, this/* clientProxy */, query);
+
+        if (shutdown) {
+
+            throw new IllegalStateException("Shutting down.");
+
+        }
 
         runningQueries.put(queryId, runningQuery);
 
         return runningQuery;
+
+    }
+
+    /**
+     * Factory for {@link RunningQuery}s.
+     */
+    protected RunningQuery newRunningQuery(final QueryEngine queryEngine,
+            final long queryId, final long readTimestamp,
+            final long writeTimestamp, final long begin, final long timeout,
+            final boolean controller, final IQueryClient clientProxy,
+            final BindingSetPipelineOp query) {
+
+        return new RunningQuery(this, queryId, readTimestamp, writeTimestamp,
+                System.currentTimeMillis()/* begin */, timeout,
+                true/* controller */, this/* clientProxy */, query,
+                newQueryBuffer(query));
 
     }
 
@@ -632,8 +783,8 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      *       should swallow the binding sets from the pipeline and we should be
      *       able to pass along a <code>null</code> query buffer.
      * 
-     * @todo in scale-out, must return a proxy for the query buffer either here
-     *       or when the query is sent along to another node for evaluation.
+     * @todo SCALEOUT: Return a proxy for the query buffer either here or when
+     *       the query is sent along to another node for evaluation?
      *       <p>
      *       Actually, it would be nice if we could reuse the same NIO transfer
      *       of {@link ByteBuffer}s to move the final results back to the client

@@ -48,42 +48,25 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
-import alice.tuprolog.Prolog;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NoSuchBOpException;
 import com.bigdata.bop.ap.Predicate;
-import com.bigdata.bop.bset.Union;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.spo.SPORelation;
-import com.bigdata.relation.IMutableRelation;
-import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.Program;
-import com.bigdata.relation.rule.eval.pipeline.DistributedJoinTask;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.ndx.IAsynchronousWriteBufferFactory;
-import com.bigdata.striterator.ChunkedArrayIterator;
-import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.concurrent.Haltable;
 
 /**
  * Metadata about running queries.
- * 
- * @todo HA aspects of running queries?  Checkpoints for long running queries?
  */
 public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuery {
 
@@ -105,47 +88,47 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
     /**
      * The class executing the query on this node.
      */
-    final QueryEngine queryEngine;
+    final private QueryEngine queryEngine;
 
     /** The unique identifier for this query. */
-    final long queryId;
+    final private long queryId;
 
     /**
      * The timestamp or transaction identifier against which the query is
      * reading.
      */
-    final long readTimestamp;
+    final private long readTimestamp;
 
     /**
      * The timestamp or transaction identifier against which the query is
      * writing.
      */
-    final long writeTimestamp;
+    final private long writeTimestamp;
 
     /**
      * The timestamp when the query was accepted by this node (ms).
      */
-    final long begin;
+    final private long begin;
 
     /**
      * How long the query is allowed to run (elapsed milliseconds) -or-
      * {@link Long#MAX_VALUE} if there is no deadline.
      */
-    final long timeout;
+    final private long timeout;
 
     /**
      * <code>true</code> iff the outer {@link QueryEngine} is the controller for
      * this query.
      */
-    final boolean controller;
+    final private boolean controller;
 
     /**
      * The client executing this query.
      */
-    final IQueryClient clientProxy;
+    final private IQueryClient clientProxy;
 
     /** The query iff materialized on this node. */
-    final AtomicReference<BOp> queryRef;
+    final private AtomicReference<BOp> queryRef;
 
     /**
      * The buffer used for the overall output of the query pipeline.
@@ -154,7 +137,7 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      *       operator? Or do we just target the coordinating {@link QueryEngine}
      *       as the sink of the last operator so we can use NIO transfers?
      */
-    final IBlockingBuffer<IBindingSet[]> queryBuffer;
+    final private IBlockingBuffer<IBindingSet[]> queryBuffer;
 
     /**
      * An index from the {@link BOp.Annotations#BOP_ID} to the {@link BOp}.
@@ -165,7 +148,7 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      * A collection of the currently executing future for operators for this
      * query.
      */
-    private final ConcurrentHashMap<BOpShard, Future<?>> operatorFutures = new ConcurrentHashMap<BOpShard, Future<?>>();
+    private final ConcurrentHashMap<BSBundle, Future<?>> operatorFutures = new ConcurrentHashMap<BSBundle, Future<?>>();
 
     /**
      * A lock guarding {@link #runningTaskCount}, {@link #availableChunkCount},
@@ -204,165 +187,6 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      * release all resources associated with that bop.
      * <p>
      * This is guarded by the {@link #runningStateLock}.
-     * 
-     * FIXME Unit tests for non-distinct {@link IElementFilter}s on an
-     * {@link IPredicate}, unit tests for distinct element filter on an
-     * {@link IPredicate} which is capable of distributed operations. Do not use
-     * distinct where not required (SPOC, only one graph, etc).
-     * <p>
-     * It seems like the right way to approach this is by unifying the stackable
-     * CTC striterator pattern with the chunked iterator pattern and passing the
-     * query engine (or the bop context) into the iterator construction process
-     * (or simply requesting that the query engine construct the iterator
-     * stack).
-     * <p>
-     * In terms of harmonization, it is difficult to say which way would work
-     * better. In the short term we could simply allow both and mask the
-     * differences in how we construct the filters, but the conversion to/from
-     * striterators and chunked iterators seems to waste a bit of effort.
-     * <p>
-     * The trickiest part of all of this is to allow a distributed filter
-     * pattern where the filter gets created on a set of nodes identified by the
-     * operator and the elements move among those nodes using the query engine's
-     * buffers.
-     * <p>
-     * To actually implement the distributed distinct filter we need to stack
-     * the following:
-     * 
-     * <pre>
-     * - ITupleIterator
-     * - Resolve ITuple to Element (e.g., SPOC).
-     * - Layer on optional IElementFilter associated with the IPredicate.
-     * - Layer on SameVariableConstraint iff required (done by AccessPath) 
-     * - Resolve SPO to SPO, stripping off the context position.
-     * - Chunk SPOs (SPO[], IKeyOrder), where the key order is from the access path.
-     * - Filter SPO[] using DHT constructed on specified nodes of the cluster.
-     *   The SPO[] chunks should be packaged into NIO buffers and shipped to those
-     *   nodes.  The results should be shipped back as a bit vectors packaged into
-     *   a NIO buffers.
-     * - Dechunk SPO[] to SPO since that is the current expectation for the filter
-     *   stack.
-     * - The result then gets wrapped as a {@link IChunkedOrderedIterator} by
-     *   the AccessPath using a {@link ChunkedArrayIterator}.
-     * </pre>
-     * 
-     * This stack is a bit complex(!). But it is certainly easy enough to
-     * generate the necessary bits programmatically.
-     * 
-     * FIXME Handling the {@link Union} of binding sets. Consider whether the
-     * chunk combiner logic from the {@link DistributedJoinTask} could be
-     * reused.
-     * 
-     * FIXME INSERT and DELETE which will construct elements using
-     * {@link IRelation#newElement(java.util.List, IBindingSet)} from a binding
-     * set and then use {@link IMutableRelation#insert(IChunkedOrderedIterator)}
-     * and {@link IMutableRelation#delete(IChunkedOrderedIterator)}. For s/o, we
-     * first need to move the bits into the right places so it makes sense to
-     * unpack the processing of the loop over the elements and move the data
-     * around, writing on each index as necessary. There could be eventually
-     * consistent approaches to this as well. For justifications we need to
-     * update some additional indices, in which case we are stuck going through
-     * {@link IRelation} rather than routing data directly or using the
-     * {@link IAsynchronousWriteBufferFactory}. For example, we could handle
-     * routing and writing in s/o as follows:
-     * 
-     * <pre>
-     * INSERT(relation,bindingSets) 
-     * 
-     * expands to
-     * 
-     * SEQUENCE(
-     * SELECT(s,p,o), // drop bindings that we do not need
-     * PARALLEL(
-     *   INSERT_INDEX(spo), // construct (s,p,o) elements and insert
-     *   INSERT_INDEX(pos), // construct (p,o,s) elements and insert
-     *   INSERT_INDEX(osp), // construct (o,s,p) elements and insert
-     * ))
-     * 
-     * </pre>
-     * 
-     * The output of the SELECT operator would be automatically mapped against
-     * the shards on which the next operators need to write. Since there is a
-     * nested PARALLEL operator, the mapping will be against the shards of each
-     * of the given indices. (A simpler operator would invoke
-     * {@link SPORelation#insert(IChunkedOrderedIterator)}. Handling
-     * justifications requires that we also formulate the justification chain
-     * from the pattern of variable bindings in the rule).
-     * 
-     * FIXME Handle {@link Program}s. There are three flavors, which should
-     * probably be broken into three operators: sequence(ops), set(ops), and
-     * closure(op). The 'set' version would be parallelized, or at least have an
-     * annotation for parallel evaluation. These things belong in the same broad
-     * category as the join graph since they are operators which control the
-     * evaluation of other operators (the current pipeline join also has that
-     * characteristic which it uses to do the nested index subqueries).
-     * 
-     * FIXME SPARQL to BOP translation
-     * <p>
-     * The initial pass should translate from {@link IRule} to {@link BOp}s so
-     * we can immediately begin running SPARQL queries against the
-     * {@link QueryEngine}. A second pass should explore a rules base
-     * translation from the openrdf SPARQL operator tree into {@link BOp}s,
-     * perhaps using an embedded {@link Prolog} engine. What follows is a
-     * partial list of special considerations for that translation:
-     * <ul>
-     * <li>Distinct can be trivially enforced for default graph queries against
-     * the SPOC index.</li>
-     * <li>Local distinct should wait until there is more than one tuple from
-     * the index since a single tuple does not need to be made distinct using a
-     * hash map.</li>
-     * <li>Low volume distributed queries should use solution modifiers which
-     * evaluate on the query controller node rather than using distributed sort,
-     * distinct, slice, or aggregation operators.</li>
-     * <li></li>
-     * <li></li>
-     * <li></li>
-     * <li>High volume queries should use special operators (different
-     * implementations of joins, use an external merge sort, etc).</li>
-     * </ul>
-     * 
-     * FIXME SPARQL Coverage: Add native support for all SPARQL operators. A lot
-     * of this can be picked up from Sesame. Some things, such as isIRI() can be
-     * done natively against the {@link IV}. Likewise, there is already a set of
-     * comparison methods for {@link IV}s which are inlined values. Add support
-     * for
-     * <ul>
-     * <li></li>
-     * <li></li>
-     * <li></li>
-     * <li></li>
-     * <li></li>
-     * <li></li>
-     * </ul>
-     * 
-     * FIXME buffer management for s/o, including binding sets movement, element
-     * chunk movement for DHT on access path, and on demand materialization of
-     * large query resources for large data sets, parallel closure, etc.;
-     * grouping operators which will run locally (such as a pipeline join plus a
-     * conditional routing operator) so we do not marshell binding sets between
-     * operators when they will not cross a network boundary. Also, handle
-     * mutation, programs and closure operators.
-     * 
-     * @todo I have not yet figured out how to mark this sort of operator to
-     *       prevent its binding sets from being buffered on NIO ByteBuffers
-     *       when running in scale-out, which is what we normally do for the
-     *       output of a join operator. Probably the operator themselves will
-     *       just carry this information either as a Java method or as an
-     *       annotation. This could interact with how we combine
-     *       {@link #chunksIn}.
-     * 
-     * @todo Expander patterns will continue to exist until we handle the
-     *       standalone backchainers in a different manner for scale-out so add
-     *       support for those for now.
-     * 
-     * @todo SCALEOUT: Life cycle management of the operators and the query
-     *       implies both a per-query bop:NodeList map on the query coordinator
-     *       identifying the nodes on which the query has been executed and a
-     *       per-query bop:ResourceList map identifying the resources associated
-     *       with the execution of that bop on that node. In fact, this could be
-     *       the same {@link #resourceMap} except that we would lose type
-     *       information about the nature of the resource so it is better to
-     *       have distinct maps for this purpose.
      */
     private final Map<Integer/* bopId */, AtomicLong/* availableChunkCount */> availableChunkCountMap = new LinkedHashMap<Integer, AtomicLong>();
 
@@ -417,6 +241,9 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
 
     /**
      * The chunks available for immediate processing.
+     * <p>
+     * Note: This is package private so it will be visible to the
+     * {@link QueryEngine}.
      * 
      * @todo SCALEOUT: We need to model the chunks available before they are
      *       materialized locally such that (a) they can be materialized on
@@ -437,6 +264,59 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      *       we are going to run over all the data anyway.
      */
     final BlockingQueue<BindingSetChunk> chunksIn = new LinkedBlockingDeque<BindingSetChunk>();
+
+    /**
+     * The class executing the query on this node.
+     */
+    public QueryEngine getQueryEngine() {
+        
+        return queryEngine;
+        
+    }
+    
+    /**
+     * The unique identifier for this query.
+     */
+    public long getQueryId() {
+        
+        return queryId;
+        
+    }
+
+    /**
+     * Return the operator tree for this query. If query processing is
+     * distributed and the query has not been materialized on this node, then it
+     * is materialized now.
+     * 
+     * @return The query.
+     */
+    public BOp getQuery() {
+
+        if (queryRef.get() == null) {
+
+            synchronized (queryRef) {
+
+                if (queryRef == null) {
+
+                    try {
+
+                        queryRef.set(clientProxy.getQuery(queryId));
+
+                    } catch (RemoteException e) {
+
+                        throw new RuntimeException(e);
+
+                    }
+
+                }
+
+            }
+
+        }
+        
+        return queryRef.get();
+
+   }
 
     /**
      * Return <code>true</code> iff this is the query controller.
@@ -493,6 +373,9 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
 
     /**
      * Create a {@link BindingSetChunk} from a sink and add it to the queue.
+     * <p>
+     * Note: If we are running standalone, then we leave the data on the heap
+     * rather than formatting it onto a {@link ByteBuffer}.
      * 
      * @param sinkId
      * @param sink
@@ -501,34 +384,9 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      *         will always be ONE (1) for scale-up. For scale-out, there will be
      *         one chunk per index partition over which the intermediate results
      *         were mapped.
-     * 
-     * @todo SCALEOUT: This is where we need to map the binding sets over the
-     *       shards for the target operator. Once they are mapped, write the
-     *       binding sets onto an NIO buffer for the target node and then send
-     *       an RMI message to the node telling it that there is a chunk
-     *       available for the given (queryId,bopId,partitionId).
-     * 
-     * @todo If we are running standalone, then do not format the data into a
-     *       {@link ByteBuffer}.
-     *       <p>
-     *       For selective queries in s/o, first format the data onto a list of
-     *       byte[]s, one per target shard/node. Then, using a lock, obtain a
-     *       ByteBuffer if there is none associated with the query yet.
-     *       Otherwise, using the same lock, obtain a slice onto that ByteBuffer
-     *       and put as much of the byte[] as will fit, continuing onto a newly
-     *       recruited ByteBuffer if necessary. Release the lock and notify the
-     *       target of the ByteBuffer slice (buffer#, off, len). Consider
-     *       pushing the data proactively for selective queries.
-     *       <p>
-     *       For unselective queries in s/o, proceed as above but we need to get
-     *       the data off the heap and onto the {@link ByteBuffer}s quickly
-     *       (incrementally) and we want the consumers to impose flow control on
-     *       the producers to bound the memory demand (this needs to be
-     *       coordinated carefully to avoid deadlocks). Typically, large result
-     *       sets should result in multiple passes over the consumer's shard
-     *       rather than writing the intermediate results onto the disk.
      */
-    private int add(final int sinkId, final IBlockingBuffer<IBindingSet[]> sink) {
+    protected int add(final int sinkId,
+            final IBlockingBuffer<IBindingSet[]> sink) {
 
         /*
          * Note: The partitionId will always be -1 in scale-up.
@@ -536,12 +394,24 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
         final BindingSetChunk chunk = new BindingSetChunk(queryId, sinkId,
                 -1/* partitionId */, sink.iterator());
 
-        queryEngine.add(chunk);
-        
+        addChunkToQueryEngine(chunk);
+
         return 1;
-        
+
     }
 
+    /**
+     * Adds a chunk to the local {@link QueryEngine}.
+     * 
+     * @param chunk
+     *            The chunk.
+     */
+    protected void addChunkToQueryEngine(final BindingSetChunk chunk) {
+
+        queryEngine.add(chunk);
+
+    }
+    
     /**
      * Make a chunk of binding sets available for consumption by the query.
      * <p>
@@ -943,7 +813,7 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
         // wrap runnable.
         final FutureTask<Void> f2 = new FutureTask(r, null/* result */);
         // add to list of active futures for this query.
-        operatorFutures.put(new BOpShard(chunk.bopId, chunk.partitionId), f2);
+        operatorFutures.put(new BSBundle(chunk.bopId, chunk.partitionId), f2);
         // return : caller will execute.
         return f2;
     }
@@ -990,8 +860,8 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      *       <p>
      *       Queries MUST NOT cause the solutions to be discarded before the
      *       client can consume them. This means that we have to carefully
-     *       integrate/product {@link SliceOp} or just wrap the query buffer to
-     *       impose the slice (simpler).
+     *       integrate {@link SliceOp} or just wrap the query buffer to impose
+     *       the slice (simpler).
      */
     final public boolean cancel(final boolean mayInterruptIfRunning) {
         // halt the query.
@@ -1005,12 +875,10 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
             // close the output sink.
             queryBuffer.close();
         }
-        // remove from the set of running queries.
-        queryEngine.runningQueries.remove(queryId, this);
-        // release any resources for this query.
-        queryEngine.releaseResources(this);
         // life cycle hook for the end of the query.
         lifeCycleTearDownQuery();
+        // remove from the collection of running queries.
+        queryEngine.runningQueries.remove(queryId, this);
         // true iff we cancelled something.
         return cancelled;
     }
@@ -1042,19 +910,27 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
     }
 
     public IBigdataFederation<?> getFederation() {
+        
         return queryEngine.getFederation();
+        
     }
 
     public IIndexManager getIndexManager() {
-        return queryEngine.getLocalIndexManager();
+        
+        return queryEngine.getIndexManager();
+        
     }
 
     public long getReadTimestamp() {
+     
         return readTimestamp;
+        
     }
 
     public long getWriteTimestamp() {
+        
         return writeTimestamp;
+        
     }
 
 }

@@ -58,7 +58,7 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("striterators");
+        final TestSuite suite = new TestSuite("striterators");
    
         suite.addTestSuite(TestMergeFilter.class);
         
@@ -68,6 +68,8 @@ public class TestAll extends TestCase {
         
         suite.addTestSuite(TestChunkedFilter.class);
 
+        suite.addTestSuite(TestDechunkerator.class);
+        
         suite.addTestSuite(TestDistinctFilter.class);
          
         return suite;

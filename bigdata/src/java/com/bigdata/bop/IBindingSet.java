@@ -167,6 +167,20 @@ public interface IBindingSet extends Cloneable, Serializable {
      * @param o
      *            Another binding set.
      */
-    public boolean equals(IBindingSet o);
+    public boolean equals(Object o);
+
+    /**
+     * The hash code of a binding is defined as the bit-wise XOR of the hash
+     * codes of the {@link IConstant}s for its bound variables. Unbound
+     * variables are ignored when computing the hash code. Binding sets are
+     * unordered collections, therefore the calculated hash code intentionally
+     * does not dependent on the order in which the bindings are iterated over.
+     * The hash code reflects the current state of the bindings and must be
+     * recomputed if the bindings are changed.
+     * 
+     * @todo the test suites should be enhanced to verify the contract for
+     *       {@link IBindingSet#hashCode()}
+     */
+    public int hashCode();
     
 }
