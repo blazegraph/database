@@ -258,7 +258,7 @@ public class TestQueryEngine extends TestCase2 {
         final int startId = 1;
         final int joinId = 2;
         final int predId = 3;
-        final BindingSetPipelineOp query = new PipelineJoin(
+        final BindingSetPipelineOp query = new PipelineJoin<E>(
         // left
                 new CopyBindingSetOp(new BOp[] {}, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
@@ -466,12 +466,12 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.BOP_ID, predId2),//
                 }));
         
-        final BindingSetPipelineOp join1Op = new PipelineJoin(startOp, pred1Op,
+        final BindingSetPipelineOp join1Op = new PipelineJoin<E>(startOp, pred1Op,
                 NV.asMap(new NV[] { new NV(Predicate.Annotations.BOP_ID,
                         joinId1),//
                         }));
 
-        final BindingSetPipelineOp join2Op = new PipelineJoin(join1Op, pred2Op,
+        final BindingSetPipelineOp join2Op = new PipelineJoin<E>(join1Op, pred2Op,
                 NV.asMap(new NV[] { new NV(Predicate.Annotations.BOP_ID,
                         joinId2),//
                         }));

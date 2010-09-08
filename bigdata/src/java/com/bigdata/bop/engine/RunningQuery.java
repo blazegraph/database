@@ -59,7 +59,6 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.concurrent.Haltable;
@@ -209,40 +208,6 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
     private final Set<Integer/*bopId*/> startedSet = new LinkedHashSet<Integer>();
     
     /**
-     * A map associating resources with running queries. When a query halts, the
-     * resources listed in its resource map are released. Resources can include
-     * {@link ByteBuffer}s backing either incoming or outgoing
-     * {@link BindingSetChunk}s, temporary files associated with the query, hash
-     * tables, etc.
-     * 
-     * @todo Cache any resources materialized for the query on this node (e.g.,
-     *       temporary graphs materialized from a peer or the client). A bop
-     *       should be able to demand those data from the cache and otherwise
-     *       have them be materialized.
-     * 
-     * @todo only use the values in the map for transient objects, such as a
-     *       hash table which is not backed by the disk. For {@link ByteBuffer}s
-     *       we want to make the references go through the {@link BufferService}
-     *       . For files, through the {@link ResourceManager}.
-     * 
-     * @todo We need to track the resources in use by the query so they can be
-     *       released when the query terminates. This includes: buffers; joins
-     *       for which there is a chunk of binding sets that are currently being
-     *       executed; downstream joins (they depend on the source joins to
-     *       notify them when they are complete in order to decide their own
-     *       termination condition); local hash tables which are part of a DHT
-     *       (especially when they are persistent); buffers and disk resources
-     *       allocated to N-way merge sorts, etc.
-     * 
-     * @todo The set of buffers having data which has been accepted for this
-     *       query.
-     * 
-     * @todo The set of buffers having data which has been generated for this
-     *       query.
-     */
-    private final ConcurrentHashMap<UUID, Object> resourceMap = new ConcurrentHashMap<UUID, Object>();
-
-    /**
      * The chunks available for immediate processing.
      * <p>
      * Note: This is package private so it will be visible to the
@@ -261,7 +226,7 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      *       combined before we execute the operator. For unselective operators,
      *       we are going to run over all the data anyway.
      */
-    final BlockingQueue<BindingSetChunk> chunksIn = new LinkedBlockingDeque<BindingSetChunk>();
+    final /*private*/ BlockingQueue<BindingSetChunk> chunksIn = new LinkedBlockingDeque<BindingSetChunk>();
 
     /**
      * The class executing the query on this node.
@@ -601,7 +566,7 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
             final long elapsed = System.currentTimeMillis() - begin;
             if (log.isTraceEnabled())
                 log.trace("bopId=" + msg.bopId + ",partitionId=" + msg.partitionId
-                        + ",serviceId=" + queryEngine.getServiceId()
+                        + ",serviceId=" + queryEngine.getServiceUUID()
                         + ", nchunks=" + fanOut + " : runningTaskCount="
                         + runningTaskCount + ", availableChunkCount="
                         + availableChunkCount + ", elapsed=" + elapsed);
@@ -742,7 +707,7 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
                 .getProperty(BindingSetPipelineOp.Annotations.BOP_ID);
         final IBlockingBuffer<IBindingSet[]> sink = (p == null ? queryBuffer
                 : op.newBuffer());
-        // altSink [@todo altSink=null or sink when not specified?]
+        // altSink (null when not specified).
         final Integer altSinkId = (Integer) op
                 .getProperty(BindingSetPipelineOp.Annotations.ALT_SINK_REF);
         if (altSinkId != null && !bopIndex.containsKey(altSinkId)) {
@@ -758,7 +723,7 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
         // Hook the FutureTask.
         final Runnable r = new Runnable() {
             public void run() {
-                final UUID serviceId = queryEngine.getServiceId();
+                final UUID serviceId = queryEngine.getServiceUUID();
                 int fanIn = 1;
                 int sinkChunksOut = 0;
                 int altSinkChunksOut = 0;

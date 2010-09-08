@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.mutation;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
@@ -39,7 +37,7 @@ import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.IShardwisePipelineOp;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.ITupleSerializer;
@@ -59,7 +57,8 @@ import com.bigdata.striterator.IKeyOrder;
  * @param <E>
  *            The generic type of the elements written onto the index.
  */
-public class InsertOp<E> extends BindingSetPipelineOp {
+public class InsertOp<E> extends BindingSetPipelineOp implements
+        IShardwisePipelineOp<E> {
 
     /**
      * 
@@ -69,12 +68,12 @@ public class InsertOp<E> extends BindingSetPipelineOp {
     public interface Annotations extends BindingSetPipelineOp.Annotations {
 
         /**
-         * An ordered {@link IVariableOrConstant}[]. Elements will be created
-         * using the binding sets which flow through the operator and
-         * {@link IRelation#newElement(java.util.List, IBindingSet)}.
+         * An {@link IPredicate}.  The {@link IPredicate#asBound(IBindingSet)}
+         * predicate will be used to create the elements to be inserted into
+         * the relation.
          * 
-         * @todo This should be an {@link IPredicate} and should be the right
-         *       hand operand just like for a JOIN.
+         * @see IPredicate#asBound(IBindingSet)
+         * @see IRelation#newElement(java.util.List, IBindingSet)
          */
         String SELECTED = InsertOp.class.getName() + ".selected";
 
@@ -116,9 +115,8 @@ public class InsertOp<E> extends BindingSetPipelineOp {
     /**
      * @see Annotations#SELECTED
      */
-    public IVariableOrConstant<?>[] getSelected() {
+    public IPredicate<E> getPredicate() {
 
-//        return (IVariableOrConstant<?>[]) getProperty(Annotations.SELECTED);
         return getRequiredProperty(Annotations.SELECTED);
 
     }
@@ -164,7 +162,7 @@ public class InsertOp<E> extends BindingSetPipelineOp {
          */
         private final IBlockingBuffer<IBindingSet[]> sink;
 
-        private List<IVariableOrConstant<?>> selected;
+        private IPredicate<E> predicate;
         
         private final IRelation<E> relation;
         
@@ -181,7 +179,7 @@ public class InsertOp<E> extends BindingSetPipelineOp {
             
             sink = context.getSink();
 
-            selected = Arrays.asList(op.getSelected());
+            predicate = op.getPredicate();
             
             relation = context.getWriteRelation(op.getRelation());
             
@@ -229,7 +227,7 @@ public class InsertOp<E> extends BindingSetPipelineOp {
 
                         final IBindingSet bset = chunk[i];
 
-                        final E e = relation.newElement(selected, bset);
+                        final E e = relation.newElement(predicate.args(), bset);
 
                         final byte[] key = keyOrder.getKey(keyBuilder, e);
 

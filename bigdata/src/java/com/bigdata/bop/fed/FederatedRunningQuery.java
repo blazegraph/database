@@ -27,19 +27,39 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.fed;
 
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.rmi.RemoteException;
+import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IShardwisePipelineOp;
+import com.bigdata.bop.engine.BindingSetChunk;
 import com.bigdata.bop.engine.IQueryClient;
+import com.bigdata.bop.engine.IQueryPeer;
+import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.RunningQuery;
+import com.bigdata.io.DirectBufferPoolAllocator;
+import com.bigdata.io.SerializerUtil;
+import com.bigdata.io.DirectBufferPoolAllocator.IAllocation;
+import com.bigdata.io.DirectBufferPoolAllocator.IAllocationContext;
 import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.jini.master.IAsynchronousClientTask;
+import com.bigdata.service.ManagedResourceService;
+import com.bigdata.service.ResourceService;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -69,6 +89,59 @@ import com.bigdata.striterator.IKeyOrder;
  * */
 public class FederatedRunningQuery extends RunningQuery {
 
+    /**
+     * The {@link UUID} of the service which is the {@link IQueryClient} running
+     * this query.
+     */
+    private final UUID queryControllerUUID;
+    
+    /**
+     * A map associating resources with running queries. When a query halts, the
+     * resources listed in its resource map are released. Resources can include
+     * {@link ByteBuffer}s backing either incoming or outgoing
+     * {@link BindingSetChunk}s, temporary files associated with the query, hash
+     * tables, etc.
+     * 
+     * @todo This map will eventually need to be moved into {@link RunningQuery}
+     *       in order to support temporary graphs or other disk-backed resources
+     *       associated with the evaluation of a query against a standalone
+     *       database. However, the main use case are the resources associated
+     *       with query against an {@link IBigdataFederation} which it why it is
+     *       being developed in the {@link FederatedRunningQuery} class.
+     * 
+     * @todo Cache any resources materialized for the query on this node (e.g.,
+     *       temporary graphs materialized from a peer or the client). A bop
+     *       should be able to demand those data from the cache and otherwise
+     *       have them be materialized.
+     * 
+     * @todo Only use the values in the map for transient objects, such as a
+     *       hash table which is not backed by the disk. For {@link ByteBuffer}s
+     *       we want to make the references go through the {@link ResourceService}
+     *       . For files, through the {@link ResourceManager}.
+     * 
+     * @todo We need to track the resources in use by the query so they can be
+     *       released when the query terminates. This includes: buffers; joins
+     *       for which there is a chunk of binding sets that are currently being
+     *       executed; downstream joins (they depend on the source joins to
+     *       notify them when they are complete in order to decide their own
+     *       termination condition); local hash tables which are part of a DHT
+     *       (especially when they are persistent); buffers and disk resources
+     *       allocated to N-way merge sorts, etc.
+     * 
+     * @todo The set of buffers having data which has been accepted for this
+     *       query.
+     * 
+     * @todo The set of buffers having data which has been generated for this
+     *       query.
+     */
+    private final ConcurrentHashMap<UUID, Object> resourceMap = new ConcurrentHashMap<UUID, Object>();
+
+    /**
+     * @todo Maintain multiple allocation contexts. Some can be query wide.
+     *       Others might be specific to a serviceId and/or sinkId.
+     */
+    private final ConcurrentHashMap<Object/* key */, IAllocationContext> allocationContexts = new ConcurrentHashMap<Object, IAllocationContext>();
+    
     public FederatedRunningQuery(FederatedQueryEngine queryEngine,
             long queryId, long readTimestamp, long writeTimestamp, long begin,
             long timeout, boolean controller, IQueryClient clientProxy,
@@ -76,6 +149,17 @@ public class FederatedRunningQuery extends RunningQuery {
 
         super(queryEngine, queryId, readTimestamp, writeTimestamp, begin,
                 timeout, controller, clientProxy, query, queryBuffer);
+
+        /*
+         * Note: getServiceUUID() should be a smart proxy method and thus not
+         * actually do RMI here.  However, it is resolved eagerly and cached
+         * anyway.
+         */
+        try {
+            this.queryControllerUUID = getQueryController().getServiceUUID();
+        } catch (RemoteException e) {
+            throw new RuntimeException(e);
+        }
         
     }
 
@@ -87,38 +171,148 @@ public class FederatedRunningQuery extends RunningQuery {
     }
 
     /**
+     * The allocation context key groups together allocations onto the same
+     * direct {@link ByteBuffer}s. There are different implementations depending
+     * on how it makes sense to group data data for a given query.
+     */
+    static abstract private class AllocationContextKey {
+
+        /**
+         * Must be overridden. The queryId must be a part of each hashCode() in
+         * order to ensure that the hash codes are well distributed across
+         * different queries on the same node.
+         */
+        @Override
+        abstract public int hashCode();
+
+        /**
+         * Must be overridden.
+         */
+        @Override
+        abstract public boolean equals(Object o);
+
+    }
+
+    /**
+     * An allocation context which is shared by all operators running in the
+     * same query.
+     */
+    static private class QueryContext extends AllocationContextKey {
+        private final Long queryId;
+
+        QueryContext(final Long queryId) {
+            this.queryId = Long.valueOf(queryId);
+        }
+
+        public int hashCode() {
+            return queryId.hashCode();
+        }
+
+        public boolean equals(final Object o) {
+            if (this == o)
+                return true;
+            if (!(o instanceof QueryContext))
+                return false;
+            if (!queryId.equals(((QueryContext) o).queryId))
+                return false;
+            return true;
+        }
+    }
+
+    /**
+     * An allocation context which is shared by all operators running in the
+     * same query which target the same service.
+     */
+    static private class ServiceContext extends AllocationContextKey {
+        private final Long queryId;
+
+        private final UUID serviceUUID;
+
+        ServiceContext(final Long queryId, final UUID serviceUUID) {
+            this.queryId = queryId;
+            this.serviceUUID = serviceUUID;
+        }
+
+        public int hashCode() {
+            return queryId.hashCode() * 31 + serviceUUID.hashCode();
+        }
+
+        public boolean equals(final Object o) {
+            if (this == o)
+                return true;
+            if (!(o instanceof ServiceContext))
+                return false;
+            if (!queryId.equals(((ServiceContext) o).queryId))
+                return false;
+            if (!serviceUUID.equals(((ServiceContext) o).serviceUUID))
+                return false;
+            return true;
+        }
+    }
+
+    /**
+     * An allocation context which is shared by all operators running in the
+     * same query which target the same shard (the same shard implies the same
+     * service, at least until we have HA with shard affinity).
+     */
+    static private class ShardContext extends AllocationContextKey {
+
+        private final Long queryId;
+
+        private final int partitionId;
+
+        ShardContext(final Long queryId, final int partitionId) {
+            this.queryId = queryId;
+            this.partitionId = partitionId;
+        }
+
+        public int hashCode() {
+            return queryId.hashCode() * 31 + partitionId;
+        }
+
+        public boolean equals(final Object o) {
+            if (this == o)
+                return true;
+            if (!(o instanceof ShardContext))
+                return false;
+            if (!queryId.equals(((ShardContext) o).queryId))
+                return false;
+            if (partitionId != partitionId)
+                return false;
+            return true;
+        }
+    }
+
+    /**
+     * Return the {@link IAllocationContext} for the given key.
+     * 
+     * @param key
+     *            The key.
+     *            
+     * @return The allocation context.
+     */
+    private IAllocationContext getAllocationContext(
+            final AllocationContextKey key) {
+
+        return getQueryEngine().getResourceService().getAllocator()
+                .getAllocationContext(key);
+
+    }
+
+    /**
      * {@inheritDoc}
-     * 
-     * @return The #of chunks made available for consumption by the sink. This
-     *         will always be ONE (1) for scale-up. For scale-out, there will be
-     *         one chunk per index partition over which the intermediate results
-     *         were mapped.
-     * 
-     *         FIXME SCALEOUT: This is where we need to map the binding sets
-     *         over the shards for the target operator. Once they are mapped,
-     *         write the binding sets onto an NIO buffer for the target node and
-     *         then send an RMI message to the node telling it that there is a
-     *         chunk available for the given (queryId,bopId,partitionId).
-     *         <p>
-     *         For selective queries in s/o, first format the data onto a list
-     *         of byte[]s, one per target shard/node. Then, using a lock, obtain
-     *         a ByteBuffer if there is none associated with the query yet.
-     *         Otherwise, using the same lock, obtain a slice onto that
-     *         ByteBuffer and put as much of the byte[] as will fit, continuing
-     *         onto a newly recruited ByteBuffer if necessary. Release the lock
-     *         and notify the target of the ByteBuffer slice (buffer#, off,
-     *         len). Consider pushing the data proactively for selective
-     *         queries.
-     *         <p>
-     *         For unselective queries in s/o, proceed as above but we need to
-     *         get the data off the heap and onto the {@link ByteBuffer}s
-     *         quickly (incrementally) and we want the consumers to impose flow
-     *         control on the producers to bound the memory demand (this needs
-     *         to be coordinated carefully to avoid deadlocks). Typically, large
-     *         result sets should result in multiple passes over the consumer's
-     *         shard rather than writing the intermediate results onto the disk.
-     * 
-     * */
+     * <p>
+     * This method is overridden to organize the output from one operator so in
+     * order to make it available to another operator running on a different
+     * node. There are several cases which have to be handled and which are
+     * identified by the {@link BOp#getEvaluationContext()}. In addition, we
+     * need to handle low latency and high data volume queries somewhat
+     * differently. Except for {@link BOpEvaluationContext#ANY}, all of these
+     * cases wind up writing the intermediate results onto a direct
+     * {@link ByteBuffer} and notifying the receiving service that there are
+     * intermediate results which it can pull when it is ready to process them.
+     * This pattern allows the receiver to impose flow control on the producer.
+     */
     @Override
     protected <E> int add(final int sinkId,
             final IBlockingBuffer<IBindingSet[]> sink) {
@@ -132,27 +326,31 @@ public class FederatedRunningQuery extends RunningQuery {
             throw new IllegalArgumentException();
 
         switch (bop.getEvaluationContext()) {
-        case ANY:
+        case ANY: {
             return super.add(sinkId, sink);
+        }
         case HASHED: {
             /*
-             * FIXME The sink self describes the nodes over which the
-             * binding sets will be mapped and the hash function to be applied
-             * so we look up those metadata and apply them to distributed the
-             * binding sets across the nodes.
+             * @todo The sink must use annotations to describe the nodes over
+             * which the binding sets will be mapped and the hash function to be
+             * applied. Look up those annotations and apply them to distribute
+             * the binding sets across the nodes.
              */
             throw new UnsupportedOperationException();
         }
         case SHARDED: {
             /*
-             * FIXME The sink must read or write on a shard so we map the
-             * binding sets across the access path for the sink.
+             * The sink must read or write on a shard so we map the binding sets
+             * across the access path for the sink.
              * 
              * @todo For a pipeline join, the predicate is the right hand
              * operator of the sink. This might be true for INSERT and DELETE
-             * operators as well.
+             * operators as well. [It is not, but make it so and document this
+             * pattern or have a common interface method which returns the
+             * IPredicate regardless of whether it is an operand or an
+             * annotation.]
              * 
-             * @todo IKeyOrder tells us which index will be used and should be
+             * Note: IKeyOrder tells us which index will be used and should be
              * set on the predicate by the join optimizer.
              * 
              * @todo Use the read or write timestamp depending on whether the
@@ -163,28 +361,21 @@ public class FederatedRunningQuery extends RunningQuery {
              * data contained in the sink (in fact, we should just process the
              * sink data in place).
              */
-            final IPredicate<E> pred = null; // @todo
-            final IKeyOrder<E> keyOrder = null; // @todo
-            final long timestamp = getReadTimestamp(); // @todo
+            @SuppressWarnings("unchecked")
+            final IPredicate<E> pred = ((IShardwisePipelineOp) bop).getPredicate();
+            final IKeyOrder<E> keyOrder = pred.getKeyOrder();
+            final long timestamp = getReadTimestamp(); // @todo read vs write timestamp.
             final int capacity = 1000;// @todo
+            final int capacity2 = 1000;// @todo
             final MapBindingSetsOverShardsBuffer<IBindingSet, E> mapper = new MapBindingSetsOverShardsBuffer<IBindingSet, E>(
                     getFederation(), pred, keyOrder, timestamp, capacity) {
-
-                        @Override
-                        IBuffer<IBindingSet> newBuffer(PartitionLocator locator) {
-                            // TODO Auto-generated method stub
-                            return null;
-                        }
-                
+                @Override
+                IBuffer<IBindingSet> newBuffer(PartitionLocator locator) {
+                    return new BlockingBuffer<IBindingSet>(capacity2);
+                }
             };
             /*
              * Map the binding sets over shards.
-             * 
-             * FIXME The buffers created above need to become associated with
-             * this query as resources of the query. Once we are done mapping
-             * the binding sets over the shards, the target node for each buffer
-             * needs to be set an RMI message to let it know that there is a
-             * chunk available for it for the target operator.
              */
             {
                 final IAsynchronousIterator<IBindingSet[]> itr = sink
@@ -201,18 +392,52 @@ public class FederatedRunningQuery extends RunningQuery {
                     sink.close();
                 }
             }
+            /*
+             * The allocation context.
+             * 
+             * @todo use (queryId, serviceId, sinkId) when the target bop is
+             * high volume operator (this requires annotation by the query
+             * planner of the operator tree).
+             */
+            final IAllocationContext allocationContext = getAllocationContext(new QueryContext(
+                    getQueryId()));
+
+            /*
+             * Generate the output chunks and notify the receivers.
+             * 
+             * @todo This stage should probably be integrated with the stage
+             * which maps the binding sets over the shards (immediately above)
+             * to minimize copying or visiting in the data.
+             */
+            for (Map.Entry<PartitionLocator, IBuffer<IBindingSet>> e : mapper
+                    .getSinks().entrySet()) {
+
+                final PartitionLocator locator = e.getKey();
+                
+                final IBuffer<IBindingSet> shardSink = e.getValue();
+
+                // FIXME harmonize IBuffer<IBindingSet> vs IBuffer<IBindingSet[]>
+//                sendOutputChunkReadyMessage(newOutputChunk(locator
+//                        .getDataServiceUUID(), sinkId, allocationContext,
+//                        shardSink));
+                throw new UnsupportedOperationException();
+            }
             
-            throw new UnsupportedOperationException();
         }
         case CONTROLLER: {
 
-            final IQueryClient clientProxy = getQueryController();
+            /*
+             * Format the binding sets onto a ByteBuffer and publish that
+             * ByteBuffer as a manager resource for the query and notify the
+             * query controller that data is available for it.
+             */
 
-//            getQueryEngine().getResourceService().port;
-//            
-//            clientProxy.bufferReady(clientProxy, serviceAddr, getQueryId(), sinkId);
+            final IAllocationContext allocationContext = getAllocationContext(new QueryContext(
+                    getQueryId()));
 
-            throw new UnsupportedOperationException();
+            sendOutputChunkReadyMessage(newOutputChunk(queryControllerUUID,
+                    sinkId, allocationContext, sink));
+
         }
         default:
             throw new AssertionError(bop.getEvaluationContext());
@@ -220,4 +445,193 @@ public class FederatedRunningQuery extends RunningQuery {
 
     }
 
+    /**
+     * Create an {@link OutputChunk} from some intermediate results.
+     * 
+     * @param serviceUUID
+     *            The {@link UUID} of the {@link IQueryPeer} who is the
+     *            recipient.
+     * @param sinkId
+     *            The identifier of the target {@link BOp}.
+     * @param allocationContext
+     *            The allocation context within which the {@link ByteBuffer}s
+     *            will be managed for this {@link OutputChunk}.
+     * @param source
+     *            The binding sets to be formatted onto a buffer.
+     * 
+     * @return The {@link OutputChunk}.
+     */
+    protected OutputChunk newOutputChunk(
+            final UUID serviceUUID,
+            final int sinkId,
+            final IAllocationContext allocationContext,
+            final IBlockingBuffer<IBindingSet[]> source) {
+
+        if (serviceUUID == null)
+            throw new IllegalArgumentException();
+
+        if (allocationContext == null)
+            throw new IllegalArgumentException();
+
+        if (source == null)
+            throw new IllegalArgumentException();
+
+        int nbytes = 0;
+        
+        final List<IAllocation> allocations = new LinkedList<IAllocation>();
+        
+        final IAsynchronousIterator<IBindingSet[]> itr = source.iterator();
+        
+        try {
+
+            while (itr.hasNext()) {
+
+                // Next chunk to be serialized.
+                final IBindingSet[] chunk = itr.next();
+                
+                // serialize the chunk of binding sets.
+                final byte[] data = SerializerUtil.serialize(chunk);
+                
+                // track size of the allocations.
+                nbytes += data.length;
+
+                // allocate enough space for those data.
+                final IAllocation[] tmp;
+                try {
+                    tmp = allocationContext.alloc(data.length);
+                } catch (InterruptedException ex) {
+                    throw new RuntimeException(ex);
+                }
+
+                // copy the data into the allocations.
+                DirectBufferPoolAllocator.put(data, tmp);
+
+                // append the new allocations.
+                allocations.addAll(Arrays.asList(tmp));
+
+            }
+
+        } finally {
+
+            itr.close();
+
+        }
+
+        return new OutputChunk(getQueryId(), serviceUUID, sinkId, nbytes,
+                allocations);
+
+    }
+    
+    protected IQueryPeer getQueryPeer(final UUID serviceUUID) {
+
+        if (serviceUUID == null)
+            throw new IllegalArgumentException();
+        
+        final IQueryPeer queryPeer;
+        
+        if (serviceUUID.equals(queryControllerUUID)) {
+        
+            // The target is the query controller.
+            queryPeer = getQueryController();
+            
+        } else {
+            
+            // The target is some data service.
+            queryPeer = getQueryEngine().getQueryPeer(serviceUUID);
+            
+        }
+
+        return queryPeer;
+
+    }
+
+    /**
+     * Notify a remote {@link IQueryPeer} that data is available for it.
+     * 
+     * @todo If the target for the {@link OutputChunk} is this node then just
+     *       drop it onto the {@link QueryEngine}.
+     * 
+     * @todo Report the #of bytes available with this message. However, first
+     *       figure out if that if the #of bytes in this {@link OutputChunk} or
+     *       across all {@link OutputChunk}s available for the target service
+     *       and sink.
+     * 
+     * @todo Consider a fast path with inline RMI based transfer for small sets
+     *       of data. We might just serialize to a byte[] and send that directly
+     *       using a different message to notify the {@link IQueryPeer}.
+     */
+    protected void sendOutputChunkReadyMessage(final OutputChunk outputChunk) {
+       
+        try {
+
+            // The peer to be notified.
+            final IQueryPeer peerProxy = getQueryPeer(outputChunk.serviceId);
+
+            // The Internet address and port where the peer can read the data
+            // from this node.
+            final InetSocketAddress serviceAddr = getQueryEngine()
+                    .getResourceService().getAddr();
+
+            peerProxy.bufferReady(getQueryController(), serviceAddr,
+                    getQueryId(), outputChunk.sinkId);
+
+        } catch (RemoteException e) {
+
+            throw new RuntimeException(e);
+
+        }
+
+    }
+
+    /**
+     * A chunk of outputs.
+     * 
+     * @todo We probably need to use the {@link DirectBufferPoolAllocator} to
+     *       receive the chunks within the {@link ManagedResourceService} as
+     *       well.
+     * 
+     * @todo Release the allocations associated with each output chunk once it
+     *       is received by the remote service.
+     *       <p>
+     *       When the query terminates all output chunks targeting any node
+     *       EXCEPT the query controller should be immediately dropped.
+     *       <p>
+     *       If there is an error during query evaluation, then the output
+     *       chunks for the query controller should be immediately dropped.
+     *       <p>
+     *       If the iterator draining the results on the query controller is
+     *       closed, then the output chunks for the query controller should be
+     *       immediately dropped.
+     * 
+     * @todo There are a few things where the resource must be made available to
+     *       more than one operator evaluation phase. The best examples are
+     *       temporary graphs for parallel closure and large collections of
+     *       graphIds for SPARQL "NAMED FROM DATA SET" extensions.
+     */
+    private static class OutputChunk {
+
+        final long queryId;
+
+        final UUID serviceId;
+
+        final int sinkId;
+
+        final int nbytes;
+
+        final List<IAllocation> allocations;
+
+        public OutputChunk(final long queryId, final UUID serviceId,
+                final int sinkId, final int nbytes,
+                final List<IAllocation> allocations) {
+
+            this.queryId = queryId;
+            this.serviceId = serviceId;
+            this.sinkId = sinkId;
+            this.nbytes = nbytes;
+            this.allocations = allocations;
+
+        }
+
+    }
+    
 }

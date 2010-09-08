@@ -42,6 +42,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.log4j.Logger;
 
 import com.bigdata.Banner;
+import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.FederatedQueryEngine;
 import com.bigdata.btree.IIndex;
@@ -202,7 +203,7 @@ abstract public class DataService extends AbstractService
      * The object used to support distributed query against an
      * {@link IBigdataFederation}.
      */
-    public FederatedQueryEngine getQueryEngine() {
+    public IQueryPeer getQueryEngine() {
         
         return queryEngine.get();
         

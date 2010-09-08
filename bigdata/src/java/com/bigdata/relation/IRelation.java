@@ -33,9 +33,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.IVariable;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -103,7 +104,7 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
      * ordered list of variables and constants. Variables are replaced using the
      * given the bindings. The element is NOT inserted into the relation.
      * 
-     * @param a
+     * @param args
      *            An ordered list of variables and/or constants.
      * @param bindingSet
      *            A set of bindings.
@@ -112,11 +113,14 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
      * 
      * @throws IllegalArgumentException
      *             if any parameter is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if any of <i>a</i> is neither an {@link IVariable} nor an
+     *             {@link IPredicate}.
      * @throws IllegalStateException
      *             if there exists a variable which is not bound given those
      *             bindings.
      */
-    E newElement(List<IVariableOrConstant<?>> a, IBindingSet bindingSet);
+    E newElement(List<BOp> args, IBindingSet bindingSet);
 
     /**
      * Return the fully qualified name of each index maintained by this

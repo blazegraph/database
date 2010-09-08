@@ -42,8 +42,8 @@ import net.jini.lookup.entry.Name;
 
 import org.apache.log4j.MDC;
 
+import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.btree.proc.IIndexProcedure;
-import com.bigdata.journal.ITx;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DataService.DataServiceFederationDelegate;
 import com.sun.jini.start.LifeCycle;
@@ -372,6 +372,18 @@ public class DataServer extends AbstractServer {
 
         }
 
+        @Override
+        public IQueryPeer getQueryEngine() {
+            
+            /*
+             * Note: DGC is not necessary since the DataService has a hard
+             * reference to the QueryEngine.
+             */
+            return getFederation()
+                    .getProxy(super.getQueryEngine(), false/* enableDGC */);
+            
+        }
+        
         /**
          * Extends the base behavior to return a {@link Name} of the service
          * from the {@link Configuration}. If no name was specified in the

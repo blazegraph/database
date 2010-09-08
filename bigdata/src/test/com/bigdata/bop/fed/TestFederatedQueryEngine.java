@@ -137,8 +137,10 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                     .awaitRunning());
 
             // resolve the query engine on one of the data services.
-            while ((queryEngine = ((DataService) dataService0).getQueryEngine()) == null) {
-                System.err.println("Waiting for query engine on dataService0");
+            while ((queryEngine = (FederatedQueryEngine) ((DataService) dataService0)
+                    .getQueryEngine()) == null) {
+                if (log.isInfoEnabled())
+                    log.info("Waiting for query engine on dataService0");
                 Thread.sleep(250);
             }
         }
@@ -148,7 +150,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
             assertTrue(((DataService) dataService1).getResourceManager()
                     .awaitRunning());
             while (((DataService) dataService1).getQueryEngine() == null) {
-                System.err.println("Waiting for query engine on dataService1");
+                if (log.isInfoEnabled())
+                    log.info("Waiting for query engine on dataService1");
                 Thread.sleep(250);
             }
         }
@@ -321,7 +324,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         final int startId = 1;
         final int joinId = 2;
         final int predId = 3;
-        final BindingSetPipelineOp query = new PipelineJoin(
+        final BindingSetPipelineOp query = new PipelineJoin<E>(
         // left
                 new CopyBindingSetOp(new BOp[] {}, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
@@ -534,12 +537,12 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV(Predicate.Annotations.BOP_ID, predId2),//
                 }));
         
-        final BindingSetPipelineOp join1Op = new PipelineJoin(startOp, pred1Op,
+        final BindingSetPipelineOp join1Op = new PipelineJoin<E>(startOp, pred1Op,
                 NV.asMap(new NV[] { new NV(Predicate.Annotations.BOP_ID,
                         joinId1),//
                         }));
 
-        final BindingSetPipelineOp join2Op = new PipelineJoin(join1Op, pred2Op,
+        final BindingSetPipelineOp join2Op = new PipelineJoin<E>(join1Op, pred2Op,
                 NV.asMap(new NV[] { new NV(Predicate.Annotations.BOP_ID,
                         joinId2),//
                         }));

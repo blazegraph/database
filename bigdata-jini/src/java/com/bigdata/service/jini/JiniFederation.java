@@ -973,16 +973,6 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
      */
     protected Exporter getExporter(final boolean enableDGC) {
         
-        /*
-         * Setup the Exporter for the iterator.
-         * 
-         * Note: Distributed garbage collection is enabled since the proxied
-         * future CAN become locally weakly reachable sooner than the client can
-         * get() the result. Distributed garbage collection handles this for us
-         * and automatically unexports the proxied iterator once it is no longer
-         * strongly referenced by the client.
-         */
-        
         return new BasicJeriExporter(TcpServerEndpoint
                 .getInstance(0/* port */), invocationLayerFactory, enableDGC,
                 false/* keepAlive */);

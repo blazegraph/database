@@ -44,6 +44,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
@@ -1567,8 +1568,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      *       operator.
      */
     @SuppressWarnings("unchecked")
-    public SPO newElement(final List<IVariableOrConstant<?>> a,
-            final IBindingSet bindingSet) {
+    public SPO newElement(final List<BOp> a, final IBindingSet bindingSet) {
 
         if (a == null)
             throw new IllegalArgumentException();
@@ -1576,11 +1576,11 @@ public class SPORelation extends AbstractRelation<ISPO> {
         if (bindingSet == null)
             throw new IllegalArgumentException();
 
-        final IV s = (IV) a.get(0).get(bindingSet);
+        final IV s = (IV) ((IVariableOrConstant<?>) a.get(0)).get(bindingSet);
 
-        final IV p = (IV) a.get(1).get(bindingSet);
+        final IV p = (IV) ((IVariableOrConstant<?>) a.get(1)).get(bindingSet);
 
-        final IV o = (IV) a.get(2).get(bindingSet);
+        final IV o = (IV) ((IVariableOrConstant<?>) a.get(2)).get(bindingSet);
 
         final SPO spo = new SPO(s, p, o, StatementEnum.Inferred);
         
