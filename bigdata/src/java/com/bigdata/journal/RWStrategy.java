@@ -563,7 +563,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	 * TODO: Modify so that current WriteCacheService is reset and re-used by new
 	 * store.
 	 */
-	protected void reopen() {
+	public void reopen() {
 		try {
 			log.warn("Request to reopen store after interrupt");
 
