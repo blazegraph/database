@@ -432,6 +432,11 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 System.out.println("Final allocation: " + faddr 
                 		+ ", allocations: " + (rw.getTotalAllocations() - numAllocs)
                 		+ ", allocated bytes: " + (rw.getTotalAllocationsSize() - startAllocations));
+                
+                store.commit();
+                
+                // Confirm that we can re-open the journal after commit
+                bufferStrategy.reopen();
             } finally {
 
                 store.destroy();
@@ -1018,7 +1023,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
             long realAddr = 0;
             try {
             	// allocBatch(store, 1, 32, 650, 100000000);
-            	allocBatch(store, 1, 32, 650, 100000);
+            	allocBatch(store, 1, 32, 650, 5000000);
             	store.commit();
 				System.out.println("Final allocations: " + rw.getTotalAllocations()
 						+ ", allocated bytes: " + rw.getTotalAllocationsSize() + ", file length: "
@@ -1033,23 +1038,80 @@ public class TestRWJournal extends AbstractJournalTestCase {
             }
         }
 
-        private long allocBatch(Journal store, int tsts, int min, int sze, int grp) {
-        	
-            RWStrategy bs = (RWStrategy) store
-            .getBufferStrategy();
+       /**
+        * The pureAlloc test is to test the allocation aspect of the memory 
+        * management rather than worrying about writing the data
+        */
+       public void test_pureAlloc() {
+           
+           Journal store = (Journal) getStore();
 
-            byte[] buf = new byte[sze+4]; // extra for checksum
-            r.nextBytes(buf);
-            
-       	                      
-        	for (int i = 0; i < grp; i++) {
-        		int alloc = min + r.nextInt(sze-min);
-                ByteBuffer bb = ByteBuffer.wrap(buf, 0, alloc);
-                bs.write(bb);
-        	}
+           RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 
-        	return 0L;
-    	}
+           RWStore rw = bs.getRWStore();
+           long realAddr = 0;
+           try {
+           	// allocBatch(store, 1, 32, 650, 100000000);
+           	pureAllocBatch(store, 1, 32, 3075, 300000); // cover wider range of blocks
+           	store.commit();
+				System.out.println("Final allocations: " + rw.getTotalAllocations()
+						+ ", allocated bytes: " + rw.getTotalAllocationsSize() + ", file length: "
+						+ rw.getStoreFile().length());
+				store.close();
+				System.out.println("Re-open Journal");
+				store = (Journal) getStore();
+
+				showStore(store);
+           } finally {
+           	store.destroy();
+           }
+       }
+
+       private long allocBatch(Journal store, int tsts, int min, int sze, int grp) {
+       	
+           RWStrategy bs = (RWStrategy) store
+           .getBufferStrategy();
+
+           byte[] buf = new byte[sze+4]; // extra for checksum
+           r.nextBytes(buf);
+           
+      	                      
+	       	for (int i = 0; i < grp; i++) {
+	       		int alloc = min + r.nextInt(sze-min);
+	               ByteBuffer bb = ByteBuffer.wrap(buf, 0, alloc);
+	               bs.write(bb);
+	       	}
+	
+	       	return 0L;
+	   	}
+       /*
+        * Allocate tests but save 50% to re-alloc
+        */
+       private long pureAllocBatch(Journal store, int tsts, int min, int sze, int grp) {
+       	
+           RWStrategy bs = (RWStrategy) store
+           .getBufferStrategy();
+           
+           RWStore rw = bs.getRWStore();
+           int freeAddr[] = new int[2048];
+           int freeCurs = 0;
+	       	for (int i = 0; i < grp; i++) {
+	       		int alloc = min + r.nextInt(sze-min);
+	            int addr = rw.alloc(alloc, null);
+	            
+	            if (i % 3 != 0) { //make avail 2 out of 3 for realloc
+	            	freeAddr[freeCurs++] = addr;
+	            	if (freeCurs == freeAddr.length) {
+	            		for (int f = 0; f < freeAddr.length; f++) {
+	            			rw.free(freeAddr[f], 0);
+	            		}
+	            		freeCurs = 0;
+	            	}
+	            }
+	       	}
+	
+	       	return 0L;
+	   	}
     }
     
      /**
