@@ -84,9 +84,9 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
         extends AbstractUnsynchronizedArrayBuffer<E> {
 
     /**
-     * The predicate from which we generate the asBound predicates. This
+     * The predicate from which we generate the asBound binding sets. This
      * predicate and the {@link IKeyOrder} together determine the required
-     * access path.
+     * access path. 
      */
     private final IPredicate<F> pred;
     
@@ -123,7 +123,12 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
      * @param fed
      *            The federation.
      * @param pred
-     *            The target predicate.
+     *            The predicate associated with the target operator. The
+     *            predicate identifies which variables and/or constants form the
+     *            key for the access path and hence selects the shards on which
+     *            the target operator must read or write. For example, when the
+     *            target operator is a JOIN, this is the {@link IPredicate}
+     *            associated with the right hand operator of the join.
      * @param keyOrder
      *            Identifies the access path for the target predicate.
      * @param timestamp
@@ -136,9 +141,10 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
      *            The capacity of this buffer.
      */
     public MapBindingSetsOverShardsBuffer(
-            final IBigdataFederation<?> fed,
-            final IPredicate<F> pred, final IKeyOrder<F> keyOrder,
-            final long timestamp,
+            final IBigdataFederation<?> fed,//
+            final IPredicate<F> pred, //
+            final IKeyOrder<F> keyOrder,//
+            final long timestamp,//
             final int capacity) {
 
         super(capacity);

@@ -135,6 +135,14 @@ public interface BOp extends Cloneable, Serializable {
     BOp clone();
 
     /**
+     * Return the evaluation context for the operator. The default is
+     * {@link BOpEvaluationContext#ANY}. Operators which must be mapped against
+     * shards, mapped against nodes, or evaluated on the query controller must
+     * override this method.
+     */
+    public BOpEvaluationContext getEvaluationContext();
+    
+    /**
      * Interface declaring well known annotations.
      */
     public interface Annotations {

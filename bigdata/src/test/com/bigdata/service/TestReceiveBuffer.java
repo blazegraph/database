@@ -29,6 +29,7 @@ package com.bigdata.service;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
@@ -99,7 +100,11 @@ public class TestReceiveBuffer extends TestCase3 {
                 log.info("allowedUUID=" + allowedUUID + ", allowedBuffer: "
                         + allowedBuffer);
 
-            final ResourceService service = new ResourceService() {
+            final ResourceService service = new ResourceService(
+                    new InetSocketAddress(InetAddress
+                            .getByName(NicUtil.getIpAddress("default.nic",
+                                    "default", true/* loopbackOk */)), 0/* port */
+                    ), 0/* requestServicePoolSize */) {
 
                 @Override
                 protected ByteBuffer getBuffer(final UUID uuid) {
@@ -126,9 +131,6 @@ public class TestReceiveBuffer extends TestCase3 {
 
             };
 
-            final InetAddress thisInetAddr = InetAddress.getByName(NicUtil
-                    .getIpAddress("default.nic", "default", true));
-
             // acquire the receive buffer from the pool.
             final ByteBuffer receiveBuffer = DirectBufferPool.INSTANCE.acquire(
                     1, TimeUnit.SECONDS);
@@ -139,8 +141,8 @@ public class TestReceiveBuffer extends TestCase3 {
 
                 assertTrue(service.isOpen());
 
-                final ByteBuffer received = new ReadBufferTask(thisInetAddr,
-                        service.port, allowedUUID, receiveBuffer).call();
+                final ByteBuffer received = new ReadBufferTask(service
+                        .getAddr(), allowedUUID, receiveBuffer).call();
 
                 /*
                  * Verify that the position and limit were not modified by the
@@ -191,12 +193,13 @@ public class TestReceiveBuffer extends TestCase3 {
 
         final Random r = new Random();
         
-        final InetAddress thisInetAddr = InetAddress.getByName(NicUtil
-                .getIpAddress("default.nic", "default", true));
-
         final ConcurrentHashMap<UUID, ByteBuffer> buffers = new ConcurrentHashMap<UUID, ByteBuffer>();
         
-        final ResourceService service = new ResourceService() {
+        final ResourceService service = new ResourceService(
+                new InetSocketAddress(InetAddress
+                        .getByName(NicUtil.getIpAddress("default.nic",
+                                "default", true/* loopbackOk */)), 0/* port */
+                ), 0/* requestServicePoolSize */) {
 
             @Override
             protected ByteBuffer getBuffer(UUID uuid) {
@@ -255,8 +258,7 @@ public class TestReceiveBuffer extends TestCase3 {
                             tmp.clear();
 
                             final ByteBuffer actual = new ReadBufferTask(
-                                    thisInetAddr, service.port, uuid, tmp)
-                                    .call();
+                                    service.getAddr(), uuid, tmp).call();
 
                             /*
                              * Verify that the returned buffer has the same data

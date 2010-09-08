@@ -104,7 +104,6 @@ import com.bigdata.service.EventType;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.MetadataService;
-import com.bigdata.service.ResourceService;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.ibm.icu.impl.ByteBuffer;
@@ -657,24 +656,24 @@ abstract public class StoreManager extends ResourceEvents implements
         
     }
     
-    /**
-     * The port at which you can connect to the {@link ResourceService}. This
-     * service provides remote access to resources hosted by the owning
-     * {@link DataService}. This is used for moving resources to other data
-     * services in the federation, including supporting service failover.
-     * 
-     * @return The port used to connect to that service.
-     * 
-     * @todo this could also be used for remote backup. however, note that you
-     *       can not read the live journal using this object.
-     */
-    public int getResourceServicePort() {
-        
-        assertRunning();
-        
-        return resourceService.port;
-        
-    }
+//    /**
+//     * The port at which you can connect to the {@link ResourceService}. This
+//     * service provides remote access to resources hosted by the owning
+//     * {@link DataService}. This is used for moving resources to other data
+//     * services in the federation, including supporting service failover.
+//     * 
+//     * @return The port used to connect to that service.
+//     * 
+//     * @todo this could also be used for remote backup. however, note that you
+//     *       can not read the live journal using this object.
+//     */
+//    public int getResourceServicePort() {
+//        
+//        assertRunning();
+//        
+//        return resourceService.port;
+//        
+//    }
     
     /**
      * @see Options#IGNORE_BAD_FILES
@@ -1569,7 +1568,7 @@ abstract public class StoreManager extends ResourceEvents implements
                 resourceService = new ManagedResourceService() {
 
                     @Override
-                    protected File getResource(UUID uuid) throws Exception {
+                    protected File getResource(final UUID uuid) throws Exception {
 
                         if (!isRunning()) {
 

@@ -299,6 +299,7 @@ public class BOpBase implements BOp {
 
     }
 
+    @SuppressWarnings("unchecked")
     public <T> T getProperty(final String name) {
 
         return (T) annotations.get(name);
@@ -307,6 +308,7 @@ public class BOpBase implements BOp {
 
     public <T> T getRequiredProperty(final String name) {
 
+        @SuppressWarnings("unchecked")
         final T tmp = (T) annotations.get(name);
 
         if (tmp == null)
@@ -336,4 +338,10 @@ public class BOpBase implements BOp {
 
     }
 
+    public BOpEvaluationContext getEvaluationContext() {
+        
+        return BOpEvaluationContext.ANY;
+        
+    }
+    
 }

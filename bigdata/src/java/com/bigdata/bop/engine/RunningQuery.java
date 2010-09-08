@@ -55,7 +55,6 @@ import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NoSuchBOpException;
 import com.bigdata.bop.ap.Predicate;
-import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -123,7 +122,11 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
     final private boolean controller;
 
     /**
-     * The client executing this query.
+     * The client executing this query (aka the query controller).
+     * <p>
+     * Note: The proxy is primarily for light weight RMI messages used to
+     * coordinate the distributed query evaluation. Ideally, all large objects
+     * will be transfered among the nodes of the cluster using NIO buffers.
      */
     final private IQueryClient clientProxy;
 
@@ -142,11 +145,11 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
     /**
      * An index from the {@link BOp.Annotations#BOP_ID} to the {@link BOp}.
      */
-    private final Map<Integer, BOp> bopIndex;
+    protected final Map<Integer, BOp> bopIndex;
 
     /**
-     * A collection of the currently executing future for operators for this
-     * query.
+     * A collection of {@link Future}s for currently executing operators for
+     * this query.
      */
     private final ConcurrentHashMap<BSBundle, Future<?>> operatorFutures = new ConcurrentHashMap<BSBundle, Future<?>>();
 
@@ -245,11 +248,6 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      * Note: This is package private so it will be visible to the
      * {@link QueryEngine}.
      * 
-     * @todo SCALEOUT: We need to model the chunks available before they are
-     *       materialized locally such that (a) they can be materialized on
-     *       demand (flow control); and (b) we can run the operator when there
-     *       are sufficient chunks available without taking on too much data.
-     * 
      * @todo It is likely that we can convert to the use of
      *       {@link BlockingQueue} instead of {@link BlockingBuffer} in the
      *       operators and then handle the logic for combining chunks inside of
@@ -271,6 +269,19 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
     public QueryEngine getQueryEngine() {
         
         return queryEngine;
+        
+    }
+
+    /**
+     * The client executing this query (aka the query controller).
+     * <p>
+     * Note: The proxy is primarily for light weight RMI messages used to
+     * coordinate the distributed query evaluation. Ideally, all large objects
+     * will be transfered among the nodes of the cluster using NIO buffers.
+     */
+    public IQueryClient getQueryController() {
+
+        return clientProxy;
         
     }
     
@@ -296,7 +307,7 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
 
             synchronized (queryRef) {
 
-                if (queryRef == null) {
+                if (queryRef.get() == null) {
 
                     try {
 
@@ -378,14 +389,16 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      * rather than formatting it onto a {@link ByteBuffer}.
      * 
      * @param sinkId
+     *            The identifier of the target operator.
      * @param sink
+     *            The intermediate results to be passed to that target operator.
      * 
      * @return The #of chunks made available for consumption by the sink. This
      *         will always be ONE (1) for scale-up. For scale-out, there will be
      *         one chunk per index partition over which the intermediate results
      *         were mapped.
      */
-    protected int add(final int sinkId,
+    protected <E> int add(final int sinkId,
             final IBlockingBuffer<IBindingSet[]> sink) {
 
         /*
@@ -394,21 +407,9 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
         final BindingSetChunk chunk = new BindingSetChunk(queryId, sinkId,
                 -1/* partitionId */, sink.iterator());
 
-        addChunkToQueryEngine(chunk);
+        queryEngine.add(chunk);
 
         return 1;
-
-    }
-
-    /**
-     * Adds a chunk to the local {@link QueryEngine}.
-     * 
-     * @param chunk
-     *            The chunk.
-     */
-    protected void addChunkToQueryEngine(final BindingSetChunk chunk) {
-
-        queryEngine.add(chunk);
 
     }
     
@@ -541,16 +542,6 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      * 
      * @throws UnsupportedOperationException
      *             If this node is not the query coordinator.
-     * 
-     * @todo Clone the {@link BOpStats} before reporting to avoid concurrent
-     *       modification?
-     * 
-     * @todo SCALEOUT: Do not release buffers backing the binding set chunks
-     *       generated by an operator or the outputs of the final operator (the
-     *       query results) until the sink has accepted those outputs. This
-     *       means that we must not release the output buffers when the bop
-     *       finishes but when its consumer finishes draining the {@link BOp}s
-     *       outputs.
      */
     public void haltOp(final HaltOpMessage msg) {
         if (!controller)
@@ -768,11 +759,6 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
         final Runnable r = new Runnable() {
             public void run() {
                 final UUID serviceId = queryEngine.getServiceId();
-                /*
-                 * @todo SCALEOUT: Combine chunks available on the queue for the
-                 * current bop. This is not exactly "fan in" since multiple
-                 * chunks could be available in scaleup as well.
-                 */
                 int fanIn = 1;
                 int sinkChunksOut = 0;
                 int altSinkChunksOut = 0;
@@ -822,17 +808,6 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      * Return an iterator which will drain the solutions from the query. The
      * query will be cancelled if the iterator is
      * {@link ICloseableIterator#close() closed}.
-     * 
-     * @return
-     * 
-     * @todo Not all queries produce binding sets. For example, mutation
-     *       operations. We could return the mutation count for mutation
-     *       operators, which could be reported by {@link BOpStats} for that
-     *       operator (unitsOut).
-     * 
-     * @todo SCALEOUT: Track chunks consumed by the client so we do not release
-     *       the backing {@link ByteBuffer} before the client is done draining
-     *       the iterator.
      */
     public IAsynchronousIterator<IBindingSet[]> iterator() {
 
@@ -854,14 +829,17 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
     }
 
     /**
-     * @todo Cancelled queries must reject or drop new chunks, etc.
-     *       <p>
-     *       Queries must release all of their resources when they are done().
-     *       <p>
-     *       Queries MUST NOT cause the solutions to be discarded before the
-     *       client can consume them. This means that we have to carefully
-     *       integrate {@link SliceOp} or just wrap the query buffer to impose
-     *       the slice (simpler).
+     * {@inheritDoc}
+     * <p>
+     * Cancelled queries :
+     * <ul>
+     * <li>must reject new chunks</li>
+     * <li>must cancel any running operators</li>
+     * <li>must not begin to evaluate operators</li>
+     * <li>must release all of their resources</li>
+     * <li>must not cause the solutions to be discarded before the client can
+     * consume them.</li>
+     * </ul>
      */
     final public boolean cancel(final boolean mayInterruptIfRunning) {
         // halt the query.

@@ -6,9 +6,9 @@ import java.rmi.RemoteException;
 import com.bigdata.bop.BOp;
 
 /**
- * Interface for a client executing queries.
+ * Interface for a client executing queries (the query controller).
  */
-public interface IQueryClient extends IQueryPeer, Remote {
+public interface IQueryClient extends IQueryPeer {
 
     /*
      * @todo Could return a data structure which encapsulates the query results

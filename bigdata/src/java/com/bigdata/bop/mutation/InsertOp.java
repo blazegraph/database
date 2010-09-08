@@ -35,8 +35,10 @@ import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.ILocalBTreeView;
@@ -70,6 +72,9 @@ public class InsertOp<E> extends BindingSetPipelineOp {
          * An ordered {@link IVariableOrConstant}[]. Elements will be created
          * using the binding sets which flow through the operator and
          * {@link IRelation#newElement(java.util.List, IBindingSet)}.
+         * 
+         * @todo This should be an {@link IPredicate} and should be the right
+         *       hand operand just like for a JOIN.
          */
         String SELECTED = InsertOp.class.getName() + ".selected";
 
@@ -267,5 +272,15 @@ public class InsertOp<E> extends BindingSetPipelineOp {
 //              .getClass());
 //  
 //  a[i] = e;
-  
+
+    /**
+     * This is a shard wise operator.
+     */
+    @Override
+    public BOpEvaluationContext getEvaluationContext() {
+        
+        return BOpEvaluationContext.SHARDED;
+        
+    }
+    
 }

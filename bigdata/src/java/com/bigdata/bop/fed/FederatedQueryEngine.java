@@ -38,7 +38,11 @@ import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ManagedResourceService;
@@ -110,10 +114,10 @@ public class FederatedQueryEngine extends QueryEngine {
      * join in a query plan.
      */
     private final IBigdataFederation<?> fed;
-    
+
     /**
-     * A service used to expose {@link ByteBuffer}s and managed index resources
-     * for transfer to remote services in support of distributed query
+     * The service used to expose {@link ByteBuffer}s and managed index
+     * resources for transfer to remote services in support of distributed query
      * evaluation.
      */
     private final ManagedResourceService resourceService;
@@ -176,6 +180,17 @@ public class FederatedQueryEngine extends QueryEngine {
 
     }
 
+    /**
+     * The service used to expose {@link ByteBuffer}s and managed index
+     * resources for transfer to remote services in support of distributed query
+     * evaluation.
+     */
+    public ManagedResourceService getResourceService() {
+    
+        return resourceService;
+        
+    }
+    
     @Override
     public void bufferReady(IQueryClient clientProxy,
             InetSocketAddress serviceAddr, long queryId, int bopId) {
@@ -198,6 +213,36 @@ public class FederatedQueryEngine extends QueryEngine {
                 writeTimestamp, System.currentTimeMillis()/* begin */, timeout,
                 true/* controller */, this/* clientProxy */, query,
                 newQueryBuffer(query));
+
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * @todo Historically, this has been a proxy object for an {@link IBuffer}
+     *       on the {@link IQueryClient query controller}. However, it would be
+     *       nice if we could reuse the same NIO transfer of {@link ByteBuffer}s
+     *       to move the final results back to the client rather than using a
+     *       proxy object for the query buffer.
+     *       <p>
+     *       In scale-out we must track chunks consumed by the client so we do
+     *       not release the backing {@link ByteBuffer} on which the solutions
+     *       are marshalled before the client is done draining the iterator. If
+     *       the solutions are generated on the peers, then the peers must
+     *       retain the data until the client has consumed them or have
+     *       transferred the solutions to itself.
+     *       <p>
+     *       The places where this can show up as a problem are {@link SliceOp},
+     *       when a query deadline is reached, and when a query terminates
+     *       normally. Also pay attention when the client closes the
+     *       {@link IAsynchronousIterator} from which it is draining solutions
+     *       early.
+     */
+    @Override
+    protected IBlockingBuffer<IBindingSet[]> newQueryBuffer(
+            final BindingSetPipelineOp query) {
+
+        return query.newBuffer();
 
     }
 

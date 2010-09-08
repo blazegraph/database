@@ -64,12 +64,17 @@ public class ManagedResourceService extends ResourceService {
     private final ConcurrentHashMap<UUID, ByteBuffer> buffers = new ConcurrentHashMap<UUID, ByteBuffer>();
 
     /**
+     * Constructor uses the default nic, any free port, and the default request
+     * service pool size.
+     * 
      * @throws IOException
      */
     public ManagedResourceService() throws IOException {
+        super();
     }
 
     /**
+     * 
      * @param port
      * @throws IOException
      */
@@ -82,8 +87,8 @@ public class ManagedResourceService extends ResourceService {
      * @param requestServicePoolSize
      * @throws IOException
      */
-    public ManagedResourceService(int port, int requestServicePoolSize)
-            throws IOException {
+    public ManagedResourceService(final int port,
+            final int requestServicePoolSize) throws IOException {
         super(port, requestServicePoolSize);
     }
     
