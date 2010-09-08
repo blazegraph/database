@@ -31,7 +31,7 @@ package com.bigdata.resources;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
-import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -63,7 +63,6 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.ResourceService;
-import com.bigdata.util.config.NicUtil;
 
 /**
  * Task moves an index partition to another {@link IDataService}.
@@ -433,7 +432,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
         private final UUID targetDataServiceUUID;
         private final int targetIndexPartitionId;
         private final Event parentEvent;
-        private final InetAddress thisInetAddr;
+//        private final InetAddress thisInetAddr;
         
         /**
          * 
@@ -481,11 +480,11 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
             this.targetIndexPartitionId = targetIndexPartitionId;
             this.parentEvent = parentEvent;
 
-            try {
-                this.thisInetAddr = InetAddress.getByName(NicUtil.getIpAddress("default.nic", "default", false));
-            } catch(Throwable t) {
-                throw new IllegalArgumentException(t.getMessage(), t);
-            }
+//            try {
+//                this.thisInetAddr = InetAddress.getByName(NicUtil.getIpAddress("default.nic", "default", false));
+//            } catch(Throwable t) {
+//                throw new IllegalArgumentException(t.getMessage(), t);
+//            }
         }
 
         /**
@@ -596,9 +595,8 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
                                                     targetIndexPartitionId,//
                                                     historicalWritesBuildResult.segmentMetadata,//
                                                     bufferedWritesBuildResult.segmentMetadata,//
-                                                    thisInetAddr,
                                                     resourceManager
-                                                            .getResourceServicePort()//
+                                                            .getResourceService().getAddr()//
                                             )).get();
 
                         } catch (ExecutionException ex) {
@@ -913,8 +911,8 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
         final private int targetIndexPartitionId;
         final private SegmentMetadata historyIndexSegmentMetadata;
         final private SegmentMetadata bufferedWritesIndexSegmentMetadata;
-        final private InetAddress addr;
-        final private int port;
+        final private InetSocketAddress addr;
+//        final private int port;
 
         /**
          * @param sourceIndexMetadata
@@ -927,14 +925,14 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
          *            Describes the {@link IndexSegmentStore} containing the
          *            historical data for the source index partition.
          * @param bufferedWritesIndexSegmentMetadata
-         *            Desribes the {@link IndexSegmentStore} containing the
+         *            Describes the {@link IndexSegmentStore} containing the
          *            buffered writes from the live journal for the source index
          *            partition.
          * @param addr
-         *            The {@link InetAddress} of the source data service.
-         * @param port
-         *            The port at which the source data service has exposed its
-         *            {@link ResourceService}
+         *            The {@link InetSocketAddress} of the
+         *            {@link ResourceService} running on the source data service
+         *            (the one from which the resources will be copied during
+         *            the move).
          */
         ReceiveIndexPartitionTask(//
                 final IndexMetadata sourceIndexMetadata,//
@@ -942,8 +940,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
                 final int targetIndexPartitionId,//
                 final SegmentMetadata historyIndexSegmentMetadata,//
                 final SegmentMetadata bufferedWritesIndexSegmentMetadata,//
-                final InetAddress addr,
-                final int port
+                final InetSocketAddress addr
                 ) {
 
             this.sourceIndexMetadata = sourceIndexMetadata;
@@ -952,7 +949,6 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
             this.historyIndexSegmentMetadata = historyIndexSegmentMetadata;
             this.bufferedWritesIndexSegmentMetadata = bufferedWritesIndexSegmentMetadata;
             this.addr = addr;
-            this.port = port;
         }
     
 //        private transient DataService dataService;
@@ -1000,8 +996,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
                                 targetIndexPartitionId,//
                                 historyIndexSegmentMetadata,//
                                 bufferedWritesIndexSegmentMetadata,//
-                                addr,//
-                                port//
+                                addr//
                         )).get();
 
                 // update the index partition receive counter.
@@ -1058,8 +1053,8 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
         final private SegmentMetadata sourceBufferedWritesSegmentMetadata;
         final private Event parentEvent;
         final private String summary;
-        final InetAddress addr;
-        final int port;
+        final InetSocketAddress addr;
+//        final int port;
 
         /**
          * @param resourceManager
@@ -1080,10 +1075,9 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
          *            buffered writes from the live journal for the source index
          *            partition.
          * @param addr
-         *            The {@link InetAddress} of the source data service.
-         * @param port
-         *            The port at which the source data service has exposed its
-         *            {@link ResourceService}
+         *            The {@link InetSocketAddress} of the
+         *            {@link ResourceService} of the source data service (the
+         *            one from which the resources will be copied).
          */
         InnerReceiveIndexPartitionTask(final ResourceManager resourceManager,
                 final String targetIndexName,
@@ -1092,8 +1086,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
                 final int targetIndexPartitionId,
                 final SegmentMetadata historyIndexSegmentMetadata,
                 final SegmentMetadata bufferedWritesIndexSegmentMetadata,
-                final InetAddress addr,
-                final int port
+                final InetSocketAddress addr
                 ) {
 
             super(resourceManager.getConcurrencyManager(), ITx.UNISOLATED,
@@ -1124,7 +1117,6 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
             this.sourceHistorySegmentMetadata = historyIndexSegmentMetadata;
             this.sourceBufferedWritesSegmentMetadata = bufferedWritesIndexSegmentMetadata;
             this.addr = addr;
-            this.port = port;
 
             this.summary = OverflowActionEnum.Move + "(" + sourceIndexName
                     + "->" + targetIndexName + ")";
@@ -1267,7 +1259,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
                 try {
 
                     // read the resource, writing onto that file.
-                    new ResourceService.ReadResourceTask(addr, port,
+                    new ResourceService.ReadResourceTask(addr,
                             sourceSegmentMetadata.getUUID(), file).call();
 
                 } catch (Throwable t) {

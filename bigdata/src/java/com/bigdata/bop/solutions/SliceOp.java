@@ -33,6 +33,7 @@ import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
@@ -270,6 +271,16 @@ public class SliceOp extends BindingSetPipelineOp {
             
         }
 
+    }
+
+    /**
+     * This operator must be evaluated on the query controller.
+     */
+    @Override
+    public BOpEvaluationContext getEvaluationContext() {
+        
+        return BOpEvaluationContext.CONTROLLER;
+        
     }
 
 }

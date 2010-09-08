@@ -50,10 +50,14 @@ public interface IPipelineOp<E> extends BOp {
      * class depending on the operator).
      */
     BOpStats newStats();
-    
+
     /**
      * Instantiate a buffer suitable as a sink for this operator. The buffer
      * will be provisioned based on the operator annotations.
+     * <p>
+     * Note: if the operation swallows binding sets from the pipeline (such as
+     * operators which write on the database) then the operator MAY return an
+     * immutable empty buffer.
      * 
      * @return The buffer.
      */

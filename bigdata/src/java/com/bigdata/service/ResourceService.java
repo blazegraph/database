@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
@@ -70,11 +71,12 @@ import com.bigdata.io.ByteBufferOutputStream;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ShutdownHelper;
+import com.bigdata.util.config.NicUtil;
 
 /**
- * A class which permits buffers identified by a {@link UUID} to be read by a
- * remote service. This class runs one thread to accept connections and thread
- * pool to send data.
+ * A service which permits resources (managed files or buffers) identified by a
+ * {@link UUID} to be read by a remote service. This class runs one thread to
+ * accept connections and thread pool to send data.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -91,6 +93,12 @@ import com.bigdata.util.concurrent.ShutdownHelper;
  * @todo Nodes should hold open connections for buffer transfers to avoid
  *       overhead with establishing those connections and problems with
  *       immediate reconnect under heavy load.
+ * 
+ * @todo Should have start() method to defer initialization of thread pools and
+ *       the {@link ServerSocket} until outside of the constructor. Either
+ *       handle visibility appropriately for those fields or move them and the
+ *       shutdown protocol into an inner class which is only initialized when
+ *       the service is running.
  * 
  * @todo Verify that multiple transfers may proceed in parallel to the from the
  *       same source to the same receiver. This is important in order for low
@@ -135,9 +143,15 @@ public abstract class ResourceService {
     protected static final Logger log = Logger.getLogger(ResourceService.class);
 
     /**
-     * The port on which the service is accepting connections.
+     * The Internet socket address at which the service is accepting
+     * connections.
      */
-    public final int port;
+    private final InetSocketAddress addr;
+    
+//    /**
+//     * The port on which the service is accepting connections.
+//     */
+//    public final int port;
 
     /**
      * The server socket.
@@ -150,163 +164,22 @@ public abstract class ResourceService {
     private volatile boolean open = false;
 
     /**
-     * Performance counters for the {@link BufferService}.
-     * 
-     * @todo could also monitor the accept and request thread pools. The latter
-     *       is the more interesting from a workload perspective.
-     */
-    static public class Counters {
-
-        /**
-         * #of requests.
-         */
-        public final CAT requestCount = new CAT();
-
-        /**
-         * #of requests which are denied.
-         */
-        public final CAT denyCount = new CAT();
-
-        /**
-         * #of requests for which the resource was not found.
-         */
-        public final CAT notFoundCount = new CAT();
-
-        /**
-         * #of requests which end in an internal error.
-         */
-        public final CAT internalErrorCount = new CAT();
-
-        /**
-         * #of errors for responses where we attempt to write the requested data
-         * on the socket.
-         */
-        public final CAT writeErrorCount = new CAT();
-
-        /**
-         * #of responses where we attempt to write the data on the socket.
-         */
-        public final CAT nwrites = new CAT();
-
-        /**
-         * #of data bytes sent.
-         */
-        public final CAT bytesWritten = new CAT();
-
-        /**
-         * The largest response written so far.
-         */
-        public long maxWriteSize;
-
-        /**
-         * A lock used to make updates to {@link #maxWriteSize} atomic.
-         */
-        final private Object maxWriteSizeLock = new Object();
-
-        /**
-         * #of nanoseconds sending data (this will double count time for data
-         * that are served concurrently to different receivers).
-         */
-        public final CAT elapsedWriteNanos = new CAT();
-
-        synchronized public CounterSet getCounters() {
-
-            if (root == null) {
-
-                root = new CounterSet();
-
-                /*
-                 * #of requests and their status outcome counters.
-                 */
-                {
-                    final CounterSet tmp = root.makePath("status");
-
-                    tmp.addCounter("Request Count", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(requestCount.get());
-                        }
-                    });
-
-                    tmp.addCounter("Deny Count", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(denyCount.get());
-                        }
-                    });
-
-                    tmp.addCounter("Not Found Count", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(notFoundCount.get());
-                        }
-                    });
-
-                    tmp.addCounter("Internal Error Count", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(internalErrorCount.get());
-                        }
-                    });
-
-                }
-
-                /*
-                 * writes (A write is a response where we try to write the file
-                 * on the socket).
-                 */
-                {
-
-                    final CounterSet tmp = root.makePath("writes");
-                    tmp.addCounter("nwrites", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(nwrites.get());
-                        }
-                    });
-
-                    tmp.addCounter("bytesWritten", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(bytesWritten.get());
-                        }
-                    });
-
-                    tmp.addCounter("writeSecs", new Instrument<Double>() {
-                        public void sample() {
-                            final double writeSecs = (elapsedWriteNanos.get() / 1000000000.);
-                            setValue(writeSecs);
-                        }
-                    });
-
-                    tmp.addCounter("bytesWrittenPerSec", new Instrument<Double>() {
-                        public void sample() {
-                            final double writeSecs = (elapsedWriteNanos.get() / 1000000000.);
-                            final double bytesWrittenPerSec = (writeSecs == 0L ? 0d : (bytesWritten.get() / writeSecs));
-                            setValue(bytesWrittenPerSec);
-                        }
-                    });
-
-                    tmp.addCounter("maxWriteSize", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(maxWriteSize);
-                        }
-                    });
-
-                }
-
-            }
-
-            return root;
-
-        }
-
-        private CounterSet root = null;
-
-    }
-
-    /**
      * Performance counters for this service.
      */
     public final Counters counters = new Counters();
 
     /**
-     * Start the service on any open port using a cached thread pool to handle
-     * requests.
+     * Return the address at which this service is accepting connections.
+     */
+    public InetSocketAddress getAddr() {
+        
+        return addr;
+        
+    }
+
+    /**
+     * Constructor uses the default nic, any free port, and the default request
+     * service pool size.
      * 
      * @throws IOException
      */
@@ -317,10 +190,12 @@ public abstract class ResourceService {
     }
 
     /**
+     * Constructor uses the default nic and request service pool size.
      * 
      * @param port
      *            The port on which to start the service or ZERO (0) to use any
      *            open port.
+     *            
      * @throws IOException
      */
     public ResourceService(final int port) throws IOException {
@@ -330,6 +205,7 @@ public abstract class ResourceService {
     }
 
     /**
+     * Constructor uses a non-loopback address on the default nic.
      * 
      * @param port
      *            The port on which to start the service or ZERO (0) to use any
@@ -340,31 +216,56 @@ public abstract class ResourceService {
      *            size limit.
      * 
      * @throws IOException
+     * 
+     * @see {@link NicUtil#getIpAddress(String, String, boolean)}
      */
-    public ResourceService(final int port, final int requestServicePoolSize) throws IOException {
+    public ResourceService(final int port, final int requestServicePoolSize)
+            throws IOException {
 
-        if (port != 0) {
+        this(new InetSocketAddress(InetAddress.getByName(NicUtil.getIpAddress(
+                "default.nic"/* systemPropertyName */,
+                "default"/* defaultNicName */, false/* loopbackOk */)), port),
+                requestServicePoolSize);
 
-            /*
-             * Use the specified port.
-             */
-            this.port = port;
+    }
 
-            ss = new ServerSocket(this.port);
+    /**
+     * Core constructor.
+     * 
+     * @param addr
+     *            The IP address and port at which the service will accept
+     *            connections. The port MAY be zero to use an ephemeral port.
+     * @param requestServicePoolSize
+     *            The size of the thread pool that will handle requests. When
+     *            ZERO (0) a cached thread pool will be used with no specific
+     *            size limit.
+     * 
+     * @throws IOException
+     */
+    public ResourceService(final InetSocketAddress addr,
+            final int requestServicePoolSize) throws IOException {
 
-        } else {
+        if (addr == null)
+            throw new IllegalArgumentException();
+        
+        if (requestServicePoolSize < 0)
+            throw new IllegalArgumentException();
 
-            /*
-             * Use any open port.
-             */
-            ss = new ServerSocket(0);
+        /*
+         * Create the ServerSocket using the specified port (which may be ZERO),
+         * the default backlog, and the specified IP address.
+         */
+        ss = new ServerSocket(addr.getPort(), 0/* default backlog */, addr
+                .getAddress());
 
-            this.port = ss.getLocalPort();
-
-        }
+        /*
+         * Save off a version of [addr] in which the actual port which reflects
+         * the actual port at which service is running.
+         */
+        this.addr = new InetSocketAddress(addr.getAddress(), ss.getLocalPort());
 
         if (log.isInfoEnabled())
-            log.info("Running on port=" + this.port);
+            log.info("Running on addr=" + this.addr);
 
         if (requestServicePoolSize == 0) {
 
@@ -386,6 +287,30 @@ public abstract class ResourceService {
         acceptService.submit(new AcceptTask());
 
     }
+
+//    /**
+//     * Return an unused port.
+//     * 
+//     * @param suggestedPort
+//     *            The suggested port.
+//     *            
+//     * @return The suggested port, unless it is zero or already in use, in which
+//     *         case an unused port is returned.
+//     * 
+//     * @throws IOException
+//     */
+//    static protected int getPort(int suggestedPort) throws IOException {
+//        ServerSocket openSocket;
+//        try {
+//            openSocket = new ServerSocket(suggestedPort);
+//        } catch (BindException ex) {
+//            // the port is busy, so look for a random open port
+//            openSocket = new ServerSocket(0);
+//        }
+//        final int port = openSocket.getLocalPort();
+//        openSocket.close();
+//        return port;
+//    }
 
     /**
      * Overridden to ensure that the service is always shutdown.
@@ -1337,18 +1262,14 @@ public abstract class ResourceService {
      */
     public static abstract class FetchResourceTask<S,T> implements Callable<T> {
         
-        final InetAddress addr;
+        final InetSocketAddress addr;
 
-        final int port;
-        
-        FetchResourceTask(final InetAddress addr, final int port) {
+        protected FetchResourceTask(final InetSocketAddress addr) {
+            
             if (addr == null)
-                throw new IllegalArgumentException();
-            if (port <= 0)
                 throw new IllegalArgumentException();
 
             this.addr = addr;
-            this.port = port;
         }
         
         /**
@@ -1492,8 +1413,8 @@ public abstract class ResourceService {
 
         /**
          * @param addr
-         *            The address of the service from which the resource will be
-         *            read.
+         *            The Internet address and port at which the service from
+         *            which the resource will be read is accepting connections.
          * @param port
          *            The port at which to connect to the service from which the
          *            resource will be read.
@@ -1503,9 +1424,10 @@ public abstract class ResourceService {
          *            The local file on which the received data will be written.
          *            The file may exist but if it exists then it must be empty.
          */
-        public ReadResourceTask(final InetAddress addr, final int port,
+        public ReadResourceTask(final InetSocketAddress addr,
                 final UUID uuid, final File file) {
-            super(addr, port);
+            
+            super(addr);
 
             if (uuid == null)
                 throw new IllegalArgumentException();
@@ -1558,7 +1480,7 @@ public abstract class ResourceService {
 
                 }
 
-                s = new Socket(addr, port);
+                s = new Socket(addr.getAddress(), addr.getPort());
 
                 // send the UUID of the resource that we want.
                 {
@@ -1617,21 +1539,18 @@ public abstract class ResourceService {
 
         /**
          * @param addr
-         *            The address of the service from which the resource will be
-         *            read.
-         * @param port
-         *            The port at which to connect to the service from which the
-         *            resource will be read.
+         *            The Internet address and port at which to connect the
+         *            service from which the resource will be read.
          * @param id
          *            The id that identifies the source ByteBuffer.
          * @param outbuf
          *            The {@link ByteBuffer} to which the data from the remote
          *            source {@link ByteBuffer} will be transferred.
          */
-        public ReadBufferTask(final InetAddress addr, final int port,
+        public ReadBufferTask(final InetSocketAddress addr,
                 final UUID id, final ByteBuffer outbuf) {
             
-            super(addr, port);
+            super(addr);
 
             if (id == null)
                 throw new IllegalArgumentException();
@@ -1673,7 +1592,7 @@ public abstract class ResourceService {
             final ByteBuffer b = outbuf.duplicate();
             final OutputStream os = new ByteBufferOutputStream(b);
             try {
-                s = new Socket(addr, port);
+                s = new Socket(addr.getAddress(), addr.getPort());
 
                 // send the UUID of the resource that we want.
                 {
@@ -1717,4 +1636,154 @@ public abstract class ResourceService {
 
     } // class ReadBufferTask
     
+    /**
+     * Performance counters for the {@link ResourceService}.
+     * 
+     * @todo could also monitor the accept and request thread pools. The latter
+     *       is the more interesting from a workload perspective.
+     */
+    static public class Counters {
+
+        /**
+         * #of requests.
+         */
+        public final CAT requestCount = new CAT();
+
+        /**
+         * #of requests which are denied.
+         */
+        public final CAT denyCount = new CAT();
+
+        /**
+         * #of requests for which the resource was not found.
+         */
+        public final CAT notFoundCount = new CAT();
+
+        /**
+         * #of requests which end in an internal error.
+         */
+        public final CAT internalErrorCount = new CAT();
+
+        /**
+         * #of errors for responses where we attempt to write the requested data
+         * on the socket.
+         */
+        public final CAT writeErrorCount = new CAT();
+
+        /**
+         * #of responses where we attempt to write the data on the socket.
+         */
+        public final CAT nwrites = new CAT();
+
+        /**
+         * #of data bytes sent.
+         */
+        public final CAT bytesWritten = new CAT();
+
+        /**
+         * The largest response written so far.
+         */
+        public long maxWriteSize;
+
+        /**
+         * A lock used to make updates to {@link #maxWriteSize} atomic.
+         */
+        final private Object maxWriteSizeLock = new Object();
+
+        /**
+         * #of nanoseconds sending data (this will double count time for data
+         * that are served concurrently to different receivers).
+         */
+        public final CAT elapsedWriteNanos = new CAT();
+
+        synchronized public CounterSet getCounters() {
+
+            if (root == null) {
+
+                root = new CounterSet();
+
+                /*
+                 * #of requests and their status outcome counters.
+                 */
+                {
+                    final CounterSet tmp = root.makePath("status");
+
+                    tmp.addCounter("Request Count", new Instrument<Long>() {
+                        public void sample() {
+                            setValue(requestCount.get());
+                        }
+                    });
+
+                    tmp.addCounter("Deny Count", new Instrument<Long>() {
+                        public void sample() {
+                            setValue(denyCount.get());
+                        }
+                    });
+
+                    tmp.addCounter("Not Found Count", new Instrument<Long>() {
+                        public void sample() {
+                            setValue(notFoundCount.get());
+                        }
+                    });
+
+                    tmp.addCounter("Internal Error Count", new Instrument<Long>() {
+                        public void sample() {
+                            setValue(internalErrorCount.get());
+                        }
+                    });
+
+                }
+
+                /*
+                 * writes (A write is a response where we try to write the file
+                 * on the socket).
+                 */
+                {
+
+                    final CounterSet tmp = root.makePath("writes");
+                    tmp.addCounter("nwrites", new Instrument<Long>() {
+                        public void sample() {
+                            setValue(nwrites.get());
+                        }
+                    });
+
+                    tmp.addCounter("bytesWritten", new Instrument<Long>() {
+                        public void sample() {
+                            setValue(bytesWritten.get());
+                        }
+                    });
+
+                    tmp.addCounter("writeSecs", new Instrument<Double>() {
+                        public void sample() {
+                            final double writeSecs = (elapsedWriteNanos.get() / 1000000000.);
+                            setValue(writeSecs);
+                        }
+                    });
+
+                    tmp.addCounter("bytesWrittenPerSec", new Instrument<Double>() {
+                        public void sample() {
+                            final double writeSecs = (elapsedWriteNanos.get() / 1000000000.);
+                            final double bytesWrittenPerSec = (writeSecs == 0L ? 0d : (bytesWritten.get() / writeSecs));
+                            setValue(bytesWrittenPerSec);
+                        }
+                    });
+
+                    tmp.addCounter("maxWriteSize", new Instrument<Long>() {
+                        public void sample() {
+                            setValue(maxWriteSize);
+                        }
+                    });
+
+                }
+
+            }
+
+            return root;
+
+        }
+
+        private CounterSet root = null;
+
+    }
+
 }

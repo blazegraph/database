@@ -28,6 +28,7 @@ package com.bigdata.service;
 
 import java.io.File;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
@@ -82,8 +83,12 @@ public class TestReceiveFile extends TestCase3 {
 
         final File tmpFile = File.createTempFile(allowedFile.getName(), ".tmp");
 
-        final ResourceService service = new ResourceService() {
-
+        final ResourceService service = new ResourceService(
+                new InetSocketAddress(InetAddress
+                        .getByName(NicUtil.getIpAddress("default.nic",
+                                "default", true/* loopbackOk */)), 0/* port */
+                ), 0/* requestServicePoolSize */) {
+            
             @Override
             protected File getResource(UUID uuid) {
 
@@ -109,17 +114,14 @@ public class TestReceiveFile extends TestCase3 {
 
         };
 
-        final InetAddress thisInetAddr = InetAddress.getByName(NicUtil
-                .getIpAddress("default.nic", "default", true));
-
         try {
 
             service.awaitRunning(100, TimeUnit.MILLISECONDS);
 
             assertTrue(service.isOpen());
 
-            assertEquals(tmpFile, new ReadResourceTask(thisInetAddr,
-                    service.port, allowedUUID, tmpFile).call());
+            assertEquals(tmpFile, new ReadResourceTask(service.getAddr(),
+                    allowedUUID, tmpFile).call());
 
             if (log.isInfoEnabled())
                 log.info(service.counters.getCounters());
@@ -165,7 +167,11 @@ public class TestReceiveFile extends TestCase3 {
         assertTrue("Could not locate file: " + allowedFile, allowedFile
                 .exists());
 
-        final ResourceService service = new ResourceService() {
+        final ResourceService service = new ResourceService(
+                new InetSocketAddress(InetAddress
+                        .getByName(NicUtil.getIpAddress("default.nic",
+                                "default", true/* loopbackOk */)), 0/* port */
+                ), 0/* requestServicePoolSize */) {
 
             @Override
             protected File getResource(UUID uuid) {
@@ -196,9 +202,6 @@ public class TestReceiveFile extends TestCase3 {
                 .newCachedThreadPool(DaemonThreadFactory.defaultThreadFactory());
 
         final List<File> tempFiles = new LinkedList<File>();
-        
-        final InetAddress thisInetAddr = InetAddress.getByName(NicUtil
-                .getIpAddress("default.nic", "default", true));
 
         try {
 
@@ -215,7 +218,8 @@ public class TestReceiveFile extends TestCase3 {
 
                 tempFiles.add(tmpFile);
 
-                tasks.add(new ReadResourceTask(thisInetAddr, service.port, allowedUUID, tmpFile));
+                tasks.add(new ReadResourceTask(service.getAddr(), allowedUUID,
+                        tmpFile));
 
             }
 

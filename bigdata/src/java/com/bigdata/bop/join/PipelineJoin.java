@@ -45,6 +45,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
@@ -1773,5 +1774,15 @@ public class PipelineJoin extends BindingSetPipelineOp {
         } // class TLBFactory
 
     }// class JoinTask
+
+    /**
+     * This is a shard wise operator.
+     */
+    @Override
+    public BOpEvaluationContext getEvaluationContext() {
+        
+        return BOpEvaluationContext.SHARDED;
+        
+    }
 
 }

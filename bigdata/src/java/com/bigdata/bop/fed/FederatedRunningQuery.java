@@ -31,11 +31,16 @@ import java.nio.ByteBuffer;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.engine.BindingSetChunk;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.RunningQuery;
+import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.jini.master.IAsynchronousClientTask;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Extends {@link RunningQuery} to provide additional state and logic required
@@ -43,7 +48,13 @@ import com.bigdata.service.IBigdataFederation;
  * .
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: FederatedRunningQuery.java 3511 2010-09-06 20:45:37Z
+ *          thompsonbry $
+ * 
+ * @todo SCALEOUT: We need to model the chunks available before they are
+ *       materialized locally such that (a) they can be materialized on demand
+ *       (flow control); and (b) we can run the operator when there are
+ *       sufficient chunks available without taking on too much data.
  * 
  * @todo SCALEOUT: Life cycle management of the operators and the query implies
  *       both a per-query bop:NodeList map on the query coordinator identifying
@@ -76,56 +87,136 @@ public class FederatedRunningQuery extends RunningQuery {
     }
 
     /**
-     * Create a {@link BindingSetChunk} from a sink and add it to the queue.
-     * <p>
-     * Note: If we are running standalone, then we leave the data on the heap
-     * rather than formatting it onto a {@link ByteBuffer}.
-     * 
-     * @param sinkId
-     * @param sink
+     * {@inheritDoc}
      * 
      * @return The #of chunks made available for consumption by the sink. This
      *         will always be ONE (1) for scale-up. For scale-out, there will be
      *         one chunk per index partition over which the intermediate results
      *         were mapped.
      * 
-     * @todo <p>
-     *       For selective queries in s/o, first format the data onto a list of
-     *       byte[]s, one per target shard/node. Then, using a lock, obtain a
-     *       ByteBuffer if there is none associated with the query yet.
-     *       Otherwise, using the same lock, obtain a slice onto that ByteBuffer
-     *       and put as much of the byte[] as will fit, continuing onto a newly
-     *       recruited ByteBuffer if necessary. Release the lock and notify the
-     *       target of the ByteBuffer slice (buffer#, off, len). Consider
-     *       pushing the data proactively for selective queries.
-     *       <p>
-     *       For unselective queries in s/o, proceed as above but we need to get
-     *       the data off the heap and onto the {@link ByteBuffer}s quickly
-     *       (incrementally) and we want the consumers to impose flow control on
-     *       the producers to bound the memory demand (this needs to be
-     *       coordinated carefully to avoid deadlocks). Typically, large result
-     *       sets should result in multiple passes over the consumer's shard
-     *       rather than writing the intermediate results onto the disk.
+     *         FIXME SCALEOUT: This is where we need to map the binding sets
+     *         over the shards for the target operator. Once they are mapped,
+     *         write the binding sets onto an NIO buffer for the target node and
+     *         then send an RMI message to the node telling it that there is a
+     *         chunk available for the given (queryId,bopId,partitionId).
+     *         <p>
+     *         For selective queries in s/o, first format the data onto a list
+     *         of byte[]s, one per target shard/node. Then, using a lock, obtain
+     *         a ByteBuffer if there is none associated with the query yet.
+     *         Otherwise, using the same lock, obtain a slice onto that
+     *         ByteBuffer and put as much of the byte[] as will fit, continuing
+     *         onto a newly recruited ByteBuffer if necessary. Release the lock
+     *         and notify the target of the ByteBuffer slice (buffer#, off,
+     *         len). Consider pushing the data proactively for selective
+     *         queries.
+     *         <p>
+     *         For unselective queries in s/o, proceed as above but we need to
+     *         get the data off the heap and onto the {@link ByteBuffer}s
+     *         quickly (incrementally) and we want the consumers to impose flow
+     *         control on the producers to bound the memory demand (this needs
+     *         to be coordinated carefully to avoid deadlocks). Typically, large
+     *         result sets should result in multiple passes over the consumer's
+     *         shard rather than writing the intermediate results onto the disk.
      * 
-     *       FIXME SCALEOUT: This is where we need to map the binding sets over
-     *       the shards for the target operator. Once they are mapped, write the
-     *       binding sets onto an NIO buffer for the target node and then send
-     *       an RMI message to the node telling it that there is a chunk
-     *       available for the given (queryId,bopId,partitionId).
-     */
+     * */
     @Override
-    protected int add(final int sinkId,
+    protected <E> int add(final int sinkId,
             final IBlockingBuffer<IBindingSet[]> sink) {
 
-        /*
-         * Note: The partitionId will always be -1 in scale-up.
-         */
-        final BindingSetChunk chunk = new BindingSetChunk(getQueryId(), sinkId,
-                -1/* partitionId */, sink.iterator());
+        if (sink == null)
+            throw new IllegalArgumentException();
 
-        addChunkToQueryEngine(chunk);
+        final BOp bop = bopIndex.get(sinkId);
 
-        return 1;
+        if (bop == null)
+            throw new IllegalArgumentException();
+
+        switch (bop.getEvaluationContext()) {
+        case ANY:
+            return super.add(sinkId, sink);
+        case HASHED: {
+            /*
+             * FIXME The sink self describes the nodes over which the
+             * binding sets will be mapped and the hash function to be applied
+             * so we look up those metadata and apply them to distributed the
+             * binding sets across the nodes.
+             */
+            throw new UnsupportedOperationException();
+        }
+        case SHARDED: {
+            /*
+             * FIXME The sink must read or write on a shard so we map the
+             * binding sets across the access path for the sink.
+             * 
+             * @todo For a pipeline join, the predicate is the right hand
+             * operator of the sink. This might be true for INSERT and DELETE
+             * operators as well.
+             * 
+             * @todo IKeyOrder tells us which index will be used and should be
+             * set on the predicate by the join optimizer.
+             * 
+             * @todo Use the read or write timestamp depending on whether the
+             * operator performs mutation [this must be part of the operator
+             * metadata.]
+             * 
+             * @todo Set the capacity of the the "map" buffer to the size of the
+             * data contained in the sink (in fact, we should just process the
+             * sink data in place).
+             */
+            final IPredicate<E> pred = null; // @todo
+            final IKeyOrder<E> keyOrder = null; // @todo
+            final long timestamp = getReadTimestamp(); // @todo
+            final int capacity = 1000;// @todo
+            final MapBindingSetsOverShardsBuffer<IBindingSet, E> mapper = new MapBindingSetsOverShardsBuffer<IBindingSet, E>(
+                    getFederation(), pred, keyOrder, timestamp, capacity) {
+
+                        @Override
+                        IBuffer<IBindingSet> newBuffer(PartitionLocator locator) {
+                            // TODO Auto-generated method stub
+                            return null;
+                        }
+                
+            };
+            /*
+             * Map the binding sets over shards.
+             * 
+             * FIXME The buffers created above need to become associated with
+             * this query as resources of the query. Once we are done mapping
+             * the binding sets over the shards, the target node for each buffer
+             * needs to be set an RMI message to let it know that there is a
+             * chunk available for it for the target operator.
+             */
+            {
+                final IAsynchronousIterator<IBindingSet[]> itr = sink
+                        .iterator();
+                try {
+                    while (itr.hasNext()) {
+                        final IBindingSet[] chunk = itr.next();
+                        for (IBindingSet bset : chunk) {
+                            mapper.add(bset);
+                        }
+                    }
+                } finally {
+                    itr.close();
+                    sink.close();
+                }
+            }
+            
+            throw new UnsupportedOperationException();
+        }
+        case CONTROLLER: {
+
+            final IQueryClient clientProxy = getQueryController();
+
+//            getQueryEngine().getResourceService().port;
+//            
+//            clientProxy.bufferReady(clientProxy, serviceAddr, getQueryId(), sinkId);
+
+            throw new UnsupportedOperationException();
+        }
+        default:
+            throw new AssertionError(bop.getEvaluationContext());
+        }
 
     }
 

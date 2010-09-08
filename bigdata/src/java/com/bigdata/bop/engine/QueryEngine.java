@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.engine;
 
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
 import java.rmi.RemoteException;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -410,6 +409,11 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
     /**
      * The currently executing queries.
+     * 
+     * @todo DEADLINE: There should be a data structure representing
+     *       {@link RunningQuery} having deadlines so we can
+     *       {@link RunningQuery#cancel(boolean)} queries when their deadline
+     *       expires.
      */
     final ConcurrentHashMap<Long/* queryId */, RunningQuery> runningQueries = new ConcurrentHashMap<Long, RunningQuery>();
 
@@ -480,20 +484,31 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      *       <p>
      *       Handle priority for unselective queries based on the order in which
      *       they are submitted?
-     *       
+     * 
      * @todo The approach taken by the {@link QueryEngine} executes one task per
      *       pipeline bop per chunk. Outside of how the tasks are scheduled,
      *       this corresponds closely to the historical pipeline query
-     *       evaluation. The other difference is that there is less opportunity
-     *       for concatenation of chunks. However, chunk concatenation could be
-     *       performed here if we (a) mark the BindingSetChunk with a flag to
-     *       indicate when it has been accepted; and (b) rip through the
-     *       incoming chunks for the query for the target bop and combine them
-     *       to feed the task. Chunks which have already been assigned would be
-     *       dropped when take() discovers them above. [The chunk combination
-     *       could also be done when we output the chunk if the sink has not
-     *       been taken, e.g., by combining the chunk into the same target
-     *       ByteBuffer, or when we add the chunk to the RunningQuery.]
+     *       evaluation.
+     *       <p>
+     *       Chunk concatenation could be performed here if we (a) mark the
+     *       {@link BindingSetChunk} with a flag to indicate when it has been
+     *       accepted; and (b) rip through the incoming chunks for the query for
+     *       the target bop and combine them to feed the task. Chunks which have
+     *       already been assigned would be dropped when take() discovers them.
+     *       [The chunk combination could also be done when we output the chunk
+     *       if the sink has not been taken, e.g., by combining the chunk into
+     *       the same target ByteBuffer, or when we add the chunk to the
+     *       RunningQuery.]
+     * 
+     * @todo SCALEOUT: High volume query operators must demand that their inputs
+     *       are materialized before they can begin evaluation. Scaleout
+     *       therefore requires a separate queue which looks at the metadata
+     *       concerning chunks available on remote nodes for an operator which
+     *       will run on this node and then demands the data either when the
+     *       predecessors in the pipeline are done (operator at once evaluation)
+     *       or when sufficient data are available to run the operator (mega
+     *       chunk pipelining). Once the data are locally materialized, the
+     *       operator may be queued for evaluation.
      */
     private class QueryEngineTask implements Runnable {
         public void run() {
@@ -778,17 +793,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     }
 
     /**
-     * 
-     * @todo if the top bop is an operation which writes on the database then it
-     *       should swallow the binding sets from the pipeline and we should be
-     *       able to pass along a <code>null</code> query buffer.
-     * 
-     * @todo SCALEOUT: Return a proxy for the query buffer either here or when
-     *       the query is sent along to another node for evaluation?
-     *       <p>
-     *       Actually, it would be nice if we could reuse the same NIO transfer
-     *       of {@link ByteBuffer}s to move the final results back to the client
-     *       rather than using a proxy object for the query buffer.
+     * Return a buffer onto which the solutions will be written.
      */
     protected IBlockingBuffer<IBindingSet[]> newQueryBuffer(
             final BindingSetPipelineOp query) {
