@@ -490,7 +490,18 @@ public class FixedAllocator implements Allocator {
 	}
 
 	public void appendShortStats(StringBuffer str) {
-		str.append("Index: " + m_index + ", address: " + getStartAddr() + ", " + m_size + "\n");
+		str.append("Index: " + m_index + ", " + m_size);
+		
+		Iterator<AllocBlock> blocks = m_allocBlocks.iterator();
+		while (blocks.hasNext()) {
+			AllocBlock block = blocks.next();
+			if (block.m_addr != 0) {
+				str.append(block.getStats());
+			} else {
+				break;
+			}
+		}
+		str.append("\n");
 	}
 	
 	public int getAllocatedBlocks() {

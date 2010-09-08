@@ -713,6 +713,9 @@ public class RWStore implements IStore {
 	protected void readAllocationBlocks() throws IOException {
 		
 		assert m_allocs.size() == 0;
+		
+		System.out.println("readAllocationBlocks, m_metaBits.length: " 
+				+ m_metaBits.length);
 
 		/**
 		 * Allocators are sorted in StartAddress order (which MUST be the order
@@ -721,7 +724,8 @@ public class RWStore implements IStore {
 		 * the metaAllocation if two allocation blocks were loaded for the same
 		 * address (must be two version of same Allocator).
 		 * 
-		 * Meta-Allocations stored as {int address; int[8] bits}
+		 * Meta-Allocations stored as {int address; int[8] bits}, so each block
+		 * holds 8*32=256 allocation slots of 1K totalling 256K.
 		 */
 		for (int b = 0; b < m_metaBits.length; b += 9) {
 			long blockStart = convertAddr(m_metaBits[b]);
@@ -771,6 +775,13 @@ public class RWStore implements IStore {
 		Collections.sort(m_allocs);
 		for (int index = 0; index < m_allocs.size(); index++) {
 			((Allocator) m_allocs.get(index)).setIndex(index);
+		}
+
+		if (false) {
+			StringBuffer tmp = new StringBuffer();
+			showAllocators(tmp);
+			
+			System.out.println("Allocators: " + tmp.toString());
 		}
 	}
 	
@@ -1997,9 +2008,10 @@ public class RWStore implements IStore {
 	static boolean tstBit(int[] bits, int bitnum) {
 		int index = bitnum / 32;
 		int bit = bitnum % 32;
-		
+
 		if (index >= bits.length)
-			throw new IllegalArgumentException();
+			throw new IllegalArgumentException("Accessing bit index: " + index 
+					+ " of array length: " + bits.length);
 
 		return (bits[(int) index] & 1 << bit) != 0;
 	}

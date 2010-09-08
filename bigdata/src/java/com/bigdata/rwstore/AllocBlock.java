@@ -193,7 +193,7 @@ public class AllocBlock {
 		final int total = m_ints * 32;
 		final int allocBits = getAllocBits();
 
-		return "Addr : " + m_addr + " [" + allocBits + "::" + total + "]";
+		return " - start addr : " + RWStore.convertAddr(m_addr) + " [" + allocBits + "::" + total + "]";
 	}
 
 	public void addAddresses(final ArrayList addrs, final int rootAddr) {
