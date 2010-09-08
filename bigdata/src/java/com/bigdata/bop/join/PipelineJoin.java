@@ -50,6 +50,7 @@ import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IShardwisePipelineOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.BytesUtil;
@@ -93,7 +94,8 @@ import com.bigdata.util.concurrent.LatchedExecutor;
  * @todo Break the star join logic out into its own join operator and test
  *       suite.
  */
-public class PipelineJoin extends BindingSetPipelineOp {
+public class PipelineJoin<E> extends BindingSetPipelineOp implements
+        IShardwisePipelineOp<E> {
 
     static private final Logger log = Logger.getLogger(PipelineJoin.class);
 
@@ -256,22 +258,36 @@ public class PipelineJoin extends BindingSetPipelineOp {
 
     }
 
-    protected BindingSetPipelineOp left() {
+    /**
+     * The left hand operator, which is the previous join in the pipeline join
+     * path.
+     */
+    public BindingSetPipelineOp left() {
 
         return (BindingSetPipelineOp) get(0);
 
     }
 
-    protected IPredicate<?> right() {
+    /**
+     * The right hand operator, which is the {@link IPredicate}.
+     */
+    @SuppressWarnings("unchecked")
+    public IPredicate<E> right() {
 
-        return (IPredicate<?>) get(1);
+        return (IPredicate<E>) get(1);
 
+    }
+    
+    public IPredicate<E> getPredicate() {
+        
+        return right();
+        
     }
 
     /**
      * @see Annotations#CONSTRAINTS
      */
-    protected IConstraint[] constraints() {
+    public IConstraint[] constraints() {
 
         return getProperty(Annotations.CONSTRAINTS, null/* defaultValue */);
 
@@ -280,7 +296,7 @@ public class PipelineJoin extends BindingSetPipelineOp {
     /**
      * @see Annotations#OPTIONAL
      */
-    protected boolean isOptional() {
+    public boolean isOptional() {
 
         return getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
 
@@ -289,7 +305,7 @@ public class PipelineJoin extends BindingSetPipelineOp {
     /**
      * @see Annotations#MAX_PARALLEL
      */
-    protected int getMaxParallel() {
+    public int getMaxParallel() {
 
         return getProperty(Annotations.MAX_PARALLEL, Annotations.DEFAULT_MAX_PARALLEL);
 
@@ -298,7 +314,7 @@ public class PipelineJoin extends BindingSetPipelineOp {
     /**
      * @see Annotations#SELECT
      */
-    protected IVariable<?>[] variablesToKeep() {
+    public IVariable<?>[] variablesToKeep() {
 
         return getProperty(Annotations.SELECT, null/* defaultValue */);
 
@@ -325,7 +341,7 @@ public class PipelineJoin extends BindingSetPipelineOp {
         /**
          * The join that is being executed.
          */
-        final private PipelineJoin joinOp;
+        final private PipelineJoin<?> joinOp;
 
         /**
          * The constraint (if any) specified for the join operator.
@@ -450,7 +466,7 @@ public class PipelineJoin extends BindingSetPipelineOp {
          * @param context
          */
         public JoinTask(//
-                final PipelineJoin joinOp,//
+                final PipelineJoin<?> joinOp,//
                 final BOpContext<IBindingSet> context
                 ) {
 

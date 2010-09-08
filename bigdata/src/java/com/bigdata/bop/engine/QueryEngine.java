@@ -372,7 +372,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      *         is running -or- <code>null</code> if the {@link QueryEngine} is
      *         not running against an {@link IBigdataFederation}.
      */
-    protected UUID getServiceId() {
+    public UUID getServiceUUID() {
 
         return null;
         

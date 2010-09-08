@@ -177,60 +177,60 @@ public abstract class ResourceService {
         
     }
 
+//    /**
+//     * Constructor uses the default nic, any free port, and the default request
+//     * service pool size.
+//     * 
+//     * @throws IOException
+//     */
+//    public ResourceService() throws IOException {
+//
+//        this(0/* port */, 0/* requestServicePoolSize */);
+//
+//    }
+//
+//    /**
+//     * Constructor uses the default nic and request service pool size.
+//     * 
+//     * @param port
+//     *            The port on which to start the service or ZERO (0) to use any
+//     *            open port.
+//     *            
+//     * @throws IOException
+//     */
+//    public ResourceService(final int port) throws IOException {
+//
+//        this(port, 0/* requestServicePoolSize */);
+//
+//    }
+//
+//    /**
+//     * Constructor uses a non-loopback address on the default nic.
+//     * 
+//     * @param port
+//     *            The port on which to start the service or ZERO (0) to use any
+//     *            open port.
+//     * @param requestServicePoolSize
+//     *            The size of the thread pool that will handle requests. When
+//     *            ZERO (0) a cached thread pool will be used with no specific
+//     *            size limit.
+//     * 
+//     * @throws IOException
+//     * 
+//     * @see {@link NicUtil#getIpAddress(String, String, boolean)}
+//     */
+//    public ResourceService(final int port, final int requestServicePoolSize)
+//            throws IOException {
+//
+//        this(new InetSocketAddress(InetAddress.getByName(NicUtil.getIpAddress(
+//                "default.nic"/* systemPropertyName */,
+//                "default"/* defaultNicName */, false/* loopbackOk */)), port),
+//                requestServicePoolSize);
+//
+//    }
+
     /**
-     * Constructor uses the default nic, any free port, and the default request
-     * service pool size.
-     * 
-     * @throws IOException
-     */
-    public ResourceService() throws IOException {
-
-        this(0/* port */, 0/* requestServicePoolSize */);
-
-    }
-
-    /**
-     * Constructor uses the default nic and request service pool size.
-     * 
-     * @param port
-     *            The port on which to start the service or ZERO (0) to use any
-     *            open port.
-     *            
-     * @throws IOException
-     */
-    public ResourceService(final int port) throws IOException {
-
-        this(port, 0/* requestServicePoolSize */);
-
-    }
-
-    /**
-     * Constructor uses a non-loopback address on the default nic.
-     * 
-     * @param port
-     *            The port on which to start the service or ZERO (0) to use any
-     *            open port.
-     * @param requestServicePoolSize
-     *            The size of the thread pool that will handle requests. When
-     *            ZERO (0) a cached thread pool will be used with no specific
-     *            size limit.
-     * 
-     * @throws IOException
-     * 
-     * @see {@link NicUtil#getIpAddress(String, String, boolean)}
-     */
-    public ResourceService(final int port, final int requestServicePoolSize)
-            throws IOException {
-
-        this(new InetSocketAddress(InetAddress.getByName(NicUtil.getIpAddress(
-                "default.nic"/* systemPropertyName */,
-                "default"/* defaultNicName */, false/* loopbackOk */)), port),
-                requestServicePoolSize);
-
-    }
-
-    /**
-     * Core constructor.
+     * Create and start the service.
      * 
      * @param addr
      *            The IP address and port at which the service will accept

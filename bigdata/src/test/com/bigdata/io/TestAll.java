@@ -65,6 +65,9 @@ public class TestAll extends TestCase {
         // test suite for the direct buffer pool.
         suite.addTestSuite(TestDirectBufferPool.class);
         
+        // test suite for allocations made against direct buffers.
+        suite.addTestSuite(TestDirectBufferPoolAllocator.class);
+        
         // test suite for FileChannel IO utility class.
         suite.addTestSuite(TestFileChannelUtility.class);
 

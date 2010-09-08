@@ -31,6 +31,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 
 import com.bigdata.bfs.BigdataFileSystem;
+import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IndexMetadata;
@@ -585,6 +586,11 @@ public interface IDataService extends ITxCommitProtocol, IService, IRemoteExecut
      * overflow processing.
      */
     public boolean isOverflowActive() throws IOException;
+
+    /**
+     * Return the {@link IQueryPeer} running on this service.
+     */
+    public IQueryPeer getQueryEngine() throws IOException;
     
 //    /**
 //     * Shutdown the service immediately and destroy any persistent data

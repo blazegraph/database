@@ -151,8 +151,7 @@ public class RelationFusedView<E> implements IRelation<E> {
 //
 //    }
     
-    public E newElement(final List<IVariableOrConstant<?>> a,
-            final IBindingSet bindingSet) {
+    public E newElement(final List<BOp> a, final IBindingSet bindingSet) {
 
         return relation1.newElement(a, bindingSet);
 

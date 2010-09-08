@@ -170,7 +170,7 @@ public class TestPipelineJoin extends TestCase2 {
         final int startId = 1;
         final int joinId = 2;
         final int predId = 3;
-        final PipelineJoin query = new PipelineJoin(
+        final PipelineJoin<E> query = new PipelineJoin<E>(
         // left
                 new CopyBindingSetOp(new BOp[] {}, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
@@ -265,7 +265,7 @@ public class TestPipelineJoin extends TestCase2 {
         final int startId = 1;
         final int joinId = 2;
         final int predId = 3;
-        final PipelineJoin query = new PipelineJoin(
+        final PipelineJoin<E> query = new PipelineJoin<E>(
         // left
                 new CopyBindingSetOp(new BOp[] {}, NV.asMap(new NV[] {//
                         new NV(BOpBase.Annotations.BOP_ID, startId),//
@@ -370,7 +370,7 @@ public class TestPipelineJoin extends TestCase2 {
         final int startId = 1;
         final int joinId = 2;
         final int predId = 3;
-        final PipelineJoin query = new PipelineJoin(
+        final PipelineJoin<E> query = new PipelineJoin<E>(
         // left
                 new CopyBindingSetOp(new BOp[] {}, NV.asMap(new NV[] {//
                         new NV(BOpBase.Annotations.BOP_ID, startId),//
@@ -484,7 +484,7 @@ public class TestPipelineJoin extends TestCase2 {
         final int joinId = 2;
         final int predId = 3;
 
-        final PipelineJoin query = new PipelineJoin(
+        final PipelineJoin<E> query = new PipelineJoin<E>(
         // left
                 new CopyBindingSetOp(new BOp[] {}, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
@@ -600,7 +600,7 @@ public class TestPipelineJoin extends TestCase2 {
         final int joinId = 2;
         final int predId = 3;
 
-        final PipelineJoin query = new PipelineJoin(
+        final PipelineJoin<E> query = new PipelineJoin<E>(
         // left
                 new CopyBindingSetOp(new BOp[] {}, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//

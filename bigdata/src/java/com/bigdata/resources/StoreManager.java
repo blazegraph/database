@@ -31,6 +31,8 @@ package com.bigdata.resources;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -106,6 +108,7 @@ import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.util.config.NicUtil;
 import com.ibm.icu.impl.ByteBuffer;
 
 /**
@@ -1565,7 +1568,15 @@ abstract public class StoreManager extends ResourceEvents implements
 
             try {
 
-                resourceService = new ManagedResourceService() {
+                resourceService = new ManagedResourceService(
+                        new InetSocketAddress(
+                                InetAddress
+                                        .getByName(NicUtil
+                                                .getIpAddress(
+                                                        "default.nic"/* systemPropertyName */,
+                                                        "default"/* defaultNicName */,
+                                                        false/* loopbackOk */)),
+                                0/* port */), 0/* requestServicePoolSize */) {
 
                     @Override
                     protected File getResource(final UUID uuid) throws Exception {

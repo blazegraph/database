@@ -42,6 +42,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.bfs.BigdataFileSystem;
+import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.filter.IFilterConstructor;
@@ -396,6 +397,10 @@ public class AbstractResourceManagerTestCase extends
 
         public Session getSession() {
             return session;
+        }
+
+        public IQueryPeer getQueryEngine() throws IOException {
+            return null;
         }
 
     }

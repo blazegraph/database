@@ -27,134 +27,102 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
-import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.service.ResourceService;
+import com.bigdata.io.DirectBufferPoolAllocator;
+import com.bigdata.io.DirectBufferPoolAllocator.IAllocation;
 
 /**
- * This class manages a pool of direct {@link ByteBuffer}s which are exposed for
- * retrieval by remote services.
+ * This class manages a pool of direct {@link ByteBuffer}s. The application can
+ * create which are exposed for retrieval by remote services.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: ManagedResourceService.java 3515 2010-09-08 13:16:30Z
+ *          thompsonbry $
  * 
- * @todo Add a constructor argument for the maximum #of buffers which may be
+ * @todo Harmonize the constructors with the base class (and perhaps simplify)
+ *       and add a constructor argument for the maximum #of buffers which may be
  *       allocated from the pool or leave this to the annotated {@link BOp}s or
  *       to logic managing resource utilization during query evaluation? E.g.,
  *       breaking a query if it would demand too many resources given the
  *       concurrent query demand or forcing the query to block until sufficient
  *       resources are available?
+ * 
+ * @todo Separate the allocation management from the resource service. it should
+ *       be its own class with its own test suite. The resource service just
+ *       makes use of the exposed allocations.
  */
-public class ManagedResourceService extends ResourceService {
+abstract public class ManagedResourceService extends ResourceService {
+
+    private final DirectBufferPoolAllocator allocator;
 
     /**
-     * The pool from which the direct {@link ByteBuffer}s are allocated.
+     * The object used to make, resolve, and release allocations against a
+     * {@link DirectBufferPool}.
      */
-    private final DirectBufferPool pool = DirectBufferPool.INSTANCE;
+    public DirectBufferPoolAllocator getAllocator() {
+       
+        return allocator;
+        
+    }
     
     /**
-     * The set of buffers "owned" by this service.
-     */
-    private final ConcurrentHashMap<UUID, ByteBuffer> buffers = new ConcurrentHashMap<UUID, ByteBuffer>();
-
-    /**
-     * Constructor uses the default nic, any free port, and the default request
-     * service pool size.
+     * Create and start the service.
      * 
-     * @throws IOException
-     */
-    public ManagedResourceService() throws IOException {
-        super();
-    }
-
-    /**
-     * 
-     * @param port
-     * @throws IOException
-     */
-    public ManagedResourceService(int port) throws IOException {
-        super(port);
-    }
-
-    /**
-     * @param port
+     * @param addr
+     *            The IP address and port at which the service will accept
+     *            connections. The port MAY be zero to use an ephemeral port.
      * @param requestServicePoolSize
+     *            The size of the thread pool that will handle requests. When
+     *            ZERO (0) a cached thread pool will be used with no specific
+     *            size limit.
+     * 
      * @throws IOException
      */
-    public ManagedResourceService(final int port,
+    public ManagedResourceService(final InetSocketAddress addr,
             final int requestServicePoolSize) throws IOException {
-        super(port, requestServicePoolSize);
+
+        super(addr, requestServicePoolSize);
+
+        this.allocator = new DirectBufferPoolAllocator(
+                DirectBufferPool.INSTANCE);
+
     }
     
     @Override
     synchronized public void shutdown() {
         super.shutdown();
-        releaseBuffers();
+        allocator.close();
     }
 
     @Override
     synchronized public void shutdownNow() {
         super.shutdownNow();
-        releaseBuffers();
+        allocator.close();
     }
 
     /**
-     * Allocate a new buffer and return its identifier.
+     * {@inheritDoc}
      * 
-     * @throws InterruptedException
-     */
-    public UUID newBuffer() throws InterruptedException {
-        final UUID uuid = UUID.randomUUID();
-        final ByteBuffer b = pool.acquire();
-        buffers.put(uuid, b);
-        return uuid;
-    }
-
-    public void releaseBuffer(final UUID uuid) throws InterruptedException {
-        final ByteBuffer b = buffers.get(uuid);
-        if (b == null) {
-            // No such buffer.
-            throw new AssertionError();
-        }
-        pool.release(b);
-        buffers.remove(uuid);
-    }
-
-    /**
-     * Release all buffers.
-     */
-    private void releaseBuffers() {
-        boolean interrupted = false;
-        for(ByteBuffer b : buffers.values()) {
-            try {
-                pool.release(b);
-            } catch (InterruptedException e) {
-                interrupted = true;
-            }
-        }
-        if (interrupted)
-            // propagate the interrupt.
-            Thread.currentThread().interrupt();
-    }
-    
-    @Override
-    protected ByteBuffer getBuffer(UUID uuid) throws Exception {
-        return buffers.get(uuid);
-    }
-
-    /**
-     * TODO This class should be setup to wrap an interface so we can delegate
-     * this method through to the ResourceManager on the data service.
+     * @todo An allocation can be concurrently released if a query terminates.
+     *       Make sure that we interrupt any transfer in progress for the
+     *       allocation when the allocation is released since there is nothing
+     *       to prevent the same direct {@link ByteBuffer} from being assigned
+     *       to a new allocation context and new allocations made against it
+     *       concurrent with any ongoing attempt to read the data from that
+     *       allocation.
      */
     @Override
-    protected File getResource(UUID uuid) throws Exception {
-        return null;
+    protected ByteBuffer getBuffer(final UUID uuid) throws Exception {
+        final IAllocation allocation = allocator.getAllocation(uuid);
+        if (allocation == null)
+            return null;
+        return allocation.getSlice();
     }
 
 }

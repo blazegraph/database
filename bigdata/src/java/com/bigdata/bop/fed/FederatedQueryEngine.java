@@ -27,17 +27,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.fed;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.engine.IQueryClient;
+import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.RunningQuery;
-import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -45,6 +46,7 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IDataService;
 import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.ResourceService;
 
@@ -55,49 +57,13 @@ import com.bigdata.service.ResourceService;
  * @version $Id: FederatedQueryEngine.java 3508 2010-09-05 17:02:34Z thompsonbry
  *          $
  * 
- * @todo Modify the {@link FederatedQueryEngine} to actually run a distributed
- *       query. Since we are in the same JVM, the {@link IBindingSet} chunks can
- *       be used directly without being marshalled onto {@link ByteBuffer}s and
- *       transferred over the network.
- *       <p>
- *       Distributed query will fail until each {@link FederatedQueryEngine} is
- *       receiving chunks and running operators against its local
- *       {@link IIndexManager}. This requires that we map the output chunks for
- *       an operator over the shards for the next operator, that we send the
- *       appropriate messages to the query engine peers, that they demand the
- *       necessary data from their peers, etc.
- *       <p>
- *       Once distributed query is running, begin to marshall the chunks onto
- *       buffers [this might have to be done immediately to get the notification
- *       protocol working].
- * 
- * @todo buffer management for s/o, including binding sets movement, element
- *       chunk movement for DHT on access path, and on demand materialization of
- *       large query resources for large data sets, parallel closure, etc.;
- *       grouping operators which will run locally (such as a pipeline join plus
- *       a conditional routing operator) so we do not marshall binding sets
- *       between operators when they will not cross a network boundary. Also,
- *       handle mutation, programs and closure operators.
- * 
- * @todo I have not yet figured out how to mark operators to indicate when their
- *       output should be mapped across shards or handled locally. It would
- *       appear that this is a concern of their parent in the operator tree. For
- *       example, the {@link ConditionalRoutingOp} would be applied to transform
- *       the output of a {@link PipelineJoin} before mapping the output over the
- *       shards.
- *       <p>
- *       The operator themselves could carry this information either as a Java
- *       method or as an annotation.
- *       <p>
- *       This could interact with how we combine {@link RunningQuery#chunksIn}.
+ * @todo buffer management for s/o including bindingSet[] movement for the
+ *       pipeline and element[] movement for DHT on access path.
  * 
  * @todo Override to release buffers associated with chunks buffered for a query
  *       when it terminates (buffers may be for received chunks or chunks which
  *       are awaiting transfer to another node). [This might be handled by a
  *       {@link RunningQuery} override.]
- * 
- * @todo Override protocol hooks for moving data around among the
- *       {@link QueryEngine}s
  * 
  * @todo Compressed representations of binding sets with the ability to read
  *       them in place or materialize them onto the java heap. The
@@ -167,7 +133,7 @@ public class FederatedQueryEngine extends QueryEngine {
     }
 
     @Override
-    protected UUID getServiceId() {
+    public UUID getServiceUUID() {
 
         return fed.getServiceUUID();
 
@@ -190,12 +156,17 @@ public class FederatedQueryEngine extends QueryEngine {
         return resourceService;
         
     }
-    
+
+    /**
+     * FIXME Once buffers are ready their data needs to be materialized on this
+     * node and the chunks queued for processing.
+     * 
+     * @todo What is the cost of passing the proxy around like this? Should it
+     *       be discovered instead from a registrar?
+     */
     @Override
     public void bufferReady(IQueryClient clientProxy,
             InetSocketAddress serviceAddr, long queryId, int bopId) {
-        
-        // @todo notify peer when a buffer is ready.
         
     }
 
@@ -245,5 +216,48 @@ public class FederatedQueryEngine extends QueryEngine {
         return query.newBuffer();
 
     }
+
+    /**
+     * Resolve an {@link IQueryPeer}.
+     * <p>
+     * Note: This only resolves the peers running on the {@link IDataService}s.
+     * It will not resolve a query controller unless an {@link IDataService} is
+     * being used as the query controller.
+     * 
+     * @param serviceUUID
+     *            The service {@link UUID}.
+     * 
+     * @return The proxy for the query peer.
+     */
+    protected IQueryPeer getQueryPeer(final UUID serviceUUID) {
+
+        IQueryPeer proxy = proxyMap.get(serviceUUID);
+
+        if (proxy == null) {
+
+            final IDataService dataService = getFederation().getDataService(
+                    serviceUUID);
+
+            if (dataService == null)
+                throw new RuntimeException("No such service: " + serviceUUID);
+
+            try {
+                proxy = dataService.getQueryEngine();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+            proxyMap.put(serviceUUID, proxy);
+
+        }
+
+        return proxy;
+
+    }
+
+    /**
+     * Cache for {@link #getQueryPeer(UUID)}.
+     */
+    private final ConcurrentHashMap<UUID, IQueryPeer> proxyMap = new ConcurrentHashMap<UUID, IQueryPeer>();
 
 }

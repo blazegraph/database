@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
@@ -498,7 +499,7 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
 //    }
 
     @SuppressWarnings("unchecked")
-    public IMagicTuple newElement(final List<IVariableOrConstant<?>> a,
+    public IMagicTuple newElement(final List<BOp> a,
             final IBindingSet bindingSet) {
 
         if (a == null)
@@ -509,11 +510,12 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
         
         final IV[] terms = new IV[arity];
 
-        final Iterator<IVariableOrConstant<?>> itr = a.iterator();
+        final Iterator<BOp> itr = a.iterator();
         
         for (int i = 0; i < arity; i++) {
         
-            terms[i] = (IV) itr.next().get(bindingSet);
+            terms[i] = (IV) ((IVariableOrConstant<?>) itr.next())
+                    .get(bindingSet);
             
         }
         

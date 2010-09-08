@@ -35,6 +35,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
@@ -169,13 +170,14 @@ public class R extends AbstractRelation<E> {
 //        return new E(name, value);
 //    }
 
-    public E newElement(final List<IVariableOrConstant<?>> a,
-            final IBindingSet bindingSet) {
+    public E newElement(final List<BOp> a, final IBindingSet bindingSet) {
 
-        final String name = (String) a.get(0).get(bindingSet);
+        final String name = (String) ((IVariableOrConstant<?>) a.get(0))
+                .get(bindingSet);
 
-        final String value = (String) a.get(1).get(bindingSet);
-        
+        final String value = (String) ((IVariableOrConstant<?>) a.get(0))
+                .get(bindingSet);
+
         return new E(name,value);
         
     }
