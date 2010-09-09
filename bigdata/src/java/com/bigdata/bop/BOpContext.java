@@ -30,6 +30,7 @@ package com.bigdata.bop;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.RunningQuery;
@@ -227,6 +228,10 @@ public class BOpContext<E> {
      *             source if the source will be ignored).
      * @throws IllegalArgumentException
      *             if the <i>sink</i> is <code>null</code>
+     * 
+     * @todo modify to accept {@link IChunkMessage} or an interface available
+     *       from getChunk() on {@link IChunkMessage} which provides us with
+     *       flexible mechanisms for accessing the chunk data.
      */
 //    * @throws IllegalArgumentException
 //    *             if the <i>indexManager</i> is <code>null</code>

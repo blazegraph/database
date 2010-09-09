@@ -195,15 +195,14 @@ public class TestQueryEngine extends TestCase2 {
         final BindingSetPipelineOp query = new CopyBindingSetOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(Predicate.Annotations.READ_TIMESTAMP,ITx.READ_COMMITTED),//
                 }));
 
         final long queryId = 1L;
-        final long readTimestamp = ITx.READ_COMMITTED;
-        final long writeTimestamp = ITx.UNISOLATED;
-        final RunningQuery runningQuery = queryEngine.eval(queryId,
-                readTimestamp, writeTimestamp, query);
+        final RunningQuery runningQuery = queryEngine.eval(queryId,query);
 
         runningQuery.startQuery(new BindingSetChunk(
+                        queryEngine,
                         queryId,
                         startId,//
                         -1, //partitionId
@@ -278,9 +277,9 @@ public class TestQueryEngine extends TestCase2 {
                                 new NV(Predicate.Annotations.BOP_ID, predId),//
                         })),
                 // join annotations
-                NV
-                        .asMap(new NV[] { new NV(Predicate.Annotations.BOP_ID,
-                                joinId),//
+                NV.asMap(new NV[] { //
+                        new NV(Predicate.Annotations.BOP_ID, joinId),//
+                        new NV(Predicate.Annotations.READ_TIMESTAMP,ITx.READ_COMMITTED),//
                         })//
         );
 
@@ -292,12 +291,10 @@ public class TestQueryEngine extends TestCase2 {
         ) };
 
         final long queryId = 1L;
-        final long readTimestamp = ITx.READ_COMMITTED;
-        final long writeTimestamp = ITx.UNISOLATED;
-        final RunningQuery runningQuery = queryEngine.eval(queryId,
-                readTimestamp, writeTimestamp, query);
+        final RunningQuery runningQuery = queryEngine.eval(queryId, query);
 
-        runningQuery.startQuery(new BindingSetChunk(queryId, startId,//
+        runningQuery.startQuery(new BindingSetChunk(queryEngine, queryId,
+                startId,//
                 -1, // partitionId
                 newBindingSetIterator(new HashBindingSet())));
 
@@ -466,23 +463,23 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.BOP_ID, predId2),//
                 }));
         
-        final BindingSetPipelineOp join1Op = new PipelineJoin<E>(startOp, pred1Op,
-                NV.asMap(new NV[] { new NV(Predicate.Annotations.BOP_ID,
-                        joinId1),//
+        final BindingSetPipelineOp join1Op = new PipelineJoin<E>(//
+                startOp, pred1Op,//
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, joinId1),//
                         }));
 
-        final BindingSetPipelineOp join2Op = new PipelineJoin<E>(join1Op, pred2Op,
-                NV.asMap(new NV[] { new NV(Predicate.Annotations.BOP_ID,
-                        joinId2),//
+        final BindingSetPipelineOp join2Op = new PipelineJoin<E>(//
+                join1Op, pred2Op,//
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, joinId2),//
+                        new NV(Predicate.Annotations.READ_TIMESTAMP, ITx.READ_COMMITTED),//
                         }));
-        
+
         final BindingSetPipelineOp query = join2Op;
 
         final long queryId = 1L;
-        final long readTimestamp = ITx.READ_COMMITTED;
-        final long writeTimestamp = ITx.UNISOLATED;
-        final RunningQuery runningQuery = queryEngine.eval(queryId,
-                readTimestamp, writeTimestamp, query);
+        final RunningQuery runningQuery = queryEngine.eval(queryId, query);
 
         // start the query.
         {
@@ -491,7 +488,8 @@ public class TestQueryEngine extends TestCase2 {
             
             initialBindings.set(Var.var("x"), new Constant<String>("Mary"));
 
-            runningQuery.startQuery(new BindingSetChunk(queryId, startId,//
+            runningQuery.startQuery(new BindingSetChunk(queryEngine, queryId,
+                    startId,//
                     -1, // partitionId
                     newBindingSetIterator(initialBindings)));
         }

@@ -28,18 +28,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.fed;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
+import com.bigdata.bop.engine.IQueryDecl;
 import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.solutions.SliceOp;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -57,18 +59,15 @@ import com.bigdata.service.ResourceService;
  * @version $Id: FederatedQueryEngine.java 3508 2010-09-05 17:02:34Z thompsonbry
  *          $
  * 
- * @todo buffer management for s/o including bindingSet[] movement for the
- *       pipeline and element[] movement for DHT on access path.
+ * @todo buffer management for s/o bindingSet[] movement
  * 
- * @todo Override to release buffers associated with chunks buffered for a query
- *       when it terminates (buffers may be for received chunks or chunks which
- *       are awaiting transfer to another node). [This might be handled by a
- *       {@link RunningQuery} override.]
+ * @todo buffer management for s/o DHT element[] movement
  * 
  * @todo Compressed representations of binding sets with the ability to read
  *       them in place or materialize them onto the java heap. The
- *       representation should be ammenable to processing in C since we want to
- *       use them on GPUs as well.
+ *       representation should be amenable to processing in C since we want to
+ *       use them on GPUs as well. See {@link IChunkMessage} and perhaps
+ *       {@link IRaba}.
  */
 public class FederatedQueryEngine extends QueryEngine {
 
@@ -158,15 +157,59 @@ public class FederatedQueryEngine extends QueryEngine {
     }
 
     /**
-     * FIXME Once buffers are ready their data needs to be materialized on this
-     * node and the chunks queued for processing.
-     * 
-     * @todo What is the cost of passing the proxy around like this? Should it
-     *       be discovered instead from a registrar?
+     * Overridden to strengthen the return type.
+     * <p>
+     * {@inheritDoc}
      */
     @Override
-    public void bufferReady(IQueryClient clientProxy,
-            InetSocketAddress serviceAddr, long queryId, int bopId) {
+    protected FederatedRunningQuery getRunningQuery(final long queryId) {
+
+        return (FederatedRunningQuery) super.getRunningQuery(queryId);
+
+    }
+    
+    public void declareQuery(final IQueryDecl queryDecl) {
+
+        final long queryId = queryDecl.getQueryId();
+        
+        putRunningQuery(queryId, newRunningQuery(this, queryId,
+                false/* controller */, queryDecl.getQueryController(),
+                queryDecl.getQuery()));
+
+    }
+    
+    @Override
+    public void bufferReady(final IChunkMessage msg) {
+
+        if (msg == null)
+            throw new IllegalArgumentException();
+        
+        assertRunning();
+        
+        final long queryId = msg.getQueryId();
+        
+        final FederatedRunningQuery q = getRunningQuery(queryId);
+        
+        if(q == null)
+            throw new RuntimeException(ERR_QUERY_NOT_RUNNING + queryId);
+    
+        if(msg.isMaterialized()) {
+
+            q.acceptChunk(msg);
+            
+        } else {
+
+            /*
+             * FIXME SCALEOUT: We need to model the chunks available before they
+             * are materialized locally such that (a) they can be materialized
+             * on demand (flow control); and (b) we can run the operator when
+             * there are sufficient chunks available without taking on too much
+             * data. [For the sort term, they can be dropped onto a queue and
+             * materialized in order of arrival.]
+             */
+            throw new UnsupportedOperationException("FIXME");
+            
+        }
         
     }
 
@@ -176,14 +219,11 @@ public class FederatedQueryEngine extends QueryEngine {
     @Override
     protected FederatedRunningQuery newRunningQuery(
             final QueryEngine queryEngine, final long queryId,
-            final long readTimestamp, final long writeTimestamp,
-            final long begin, final long timeout, final boolean controller,
-            final IQueryClient clientProxy, final BindingSetPipelineOp query) {
+            final boolean controller, final IQueryClient clientProxy,
+            final BindingSetPipelineOp query) {
 
-        return new FederatedRunningQuery(this, queryId, readTimestamp,
-                writeTimestamp, System.currentTimeMillis()/* begin */, timeout,
-                true/* controller */, this/* clientProxy */, query,
-                newQueryBuffer(query));
+        return new FederatedRunningQuery(this, queryId, true/* controller */,
+                this/* clientProxy */, query, newQueryBuffer(query));
 
     }
 

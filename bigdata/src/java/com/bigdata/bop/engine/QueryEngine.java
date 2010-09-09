@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.engine;
 
-import java.net.InetSocketAddress;
 import java.rmi.RemoteException;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -50,8 +49,6 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.IMutableRelation;
@@ -328,6 +325,11 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
             .getLogger(QueryEngine.class);
 
     /**
+     * Error message used if a query is not running.
+     */
+    protected static final transient String ERR_QUERY_NOT_RUNNING = "Query is not running:";
+
+    /**
      * Access to the indices.
      * <p>
      * Note: You MUST NOT use unisolated indices without obtaining the necessary
@@ -477,6 +479,19 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     private volatile boolean shutdown = false;
 
     /**
+     * Return if the query engine is running.
+     * 
+     * @throws IllegalStateException
+     *             if the query engine is shutting down.
+     */
+    protected void assertRunning() {
+       
+        if (shutdown)
+            throw new IllegalStateException("Shutting down.");
+
+    }
+
+    /**
      * Runnable submits chunks available for evaluation against running queries.
      * 
      * @todo Handle priority for selective queries based on the time remaining
@@ -519,7 +534,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
                     final long queryId = q.getQueryId();
                     if (q.isCancelled())
                         continue;
-                    final BindingSetChunk chunk = q.chunksIn.poll();
+                    final IChunkMessage chunk = q.chunksIn.poll();
                     if (chunk == null) {
                         // not expected, but can't do anything without a chunk.
                         if (log.isDebugEnabled())
@@ -528,7 +543,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
                     }
                     if (log.isTraceEnabled())
                         log.trace("Accepted chunk: queryId=" + queryId
-                                + ", bopId=" + chunk.bopId);
+                                + ", bopId=" + chunk.getBOpId());
                     try {
                         // create task.
                         final FutureTask<?> ft = q.newChunkTask(chunk);
@@ -558,19 +573,27 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * 
      * @param chunk
      *            A chunk of intermediate results.
+     * 
+     * @throws IllegalArgumentException
+     *             if the chunk is <code>null</code>.
+     * @throws IllegalStateException
+     *             if the chunk is not materialized.
      */
-    void add(final BindingSetChunk chunk) {
+    void acceptChunk(final IChunkMessage chunk) {
         
         if (chunk == null)
             throw new IllegalArgumentException();
 
-        final RunningQuery q = runningQueries.get(chunk.queryId);
+        if (!chunk.isMaterialized())
+            throw new IllegalStateException();
+
+        final RunningQuery q = runningQueries.get(chunk.getQueryId());
         
         if(q == null)
             throw new IllegalStateException();
         
         // add chunk to the query's input queue on this node.
-        q.add(chunk);
+        q.acceptChunk(chunk);
         
         // add query to the engine's task queue.
         priorityQueue.add(q);
@@ -657,33 +680,35 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * IQueryPeer
      */
     
-    public void bufferReady(IQueryClient clientProxy,
-            InetSocketAddress serviceAddr, long queryId, int bopId) {
-        // NOP
+    public void declareQuery(final IQueryDecl queryDecl) {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+    
+    public void bufferReady(IChunkMessage msg) {
+
+        throw new UnsupportedOperationException();
+
     }
     
     /*
      * IQueryClient
      */
 
-    /**
-     * @todo Define the behavior for these methods if the queryId is not found
-     *       whether because the caller has the wrong value or because the query
-     *       has terminated.
-     */
-    public BOp getQuery(final long queryId) throws RemoteException {
-        
-        final RunningQuery q = runningQueries.get(queryId);
-        
-        if (q != null) {
-            
-            return q.getQuery();
-        
-        }
-        
-        return null;
-        
-    }
+//    public BOp getQuery(final long queryId) throws RemoteException {
+//        
+//        final RunningQuery q = runningQueries.get(queryId);
+//        
+//        if (q != null) {
+//            
+//            return q.getQuery();
+//        
+//        }
+//        
+//        return null;
+//        
+//    }
 
     public void startOp(final StartOpMessage msg) throws RemoteException {
         
@@ -715,85 +740,110 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * 
      * @param queryId
      *            The unique identifier for the query.
-     * @param readTimestamp
-     *            The timestamp or transaction against which the query will run.
-     * @param writeTimestamp
-     *            The timestamp or transaction against which the query will
-     *            write.
      * @param query
      *            The query to evaluate.
      * 
      * @return An iterator visiting {@link IBindingSet}s which result from
      *         evaluating the query.
      * 
-     * @throws IllegalArgumentException
-     *             if the <i>readTimestamp</i> is {@link ITx#UNISOLATED}
-     *             (queries may not read on the unisolated indices).
-     * @throws IllegalArgumentException
-     *             if the <i>writeTimestamp</i> is neither
-     *             {@link ITx#UNISOLATED} nor a read-write transaction
-     *             identifier.
      * @throws IllegalStateException
      *             if the {@link QueryEngine} has been {@link #shutdown()}.
      * @throws Exception
-     * 
-     * @todo Consider elevating the read/write timestamps into the query plan as
-     *       annotations. Closure would then rewrite the query plan for each
-     *       pass, replacing the readTimestamp with the new read-behind
-     *       timestamp. [This is related to how we will handle sequences of
-     *       steps, parallel steps, and closure of steps.]
      */
-    public RunningQuery eval(final long queryId, final long readTimestamp,
-            final long writeTimestamp, final BindingSetPipelineOp query)
-            throws Exception {
+    public RunningQuery eval(final long queryId,
+            final BindingSetPipelineOp query) throws Exception {
 
         if (query == null)
             throw new IllegalArgumentException();
-        
-        if (readTimestamp == ITx.UNISOLATED)
-            throw new IllegalArgumentException();
-        
-        if (TimestampUtility.isReadOnly(writeTimestamp))
-            throw new IllegalArgumentException();
+
+        final RunningQuery runningQuery = newRunningQuery(this, queryId,
+//                System.currentTimeMillis()/* begin */,
+                true/* controller */, this/* clientProxy */, query);
+
+        assertRunning();
 
         final long timeout = query.getProperty(BOp.Annotations.TIMEOUT,
                 BOp.Annotations.DEFAULT_TIMEOUT);
 
-        final RunningQuery runningQuery = newRunningQuery(this, queryId,
-                readTimestamp, writeTimestamp,
-                System.currentTimeMillis()/* begin */, timeout,
-                true/* controller */, this/* clientProxy */, query);
+        if (timeout < 0)
+            throw new IllegalArgumentException(BOp.Annotations.TIMEOUT);
 
-        if (shutdown) {
+        if (timeout != Long.MAX_VALUE) {
 
-            throw new IllegalStateException("Shutting down.");
+            // Compute the deadline (may overflow if timeout is very large).
+            final long deadline = System.currentTimeMillis() + timeout;
+
+            if (deadline > 0) {
+                /*
+                 * Impose a deadline on the query.
+                 */
+                runningQuery.setDeadline(deadline);
+
+            }
 
         }
 
-        runningQueries.put(queryId, runningQuery);
+        putRunningQuery(queryId, runningQuery);
 
         return runningQuery;
 
     }
 
     /**
+     * Return the {@link RunningQuery} associated with that query identifier.
+     * 
+     * @param queryId
+     *            The query identifier.
+     *            
+     * @return The {@link RunningQuery} -or- <code>null</code> if there is no
+     *         query associated with that query identifier.
+     */
+    protected RunningQuery getRunningQuery(final long queryId) {
+
+        return runningQueries.get(queryId);
+
+    }
+    
+    /**
+     * Places the {@link RunningQuery} object into the internal map.
+     * 
+     * @param queryId
+     *            The query identifier.
+     * @param runningQuery
+     *            The {@link RunningQuery}.
+     */
+    protected void putRunningQuery(final long queryId,
+            final RunningQuery runningQuery) {
+
+        if (runningQuery == null)
+            throw new IllegalArgumentException();
+        
+        runningQueries.put(queryId, runningQuery);
+
+    }
+    
+    /**
      * Factory for {@link RunningQuery}s.
      */
     protected RunningQuery newRunningQuery(final QueryEngine queryEngine,
-            final long queryId, final long readTimestamp,
-            final long writeTimestamp, final long begin, final long timeout,
-            final boolean controller, final IQueryClient clientProxy,
-            final BindingSetPipelineOp query) {
+            final long queryId, final boolean controller,
+            final IQueryClient clientProxy, final BindingSetPipelineOp query) {
 
-        return new RunningQuery(this, queryId, readTimestamp, writeTimestamp,
-                System.currentTimeMillis()/* begin */, timeout,
-                true/* controller */, this/* clientProxy */, query,
-                newQueryBuffer(query));
+        return new RunningQuery(this, queryId, true/* controller */,
+                this/* clientProxy */, query, newQueryBuffer(query));
 
     }
 
     /**
      * Return a buffer onto which the solutions will be written.
+     * 
+     * @todo This method is probably in the wrong place. We should use whatever
+     *       is associated with the top-level {@link BOp} in the query and then
+     *       rely on the NIO mechanisms to move the data around as necessary.
+     * 
+     * @todo Could return a data structure which encapsulates the query results
+     *       and could allow multiple results from a query, e.g., one per step
+     *       in a program.
      */
     protected IBlockingBuffer<IBindingSet[]> newQueryBuffer(
             final BindingSetPipelineOp query) {

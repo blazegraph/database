@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.engine;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.service.IBigdataFederation;
@@ -58,12 +59,18 @@ public interface IRunningQuery {
     /**
      * The timestamp or transaction identifier against which the query is
      * reading.
+     * 
+     * @todo may be moved into the individual operator. See
+     *       {@link BOp.Annotations#READ_TIMESTAMP}
      */
     long getReadTimestamp();
 
     /**
      * The timestamp or transaction identifier against which the query is
      * writing.
+     * 
+     * @todo may be moved into the individual operator. See
+     *       {@link BOp.Annotations#WRITE_TIMESTAMP}
      */
     long getWriteTimestamp();
 

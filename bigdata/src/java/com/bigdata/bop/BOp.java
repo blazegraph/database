@@ -147,13 +147,6 @@ public interface BOp extends Cloneable, Serializable {
      */
     public interface Annotations {
 
-//        /**
-//         * A cross reference to the query identifier. This is required on
-//         * operators which associate distributed state with a query. [We can
-//         * probably get this from the evaluation context.]
-//         */
-//        String QUERY_REF = "queryRef";
-
         /**
          * The unique identifier within a query for a specific {@link BOp}. The
          * {@link #QUERY_ID} and the {@link #BOP_ID} together provide a unique
@@ -161,11 +154,19 @@ public interface BOp extends Cloneable, Serializable {
          * query.
          */
         String BOP_ID = "bopId";
-        
+
         /**
          * The timeout for the operator evaluation (milliseconds).
          * 
          * @see #DEFAULT_TIMEOUT
+         * 
+         * @todo Probably support both deadlines and timeouts. A deadline
+         *       expresses when the query must be done while a timeout expresses
+         *       how long it may run. A deadline may be imposed as soon as the
+         *       query plan is formulated and could even be communicated from a
+         *       remote client (e.g., as an httpd header). A timeout will always
+         *       be interpreted with respect to the time when the query began to
+         *       execute.
          */
         String TIMEOUT = "timeout";
         
@@ -175,12 +176,30 @@ public interface BOp extends Cloneable, Serializable {
         long DEFAULT_TIMEOUT = Long.MAX_VALUE;
 
         /**
+         * The timestamp (or transaction identifier) associated with a read from
+         * the database.
+         * 
+         * @todo Combine the read and write timestamps as a single
+         *       <code>TX</code> value and require this on any operator which
+         *       reads or writes on the database.
+         */
+        String READ_TIMESTAMP = BOp.class.getName() + ".readTimestamp";
+
+        /**
+         * The timestamp (or transaction identifier) associated with a write on
+         * the database.
+         */
+        String WRITE_TIMESTAMP = BOp.class.getName() + ".writeTimestamp";
+
+        /**
          * For hash partitioned operators, this is the set of the member nodes
          * for the operator.
          * <p>
          * This annotation is required for such operators since the set of known
          * nodes of a given type (such as all data services) can otherwise
          * change at runtime.
+         * 
+         * @todo Move onto an interface parallel to {@link IShardwisePipelineOp}
          */
         String MEMBER_SERVICES = "memberServices";
         

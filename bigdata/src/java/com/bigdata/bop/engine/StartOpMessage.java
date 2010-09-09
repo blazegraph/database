@@ -11,8 +11,8 @@ import java.util.UUID;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo both {@link StartOpMessage} and {@link HaltOpMessage} should be
- *       versioned.
+ * @todo both {@link StartOpMessage} and {@link HaltOpMessage} should be either
+ *       versioned data structures or pure interfaces.
  */
 public class StartOpMessage implements Serializable {
 
@@ -47,4 +47,5 @@ public class StartOpMessage implements Serializable {
         this.serviceId = serviceId;
         this.nchunks = nchunks;
     }
+
 }
