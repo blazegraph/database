@@ -1,6 +1,5 @@
 package com.bigdata.bop.engine;
 
-import java.net.InetSocketAddress;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.util.UUID;
@@ -23,26 +22,30 @@ public interface IQueryPeer extends Remote {
     UUID getServiceUUID() throws RemoteException;
 
     /**
+     * Declare a query to a peer. This message is sent to the peer before any
+     * other message for that query and declares the query and the query
+     * controller with which the peer must communicate during query evaluation.
+     * 
+     * @param queryDecl
+     *            The query declaration.
+     * 
+     * @throws UnsupportedOperationException
+     *             unless running in scale-out.
+     */
+    void declareQuery(IQueryDecl queryDecl);
+
+    /**
      * Notify a service that a buffer having data for some {@link BOp} in some
      * running query is available. The receiver may request the data when they
      * are ready. If the query is cancelled, then the sender will drop the
      * buffer.
      * 
-     * @param clientProxy
-     *            proxy used to communicate with the client running the query.
-     * @param serviceAddr
-     *            address which may be used to demand the data.
-     * @param queryId
-     *            the unique query identifier.
-     * @param bopId
-     *            the identifier for the target {@link BOp}.
+     * @param msg
+     *            The message.
      * 
-     * @return <code>true</code> unless the receiver knows that the query has
-     *         already been cancelled.
+     * @throws UnsupportedOperationException
+     *             unless running in scale-out.
      */
-//    * @param nbytes
-//    *            The #of bytes of data which are available for that operator.
-    void bufferReady(IQueryClient clientProxy, InetSocketAddress serviceAddr,
-            long queryId, int bopId/*, int nbytes*/) throws RemoteException;
+    void bufferReady(IChunkMessage msg) throws RemoteException;
 
 }

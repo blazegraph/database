@@ -22,52 +22,61 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Sep 1, 2010
+ * Created on Sep 9, 2010
  */
 
 package com.bigdata.bop.engine;
 
+import java.io.Serializable;
+
+import com.bigdata.bop.BindingSetPipelineOp;
+
 /**
- * An immutable class capturing the evaluation context of an operator against a
- * shard.
+ * Default implementation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BSBundle {
-
-    public final int bopId;
-
-    public final int shardId;
-
-    public BSBundle(final int bopId, final int shardId) {
-
-        this.bopId = bopId;
-
-        this.shardId = shardId;
-
-    }
+public class QueryDecl implements IQueryDecl, Serializable {
 
     /**
-     * {@inheritDoc}
+     * 
      */
-    public int hashCode() {
+    private static final long serialVersionUID = 1L;
 
-        return (bopId * 31) + shardId;
+    private final long queryId;
+
+    private final IQueryClient clientProxy;
+
+    private final BindingSetPipelineOp query;
+
+    public QueryDecl(final IQueryClient clientProxy, final long queryId,
+            final BindingSetPipelineOp query) {
+
+        if (clientProxy == null)
+            throw new IllegalArgumentException();
+
+        if (query == null)
+            throw new IllegalArgumentException();
+
+        this.clientProxy = clientProxy;
+
+        this.queryId = queryId;
+
+        this.query = query;
 
     }
 
-    public boolean equals(final Object o) {
-        
-        if (this == o)
-            return true;
-        
-        if (!(o instanceof BSBundle))
-            return false;
-        
-        return bopId == ((BSBundle) o).bopId
-                && shardId == ((BSBundle) o).shardId;
-        
+    public BindingSetPipelineOp getQuery() {
+        return query;
+    }
+
+    public IQueryClient getQueryController() {
+        return clientProxy;
+    }
+
+    public long getQueryId() {
+        return queryId;
     }
 
 }

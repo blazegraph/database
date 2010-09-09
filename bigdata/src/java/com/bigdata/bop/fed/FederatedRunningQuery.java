@@ -31,6 +31,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.rmi.RemoteException;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +44,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IShardwisePipelineOp;
 import com.bigdata.bop.engine.BindingSetChunk;
+import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.bop.engine.QueryEngine;
@@ -70,11 +72,6 @@ import com.bigdata.striterator.IKeyOrder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: FederatedRunningQuery.java 3511 2010-09-06 20:45:37Z
  *          thompsonbry $
- * 
- * @todo SCALEOUT: We need to model the chunks available before they are
- *       materialized locally such that (a) they can be materialized on demand
- *       (flow control); and (b) we can run the operator when there are
- *       sufficient chunks available without taking on too much data.
  * 
  * @todo SCALEOUT: Life cycle management of the operators and the query implies
  *       both a per-query bop:NodeList map on the query coordinator identifying
@@ -137,18 +134,92 @@ public class FederatedRunningQuery extends RunningQuery {
     private final ConcurrentHashMap<UUID, Object> resourceMap = new ConcurrentHashMap<UUID, Object>();
 
     /**
-     * @todo Maintain multiple allocation contexts. Some can be query wide.
-     *       Others might be specific to a serviceId and/or sinkId.
+     * A map of all allocation contexts associated with this query.
+     * 
+     * FIXME Separate out the life cycle of the allocation from the allocation
+     * context. This is necessary so we can send chunks to multiple receivers or
+     * retry transmission if a receiver dies.
+     * 
+     * FIXME When a chunk is transferred to the receiver, its allocation(s) must
+     * be released on the sender. That should be done based on the life cycle of
+     * the allocation. This implies that we should maintain a list for each life
+     * cycle so they can be cleared without scanning the set of all allocations.
+     * 
+     * FIXME When the query is done, those allocations MUST be released
+     * (excepting only allocations associated with the solutions which need to
+     * be released as those data are consumed).
+     * 
+     * <pre>
+     * Query terminates: releaseAllocationContexts(queryId)
+     * BOp terminates: releaseAllocationContexts(queryId,bopId)
+     * BOp+shard terminates: releaseAllocationContexts(queryId,bopId,shardId)
+     * receiver takes data: releaseAllocations(IChunkMessage)
+     * </pre>
+     * 
+     * The allocation contexts which use a bopId MUST use the bopId of the
+     * operator which will consume the chunk. That way the producer can release
+     * outputs buffered for that consumer as they are transferred to the
+     * consumer. [If we leave the allocations in place until the bop evaluates
+     * the chunk then we could retry if the node running the bop fails.]
+     * <p>
+     * Allocations which are tied to the life cycle of a {@link BOp}, rather the
+     * the chunks processed for that {@link BOp}, should use (queryId,bopId).
+     * For example, a DHT imposing distinct on a default graph access path has a
+     * life cycle linked to the join reading on that access path (not the
+     * predicate since the predicate is not part of the pipeline and is
+     * evaluated by the join rather than the query engine).
+     * <p>
+     * Allocations tied to the life cycle of a query will not be released until
+     * the query terminates. For example, a temporary graph containing the
+     * ontology for a parallel distributed closure operation.
      */
-    private final ConcurrentHashMap<Object/* key */, IAllocationContext> allocationContexts = new ConcurrentHashMap<Object, IAllocationContext>();
-    
-    public FederatedRunningQuery(FederatedQueryEngine queryEngine,
-            long queryId, long readTimestamp, long writeTimestamp, long begin,
-            long timeout, boolean controller, IQueryClient clientProxy,
-            BOp query, IBlockingBuffer<IBindingSet[]> queryBuffer) {
+    private final ConcurrentHashMap<AllocationContextKey, IAllocationContext> allocationContexts = new ConcurrentHashMap<AllocationContextKey, IAllocationContext>();
 
-        super(queryEngine, queryId, readTimestamp, writeTimestamp, begin,
-                timeout, controller, clientProxy, query, queryBuffer);
+    /**
+     * Extended to release all allocations associated with the specified
+     * operator.
+     * <p>
+     * {@inheritDoc}
+     */
+    @Override
+    protected void lifeCycleTearDownOperator(final int bopId) {
+        final Iterator<Map.Entry<AllocationContextKey, IAllocationContext>> itr = allocationContexts
+                .entrySet().iterator();
+        while (itr.hasNext()) {
+            final Map.Entry<AllocationContextKey, IAllocationContext> e = itr
+                    .next();
+            if (e.getKey().hasOperatorScope(bopId)) {
+                e.getValue().release();
+            }
+        }
+        super.lifeCycleTearDownOperator(bopId);
+    }
+
+    /**
+     * Extended to release all {@link IAllocationContext}s associated with the
+     * query when it terminates.
+     * <p>
+     * {@inheritDoc}
+     * 
+     * @todo We need to have distinct events for the query evaluation life cycle
+     *       and the query results life cycle.
+     */
+    @Override
+    protected void lifeCycleTearDownQuery() {
+        for(IAllocationContext ctx : allocationContexts.values()) {
+            ctx.release();
+        }
+        allocationContexts.clear();
+        super.lifeCycleTearDownQuery();
+    }
+    
+    public FederatedRunningQuery(final FederatedQueryEngine queryEngine,
+            final long queryId, /*final long begin, */final boolean controller,
+            final IQueryClient clientProxy, final BOp query,
+            final IBlockingBuffer<IBindingSet[]> queryBuffer) {
+
+        super(queryEngine, queryId, /*begin, */controller, clientProxy, query,
+                queryBuffer);
 
         /*
          * Note: getServiceUUID() should be a smart proxy method and thus not
@@ -171,119 +242,6 @@ public class FederatedRunningQuery extends RunningQuery {
     }
 
     /**
-     * The allocation context key groups together allocations onto the same
-     * direct {@link ByteBuffer}s. There are different implementations depending
-     * on how it makes sense to group data data for a given query.
-     */
-    static abstract private class AllocationContextKey {
-
-        /**
-         * Must be overridden. The queryId must be a part of each hashCode() in
-         * order to ensure that the hash codes are well distributed across
-         * different queries on the same node.
-         */
-        @Override
-        abstract public int hashCode();
-
-        /**
-         * Must be overridden.
-         */
-        @Override
-        abstract public boolean equals(Object o);
-
-    }
-
-    /**
-     * An allocation context which is shared by all operators running in the
-     * same query.
-     */
-    static private class QueryContext extends AllocationContextKey {
-        private final Long queryId;
-
-        QueryContext(final Long queryId) {
-            this.queryId = Long.valueOf(queryId);
-        }
-
-        public int hashCode() {
-            return queryId.hashCode();
-        }
-
-        public boolean equals(final Object o) {
-            if (this == o)
-                return true;
-            if (!(o instanceof QueryContext))
-                return false;
-            if (!queryId.equals(((QueryContext) o).queryId))
-                return false;
-            return true;
-        }
-    }
-
-    /**
-     * An allocation context which is shared by all operators running in the
-     * same query which target the same service.
-     */
-    static private class ServiceContext extends AllocationContextKey {
-        private final Long queryId;
-
-        private final UUID serviceUUID;
-
-        ServiceContext(final Long queryId, final UUID serviceUUID) {
-            this.queryId = queryId;
-            this.serviceUUID = serviceUUID;
-        }
-
-        public int hashCode() {
-            return queryId.hashCode() * 31 + serviceUUID.hashCode();
-        }
-
-        public boolean equals(final Object o) {
-            if (this == o)
-                return true;
-            if (!(o instanceof ServiceContext))
-                return false;
-            if (!queryId.equals(((ServiceContext) o).queryId))
-                return false;
-            if (!serviceUUID.equals(((ServiceContext) o).serviceUUID))
-                return false;
-            return true;
-        }
-    }
-
-    /**
-     * An allocation context which is shared by all operators running in the
-     * same query which target the same shard (the same shard implies the same
-     * service, at least until we have HA with shard affinity).
-     */
-    static private class ShardContext extends AllocationContextKey {
-
-        private final Long queryId;
-
-        private final int partitionId;
-
-        ShardContext(final Long queryId, final int partitionId) {
-            this.queryId = queryId;
-            this.partitionId = partitionId;
-        }
-
-        public int hashCode() {
-            return queryId.hashCode() * 31 + partitionId;
-        }
-
-        public boolean equals(final Object o) {
-            if (this == o)
-                return true;
-            if (!(o instanceof ShardContext))
-                return false;
-            if (!queryId.equals(((ShardContext) o).queryId))
-                return false;
-            if (partitionId != partitionId)
-                return false;
-            return true;
-        }
-    }
-
-    /**
      * Return the {@link IAllocationContext} for the given key.
      * 
      * @param key
@@ -294,8 +252,13 @@ public class FederatedRunningQuery extends RunningQuery {
     private IAllocationContext getAllocationContext(
             final AllocationContextKey key) {
 
-        return getQueryEngine().getResourceService().getAllocator()
-                .getAllocationContext(key);
+        final IAllocationContext ctx = getQueryEngine().getResourceService()
+                .getAllocator().getAllocationContext(key);
+
+        // note the allocation contexts associated with this running query.
+        allocationContexts.putIfAbsent(key, ctx);
+
+        return ctx;
 
     }
 
@@ -314,7 +277,7 @@ public class FederatedRunningQuery extends RunningQuery {
      * This pattern allows the receiver to impose flow control on the producer.
      */
     @Override
-    protected <E> int add(final int sinkId,
+    protected <E> int handleOutputChunk(final int sinkId,
             final IBlockingBuffer<IBindingSet[]> sink) {
 
         if (sink == null)
@@ -327,7 +290,7 @@ public class FederatedRunningQuery extends RunningQuery {
 
         switch (bop.getEvaluationContext()) {
         case ANY: {
-            return super.add(sinkId, sink);
+            return super.handleOutputChunk(sinkId, sink);
         }
         case HASHED: {
             /*
@@ -343,13 +306,6 @@ public class FederatedRunningQuery extends RunningQuery {
              * The sink must read or write on a shard so we map the binding sets
              * across the access path for the sink.
              * 
-             * @todo For a pipeline join, the predicate is the right hand
-             * operator of the sink. This might be true for INSERT and DELETE
-             * operators as well. [It is not, but make it so and document this
-             * pattern or have a common interface method which returns the
-             * IPredicate regardless of whether it is an operand or an
-             * annotation.]
-             * 
              * Note: IKeyOrder tells us which index will be used and should be
              * set on the predicate by the join optimizer.
              * 
@@ -361,6 +317,7 @@ public class FederatedRunningQuery extends RunningQuery {
              * data contained in the sink (in fact, we should just process the
              * sink data in place).
              */
+            int nchunksout = 0; // FIXME count the output chunks
             @SuppressWarnings("unchecked")
             final IPredicate<E> pred = ((IShardwisePipelineOp) bop).getPredicate();
             final IKeyOrder<E> keyOrder = pred.getKeyOrder();
@@ -423,6 +380,8 @@ public class FederatedRunningQuery extends RunningQuery {
                 throw new UnsupportedOperationException();
             }
             
+            return nchunksout;
+            
         }
         case CONTROLLER: {
 
@@ -438,11 +397,17 @@ public class FederatedRunningQuery extends RunningQuery {
             sendOutputChunkReadyMessage(newOutputChunk(queryControllerUUID,
                     sinkId, allocationContext, sink));
 
+            /*
+             * Chunks send to the query controller do not keep the query
+             * running.
+             */
+            return 0;
+
         }
         default:
             throw new AssertionError(bop.getEvaluationContext());
         }
-
+        
     }
 
     /**
@@ -546,19 +511,25 @@ public class FederatedRunningQuery extends RunningQuery {
     }
 
     /**
+     * Overridden to make this visible to the {@link FederatedQueryEngine}.
+     * <p>
+     * {@inheritDoc}
+     */
+    @Override
+    protected void acceptChunk(final IChunkMessage msg) {
+
+        super.acceptChunk(msg);
+        
+    }
+    
+    /**
      * Notify a remote {@link IQueryPeer} that data is available for it.
      * 
      * @todo If the target for the {@link OutputChunk} is this node then just
      *       drop it onto the {@link QueryEngine}.
      * 
-     * @todo Report the #of bytes available with this message. However, first
-     *       figure out if that if the #of bytes in this {@link OutputChunk} or
-     *       across all {@link OutputChunk}s available for the target service
-     *       and sink.
-     * 
-     * @todo Consider a fast path with inline RMI based transfer for small sets
-     *       of data. We might just serialize to a byte[] and send that directly
-     *       using a different message to notify the {@link IQueryPeer}.
+     *       FIXME Fast path with inline RMI based transfer for small sets of
+     *       data using a 'think' {@link IChunkMessage}.
      */
     protected void sendOutputChunkReadyMessage(final OutputChunk outputChunk) {
        
@@ -572,9 +543,11 @@ public class FederatedRunningQuery extends RunningQuery {
             final InetSocketAddress serviceAddr = getQueryEngine()
                     .getResourceService().getAddr();
 
-            peerProxy.bufferReady(getQueryController(), serviceAddr,
-                    getQueryId(), outputChunk.sinkId);
-
+            // FIXME invoke peerProxy.bufferReady(msg) here!
+//            peerProxy.bufferReady(getQueryController(), serviceAddr,
+//                    getQueryId(), outputChunk.sinkId);
+            peerProxy.bufferReady(null/*FIXME msg.*/);
+            
         } catch (RemoteException e) {
 
             throw new RuntimeException(e);

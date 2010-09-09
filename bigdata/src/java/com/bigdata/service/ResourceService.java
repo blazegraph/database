@@ -38,7 +38,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -71,7 +70,6 @@ import com.bigdata.io.ByteBufferOutputStream;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ShutdownHelper;
-import com.bigdata.util.config.NicUtil;
 
 /**
  * A service which permits resources (managed files or buffers) identified by a
@@ -385,7 +383,10 @@ public abstract class ResourceService {
 
     /**
      * Class handles the accept of new connections. Only a single instance of
-     * this task will be executed over the life of the service.
+     * this task will be executed over the life of the service. Each connection
+     * runs a {@link RequestTask}. The connection requests a resource using its
+     * {@link UUID}. If the resource is available, etc., then it is shipped back
+     * over the socket.
      */
     private class AcceptTask implements Runnable {
 
@@ -616,11 +617,17 @@ public abstract class ResourceService {
         }
 
     }
-    
+
     /**
      * Handles a request and is run (by the caller) on a worker thread pool.
      * <p>
-     * The request consists of the resource {@link UUID} to be read.
+     * The request consists of the following fields:
+     * <dl>
+     * <dt>resource type</dt>
+     * <dd>The {@link ResourceTypeEnum}, represented as a single byte.</dd>
+     * <dt>resource identifier</dt>
+     * <dd>The {@link UUID} of the resource to be read.</dd>
+     * </dl>
      * <p>
      * The response consists for the following fields:
      * <dl>

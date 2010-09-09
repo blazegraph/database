@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.bop.engine;
 
-import java.nio.ByteBuffer;
 import java.rmi.RemoteException;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -43,7 +42,6 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
@@ -54,9 +52,9 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NoSuchBOpException;
-import com.bigdata.bop.ap.Predicate;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.service.IBigdataFederation;
@@ -103,10 +101,15 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      */
     final private long writeTimestamp;
 
+//    /**
+//     * The timestamp when the query was accepted by this node (ms).
+//     */
+//    final private long begin;
     /**
-     * The timestamp when the query was accepted by this node (ms).
+     * The query deadline. The value is the system clock time in milliseconds
+     * when the query is due and {@link Long#MAX_VALUE} if there is no deadline.
      */
-    final private long begin;
+    final private AtomicLong deadline = new AtomicLong(Long.MAX_VALUE);
 
     /**
      * How long the query is allowed to run (elapsed milliseconds) -or-
@@ -129,15 +132,16 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      */
     final private IQueryClient clientProxy;
 
-    /** The query iff materialized on this node. */
-    final private AtomicReference<BOp> queryRef;
+//    /** The query iff materialized on this node. */
+//    final private AtomicReference<BOp> queryRef;
+    /** The query. */
+    final private BOp query;
 
     /**
      * The buffer used for the overall output of the query pipeline.
      * 
-     * @todo How does the pipeline get attached to this buffer? Via a special
-     *       operator? Or do we just target the coordinating {@link QueryEngine}
-     *       as the sink of the last operator so we can use NIO transfers?
+     * FIXME SCALEOUT: This should only exist on the query controller. Other
+     * nodes will send {@link IChunkMessage}s to the query controller.
      */
     final private IBlockingBuffer<IBindingSet[]> queryBuffer;
 
@@ -208,25 +212,48 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
     private final Set<Integer/*bopId*/> startedSet = new LinkedHashSet<Integer>();
     
     /**
-     * The chunks available for immediate processing.
+     * The chunks available for immediate processing (they must have been
+     * materialized).
      * <p>
      * Note: This is package private so it will be visible to the
      * {@link QueryEngine}.
-     * 
-     * @todo It is likely that we can convert to the use of
-     *       {@link BlockingQueue} instead of {@link BlockingBuffer} in the
-     *       operators and then handle the logic for combining chunks inside of
-     *       the {@link QueryEngine}. E.g., by scanning this list for chunks for
-     *       the same bopId and combining them logically into a single chunk.
-     *       <p>
-     *       For scale-out, chunk combination will naturally occur when the node
-     *       on which the operator will run requests the {@link ByteBuffer}s
-     *       from the source nodes. Those will get wrapped up logically into a
-     *       source for processing. For selective operators, those chunks can be
-     *       combined before we execute the operator. For unselective operators,
-     *       we are going to run over all the data anyway.
      */
-    final /*private*/ BlockingQueue<BindingSetChunk> chunksIn = new LinkedBlockingDeque<BindingSetChunk>();
+    final/* private */BlockingQueue<IChunkMessage> chunksIn = new LinkedBlockingDeque<IChunkMessage>();
+
+    /**
+     * Set the query deadline. The query will be cancelled when the deadline is
+     * passed. If the deadline is passed, the query is immediately cancelled.
+     * 
+     * @param deadline
+     *            The deadline.
+     * @throws IllegalArgumentException
+     *             if the deadline is non-positive.
+     * @throws IllegalStateException
+     *             if the deadline was already set.
+     * @throws UnsupportedOperationException
+     *             unless node is the query controller.
+     */
+    public void setDeadline(final long deadline) {
+
+        if(!controller)
+            throw new UnsupportedOperationException();
+        
+        if (deadline <= 0)
+            throw new IllegalArgumentException();
+
+        // set the deadline.
+        if (!this.deadline
+                .compareAndSet(Long.MAX_VALUE/* expect */, deadline/* update */)) {
+            // the deadline is already set.
+            throw new IllegalStateException();
+        }
+
+        if (deadline < System.currentTimeMillis()) {
+            // deadline has already expired.
+            cancel(true/* mayInterruptIfRunning */);
+        }
+
+    }
 
     /**
      * The class executing the query on this node.
@@ -259,40 +286,44 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
         
     }
 
-    /**
-     * Return the operator tree for this query. If query processing is
-     * distributed and the query has not been materialized on this node, then it
-     * is materialized now.
-     * 
-     * @return The query.
-     */
     public BOp getQuery() {
-
-        if (queryRef.get() == null) {
-
-            synchronized (queryRef) {
-
-                if (queryRef.get() == null) {
-
-                    try {
-
-                        queryRef.set(clientProxy.getQuery(queryId));
-
-                    } catch (RemoteException e) {
-
-                        throw new RuntimeException(e);
-
-                    }
-
-                }
-
-            }
-
-        }
-        
-        return queryRef.get();
-
-   }
+        return query;
+    }
+    
+//    /**
+//     * Return the operator tree for this query. If query processing is
+//     * distributed and the query has not been materialized on this node, then it
+//     * is materialized now.
+//     * 
+//     * @return The query.
+//     */
+//    public BOp getQuery() {
+//
+//        if (queryRef.get() == null) {
+//
+//            synchronized (queryRef) {
+//
+//                if (queryRef.get() == null) {
+//
+//                    try {
+//
+//                        queryRef.set(clientProxy.getQuery(queryId));
+//
+//                    } catch (RemoteException e) {
+//
+//                        throw new RuntimeException(e);
+//
+//                    }
+//
+//                }
+//
+//            }
+//
+//        }
+//        
+//        return queryRef.get();
+//
+//   }
 
     /**
      * Return <code>true</code> iff this is the query controller.
@@ -305,11 +336,8 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
 
     /**
      * Return the current statistics for the query and <code>null</code> unless
-     * this is the query controller.
-     * 
-     * @todo When the query is done, there will be one entry in this map for
-     *       each operator in the pipeline. Non-pipeline operators such as
-     *       {@link Predicate}s do not currently make it into this map.
+     * this is the query controller. For {@link BindingSetPipelineOp} operator
+     * which is evaluated there will be a single entry in this map.
      */
     public Map<Integer/*bopId*/,BOpStats> getStats() {
         
@@ -323,35 +351,100 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      * @param begin
      * @param clientProxy
      * @param query
-     *            The query (optional).
+     * 
+     * @throws IllegalArgumentException
+     *             if any argument is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if the <i>readTimestamp</i> is {@link ITx#UNISOLATED}
+     *             (queries may not read on the unisolated indices).
+     * @throws IllegalArgumentException
+     *             if the <i>writeTimestamp</i> is neither
+     *             {@link ITx#UNISOLATED} nor a read-write transaction
+     *             identifier.
+     * 
+     * @todo is queryBuffer required? should it be allocated from the top bop?
      */
     public RunningQuery(final QueryEngine queryEngine, final long queryId,
-            final long readTimestamp, final long writeTimestamp,
-            final long begin, final long timeout, final boolean controller,
+//            final long begin, 
+            final boolean controller,
             final IQueryClient clientProxy, final BOp query,
             final IBlockingBuffer<IBindingSet[]> queryBuffer) {
+
+        if (queryEngine == null)
+            throw new IllegalArgumentException();
+
+        if (clientProxy == null)
+            throw new IllegalArgumentException();
+        
+        if (query == null)
+            throw new IllegalArgumentException();
+        
         this.queryEngine = queryEngine;
         this.queryId = queryId;
-        this.readTimestamp = readTimestamp;
-        this.writeTimestamp = writeTimestamp;
-        this.begin = begin;
-        this.timeout = timeout;
+//        this.begin = begin;
         this.controller = controller;
         this.clientProxy = clientProxy;
-        this.queryRef = new AtomicReference<BOp>(query);
-        if (controller && query == null)
-            throw new IllegalArgumentException();
+        this.query = query;
         this.queryBuffer = queryBuffer;
         this.bopIndex = BOpUtility.getIndex(query);
         this.statsMap = controller ? new ConcurrentHashMap<Integer, BOpStats>()
                 : null;
+        /*
+         * @todo when making a per-bop annotation, queries must obtain a tx for
+         * each timestamp up front on the controller and rewrite the bop to hold
+         * the tx until it is done.
+         * 
+         * @todo This is related to how we handle sequences of steps, parallel
+         * steps, closure of steps, and join graphs. Those operations need to be
+         * evaluated on the controller. We will have to model the relationship
+         * between the subquery and the query in order to terminate the subquery
+         * when the query halts and to terminate the query if the subquery
+         * fails.
+         * 
+         * @todo Closure operations must rewrite the query to update the
+         * annotations. Each pass in a closure needs to be its own "subquery"
+         * and will need to have a distinct queryId.
+         */
+        final Long readTimestamp = query
+                .getProperty(BOp.Annotations.READ_TIMESTAMP);
+
+        // @todo remove default when elevating to per-writable bop annotation.
+        final long writeTimestamp = query.getProperty(
+                BOp.Annotations.WRITE_TIMESTAMP, ITx.UNISOLATED);
+
+        if (readTimestamp == null)
+            throw new IllegalArgumentException();
+
+        if (readTimestamp.longValue() == ITx.UNISOLATED)
+            throw new IllegalArgumentException();
+
+        if (TimestampUtility.isReadOnly(writeTimestamp))
+            throw new IllegalArgumentException();
+
+        this.readTimestamp = readTimestamp;
+        
+        this.writeTimestamp = writeTimestamp;
+
+        this.timeout = query.getProperty(BOp.Annotations.TIMEOUT,
+                BOp.Annotations.DEFAULT_TIMEOUT);
+
+        if (timeout < 0)
+            throw new IllegalArgumentException();
+        
     }
 
     /**
-     * Create a {@link BindingSetChunk} from a sink and add it to the queue.
+     * Take a chunk generated by some pass over an operator and make it
+     * available to the target operator. How this is done depends on whether the
+     * query is running against a standalone database or the scale-out database.
      * <p>
-     * Note: If we are running standalone, then we leave the data on the heap
-     * rather than formatting it onto a {@link ByteBuffer}.
+     * Note: The return value is used as part of the termination criteria for
+     * the query.
+     * <p>
+     * The default implementation supports a standalone database. The generated
+     * chunk is left on the Java heap and handed off synchronously using
+     * {@link QueryEngine#add(IChunkMessage)}. That method will queue the chunk
+     * for asynchronous processing.
      * 
      * @param sinkId
      *            The identifier of the target operator.
@@ -363,39 +456,42 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      *         one chunk per index partition over which the intermediate results
      *         were mapped.
      */
-    protected <E> int add(final int sinkId,
+    protected <E> int handleOutputChunk(final int sinkId,
             final IBlockingBuffer<IBindingSet[]> sink) {
 
         /*
          * Note: The partitionId will always be -1 in scale-up.
          */
-        final BindingSetChunk chunk = new BindingSetChunk(queryId, sinkId,
-                -1/* partitionId */, sink.iterator());
+        final BindingSetChunk chunk = new BindingSetChunk(clientProxy, queryId,
+                sinkId, -1/* partitionId */, sink.iterator());
 
-        queryEngine.add(chunk);
+        queryEngine.acceptChunk(chunk);
 
         return 1;
 
-    }
+    }   
     
     /**
      * Make a chunk of binding sets available for consumption by the query.
      * <p>
      * Note: this is invoked by {@link QueryEngine#add(BindingSetChunk)}.
      * 
-     * @param chunk
+     * @param msg
      *            The chunk.
      */
-    void add(final BindingSetChunk chunk) {
+    protected void acceptChunk(final IChunkMessage msg) {
 
-        if (chunk == null)
+        if (msg == null)
             throw new IllegalArgumentException();
+
+        if (!msg.isMaterialized())
+            throw new IllegalStateException();
 
         // verify still running.
         future.halted();
 
         // add chunk to be consumed.
-        chunksIn.add(chunk);
+        chunksIn.add(msg);
 
         if (log.isDebugEnabled())
             log.debug("queryId=" + queryId + ", chunksIn.size()="
@@ -409,30 +505,31 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      * 
      * @todo this should reject multiple invocations for a given query instance.
      */
-    public void startQuery(final BindingSetChunk chunk) {
+    public void startQuery(final IChunkMessage chunk) {
         if (!controller)
             throw new UnsupportedOperationException();
         if (chunk == null)
             throw new IllegalArgumentException();
-        if (chunk.queryId != queryId) // @todo equals() if queryId is UUID.
+        if (chunk.getQueryId() != queryId) // @todo equals() if queryId is UUID.
             throw new IllegalArgumentException();
+        final int bopId = chunk.getBOpId();
         runStateLock.lock();
         try {
             lifeCycleSetUpQuery();
             availableChunkCount++;
             {
-                AtomicLong n = availableChunkCountMap.get(chunk.bopId);
+                AtomicLong n = availableChunkCountMap.get(bopId);
                 if (n == null)
-                    availableChunkCountMap.put(chunk.bopId, n = new AtomicLong());
+                    availableChunkCountMap.put(bopId, n = new AtomicLong());
                 n.incrementAndGet();
             }
             if (log.isInfoEnabled())
                 log.info("queryId=" + queryId + ",runningTaskCount="
                         + runningTaskCount + ",availableChunks="
                         + availableChunkCount);
-            System.err.println("startQ : bopId=" + chunk.bopId + ",running="
+            System.err.println("startQ : bopId=" + bopId + ",running="
                     + runningTaskCount + ",available=" + availableChunkCount);
-            queryEngine.add(chunk);
+            queryEngine.acceptChunk(chunk);
         } finally {
             runStateLock.unlock();
         }
@@ -484,13 +581,9 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
             System.err.println("startOp: bopId=" + msg.bopId + ",running="
                     + runningTaskCount + ",available=" + availableChunkCount
                     + ",fanIn=" + msg.nchunks);
-            final long elapsed = System.currentTimeMillis() - begin;
-            if (log.isTraceEnabled())
-                log.trace("bopId=" + msg.bopId + ",partitionId=" + msg.partitionId
-                        + ",serviceId=" + msg.serviceId + " : runningTaskCount="
-                        + runningTaskCount + ", availableChunkCount="
-                        + availableChunkCount + ", elapsed=" + elapsed);
-            if (elapsed > timeout) {
+            if (deadline.get() < System.currentTimeMillis()) {
+                if (log.isTraceEnabled())
+                    log.trace("queryId: deadline expired.");
                 future.halt(new TimeoutException());
                 cancel(true/* mayInterruptIfRunning */);
             }
@@ -563,13 +656,13 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
                     + runningTaskCount;
             assert availableChunkCount >= 0 : "availableChunkCount="
                     + availableChunkCount;
-            final long elapsed = System.currentTimeMillis() - begin;
+//            final long elapsed = System.currentTimeMillis() - begin;
             if (log.isTraceEnabled())
                 log.trace("bopId=" + msg.bopId + ",partitionId=" + msg.partitionId
                         + ",serviceId=" + queryEngine.getServiceUUID()
                         + ", nchunks=" + fanOut + " : runningTaskCount="
                         + runningTaskCount + ", availableChunkCount="
-                        + availableChunkCount + ", elapsed=" + elapsed);
+                        + availableChunkCount);// + ", elapsed=" + elapsed);
             // test termination criteria
             if (msg.cause != null) {
                 // operator failed on this chunk.
@@ -582,8 +675,9 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
                 // success (all done).
                 future.halt(getStats());
                 cancel(true/* mayInterruptIfRunning */);
-            } else if (elapsed > timeout) {
-                // timeout
+            } else if (deadline.get() < System.currentTimeMillis()) {
+                if (log.isTraceEnabled())
+                    log.trace("queryId: deadline expired.");
                 future.halt(new TimeoutException());
                 cancel(true/* mayInterruptIfRunning */);
             }
@@ -614,8 +708,8 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
         if (!runStateLock.isHeldByCurrentThread())
             throw new IllegalMonitorStateException();
 
-        return PipelineUtility.isDone(bopId, queryRef.get(), bopIndex,
-                runningCountMap, availableChunkCountMap);
+        return PipelineUtility.isDone(bopId, query, bopIndex, runningCountMap,
+                availableChunkCountMap);
 
     }
 
@@ -681,14 +775,16 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      *            A chunk to be consumed.
      */
     @SuppressWarnings("unchecked")
-    protected FutureTask<Void> newChunkTask(final BindingSetChunk chunk) {
+    protected FutureTask<Void> newChunkTask(final IChunkMessage chunk) {
         /*
          * Look up the BOp in the index, create the BOpContext for that BOp, and
          * return the value returned by BOp.eval(context).
          */
-        final BOp bop = bopIndex.get(chunk.bopId);
+        final int bopId = chunk.getBOpId();
+        final int partitionId = chunk.getPartitionId();
+        final BOp bop = bopIndex.get(bopId);
         if (bop == null) {
-            throw new NoSuchBOpException(chunk.bopId);
+            throw new NoSuchBOpException(bopId);
         }
         if (!(bop instanceof BindingSetPipelineOp)) {
             /*
@@ -701,7 +797,7 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
         // self
         final BindingSetPipelineOp op = ((BindingSetPipelineOp) bop);
         // parent (null if this is the root of the operator tree).
-        final BOp p = BOpUtility.getParent(queryRef.get(), op);
+        final BOp p = BOpUtility.getParent(query, op);
         // sink (null unless parent is defined)
         final Integer sinkId = p == null ? null : (Integer) p
                 .getProperty(BindingSetPipelineOp.Annotations.BOP_ID);
@@ -716,8 +812,8 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
         final IBlockingBuffer<IBindingSet[]> altSink = altSinkId == null ? null
                 : op.newBuffer();
         // context
-        final BOpContext context = new BOpContext(this, chunk.partitionId, op
-                .newStats(), chunk.source, sink, altSink);
+        final BOpContext context = new BOpContext(this, partitionId, op
+                .newStats(), chunk.iterator(), sink, altSink);
         // FutureTask for operator execution (not running yet).
         final FutureTask<Void> f = op.eval(context);
         // Hook the FutureTask.
@@ -729,29 +825,29 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
                 int altSinkChunksOut = 0;
                 try {
                     clientProxy.startOp(new StartOpMessage(queryId,
-                            chunk.bopId, chunk.partitionId, serviceId, fanIn));
+                            bopId, partitionId, serviceId, fanIn));
                     if (log.isDebugEnabled())
                         log.debug("Running chunk: queryId=" + queryId
-                                + ", bopId=" + chunk.bopId + ", bop=" + bop);
+                                + ", bopId=" + bopId + ", bop=" + bop);
                     f.run(); // run
                     f.get(); // verify success
                     if (sink != queryBuffer && !sink.isEmpty()) {
                         // handle output chunk.
-                        sinkChunksOut += add(sinkId, sink);
+                        sinkChunksOut += handleOutputChunk(sinkId, sink);
                     }
                     if (altSink != queryBuffer && altSink != null
                             && !altSink.isEmpty()) {
                         // handle alt sink output chunk.
-                        altSinkChunksOut += add(altSinkId, altSink);
+                        altSinkChunksOut += handleOutputChunk(altSinkId, altSink);
                     }
-                    clientProxy.haltOp(new HaltOpMessage(queryId, chunk.bopId,
-                            chunk.partitionId, serviceId, null/* cause */,
+                    clientProxy.haltOp(new HaltOpMessage(queryId, bopId,
+                            partitionId, serviceId, null/* cause */,
                             sinkId, sinkChunksOut, altSinkId,
                             altSinkChunksOut, context.getStats()));
                 } catch (Throwable t) {
                     try {
                         clientProxy.haltOp(new HaltOpMessage(queryId,
-                                chunk.bopId, chunk.partitionId, serviceId,
+                                bopId, partitionId, serviceId,
                                 t/* cause */, sinkId, sinkChunksOut, altSinkId,
                                 altSinkChunksOut, context.getStats()));
                     } catch (RemoteException e) {
@@ -764,7 +860,7 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
         // wrap runnable.
         final FutureTask<Void> f2 = new FutureTask(r, null/* result */);
         // add to list of active futures for this query.
-        operatorFutures.put(new BSBundle(chunk.bopId, chunk.partitionId), f2);
+        operatorFutures.put(new BSBundle(bopId, partitionId), f2);
         // return : caller will execute.
         return f2;
     }
