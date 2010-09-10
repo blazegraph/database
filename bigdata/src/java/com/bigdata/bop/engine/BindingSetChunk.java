@@ -15,7 +15,7 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
 public class BindingSetChunk implements IChunkMessage {
 
     /** The query controller. */
-    private final IQueryClient clientProxy;
+    private final IQueryClient queryController;
 
     /**
      * The query identifier.
@@ -38,7 +38,7 @@ public class BindingSetChunk implements IChunkMessage {
     private IAsynchronousIterator<IBindingSet[]> source;
 
     public IQueryClient getQueryController() {
-        return clientProxy;
+        return queryController;
     }
 
     public long getQueryId() {
@@ -57,22 +57,17 @@ public class BindingSetChunk implements IChunkMessage {
         return true;
     }
 
-    /**
-     * 
-     * @todo constructor to accept the BlockingBuffer instead as part of
-     *       {@link IChunkMessage} harmonization (or an "IChunk" API).
-     */
-    public BindingSetChunk(final IQueryClient clientProxy, final long queryId,
-            final int bopId, final int partitionId,
+    public BindingSetChunk(final IQueryClient queryController,
+            final long queryId, final int bopId, final int partitionId,
             final IAsynchronousIterator<IBindingSet[]> source) {
 
-        if (clientProxy == null)
+        if (queryController == null)
             throw new IllegalArgumentException();
         
         if (source == null)
             throw new IllegalArgumentException();
         
-        this.clientProxy = clientProxy;
+        this.queryController = queryController;
         
         this.queryId = queryId;
         

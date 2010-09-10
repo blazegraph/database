@@ -64,7 +64,7 @@ public class SampleLocalShard<E> extends AbstractSampleIndex<E> {
 
             final IPredicate<E> pred = pred();
             
-            final IRelation<E> view = context.getReadRelation(pred);
+            final IRelation<E> view = context.getRelation(pred);
 
             final IAccessPath<E> accessPath = view.getAccessPath(pred);
 

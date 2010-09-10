@@ -188,6 +188,7 @@ public class TestPipelineJoin extends TestCase2 {
                                 new NV(Predicate.Annotations.CONSTRAINT, null),//
                                 new NV(Predicate.Annotations.EXPANDER, null),//
                                 new NV(Predicate.Annotations.BOP_ID, predId),//
+                                new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                         })),
                 // join annotations
                 NV
@@ -216,9 +217,8 @@ public class TestPipelineJoin extends TestCase2 {
         final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer();
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                new MockRunningQuery(null/* fed */, jnl/* indexManager */,
-                ITx.READ_COMMITTED/* readTimestamp */,
-                ITx.UNISOLATED/* writeTimestamp */), -1/* partitionId */, stats,
+                new MockRunningQuery(null/* fed */, jnl/* indexManager */
+                ), -1/* partitionId */, stats,
                 source, sink, null/* sink2 */);
 
         // get task.
@@ -289,6 +289,7 @@ public class TestPipelineJoin extends TestCase2 {
                                                 null),//
                                         new NV(Predicate.Annotations.BOP_ID,
                                                 predId),//
+                                        new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                                 })),
                 // join annotations
                 NV.asMap(new NV[] {//
@@ -313,10 +314,8 @@ public class TestPipelineJoin extends TestCase2 {
         final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer();
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                new MockRunningQuery(null/* fed */, jnl/* indexManager */,
-                ITx.READ_COMMITTED/* readTimestamp */,
-                ITx.UNISOLATED/* writeTimestamp */), -1/* partitionId */, stats,
-                source, sink, null/* sink2 */);
+                new MockRunningQuery(null/* fed */, jnl/* indexManager */),
+                -1/* partitionId */, stats, source, sink, null/* sink2 */);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);
@@ -394,6 +393,8 @@ public class TestPipelineJoin extends TestCase2 {
                                                 null),//
                                         new NV(Predicate.Annotations.BOP_ID,
                                                 predId),//
+                                        new NV(Predicate.Annotations.TIMESTAMP,
+                                                ITx.READ_COMMITTED),//
                                 })),
                 // join annotations
                 NV.asMap(new NV[] {//
@@ -436,10 +437,8 @@ public class TestPipelineJoin extends TestCase2 {
         final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer();
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                new MockRunningQuery(null/* fed */, jnl/* indexManager */,
-                ITx.READ_COMMITTED/* readTimestamp */,
-                ITx.UNISOLATED/* writeTimestamp */), -1/* partitionId */, stats,
-                source, sink, null/* sink2 */);
+                new MockRunningQuery(null/* fed */, jnl/* indexManager */),
+                -1/* partitionId */, stats, source, sink, null/* sink2 */);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);
@@ -502,6 +501,7 @@ public class TestPipelineJoin extends TestCase2 {
                                 new NV(Predicate.Annotations.CONSTRAINT, null),//
                                 new NV(Predicate.Annotations.EXPANDER, null),//
                                 new NV(Predicate.Annotations.BOP_ID, predId),//
+                                new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                         })),
                 // join annotations
                 NV
@@ -554,10 +554,8 @@ public class TestPipelineJoin extends TestCase2 {
         final PipelineJoinStats stats = query.newStats();
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                new MockRunningQuery(null/* fed */, jnl/* indexManager */,
-                ITx.READ_COMMITTED/* readTimestamp */,
-                ITx.UNISOLATED/* writeTimestamp */), -1/* partitionId */, stats,
-                source, sink, null/* sink2 */);
+                new MockRunningQuery(null/* fed */, jnl/* indexManager */),
+                -1/* partitionId */, stats, source, sink, null/* sink2 */);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);
@@ -618,6 +616,7 @@ public class TestPipelineJoin extends TestCase2 {
                                 new NV(Predicate.Annotations.CONSTRAINT, null),//
                                 new NV(Predicate.Annotations.EXPANDER, null),//
                                 new NV(Predicate.Annotations.BOP_ID, predId),//
+                                new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                         })),
                 // join annotations
                 NV
@@ -676,10 +675,8 @@ public class TestPipelineJoin extends TestCase2 {
         final PipelineJoinStats stats = query.newStats();
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                new MockRunningQuery(null/* fed */, jnl/* indexManager */,
-                ITx.READ_COMMITTED/* readTimestamp */,
-                ITx.UNISOLATED/* writeTimestamp */), -1/* partitionId */, stats,
-                source, sink, sink2);
+                new MockRunningQuery(null/* fed */, jnl/* indexManager */),
+                -1/* partitionId */, stats, source, sink, sink2);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);

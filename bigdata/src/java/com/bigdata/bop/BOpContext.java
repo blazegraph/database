@@ -115,21 +115,25 @@ public class BOpContext<E> {
         return runningQuery.getIndexManager();
     }
 
-    /**
-     * The timestamp or transaction identifier against which the query is
-     * reading.
-     */
-    public final long getReadTimestamp() {
-        return runningQuery.getReadTimestamp();
-    }
-
-    /**
-     * The timestamp or transaction identifier against which the query is
-     * writing.
-     */
-    public final long getWriteTimestamp() {
-        return runningQuery.getWriteTimestamp();
-    }
+//    /**
+//     * The timestamp or transaction identifier against which the query is
+//     * reading.
+//     * 
+//     * @deprecated by {@link BOp.Annotations#TIMESTAMP}
+//     */
+//    public final long getReadTimestamp() {
+//        return runningQuery.getReadTimestamp();
+//    }
+//
+//    /**
+//     * The timestamp or transaction identifier against which the query is
+//     * writing.
+//     * 
+//     * @deprecated by {@link BOp.Annotations#TIMESTAMP}
+//     */
+//    public final long getWriteTimestamp() {
+//        return runningQuery.getWriteTimestamp();
+//    }
 
     /**
      * The index partition identifier -or- <code>-1</code> if the index is not
@@ -305,105 +309,49 @@ public class BOpContext<E> {
      *       order to support mutation operator we will also have to pass in the
      *       {@link #writeTimestamp} or differentiate this in the method name.
      */
-    public IRelation getReadRelation(final IPredicate<?> pred) {
+    public IRelation getRelation(final IPredicate<?> pred) {
 
         /*
-         * @todo Cache the resource locator?
-         * 
-         * @todo This should be using the federation as the index manager when
-         * locating a resource for scale-out, right? But s/o reads must use the
-         * local index manager when actually obtaining the index view for the
-         * relation.
+         * Note: This uses the federation as the index manager when locating a
+         * resource for scale-out. However, s/o reads must use the local index
+         * manager when actually obtaining the index view for the relation.
          */
-        return (IRelation) getIndexManager().getResourceLocator().locate(
-                pred.getOnlyRelationName(), getReadTimestamp());
+        final IIndexManager tmp = getFederation() == null ? getIndexManager()
+                : getFederation();
+        
+        final long timestamp = pred
+                .getRequiredProperty(BOp.Annotations.TIMESTAMP);
+
+        return (IRelation<?>) tmp.getResourceLocator().locate(
+                pred.getOnlyRelationName(), timestamp);
 
     }
 
-    /**
-     * Return a writable view of the relation.
-     * 
-     * @param namespace
-     *            The namespace of the relation.
-     *            
-     * @return A writable view of the relation.
-     */
-    public IRelation getWriteRelation(final String namespace) {
+//    /**
+//     * Return a writable view of the relation.
+//     * 
+//     * @param namespace
+//     *            The namespace of the relation.
+//     *            
+//     * @return A writable view of the relation.
+//     * 
+//     * @deprecated by getRelation()
+//     */
+//    public IRelation getWriteRelation(final String namespace) {
+//
+//        /*
+//         * @todo Cache the resource locator?
+//         * 
+//         * @todo This should be using the federation as the index manager when
+//         * locating a resource for scale-out, right?  But s/o writes must use
+//         * the local index manager when actually obtaining the index view for
+//         * the relation.
+//         */        
+//        return (IRelation) getIndexManager().getResourceLocator().locate(
+//                namespace, getWriteTimestamp());
+//
+//    }
 
-        /*
-         * @todo Cache the resource locator?
-         * 
-         * @todo This should be using the federation as the index manager when
-         * locating a resource for scale-out, right?  But s/o writes must use
-         * the local index manager when actually obtaining the index view for
-         * the relation.
-         */
-        return (IRelation) getIndexManager().getResourceLocator().locate(
-                namespace, getWriteTimestamp());
-
-    }
-
-    /**
-     * Return an mutable view of the specified index.
-     * 
-     * @param <T>
-     *            The generic type of the elements in the relation.
-     * @param relation
-     *            The relation.
-     * @param keyOrder
-     *            The key order for that index.
-     * @param partitionId
-     *            The partition identifier and <code>-1</code> unless running
-     *            against an {@link IBigdataFederation}.
-     * 
-     * @return The mutable view of the index.
-     * 
-     * @throws UnsupportedOperationException
-     *             if there is an attempt to read on an index partition when the
-     *             database is not an {@link IBigdataFederation} or when the
-     *             database is an {@link IBigdataFederation} unless the index
-     *             partition was specified.
-     */
-    public <T> ILocalBTreeView getMutableLocalIndexView(
-            final IRelation<T> relation, final IKeyOrder<T> keyOrder,
-            final int partitionId) {
-
-        final String namespace = relation.getNamespace();
-
-        final ILocalBTreeView ndx;
-
-        if (partitionId == -1) {
-
-            if (getFederation() != null) {
-                // This is scale-out so the partition identifier is required. 
-                throw new UnsupportedOperationException();
-            }
-            
-            // The index is not partitioned.
-            ndx = (ILocalBTreeView) getIndexManager().getIndex(namespace + "."
-                    + keyOrder.getIndexName(), getWriteTimestamp());
-
-        } else {
-
-            if (getFederation() == null) {
-                // This is not scale-out so index partitions are not supported.
-                throw new UnsupportedOperationException();
-            }
-
-            // The name of the desired index partition.
-            final String name = DataService.getIndexPartitionName(namespace
-                    + "." + keyOrder.getIndexName(), partitionId);
-
-            // MUST be a local index view.
-            ndx = (ILocalBTreeView) getIndexManager().getIndex(name,
-                    getWriteTimestamp());
-
-        }
-
-        return ndx;
-
-    }
-    
     /**
      * Obtain an access path reading from relation for the specified predicate
      * (from the tail of some rule).
@@ -443,10 +391,13 @@ public class BOpContext<E> {
 
         final int partitionId = predicate.getPartitionId();
 
+        final long timestamp = predicate
+                .getRequiredProperty(BOp.Annotations.TIMESTAMP);
+        
         final int flags = predicate.getProperty(
                 PipelineOp.Annotations.FLAGS,
                 PipelineOp.Annotations.DEFAULT_FLAGS)
-                | (TimestampUtility.isReadOnly(getReadTimestamp()) ? IRangeQuery.READONLY
+                | (TimestampUtility.isReadOnly(timestamp) ? IRangeQuery.READONLY
                         : 0);
         
         final int chunkOfChunksCapacity = predicate.getProperty(
@@ -462,8 +413,6 @@ public class BOpContext<E> {
                 PipelineOp.Annotations.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD);
         
         final IIndexManager indexManager = getIndexManager();
-        
-        final long readTimestamp = getReadTimestamp();
         
         if (predicate.getPartitionId() != -1) {
 
@@ -497,9 +446,9 @@ public class BOpContext<E> {
 
             // MUST be a local index view.
             final ILocalBTreeView ndx = (ILocalBTreeView) indexManager
-                    .getIndex(name, readTimestamp);
+                    .getIndex(name, timestamp);
 
-            return new AccessPath(relation, indexManager, readTimestamp,
+            return new AccessPath(relation, indexManager, timestamp,
                     predicate, keyOrder, ndx, flags, chunkOfChunksCapacity,
                     chunkCapacity, fullyBufferedReadThreshold).init();
 
@@ -522,13 +471,13 @@ public class BOpContext<E> {
             
                 throw new IllegalArgumentException("no index? relation="
                         + relation.getNamespace() + ", timestamp="
-                        + readTimestamp + ", keyOrder=" + keyOrder + ", pred="
+                        + timestamp + ", keyOrder=" + keyOrder + ", pred="
                         + predicate + ", indexManager=" + getIndexManager());
 
             }
 
             accessPath = new AccessPath((IRelation) relation, indexManager,
-                    readTimestamp, (IPredicate) predicate,
+                    timestamp, (IPredicate) predicate,
                     (IKeyOrder) keyOrder, ndx, flags, chunkOfChunksCapacity,
                     chunkCapacity, fullyBufferedReadThreshold).init();
 

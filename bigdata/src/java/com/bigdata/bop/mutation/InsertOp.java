@@ -41,10 +41,15 @@ import com.bigdata.bop.IShardwisePipelineOp;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.ITupleSerializer;
+import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.service.DataService;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -181,7 +186,7 @@ public class InsertOp<E> extends BindingSetPipelineOp implements
 
             predicate = op.getPredicate();
             
-            relation = context.getWriteRelation(op.getRelation());
+            relation = context.getRelation(predicate);
             
             keyOrder = op.getKeyOrder();
             
@@ -198,14 +203,8 @@ public class InsertOp<E> extends BindingSetPipelineOp implements
          */
         public Void call() throws Exception {
 
-            /*
-             * @todo validate for s/o. Since this goes through a common code
-             * path, what we really need to test is getMutableLocalIndexView().
-             * The rest of the insert operation can be tested against a local
-             * Journal.
-             */
-            final ILocalBTreeView ndx = context.getMutableLocalIndexView(
-                    relation, keyOrder, context.getPartitionId());
+            final ILocalBTreeView ndx = getMutableLocalIndexView(relation,
+                    keyOrder, context.getPartitionId());
 
             final IKeyBuilder keyBuilder = ndx.getIndexMetadata()
                     .getKeyBuilder();
@@ -260,6 +259,95 @@ public class InsertOp<E> extends BindingSetPipelineOp implements
             
         }
 
+        /**
+         * Return an mutable view of the specified index.
+         * 
+         * @param <T>
+         *            The generic type of the elements in the relation.
+         * @param relation
+         *            The relation.
+         * @param keyOrder
+         *            The key order for that index.
+         * @param partitionId
+         *            The partition identifier and <code>-1</code> unless
+         *            running against an {@link IBigdataFederation}.
+         * 
+         * @return The mutable view of the index.
+         * 
+         * @throws UnsupportedOperationException
+         *             if there is an attempt to read on an index partition when
+         *             the database is not an {@link IBigdataFederation} or when
+         *             the database is an {@link IBigdataFederation} unless the
+         *             index partition was specified.
+         * 
+         * @todo validate for standalone. probably needs to be wrapped as an
+         *       {@link UnisolatedReadWriteIndex} whcih migtht be done by how we
+         *       get the relation view.
+         * 
+         * @todo validate for s/o. Since this goes through a common code path,
+         *       what we really need to test is getMutableLocalIndexView(). The
+         *       rest of the insert operation can be tested against a local
+         *       Journal.
+         * 
+         *       FIXME This must obtain the appropriate lock for the mutable
+         *       index in scale-out.
+         */
+        public <T> ILocalBTreeView getMutableLocalIndexView(
+                final IRelation<T> relation, final IKeyOrder<T> keyOrder,
+                final int partitionId) {
+
+            if(true) {
+                /*
+                 * FIXME Concurrency control and locks. Maybe submit as an
+                 * AbstractTask?
+                 */
+                throw new UnsupportedOperationException();
+            }
+            
+            final IBigdataFederation<?> fed = context.getFederation();
+            final IIndexManager indexManager = context.getIndexManager();
+            final long writeTimestamp = predicate.getTimestamp();
+            
+            final String namespace = relation.getNamespace();
+
+            final ILocalBTreeView ndx;
+
+            if (partitionId == -1) {
+
+                if (fed != null) {
+                    // This is scale-out so the partition identifier is required. 
+                    throw new UnsupportedOperationException();
+                }
+
+                // The index is not partitioned.
+                ndx = (ILocalBTreeView) indexManager.getIndex(namespace + "."
+                        + keyOrder.getIndexName(), writeTimestamp);
+
+            } else {
+
+                if (fed == null) {
+                    /*
+                     * This is not scale-out so index partitions are not
+                     * supported.
+                     */
+                    throw new UnsupportedOperationException();
+                }
+
+                // The name of the desired index partition.
+                final String name = DataService.getIndexPartitionName(namespace
+                        + "." + keyOrder.getIndexName(), partitionId);
+
+                // MUST be a local index view.
+                ndx = (ILocalBTreeView) indexManager.getIndex(name,
+                        writeTimestamp);
+
+            }
+
+            return ndx;
+
+        }
+        
+
     }
 
 
@@ -280,5 +368,5 @@ public class InsertOp<E> extends BindingSetPipelineOp implements
         return BOpEvaluationContext.SHARDED;
         
     }
-    
+
 }

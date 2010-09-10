@@ -259,7 +259,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         final BindingSetPipelineOp query = new CopyBindingSetOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
-                new NV(Predicate.Annotations.READ_TIMESTAMP, ITx.READ_COMMITTED),//
+//                new NV(Predicate.Annotations.READ_TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
 
         final long queryId = 1L;
@@ -341,11 +341,11 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                                 new NV(Predicate.Annotations.CONSTRAINT, null),//
                                 new NV(Predicate.Annotations.EXPANDER, null),//
                                 new NV(Predicate.Annotations.BOP_ID, predId),//
+                                new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                         })),
                 // join annotations
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, joinId),//
-                        new NV(Predicate.Annotations.READ_TIMESTAMP, ITx.READ_COMMITTED),//
                         })//
         );
 
@@ -518,6 +518,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV(Predicate.Annotations.CONSTRAINT, null),//
                         new NV(Predicate.Annotations.EXPANDER, null),//
                         new NV(Predicate.Annotations.BOP_ID, predId1),//
+                        new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
         
         final Predicate<?> pred2Op = new Predicate<E>(new IVariableOrConstant[] {
@@ -532,6 +533,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV(Predicate.Annotations.CONSTRAINT, null),//
                         new NV(Predicate.Annotations.EXPANDER, null),//
                         new NV(Predicate.Annotations.BOP_ID, predId2),//
+                        new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
         
         final BindingSetPipelineOp join1Op = new PipelineJoin<E>(//
@@ -544,7 +546,6 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 join1Op, pred2Op,//
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, joinId2),//
-                        new NV(Predicate.Annotations.READ_TIMESTAMP, ITx.READ_COMMITTED),//
                         }));
 
         final BindingSetPipelineOp query = join2Op;

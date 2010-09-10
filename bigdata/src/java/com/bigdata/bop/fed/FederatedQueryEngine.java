@@ -299,5 +299,5 @@ public class FederatedQueryEngine extends QueryEngine {
      * Cache for {@link #getQueryPeer(UUID)}.
      */
     private final ConcurrentHashMap<UUID, IQueryPeer> proxyMap = new ConcurrentHashMap<UUID, IQueryPeer>();
-
+    
 }

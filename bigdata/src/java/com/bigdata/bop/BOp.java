@@ -140,7 +140,23 @@ public interface BOp extends Cloneable, Serializable {
      * shards, mapped against nodes, or evaluated on the query controller must
      * override this method.
      */
-    public BOpEvaluationContext getEvaluationContext();
+    BOpEvaluationContext getEvaluationContext();
+
+    /**
+     * Return <code>true</code> iff this operator is an access path which writes
+     * on the database.
+     * 
+     * @see Annotations#MUTATION
+     */
+    boolean isMutation();
+    
+    /**
+     * The timestamp or transaction identifier on which the operator will read
+     * or write.
+     * 
+     * @see Annotations#TIMESTAMP
+     */
+    long getTimestamp();
     
     /**
      * Interface declaring well known annotations.
@@ -176,20 +192,31 @@ public interface BOp extends Cloneable, Serializable {
         long DEFAULT_TIMEOUT = Long.MAX_VALUE;
 
         /**
-         * The timestamp (or transaction identifier) associated with a read from
-         * the database.
+         * Boolean property whose value is <code>true</code> iff this operator
+         * writes on a database.
+         * <p>
+         * Most operators operate solely on streams of elements or binding sets.
+         * Some operators read or write on the database using an access path,
+         * which is typically described by an {@link IPredicate}. This property
+         * MUST be <code>true</code> when access path is used to write on the
+         * database.
+         * <p>
+         * Operators which read or write on the database must declare the
+         * {@link Annotations#TIMESTAMP} associated with that operation.
          * 
-         * @todo Combine the read and write timestamps as a single
-         *       <code>TX</code> value and require this on any operator which
-         *       reads or writes on the database.
+         * @see #TIMESTAMP
          */
-        String READ_TIMESTAMP = BOp.class.getName() + ".readTimestamp";
-
+        String MUTATION = BOp.class.getName() + ".mutation";
+        
+        boolean DEFAULT_MUTATION = false;
+        
         /**
-         * The timestamp (or transaction identifier) associated with a write on
-         * the database.
+         * The timestamp (or transaction identifier) used by this operator if it
+         * reads or writes on the database.
+         * 
+         * @see #MUTATION
          */
-        String WRITE_TIMESTAMP = BOp.class.getName() + ".writeTimestamp";
+        String TIMESTAMP = BOp.class.getName() + ".timestamp";
 
         /**
          * For hash partitioned operators, this is the set of the member nodes
@@ -202,7 +229,7 @@ public interface BOp extends Cloneable, Serializable {
          * @todo Move onto an interface parallel to {@link IShardwisePipelineOp}
          */
         String MEMBER_SERVICES = "memberServices";
-        
+
     }
-    
+
 }

@@ -46,9 +46,9 @@ public class MockRunningQuery implements IRunningQuery {
 
     private final IIndexManager indexManager;
 
-    private final long readTimestamp;
-
-    private final long writeTimestamp;
+//    private final long readTimestamp;
+//
+//    private final long writeTimestamp;
 
     /**
      * Note: This constructor DOES NOT check its arguments so unit tests may be
@@ -60,13 +60,13 @@ public class MockRunningQuery implements IRunningQuery {
      * @param writeTimestamp
      */
     public MockRunningQuery(final IBigdataFederation<?> fed,
-            final IIndexManager indexManager, final long readTimestamp,
-            final long writeTimestamp) {
+            final IIndexManager indexManager/*, final long readTimestamp,
+            final long writeTimestamp*/) {
 
         this.fed = fed;
         this.indexManager = indexManager;
-        this.readTimestamp = readTimestamp;
-        this.writeTimestamp = writeTimestamp;
+//        this.readTimestamp = readTimestamp;
+//        this.writeTimestamp = writeTimestamp;
 
     }
 
@@ -78,13 +78,13 @@ public class MockRunningQuery implements IRunningQuery {
         return indexManager;
     }
 
-    public long getReadTimestamp() {
-        return readTimestamp;
-    }
-
-    public long getWriteTimestamp() {
-        return writeTimestamp;
-    }
+//    public long getReadTimestamp() {
+//        return readTimestamp;
+//    }
+//
+//    public long getWriteTimestamp() {
+//        return writeTimestamp;
+//    }
 
     /**
      * NOP (you have to test things like slices with a full integration).

@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.fed;
 
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.rmi.RemoteException;
 import java.util.Arrays;
@@ -47,7 +46,6 @@ import com.bigdata.bop.engine.BindingSetChunk;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryPeer;
-import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.io.DirectBufferPoolAllocator;
 import com.bigdata.io.SerializerUtil;
@@ -242,21 +240,80 @@ public class FederatedRunningQuery extends RunningQuery {
     }
 
     /**
+     * Overridden to make this visible to the {@link FederatedQueryEngine}.
+     * <p>
+     * {@inheritDoc}
+     */
+    @Override
+    protected void acceptChunk(final IChunkMessage msg) {
+
+        super.acceptChunk(msg);
+        
+    }
+
+    /**
+     * Resolve the proxy for an {@link IQueryPeer}. This is special cased for
+     * both <i>this</i> service (the actual reference is returned) and the query
+     * controller (we use an alternative path to discover the query controller
+     * since it might not be registered against a lookup service if it is not a
+     * data service).
+     * 
+     * @param serviceUUID
+     *            The service identifier for the peer.
+     * 
+     * @return The proxy for the service or <code>null</code> if the service
+     *         could not be discovered.
+     */
+    protected IQueryPeer getQueryPeer(final UUID serviceUUID) {
+
+        if (serviceUUID == null)
+            throw new IllegalArgumentException();
+        
+        final IQueryPeer queryPeer;
+        
+        if(serviceUUID.equals(getQueryEngine().getServiceUUID())) {
+        
+            // Return a hard reference to the query engine (NOT a proxy).
+            return getQueryEngine();
+            
+        } else if (serviceUUID.equals(queryControllerUUID)) {
+        
+            // The target is the query controller.
+            queryPeer = getQueryController();
+            
+        } else {
+            
+            // The target is some data service.
+            queryPeer = getQueryEngine().getQueryPeer(serviceUUID);
+            
+        }
+
+        return queryPeer;
+
+    }
+
+    /**
      * Return the {@link IAllocationContext} for the given key.
      * 
      * @param key
      *            The key.
      *            
      * @return The allocation context.
+     * 
+     * @todo use typesafe enum for the types of allocation contexts?
      */
-    private IAllocationContext getAllocationContext(
+    public IAllocationContext getAllocationContext(
             final AllocationContextKey key) {
 
         final IAllocationContext ctx = getQueryEngine().getResourceService()
                 .getAllocator().getAllocationContext(key);
 
         // note the allocation contexts associated with this running query.
-        allocationContexts.putIfAbsent(key, ctx);
+        final IAllocationContext ctx2 = allocationContexts
+                .putIfAbsent(key, ctx);
+
+        if (ctx2 != null)
+            return ctx2;
 
         return ctx;
 
@@ -309,10 +366,6 @@ public class FederatedRunningQuery extends RunningQuery {
              * Note: IKeyOrder tells us which index will be used and should be
              * set on the predicate by the join optimizer.
              * 
-             * @todo Use the read or write timestamp depending on whether the
-             * operator performs mutation [this must be part of the operator
-             * metadata.]
-             * 
              * @todo Set the capacity of the the "map" buffer to the size of the
              * data contained in the sink (in fact, we should just process the
              * sink data in place).
@@ -321,7 +374,7 @@ public class FederatedRunningQuery extends RunningQuery {
             @SuppressWarnings("unchecked")
             final IPredicate<E> pred = ((IShardwisePipelineOp) bop).getPredicate();
             final IKeyOrder<E> keyOrder = pred.getKeyOrder();
-            final long timestamp = getReadTimestamp(); // @todo read vs write timestamp.
+            final long timestamp = pred.getTimestamp(); 
             final int capacity = 1000;// @todo
             final int capacity2 = 1000;// @todo
             final MapBindingSetsOverShardsBuffer<IBindingSet, E> mapper = new MapBindingSetsOverShardsBuffer<IBindingSet, E>(
@@ -373,11 +426,11 @@ public class FederatedRunningQuery extends RunningQuery {
                 
                 final IBuffer<IBindingSet> shardSink = e.getValue();
 
-                // FIXME harmonize IBuffer<IBindingSet> vs IBuffer<IBindingSet[]>
-//                sendOutputChunkReadyMessage(newOutputChunk(locator
-//                        .getDataServiceUUID(), sinkId, allocationContext,
-//                        shardSink));
+//                // FIXME harmonize IBuffer<IBindingSet> vs IBuffer<IBindingSet[]>
+//                sendChunkMessage(locator.getDataServiceUUID(), sinkId, locator
+//                        .getPartitionId(), allocationContext, shardSink);
                 throw new UnsupportedOperationException();
+
             }
             
             return nchunksout;
@@ -394,8 +447,8 @@ public class FederatedRunningQuery extends RunningQuery {
             final IAllocationContext allocationContext = getAllocationContext(new QueryContext(
                     getQueryId()));
 
-            sendOutputChunkReadyMessage(newOutputChunk(queryControllerUUID,
-                    sinkId, allocationContext, sink));
+            sendChunkMessage(queryControllerUUID, sinkId, -1/* partitionId */,
+                    allocationContext, sink);
 
             /*
              * Chunks send to the query controller do not keep the query
@@ -411,7 +464,9 @@ public class FederatedRunningQuery extends RunningQuery {
     }
 
     /**
-     * Create an {@link OutputChunk} from some intermediate results.
+     * Create and send an {@link IChunkMessage} from some intermediate results.
+     * Various optimizations are employed depending on the amount of data to be
+     * moved and whether or not the target is this service.
      * 
      * @param serviceUUID
      *            The {@link UUID} of the {@link IQueryPeer} who is the
@@ -420,15 +475,46 @@ public class FederatedRunningQuery extends RunningQuery {
      *            The identifier of the target {@link BOp}.
      * @param allocationContext
      *            The allocation context within which the {@link ByteBuffer}s
-     *            will be managed for this {@link OutputChunk}.
+     *            will be managed for this {@link ChunkMessageWithNIOPayload}.
      * @param source
      *            The binding sets to be formatted onto a buffer.
      * 
-     * @return The {@link OutputChunk}.
+     * @return The {@link ChunkMessageWithNIOPayload}.
+     * 
+     * @todo This is basically a factory for creating {@link IChunkMessage}s.
+     *       That factory pattern in combined with the logic to send the message
+     *       so we can do within JVM handoffs. We could break these things apart
+     *       using {@link IChunkMessage#isMaterialized()} to detect inline
+     *       cases. That would let us send out the messages in parallel, which
+     *       could help to cut latency when an operator has a large fan out (in
+     *       scale-out when mapping over shards or nodes).
+     * 
+     * @todo We probably need to use the {@link DirectBufferPoolAllocator} to
+     *       receive the chunks within the {@link ManagedResourceService} as
+     *       well.
+     * 
+     * @todo Release the allocations associated with each output chunk once it
+     *       is received by the remote service.
+     *       <p>
+     *       When the query terminates all output chunks targeting any node
+     *       EXCEPT the query controller should be immediately dropped.
+     *       <p>
+     *       If there is an error during query evaluation, then the output
+     *       chunks for the query controller should be immediately dropped.
+     *       <p>
+     *       If the iterator draining the results on the query controller is
+     *       closed, then the output chunks for the query controller should be
+     *       immediately dropped.
+     * 
+     * @todo There are a few things where the resource must be made available to
+     *       more than one operator evaluation phase. The best examples are
+     *       temporary graphs for parallel closure and large collections of
+     *       graphIds for SPARQL "NAMED FROM DATA SET" extensions.
      */
-    protected OutputChunk newOutputChunk(
+    protected void sendChunkMessage(
             final UUID serviceUUID,
             final int sinkId,
+            final int partitionId,
             final IAllocationContext allocationContext,
             final IBlockingBuffer<IBindingSet[]> source) {
 
@@ -441,6 +527,97 @@ public class FederatedRunningQuery extends RunningQuery {
         if (source == null)
             throw new IllegalArgumentException();
 
+        if (source.isEmpty())
+            throw new RuntimeException();
+
+        // The peer to be notified.
+        final IQueryPeer peerProxy = getQueryPeer(serviceUUID);
+
+        if (peerProxy == null)
+            throw new RuntimeException("Not found: serviceId=" + serviceUUID);
+        
+        // true iff the target is this service (no proxy, no RMI).
+        final boolean thisService = peerProxy == getQueryEngine();
+        
+        if(thisService) {
+            /*
+             * Leave the chunk as Java objects and drop it directly onto the
+             * query engine.
+             */
+
+            final IChunkMessage msg = new BindingSetChunk(getQueryController(),
+                    getQueryId(), sinkId, partitionId, source.iterator());
+            
+            getQueryEngine().bufferReady(msg);
+         
+            return;
+            
+        }
+
+        /*
+         * We will be notifying another service (RMI) that a chunk is available.
+         * 
+         * Note: Depending on how much data it involved, we may move it with the
+         * RMI message or out of band using NIO. This decision effects how we
+         * serialize the chunk.
+         */
+        final IChunkMessage msg;
+        if (source.size() < 100) {
+
+            /*
+             * FIXME Send payload inline with the RMI message.
+             */
+
+//            final byte[] data = SerializerUtil.serialize(obj);
+//            
+//            // @todo harmonize serialization and compression and ctors.
+//            msg = new ThickChunkMessage(getQueryController(), getQueryId(),
+//                    sinkId, partitionId, data);
+            throw new UnsupportedOperationException();
+
+        } else
+        {
+
+            /*
+             * Marshall the data onto direct ByteBuffer(s) and send a thin
+             * message by RMI. The receiver will retrieve the data using NIO
+             * against the ResourceService.
+             * 
+             * @todo harmonize serialization and compression and ctors.
+             */
+            final List<IAllocation> allocations = moveToNIOBuffers(
+                    allocationContext, source);
+
+            msg = new ChunkMessageWithNIOPayload(getQueryController(),
+                    getQueryId(), sinkId, partitionId, allocations,
+                    getQueryEngine().getResourceService().getAddr());
+
+        }
+
+        try {
+
+            peerProxy.bufferReady(msg);
+
+        } catch (RemoteException e) {
+
+            throw new RuntimeException(e);
+
+        }
+
+    }
+
+    /**
+     * Chunk-wise serialization of the data onto allocations. 
+     * @param allocationContext
+     * @param source
+     * @return
+     * 
+     * @todo should be on message per chunk, right?
+     */
+    private List<IAllocation> moveToNIOBuffers(
+            final IAllocationContext allocationContext,
+            final IBlockingBuffer<IBindingSet[]> source) {
+        
         int nbytes = 0;
         
         final List<IAllocation> allocations = new LinkedList<IAllocation>();
@@ -476,135 +653,14 @@ public class FederatedRunningQuery extends RunningQuery {
 
             }
 
+            return allocations;
+            
         } finally {
 
             itr.close();
 
         }
 
-        return new OutputChunk(getQueryId(), serviceUUID, sinkId, nbytes,
-                allocations);
-
-    }
-    
-    protected IQueryPeer getQueryPeer(final UUID serviceUUID) {
-
-        if (serviceUUID == null)
-            throw new IllegalArgumentException();
-        
-        final IQueryPeer queryPeer;
-        
-        if (serviceUUID.equals(queryControllerUUID)) {
-        
-            // The target is the query controller.
-            queryPeer = getQueryController();
-            
-        } else {
-            
-            // The target is some data service.
-            queryPeer = getQueryEngine().getQueryPeer(serviceUUID);
-            
-        }
-
-        return queryPeer;
-
     }
 
-    /**
-     * Overridden to make this visible to the {@link FederatedQueryEngine}.
-     * <p>
-     * {@inheritDoc}
-     */
-    @Override
-    protected void acceptChunk(final IChunkMessage msg) {
-
-        super.acceptChunk(msg);
-        
-    }
-    
-    /**
-     * Notify a remote {@link IQueryPeer} that data is available for it.
-     * 
-     * @todo If the target for the {@link OutputChunk} is this node then just
-     *       drop it onto the {@link QueryEngine}.
-     * 
-     *       FIXME Fast path with inline RMI based transfer for small sets of
-     *       data using a 'think' {@link IChunkMessage}.
-     */
-    protected void sendOutputChunkReadyMessage(final OutputChunk outputChunk) {
-       
-        try {
-
-            // The peer to be notified.
-            final IQueryPeer peerProxy = getQueryPeer(outputChunk.serviceId);
-
-            // The Internet address and port where the peer can read the data
-            // from this node.
-            final InetSocketAddress serviceAddr = getQueryEngine()
-                    .getResourceService().getAddr();
-
-            // FIXME invoke peerProxy.bufferReady(msg) here!
-//            peerProxy.bufferReady(getQueryController(), serviceAddr,
-//                    getQueryId(), outputChunk.sinkId);
-            peerProxy.bufferReady(null/*FIXME msg.*/);
-            
-        } catch (RemoteException e) {
-
-            throw new RuntimeException(e);
-
-        }
-
-    }
-
-    /**
-     * A chunk of outputs.
-     * 
-     * @todo We probably need to use the {@link DirectBufferPoolAllocator} to
-     *       receive the chunks within the {@link ManagedResourceService} as
-     *       well.
-     * 
-     * @todo Release the allocations associated with each output chunk once it
-     *       is received by the remote service.
-     *       <p>
-     *       When the query terminates all output chunks targeting any node
-     *       EXCEPT the query controller should be immediately dropped.
-     *       <p>
-     *       If there is an error during query evaluation, then the output
-     *       chunks for the query controller should be immediately dropped.
-     *       <p>
-     *       If the iterator draining the results on the query controller is
-     *       closed, then the output chunks for the query controller should be
-     *       immediately dropped.
-     * 
-     * @todo There are a few things where the resource must be made available to
-     *       more than one operator evaluation phase. The best examples are
-     *       temporary graphs for parallel closure and large collections of
-     *       graphIds for SPARQL "NAMED FROM DATA SET" extensions.
-     */
-    private static class OutputChunk {
-
-        final long queryId;
-
-        final UUID serviceId;
-
-        final int sinkId;
-
-        final int nbytes;
-
-        final List<IAllocation> allocations;
-
-        public OutputChunk(final long queryId, final UUID serviceId,
-                final int sinkId, final int nbytes,
-                final List<IAllocation> allocations) {
-
-            this.queryId = queryId;
-            this.serviceId = serviceId;
-            this.sinkId = sinkId;
-            this.nbytes = nbytes;
-            this.allocations = allocations;
-
-        }
-
-    }
-    
 }

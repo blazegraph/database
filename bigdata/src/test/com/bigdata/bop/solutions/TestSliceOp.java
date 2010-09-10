@@ -205,9 +205,8 @@ public class TestSliceOp extends TestCase2 {
         final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer();
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                new MockRunningQuery(null/* fed */, null/* indexManager */,
-                ITx.READ_COMMITTED/* readTimestamp */,
-                ITx.UNISOLATED/* writeTimestamp */), -1/* partitionId */, stats,
+                new MockRunningQuery(null/* fed */, null/* indexManager */
+                ), -1/* partitionId */, stats,
                 source, sink, null/* sink2 */);
 
         // get task.
