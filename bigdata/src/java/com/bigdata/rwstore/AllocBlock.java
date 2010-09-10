@@ -27,6 +27,7 @@ package com.bigdata.rwstore;
 import java.util.ArrayList;
 
 import com.bigdata.io.writecache.WriteCacheService;
+import com.bigdata.rwstore.RWStore.AllocationStats;
 
 /**
  * Bit maps for an allocator. The allocator is a bit map managed as int[]s.
@@ -189,10 +190,17 @@ public class AllocBlock {
 		return allocBits;
 	}
 
-	public String getStats() {
+	public String getStats(AllocationStats stats) {
 		final int total = m_ints * 32;
 		final int allocBits = getAllocBits();
 
+		if (stats != null) {
+			stats.m_reservedSlots += total;
+			stats.m_filledSlots += allocBits;
+			
+			return "";
+		}
+		
 		return " - start addr : " + RWStore.convertAddr(m_addr) + " [" + allocBits + "::" + total + "]";
 	}
 

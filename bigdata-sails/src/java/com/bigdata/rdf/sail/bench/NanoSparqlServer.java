@@ -75,11 +75,13 @@ import org.openrdf.sail.SailException;
 import com.bigdata.LRUNexus;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
@@ -89,6 +91,7 @@ import com.bigdata.rdf.sail.bench.NanoSparqlClient.QueryType;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.RelationSchema;
+import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IBigdataFederation;
@@ -363,6 +366,17 @@ public class NanoSparqlServer extends AbstractHTTPD {
 			}
 
 			// sb.append(tripleStore.predicateUsage());
+			
+			if (tripleStore.getIndexManager() instanceof Journal) {
+				Journal journal = (Journal) tripleStore.getIndexManager();
+				IBufferStrategy strategy = journal.getBufferStrategy();
+				if (strategy instanceof RWStrategy) {
+					RWStore store = ((RWStrategy) strategy).getRWStore();
+					
+					store.showAllocators(sb);
+					
+				}
+			}
 
 		} catch (Throwable t) {
 

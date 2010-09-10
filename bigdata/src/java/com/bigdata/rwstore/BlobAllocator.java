@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.bigdata.rwstore.RWStore.AllocationStats;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -297,7 +298,7 @@ public class BlobAllocator implements Allocator {
 		return m_hdrs[hdrIndex];
 	}
 
-	public void appendShortStats(StringBuffer str) {
+	public void appendShortStats(StringBuilder str, AllocationStats[] stats) {
 		str.append("Index: " + m_index + ", address: " + getStartAddr() + ", BLOB\n");
 	}
 
