@@ -194,9 +194,9 @@ public class RWStore implements IStore {
 	 *       com.bigdata.rwstore.RWStore.allocSizes=1,2,3,5... 
 	 *       
 	 */
-	// static final int[] DEFAULT_ALLOC_SIZES = { 1, 2, 3, 5, 8, 12, 16, 32, 48, 64, 128, 192, 320, 512, 832, 1344, 2176, 3520 };
-	private static final int[] DEFAULT_ALLOC_SIZES = { 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181 };
-	// static final int[] ALLOC_SIZES = { 1, 2, 4, 8, 16, 32, 64, 128 };
+	private static final int[] DEFAULT_ALLOC_SIZES = { 1, 2, 3, 5, 8, 12, 16, 32, 48, 64, 128, 192, 320, 512, 832, 1344, 2176, 3520 };
+	// private static final int[] DEFAULT_ALLOC_SIZES = { 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181 };
+	// private static final int[] ALLOC_SIZES = { 1, 2, 4, 8, 16, 32, 64, 128 };
 
 	final int m_maxFixedAlloc;
 	final int m_minFixedAlloc;
@@ -2108,18 +2108,23 @@ public class RWStore implements IStore {
 		str.append("RWStore Allocation Summary\n");
 		str.append("-------------------------\n");
 		long treserved = 0;
+		long treservedSlots = 0;
 		long tfilled = 0;
+		long tfilledSlots = 0;
 		for (int i = 0; i < stats.length; i++) {
-			str.append("Allocation: " + stats[i].m_blockSize);
 			long reserved = stats[i].m_reservedSlots * stats[i].m_blockSize;
 			treserved += reserved;
-			str.append(", reserved: " + reserved);
+			treservedSlots += stats[i].m_reservedSlots;
 			long filled = stats[i].m_filledSlots * stats[i].m_blockSize;
 			tfilled += filled;
-			str.append(", filled: " + filled);
+			tfilledSlots += stats[i].m_filledSlots;
+			
+			str.append("Allocation: " + stats[i].m_blockSize);
+			str.append(", slots: "  + stats[i].m_filledSlots + "/" + stats[i].m_reservedSlots);
+			str.append(", storage: "  + filled + "/" + reserved);
 			str.append("\n");
 		}
-		str.append("Total - file: " + convertAddr(m_fileSize) + ", reserved: " + treserved + ", filled: " + tfilled + "\n");
+		str.append("Total - file: " + convertAddr(m_fileSize) + ", slots: " + tfilledSlots + "/" + treservedSlots + ", storage: " + tfilled + "/"  + treserved + "\n");
 	}
 
 	public ArrayList getStorageBlockAddresses() {
