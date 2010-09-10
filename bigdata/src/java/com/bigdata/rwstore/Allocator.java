@@ -28,6 +28,8 @@ import java.io.DataInputStream;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.bigdata.rwstore.RWStore.AllocationStats;
+
 
 public interface Allocator extends Comparable {
   public int getBlockSize();
@@ -50,7 +52,7 @@ public interface Allocator extends Comparable {
   public void addAddresses(ArrayList addrs);
   public int getRawStartAddr();
   public int getIndex();
-  public void appendShortStats(StringBuffer str);
+  public void appendShortStats(StringBuilder str, AllocationStats[] stats);
   public boolean canImmediatelyFree(int addr, int size, IAllocationContext context);
 }
 	

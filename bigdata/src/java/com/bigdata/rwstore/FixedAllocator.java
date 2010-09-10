@@ -30,6 +30,7 @@ import java.io.*;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.rwstore.RWStore.AllocationStats;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -334,7 +335,7 @@ public class FixedAllocator implements Allocator {
 			if (block.m_addr == 0) {
 				break;
 			}
-            sb.append(block.getStats() + "\r\n");
+            sb.append(block.getStats(null) + "\r\n");
 			counter.addAndGet(block.getAllocBits() * m_size);
 		}
 
@@ -489,14 +490,26 @@ public class FixedAllocator implements Allocator {
 		return m_index;
 	}
 
-	public void appendShortStats(StringBuffer str) {
-		str.append("Index: " + m_index + ", " + m_size);
+	public void appendShortStats(StringBuilder str, AllocationStats[] stats) {
+
+		int si = -1;
+
+		if (stats == null) {
+			str.append("Index: " + m_index + ", " + m_size);
+		} else {		
+			for (int i = 0; i < stats.length; i++) {
+				if (m_size == stats[i].m_blockSize) {
+					si = i;
+					break;
+				}
+			}
+		}
 		
 		Iterator<AllocBlock> blocks = m_allocBlocks.iterator();
 		while (blocks.hasNext()) {
 			AllocBlock block = blocks.next();
 			if (block.m_addr != 0) {
-				str.append(block.getStats());
+				str.append(block.getStats(si == -1 ? null : stats[si]));
 			} else {
 				break;
 			}

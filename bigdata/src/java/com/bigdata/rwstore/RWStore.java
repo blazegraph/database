@@ -634,7 +634,7 @@ public class RWStore implements IStore {
 			// clearOutstandingDeferrels(deferredFreeListAddr, deferredFreeListEntries);
 
 			if (log.isTraceEnabled()) {
-				final StringBuffer str = new StringBuffer();
+				final StringBuilder str = new StringBuilder();
 				this.showAllocators(str);
 				log.trace(str);
 			}
@@ -778,7 +778,7 @@ public class RWStore implements IStore {
 		}
 
 		if (false) {
-			StringBuffer tmp = new StringBuffer();
+			StringBuilder tmp = new StringBuilder();
 			showAllocators(tmp);
 			
 			System.out.println("Allocators: " + tmp.toString());
@@ -2076,16 +2076,50 @@ public class RWStore implements IStore {
 
 	}
 	
+	public static class AllocationStats {
+		public AllocationStats(int i) {
+			m_blockSize = i;
+		}
+		long m_blockSize;
+		long m_reservedSlots;
+		long m_filledSlots;
+	}
 	/**
 	 * Utility debug outputing the allocator array, showing index, start
 	 * address and alloc type/size
+	 * 
+	 * Collected statistics are against each Allocation Block size:
+	 * total number of slots | store size
+	 * number of filled slots | store used
 	 */
-	public void showAllocators(StringBuffer str) {
+	public void showAllocators(StringBuilder str) {
+		AllocationStats[] stats = new AllocationStats[m_allocSizes.length];
+		for (int i = 0; i < stats.length; i++) {
+			stats[i] = new AllocationStats(m_allocSizes[i]*64);
+		}
 		Iterator allocs = m_allocs.iterator();
 		while (allocs.hasNext()) {
 			Allocator alloc = (Allocator) allocs.next();
-			alloc.appendShortStats(str);
+			alloc.appendShortStats(str, stats);
 		}
+		
+		// Append Summary
+		str.append("\n-------------------------\n");
+		str.append("RWStore Allocation Summary\n");
+		str.append("-------------------------\n");
+		long treserved = 0;
+		long tfilled = 0;
+		for (int i = 0; i < stats.length; i++) {
+			str.append("Allocation: " + stats[i].m_blockSize);
+			long reserved = stats[i].m_reservedSlots * stats[i].m_blockSize;
+			treserved += reserved;
+			str.append(", reserved: " + reserved);
+			long filled = stats[i].m_filledSlots * stats[i].m_blockSize;
+			tfilled += filled;
+			str.append(", filled: " + filled);
+			str.append("\n");
+		}
+		str.append("Total - file: " + convertAddr(m_fileSize) + ", reserved: " + treserved + ", filled: " + tfilled + "\n");
 	}
 
 	public ArrayList getStorageBlockAddresses() {
