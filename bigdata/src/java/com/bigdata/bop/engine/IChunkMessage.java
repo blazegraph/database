@@ -30,15 +30,6 @@ public interface IChunkMessage {
     /** The identifier for the target index partition. */
     int getPartitionId();
 
-    /*
-     * @todo Report the #of bytes available with this message. However, first
-     * figure out if that if the #of bytes in this {@link OutputChunk} or across
-     * all {@link OutputChunk}s available for the target service and sink.
-     */ 
-    // @todo move to concrete subclass or allow ZERO if data are in memory (no RMI).
-//    /** The #of bytes of data which are available for that operator. */
-//    int getBytesAvailable();
-    
     /**
      * Return <code>true</code> if the chunk is materialized on the receiver.
      */
@@ -78,16 +69,5 @@ public interface IChunkMessage {
      *       we are going to run over all the data anyway.
      */
     IAsynchronousIterator<IBindingSet[]> iterator();
-
-    // /**
-    // * The Internet address and port of a {@link ResourceService} from which
-    // * the receiver may demand the data.
-    // */
-    // InetSocketAddress getServiceAddr();
-    //
-    // /**
-    // * The set of resources on the sender which comprise the data.
-    // */
-    // Iterator<UUID> getChunkIds();
 
 }

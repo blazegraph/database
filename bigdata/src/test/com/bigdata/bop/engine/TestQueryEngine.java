@@ -195,7 +195,6 @@ public class TestQueryEngine extends TestCase2 {
         final BindingSetPipelineOp query = new CopyBindingSetOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
-                new NV(Predicate.Annotations.READ_TIMESTAMP,ITx.READ_COMMITTED),//
                 }));
 
         final long queryId = 1L;
@@ -275,11 +274,11 @@ public class TestQueryEngine extends TestCase2 {
                                 new NV(Predicate.Annotations.CONSTRAINT, null),//
                                 new NV(Predicate.Annotations.EXPANDER, null),//
                                 new NV(Predicate.Annotations.BOP_ID, predId),//
+                                new NV(Predicate.Annotations.TIMESTAMP,ITx.READ_COMMITTED),//
                         })),
                 // join annotations
                 NV.asMap(new NV[] { //
                         new NV(Predicate.Annotations.BOP_ID, joinId),//
-                        new NV(Predicate.Annotations.READ_TIMESTAMP,ITx.READ_COMMITTED),//
                         })//
         );
 
@@ -447,6 +446,7 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.CONSTRAINT, null),//
                         new NV(Predicate.Annotations.EXPANDER, null),//
                         new NV(Predicate.Annotations.BOP_ID, predId1),//
+                        new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
         
         final Predicate<?> pred2Op = new Predicate<E>(new IVariableOrConstant[] {
@@ -461,6 +461,7 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.CONSTRAINT, null),//
                         new NV(Predicate.Annotations.EXPANDER, null),//
                         new NV(Predicate.Annotations.BOP_ID, predId2),//
+                        new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
         
         final BindingSetPipelineOp join1Op = new PipelineJoin<E>(//
@@ -473,7 +474,6 @@ public class TestQueryEngine extends TestCase2 {
                 join1Op, pred2Op,//
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, joinId2),//
-                        new NV(Predicate.Annotations.READ_TIMESTAMP, ITx.READ_COMMITTED),//
                         }));
 
         final BindingSetPipelineOp query = join2Op;

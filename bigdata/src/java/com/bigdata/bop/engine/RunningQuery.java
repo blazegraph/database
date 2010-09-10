@@ -89,17 +89,17 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
     /** The unique identifier for this query. */
     final private long queryId;
 
-    /**
-     * The timestamp or transaction identifier against which the query is
-     * reading.
-     */
-    final private long readTimestamp;
-
-    /**
-     * The timestamp or transaction identifier against which the query is
-     * writing.
-     */
-    final private long writeTimestamp;
+//    /**
+//     * The timestamp or transaction identifier against which the query is
+//     * reading.
+//     */
+//    final private long readTimestamp;
+//
+//    /**
+//     * The timestamp or transaction identifier against which the query is
+//     * writing.
+//     */
+//    final private long writeTimestamp;
 
 //    /**
 //     * The timestamp when the query was accepted by this node (ms).
@@ -389,41 +389,42 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
         this.bopIndex = BOpUtility.getIndex(query);
         this.statsMap = controller ? new ConcurrentHashMap<Integer, BOpStats>()
                 : null;
-        /*
-         * @todo when making a per-bop annotation, queries must obtain a tx for
-         * each timestamp up front on the controller and rewrite the bop to hold
-         * the tx until it is done.
-         * 
-         * @todo This is related to how we handle sequences of steps, parallel
-         * steps, closure of steps, and join graphs. Those operations need to be
-         * evaluated on the controller. We will have to model the relationship
-         * between the subquery and the query in order to terminate the subquery
-         * when the query halts and to terminate the query if the subquery
-         * fails.
-         * 
-         * @todo Closure operations must rewrite the query to update the
-         * annotations. Each pass in a closure needs to be its own "subquery"
-         * and will need to have a distinct queryId.
-         */
-        final Long readTimestamp = query
-                .getProperty(BOp.Annotations.READ_TIMESTAMP);
-
-        // @todo remove default when elevating to per-writable bop annotation.
-        final long writeTimestamp = query.getProperty(
-                BOp.Annotations.WRITE_TIMESTAMP, ITx.UNISOLATED);
-
-        if (readTimestamp == null)
-            throw new IllegalArgumentException();
-
-        if (readTimestamp.longValue() == ITx.UNISOLATED)
-            throw new IllegalArgumentException();
-
-        if (TimestampUtility.isReadOnly(writeTimestamp))
-            throw new IllegalArgumentException();
-
-        this.readTimestamp = readTimestamp;
         
-        this.writeTimestamp = writeTimestamp;
+//        /*
+//         * @todo when making a per-bop annotation, queries must obtain a tx for
+//         * each timestamp up front on the controller and rewrite the bop to hold
+//         * the tx until it is done.
+//         * 
+//         * @todo This is related to how we handle sequences of steps, parallel
+//         * steps, closure of steps, and join graphs. Those operations need to be
+//         * evaluated on the controller. We will have to model the relationship
+//         * between the subquery and the query in order to terminate the subquery
+//         * when the query halts and to terminate the query if the subquery
+//         * fails.
+//         * 
+//         * @todo Closure operations must rewrite the query to update the
+//         * annotations. Each pass in a closure needs to be its own "subquery"
+//         * and will need to have a distinct queryId.
+//         */
+//        final Long timestamp = query
+//                .getProperty(BOp.Annotations.TIMESTAMP);
+//
+//        // @todo remove default when elevating to per-writable bop annotation.
+//        final long writeTimestamp = query.getProperty(
+//                BOp.Annotations.WRITE_TIMESTAMP, ITx.UNISOLATED);
+//
+//        if (readTimestamp == null)
+//            throw new IllegalArgumentException();
+//
+//        if (readTimestamp.longValue() == ITx.UNISOLATED)
+//            throw new IllegalArgumentException();
+//
+//        if (TimestampUtility.isReadOnly(writeTimestamp))
+//            throw new IllegalArgumentException();
+//
+//        this.readTimestamp = readTimestamp;
+//        
+//        this.writeTimestamp = writeTimestamp;
 
         this.timeout = query.getProperty(BOp.Annotations.TIMEOUT,
                 BOp.Annotations.DEFAULT_TIMEOUT);
@@ -960,16 +961,16 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
         
     }
 
-    public long getReadTimestamp() {
-     
-        return readTimestamp;
-        
-    }
-
-    public long getWriteTimestamp() {
-        
-        return writeTimestamp;
-        
-    }
+//    public long getReadTimestamp() {
+//     
+//        return readTimestamp;
+//        
+//    }
+//
+//    public long getWriteTimestamp() {
+//        
+//        return writeTimestamp;
+//        
+//    }
 
 }

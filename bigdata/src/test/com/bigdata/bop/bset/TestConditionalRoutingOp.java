@@ -49,7 +49,6 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.MockRunningQuery;
 import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.bop.solutions.DistinctBindingSetOp;
-import com.bigdata.journal.ITx;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
@@ -210,11 +209,8 @@ public class TestConditionalRoutingOp extends TestCase2 {
         final IBlockingBuffer<IBindingSet[]> sink2 = query.newBuffer();
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                new MockRunningQuery(
-                null/* fed */, null/* indexManager */,
-                ITx.READ_COMMITTED/* readTimestamp */,
-                ITx.UNISOLATED/* writeTimestamp */), -1/* partitionId */, stats,
-                source, sink, sink2);
+                new MockRunningQuery(null/* fed */, null/* indexManager */),
+                -1/* partitionId */, stats, source, sink, sink2);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);

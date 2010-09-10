@@ -492,7 +492,7 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
             this.optional = joinOp.isOptional();
             this.variablesToKeep = joinOp.variablesToKeep();
             this.context = context;
-            this.relation = context.getReadRelation(right);
+            this.relation = context.getRelation(right);
             this.source = context.getSource();
             this.sink = context.getSink();
             this.sink2 = context.getSink2();

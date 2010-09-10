@@ -50,7 +50,7 @@ public class ThickChunkMessage implements IChunkMessage, Serializable {
      */
     private static final long serialVersionUID = 1L;
 
-    final private IQueryClient clientProxy;
+    final private IQueryClient queryController;
 
     final private long queryId;
 
@@ -61,7 +61,7 @@ public class ThickChunkMessage implements IChunkMessage, Serializable {
     final private byte[] data;
 
     public IQueryClient getQueryController() {
-        return clientProxy;
+        return queryController;
     }
 
     public long getQueryId() {
@@ -84,11 +84,19 @@ public class ThickChunkMessage implements IChunkMessage, Serializable {
         return data.length;
     }
 
-    public ThickChunkMessage(final IQueryClient clientProxy,
+    /**
+     * 
+     * @param queryController
+     * @param queryId
+     * @param bopId
+     * @param partitionId
+     * @param data
+     */
+    public ThickChunkMessage(final IQueryClient queryController,
             final long queryId, final int bopId, final int partitionId,
             final byte[] data) {
 
-        if (clientProxy == null)
+        if (queryController == null)
             throw new IllegalArgumentException();
 
         if (data == null)
@@ -98,7 +106,7 @@ public class ThickChunkMessage implements IChunkMessage, Serializable {
         if (data.length == 0)
             throw new IllegalArgumentException();
 
-        this.clientProxy = clientProxy;
+        this.queryController = queryController;
         
         this.queryId = queryId;
 
