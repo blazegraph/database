@@ -50,7 +50,7 @@ public class TestDelete extends TestCase2 {
         super(name);
     }
 
-    public void test_insert() {
+    public void test_something() {
 
         fail("write tests");
         

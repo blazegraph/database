@@ -12,7 +12,7 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
  * be consumed by some {@link BOp} in a specific query (this is only used in
  * query evaluation for the standalone database).
  */
-public class BindingSetChunk implements IChunkMessage {
+public class BindingSetChunk<E> implements IChunkMessage<E> {
 
     /** The query controller. */
     private final IQueryClient queryController;
@@ -35,7 +35,7 @@ public class BindingSetChunk implements IChunkMessage {
     /**
      * The binding sets to be consumed by that {@link BOp}.
      */
-    private IAsynchronousIterator<IBindingSet[]> source;
+    private IAsynchronousIterator<E[]> source;
 
     public IQueryClient getQueryController() {
         return queryController;
@@ -59,7 +59,7 @@ public class BindingSetChunk implements IChunkMessage {
 
     public BindingSetChunk(final IQueryClient queryController,
             final long queryId, final int bopId, final int partitionId,
-            final IAsynchronousIterator<IBindingSet[]> source) {
+            final IAsynchronousIterator<E[]> source) {
 
         if (queryController == null)
             throw new IllegalArgumentException();
@@ -89,8 +89,12 @@ public class BindingSetChunk implements IChunkMessage {
     public void materialize(FederatedRunningQuery runningQuery) {
         // NOP
     }
+
+    public void release() {
+        // NOP
+    }
     
-    public IAsynchronousIterator<IBindingSet[]> iterator() {
+    public IAsynchronousIterator<E[]> iterator() {
         return source;
     }
 

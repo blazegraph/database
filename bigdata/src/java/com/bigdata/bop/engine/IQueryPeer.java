@@ -5,6 +5,7 @@ import java.rmi.RemoteException;
 import java.util.UUID;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.service.IService;
 
 /**
@@ -46,6 +47,6 @@ public interface IQueryPeer extends Remote {
      * @throws UnsupportedOperationException
      *             unless running in scale-out.
      */
-    void bufferReady(IChunkMessage msg) throws RemoteException;
+    void bufferReady(IChunkMessage<IBindingSet> msg) throws RemoteException;
 
 }

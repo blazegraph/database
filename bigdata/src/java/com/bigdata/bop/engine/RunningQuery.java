@@ -48,13 +48,15 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NoSuchBOpException;
+import com.bigdata.bop.bset.CopyBindingSetOp;
+import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.TimestampUtility;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.service.IBigdataFederation;
@@ -90,24 +92,15 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
     final private long queryId;
 
 //    /**
-//     * The timestamp or transaction identifier against which the query is
-//     * reading.
-//     */
-//    final private long readTimestamp;
-//
-//    /**
-//     * The timestamp or transaction identifier against which the query is
-//     * writing.
-//     */
-//    final private long writeTimestamp;
-
-//    /**
 //     * The timestamp when the query was accepted by this node (ms).
 //     */
 //    final private long begin;
+
     /**
      * The query deadline. The value is the system clock time in milliseconds
      * when the query is due and {@link Long#MAX_VALUE} if there is no deadline.
+     * In order to have a guarantee of a consistent clock, the deadline is
+     * interpreted by the query controller.
      */
     final private AtomicLong deadline = new AtomicLong(Long.MAX_VALUE);
 
@@ -132,8 +125,6 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      */
     final private IQueryClient clientProxy;
 
-//    /** The query iff materialized on this node. */
-//    final private AtomicReference<BOp> queryRef;
     /** The query. */
     final private BOp query;
 
@@ -141,7 +132,12 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      * The buffer used for the overall output of the query pipeline.
      * 
      * FIXME SCALEOUT: This should only exist on the query controller. Other
-     * nodes will send {@link IChunkMessage}s to the query controller.
+     * nodes will send {@link IChunkMessage}s to the query controller. s/o will
+     * use an operator with {@link BOpEvaluationContext#CONTROLLER} in order to
+     * ensure that the results are transferred to the query controller. When a
+     * {@link SliceOp} is used, this is redundant. The operator in other cases
+     * can be a {@link CopyBindingSetOp} whose {@link BOpEvaluationContext} has
+     * been overridden.
      */
     final private IBlockingBuffer<IBindingSet[]> queryBuffer;
 
@@ -218,7 +214,7 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      * Note: This is package private so it will be visible to the
      * {@link QueryEngine}.
      */
-    final/* private */BlockingQueue<IChunkMessage> chunksIn = new LinkedBlockingDeque<IChunkMessage>();
+    final/* private */BlockingQueue<IChunkMessage<IBindingSet>> chunksIn = new LinkedBlockingDeque<IChunkMessage<IBindingSet>>();
 
     /**
      * Set the query deadline. The query will be cancelled when the deadline is
@@ -286,45 +282,13 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
         
     }
 
+    /**
+     * Return the operator tree for this query.
+     */
     public BOp getQuery() {
         return query;
     }
     
-//    /**
-//     * Return the operator tree for this query. If query processing is
-//     * distributed and the query has not been materialized on this node, then it
-//     * is materialized now.
-//     * 
-//     * @return The query.
-//     */
-//    public BOp getQuery() {
-//
-//        if (queryRef.get() == null) {
-//
-//            synchronized (queryRef) {
-//
-//                if (queryRef.get() == null) {
-//
-//                    try {
-//
-//                        queryRef.set(clientProxy.getQuery(queryId));
-//
-//                    } catch (RemoteException e) {
-//
-//                        throw new RuntimeException(e);
-//
-//                    }
-//
-//                }
-//
-//            }
-//
-//        }
-//        
-//        return queryRef.get();
-//
-//   }
-
     /**
      * Return <code>true</code> iff this is the query controller.
      */
@@ -361,8 +325,6 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      *             if the <i>writeTimestamp</i> is neither
      *             {@link ITx#UNISOLATED} nor a read-write transaction
      *             identifier.
-     * 
-     * @todo is queryBuffer required? should it be allocated from the top bop?
      */
     public RunningQuery(final QueryEngine queryEngine, final long queryId,
 //            final long begin, 
@@ -390,42 +352,6 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
         this.statsMap = controller ? new ConcurrentHashMap<Integer, BOpStats>()
                 : null;
         
-//        /*
-//         * @todo when making a per-bop annotation, queries must obtain a tx for
-//         * each timestamp up front on the controller and rewrite the bop to hold
-//         * the tx until it is done.
-//         * 
-//         * @todo This is related to how we handle sequences of steps, parallel
-//         * steps, closure of steps, and join graphs. Those operations need to be
-//         * evaluated on the controller. We will have to model the relationship
-//         * between the subquery and the query in order to terminate the subquery
-//         * when the query halts and to terminate the query if the subquery
-//         * fails.
-//         * 
-//         * @todo Closure operations must rewrite the query to update the
-//         * annotations. Each pass in a closure needs to be its own "subquery"
-//         * and will need to have a distinct queryId.
-//         */
-//        final Long timestamp = query
-//                .getProperty(BOp.Annotations.TIMESTAMP);
-//
-//        // @todo remove default when elevating to per-writable bop annotation.
-//        final long writeTimestamp = query.getProperty(
-//                BOp.Annotations.WRITE_TIMESTAMP, ITx.UNISOLATED);
-//
-//        if (readTimestamp == null)
-//            throw new IllegalArgumentException();
-//
-//        if (readTimestamp.longValue() == ITx.UNISOLATED)
-//            throw new IllegalArgumentException();
-//
-//        if (TimestampUtility.isReadOnly(writeTimestamp))
-//            throw new IllegalArgumentException();
-//
-//        this.readTimestamp = readTimestamp;
-//        
-//        this.writeTimestamp = writeTimestamp;
-
         this.timeout = query.getProperty(BOp.Annotations.TIMEOUT,
                 BOp.Annotations.DEFAULT_TIMEOUT);
 
@@ -463,8 +389,9 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
         /*
          * Note: The partitionId will always be -1 in scale-up.
          */
-        final BindingSetChunk chunk = new BindingSetChunk(clientProxy, queryId,
-                sinkId, -1/* partitionId */, sink.iterator());
+        final BindingSetChunk<IBindingSet> chunk = new BindingSetChunk<IBindingSet>(
+                clientProxy, queryId, sinkId, -1/* partitionId */, sink
+                        .iterator());
 
         queryEngine.acceptChunk(chunk);
 
@@ -475,12 +402,12 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
     /**
      * Make a chunk of binding sets available for consumption by the query.
      * <p>
-     * Note: this is invoked by {@link QueryEngine#add(BindingSetChunk)}.
+     * Note: this is invoked by {@link QueryEngine#acceptChunk(IChunkMessage)}
      * 
      * @param msg
      *            The chunk.
      */
-    protected void acceptChunk(final IChunkMessage msg) {
+    protected void acceptChunk(final IChunkMessage<IBindingSet> msg) {
 
         if (msg == null)
             throw new IllegalArgumentException();
@@ -506,7 +433,7 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      * 
      * @todo this should reject multiple invocations for a given query instance.
      */
-    public void startQuery(final IChunkMessage chunk) {
+    public void startQuery(final IChunkMessage<IBindingSet> chunk) {
         if (!controller)
             throw new UnsupportedOperationException();
         if (chunk == null)
@@ -776,7 +703,7 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      *            A chunk to be consumed.
      */
     @SuppressWarnings("unchecked")
-    protected FutureTask<Void> newChunkTask(final IChunkMessage chunk) {
+    protected FutureTask<Void> newChunkTask(final IChunkMessage<IBindingSet> chunk) {
         /*
          * Look up the BOp in the index, create the BOpContext for that BOp, and
          * return the value returned by BOp.eval(context).
@@ -792,6 +719,9 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
              * @todo evaluation of element[] pipelines needs to use pretty much
              * the same code, but it needs to be typed for E[] rather than
              * IBindingSet[].
+             * 
+             * @todo evaluation of Monet style BATs would also operate under
+             * different assumptions, closer to those of an element[].
              */
             throw new UnsupportedOperationException(bop.getClass().getName());
         }
@@ -960,17 +890,5 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
         return queryEngine.getIndexManager();
         
     }
-
-//    public long getReadTimestamp() {
-//     
-//        return readTimestamp;
-//        
-//    }
-//
-//    public long getWriteTimestamp() {
-//        
-//        return writeTimestamp;
-//        
-//    }
 
 }

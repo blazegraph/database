@@ -15,8 +15,18 @@ import com.bigdata.service.ResourceService;
  * processing. There are several implementations of this interface supporting
  * same-JVM messages, thick RMI messages, and RMI messages where the payload is
  * materialized using NIO transfers from the {@link ResourceService}.
+ * 
+ * @param <E>
+ *            The generic type of the elements in the chunk (binding sets,
+ *            elements from a relation, etc).
+ * 
+ * @todo Compressed representations of binding sets with the ability to read
+ *       them in place or materialize them onto the java heap. The
+ *       representation should be amenable to processing in C since we want to
+ *       use them on GPUs as well. See {@link IChunkMessage} and perhaps
+ *       {@link IRaba}.
  */
-public interface IChunkMessage {
+public interface IChunkMessage<E> {
 
     /** The proxy for the query controller. */
     IQueryClient getQueryController();
@@ -44,6 +54,11 @@ public interface IChunkMessage {
     void materialize(FederatedRunningQuery runningQuery);
 
     /**
+     * Discard the materialized data.
+     */
+    void release();
+    
+    /**
      * Visit the binding sets in the chunk.
      * 
      * @todo we do not need to use {@link IAsynchronousIterator} any more. This
@@ -67,7 +82,10 @@ public interface IChunkMessage {
      *       source for processing. For selective operators, those chunks can be
      *       combined before we execute the operator. For unselective operators,
      *       we are going to run over all the data anyway.
+     * 
+     * @throws IllegalStateException
+     *             if the payload is not materialized.
      */
-    IAsynchronousIterator<IBindingSet[]> iterator();
+    IAsynchronousIterator<E[]> iterator();
 
 }

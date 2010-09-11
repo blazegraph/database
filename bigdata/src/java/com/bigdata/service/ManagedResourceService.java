@@ -52,10 +52,6 @@ import com.bigdata.io.DirectBufferPoolAllocator.IAllocation;
  *       breaking a query if it would demand too many resources given the
  *       concurrent query demand or forcing the query to block until sufficient
  *       resources are available?
- * 
- * @todo Separate the allocation management from the resource service. it should
- *       be its own class with its own test suite. The resource service just
- *       makes use of the exposed allocations.
  */
 abstract public class ManagedResourceService extends ResourceService {
 

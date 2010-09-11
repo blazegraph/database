@@ -29,10 +29,7 @@ package com.bigdata.bop.fed;
 
 import java.nio.ByteBuffer;
 import java.rmi.RemoteException;
-import java.util.Arrays;
 import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -47,9 +44,7 @@ import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.bop.engine.RunningQuery;
-import com.bigdata.io.DirectBufferPoolAllocator;
-import com.bigdata.io.SerializerUtil;
-import com.bigdata.io.DirectBufferPoolAllocator.IAllocation;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.DirectBufferPoolAllocator.IAllocationContext;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -58,7 +53,6 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.ResourceService;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -245,7 +239,7 @@ public class FederatedRunningQuery extends RunningQuery {
      * {@inheritDoc}
      */
     @Override
-    protected void acceptChunk(final IChunkMessage msg) {
+    protected void acceptChunk(final IChunkMessage<IBindingSet> msg) {
 
         super.acceptChunk(msg);
         
@@ -475,11 +469,11 @@ public class FederatedRunningQuery extends RunningQuery {
      *            The identifier of the target {@link BOp}.
      * @param allocationContext
      *            The allocation context within which the {@link ByteBuffer}s
-     *            will be managed for this {@link ChunkMessageWithNIOPayload}.
+     *            will be managed for this {@link NIOChunkMessage}.
      * @param source
      *            The binding sets to be formatted onto a buffer.
      * 
-     * @return The {@link ChunkMessageWithNIOPayload}.
+     * @return The {@link NIOChunkMessage}.
      * 
      * @todo This is basically a factory for creating {@link IChunkMessage}s.
      *       That factory pattern in combined with the logic to send the message
@@ -488,10 +482,6 @@ public class FederatedRunningQuery extends RunningQuery {
      *       cases. That would let us send out the messages in parallel, which
      *       could help to cut latency when an operator has a large fan out (in
      *       scale-out when mapping over shards or nodes).
-     * 
-     * @todo We probably need to use the {@link DirectBufferPoolAllocator} to
-     *       receive the chunks within the {@link ManagedResourceService} as
-     *       well.
      * 
      * @todo Release the allocations associated with each output chunk once it
      *       is received by the remote service.
@@ -506,10 +496,32 @@ public class FederatedRunningQuery extends RunningQuery {
      *       closed, then the output chunks for the query controller should be
      *       immediately dropped.
      * 
-     * @todo There are a few things where the resource must be made available to
-     *       more than one operator evaluation phase. The best examples are
-     *       temporary graphs for parallel closure and large collections of
-     *       graphIds for SPARQL "NAMED FROM DATA SET" extensions.
+     * @todo There are a few things for which the resource must be made
+     *       available to more than one operator evaluation phase. The best
+     *       examples are temporary graphs for parallel closure and large
+     *       collections of graphIds for SPARQL "NAMED FROM DATA SET"
+     *       extensions.
+     * 
+     * @todo Rethink the multiplicity relationship between chunks output from an
+     *       operator, chunks output from mapping the operator over shards or
+     *       nodes, RMI messages concerning buffers available for the sink
+     *       operator on the various nodes, and the #of allocations per RMI
+     *       message on both the sender and the receiver.
+     *       <p>
+     *       I am pretty sure that none of these are strongly coupled, e.g.,
+     *       they are not 1:1. Some stages can combine chunks. Multiple
+     *       allocations could be required on either the sender or the receiver
+     *       purely due to where the slices fall on the backing direct
+     *       {@link ByteBuffer}s in the {@link DirectBufferPool} and the sender
+     *       and receiver do not need to use the same allocation context or have
+     *       the same projection of slices onto the backing buffers.
+     *       <p>
+     *       The one thing which is critical is that the query controller is
+     *       properly informed of the #of chunks made available to an operator
+     *       and consumed by that operator, that those reports must be in the
+     *       same units, and that the reports must be delivered back to the
+     *       query controller in a manner which does not transiently violate the
+     *       termination conditions of the query.
      */
     protected void sendChunkMessage(
             final UUID serviceUUID,
@@ -540,13 +552,15 @@ public class FederatedRunningQuery extends RunningQuery {
         final boolean thisService = peerProxy == getQueryEngine();
         
         if(thisService) {
+
             /*
              * Leave the chunk as Java objects and drop it directly onto the
              * query engine.
              */
 
-            final IChunkMessage msg = new BindingSetChunk(getQueryController(),
-                    getQueryId(), sinkId, partitionId, source.iterator());
+            final IChunkMessage<IBindingSet> msg = new BindingSetChunk<IBindingSet>(
+                    getQueryController(), getQueryId(), sinkId, partitionId,
+                    source.iterator());
             
             getQueryEngine().bufferReady(msg);
          
@@ -561,36 +575,22 @@ public class FederatedRunningQuery extends RunningQuery {
          * RMI message or out of band using NIO. This decision effects how we
          * serialize the chunk.
          */
-        final IChunkMessage msg;
+        final IChunkMessage<IBindingSet> msg;
         if (source.size() < 100) {
 
-            /*
-             * FIXME Send payload inline with the RMI message.
-             */
+            msg = new ThickChunkMessage<IBindingSet>(getQueryController(),
+                    getQueryId(), sinkId, partitionId, source);
 
-//            final byte[] data = SerializerUtil.serialize(obj);
-//            
-//            // @todo harmonize serialization and compression and ctors.
-//            msg = new ThickChunkMessage(getQueryController(), getQueryId(),
-//                    sinkId, partitionId, data);
-            throw new UnsupportedOperationException();
-
-        } else
-        {
+        } else {
 
             /*
              * Marshall the data onto direct ByteBuffer(s) and send a thin
              * message by RMI. The receiver will retrieve the data using NIO
              * against the ResourceService.
-             * 
-             * @todo harmonize serialization and compression and ctors.
              */
-            final List<IAllocation> allocations = moveToNIOBuffers(
-                    allocationContext, source);
-
-            msg = new ChunkMessageWithNIOPayload(getQueryController(),
-                    getQueryId(), sinkId, partitionId, allocations,
-                    getQueryEngine().getResourceService().getAddr());
+            msg = new NIOChunkMessage<IBindingSet>(getQueryController(),
+                    getQueryId(), sinkId, partitionId, allocationContext,
+                    source, getQueryEngine().getResourceService().getAddr());
 
         }
 
@@ -601,63 +601,6 @@ public class FederatedRunningQuery extends RunningQuery {
         } catch (RemoteException e) {
 
             throw new RuntimeException(e);
-
-        }
-
-    }
-
-    /**
-     * Chunk-wise serialization of the data onto allocations. 
-     * @param allocationContext
-     * @param source
-     * @return
-     * 
-     * @todo should be on message per chunk, right?
-     */
-    private List<IAllocation> moveToNIOBuffers(
-            final IAllocationContext allocationContext,
-            final IBlockingBuffer<IBindingSet[]> source) {
-        
-        int nbytes = 0;
-        
-        final List<IAllocation> allocations = new LinkedList<IAllocation>();
-        
-        final IAsynchronousIterator<IBindingSet[]> itr = source.iterator();
-        
-        try {
-
-            while (itr.hasNext()) {
-
-                // Next chunk to be serialized.
-                final IBindingSet[] chunk = itr.next();
-                
-                // serialize the chunk of binding sets.
-                final byte[] data = SerializerUtil.serialize(chunk);
-                
-                // track size of the allocations.
-                nbytes += data.length;
-
-                // allocate enough space for those data.
-                final IAllocation[] tmp;
-                try {
-                    tmp = allocationContext.alloc(data.length);
-                } catch (InterruptedException ex) {
-                    throw new RuntimeException(ex);
-                }
-
-                // copy the data into the allocations.
-                DirectBufferPoolAllocator.put(data, tmp);
-
-                // append the new allocations.
-                allocations.addAll(Arrays.asList(tmp));
-
-            }
-
-            return allocations;
-            
-        } finally {
-
-            itr.close();
 
         }
 
