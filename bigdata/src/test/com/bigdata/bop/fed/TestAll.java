@@ -67,6 +67,16 @@ public class TestAll extends TestCase {
         // unit tests for mapping binding sets over nodes. 
         suite.addTestSuite(TestMapBindingSetsOverNodes.class);
 
+        /*
+         * Chunk message tests.
+         */
+        
+        // The payload is inline with the RMI message.
+        suite.addTestSuite(TestThickChunkMessage.class);
+
+        // The payload is transfered using NIO and the ResourceService.
+        suite.addTestSuite(TestNIOChunkMessage.class);
+        
         // unit tests for the federated query engine.
         suite.addTestSuite(TestFederatedQueryEngine.class);
         

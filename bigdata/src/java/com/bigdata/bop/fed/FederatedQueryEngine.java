@@ -31,6 +31,12 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
@@ -41,7 +47,6 @@ import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.solutions.SliceOp;
-import com.bigdata.btree.raba.IRaba;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -51,6 +56,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.ResourceService;
+import com.bigdata.util.InnerCause;
 
 /**
  * An {@link IBigdataFederation} aware {@link QueryEngine}.
@@ -59,17 +65,12 @@ import com.bigdata.service.ResourceService;
  * @version $Id: FederatedQueryEngine.java 3508 2010-09-05 17:02:34Z thompsonbry
  *          $
  * 
- * @todo buffer management for s/o bindingSet[] movement
- * 
- * @todo buffer management for s/o DHT element[] movement
- * 
- * @todo Compressed representations of binding sets with the ability to read
- *       them in place or materialize them onto the java heap. The
- *       representation should be amenable to processing in C since we want to
- *       use them on GPUs as well. See {@link IChunkMessage} and perhaps
- *       {@link IRaba}.
+ * @todo DEFAULT_GRAPH_QUERY: buffer management for s/o DHT element[] movement
  */
 public class FederatedQueryEngine extends QueryEngine {
+
+    private final static transient Logger log = Logger
+            .getLogger(FederatedQueryEngine.class);
 
     /**
      * The {@link IBigdataFederation} iff running in scale-out.
@@ -88,6 +89,17 @@ public class FederatedQueryEngine extends QueryEngine {
     private final ManagedResourceService resourceService;
 
     /**
+     * A priority queue of {@link IChunkMessage}s which needs to have their data
+     * materialized so an operator can consume those data on this node.
+     */
+    final private PriorityBlockingQueue<IChunkMessage<?>> chunkMaterializationQueue = new PriorityBlockingQueue<IChunkMessage<?>>();
+
+    /**
+     * The {@link Future} for the task draining the {@link #chunkMaterializationQueue}.
+     */
+    private final AtomicReference<FutureTask<Void>> materializeChunksFuture = new AtomicReference<FutureTask<Void>>();
+
+    /**
      * Constructor used on a {@link DataService} (a query engine peer).
      * 
      * @param dataService
@@ -99,36 +111,6 @@ public class FederatedQueryEngine extends QueryEngine {
                 new DelegateIndexManager(dataService), dataService
                         .getResourceManager().getResourceService());
         
-    }
-
-    /**
-     * Constructor used on a non-{@link DataService} node to expose a query
-     * controller. Since the query controller is not embedded within a data
-     * service it needs to provide its own {@link ResourceService} and local
-     * {@link IIndexManager}.
-     * 
-     * @param fed
-     * @param indexManager
-     * @param resourceService
-     */
-    public FederatedQueryEngine(//
-            final IBigdataFederation<?> fed,//
-            final IIndexManager indexManager,//
-            final ManagedResourceService resourceService//
-            ) {
-
-        super(indexManager);
-
-        if (fed == null)
-            throw new IllegalArgumentException();
-
-        if (resourceService == null)
-            throw new IllegalArgumentException();
-
-        this.fed = fed;
-
-        this.resourceService = resourceService;
-
     }
 
     @Override
@@ -168,6 +150,151 @@ public class FederatedQueryEngine extends QueryEngine {
 
     }
     
+    /**
+     * Constructor used on a non-{@link DataService} node to expose a query
+     * controller. Since the query controller is not embedded within a data
+     * service it needs to provide its own {@link ResourceService} and local
+     * {@link IIndexManager}.
+     * 
+     * @param fed
+     * @param indexManager
+     * @param resourceService
+     */
+    public FederatedQueryEngine(//
+            final IBigdataFederation<?> fed,//
+            final IIndexManager indexManager,//
+            final ManagedResourceService resourceService//
+            ) {
+
+        super(indexManager);
+
+        if (fed == null)
+            throw new IllegalArgumentException();
+
+        if (resourceService == null)
+            throw new IllegalArgumentException();
+
+        this.fed = fed;
+
+        this.resourceService = resourceService;
+
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Extended to also initialize a thread which will materialize
+     * {@link IChunkMessage} for consumption by this node.
+     * 
+     * @todo ANALYTIC_QUERY: {@link IChunkMessage} are dropped onto a queue and
+     *       materialized in order of arrival. This works fine for low latency
+     *       pipelined query evaluation.
+     *       <p>
+     *       For analytic query, we (a) manage the #of high volume operators
+     *       which run concurrently, presumably based on their demands on
+     *       memory; and (b) model the chunks available before they are
+     *       materialized locally such that (c) they can be materialized on
+     *       demand (flow control); and (d) we can run the operator when there
+     *       are sufficient chunks available without taking on too much data.
+     *       <p>
+     *       This requires a separate queue for executing high volume operators
+     *       and also separate consideration of when chunks available on remote
+     *       nodes should be materialized.
+     */
+    @Override
+    public void init() {
+
+        final FutureTask<Void> ft = new FutureTask<Void>(
+                new MaterializeChunksTask(), (Void) null);
+        
+        if (materializeChunksFuture.compareAndSet(null/* expect */, ft)) {
+        
+            getIndexManager().getExecutorService().execute(ft);
+            
+        } else {
+            
+            throw new IllegalStateException("Already running");
+            
+        }
+
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Extended to stop materializing chunks once all running queries are done.
+     */
+    @Override
+    protected void didShutdown() {
+        
+        // stop materializing chunks.
+        final Future<?> f = materializeChunksFuture.get();
+        if (f != null)
+            f.cancel(true/* mayInterruptIfRunning */);
+
+    }
+    
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Extended to stop materializing chunks.
+     */
+    @Override
+    public void shutdownNow() {
+        
+        // stop materializing chunks.
+        final Future<?> f = materializeChunksFuture.get();
+        if (f != null)
+            f.cancel(true/* mayInterruptIfRunning */);
+
+        super.shutdownNow();
+
+    }
+    
+    /**
+     * Runnable materializes chunks and makes them available for further
+     * processing.
+     */
+    private class MaterializeChunksTask implements Runnable {
+        public void run() {
+            while (true) {
+                try {
+                    final IChunkMessage<?> c = chunkMaterializationQueue.take();
+                    final long queryId = c.getQueryId();
+                    final FederatedRunningQuery q = getRunningQuery(queryId);
+                    if (q.isCancelled())
+                        continue;
+                    final IChunkMessage<?> msg = chunkMaterializationQueue
+                            .poll();
+                    try {
+                        msg.materialize(q);
+                        /*
+                         * @todo The type warning here is because the rest of
+                         * the API does not know what to do with messages for
+                         * chunks other than IBindingSet[], e.g., IElement[],
+                         * etc.
+                         */
+                        FederatedQueryEngine.this
+                                .bufferReady((IChunkMessage) msg);
+                    } catch(Throwable t) {
+                        if(InnerCause.isInnerCause(t, InterruptedException.class)) {
+                            log.warn("Interrupted.");
+                            return;
+                        }
+                        throw new RuntimeException(t);
+                    }
+                } catch (InterruptedException e) {
+                    log.warn("Interrupted.");
+                    return;
+                } catch (Throwable ex) {
+                    // log and continue
+                    log.error(ex, ex);
+                    continue;
+                }
+            }
+        }
+    } // MaterializeChunksTask
+
     public void declareQuery(final IQueryDecl queryDecl) {
 
         final long queryId = queryDecl.getQueryId();
@@ -179,7 +306,7 @@ public class FederatedQueryEngine extends QueryEngine {
     }
     
     @Override
-    public void bufferReady(final IChunkMessage msg) {
+    public void bufferReady(final IChunkMessage<IBindingSet> msg) {
 
         if (msg == null)
             throw new IllegalArgumentException();
@@ -200,12 +327,6 @@ public class FederatedQueryEngine extends QueryEngine {
         } else {
 
             /*
-             * FIXME SCALEOUT: We need to model the chunks available before they
-             * are materialized locally such that (a) they can be materialized
-             * on demand (flow control); and (b) we can run the operator when
-             * there are sufficient chunks available without taking on too much
-             * data. [For the sort term, they can be dropped onto a queue and
-             * materialized in order of arrival.]
              */
             throw new UnsupportedOperationException("FIXME");
             
@@ -248,6 +369,8 @@ public class FederatedQueryEngine extends QueryEngine {
      *       normally. Also pay attention when the client closes the
      *       {@link IAsynchronousIterator} from which it is draining solutions
      *       early.
+     * 
+     * @deprecated This is going away.
      */
     @Override
     protected IBlockingBuffer<IBindingSet[]> newQueryBuffer(

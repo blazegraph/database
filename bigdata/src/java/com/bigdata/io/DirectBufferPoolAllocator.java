@@ -353,7 +353,12 @@ public class DirectBufferPoolAllocator {
             
         }
 
-    }
+        public String toString() {
+            return getClass().getName() + "{id=" + id + ",slice="
+                    + allocatedSlice + ",context=" + allocationContext + "}";
+        }
+        
+    } // class Allocation
 
     /**
      * An allocation context links some application specified key with a list of
@@ -390,6 +395,21 @@ public class DirectBufferPoolAllocator {
          */
         private final ConcurrentHashMap<UUID, Allocation> allocations = new ConcurrentHashMap<UUID, Allocation>();
 
+        /**
+         * Human readable summary (non-blocking).
+         * <p>
+         * Note: The #of native buffers is approximate since this method does
+         * not acquire the lock guarding that field and thus can not ensure
+         * timely visibility.
+         */
+        public String toString() {
+
+            return getClass().getName() + "{key=" + key + ",#allocations="
+                    + allocations.size() + ",#nativeBuffers="
+                    + nativeBuffers.size() + "}";
+            
+        }
+        
         public AllocationContext(final Object key) {
 
             if (key == null)
@@ -476,57 +496,6 @@ public class DirectBufferPoolAllocator {
 
         }
         
-//        /**
-//         * Allocate a direct buffer from the pool.
-//         * 
-//         * @return The allocation.
-//         * 
-//         * @throws InterruptedException
-//         */
-//        private DirectBufferAllocation acquireBuffer() throws InterruptedException {
-//            final ByteBuffer b = directBufferPool.acquire();
-//            try {
-//                final DirectBufferAllocation a = new DirectBufferAllocation(
-//                        nextDirectBufferId.incrementAndGet(), b);
-//                nativeBuffers.put(a.id, a);
-//                return a;
-//            } catch (Throwable t) {
-//                directBufferPool.release(b);
-//                throw new RuntimeException(t);
-//            }
-//        }
-//
-//        /**
-//         * Release a direct buffer back to the pool.
-//         * 
-//         * @param id
-//         *            The buffer identifier.
-//         *            
-//         * @throws InterruptedException
-//         */
-//        private void releaseBuffer(final long id) throws InterruptedException {
-//            final DirectBufferAllocation b = directBuffers.remove(id);
-//            if (b == null) {
-//                // No such buffer.
-//                throw new IllegalArgumentException("Not found: id=" + id);
-//            }
-//            directBufferPool.release(b.directBuffer);
-//        }
-
-//        /**
-//         * Return a previously allocated {@link ByteBuffer} slice. The slice
-//         * will have a position, limit, and mark which are independent of the
-//         * underlying direct {@link ByteBuffer} against which it was allocated.
-//         * 
-//         * @param id
-//         *            The allocation identifier.
-//         * 
-//         * @return The slice.
-//         */
-//        public ByteBuffer get(final UUID id) {
-//            return allocations.get(id);
-//        }
-
         /**
          * Release all direct {@link ByteBuffer}s associated with this
          * allocation context back to the {@link #directBufferPool}. If the
@@ -640,6 +609,41 @@ public class DirectBufferPoolAllocator {
             slice.put(src, offset, length);
 
             offset += length;
+
+            remaining -= length;
+
+        }
+
+        if (remaining > 0)
+            throw new BufferOverflowException();
+
+    }
+    
+    /**
+     * Copy the caller's data onto the ordered array of allocations. The
+     * position of each {@link IAllocation#getSlice() allocation} will be
+     * advanced by the #of bytes copied into that allocation.
+     * 
+     * @param src
+     *            The source data.
+     * @param a
+     *            The allocations.
+     * 
+     * @throws BufferOverflowException
+     *             if there is not enough room in the allocations for the data
+     *             to be copied.
+     */
+    static public void put(final ByteBuffer src, final IAllocation[] a) {
+
+        int remaining = src.remaining();
+        
+        for (int i = 0; i < a.length && remaining > 0; i++) {
+
+            final ByteBuffer slice = a[i].getSlice();
+
+            final int length = Math.min(remaining, slice.remaining());
+
+            slice.put(src);
 
             remaining -= length;
 

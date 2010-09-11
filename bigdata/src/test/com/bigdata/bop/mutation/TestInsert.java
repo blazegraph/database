@@ -29,6 +29,10 @@ package com.bigdata.bop.mutation;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.btree.UnisolatedReadWriteIndex;
+import com.bigdata.concurrent.LockManager;
+import com.bigdata.journal.ConcurrencyManager;
+
 /**
  * Test suite for {@link InsertOp}.
  * 
@@ -52,6 +56,23 @@ public class TestInsert extends TestCase2 {
 
     /**
      * @todo test writing an index. verify read back after the write.
+     * 
+     * @todo One of the critical things to verify is that the appropriate locks
+     *       are being obtain before writing on an access path. Other than
+     *       tracing this through the code, the best way to verify this is with
+     *       a concurrent stress test. A failure to obtain the appropriate lock
+     *       will show up as an error in the B+Tree due to concurrent
+     *       modifications of the underlying data structures.
+     *       <p>
+     *       Indices are protected by one of two different mechanisms. (1) When
+     *       a journal is used without regard to the concurrency manager, the
+     *       {@link UnisolatedReadWriteIndex} is responsible for imposing the
+     *       appropriate concurrency constraints. (2) When running on a data
+     *       service, the {@link ConcurrencyManager} relies on the
+     *       {@link LockManager} to serialize access to the mutable indices.
+     *       <p>
+     *       The query engine refactor needs to respect these same mechanisms in
+     *       order to co-exist with the existing design patterns.
      */
     public void test_insert() {
 

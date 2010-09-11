@@ -45,6 +45,7 @@ import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.bset.Union;
+import com.bigdata.bop.fed.FederatedQueryEngine;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.view.FusedView;
@@ -411,11 +412,6 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
     /**
      * The currently executing queries.
-     * 
-     * @todo DEADLINE: There should be a data structure representing
-     *       {@link RunningQuery} having deadlines so we can
-     *       {@link RunningQuery#cancel(boolean)} queries when their deadline
-     *       expires.
      */
     final ConcurrentHashMap<Long/* queryId */, RunningQuery> runningQueries = new ConcurrentHashMap<Long, RunningQuery>();
 
@@ -514,54 +510,39 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      *       if the sink has not been taken, e.g., by combining the chunk into
      *       the same target ByteBuffer, or when we add the chunk to the
      *       RunningQuery.]
-     * 
-     * @todo SCALEOUT: High volume query operators must demand that their inputs
-     *       are materialized before they can begin evaluation. Scaleout
-     *       therefore requires a separate queue which looks at the metadata
-     *       concerning chunks available on remote nodes for an operator which
-     *       will run on this node and then demands the data either when the
-     *       predecessors in the pipeline are done (operator at once evaluation)
-     *       or when sufficient data are available to run the operator (mega
-     *       chunk pipelining). Once the data are locally materialized, the
-     *       operator may be queued for evaluation.
      */
     private class QueryEngineTask implements Runnable {
         public void run() {
-            try {
-                System.err.println("QueryEngine running: "+this);
-                while (true) {
+            System.err.println("QueryEngine running: " + this);
+            while (true) {
+                try {
                     final RunningQuery q = priorityQueue.take();
                     final long queryId = q.getQueryId();
                     if (q.isCancelled())
                         continue;
-                    final IChunkMessage chunk = q.chunksIn.poll();
-                    if (chunk == null) {
-                        // not expected, but can't do anything without a chunk.
-                        if (log.isDebugEnabled())
-                            log.debug("Dropping chunk: queryId=" + queryId);
-                        continue;
-                    }
+                    final IChunkMessage<IBindingSet> chunk = q.chunksIn.poll();
                     if (log.isTraceEnabled())
                         log.trace("Accepted chunk: queryId=" + queryId
                                 + ", bopId=" + chunk.getBOpId());
+                    // create task.
                     try {
-                        // create task.
                         final FutureTask<?> ft = q.newChunkTask(chunk);
                         // execute task.
                         localIndexManager.getExecutorService().execute(ft);
                     } catch (RejectedExecutionException ex) {
-                        // shutdown of the pool (should be an unbounded pool).
+                        // shutdown of the pool (should be an unbounded
+                        // pool).
                         log.warn("Dropping chunk: queryId=" + queryId);
                         continue;
-                    } catch (Throwable ex) {
-                        // log and continue
-                        log.error(ex, ex);
-                        continue;
                     }
+                } catch (InterruptedException e) {
+                    log.warn("Interrupted.");
+                    return;
+                } catch (Throwable ex) {
+                    // log and continue
+                    log.error(ex, ex);
+                    continue;
                 }
-            } catch (InterruptedException e) {
-                log.warn("Interrupted.");
-                return;
             }
         }
     } // QueryEngineTask
@@ -579,7 +560,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * @throws IllegalStateException
      *             if the chunk is not materialized.
      */
-    void acceptChunk(final IChunkMessage chunk) {
+    void acceptChunk(final IChunkMessage<IBindingSet> chunk) {
         
         if (chunk == null)
             throw new IllegalArgumentException();
@@ -625,8 +606,24 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
             
         }
         
+        // hook for subclasses.
+        didShutdown();
+        
+        // stop the query engine.
+        final Future<?> f = engineFuture.get();
+        if (f != null)
+            f.cancel(true/* mayInterruptIfRunning */);
+        
     }
 
+    /**
+     * Hook is notified by {@link #shutdown()} when all running queries have
+     * terminated.
+     */
+    protected void didShutdown() {
+        
+    }
+    
     /**
      * Do not accept new queries and halt any running binding set chunk tasks.
      */
@@ -686,7 +683,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         
     }
     
-    public void bufferReady(IChunkMessage msg) {
+    public void bufferReady(IChunkMessage<IBindingSet> msg) {
 
         throw new UnsupportedOperationException();
 
@@ -844,6 +841,10 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * @todo Could return a data structure which encapsulates the query results
      *       and could allow multiple results from a query, e.g., one per step
      *       in a program.
+     * 
+     * @deprecated This is going away.
+     * 
+     * @see FederatedQueryEngine#newQueryBuffer(BindingSetPipelineOp)
      */
     protected IBlockingBuffer<IBindingSet[]> newQueryBuffer(
             final BindingSetPipelineOp query) {

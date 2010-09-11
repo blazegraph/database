@@ -34,7 +34,11 @@ import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
- * Dechunks a chunked iterator.
+ * Wrap an iterator visiting chunks as an iterator visiting the individual
+ * elements in each chunk.
+ * 
+ * @param <E>
+ *            The generic type of the elements in the chunks.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -51,6 +55,13 @@ public class Dechunkerator<E> implements ICloseableIterator<E> {
      */
     private final Iterator<E> itr;
 
+    /**
+     * Wrap an iterator visiting chunks as an iterator visiting the individual
+     * elements in each chunk.
+     * 
+     * @param src
+     *            An iterator visiting chunks of type <E>
+     */
     @SuppressWarnings("unchecked")
     public Dechunkerator(final Iterator<E[]> src) {
 
