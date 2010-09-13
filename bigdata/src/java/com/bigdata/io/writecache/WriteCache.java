@@ -48,6 +48,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IndexSegmentBuilder;
+import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.io.DirectBufferPool;
@@ -792,7 +793,7 @@ abstract public class WriteCache implements IWriteCache {
 			if ((md = recordMap.get(offset)) == null) {
 
 				// The record is not in this write cache.
-				counters.nmiss.incrementAndGet();
+				counters.nmiss.increment();
 
 				return null;
 			}
@@ -843,7 +844,7 @@ abstract public class WriteCache implements IWriteCache {
 
 			}
 
-			counters.nhit.incrementAndGet();
+			counters.nhit.increment();
 
 			if (log.isTraceEnabled()) {
 				log.trace(show(dst, "read bytes"));
@@ -1329,12 +1330,12 @@ abstract public class WriteCache implements IWriteCache {
 		/**
 		 * #of read requests that are satisfied by the write cache.
 		 */
-		public final AtomicLong nhit = new AtomicLong();
+		public final CAT nhit = new CAT();
 
 		/**
 		 * The #of read requests that are not satisfied by the write cache.
 		 */
-		public final AtomicLong nmiss = new AtomicLong();
+		public final CAT nmiss = new CAT();
 
 		/*
 		 * write on the cache.
