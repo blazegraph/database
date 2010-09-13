@@ -628,9 +628,22 @@ abstract public class WriteCacheService implements IWriteCache {
 					try {
 						cleanList.add(cache);
 						cleanListNotEmpty.signalAll();
-						counters.get().nclean = dirtyList.size();
+						counters.get().nclean = cleanList.size();
 					} finally {
 						cleanListLock.unlock();
+					}
+					if(log.isInfoEnabled()) {
+						final WriteCacheServiceCounters tmp = counters.get();
+						final long nhit = tmp.nhit.get();
+						final long ntests = nhit + tmp.nmiss.get();
+						final double hitRate=(ntests == 0L ? 0d : (double) nhit / ntests);
+						log.info("WriteCacheService: bufferSize="
+								+ buffers[0].capacity() + ",nbuffers="
+								+ tmp.nbuffers + ",nclean=" + tmp.nclean
+								+ ",ndirty=" + tmp.ndirty + ",maxDirty="
+								+ tmp.maxdirty + ",nflush=" + tmp.nflush
+								+ ",nwrite=" + tmp.nwrite + ",hitRate="
+								+ hitRate);
 					}
 
 				} catch (InterruptedException t) {
@@ -1394,8 +1407,8 @@ abstract public class WriteCacheService implements IWriteCache {
     public boolean write(final long offset, final ByteBuffer data, final int chk, final boolean useChecksum)
             throws InterruptedException, IllegalStateException {
 
-        if (log.isInfoEnabled()) {
-            log.info("offset: " + offset + ", length: " + data.limit()
+        if (log.isTraceEnabled()) {
+            log.trace("offset: " + offset + ", length: " + data.limit()
                     + ", chk=" + chk + ", useChecksum=" + useChecksum);
         }
 
@@ -1675,8 +1688,8 @@ abstract public class WriteCacheService implements IWriteCache {
 	protected boolean writeLargeRecord(final long offset, final ByteBuffer data, final int chk, final boolean useChecksum)
 			throws InterruptedException, IllegalStateException {
 
-		if (log.isInfoEnabled()) {
-			log.info("offset: " + offset + ", length: " + data.limit() + ", chk=" + chk + ", useChecksum="
+		if (log.isTraceEnabled()) {
+			log.trace("offset: " + offset + ", length: " + data.limit() + ", chk=" + chk + ", useChecksum="
 					+ useChecksum);
 		}
 
@@ -1905,6 +1918,9 @@ abstract public class WriteCacheService implements IWriteCache {
         if (cache == null) {
 
             // No match.
+
+        	counters.get().nmiss.increment();
+        	
             return null;
 
         }
