@@ -1749,26 +1749,27 @@ abstract public class WriteCache implements IWriteCache {
 			// }
 			final ByteBuffer tmp = acquire();
 			try {
-                if (tmp.remaining() >= 12) {
-                    /*
-                     * Note: We must synchronize before having a side effect on
-                     * position. Also see write(...) which is synchronized on
-                     * the buffer during critical sections which have a side
-                     * effect on the buffer position.
-                     */
-                    synchronized (tmp) {
-                        final int spos = tmp.position();
-                        tmp.putLong(addr);
-                        tmp.putInt(0);
-                        if (checker != null) {
-                            // update the checksum (no side-effects on [data])
-                            final ByteBuffer chkBuf = tmp.asReadOnlyBuffer();
-                            chkBuf.position(spos);
-                            chkBuf.limit(tmp.position());
-                            checker.update(chkBuf);
-                        }
-                    } // synchronized(tmp)
-                }
+                /*
+                 * Note: We must synchronize before having a side effect on
+                 * position (which includes depending on remaining()). Also see
+                 * write(...) which is synchronized on the buffer during
+                 * critical sections which have a side effect on the buffer
+                 * position.
+                 */
+                synchronized (tmp) {
+                    if (tmp.remaining() >= 12) {
+                            final int spos = tmp.position();
+                            tmp.putLong(addr);
+                            tmp.putInt(0);
+                            if (checker != null) {
+                                // update the checksum (no side-effects on [data])
+                                final ByteBuffer chkBuf = tmp.asReadOnlyBuffer();
+                                chkBuf.position(spos);
+                                chkBuf.limit(tmp.position());
+                                checker.update(chkBuf);
+                            }
+                    }
+                } // synchronized(tmp)
 			} finally {
 				release();
 			}
