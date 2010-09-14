@@ -29,6 +29,7 @@ package com.bigdata.bop.fed;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.rmi.RemoteException;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
@@ -46,11 +47,7 @@ import com.bigdata.bop.engine.IQueryDecl;
 import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.RunningQuery;
-import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
@@ -99,20 +96,6 @@ public class FederatedQueryEngine extends QueryEngine {
      */
     private final AtomicReference<FutureTask<Void>> materializeChunksFuture = new AtomicReference<FutureTask<Void>>();
 
-    /**
-     * Constructor used on a {@link DataService} (a query engine peer).
-     * 
-     * @param dataService
-     *            The data service.
-     */
-    public FederatedQueryEngine(final DataService dataService) {
-
-        this(dataService.getFederation(),
-                new DelegateIndexManager(dataService), dataService
-                        .getResourceManager().getResourceService());
-        
-    }
-
     @Override
     public UUID getServiceUUID() {
 
@@ -139,6 +122,20 @@ public class FederatedQueryEngine extends QueryEngine {
     }
 
     /**
+     * Constructor used on a {@link DataService} (a query engine peer).
+     * 
+     * @param dataService
+     *            The data service.
+     */
+    public FederatedQueryEngine(final DataService dataService) {
+
+        this(dataService.getFederation(),
+                new DelegateIndexManager(dataService), dataService
+                        .getResourceManager().getResourceService());
+        
+    }
+
+    /**
      * Overridden to strengthen the return type.
      * <p>
      * {@inheritDoc}
@@ -147,6 +144,12 @@ public class FederatedQueryEngine extends QueryEngine {
     protected FederatedRunningQuery getRunningQuery(final long queryId) {
 
         return (FederatedRunningQuery) super.getRunningQuery(queryId);
+
+    }
+
+    public String toString() {
+
+        return getClass().getName() + "{serviceUUID=" + getServiceUUID() + "}";
 
     }
     
@@ -204,6 +207,8 @@ public class FederatedQueryEngine extends QueryEngine {
     @Override
     public void init() {
 
+        super.init();
+        
         final FutureTask<Void> ft = new FutureTask<Void>(
                 new MaterializeChunksTask(), (Void) null);
         
@@ -254,20 +259,27 @@ public class FederatedQueryEngine extends QueryEngine {
     /**
      * Runnable materializes chunks and makes them available for further
      * processing.
+     * 
+     * @todo multiple threads for materializing chunks, not just one. can
+     * be multiple {@link MaterializeChunksTask}s running.
      */
     private class MaterializeChunksTask implements Runnable {
+
         public void run() {
+            if(log.isInfoEnabled())
+                log.info("running: " + this);
             while (true) {
                 try {
-                    final IChunkMessage<?> c = chunkMaterializationQueue.take();
-                    final long queryId = c.getQueryId();
-                    final FederatedRunningQuery q = getRunningQuery(queryId);
-                    if (q.isCancelled())
-                        continue;
-                    final IChunkMessage<?> msg = chunkMaterializationQueue
-                            .poll();
+                    final IChunkMessage<?> msg = chunkMaterializationQueue.take();
+                    if(log.isDebugEnabled())
+                        log.debug("msg=" + msg);
                     try {
-                        msg.materialize(q);
+                        if(!accept(msg)) {
+                            if(log.isDebugEnabled())
+                                log.debug("dropping: " + msg);
+                        }
+                        if(log.isDebugEnabled())
+                            log.debug("accepted: " + msg);
                         /*
                          * @todo The type warning here is because the rest of
                          * the API does not know what to do with messages for
@@ -293,6 +305,82 @@ public class FederatedQueryEngine extends QueryEngine {
                 }
             }
         }
+
+        /**
+         * Accept and materialize a chunk for processing.
+         * 
+         * @param msg
+         *            The message.
+         * 
+         * @return true if the message was accepted and materialized.
+         * 
+         * @throws RemoteException
+         */
+        private boolean accept(final IChunkMessage<?> msg) throws RemoteException {
+
+            final long queryId = msg.getQueryId();
+            
+            // lookup query by id.
+            FederatedRunningQuery q = getRunningQuery(queryId);
+
+            if (q == null) {
+
+                /*
+                 * This code path handles the message the first time a chunk is
+                 * observed on a node for a query. Since we do not broadcast the
+                 * query to all nodes, the node has to resolve the query from the
+                 * query controller.
+                 * 
+                 * @todo Track recently terminated queries and do not recreate them.
+                 */
+                
+                // true iff this is the query controller
+                final boolean isController = getServiceUUID().equals(
+                        msg.getQueryController().getServiceUUID());
+                
+                if(isController) {
+                    /*
+                     * @todo This would indicate that the query had been
+                     * concurrently terminated and cleared from the set of
+                     * runningQueries and that we were not retaining metadata about
+                     * queries which had been terminated.
+                     */
+                    throw new AssertionError(
+                            "Query not running on controller: thisService="
+                                    + getServiceUUID() + ", msg=" + msg);
+                }
+                
+                // request from the query controller.
+                final BindingSetPipelineOp query = msg.getQueryController()
+                        .getQuery(msg.getQueryId());
+
+                q = newRunningQuery(FederatedQueryEngine.this, queryId,
+                        isController, msg.getQueryController(), query);
+
+                final RunningQuery tmp = runningQueries.putIfAbsent(queryId, q);
+                
+                if(tmp != null) {
+                    
+                    // another thread won this race.
+                    q = (FederatedRunningQuery) tmp;
+                    
+                }
+
+            }
+            
+//            if(q == null)
+//                throw new RuntimeException(ERR_QUERY_NOT_RUNNING + queryId);
+        
+            if (!q.isCancelled() && !msg.isMaterialized()) {
+
+                msg.materialize(q);
+
+            }
+
+            return !q.isCancelled();
+
+        }
+        
     } // MaterializeChunksTask
 
     public void declareQuery(final IQueryDecl queryDecl) {
@@ -313,24 +401,8 @@ public class FederatedQueryEngine extends QueryEngine {
         
         assertRunning();
         
-        final long queryId = msg.getQueryId();
-        
-        final FederatedRunningQuery q = getRunningQuery(queryId);
-        
-        if(q == null)
-            throw new RuntimeException(ERR_QUERY_NOT_RUNNING + queryId);
-    
-        if(msg.isMaterialized()) {
-
-            q.acceptChunk(msg);
-            
-        } else {
-
-            /*
-             */
-            throw new UnsupportedOperationException("FIXME");
-            
-        }
+        // queue up message to be materialized or otherwise handled later.
+        chunkMaterializationQueue.add(msg);
         
     }
 
@@ -344,39 +416,7 @@ public class FederatedQueryEngine extends QueryEngine {
             final BindingSetPipelineOp query) {
 
         return new FederatedRunningQuery(this, queryId, true/* controller */,
-                this/* clientProxy */, query, newQueryBuffer(query));
-
-    }
-
-    /**
-     * {@inheritDoc}
-     * 
-     * @todo Historically, this has been a proxy object for an {@link IBuffer}
-     *       on the {@link IQueryClient query controller}. However, it would be
-     *       nice if we could reuse the same NIO transfer of {@link ByteBuffer}s
-     *       to move the final results back to the client rather than using a
-     *       proxy object for the query buffer.
-     *       <p>
-     *       In scale-out we must track chunks consumed by the client so we do
-     *       not release the backing {@link ByteBuffer} on which the solutions
-     *       are marshalled before the client is done draining the iterator. If
-     *       the solutions are generated on the peers, then the peers must
-     *       retain the data until the client has consumed them or have
-     *       transferred the solutions to itself.
-     *       <p>
-     *       The places where this can show up as a problem are {@link SliceOp},
-     *       when a query deadline is reached, and when a query terminates
-     *       normally. Also pay attention when the client closes the
-     *       {@link IAsynchronousIterator} from which it is draining solutions
-     *       early.
-     * 
-     * @deprecated This is going away.
-     */
-    @Override
-    protected IBlockingBuffer<IBindingSet[]> newQueryBuffer(
-            final BindingSetPipelineOp query) {
-
-        return query.newBuffer();
+                this/* clientProxy */, query);
 
     }
 

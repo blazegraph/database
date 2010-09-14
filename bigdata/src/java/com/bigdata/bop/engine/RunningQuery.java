@@ -53,6 +53,7 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NoSuchBOpException;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bset.CopyBindingSetOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.IIndexManager;
@@ -70,6 +71,12 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
 
     private final static transient Logger log = Logger
             .getLogger(RunningQuery.class);
+
+    /**
+     * Logger for the {@link ChunkTask}.
+     */
+    private final static Logger chunkTaskLog = Logger
+            .getLogger(ChunkTask.class);
 
     /**
      * The run state of the query and the result of the computation iff it
@@ -91,11 +98,6 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
     /** The unique identifier for this query. */
     final private long queryId;
 
-//    /**
-//     * The timestamp when the query was accepted by this node (ms).
-//     */
-//    final private long begin;
-
     /**
      * The query deadline. The value is the system clock time in milliseconds
      * when the query is due and {@link Long#MAX_VALUE} if there is no deadline.
@@ -103,12 +105,6 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      * interpreted by the query controller.
      */
     final private AtomicLong deadline = new AtomicLong(Long.MAX_VALUE);
-
-    /**
-     * How long the query is allowed to run (elapsed milliseconds) -or-
-     * {@link Long#MAX_VALUE} if there is no deadline.
-     */
-    final private long timeout;
 
     /**
      * <code>true</code> iff the outer {@link QueryEngine} is the controller for
@@ -126,7 +122,7 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
     final private IQueryClient clientProxy;
 
     /** The query. */
-    final private BOp query;
+    final private BindingSetPipelineOp query;
 
     /**
      * The buffer used for the overall output of the query pipeline.
@@ -153,59 +149,20 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
     private final ConcurrentHashMap<BSBundle, Future<?>> operatorFutures = new ConcurrentHashMap<BSBundle, Future<?>>();
 
     /**
-     * A lock guarding {@link #runningTaskCount}, {@link #availableChunkCount},
-     * {@link #availableChunkCountMap}.
+     * A lock guarding {@link RunState#runningTaskCount},
+     * {@link RunState#availableChunkCount},
+     * {@link RunState#availableChunkCountMap}. This is <code>null</code> unless
+     * this is the query controller.
+     * 
+     * @see RunState
      */
-    private final ReentrantLock runStateLock = new ReentrantLock();
+    private final ReentrantLock runStateLock;
 
     /**
-     * The #of tasks for this query which have started but not yet halted and
-     * ZERO (0) if this is not the query coordinator.
-     * <p>
-     * This is guarded by the {@link #runningStateLock}.
+     * The run state of this query and <code>null</code> unless this is the
+     * query controller.
      */
-    private long runningTaskCount = 0;
-
-    /**
-     * The #of chunks for this query of which a running task has made available
-     * but which have not yet been accepted for processing by another task and
-     * ZERO (0) if this is not the query coordinator.
-     * <p>
-     * This is guarded by the {@link #runningStateLock}.
-     */
-    private long availableChunkCount = 0;
-
-    /**
-     * A map reporting the #of chunks available for each operator in the
-     * pipeline (we only report chunks for pipeline operators). The total #of
-     * chunks available for any given operator in the pipeline is reported by
-     * {@link #availableChunkCount}.
-     * <p>
-     * The movement of the intermediate binding set chunks forms an acyclic
-     * directed graph. This map is used to track the #of chunks available for
-     * each bop in the pipeline. When a bop has no more incoming chunks, we send
-     * an asynchronous message to all nodes on which that bop had executed
-     * informing the {@link QueryEngine} on that node that it should immediately
-     * release all resources associated with that bop.
-     * <p>
-     * This is guarded by the {@link #runningStateLock}.
-     */
-    private final Map<Integer/* bopId */, AtomicLong/* availableChunkCount */> availableChunkCountMap = new LinkedHashMap<Integer, AtomicLong>();
-
-    /**
-     * A collection reporting on the #of instances of a given {@link BOp} which
-     * are concurrently executing.
-     * <p>
-     * This is guarded by the {@link #runningStateLock}.
-     */
-    private final Map<Integer/*bopId*/, AtomicLong/*runningCount*/> runningCountMap = new LinkedHashMap<Integer, AtomicLong>();
-
-    /**
-     * A collection of the operators which have executed at least once.
-     * <p>
-     * This is guarded by the {@link #runningStateLock}.
-     */
-    private final Set<Integer/*bopId*/> startedSet = new LinkedHashSet<Integer>();
+    final private RunState runState;
     
     /**
      * The chunks available for immediate processing (they must have been
@@ -285,7 +242,7 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
     /**
      * Return the operator tree for this query.
      */
-    public BOp getQuery() {
+    public BindingSetPipelineOp getQuery() {
         return query;
     }
     
@@ -329,8 +286,8 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
     public RunningQuery(final QueryEngine queryEngine, final long queryId,
 //            final long begin, 
             final boolean controller,
-            final IQueryClient clientProxy, final BOp query,
-            final IBlockingBuffer<IBindingSet[]> queryBuffer) {
+            final IQueryClient clientProxy, final BindingSetPipelineOp query
+            ) {
 
         if (queryEngine == null)
             throw new IllegalArgumentException();
@@ -342,21 +299,41 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
             throw new IllegalArgumentException();
         
         this.queryEngine = queryEngine;
+
         this.queryId = queryId;
-//        this.begin = begin;
+        
         this.controller = controller;
+        
         this.clientProxy = clientProxy;
+        
         this.query = query;
-        this.queryBuffer = queryBuffer;
+        
         this.bopIndex = BOpUtility.getIndex(query);
+        
         this.statsMap = controller ? new ConcurrentHashMap<Integer, BOpStats>()
                 : null;
-        
-        this.timeout = query.getProperty(BOp.Annotations.TIMEOUT,
-                BOp.Annotations.DEFAULT_TIMEOUT);
 
-        if (timeout < 0)
-            throw new IllegalArgumentException();
+        runStateLock = controller ? new ReentrantLock() : null;
+        
+        runState = controller ? new RunState(this) : null;
+        
+        this.queryBuffer = newQueryBuffer();
+        
+    }
+
+    /**
+     * Return the buffer on which the solutions will be written (if any). This
+     * is based on the top-level operator in the query plan.
+     * 
+     * @return The buffer for the solutions -or- <code>null</code> if the
+     *         top-level operator in the query plan is a mutation operator.
+     */
+    protected IBlockingBuffer<IBindingSet[]> newQueryBuffer() {
+
+        if (query.isMutation())
+            return null;
+
+        return ((BindingSetPipelineOp) query).newBuffer();
         
     }
 
@@ -423,27 +400,88 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
 
         if (log.isDebugEnabled())
             log.debug("queryId=" + queryId + ", chunksIn.size()="
-                    + chunksIn.size());
+                    + chunksIn.size() + ", msg=" + msg);
 
     }
 
     /**
-     * Invoked once by the query controller with the initial
-     * {@link BindingSetChunk} which gets the query moving.
-     * 
-     * @todo this should reject multiple invocations for a given query instance.
+     * The run state for the query.
      */
-    public void startQuery(final IChunkMessage<IBindingSet> chunk) {
-        if (!controller)
-            throw new UnsupportedOperationException();
-        if (chunk == null)
-            throw new IllegalArgumentException();
-        if (chunk.getQueryId() != queryId) // @todo equals() if queryId is UUID.
-            throw new IllegalArgumentException();
-        final int bopId = chunk.getBOpId();
-        runStateLock.lock();
-        try {
-            lifeCycleSetUpQuery();
+    static private class RunState {
+
+        /**
+         * The query.
+         */
+        private final RunningQuery query;
+
+        /**
+         * The query identifier.
+         */
+        private final long queryId;
+
+        /**
+         * The #of tasks for this query which have started but not yet halted
+         * and ZERO (0) if this is not the query coordinator.
+         * <p>
+         * This is guarded by the {@link #runningStateLock}.
+         */
+        private long runningTaskCount = 0;
+
+        /**
+         * The #of chunks for this query of which a running task has made
+         * available but which have not yet been accepted for processing by
+         * another task and ZERO (0) if this is not the query coordinator.
+         * <p>
+         * This is guarded by the {@link #runningStateLock}.
+         */
+        private long availableChunkCount = 0;
+
+        /**
+         * A map reporting the #of chunks available for each operator in the
+         * pipeline (we only report chunks for pipeline operators). The total
+         * #of chunks available across all operators in the pipeline is reported
+         * by {@link #availableChunkCount}.
+         * <p>
+         * The movement of the intermediate binding set chunks forms an acyclic
+         * directed graph. This map is used to track the #of chunks available
+         * for each bop in the pipeline. When a bop has no more incoming chunks,
+         * we send an asynchronous message to all nodes on which that bop had
+         * executed informing the {@link QueryEngine} on that node that it
+         * should immediately release all resources associated with that bop.
+         * <p>
+         * This is guarded by the {@link #runningStateLock}.
+         */
+        private final Map<Integer/* bopId */, AtomicLong/* availableChunkCount */> availableChunkCountMap = new LinkedHashMap<Integer, AtomicLong>();
+
+        /**
+         * A collection reporting on the #of instances of a given {@link BOp}
+         * which are concurrently executing.
+         * <p>
+         * This is guarded by the {@link #runningStateLock}.
+         */
+        private final Map<Integer/* bopId */, AtomicLong/* runningCount */> runningCountMap = new LinkedHashMap<Integer, AtomicLong>();
+
+        /**
+         * A collection of the operators which have executed at least once.
+         * <p>
+         * This is guarded by the {@link #runningStateLock}.
+         */
+        private final Set<Integer/* bopId */> startedSet = new LinkedHashSet<Integer>();
+
+        public RunState(final RunningQuery query) {
+
+            this.query = query;
+
+            this.queryId = query.queryId;
+
+        }
+
+        public void startQuery(final IChunkMessage<?> msg) {
+
+            query.lifeCycleSetUpQuery();
+            
+            final Integer bopId = Integer.valueOf(msg.getBOpId());
+            
             availableChunkCount++;
             {
                 AtomicLong n = availableChunkCountMap.get(bopId);
@@ -451,114 +489,81 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
                     availableChunkCountMap.put(bopId, n = new AtomicLong());
                 n.incrementAndGet();
             }
+
             if (log.isInfoEnabled())
                 log.info("queryId=" + queryId + ",runningTaskCount="
                         + runningTaskCount + ",availableChunks="
                         + availableChunkCount);
+
             System.err.println("startQ : bopId=" + bopId + ",running="
                     + runningTaskCount + ",available=" + availableChunkCount);
-            queryEngine.acceptChunk(chunk);
-        } finally {
-            runStateLock.unlock();
-        }
-    }
 
-    /**
-     * Message provides notice that the operator has started execution and will
-     * consume some specific number of binding set chunks.
-     * 
-     * @param bopId
-     *            The identifier of the operator.
-     * @param partitionId
-     *            The index partition identifier against which the operator is
-     *            executing.
-     * @param serviceId
-     *            The identifier of the service on which the operator is
-     *            executing.
-     * @param fanIn
-     *            The #of chunks that will be consumed by the operator
-     *            execution.
-     * 
-     * @throws UnsupportedOperationException
-     *             If this node is not the query coordinator.
-     */
-    public void startOp(final StartOpMessage msg) {
-        if (!controller)
-            throw new UnsupportedOperationException();
-        final Integer bopId = Integer.valueOf(msg.bopId);
-        runStateLock.lock();
-        try {
+        }
+
+        public void startOp(final StartOpMessage msg) {
+
+            final Integer bopId = Integer.valueOf(msg.bopId);
+
             runningTaskCount++;
             {
                 AtomicLong n = runningCountMap.get(bopId);
                 if (n == null)
                     runningCountMap.put(bopId, n = new AtomicLong());
                 n.incrementAndGet();
-                if(startedSet.add(bopId)) {
+                if (startedSet.add(bopId)) {
                     // first evaluation pass for this operator.
-                    lifeCycleSetUpOperator(msg.bopId);
+                    query.lifeCycleSetUpOperator(bopId);
                 }
             }
+
             availableChunkCount -= msg.nchunks;
+
             {
                 AtomicLong n = availableChunkCountMap.get(bopId);
                 if (n == null)
                     throw new AssertionError();
                 n.addAndGet(-msg.nchunks);
             }
-            System.err.println("startOp: bopId=" + msg.bopId + ",running="
+
+            System.err.println("startOp: bopId=" + bopId + ",running="
                     + runningTaskCount + ",available=" + availableChunkCount
                     + ",fanIn=" + msg.nchunks);
-            if (deadline.get() < System.currentTimeMillis()) {
-                if (log.isTraceEnabled())
-                    log.trace("queryId: deadline expired.");
-                future.halt(new TimeoutException());
-                cancel(true/* mayInterruptIfRunning */);
-            }
-        } finally {
-            runStateLock.unlock();
-        }
-    }
 
-    /**
-     * Message provides notice that the operator has ended execution. The
-     * termination conditions for the query are checked. (For scale-out, the
-     * node node controlling the query needs to be involved for each operator
-     * start/stop in order to make the termination decision atomic).
-     * 
-     * @throws UnsupportedOperationException
-     *             If this node is not the query coordinator.
-     */
-    public void haltOp(final HaltOpMessage msg) {
-        if (!controller)
-            throw new UnsupportedOperationException();
-        runStateLock.lock();
-        try {
-            // update per-operator statistics.
-            {
-                final BOpStats stats = statsMap.get(msg.bopId);
-                if (stats == null) {
-                    statsMap.put(msg.bopId, msg.taskStats);
-                } else {
-                    stats.add(msg.taskStats);
-                }
+            // check deadline.
+            if (query.deadline.get() < System.currentTimeMillis()) {
+
+                if (log.isTraceEnabled())
+                    log.trace("expired: queryId=" + queryId + ", deadline="
+                            + query.deadline);
+                
+                query.future.halt(new TimeoutException());
+                
+                query.cancel(true/* mayInterruptIfRunning */);
+                
             }
-            /*
-             * Update termination criteria counters.
-             */
+
+        }
+
+        /**
+         * Update termination criteria counters.
+         */
+        public void haltOp(final HaltOpMessage msg) {
+
             // chunks generated by this task.
             final int fanOut = msg.sinkChunksOut + msg.altSinkChunksOut;
             availableChunkCount += fanOut;
             if (msg.sinkId != null) {
                 AtomicLong n = availableChunkCountMap.get(msg.sinkId);
                 if (n == null)
-                    availableChunkCountMap.put(msg.sinkId, n = new AtomicLong());
+                    availableChunkCountMap
+                            .put(msg.sinkId, n = new AtomicLong());
                 n.addAndGet(msg.sinkChunksOut);
             }
             if (msg.altSinkId != null) {
                 AtomicLong n = availableChunkCountMap.get(msg.altSinkId);
                 if (n == null)
-                    availableChunkCountMap.put(msg.altSinkId, n = new AtomicLong());
+                    availableChunkCountMap.put(msg.altSinkId,
+                            n = new AtomicLong());
                 n.addAndGet(msg.altSinkChunksOut);
             }
             // one less task is running.
@@ -575,7 +580,7 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
                  * No more chunks can appear for this operator so invoke its end
                  * of life cycle hook.
                  */
-                lifeCycleTearDownOperator(msg.bopId);
+                query.lifeCycleTearDownOperator(msg.bopId);
             }
             System.err.println("haltOp : bopId=" + msg.bopId + ",running="
                     + runningTaskCount + ",available=" + availableChunkCount
@@ -584,61 +589,156 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
                     + runningTaskCount;
             assert availableChunkCount >= 0 : "availableChunkCount="
                     + availableChunkCount;
-//            final long elapsed = System.currentTimeMillis() - begin;
             if (log.isTraceEnabled())
-                log.trace("bopId=" + msg.bopId + ",partitionId=" + msg.partitionId
-                        + ",serviceId=" + queryEngine.getServiceUUID()
-                        + ", nchunks=" + fanOut + " : runningTaskCount="
-                        + runningTaskCount + ", availableChunkCount="
-                        + availableChunkCount);// + ", elapsed=" + elapsed);
+                log.trace("bopId=" + msg.bopId + ",partitionId="
+                        + msg.partitionId + ",serviceId="
+                        + query.queryEngine.getServiceUUID() + ", nchunks="
+                        + fanOut + " : runningTaskCount=" + runningTaskCount
+                        + ", availableChunkCount=" + availableChunkCount);
             // test termination criteria
             if (msg.cause != null) {
                 // operator failed on this chunk.
                 log.error("Error: Canceling query: queryId=" + queryId
                         + ",bopId=" + msg.bopId + ",partitionId="
                         + msg.partitionId, msg.cause);
-                future.halt(msg.cause);
-                cancel(true/* mayInterruptIfRunning */);
+                query.future.halt(msg.cause);
+                query.cancel(true/* mayInterruptIfRunning */);
             } else if (runningTaskCount == 0 && availableChunkCount == 0) {
                 // success (all done).
-                future.halt(getStats());
-                cancel(true/* mayInterruptIfRunning */);
-            } else if (deadline.get() < System.currentTimeMillis()) {
                 if (log.isTraceEnabled())
-                    log.trace("queryId: deadline expired.");
-                future.halt(new TimeoutException());
-                cancel(true/* mayInterruptIfRunning */);
+                    log.trace("success: queryId=" + queryId);
+                query.future.halt(query.getStats());
+                query.cancel(true/* mayInterruptIfRunning */);
+            } else if (query.deadline.get() < System.currentTimeMillis()) {
+                if (log.isTraceEnabled())
+                    log.trace("expired: queryId=" + queryId + ", deadline="
+                            + query.deadline);
+                query.future.halt(new TimeoutException());
+                query.cancel(true/* mayInterruptIfRunning */);
             }
-        } finally {
-            runStateLock.unlock();
         }
+
+        /**
+         * Return <code>true</code> the specified operator can no longer be
+         * triggered by the query. The specific criteria are that no operators
+         * which are descendants of the specified operator are running or have
+         * chunks available against which they could run. Under those conditions
+         * it is not possible for a chunk to show up which would cause the
+         * operator to be executed.
+         * 
+         * @param bopId
+         *            Some operator identifier.
+         * 
+         * @return <code>true</code> if the operator can not be triggered given
+         *         the current query activity.
+         * 
+         * @throws IllegalMonitorStateException
+         *             unless the {@link #runStateLock} is held by the caller.
+         */
+        protected boolean isOperatorDone(final int bopId) {
+
+            return PipelineUtility.isDone(bopId, query.getQuery(),
+                    query.bopIndex, runningCountMap, availableChunkCountMap);
+
+        }
+
+    } // class RunState
+
+    /**
+     * Invoked once by the query controller with the initial
+     * {@link BindingSetChunk} which gets the query moving.
+     * 
+     * @todo this should reject multiple invocations for a given query instance.
+     */
+    public void startQuery(final IChunkMessage<IBindingSet> msg) {
+
+        if (!controller)
+            throw new UnsupportedOperationException();
+        
+        if (msg == null)
+            throw new IllegalArgumentException();
+        
+        if (msg.getQueryId() != queryId) // @todo equals() if queryId is UUID.
+            throw new IllegalArgumentException();
+        
+        runStateLock.lock();
+        
+        try {
+        
+            runState.startQuery(msg);
+            
+            queryEngine.acceptChunk(msg);
+            
+        } finally {
+            
+            runStateLock.unlock();
+            
+        }
+
     }
 
     /**
-     * Return <code>true</code> the specified operator can no longer be
-     * triggered by the query. The specific criteria are that no operators which
-     * are descendants of the specified operator are running or have chunks
-     * available against which they could run. Under those conditions it is not
-     * possible for a chunk to show up which would cause the operator to be
-     * executed.
+     * Message provides notice that the operator has started execution and will
+     * consume some specific number of binding set chunks.
      * 
-     * @param bopId
-     *            Some operator identifier.
+     * @param msg The {@link StartOpMessage}.
      * 
-     * @return <code>true</code> if the operator can not be triggered given the
-     *         current query activity.
-     * 
-     * @throws IllegalMonitorStateException
-     *             unless the {@link #runStateLock} is held by the caller.
+     * @throws UnsupportedOperationException
+     *             If this node is not the query coordinator.
      */
-    protected boolean isOperatorDone(final int bopId) {
+    public void startOp(final StartOpMessage msg) {
 
-        if (!runStateLock.isHeldByCurrentThread())
-            throw new IllegalMonitorStateException();
+        if (!controller)
+            throw new UnsupportedOperationException();
+        
+        runStateLock.lock();
+        
+        try {
+        
+            runState.startOp(msg);
 
-        return PipelineUtility.isDone(bopId, query, bopIndex, runningCountMap,
-                availableChunkCountMap);
+        } finally {
+            
+            runStateLock.unlock();
+            
+        }
+        
+    }
 
+    /**
+     * Message provides notice that the operator has ended execution. The
+     * termination conditions for the query are checked. (For scale-out, the
+     * node node controlling the query needs to be involved for each operator
+     * start/stop in order to make the termination decision atomic).
+     * 
+     * @param msg The {@link HaltOpMessage}
+     * 
+     * @throws UnsupportedOperationException
+     *             If this node is not the query coordinator.
+     */
+    public void haltOp(final HaltOpMessage msg) {
+        
+        if (!controller)
+            throw new UnsupportedOperationException();
+
+        // update per-operator statistics.
+        final BOpStats tmp = statsMap.putIfAbsent(msg.bopId, msg.taskStats);
+
+        if (tmp != null)
+            tmp.add(msg.taskStats);
+
+        runStateLock.lock();
+        
+        try {
+        
+            runState.haltOp(msg);
+            
+        } finally {
+            
+            runStateLock.unlock();
+            
+        }
+        
     }
 
     /**
@@ -703,99 +803,221 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      *            A chunk to be consumed.
      */
     @SuppressWarnings("unchecked")
-    protected FutureTask<Void> newChunkTask(final IChunkMessage<IBindingSet> chunk) {
-        /*
-         * Look up the BOp in the index, create the BOpContext for that BOp, and
-         * return the value returned by BOp.eval(context).
-         */
-        final int bopId = chunk.getBOpId();
-        final int partitionId = chunk.getPartitionId();
-        final BOp bop = bopIndex.get(bopId);
-        if (bop == null) {
-            throw new NoSuchBOpException(bopId);
-        }
-        if (!(bop instanceof BindingSetPipelineOp)) {
-            /*
-             * @todo evaluation of element[] pipelines needs to use pretty much
-             * the same code, but it needs to be typed for E[] rather than
-             * IBindingSet[].
-             * 
-             * @todo evaluation of Monet style BATs would also operate under
-             * different assumptions, closer to those of an element[].
-             */
-            throw new UnsupportedOperationException(bop.getClass().getName());
-        }
-        // self
-        final BindingSetPipelineOp op = ((BindingSetPipelineOp) bop);
-        // parent (null if this is the root of the operator tree).
-        final BOp p = BOpUtility.getParent(query, op);
-        // sink (null unless parent is defined)
-        final Integer sinkId = p == null ? null : (Integer) p
-                .getProperty(BindingSetPipelineOp.Annotations.BOP_ID);
-        final IBlockingBuffer<IBindingSet[]> sink = (p == null ? queryBuffer
-                : op.newBuffer());
-        // altSink (null when not specified).
-        final Integer altSinkId = (Integer) op
-                .getProperty(BindingSetPipelineOp.Annotations.ALT_SINK_REF);
-        if (altSinkId != null && !bopIndex.containsKey(altSinkId)) {
-            throw new NoSuchBOpException(altSinkId);
-        }
-        final IBlockingBuffer<IBindingSet[]> altSink = altSinkId == null ? null
-                : op.newBuffer();
-        // context
-        final BOpContext context = new BOpContext(this, partitionId, op
-                .newStats(), chunk.iterator(), sink, altSink);
-        // FutureTask for operator execution (not running yet).
-        final FutureTask<Void> f = op.eval(context);
-        // Hook the FutureTask.
-        final Runnable r = new Runnable() {
-            public void run() {
-                final UUID serviceId = queryEngine.getServiceUUID();
-                int fanIn = 1;
-                int sinkChunksOut = 0;
-                int altSinkChunksOut = 0;
-                try {
-                    clientProxy.startOp(new StartOpMessage(queryId,
-                            bopId, partitionId, serviceId, fanIn));
-                    if (log.isDebugEnabled())
-                        log.debug("Running chunk: queryId=" + queryId
-                                + ", bopId=" + bopId + ", bop=" + bop);
-                    f.run(); // run
-                    f.get(); // verify success
-                    if (sink != queryBuffer && !sink.isEmpty()) {
-                        // handle output chunk.
-                        sinkChunksOut += handleOutputChunk(sinkId, sink);
-                    }
-                    if (altSink != queryBuffer && altSink != null
-                            && !altSink.isEmpty()) {
-                        // handle alt sink output chunk.
-                        altSinkChunksOut += handleOutputChunk(altSinkId, altSink);
-                    }
-                    clientProxy.haltOp(new HaltOpMessage(queryId, bopId,
-                            partitionId, serviceId, null/* cause */,
-                            sinkId, sinkChunksOut, altSinkId,
-                            altSinkChunksOut, context.getStats()));
-                } catch (Throwable t) {
-                    try {
-                        clientProxy.haltOp(new HaltOpMessage(queryId,
-                                bopId, partitionId, serviceId,
-                                t/* cause */, sinkId, sinkChunksOut, altSinkId,
-                                altSinkChunksOut, context.getStats()));
-                    } catch (RemoteException e) {
-                        cancel(true/* mayInterruptIfRunning */);
-                        log.error("queryId=" + queryId, e);
-                    }
-                }
-            }
-        };
+    protected FutureTask<Void> newChunkTask(
+            final IChunkMessage<IBindingSet> chunk) {
+
+        // create runnable to evaluate a chunk for an operator and partition.
+        final Runnable r = new ChunkTask(chunk);
+
         // wrap runnable.
         final FutureTask<Void> f2 = new FutureTask(r, null/* result */);
+
         // add to list of active futures for this query.
-        operatorFutures.put(new BSBundle(bopId, partitionId), f2);
+        operatorFutures.put(new BSBundle(chunk.getBOpId(), chunk
+                .getPartitionId()), f2);
+
         // return : caller will execute.
         return f2;
+
     }
 
+    /**
+     * Runnable evaluates an operator for some chunk of inputs. In scale-out,
+     * the operator may be evaluated against some partition of a scale-out
+     * index.
+     */
+    private class ChunkTask implements Runnable {
+
+        /** Alias for the {@link ChunkTask}'s logger. */
+        private final Logger log = chunkTaskLog;
+
+        /** The index of the bop which is being evaluated. */
+        private final int bopId;
+
+        /**
+         * The index partition against which the operator is being evaluated and
+         * <code>-1</code> if the operator is not being evaluated against a
+         * shard.
+         */ 
+        private final int partitionId;
+
+        /** The operator which is being evaluated. */
+        private final BOp bop;
+
+        /**
+         * The index of the operator which is the default sink for outputs
+         * generated by this evaluation. This is the
+         * {@link BOp.Annotations#BOP_ID} of the parent of this operator. This
+         * will be <code>null</code> if the operator does not have a parent and
+         * is not a query since no outputs will be generated in that case.
+         */
+        private final Integer sinkId;
+
+        /**
+         * The index of the operator which is the alternative sink for outputs
+         * generated by this evaluation. This is <code>null</code> unless the
+         * operator explicitly specifies an alternative sink using
+         * {@link BindingSetPipelineOp.Annotations#ALT_SINK_REF}.
+         */
+        private final Integer altSinkId;
+
+        /**
+         * The sink on which outputs destined for the {@link #sinkId} operator
+         * will be written and <code>null</code> if {@link #sinkId} is
+         * <code>null</code>.
+         */
+        private final IBlockingBuffer<IBindingSet[]> sink;
+
+        /**
+         * The sink on which outputs destined for the {@link #altSinkId}
+         * operator will be written and <code>null</code> if {@link #altSinkId}
+         * is <code>null</code>.
+         */
+        private final IBlockingBuffer<IBindingSet[]> altSink;
+
+        /**
+         * The evaluation context for this operator.
+         */
+        private final BOpContext<IBindingSet> context;
+
+        /**
+         * {@link FutureTask} which evaluates the operator (evaluation is
+         * delegated to this {@link FutureTask}).
+         */
+        private final FutureTask<Void> ft;
+
+        /**
+         * Create a task to consume a chunk. This looks up the {@link BOp} which
+         * is the target for the message in the {@link RunningQuery#bopIndex},
+         * creates the sink(s) for the {@link BOp}, creates the
+         * {@link BOpContext} for that {@link BOp}, and wraps the value returned
+         * by {@link PipelineOp#eval(BOpContext)} in order to handle the outputs
+         * written on those sinks.
+         * 
+         * @param chunk
+         *            A message containing the materialized chunk and metadata
+         *            about the operator which will consume that chunk.
+         */
+        public ChunkTask(final IChunkMessage<IBindingSet> chunk) {
+            bopId = chunk.getBOpId();
+            partitionId = chunk.getPartitionId();
+            bop = bopIndex.get(bopId);
+            if (bop == null) {
+                throw new NoSuchBOpException(bopId);
+            }
+            if (!(bop instanceof BindingSetPipelineOp)) {
+                /*
+                 * @todo evaluation of element[] pipelines needs to use pretty
+                 * much the same code, but it needs to be typed for E[] rather
+                 * than IBindingSet[].
+                 * 
+                 * @todo evaluation of Monet style BATs would also operate under
+                 * different assumptions, closer to those of an element[].
+                 */
+                throw new UnsupportedOperationException(bop.getClass()
+                        .getName());
+            }
+            
+            // self
+            final BindingSetPipelineOp op = ((BindingSetPipelineOp) bop);
+            
+            // parent (null if this is the root of the operator tree).
+            final BOp p = BOpUtility.getParent(query, op);
+            
+            // sink (null unless parent is defined)
+            sinkId = p == null ? null : (Integer) p
+                    .getProperty(BindingSetPipelineOp.Annotations.BOP_ID);
+            
+            // altSink (null when not specified).
+            altSinkId = (Integer) op
+                    .getProperty(BindingSetPipelineOp.Annotations.ALT_SINK_REF);
+            
+            if (altSinkId != null && !bopIndex.containsKey(altSinkId))
+                throw new NoSuchBOpException(altSinkId);
+            
+            if (altSinkId != null && sinkId == null) {
+                throw new RuntimeException(
+                        "The primary sink must be defined if the altSink is defined: "
+                                + bop);
+            }
+
+            if (sinkId != null && altSinkId != null
+                    && sinkId.intValue() == altSinkId.intValue()) {
+                throw new RuntimeException(
+                        "The primary and alternative sink may not be the same operator: "
+                                + bop);
+            }
+
+            sink = (p == null ? queryBuffer : op.newBuffer());
+
+            altSink = altSinkId == null ? null : op.newBuffer();
+            
+            // context
+            context = new BOpContext<IBindingSet>(RunningQuery.this,
+                    partitionId, op.newStats(), chunk.getChunkAccessor()
+                            .iterator(), sink, altSink);
+
+            // FutureTask for operator execution (not running yet).
+            ft = op.eval(context);
+            
+        }
+
+        /**
+         * Evaluate the {@link IChunkMessage}.
+         */
+        public void run() {
+            final UUID serviceId = queryEngine.getServiceUUID();
+            int fanIn = 1;
+            int sinkChunksOut = 0;
+            int altSinkChunksOut = 0;
+            try {
+                clientProxy.startOp(new StartOpMessage(queryId,
+                        bopId, partitionId, serviceId, fanIn));
+                if (log.isDebugEnabled())
+                    log.debug("Running chunk: queryId=" + queryId + ", bopId="
+                            + bopId + ", bop=" + bop);
+                ft.run(); // run
+                ft.get(); // verify success
+                if (sink != null && sink != queryBuffer && !sink.isEmpty()) {
+                    /*
+                     * Handle sink output, sending appropriate chunk
+                     * message(s).
+                     * 
+                     * Note: This maps output over shards/nodes in s/o.
+                     */
+                    sinkChunksOut += handleOutputChunk(sinkId, sink);
+                }
+                if (altSink != null && altSink != queryBuffer
+                        && !altSink.isEmpty()) {
+                    /*
+                     * Handle alt sink output , sending appropriate chunk
+                     * message(s).
+                     * 
+                     * Note: This maps output over shards/nodes in s/o.
+                     */
+                    altSinkChunksOut += handleOutputChunk(altSinkId,
+                            altSink);
+                }
+                clientProxy.haltOp(new HaltOpMessage(queryId, bopId,
+                        partitionId, serviceId, null/* cause */,
+                        sinkId, sinkChunksOut, altSinkId,
+                        altSinkChunksOut, context.getStats()));
+            } catch (Throwable t) {
+                try {
+                    clientProxy.haltOp(new HaltOpMessage(queryId,
+                            bopId, partitionId, serviceId,
+                            t/* cause */, sinkId, sinkChunksOut, altSinkId,
+                            altSinkChunksOut, context.getStats()));
+                } catch (RemoteException e) {
+                    cancel(true/* mayInterruptIfRunning */);
+                    log.error("queryId=" + queryId + ", bopId=" + bopId, e);
+                }
+            }
+
+        } // run()
+        
+    } // class ChunkTask
+    
     /**
      * Return an iterator which will drain the solutions from the query. The
      * query will be cancelled if the iterator is

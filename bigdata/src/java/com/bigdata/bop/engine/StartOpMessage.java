@@ -22,25 +22,25 @@ public class StartOpMessage implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /** The query identifier. */
-    final long queryId;
+    final public long queryId;
 
     /** The operator identifier. */
-    final int bopId;
+    final public int bopId;
 
-    /**The index partition identifier.*/
-    final int partitionId;
+    /** The index partition identifier. */
+    final public int partitionId;
 
     /** The node on which the operator will execute. */
-    final UUID serviceId;
+    final public UUID serviceId;
 
     /**
-     * The #of chunks which form the input to that operator (for the
-     * atomic termination condition decision).
+     * The #of chunks which form the input to that operator (for the atomic
+     * termination condition decision).
      */
-    final int nchunks;
+    final public int nchunks;
 
-    public StartOpMessage(long queryId, int opId, int partitionId,
-            UUID serviceId, final int nchunks) {
+    public StartOpMessage(final long queryId, final int opId,
+            final int partitionId, final UUID serviceId, final int nchunks) {
         this.queryId = queryId;
         this.bopId = opId;
         this.partitionId = partitionId;

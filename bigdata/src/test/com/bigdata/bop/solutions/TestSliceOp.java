@@ -46,7 +46,6 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.MockRunningQuery;
 import com.bigdata.bop.engine.TestQueryEngine;
-import com.bigdata.journal.ITx;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;

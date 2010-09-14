@@ -34,8 +34,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
+import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IShardwisePipelineOp;
@@ -77,6 +80,9 @@ import com.bigdata.striterator.IKeyOrder;
  * @todo HA aspects of running queries? Checkpoints for long running queries?
  * */
 public class FederatedRunningQuery extends RunningQuery {
+
+    private final static transient Logger log = Logger
+            .getLogger(FederatedRunningQuery.class);
 
     /**
      * The {@link UUID} of the service which is the {@link IQueryClient} running
@@ -204,14 +210,19 @@ public class FederatedRunningQuery extends RunningQuery {
         allocationContexts.clear();
         super.lifeCycleTearDownQuery();
     }
-    
+
+    /**
+     * @param queryEngine
+     * @param queryId
+     * @param controller
+     * @param clientProxy
+     * @param query
+     */
     public FederatedRunningQuery(final FederatedQueryEngine queryEngine,
             final long queryId, /*final long begin, */final boolean controller,
-            final IQueryClient clientProxy, final BOp query,
-            final IBlockingBuffer<IBindingSet[]> queryBuffer) {
+            final IQueryClient clientProxy, final BindingSetPipelineOp query) {
 
-        super(queryEngine, queryId, /*begin, */controller, clientProxy, query,
-                queryBuffer);
+        super(queryEngine, queryId, /*begin, */controller, clientProxy, query);
 
         /*
          * Note: getServiceUUID() should be a smart proxy method and thus not
@@ -224,6 +235,20 @@ public class FederatedRunningQuery extends RunningQuery {
             throw new RuntimeException(e);
         }
         
+        if (!getQuery().getEvaluationContext().equals(
+                BOpEvaluationContext.CONTROLLER)) {
+
+            /*
+             * In scale-out, the top-level operator in the query plan must be
+             * evaluated on the query controller in order for the solutions to
+             * be transferred to the query controller where they may be consumed
+             * by the client.
+             */
+            throw new RuntimeException(
+                    "The top-level of a query must be evaluated on the query controller.");
+
+        }
+
     }
 
     @Override
@@ -339,6 +364,9 @@ public class FederatedRunningQuery extends RunningQuery {
         if (bop == null)
             throw new IllegalArgumentException();
 
+        if(log.isTraceEnabled())
+            log.trace("queryId=" + getQueryId() + ", sink=" + sinkId);
+        
         switch (bop.getEvaluationContext()) {
         case ANY: {
             return super.handleOutputChunk(sinkId, sink);
@@ -364,7 +392,6 @@ public class FederatedRunningQuery extends RunningQuery {
              * data contained in the sink (in fact, we should just process the
              * sink data in place).
              */
-            int nchunksout = 0; // FIXME count the output chunks
             @SuppressWarnings("unchecked")
             final IPredicate<E> pred = ((IShardwisePipelineOp) bop).getPredicate();
             final IKeyOrder<E> keyOrder = pred.getKeyOrder();
@@ -374,8 +401,9 @@ public class FederatedRunningQuery extends RunningQuery {
             final MapBindingSetsOverShardsBuffer<IBindingSet, E> mapper = new MapBindingSetsOverShardsBuffer<IBindingSet, E>(
                     getFederation(), pred, keyOrder, timestamp, capacity) {
                 @Override
-                IBuffer<IBindingSet> newBuffer(PartitionLocator locator) {
-                    return new BlockingBuffer<IBindingSet>(capacity2);
+                IBuffer<IBindingSet[]> newBuffer(final PartitionLocator locator) {
+                    // @todo chunkCapacity and chunkOfChunksCapacity plus timeout stuff.
+                    return new BlockingBuffer<IBindingSet[]>(capacity2);
                 }
             };
             /*
@@ -393,7 +421,7 @@ public class FederatedRunningQuery extends RunningQuery {
                     }
                 } finally {
                     itr.close();
-                    sink.close();
+                    mapper.flush();
                 }
             }
             /*
@@ -412,23 +440,41 @@ public class FederatedRunningQuery extends RunningQuery {
              * @todo This stage should probably be integrated with the stage
              * which maps the binding sets over the shards (immediately above)
              * to minimize copying or visiting in the data.
+             * 
+             * FIXME Review the definition of an "output chunk" from the
+             * perspective of the atomic query termination decision. I think
+             * that it probably corresponds to a "message" sent to a node. For
+             * each message sent, we must later observe the evaluate of the
+             * operator on that node+shard. If the receiver is permitted to
+             * combine messages, then it must tell us how many messages were
+             * consumed.
              */
-            for (Map.Entry<PartitionLocator, IBuffer<IBindingSet>> e : mapper
+            int nchunksout = 0;
+            for (Map.Entry<PartitionLocator, IBuffer<IBindingSet[]>> e : mapper
                     .getSinks().entrySet()) {
 
                 final PartitionLocator locator = e.getKey();
                 
-                final IBuffer<IBindingSet> shardSink = e.getValue();
+                /*
+                 * Note: newBuffer() above creates an BlockingBuffer so this
+                 * cast is safe.
+                 */
+                final IBlockingBuffer<IBindingSet[]> shardSink = (IBlockingBuffer<IBindingSet[]>) e
+                        .getValue();
 
-//                // FIXME harmonize IBuffer<IBindingSet> vs IBuffer<IBindingSet[]>
-//                sendChunkMessage(locator.getDataServiceUUID(), sinkId, locator
-//                        .getPartitionId(), allocationContext, shardSink);
-                throw new UnsupportedOperationException();
+                // close buffer now that nothing is left to map onto it.
+                shardSink.close();
+                
+                // send message.
+                sendChunkMessage(locator.getDataServiceUUID(), sinkId, locator
+                        .getPartitionId(), allocationContext, shardSink);
+                
+                nchunksout++;
 
             }
-            
+
             return nchunksout;
-            
+
         }
         case CONTROLLER: {
 
@@ -561,7 +607,10 @@ public class FederatedRunningQuery extends RunningQuery {
             final IChunkMessage<IBindingSet> msg = new BindingSetChunk<IBindingSet>(
                     getQueryController(), getQueryId(), sinkId, partitionId,
                     source.iterator());
-            
+
+            if (log.isDebugEnabled())
+                log.debug("Sending local message: " + msg);
+
             getQueryEngine().bufferReady(msg);
          
             return;
@@ -593,6 +642,9 @@ public class FederatedRunningQuery extends RunningQuery {
                     source, getQueryEngine().getResourceService().getAddr());
 
         }
+
+        if (log.isDebugEnabled())
+            log.debug("Sending remote message: " + msg);
 
         try {
 

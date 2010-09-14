@@ -45,7 +45,6 @@ import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.bset.Union;
-import com.bigdata.bop.fed.FederatedQueryEngine;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.view.FusedView;
@@ -54,7 +53,6 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.Program;
@@ -413,7 +411,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     /**
      * The currently executing queries.
      */
-    final ConcurrentHashMap<Long/* queryId */, RunningQuery> runningQueries = new ConcurrentHashMap<Long, RunningQuery>();
+    final protected ConcurrentHashMap<Long/* queryId */, RunningQuery> runningQueries = new ConcurrentHashMap<Long, RunningQuery>();
 
     /**
      * A priority queue of {@link RunningQuery}s having binding set chunks
@@ -513,7 +511,8 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     private class QueryEngineTask implements Runnable {
         public void run() {
-            System.err.println("QueryEngine running: " + this);
+            if(log.isInfoEnabled())
+                log.info("running: " + this);
             while (true) {
                 try {
                     final RunningQuery q = priorityQueue.take();
@@ -522,11 +521,12 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
                         continue;
                     final IChunkMessage<IBindingSet> chunk = q.chunksIn.poll();
                     if (log.isTraceEnabled())
-                        log.trace("Accepted chunk: queryId=" + queryId
-                                + ", bopId=" + chunk.getBOpId());
-                    // create task.
+                        log.trace("Accepted chunk: " + chunk);
                     try {
+                        // create task.
                         final FutureTask<?> ft = q.newChunkTask(chunk);
+                        if (log.isDebugEnabled())
+                            log.debug("Running chunk: " + chunk);
                         // execute task.
                         localIndexManager.getExecutorService().execute(ft);
                     } catch (RejectedExecutionException ex) {
@@ -670,6 +670,9 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
         // remove from the set of running queries.
         runningQueries.remove(q.getQueryId(), q);
+        
+        if (log.isInfoEnabled())
+            log.info("Removed entry for query: " + q.getQueryId());
 
     }
     
@@ -800,6 +803,17 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         return runningQueries.get(queryId);
 
     }
+
+    public BindingSetPipelineOp getQuery(final long queryId) {
+     
+        final RunningQuery q = getRunningQuery(queryId);
+        
+        if (q == null)
+            throw new IllegalArgumentException();
+        
+        return q.getQuery();
+        
+    }
     
     /**
      * Places the {@link RunningQuery} object into the internal map.
@@ -827,29 +841,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
             final IQueryClient clientProxy, final BindingSetPipelineOp query) {
 
         return new RunningQuery(this, queryId, true/* controller */,
-                this/* clientProxy */, query, newQueryBuffer(query));
-
-    }
-
-    /**
-     * Return a buffer onto which the solutions will be written.
-     * 
-     * @todo This method is probably in the wrong place. We should use whatever
-     *       is associated with the top-level {@link BOp} in the query and then
-     *       rely on the NIO mechanisms to move the data around as necessary.
-     * 
-     * @todo Could return a data structure which encapsulates the query results
-     *       and could allow multiple results from a query, e.g., one per step
-     *       in a program.
-     * 
-     * @deprecated This is going away.
-     * 
-     * @see FederatedQueryEngine#newQueryBuffer(BindingSetPipelineOp)
-     */
-    protected IBlockingBuffer<IBindingSet[]> newQueryBuffer(
-            final BindingSetPipelineOp query) {
-
-        return query.newBuffer();
+                this/* clientProxy */, query);
 
     }
 

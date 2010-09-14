@@ -90,13 +90,17 @@ public class R extends AbstractRelation<E> {
                 throw new IndexOutOfBoundsException();
             return keyPos;
         }
+        
+        public String toString() {
+            return getClass().getName() + "{" + getIndexName() + "}";
+        }
 
     }
 
     /**
      * The only defined index order (the primary key).
      */
-    private static final KeyOrder primaryKeyOrder = new KeyOrder();
+    public static final KeyOrder primaryKeyOrder = new KeyOrder();
 
     /**
      * @param indexManager

@@ -34,6 +34,7 @@ import java.util.UUID;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
@@ -147,8 +148,9 @@ public class TestThickChunkMessage extends TestCase2 {
         assertTrue(msg.isMaterialized());
         
         assertSameIterator(data.toArray(new IBindingSet[0]),
-                new Dechunkerator<IBindingSet>(msg.iterator()));
-        
+                new Dechunkerator<IBindingSet>(msg.getChunkAccessor()
+                        .iterator()));
+
     }
 
     /**
@@ -170,6 +172,11 @@ public class TestThickChunkMessage extends TestCase2 {
         }
 
         public UUID getServiceUUID() throws RemoteException {
+            return null;
+        }
+
+        public BindingSetPipelineOp getQuery(long queryId)
+                throws RemoteException {
             return null;
         }
         

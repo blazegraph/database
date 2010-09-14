@@ -30,7 +30,6 @@ package com.bigdata.bop.fed;
 import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -39,6 +38,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.bigdata.bop.engine.IChunkAccessor;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.io.DirectBufferPoolAllocator;
@@ -131,8 +131,9 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
     public String toString() {
 
         return getClass().getName() + "{queryId=" + queryId + ",bopId=" + bopId
-                + ",partitionId=" + partitionId + ", solutionCount="
-                + solutionCount + ", bytesAvailable=" + nbytes + ", nslices="
+                + ",partitionId=" + partitionId + ", controller="
+                + queryController + ",solutionCount=" + solutionCount
+                + ", bytesAvailable=" + nbytes + ", nslices="
                 + allocations.length + ", serviceAddr=" + addr + "}";
 
     }
@@ -418,17 +419,35 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
 
     }
 
-    public IAsynchronousIterator<E[]> iterator() {
+    public IChunkAccessor<E> getChunkAccessor() {
 
-        final List<IAllocation> tmp = materialized;
+        return new ChunkAccessor();
         
-        if (tmp == null)
-            throw new UnsupportedOperationException();
+    }
 
-        return new DeserializationIterator(materialized.iterator());
+    /**
+     * FIXME Provide in place decompression and read out of the binding sets.
+     * This should be factored out into classes similar to IRaba and IRabaCoder.
+     * This stuff should be generic so it can handle elements and binding sets
+     * and bats, but there should be specific coders for handling binding sets
+     * which leverages the known set of variables in play as of the operator
+     * which generated those intermediate results.
+     */
+    private class ChunkAccessor implements IChunkAccessor<E> {
+
+        public IAsynchronousIterator<E[]> iterator() {
+
+            final List<IAllocation> tmp = materialized;
+            
+            if (tmp == null)
+                throw new UnsupportedOperationException();
+
+            return new DeserializationIterator(materialized.iterator());
+
+        }
 
     }
-    
+
     private class DeserializationIterator implements IAsynchronousIterator<E[]> {
 
         private final Iterator<IAllocation> src;
