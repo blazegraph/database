@@ -488,8 +488,8 @@ public class TestQueryEngine extends TestCase2 {
             
             initialBindings.set(Var.var("x"), new Constant<String>("Mary"));
 
-            runningQuery.startQuery(new BindingSetChunk(queryEngine, queryId,
-                    startId,//
+            runningQuery.startQuery(new BindingSetChunk<IBindingSet>(
+                    queryEngine, queryId, startId,//
                     -1, // partitionId
                     newBindingSetIterator(initialBindings)));
         }
