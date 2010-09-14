@@ -148,7 +148,7 @@ public class SingleResourceReaderTask implements Runnable {
         }
         
         // Note: IFF the task succeeds!
-        toldTriples.addAndGet(loadStats.toldTriples);
+        toldTriples.addAndGet(loadStats.toldTriples.get());
 
     }
 
@@ -194,9 +194,11 @@ public class SingleResourceReaderTask implements Runnable {
 
             final long now = System.currentTimeMillis();
             
-            stats.toldTriples = nstmts;
+            stats.toldTriples.set(nstmts);
 
-            stats.totalTime = stats.loadTime = now - begin;
+            stats.totalTime.set( now - begin );
+
+            stats.loadTime.set( now - begin );
             
             /*
              * This reports the load rate for the file, but this will only
