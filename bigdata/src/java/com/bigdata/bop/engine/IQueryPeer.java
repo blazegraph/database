@@ -33,7 +33,7 @@ public interface IQueryPeer extends Remote {
      * @throws UnsupportedOperationException
      *             unless running in scale-out.
      */
-    void declareQuery(IQueryDecl queryDecl);
+    void declareQuery(IQueryDecl queryDecl) throws RemoteException;
 
     /**
      * Notify a service that a buffer having data for some {@link BOp} in some

@@ -46,6 +46,7 @@ import com.bigdata.bop.engine.HaltOpMessage;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryDecl;
+import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.engine.StartOpMessage;
 import com.bigdata.io.DirectBufferPoolAllocator.IAllocationContext;
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -255,6 +256,12 @@ public class TestNIOChunkMessage extends TestCase2 {
                 throws RemoteException {
             return null;
         }
+
+		@Override
+		public RunningQuery eval(long queryId, BindingSetPipelineOp query)
+				throws Exception, RemoteException {
+			return null;
+		}
         
     }
 

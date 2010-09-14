@@ -37,7 +37,6 @@ import junit.framework.TestCase2;
 import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
@@ -50,9 +49,10 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
-import com.bigdata.bop.bset.CopyBindingSetOp;
+import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BindingSetChunk;
+import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.bop.engine.PipelineDelayOp;
 import com.bigdata.bop.engine.QueryEngine;
@@ -62,15 +62,15 @@ import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SortOp;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.jini.util.JiniUtil;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ITx;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
-import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedFederation;
-import com.bigdata.service.jini.DataServer;
+import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.service.jini.util.JiniServicesHelper;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.Dechunkerator;
 import com.ibm.icu.impl.ByteBuffer;
@@ -128,40 +128,43 @@ public class TestFederatedQueryEngine extends TestCase2 {
     }
 
     // Namespace for the relation.
-    static private final String namespace = "ns";
+    static private final String namespace = TestFederatedQueryEngine.class.getName();
     
     // The separator key between the index partitions.
     private byte[] separatorKey;
 
-    private FederatedQueryEngine queryEngine;
+    private IQueryClient queryEngine;
     
+    private JiniClient<?> client;
 
-    private JiniServicesHelper helper;
-    
-//    private JiniClient<?> client;
-    
+    private IDataService dataService0; 
+    private IDataService dataService1; 
+
     protected void setUp() throws Exception {
+
+    	client = new JiniClient(new String[]{"/nas/bigdata/bigdata-0.83.2/dist/bigdata/var/config/jini/bigdataStandalone.config"});
+        
+    	final IBigdataFederation<?> fed = client.connect();
     
-        helper = new JiniServicesHelper();
-        
-        // start services.
-        helper.start();
-        
-//        // expose to subclasses.
-//        client = helper.client;
-        
+    	final int maxCount = 2;
+    	UUID[] dataServices = null;
+    	while((dataServices = fed.getDataServiceUUIDs(maxCount)).length < maxCount) {
+    		System.err.println("Waiting for "+maxCount+" data services.  There are "+dataServices.length+" discovered.");
+    		Thread.sleep(250/*ms*/);
+    	}
+    	
         super.setUp();
-        
+
+        dataService0 = fed.getDataService(dataServices[0]); 
+        dataService1 = fed.getDataService(dataServices[1]); 
         {
-            
-            final DataServer dataServer = helper.dataServer0;
-            
-            assertTrue(((DataService) dataServer.getProxy())
-                    .getResourceManager().awaitRunning());
+
+        	// @todo need to wait for the dataService to be running.
+//            assertTrue(((DataService) dataServer.getProxy())
+//                    .getResourceManager().awaitRunning());
 
             // resolve the query engine on one of the data services.
-            while ((queryEngine = (FederatedQueryEngine) ((DataService) dataServer
-                    .getProxy()).getQueryEngine()) == null) {
+            while ((queryEngine = (IQueryClient) dataService0.getQueryEngine()) == null) {
  
                 if (log.isInfoEnabled())
                     log.info("Waiting for query engine on dataService0");
@@ -175,17 +178,14 @@ public class TestFederatedQueryEngine extends TestCase2 {
         }
 
         // resolve the query engine on the other data services.
-        if (helper.dataServer1 != null) {
+        {
 
-            final DataServer dataServer = helper.dataServer1;
-            
             IQueryPeer other = null;
             
-            assertTrue(((DataService) dataServer.getProxy())
-                    .getResourceManager().awaitRunning());
+//            assertTrue(((DataService) dataServer.getProxy())
+//                    .getResourceManager().awaitRunning());
             
-            while ((other = ((DataService) dataServer.getProxy())
-                    .getQueryEngine()) == null) {
+            while ((other = dataService1.getQueryEngine()) == null) {
             
                 if (log.isInfoEnabled())
                     log.info("Waiting for query engine on dataService1");
@@ -207,9 +207,13 @@ public class TestFederatedQueryEngine extends TestCase2 {
         // clear reference.
         separatorKey = null;
         
-        helper.destroy();
+        client.disconnect(true/*immediateShutdown*/);
+        client = null;
+
+        dataService0 = null;
+        dataService1 = null;
         
-        helper = null;
+        queryEngine = null;
 
         super.tearDown();
         
@@ -244,8 +248,8 @@ public class TestFederatedQueryEngine extends TestCase2 {
         };
 
         final UUID[] dataServices = new UUID[] {//
-                JiniUtil.serviceID2UUID(helper.dataServer0.getServiceID()),//
-                JiniUtil.serviceID2UUID(helper.dataServer1.getServiceID()),//
+                dataService0.getServiceUUID(),//
+                dataService1.getServiceUUID(),//
         };
 
         /*
@@ -253,14 +257,19 @@ public class TestFederatedQueryEngine extends TestCase2 {
          * using the given separator keys and data services.
          */
         
-        final R rel = new R(helper.getFederation(), namespace, ITx.UNISOLATED, new Properties());
+        final R rel = new R(client.getFederation(), namespace, ITx.UNISOLATED, new Properties());
 
+        if(client.getFederation()
+        .getResourceLocator().locate(namespace, ITx.UNISOLATED)==null) {
+        	
         rel.create(separatorKeys, dataServices);
 
         /*
          * Insert data into the appropriate index partitions.
          */
         rel.insert(new ChunkedArrayIterator<E>(a.length, a, null/* keyOrder */));
+        
+        }
 
     }
 
@@ -302,17 +311,11 @@ public class TestFederatedQueryEngine extends TestCase2 {
     public void test_query_startRun() throws Exception {
 
         final int startId = 1;
-        final BindingSetPipelineOp query = new CopyBindingSetOp(new BOp[] {}, NV
+        final BindingSetPipelineOp query = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
 //                new NV(Predicate.Annotations.READ_TIMESTAMP, ITx.READ_COMMITTED),//
-                })){
-            private static final long serialVersionUID = 1L;
-
-            public BOpEvaluationContext getEvaluationContext() {
-                return BOpEvaluationContext.CONTROLLER;
-            }
-        };
+                }));
 
         final long queryId = 1L;
         final RunningQuery runningQuery = queryEngine.eval(queryId, query);
@@ -379,7 +382,7 @@ public class TestFederatedQueryEngine extends TestCase2 {
         final BindingSetPipelineOp query = 
             new SliceOp(new BOp[]{new PipelineJoin<E>(
         // left
-                new CopyBindingSetOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
                         })),
                 // right
@@ -563,7 +566,7 @@ public class TestFederatedQueryEngine extends TestCase2 {
         final int predId2 = 5;
         final int sliceId = 6;
         
-        final BindingSetPipelineOp startOp = new CopyBindingSetOp(new BOp[] {},
+        final BindingSetPipelineOp startOp = new StartOp(new BOp[] {},
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
                         }));
