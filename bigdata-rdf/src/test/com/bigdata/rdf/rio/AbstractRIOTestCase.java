@@ -401,7 +401,7 @@ abstract public class AbstractRIOTestCase extends AbstractTripleStoreTestCase {
 
                     });
 
-                    loader.loadRdf((Reader) reader, baseURI, rdfFormat, options);
+                    loader.loadRdf((Reader) reader, baseURI, rdfFormat, null, options);
 
                     if (log.isInfoEnabled())
                         log.info("Done: " + resource);
@@ -681,7 +681,7 @@ abstract public class AbstractRIOTestCase extends AbstractTripleStoreTestCase {
 
                 loader.loadRdf(new BufferedReader(new InputStreamReader(
                         new FileInputStream(resource))), baseURI, rdfFormat,
-                        options);
+                        null, options);
 
                 if(log.isInfoEnabled())
                 	log.info("End of reparse: nerrors=" + nerrs + ", file="

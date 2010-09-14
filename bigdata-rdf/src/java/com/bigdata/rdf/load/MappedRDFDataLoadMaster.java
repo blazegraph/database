@@ -272,7 +272,18 @@ V extends Serializable//
 //
 //        /** {@value #DEFAULT_MAX_TRIES} */
 //        int DEFAULT_MAX_TRIES = 3;
-        
+
+        /**
+         * The value that will be used for the graph/context co-ordinate when
+         * loading data represented in a triple format into a quad store.
+         */
+        String DEFAULT_GRAPH = "defaultGraph" ;
+
+        /**
+         * TODO Should we always enforce a real value? i.e. provide a real default
+         * or abort the load.
+         */
+        String DEFAULT_DEFAULT_GRAPH = null ;
     }
 
     /**
@@ -402,6 +413,12 @@ V extends Serializable//
         private transient RDFFormat rdfFormat;
 
         /**
+         * The value that will be used for the graph/context co-ordinate when
+         * loading data represented in a triple format into a quad store.
+         */
+        public final String defaultGraph ;
+
+        /**
          * Force the load of the NxParser integration class and its registration
          * of the NQuadsParser#nquads RDFFormat.
          * 
@@ -495,6 +512,8 @@ V extends Serializable//
                     + parserOptions);
             
             sb.append(", " + ConfigurationOptions.RDF_FORMAT + "=" + rdfFormat);
+
+            sb.append(", " + ConfigurationOptions.DEFAULT_GRAPH + "=" + defaultGraph) ;
 
             sb.append(", " + ConfigurationOptions.FORCE_OVERFLOW_BEFORE_CLOSURE + "="
                     + forceOverflowBeforeClosure);
@@ -600,6 +619,10 @@ V extends Serializable//
                 }
 
             }
+
+            defaultGraph = (String) config.getEntry(component,
+                    ConfigurationOptions.DEFAULT_GRAPH, String.class,
+                    ConfigurationOptions.DEFAULT_DEFAULT_GRAPH);
 
             rejectedExecutionDelay = (Long) config.getEntry(
                     component,
@@ -979,6 +1002,7 @@ V extends Serializable//
                 jobState.ontology,//file
                 jobState.ontology.getPath(),//baseURI
                 jobState.getRDFFormat(),//
+                jobState.defaultGraph,
                 jobState.ontologyFileFilter //
                 );
 
