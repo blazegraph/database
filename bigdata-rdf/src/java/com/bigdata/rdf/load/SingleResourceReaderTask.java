@@ -186,7 +186,7 @@ public class SingleResourceReaderTask implements Runnable {
 
             // run the parser.
             // @todo reuse the same underlying parser instance?
-            loader.loadRdf(reader, baseURL, rdfFormat, parserOptions);
+            loader.loadRdf(reader, baseURL, rdfFormat, null, parserOptions);
 
             success = true;
             

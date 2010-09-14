@@ -640,7 +640,7 @@ public class DataLoader {
 
             final LoadStats totals = new LoadStats();
 
-            loadData3(totals, reader, baseURL, rdfFormat, true/*endOfBatch*/);
+            loadData3(totals, reader, baseURL, rdfFormat, null, true/*endOfBatch*/);
             
             return totals;
         
@@ -668,7 +668,7 @@ public class DataLoader {
 
             final LoadStats totals = new LoadStats();
             
-            loadData3(totals, is, baseURL, rdfFormat, true/* endOfBatch */);
+            loadData3(totals, is, baseURL, rdfFormat, null, true/* endOfBatch */);
             
             return totals;
             
@@ -704,7 +704,7 @@ public class DataLoader {
         
             final LoadStats totals = new LoadStats();
             
-            loadData3(totals, is, baseURL, rdfFormat, true/*endOfBatch*/);
+            loadData3(totals, is, baseURL, rdfFormat, null, true/*endOfBatch*/);
             
             return totals;
         
@@ -762,7 +762,7 @@ public class DataLoader {
                 if(file.exists()) {
                 
                     loadFiles(totals, 0/* depth */, file, baseURL,
-                        rdfFormat, filter, endOfBatch);
+                        rdfFormat, null, filter, endOfBatch);
 
                     return;
                 
@@ -789,7 +789,7 @@ public class DataLoader {
 
         try {
 
-            loadData3(totals, reader, baseURL, rdfFormat, endOfBatch);
+            loadData3(totals, reader, baseURL, rdfFormat, null, endOfBatch);
 
         } catch (Exception ex) {
 
@@ -817,6 +817,9 @@ public class DataLoader {
      *            The format of the file (optional, when not specified the
      *            format is deduced for each file in turn using the
      *            {@link RDFFormat} static methods).
+     * @param defaultGraph
+     *            The value that will be used for the graph/context co-ordinate when
+     *            loading data represented in a triple format into a quad store.
      * @param filter
      *            A filter selecting the file names that will be loaded
      *            (optional). When specified, the filter MUST accept directories
@@ -827,7 +830,8 @@ public class DataLoader {
      * @throws IOException
      */
     public LoadStats loadFiles(final File file, final String baseURI,
-            final RDFFormat rdfFormat, final FilenameFilter filter)
+            final RDFFormat rdfFormat, final String defaultGraph,
+            final FilenameFilter filter)
             throws IOException {
 
         if (file == null)
@@ -835,7 +839,7 @@ public class DataLoader {
         
         final LoadStats totals = new LoadStats();
 
-        loadFiles(totals, 0/* depth */, file, baseURI, rdfFormat, filter, true/* endOfBatch */
+        loadFiles(totals, 0/* depth */, file, baseURI, rdfFormat, defaultGraph, filter, true/* endOfBatch */
         );
 
         return totals;
@@ -844,7 +848,8 @@ public class DataLoader {
 
     protected void loadFiles(final LoadStats totals, final int depth,
             final File file, final String baseURI, final RDFFormat rdfFormat,
-            final FilenameFilter filter, final boolean endOfBatch)
+            final String defaultGraph, final FilenameFilter filter,
+            final boolean endOfBatch)
             throws IOException {
 
         if (file.isDirectory()) {
@@ -864,7 +869,7 @@ public class DataLoader {
 //                final RDFFormat fmt = RDFFormat.forFileName(f.toString(),
 //                        rdfFormat);
 
-                loadFiles(totals, depth + 1, f, baseURI, rdfFormat, filter,
+                loadFiles(totals, depth + 1, f, baseURI, rdfFormat, defaultGraph, filter,
                         (depth == 0 && i < files.length ? false : endOfBatch));
                 
             }
@@ -919,7 +924,7 @@ public class DataLoader {
                 final String s = baseURI != null ? baseURI : file.toURI()
                         .toString();
 
-                loadData3(totals, reader, s, fmt, endOfBatch);
+                loadData3(totals, reader, s, fmt, defaultGraph, endOfBatch);
                 
                 return;
 
@@ -955,7 +960,7 @@ public class DataLoader {
      */
     protected void loadData3(final LoadStats totals, final Object source,
             final String baseURL, final RDFFormat rdfFormat,
-            final boolean endOfBatch) throws IOException {
+            final String defaultGraph, final boolean endOfBatch) throws IOException {
 
         final long begin = System.currentTimeMillis();
         
@@ -978,11 +983,10 @@ public class DataLoader {
         }
         
         // Setup the loader.
-        final PresortRioLoader loader = new PresortRioLoader(buffer);
+        final PresortRioLoader loader = new PresortRioLoader ( buffer ) ;
 
         // @todo review: disable auto-flush - caller will handle flush of the buffer.
 //        loader.setFlush(false);
-
         // add listener to log progress.
         loader.addRioLoaderListener( new RioLoaderListener() {
             
@@ -1006,12 +1010,12 @@ public class DataLoader {
             
             if(source instanceof Reader) {
                 
-                loader.loadRdf((Reader) source, baseURL, rdfFormat, parserOptions);
+                loader.loadRdf((Reader) source, baseURL, rdfFormat, defaultGraph, parserOptions);
 
             } else if (source instanceof InputStream) {
 
                 loader.loadRdf((InputStream) source, baseURL, rdfFormat,
-                        parserOptions);
+                        defaultGraph, parserOptions);
 
             } else
                 throw new AssertionError();
@@ -1360,7 +1364,7 @@ public class DataLoader {
 //                        rdfFormat, filter);
 
                 dataLoader.loadFiles(totals, 0/* depth */, fileOrDir, baseURI,
-                        rdfFormat, filter, true/* endOfBatch */
+                        rdfFormat, null, filter, true/* endOfBatch */
                 );
 
             }

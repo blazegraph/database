@@ -72,12 +72,14 @@ public interface IRioLoader {
      *            The base URL for those data.
      * @param rdfFormat
      *            The interchange format.
+     * @param defaultGraph
+     *            The default graph.
      * @param options
      *            Options to be applied to the {@link RDFParser}.
      * @throws Exception
      */
     public void loadRdf(Reader reader, String baseURL, RDFFormat rdfFormat,
-            RDFParserOptions options) throws Exception;
+            String defaultGraph, RDFParserOptions options) throws Exception;
 
     /**
      * Parse RDF data.
@@ -88,11 +90,13 @@ public interface IRioLoader {
      *            The base URL for those data.
      * @param rdfFormat
      *            The interchange format.
+     * @param defaultGraph
+     *            The default graph.
      * @param options
      *            Options to be applied to the {@link RDFParser}.
      * @throws Exception
      */
     public void loadRdf(InputStream is, String baseURI, RDFFormat rdfFormat,
-            RDFParserOptions options) throws Exception;
+            String defaultGraph, RDFParserOptions options) throws Exception;
     
 }

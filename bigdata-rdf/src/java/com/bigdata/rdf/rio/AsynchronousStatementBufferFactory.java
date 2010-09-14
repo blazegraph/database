@@ -356,7 +356,13 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      * The default {@link RDFFormat}.
      */
     private final RDFFormat defaultFormat;
-    
+
+    /**
+     * The value that will be used for the graph/context co-ordinate when
+     * loading data represented in a triple format into a quad store.
+     */
+    private final String defaultGraph;
+
     /**
      * Options for the {@link RDFParser}.
      */
@@ -1423,7 +1429,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                     try {
                         // run the parser.
                         new PresortRioLoader(buffer).loadRdf(reader, baseURL,
-                                rdfFormat, parserOptions);
+                                rdfFormat, defaultGraph, parserOptions);
                     } finally {
                         reader.close();
                     }
@@ -1490,6 +1496,9 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      *            {@link BNode}s parsed from a single document.
      * @param defaultFormat
      *            The default {@link RDFFormat} which will be assumed.
+     * @param defaultGraph
+     *            The value that will be used for the graph/context co-ordinate when
+     *            loading data represented in a triple format into a quad store.
      * @param parserOptions
      *            Options for the {@link RDFParser}.
      * @param deleteAfter
@@ -1529,6 +1538,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             final int valuesInitialCapacity,//
             final int bnodesInitialCapacity, //
             final RDFFormat defaultFormat,//
+            final String defaultGraph,//
             final RDFParserOptions parserOptions,//
             final boolean deleteAfter,//
             final int parserPoolSize,//
@@ -1565,6 +1575,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         this.bnodesInitialCapacity = bnodesInitialCapacity;
         
         this.defaultFormat  = defaultFormat;
+        
+        this.defaultGraph = defaultGraph;
         
         this.parserOptions = parserOptions;
         
