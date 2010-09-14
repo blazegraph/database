@@ -32,14 +32,9 @@ import java.net.MalformedURLException;
 import java.util.concurrent.TimeUnit;
 
 import net.jini.core.discovery.LookupLocator;
-import net.jini.core.lookup.ServiceRegistrar;
-import net.jini.discovery.DiscoveryEvent;
-import net.jini.discovery.DiscoveryListener;
 import net.jini.discovery.LookupDiscovery;
-import net.jini.discovery.LookupDiscoveryManager;
 
-import org.apache.log4j.Logger;
-
+import com.bigdata.jini.start.config.JiniCoreServicesConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 
 /**
@@ -50,12 +45,12 @@ import com.bigdata.jini.start.config.ServiceConfiguration;
  */
 public class JiniCoreServicesHelper {
 
-    protected final static Logger log = Logger
-            .getLogger(JiniCoreServicesHelper.class);
+//    private final static Logger log = Logger
+//            .getLogger(JiniCoreServicesHelper.class);
 
-    protected final static boolean INFO = log.isInfoEnabled();
-
-    protected final static boolean DEBUG = log.isDebugEnabled();
+//    protected final static boolean INFO = log.isInfoEnabled();
+//
+//    protected final static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Return <code>true</code> if Jini appears to be running on the
@@ -129,108 +124,9 @@ public class JiniCoreServicesHelper {
             final LookupLocator[] locators, long timeout, final TimeUnit unit)
             throws InterruptedException, IOException {
 
-        return getServiceRegistrars(1/* maxCount */, groups, locators, timeout,
-                unit).length > 0;
+        return JiniCoreServicesConfiguration.getServiceRegistrars(
+                1/* maxCount */, groups, locators, timeout, unit).length > 0;
         
-    }
-
-    /**
-     * Return Jini registrars discovered within the specified timeout.
-     * 
-     * @param maxCount
-     *            The maximum #of registrars to discover.
-     * @param groups
-     *            An array of groups or {@link LookupDiscovery#ALL_GROUPS} if
-     *            you will be using multicast discovery.
-     * @param locators
-     *            An array of {@link LookupLocator}s. These use URIs of the
-     *            form <code>jini://host/</code> or
-     *            <code>jini://host:port/</code>. This MAY be an empty array
-     *            if you want to use <em>multicast</em> discovery.
-     * 
-     * @throws IOException
-     */
-    static public ServiceRegistrar[] getServiceRegistrars(int maxCount,
-            final String[] groups, final LookupLocator[] locators,
-            long timeout, final TimeUnit unit) throws InterruptedException,
-            IOException {
-        
-        final long begin = System.nanoTime();
-
-        timeout = unit.toNanos(timeout);
-
-        final Object signal = new Object();
-
-        final LookupDiscoveryManager discovery = new LookupDiscoveryManager(groups,
-                locators,
-                /*
-                 * Add a listener that wakes us up if a registrar is discovered.
-                 */
-                new DiscoveryListener() {
-
-                    public void discarded(DiscoveryEvent e) {
-
-                        if(DEBUG)
-                            log.debug("discarded: "+e);
-
-                        // ignored.
-
-                    }
-
-                    public void discovered(DiscoveryEvent e) {
-
-                        if(DEBUG)
-                            log.debug("discovered: "+e);
-                        
-                        synchronized (signal) {
-
-                            signal.notify();
-
-                        }
-
-                    }
-        
-        });
-                
-        try {
-
-            long elapsed;
-
-            // demand some results.
-            ServiceRegistrar[] registrars = new ServiceRegistrar[0];
-
-            while ((timeout -= (elapsed = (System.nanoTime() - begin))) > 0
-                    && registrars.length < maxCount) {
-
-                synchronized (signal) {
-
-                    try {
-                        signal.wait(TimeUnit.NANOSECONDS.toMillis(timeout));
-                    } catch(InterruptedException ex) {
-                        // fall through
-                    }
-
-                    if(DEBUG)
-                        log.debug("woke up.");
-
-                }
-
-                registrars = discovery.getRegistrars();
-
-            }
-
-            if (log.isInfoEnabled())
-                log.info("Found " + registrars.length + " registrars in "
-                        + TimeUnit.NANOSECONDS.toMillis(elapsed) + "ms.");
-
-            return registrars;
-
-        } finally {
-
-            discovery.terminate();
-
-        }
-
     }
 
     /**
@@ -241,7 +137,7 @@ public class JiniCoreServicesHelper {
      * @param b
      * @return
      */
-    @SuppressWarnings("unchecked")
+//    @SuppressWarnings("unchecked")
     protected static <T> T[] concat(final T[] a, final T[] b) {
 
         return ServiceConfiguration.concat(a, b);

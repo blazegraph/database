@@ -57,35 +57,10 @@ public interface IChunkMessage<E> {
      * Discard the materialized data.
      */
     void release();
-    
+
     /**
-     * Visit the binding sets in the chunk.
-     * 
-     * @todo we do not need to use {@link IAsynchronousIterator} any more. This
-     *       could be much more flexible and should be harmonized to support
-     *       high volume operators, GPU operators, etc. probably the right thing
-     *       to do is introduce another interface here with a getChunk():IChunk
-     *       where IChunk let's you access the chunks data in different ways
-     *       (and chunks can be both {@link IBindingSet}[]s and element[]s so we
-     *       might need to raise that into the interfaces and/or generics as
-     *       well).
-     * 
-     * @todo It is likely that we can convert to the use of
-     *       {@link BlockingQueue} instead of {@link BlockingBuffer} in the
-     *       operators and then handle the logic for combining chunks inside of
-     *       the {@link QueryEngine}. E.g., by scanning this list for chunks for
-     *       the same bopId and combining them logically into a single chunk.
-     *       <p>
-     *       For scale-out, chunk combination will naturally occur when the node
-     *       on which the operator will run requests the {@link ByteBuffer}s
-     *       from the source nodes. Those will get wrapped up logically into a
-     *       source for processing. For selective operators, those chunks can be
-     *       combined before we execute the operator. For unselective operators,
-     *       we are going to run over all the data anyway.
-     * 
-     * @throws IllegalStateException
-     *             if the payload is not materialized.
+     * Return an interface which may be used to access the chunk's data.
      */
-    IAsynchronousIterator<E[]> iterator();
+    IChunkAccessor<E> getChunkAccessor();
 
 }

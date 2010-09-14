@@ -3,7 +3,6 @@ package com.bigdata.bop.engine;
 import java.io.Serializable;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.fed.FederatedRunningQuery;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 
@@ -94,8 +93,16 @@ public class BindingSetChunk<E> implements IChunkMessage<E> {
         // NOP
     }
     
-    public IAsynchronousIterator<E[]> iterator() {
-        return source;
+    public IChunkAccessor<E> getChunkAccessor() {
+        return new ChunkAccessor();
+    }
+
+    private class ChunkAccessor implements IChunkAccessor<E> {
+
+        public IAsynchronousIterator<E[]> iterator() {
+            return source;
+        }
+
     }
 
 }

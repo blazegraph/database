@@ -37,6 +37,7 @@ import java.util.UUID;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
@@ -207,8 +208,9 @@ public class TestNIOChunkMessage extends TestCase2 {
 
                 // visit and verify the data.
                 assertSameIterator(data.toArray(new IBindingSet[0]),
-                        new Dechunkerator<IBindingSet>(msg.iterator()));
-                
+                        new Dechunkerator<IBindingSet>(msg.getChunkAccessor()
+                                .iterator()));
+
             } finally {
                 
                 msg.release();
@@ -246,6 +248,11 @@ public class TestNIOChunkMessage extends TestCase2 {
         }
 
         public UUID getServiceUUID() throws RemoteException {
+            return null;
+        }
+
+        public BindingSetPipelineOp getQuery(long queryId)
+                throws RemoteException {
             return null;
         }
         

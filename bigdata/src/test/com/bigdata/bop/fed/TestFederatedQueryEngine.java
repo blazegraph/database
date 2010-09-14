@@ -32,9 +32,12 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
+import junit.framework.TestCase2;
+
 import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
@@ -50,20 +53,24 @@ import com.bigdata.bop.ap.R;
 import com.bigdata.bop.bset.CopyBindingSetOp;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BindingSetChunk;
+import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.bop.engine.PipelineDelayOp;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SortOp;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.ITx;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
-import com.bigdata.service.AbstractEmbeddedFederationTestCase;
 import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedFederation;
+import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.jini.util.JiniServicesHelper;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.Dechunkerator;
 import com.ibm.icu.impl.ByteBuffer;
@@ -108,7 +115,7 @@ import com.ibm.icu.impl.ByteBuffer;
  * @todo test suite for join evaluation against an {@link JiniFederation} with
  *       2DS.
  */
-public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase {
+public class TestFederatedQueryEngine extends TestCase2 {
 
     public TestFederatedQueryEngine() {
         
@@ -128,43 +135,82 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
     private FederatedQueryEngine queryEngine;
     
-    public void setUp() throws Exception {
 
+    private JiniServicesHelper helper;
+    
+//    private JiniClient<?> client;
+    
+    protected void setUp() throws Exception {
+    
+        helper = new JiniServicesHelper();
+        
+        // start services.
+        helper.start();
+        
+//        // expose to subclasses.
+//        client = helper.client;
+        
         super.setUp();
         
         {
-            assertTrue(((DataService) dataService0).getResourceManager()
-                    .awaitRunning());
+            
+            final DataServer dataServer = helper.dataServer0;
+            
+            assertTrue(((DataService) dataServer.getProxy())
+                    .getResourceManager().awaitRunning());
 
             // resolve the query engine on one of the data services.
-            while ((queryEngine = (FederatedQueryEngine) ((DataService) dataService0)
-                    .getQueryEngine()) == null) {
+            while ((queryEngine = (FederatedQueryEngine) ((DataService) dataServer
+                    .getProxy()).getQueryEngine()) == null) {
+ 
                 if (log.isInfoEnabled())
                     log.info("Waiting for query engine on dataService0");
+                
                 Thread.sleep(250);
+                
             }
+            
+            System.err.println("controller: " + queryEngine);
+            
         }
 
         // resolve the query engine on the other data services.
-        if (dataService1 != null) {
-            assertTrue(((DataService) dataService1).getResourceManager()
-                    .awaitRunning());
-            while (((DataService) dataService1).getQueryEngine() == null) {
+        if (helper.dataServer1 != null) {
+
+            final DataServer dataServer = helper.dataServer1;
+            
+            IQueryPeer other = null;
+            
+            assertTrue(((DataService) dataServer.getProxy())
+                    .getResourceManager().awaitRunning());
+            
+            while ((other = ((DataService) dataServer.getProxy())
+                    .getQueryEngine()) == null) {
+            
                 if (log.isInfoEnabled())
                     log.info("Waiting for query engine on dataService1");
+                
                 Thread.sleep(250);
+                
             }
+
+            System.err.println("other     : " + other);
+            
         }
 
         loadData();
         
     }
-    
+
     public void tearDown() throws Exception {
         
         // clear reference.
         separatorKey = null;
         
+        helper.destroy();
+        
+        helper = null;
+
         super.tearDown();
         
     }
@@ -198,8 +244,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         };
 
         final UUID[] dataServices = new UUID[] {//
-                dataService0.getServiceUUID(),//
-                dataService1.getServiceUUID() //
+                JiniUtil.serviceID2UUID(helper.dataServer0.getServiceID()),//
+                JiniUtil.serviceID2UUID(helper.dataServer1.getServiceID()),//
         };
 
         /*
@@ -207,7 +253,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
          * using the given separator keys and data services.
          */
         
-        final R rel = new R(fed, namespace, ITx.UNISOLATED, new Properties());
+        final R rel = new R(helper.getFederation(), namespace, ITx.UNISOLATED, new Properties());
 
         rel.create(separatorKeys, dataServices);
 
@@ -260,7 +306,13 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
 //                new NV(Predicate.Annotations.READ_TIMESTAMP, ITx.READ_COMMITTED),//
-                }));
+                })){
+            private static final long serialVersionUID = 1L;
+
+            public BOpEvaluationContext getEvaluationContext() {
+                return BOpEvaluationContext.CONTROLLER;
+            }
+        };
 
         final long queryId = 1L;
         final RunningQuery runningQuery = queryEngine.eval(queryId, query);
@@ -323,7 +375,9 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         final int startId = 1;
         final int joinId = 2;
         final int predId = 3;
-        final BindingSetPipelineOp query = new PipelineJoin<E>(
+        final int sliceId = 4;
+        final BindingSetPipelineOp query = 
+            new SliceOp(new BOp[]{new PipelineJoin<E>(
         // left
                 new CopyBindingSetOp(new BOp[] {}, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
@@ -334,6 +388,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         .asMap(new NV[] {//
                                 new NV(Predicate.Annotations.RELATION_NAME,
                                         new String[] { namespace }),//
+                                new NV(Predicate.Annotations.KEY_ORDER,
+                                        R.primaryKeyOrder),//
                                 new NV(Predicate.Annotations.PARTITION_ID,
                                         Integer.valueOf(-1)),//
                                 new NV(Predicate.Annotations.OPTIONAL,
@@ -347,6 +403,11 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, joinId),//
                         })//
+        )},
+        // slice annotations
+        NV.asMap(new NV[] {//
+                new NV(Predicate.Annotations.BOP_ID, sliceId),//
+                })//
         );
 
         // the expected solutions.
@@ -500,6 +561,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         final int predId1 = 3;
         final int joinId2 = 4;
         final int predId2 = 5;
+        final int sliceId = 6;
         
         final BindingSetPipelineOp startOp = new CopyBindingSetOp(new BOp[] {},
                 NV.asMap(new NV[] {//
@@ -548,7 +610,10 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV(Predicate.Annotations.BOP_ID, joinId2),//
                         }));
 
-        final BindingSetPipelineOp query = join2Op;
+        final BindingSetPipelineOp query = new SliceOp(new BOp[] { join2Op },
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, sliceId),//
+                        }));
 
         final long queryId = 1L;
         final RunningQuery runningQuery = queryEngine.eval(queryId, query);
@@ -651,6 +716,19 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
             assertEquals(1L, stats.chunksOut.get()); // @todo depends on where the shards are.
         }
 
+        // validate stats for the sliceOp (on the query controller)
+        {
+            final BOpStats stats = statsMap.get(sliceId);
+            assertNotNull(stats);
+            System.err.println("slice: " + stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get()); // @todo?
+            assertEquals(2L, stats.unitsIn.get());
+            assertEquals(2L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get()); // @todo?
+        }
+        
     }
 
     /**

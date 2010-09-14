@@ -2,21 +2,24 @@ package com.bigdata.bop.engine;
 
 import java.rmi.RemoteException;
 
+import com.bigdata.bop.BindingSetPipelineOp;
+
 /**
  * Interface for a client executing queries (the query controller).
  */
 public interface IQueryClient extends IQueryPeer {
 
-//    /**
-//     * Return the query.
-//     * 
-//     * @param queryId
-//     *            The query identifier.
-//     * @return The query.
-//     * 
-//     * @throws RemoteException
-//     */
-//    public BOp getQuery(long queryId) throws RemoteException;
+    /**
+     * Return the query.
+     * 
+     * @param queryId
+     *            The query identifier.
+     * @return The query.
+     * 
+     * @throws IllegalArgumentException
+     *             if there is no such query.
+     */
+    public BindingSetPipelineOp getQuery(long queryId) throws RemoteException;
 
     /**
      * Notify the client that execution has started for some query, operator,

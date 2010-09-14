@@ -6,6 +6,8 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.Map;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
@@ -83,6 +85,8 @@ import com.bigdata.striterator.IKeyOrder;
 public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
         extends AbstractUnsynchronizedArrayBuffer<E> {
 
+    private static transient final Logger log = Logger.getLogger(MapBindingSetsOverShardsBuffer.class);
+    
     /**
      * The predicate from which we generate the asBound binding sets. This
      * predicate and the {@link IKeyOrder} together determine the required
@@ -370,6 +374,9 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
 
         }
 
+        if (log.isTraceEnabled())
+            log.trace("nsplits=" + splits.size() + ", pred=" + pred);
+        
         /*
          * For each split, write the binding sets in that split onto the
          * corresponding buffer.
@@ -377,17 +384,33 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
         for (Split split : splits) {
 
             // Note: pmd is a PartitionLocator, so this cast is valid.
-            final IBuffer<IBindingSet> sink = getBuffer((PartitionLocator) split.pmd);
+            final IBuffer<IBindingSet[]> sink = getBuffer((PartitionLocator) split.pmd);
 
-            for (int i = split.fromIndex; i < split.toIndex; i++) {
+            final IBindingSet[] slice = new IBindingSet[split.ntuples];
 
-                final Bundle bundle = bundles[i];
+            for (int j = 0, i = split.fromIndex; i < split.toIndex; i++, j++) {
+                
+                final IBindingSet bset = bundles[i].bindingSet;
+                
+                slice[j] = bset;
 
-                sink.add(bundle.bindingSet);
-
-//                stats.unitsOut.increment();
+                if (log.isTraceEnabled())
+                    log.trace("Mapping: keyOrder=" + keyOrder + ",bset=" + bset
+                            + " onto " + split.pmd.getPartitionId());
 
             }
+
+//            for (int i = split.fromIndex; i < split.toIndex; i++) {
+//
+//                final Bundle bundle = bundles[i];
+//
+//                sink.add(bundle.bindingSet);
+//
+////                stats.unitsOut.increment();
+//
+//            }
+            
+            sink.add(slice);
             
         }
 
@@ -404,7 +427,7 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
 
         final long n = super.flush();
 
-        for (IBuffer<IBindingSet> sink : sinks.values()) {
+        for (IBuffer<IBindingSet[]> sink : sinks.values()) {
 
             if (!sink.isEmpty())
                 sink.flush();
@@ -423,12 +446,12 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
      * the collection. However, the {@link MapBindingSetsOverShardsBuffer} is not
      * thread-safe either so this should be Ok.
      */
-    private final LinkedHashMap<PartitionLocator, IBuffer<IBindingSet>/* sink */> sinks = new LinkedHashMap<PartitionLocator, IBuffer<IBindingSet>>();
+    private final LinkedHashMap<PartitionLocator, IBuffer<IBindingSet[]>/* sink */> sinks = new LinkedHashMap<PartitionLocator, IBuffer<IBindingSet[]>>();
 
     /**
      * An immutable view of the sinks.
      */
-    protected Map<PartitionLocator, IBuffer<IBindingSet>/* sink */> getSinks() {
+    protected Map<PartitionLocator, IBuffer<IBindingSet[]>/* sink */> getSinks() {
 
         return Collections.unmodifiableMap(sinks);
 
@@ -443,9 +466,9 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
      * 
      * @return The buffer.
      */
-    private IBuffer<IBindingSet> getBuffer(final PartitionLocator locator) {
+    private IBuffer<IBindingSet[]> getBuffer(final PartitionLocator locator) {
 
-        IBuffer<IBindingSet> sink = sinks.get(locator);
+        IBuffer<IBindingSet[]> sink = sinks.get(locator);
 
         if (sink == null) {
 
@@ -469,6 +492,6 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
      * 
      * @return The buffer.
      */
-    abstract IBuffer<IBindingSet> newBuffer(PartitionLocator locator);
+    abstract IBuffer<IBindingSet[]> newBuffer(PartitionLocator locator);
 
 }

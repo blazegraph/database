@@ -30,6 +30,7 @@ package com.bigdata.jini.start.config;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -39,11 +40,14 @@ import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 import net.jini.core.discovery.LookupLocator;
 import net.jini.core.lookup.ServiceRegistrar;
+import net.jini.discovery.DiscoveryEvent;
+import net.jini.discovery.DiscoveryListener;
+import net.jini.discovery.LookupDiscovery;
+import net.jini.discovery.LookupDiscoveryManager;
 
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.process.JiniCoreServicesProcessHelper;
 import com.bigdata.service.jini.JiniClientConfig;
-import com.bigdata.service.jini.util.JiniServicesHelper;
 import com.bigdata.service.jini.util.LookupStarter;
 import com.sun.jini.start.NonActivatableServiceDescriptor;
 import com.sun.jini.start.ServiceStarter;
@@ -333,10 +337,10 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
              * Look for at least one registrar on the local host using the
              * configured locators. We do not wait beyond the timeout.
              */
-            final ServiceRegistrar[] registrars = JiniServicesHelper
-                    .getServiceRegistrars(1/* maxCount */,
+            final ServiceRegistrar[] registrars = 
+                    getServiceRegistrars(1/* maxCount */,
                             clientConfig.groups, /* clientConfig. */locators,
-                            nanos, unit);
+                            nanos, TimeUnit.NANOSECONDS);
 
             // elapsed time (ns).
             final long elapsed = (System.nanoTime() - begin);
@@ -354,9 +358,109 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
                 
                 throw new TimeoutException("Registrar not found: timeout="
                         + TimeUnit.NANOSECONDS.toMillis(elapsed)
-                        + "ms, locators=" + locators);
+                        + "ms, locators="
+                        + (locators == null ? null : Arrays.toString(locators)));
 
             }
+
+        }
+
+    }
+
+    /**
+     * Return Jini registrars discovered within the specified timeout.
+     * 
+     * @param maxCount
+     *            The maximum #of registrars to discover.
+     * @param groups
+     *            An array of groups or {@link LookupDiscovery#ALL_GROUPS} if
+     *            you will be using multicast discovery.
+     * @param locators
+     *            An array of {@link LookupLocator}s. These use URIs of the
+     *            form <code>jini://host/</code> or
+     *            <code>jini://host:port/</code>. This MAY be an empty array
+     *            if you want to use <em>multicast</em> discovery.
+     * 
+     * @throws IOException
+     */
+    static public ServiceRegistrar[] getServiceRegistrars(int maxCount,
+            final String[] groups, final LookupLocator[] locators,
+            long timeout, final TimeUnit unit) throws InterruptedException,
+            IOException {
+        
+        final long begin = System.nanoTime();
+
+        timeout = unit.toNanos(timeout);
+
+        final Object signal = new Object();
+
+        final LookupDiscoveryManager discovery = new LookupDiscoveryManager(groups,
+                locators,
+                /*
+                 * Add a listener that wakes us up if a registrar is discovered.
+                 */
+                new DiscoveryListener() {
+
+                    public void discarded(DiscoveryEvent e) {
+
+                        if(log.isDebugEnabled())
+                            log.debug("discarded: "+e);
+
+                        // ignored.
+
+                    }
+
+                    public void discovered(DiscoveryEvent e) {
+
+                        if(log.isDebugEnabled())
+                            log.debug("discovered: "+e);
+                        
+                        synchronized (signal) {
+
+                            signal.notify();
+
+                        }
+
+                    }
+        
+        });
+                
+        try {
+
+            long elapsed;
+
+            // demand some results.
+            ServiceRegistrar[] registrars = new ServiceRegistrar[0];
+
+            while ((timeout -= (elapsed = (System.nanoTime() - begin))) > 0
+                    && registrars.length < maxCount) {
+
+                synchronized (signal) {
+
+                    try {
+                        signal.wait(TimeUnit.NANOSECONDS.toMillis(timeout));
+                    } catch(InterruptedException ex) {
+                        // fall through
+                    }
+
+                    if(log.isDebugEnabled())
+                        log.debug("woke up.");
+
+                }
+
+                registrars = discovery.getRegistrars();
+
+            }
+
+            if (log.isInfoEnabled())
+                log.info("Found " + registrars.length + " registrars in "
+                        + TimeUnit.NANOSECONDS.toMillis(elapsed) + "ms.");
+
+            return registrars;
+
+        } finally {
+
+            discovery.terminate();
 
         }
 

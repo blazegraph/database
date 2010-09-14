@@ -370,7 +370,7 @@ public class TestMapBindingSetsOverShards extends
 
         try {
             
-            final MockDistributedOutputBuffer<E> fixture = new MockDistributedOutputBuffer<E>(
+            final MockMapBindingSetsOverShardsBuffer<E> fixture = new MockMapBindingSetsOverShardsBuffer<E>(
                     fed, pred, rel.getPrimaryKeyOrder(), tx, 100/* capacity */);
 
             // write the binding sets on the fixture.
@@ -469,7 +469,7 @@ public class TestMapBindingSetsOverShards extends
      *            The generic type of the elements in the relation for the
      *            target predicate.
      */
-    static private class MockDistributedOutputBuffer<F> extends
+    static private class MockMapBindingSetsOverShardsBuffer<F> extends
             MapBindingSetsOverShardsBuffer<IBindingSet, F> {
 
         /**
@@ -485,9 +485,10 @@ public class TestMapBindingSetsOverShards extends
          * @param capacity
          *            The capacity of this buffer
          */
-        public MockDistributedOutputBuffer(IBigdataFederation<?> fed,
-                IPredicate<F> pred, IKeyOrder<F> keyOrder, long timestamp,
-                int capacity) {
+        public MockMapBindingSetsOverShardsBuffer(
+                final IBigdataFederation<?> fed, final IPredicate<F> pred,
+                final IKeyOrder<F> keyOrder, final long timestamp,
+                final int capacity) {
 
             super(fed, pred, keyOrder, timestamp, capacity);
 
@@ -500,19 +501,25 @@ public class TestMapBindingSetsOverShards extends
         }
 
         @Override
-        IBuffer<IBindingSet> newBuffer(final PartitionLocator locator) {
+        IBuffer<IBindingSet[]> newBuffer(final PartitionLocator locator) {
 
-            return new AbstractArrayBuffer<IBindingSet>(outputBufferCapacity,
-                    IBindingSet.class, null/* filter */) {
+            return new AbstractArrayBuffer<IBindingSet[]>(outputBufferCapacity,
+                    IBindingSet[].class, null/* filter */) {
 
                 /**
                  * Puts a copy of the locator and the binding set chunk onto a
                  * list for examination by the test harness.
                  */
                 @Override
-                protected long flush(final int n, final IBindingSet[] a) {
+                protected long flush(final int n, final IBindingSet[][] a) {
 
-                    flushedChunks.add(new Bundle(locator, Arrays.copyOf(a, n)));
+                    for (int i = 0; i < n; i++) {
+
+                        flushedChunks.add(new Bundle(locator, a[i]));
+//                        flushedChunks.add(new Bundle(locator, Arrays.copyOf(
+//                                a[i], n)));
+
+                    }
 
                     return n;
 

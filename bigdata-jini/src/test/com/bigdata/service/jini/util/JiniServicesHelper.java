@@ -66,7 +66,7 @@ import com.bigdata.zookeeper.ZooHelper;
  */
 public class JiniServicesHelper extends JiniCoreServicesHelper {
 
-    protected final static Logger log = Logger
+    private final static Logger log = Logger
             .getLogger(JiniServicesHelper.class);
 
     public MetadataServer metadataServer0;

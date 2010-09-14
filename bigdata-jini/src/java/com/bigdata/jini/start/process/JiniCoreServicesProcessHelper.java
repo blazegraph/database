@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.jini.start.process;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.util.concurrent.TimeUnit;
 
 import net.jini.config.Configuration;
@@ -40,7 +39,6 @@ import com.bigdata.jini.start.config.HostAllowConstraint;
 import com.bigdata.jini.start.config.JiniCoreServicesConfiguration;
 import com.bigdata.jini.start.config.JiniCoreServicesConfiguration.JiniCoreServicesStarter;
 import com.bigdata.service.jini.JiniClientConfig;
-import com.bigdata.service.jini.util.JiniServicesHelper;
 import com.bigdata.service.jini.util.LookupStarter;
 import com.bigdata.util.config.NicUtil;
 
@@ -147,7 +145,7 @@ public class JiniCoreServicesProcessHelper extends ProcessHelper {
         /*
          * The #of registrars that we can locate within a timeout.
          */
-        final ServiceRegistrar[] registrars = JiniServicesHelper
+        final ServiceRegistrar[] registrars = JiniCoreServicesConfiguration
                 .getServiceRegistrars(Integer.MAX_VALUE/* maxCount */,
                         clientConfig.groups, clientConfig.locators, 1500,
                         TimeUnit.MILLISECONDS);

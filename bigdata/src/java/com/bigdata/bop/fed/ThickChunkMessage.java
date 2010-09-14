@@ -38,6 +38,7 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.TimeUnit;
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.engine.IChunkAccessor;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -101,8 +102,9 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
     public String toString() {
 
         return getClass().getName() + "{queryId=" + queryId + ",bopId=" + bopId
-                + ",partitionId=" + partitionId + ", solutionCount="
-                + solutionCount + ", bytesAvailable=" + data.length + "}";
+                + ",partitionId=" + partitionId + ",controller="
+                + queryController + ", solutionCount=" + solutionCount
+                + ", bytesAvailable=" + data.length + "}";
 
     }
 
@@ -180,7 +182,13 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
     public void release() {
         // NOP
     }
-    
+
+    public IChunkAccessor<E> getChunkAccessor() {
+
+        return new ChunkAccessor();
+        
+    }
+
     /**
      * FIXME Provide in place decompression and read out of the binding sets.
      * This should be factored out into classes similar to IRaba and IRabaCoder.
@@ -189,12 +197,16 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
      * which leverages the known set of variables in play as of the operator
      * which generated those intermediate results.
      */
-    public IAsynchronousIterator<E[]> iterator() {
+    private class ChunkAccessor implements IChunkAccessor<E> {
 
-        return new DeserializationIterator();
+        public IAsynchronousIterator<E[]> iterator() {
+
+            return new DeserializationIterator();
+            
+        }
 
     }
-    
+
     private class DeserializationIterator implements IAsynchronousIterator<E[]> {
 
         private volatile ObjectInputStream ois;

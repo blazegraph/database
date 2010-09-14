@@ -36,7 +36,6 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -109,18 +108,31 @@ public class SliceOp extends BindingSetPipelineOp {
     }
     
     /**
+     * Deep Copy constructor.
      * @param op
      */
-    public SliceOp(PipelineOp<IBindingSet> op) {
+    public SliceOp(SliceOp op) {
+
         super(op);
+        
     }
 
     /**
+     * Shallow copy constructor.
+     * 
      * @param args
      * @param annotations
      */
     public SliceOp(BOp[] args, Map<String, Object> annotations) {
+
         super(args, annotations);
+
+//        if (args.length != 1)
+//            throw new IllegalArgumentException();
+//
+//        if (!(args[0] instanceof BindingSetPipelineOp))
+//            throw new IllegalArgumentException();
+        
     }
 
     /**
