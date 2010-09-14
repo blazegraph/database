@@ -116,18 +116,36 @@ public interface BOp extends Cloneable, Serializable {
      */
     <T> T getProperty(final String name);
 
-    /**
-     * Return the value of the named annotation.
-     * 
-     * @param name
-     *            The name of the annotation.
-     * 
-     * @return The value of the annotation.
-     * 
-     * @throws IllegalArgumentException
-     *             if the named annotation is not bound.
-     */
-    <T> T getRequiredProperty(final String name);
+//    /**
+//     * Return the value of the named annotation.
+//     * 
+//     * @param name
+//     *            The name of the annotation.
+//     * 
+//     * @return The value of the annotation.
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if the named annotation is not bound.
+//     */
+//    <T> T getRequiredProperty(final String name);
+
+	/**
+	 * Return the value of the named annotation.
+	 * 
+	 * @param name
+	 *            The name of the annotation.
+	 * 
+	 * @return The value of the annotation.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if the named annotation is not bound.
+	 * 
+	 * @todo Note: This variant without generics is required for some java
+	 *       compiler versions.
+	 * 
+	 * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6302954
+	 */
+    public Object getRequiredProperty(final String name);
     
     /**
      * Deep copy clone of the operator.

@@ -306,10 +306,21 @@ public class BOpBase implements BOp {
 
     }
 
-    public <T> T getRequiredProperty(final String name) {
+//    public <T> T getRequiredProperty(final String name) {
+//
+//        @SuppressWarnings("unchecked")
+//        final T tmp = (T) annotations.get(name);
+//
+//        if (tmp == null)
+//            throw new IllegalArgumentException("Required property: " + name);
+//
+//        return tmp;
+//        
+//    }
 
-        @SuppressWarnings("unchecked")
-        final T tmp = (T) annotations.get(name);
+    public Object getRequiredProperty(final String name) {
+
+        final Object tmp = annotations.get(name);
 
         if (tmp == null)
             throw new IllegalArgumentException("Required property: " + name);
@@ -358,7 +369,7 @@ public class BOpBase implements BOp {
 
     public final long getTimestamp() {
 
-        return getRequiredProperty(Annotations.TIMESTAMP);
+		return (Long) getRequiredProperty(Annotations.TIMESTAMP);
 
     }
 

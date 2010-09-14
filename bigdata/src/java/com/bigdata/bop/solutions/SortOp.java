@@ -80,7 +80,7 @@ abstract public class SortOp extends BindingSetPipelineOp {
      */
     public ComparatorOp getComparator() {
    
-        return getRequiredProperty(Annotations.COMPARATOR);
+        return (ComparatorOp) getRequiredProperty(Annotations.COMPARATOR);
     
     }
     

@@ -319,7 +319,7 @@ public class BOpContext<E> {
         final IIndexManager tmp = getFederation() == null ? getIndexManager()
                 : getFederation();
         
-        final long timestamp = pred
+        final long timestamp = (Long) pred
                 .getRequiredProperty(BOp.Annotations.TIMESTAMP);
 
         return (IRelation<?>) tmp.getResourceLocator().locate(
@@ -391,7 +391,7 @@ public class BOpContext<E> {
 
         final int partitionId = predicate.getPartitionId();
 
-        final long timestamp = predicate
+        final long timestamp = (Long) predicate
                 .getRequiredProperty(BOp.Annotations.TIMESTAMP);
         
         final int flags = predicate.getProperty(

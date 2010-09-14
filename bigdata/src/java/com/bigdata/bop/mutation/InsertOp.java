@@ -113,34 +113,36 @@ public class InsertOp<E> extends BindingSetPipelineOp implements
         
         super(args, annotations);
         
-        getRequiredProperty(Annotations.SELECTED);
-        
-    }
+		getRequiredProperty(Annotations.SELECTED);
 
-    /**
-     * @see Annotations#SELECTED
-     */
-    public IPredicate<E> getPredicate() {
+	}
 
-        return getRequiredProperty(Annotations.SELECTED);
+	/**
+	 * @see Annotations#SELECTED
+	 */
+	@SuppressWarnings("unchecked")
+	public IPredicate<E> getPredicate() {
 
-    }
-    
+		return (IPredicate<E>) getRequiredProperty(Annotations.SELECTED);
+
+	}
+
     /**
      * @see Annotations#RELATION
      */
     public String getRelation() {
         
-        return getRequiredProperty(Annotations.RELATION);
+        return (String) getRequiredProperty(Annotations.RELATION);
         
     }
     
     /**
      * @see Annotations#KEY_ORDER
      */
-    public IKeyOrder<E> getKeyOrder() {
+    @SuppressWarnings("unchecked")
+	public IKeyOrder<E> getKeyOrder() {
         
-        return getRequiredProperty(Annotations.KEY_ORDER);
+		return (IKeyOrder<E>) getRequiredProperty(Annotations.KEY_ORDER);
         
     }
     
