@@ -734,22 +734,6 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         
     }
 
-    /**
-     * Evaluate a query which visits {@link IBindingSet}s, such as a join. This
-     * node will serve as the controller for the query.
-     * 
-     * @param queryId
-     *            The unique identifier for the query.
-     * @param query
-     *            The query to evaluate.
-     * 
-     * @return An iterator visiting {@link IBindingSet}s which result from
-     *         evaluating the query.
-     * 
-     * @throws IllegalStateException
-     *             if the {@link QueryEngine} has been {@link #shutdown()}.
-     * @throws Exception
-     */
     public RunningQuery eval(final long queryId,
             final BindingSetPipelineOp query) throws Exception {
 

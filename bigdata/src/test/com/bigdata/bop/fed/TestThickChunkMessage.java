@@ -43,6 +43,7 @@ import com.bigdata.bop.engine.HaltOpMessage;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryDecl;
+import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.engine.StartOpMessage;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -180,6 +181,12 @@ public class TestThickChunkMessage extends TestCase2 {
             return null;
         }
         
+		@Override
+		public RunningQuery eval(long queryId, BindingSetPipelineOp query)
+				throws Exception, RemoteException {
+			return null;
+		}
+
     }
     
 }
