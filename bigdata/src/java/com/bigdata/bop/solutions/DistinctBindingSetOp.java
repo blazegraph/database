@@ -125,7 +125,7 @@ public class DistinctBindingSetOp extends BindingSetPipelineOp {
      */
     public IVariable<?>[] getVariables() {
 
-        return getRequiredProperty(Annotations.VARIABLES);
+        return (IVariable<?>[]) getRequiredProperty(Annotations.VARIABLES);
         
     }
 

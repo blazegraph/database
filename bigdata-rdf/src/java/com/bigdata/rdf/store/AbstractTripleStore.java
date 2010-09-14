@@ -146,7 +146,6 @@ import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.IRuleTaskFactory;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.search.FullTextIndex;
-import com.bigdata.service.AbstractEmbeddedDataService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ndx.IClientIndex;
@@ -1129,8 +1128,7 @@ abstract public class AbstractTripleStore extends
      * and writers. This property depends on primarily on the concurrency
      * control mechanisms (if any) that are used to prevent concurrent access to
      * an unisolated index while a thread is writing on that index. Stores based
-     * on the {@link IBigdataFederation} or an
-     * {@link AbstractEmbeddedDataService} automatically inherent the
+     * on the {@link IBigdataFederation} automatically inherent the
      * appropriate concurrency controls as would a store whose index access was
      * intermediated by the executor service of an {@link IConcurrencyManager}.
      * <p>

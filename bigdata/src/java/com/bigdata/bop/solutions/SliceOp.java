@@ -140,7 +140,7 @@ public class SliceOp extends BindingSetPipelineOp {
      */
     public long getOffset() {
         
-        return getRequiredProperty(Annotations.OFFSET);
+        return (Long) getRequiredProperty(Annotations.OFFSET);
         
     }
 
@@ -149,7 +149,7 @@ public class SliceOp extends BindingSetPipelineOp {
      */
     public long getLimit() {
         
-        return getRequiredProperty(Annotations.LIMIT);
+        return (Long) getRequiredProperty(Annotations.LIMIT);
         
     }
     

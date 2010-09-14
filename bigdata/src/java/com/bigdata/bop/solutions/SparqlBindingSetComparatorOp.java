@@ -46,7 +46,7 @@ public class SparqlBindingSetComparatorOp extends ComparatorOp {
      */
     public ISortOrder<?>[] getOrder() {
 
-        return getRequiredProperty(Annotations.ORDER);
+        return (ISortOrder<?>[]) getRequiredProperty(Annotations.ORDER);
 
     }
 
