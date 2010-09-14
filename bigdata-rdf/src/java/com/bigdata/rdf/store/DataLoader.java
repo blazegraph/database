@@ -230,8 +230,8 @@ public class DataLoader {
 
         if (buffer != null) {
 
-            if(log.isInfoEnabled())
-                log.info("Flushing the buffer.");
+            if(log.isDebugEnabled())
+                log.debug("Flushing the buffer.");
             
             buffer.flush();
             
@@ -610,7 +610,7 @@ public class DataLoader {
             
             database.commit();
 
-            totals.commitTime += System.currentTimeMillis() - beginCommit;
+            totals.commitTime.add(System.currentTimeMillis() - beginCommit);
 
             if (log.isInfoEnabled())
                 log.info("commit: latency="+totals.commitTime+"ms");
@@ -838,8 +838,8 @@ public class DataLoader {
 
         if (file.isDirectory()) {
 
-            if (log.isInfoEnabled())
-                log.info("loading directory: " + file);
+            if (log.isDebugEnabled())
+                log.debug("loading directory: " + file);
 
 //            final LoadStats loadStats = new LoadStats();
 
@@ -1007,9 +1007,9 @@ public class DataLoader {
 
             final long nstmts = loader.getStatementsAdded();
 
-            stats.toldTriples = nstmts;
+            stats.toldTriples.set( nstmts );
 
-            stats.loadTime = System.currentTimeMillis() - begin;
+            stats.loadTime.set(System.currentTimeMillis() - begin);
 
             if (closureEnum == ClosureEnum.Incremental
                     || (endOfBatch && closureEnum == ClosureEnum.Batch)) {
@@ -1037,20 +1037,24 @@ public class DataLoader {
 
                 database.commit();
 
-                stats.commitTime = System.currentTimeMillis() - beginCommit;
+                stats.commitTime.set(System.currentTimeMillis() - beginCommit);
 
                 if (log.isInfoEnabled())
                     log.info("commit: latency=" + stats.commitTime + "ms");
 
             }
 
-            stats.totalTime = System.currentTimeMillis() - begin;
+            stats.totalTime.set(System.currentTimeMillis() - begin);
+
+            // aggregate stats
+            totals.add(stats);
 
             if (log.isInfoEnabled()) {
-                log.info(stats.toString());
+				log.info("file:: " + stats + "; totals:: " + totals);
                 if (buffer != null
                         && buffer.getDatabase() instanceof AbstractLocalTripleStore) {
-                    log.info(((AbstractLocalTripleStore) buffer.getDatabase())
+                	if(log.isDebugEnabled())
+                    log.debug(((AbstractLocalTripleStore) buffer.getDatabase())
                             .getLocalBTreeBytesWritten(new StringBuilder())
                             .toString());
                 }
@@ -1059,6 +1063,9 @@ public class DataLoader {
             return;
             
         } catch ( Exception ex ) {
+
+        	// aggregate stats even for exceptions.
+            totals.add(stats);
 
             /*
              * Note: discard anything in the buffer in case auto-flush is
@@ -1096,10 +1103,10 @@ public class DataLoader {
             
             throw ex2;
             
-        } finally {
-            
-            // aggregate regardless of the outcome.
-            totals.add(stats);
+//        } finally {
+//            
+//            // aggregate regardless of the outcome.
+//            totals.add(stats);
             
         }
 
@@ -1436,8 +1443,8 @@ public class DataLoader {
                     || (name.endsWith(".gz") && RDFFormat.forFileName(name
                             .substring(0, name.length() - 3)) != null);
 
-			if (log.isInfoEnabled())
-				log.info("dir=" + dir + ", name=" + name + " : isRDF=" + isRDF);
+			if (log.isDebugEnabled())
+				log.debug("dir=" + dir + ", name=" + name + " : isRDF=" + isRDF);
 
             return isRDF;
 
