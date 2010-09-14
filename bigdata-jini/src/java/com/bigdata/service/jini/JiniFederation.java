@@ -786,9 +786,9 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
         
     }
 
-    private static final String ERR_RESOLVE = "Could not resolve: ";
-
-    private static final String ERR_DESTROY_ADMIN = "Could not destroy: ";
+//    private static final String ERR_RESOLVE = "Could not resolve: ";
+//
+//    private static final String ERR_DESTROY_ADMIN = "Could not destroy: ";
 
     /**
      * Shutdown the services in the distributed federation <strong>NOT</strong>
