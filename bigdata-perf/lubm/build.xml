@@ -54,14 +54,14 @@
 				<exclude name="**/*.java" />
 				<exclude name="**/package.html" />
 			</fileset>
-			<!-- copy log4j configuration file. -->
-			<fileset dir="${lubm.dir}/src/resources/logging" />
 		</copy>
 		<copy toDir="${build.dir}/bin">
 			<!-- copy benchmark data and queries. -->
 			<fileset dir="${lubm.dir}/src/resources/config" />
 			<!-- copy the journal configuration file. -->
 			<fileset file="${lubm.dir}/*.properties" />
+			<!-- copy log4j configuration file. -->
+			<fileset dir="${lubm.dir}/src/resources/logging" />
 		</copy>
 	</target>
 
@@ -90,7 +90,9 @@
 		<java classname="com.bigdata.rdf.store.DataLoader" fork="true" failonerror="true">
 			<arg line="-closure -namespace ${lubm.namespace} ${lubm.journalPropertyFile} ${lubm.ontologyFile} ${lubm.dataDir}" />
 			<!-- specify/override the journal file name. -->
-			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${lubm.journalFile}" />
+			<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${lubm.journalFile}
+				-Dcom.bigdata.io.DirectBufferPool.bufferCapacity=10485760
+				" />
 			<classpath>
 				<path refid="runtime.classpath" />
 			</classpath>
