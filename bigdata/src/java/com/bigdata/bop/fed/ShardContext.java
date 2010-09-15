@@ -1,5 +1,7 @@
 package com.bigdata.bop.fed;
 
+import java.util.UUID;
+
 /**
  * An allocation context which is shared by all operators running in the
  * same query which target the same shard (the same shard implies the same
@@ -7,13 +9,15 @@ package com.bigdata.bop.fed;
  */
 class ShardContext extends AllocationContextKey {
 
-    private final Long queryId;
+    private final UUID queryId;
 
     private final int bopId;
     
     private final int partitionId;
 
-    ShardContext(final Long queryId, final int bopId, final int partitionId) {
+    ShardContext(final UUID queryId, final int bopId, final int partitionId) {
+        if (queryId == null)
+            throw new IllegalArgumentException();
         this.queryId = queryId;
         this.bopId = bopId;
         this.partitionId = partitionId;

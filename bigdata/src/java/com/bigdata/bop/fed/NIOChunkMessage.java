@@ -67,7 +67,7 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
 
     final private IQueryClient queryController;
 
-    final private long queryId;
+    final private UUID queryId;
 
     final private int bopId;
 
@@ -94,7 +94,7 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
         return queryController;
     }
 
-    public long getQueryId() {
+    public UUID getQueryId() {
         return queryId;
     }
 
@@ -151,12 +151,15 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
      *            payload using the sender's {@link ResourceService}.
      */
     public NIOChunkMessage(final IQueryClient queryController,
-            final long queryId, final int sinkId, final int partitionId,
+            final UUID queryId, final int sinkId, final int partitionId,
             final IAllocationContext allocationContext,
             final IBlockingBuffer<E[]> source,
             final InetSocketAddress addr) {
 
         if (queryController == null)
+            throw new IllegalArgumentException();
+
+        if (queryId == null)
             throw new IllegalArgumentException();
 
         if (allocationContext == null)

@@ -25,16 +25,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Sep 5, 2010
  */
 
-package com.bigdata.bop.fed;
+package com.bigdata.bop.fed.jini;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+import junit.framework.TestCase2;
 
 import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.BOp;
@@ -59,6 +62,7 @@ import com.bigdata.bop.engine.PipelineDelayOp;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.engine.TestQueryEngine;
+import com.bigdata.bop.fed.FederatedQueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SortOp;
@@ -68,57 +72,69 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
-import com.bigdata.service.AbstractEmbeddedFederationTestCase;
 import com.bigdata.service.DataService;
-import com.bigdata.service.EmbeddedClient;
-import com.bigdata.service.EmbeddedFederation;
+import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IDataService;
 import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.ResourceService;
+import com.bigdata.service.jini.JiniClient;
+import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.util.config.NicUtil;
+import com.ibm.icu.impl.ByteBuffer;
 
 /**
- * Unit tests for {@link FederatedQueryEngine} running against an
- * {@link EmbeddedFederation} having a single {@link DataService}. The data may
- * be partitioned, but the partitions will live on the same {@link DataService}.
- * <p>
- * Note: You can not use multiple {@link DataService}s in this test suite with
- * the {@link EmbeddedFederation} because the services are not sufficiently
- * distinct based on how they are created. Therefore unit tests against more
- * than one {@link DataService} are located in the <code>bigdata-jini</code>
- * module.
+ * Unit tests for {@link FederatedQueryEngine} running against a
+ * {@link JiniFederation} with 2 {@link DataService}s.
  * <p>
  * Note: Distributed query processing generally means that the order in which
  * the chunks arrive is non-deterministic. Therefore the order of the solutions
  * can not be checked unless a total order is placed on the solutions using a
  * {@link SortOp}.
  * 
- * <pre>
- * -Dlog4j.configuration=bigdata/src/resources/logging/log4j.properties
- * </pre>
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestFederatedQueryEngine.java 3508 2010-09-05 17:02:34Z
  *          thompsonbry $
+ * 
+ * @todo test distributed execution of potentially distributed operations
+ *       including: JOIN (selective and unselective), DISTINCT access path,
+ *       DISTINCT solutions, GROUP BY, ORDER BY.
+ * 
+ * @todo Write unit tests for distributed pipeline query with an eye towards
+ *       verification of integration of the {@link QueryEngine} with the
+ *       protocol used to move data around among the nodes.
+ *       <p>
+ *       Each of the operators which has specialized execution against a
+ *       federation should be tested as well. This includes:
+ *       <p>
+ *       distributed merge sort (assuming that there is a requirement to
+ *       interchange buffers as part of the distributed sort).
+ *       <p>
+ *       distributed hash tables used in a distributed distinct filter on an
+ *       access path (for scale-out default graph queries in quads mode).
+ *       <p>
+ *       ...
  */
-public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase {
+public class TestJiniFederatedQueryEngine extends TestCase2 {
 
-    public TestFederatedQueryEngine() {
+    public TestJiniFederatedQueryEngine() {
         
     }
     
-    public TestFederatedQueryEngine(String name) {
+    public TestJiniFederatedQueryEngine(String name) {
         
         super(name);
         
     }
 
     // Namespace for the relation.
-    static private final String namespace = TestFederatedQueryEngine.class.getName();
+    static private final String namespace = TestJiniFederatedQueryEngine.class.getName();
     
     // The separator key between the index partitions.
     private byte[] separatorKey;
+
+    private JiniClient<?> client;
 
     /** The local persistence store for the {@link #queryEngine}. */
     private Journal queryEngineStore;
@@ -129,27 +145,22 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
     /** The query controller. */
     private FederatedQueryEngine queryEngine;
     
-    public Properties getProperties() {
+    private IDataService dataService0;
 
-        final Properties properties = new Properties(super.getProperties());
-        
+    private IDataService dataService1;
+
+    protected void setUp() throws Exception {
+
         /*
-         * Restrict to a single data service.
+         * FIXME This is hardcoded to a specific location in the file system.
+         * 
+         * Also, the dependency on JiniClient means that we must move this test
+         * class into the bigdata-jini package.
          */
-        properties.setProperty(EmbeddedClient.Options.NDATA_SERVICES, "1");
+        client = new JiniClient(
+                new String[] { "/nas/bigdata/bigdata-0.83.2/dist/bigdata/var/config/jini/bigdataStandalone.config" });
 
-        return properties;
-        
-    }
-
-    public void setUp() throws Exception {
-
-        super.setUp();
-
-        assertNotNull(dataService0);
-        assertNull(dataService1);
-        
-//        final IBigdataFederation<?> fed = client.connect();
+        final IBigdataFederation<?> fed = client.connect();
 
         // create index manager for the query controller.
         {
@@ -174,41 +185,64 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 }
             };
         }
-
+        
+        // create the query controller.
         {
-
-            // create the query controller.
-            queryEngine = new FederatedQueryEngine(UUID.randomUUID(), fed,
+         
+            queryEngine = new FederatedQueryEngine(fed.getServiceUUID(), fed,
                     queryEngineStore, queryEngineResourceService);
 
             queryEngine.init();
-
-            System.err.println("controller: " + queryEngine);
-
+            
         }
+    
+        /*
+         * Discover the data services. We need their UUIDs in order to create
+         * the test relation split across an index partition located on each of
+         * the two data services.
+         */
+        final int maxCount = 2;
+        UUID[] dataServices = null;
+        final long begin = System.currentTimeMillis();
+        long elapsed = 0L;
+        while ((dataServices = fed.getDataServiceUUIDs(maxCount)).length < maxCount
+                && ((elapsed = System.currentTimeMillis() - begin) < TimeUnit.SECONDS
+                        .toMillis(60))) {
+            System.err.println("Waiting for " + maxCount
+                    + " data services.  There are " + dataServices.length
+                    + " discovered : elapsed=" + elapsed + "ms");
+            Thread.sleep(250/* ms */);
+    	}
+
+        if (dataServices.length < maxCount)
+            throw new TimeoutException("Discovered " + dataServices.length
+                    + " data services in " + elapsed + "ms but require "
+                    + maxCount);
         
+        super.setUp();
+
 //        dataService0 = fed.getDataService(dataServices[0]); 
 //        dataService1 = fed.getDataService(dataServices[1]); 
-        {
-
-            // @todo need to wait for the dataService to be running.
-            assertTrue(((DataService) dataService0).getResourceManager()
-                    .awaitRunning());
-
-            // resolve the query engine on one of the data services.
-            while (dataService0.getQueryEngine() == null) {
-
-                if (log.isInfoEnabled())
-                    log.info("Waiting for query engine on dataService0");
-
-                Thread.sleep(250);
-
-            }
-            
-            System.err.println("queryPeer : " + dataService0.getQueryEngine());
-            
-        }
-
+//        {
+//
+//        	// @todo need to wait for the dataService to be running.
+////            assertTrue(((DataService) dataServer.getProxy())
+////                    .getResourceManager().awaitRunning());
+//
+//            // resolve the query engine on one of the data services.
+//            while ((queryEngine = (IQueryClient) dataService0.getQueryEngine()) == null) {
+//
+//                if (log.isInfoEnabled())
+//                    log.info("Waiting for query engine on dataService0");
+//
+//                Thread.sleep(250);
+//
+//            }
+//            
+//            System.err.println("controller: " + queryEngine);
+//            
+//        }
+//
 //        // resolve the query engine on the other data services.
 //        {
 //
@@ -238,6 +272,12 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         
         // clear reference.
         separatorKey = null;
+        
+        client.disconnect(true/*immediateShutdown*/);
+        client = null;
+
+        dataService0 = null;
+        dataService1 = null;
         
         if (queryEngineResourceService != null) {
             queryEngineResourceService.shutdownNow();
@@ -284,10 +324,9 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 separatorKey //
         };
 
-        // two partitions on the same data service.
         final UUID[] dataServices = new UUID[] {//
                 dataService0.getServiceUUID(),//
-                dataService0.getServiceUUID(),//
+                dataService1.getServiceUUID(),//
         };
 
         /*

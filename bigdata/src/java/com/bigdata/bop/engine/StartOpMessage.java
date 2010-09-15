@@ -22,7 +22,7 @@ public class StartOpMessage implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /** The query identifier. */
-    final public long queryId;
+    final public UUID queryId;
 
     /** The operator identifier. */
     final public int bopId;
@@ -39,7 +39,7 @@ public class StartOpMessage implements Serializable {
      */
     final public int nchunks;
 
-    public StartOpMessage(final long queryId, final int opId,
+    public StartOpMessage(final UUID queryId, final int opId,
             final int partitionId, final UUID serviceId, final int nchunks) {
         this.queryId = queryId;
         this.bopId = opId;

@@ -1,13 +1,10 @@
 package com.bigdata.bop.engine;
 
-import java.nio.ByteBuffer;
-import java.util.concurrent.BlockingQueue;
+import java.util.UUID;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.fed.FederatedRunningQuery;
-import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.service.ResourceService;
 
 /**
@@ -32,7 +29,7 @@ public interface IChunkMessage<E> {
     IQueryClient getQueryController();
 
     /** The query identifier. */
-    long getQueryId();
+    UUID getQueryId();
 
     /** The identifier for the target {@link BOp}. */
     int getBOpId();

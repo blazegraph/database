@@ -1,6 +1,7 @@
 package com.bigdata.bop.engine;
 
 import java.rmi.RemoteException;
+import java.util.UUID;
 
 import com.bigdata.bop.BindingSetPipelineOp;
 
@@ -19,7 +20,7 @@ public interface IQueryClient extends IQueryPeer {
      * @throws IllegalArgumentException
      *             if there is no such query.
      */
-    BindingSetPipelineOp getQuery(long queryId) throws RemoteException;
+    BindingSetPipelineOp getQuery(UUID queryId) throws RemoteException;
 
     /**
      * Notify the client that execution has started for some query, operator,

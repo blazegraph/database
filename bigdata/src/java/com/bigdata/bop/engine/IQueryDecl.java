@@ -1,5 +1,7 @@
 package com.bigdata.bop.engine;
 
+import java.util.UUID;
+
 import com.bigdata.bop.BindingSetPipelineOp;
 
 /**
@@ -15,7 +17,7 @@ public interface IQueryDecl {
     /**
      * The query identifier.
      */
-    long getQueryId();
+    UUID getQueryId();
 
     /**
      * The query.

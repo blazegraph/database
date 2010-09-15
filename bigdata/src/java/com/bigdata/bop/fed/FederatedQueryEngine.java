@@ -70,6 +70,11 @@ public class FederatedQueryEngine extends QueryEngine {
             .getLogger(FederatedQueryEngine.class);
 
     /**
+     * The {@link UUID} associated with this service.
+     */
+    private final UUID serviceUUID;
+    
+    /**
      * The {@link IBigdataFederation} iff running in scale-out.
      * <p>
      * Note: The {@link IBigdataFederation} is required in scale-out in order to
@@ -99,7 +104,7 @@ public class FederatedQueryEngine extends QueryEngine {
     @Override
     public UUID getServiceUUID() {
 
-        return fed.getServiceUUID();
+        return serviceUUID;
 
     }
 
@@ -127,7 +132,7 @@ public class FederatedQueryEngine extends QueryEngine {
      * {@inheritDoc}
      */
     @Override
-    protected FederatedRunningQuery getRunningQuery(final long queryId) {
+    protected FederatedRunningQuery getRunningQuery(final UUID queryId) {
 
         return (FederatedRunningQuery) super.getRunningQuery(queryId);
 
@@ -147,10 +152,10 @@ public class FederatedQueryEngine extends QueryEngine {
      */
     public FederatedQueryEngine(final DataService dataService) {
 
-        this(dataService.getFederation(),
+        this(dataService.getServiceUUID(), dataService.getFederation(),
                 new DelegateIndexManager(dataService), dataService
                         .getResourceManager().getResourceService());
-        
+
     }
     
     /**
@@ -164,6 +169,7 @@ public class FederatedQueryEngine extends QueryEngine {
      * @param resourceService
      */
     public FederatedQueryEngine(//
+            final UUID thisService,
             final IBigdataFederation<?> fed,//
             final IIndexManager indexManager,//
             final ManagedResourceService resourceService//
@@ -179,6 +185,8 @@ public class FederatedQueryEngine extends QueryEngine {
 
         this.fed = fed;
 
+        this.serviceUUID = thisService;
+        
         this.resourceService = resourceService;
 
     }
@@ -277,6 +285,7 @@ public class FederatedQueryEngine extends QueryEngine {
                         if(!accept(msg)) {
                             if(log.isDebugEnabled())
                                 log.debug("dropping: " + msg);
+                            continue;
                         }
                         if(log.isDebugEnabled())
                             log.debug("accepted: " + msg);
@@ -287,7 +296,7 @@ public class FederatedQueryEngine extends QueryEngine {
                          * etc.
                          */
                         FederatedQueryEngine.this
-                                .bufferReady((IChunkMessage) msg);
+                                .acceptChunk((IChunkMessage) msg);
                     } catch(Throwable t) {
                         if(InnerCause.isInnerCause(t, InterruptedException.class)) {
                             log.warn("Interrupted.");
@@ -318,7 +327,7 @@ public class FederatedQueryEngine extends QueryEngine {
          */
         private boolean accept(final IChunkMessage<?> msg) throws RemoteException {
 
-            final long queryId = msg.getQueryId();
+            final UUID queryId = msg.getQueryId();
             
             // lookup query by id.
             FederatedRunningQuery q = getRunningQuery(queryId);
@@ -385,7 +394,7 @@ public class FederatedQueryEngine extends QueryEngine {
 
     public void declareQuery(final IQueryDecl queryDecl) {
 
-        final long queryId = queryDecl.getQueryId();
+        final UUID queryId = queryDecl.getQueryId();
         
         putRunningQuery(queryId, newRunningQuery(this, queryId,
                 false/* controller */, queryDecl.getQueryController(),
@@ -411,7 +420,7 @@ public class FederatedQueryEngine extends QueryEngine {
      */
     @Override
     protected FederatedRunningQuery newRunningQuery(
-            final QueryEngine queryEngine, final long queryId,
+            final QueryEngine queryEngine, final UUID queryId,
             final boolean controller, final IQueryClient clientProxy,
             final BindingSetPipelineOp query) {
 

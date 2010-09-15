@@ -1,14 +1,22 @@
 package com.bigdata.bop.fed;
 
+import java.util.UUID;
+
 /**
  * An allocation context which is shared by all operators running in the
  * same query.
  */
 class QueryContext extends AllocationContextKey {
-    private final Long queryId;
 
-    QueryContext(final Long queryId) {
-        this.queryId = Long.valueOf(queryId);
+    private final UUID queryId;
+
+    QueryContext(final UUID queryId) {
+        
+        if (queryId == null)
+            throw new IllegalArgumentException();
+
+        this.queryId = queryId;
+        
     }
 
     public int hashCode() {

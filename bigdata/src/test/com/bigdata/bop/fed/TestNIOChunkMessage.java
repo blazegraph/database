@@ -46,7 +46,6 @@ import com.bigdata.bop.engine.HaltOpMessage;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryDecl;
-import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.engine.StartOpMessage;
 import com.bigdata.io.DirectBufferPoolAllocator.IAllocationContext;
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -160,7 +159,7 @@ public class TestNIOChunkMessage extends TestCase2 {
         }
         
         final IQueryClient queryController = new MockQueryController();
-        final long queryId = 0L;
+        final UUID queryId = UUID.randomUUID();
         final int bopId = 1;
         final int partitionId = 2;
         final IBlockingBuffer<IBindingSet[]> source = new BlockingBuffer<IBindingSet[]>(
@@ -252,7 +251,7 @@ public class TestNIOChunkMessage extends TestCase2 {
             return null;
         }
 
-        public BindingSetPipelineOp getQuery(long queryId)
+        public BindingSetPipelineOp getQuery(UUID queryId)
                 throws RemoteException {
             return null;
         }
@@ -275,7 +274,7 @@ public class TestNIOChunkMessage extends TestCase2 {
          * @param source
          * @param addr
          */
-        public MyNIOChunkMessage(IQueryClient queryController, long queryId,
+        public MyNIOChunkMessage(IQueryClient queryController, UUID queryId,
                 int sinkId, int partitionId,
                 IAllocationContext allocationContext,
                 IBlockingBuffer<E[]> source, InetSocketAddress addr) {

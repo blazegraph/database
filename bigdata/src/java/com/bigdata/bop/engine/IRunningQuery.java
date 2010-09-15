@@ -55,24 +55,6 @@ public interface IRunningQuery {
      */
     IIndexManager getIndexManager();
 
-//    /**
-//     * The timestamp or transaction identifier against which the query is
-//     * reading.
-//     * 
-//     * @deprecated move into the individual operator. See
-//     *             {@link BOp.Annotations#TIMESTAMP}
-//     */
-//    long getReadTimestamp();
-//
-//    /**
-//     * The timestamp or transaction identifier against which the query is
-//     * writing.
-//     * 
-//     * @deprecated moved into the individual operator. See
-//     *       {@link BOp.Annotations#TIMESTAMP}
-//     */
-//    long getWriteTimestamp();
-
     /**
      * Terminate query evaluation
      */

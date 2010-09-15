@@ -28,10 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.engine;
 
 import java.rmi.RemoteException;
+import java.util.Comparator;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -412,13 +415,23 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     /**
      * The currently executing queries.
      */
-    final protected ConcurrentHashMap<Long/* queryId */, RunningQuery> runningQueries = new ConcurrentHashMap<Long, RunningQuery>();
+    final protected ConcurrentHashMap<UUID/* queryId */, RunningQuery> runningQueries = new ConcurrentHashMap<UUID, RunningQuery>();
 
     /**
-     * A priority queue of {@link RunningQuery}s having binding set chunks
-     * available for consumption.
+     * A queue of {@link RunningQuery}s having binding set chunks available for
+     * consumption.
+     * 
+     * @todo Be careful when testing out a {@link PriorityBlockingQueue} here.
+     *       First, that collection is intrinsically bounded (it is backed by an
+     *       array) so it will BLOCK under heavy load and could be expected to
+     *       have some resize costs if the queue size becomes too large. Second,
+     *       either {@link RunningQuery} needs to implement an appropriate
+     *       {@link Comparator} or we need to pass one into the constructor for
+     *       the queue.
      */
-    final private PriorityBlockingQueue<RunningQuery> priorityQueue = new PriorityBlockingQueue<RunningQuery>();
+    final private BlockingQueue<RunningQuery> priorityQueue = new LinkedBlockingQueue<RunningQuery>();
+//    final private BlockingQueue<RunningQuery> priorityQueue = new PriorityBlockingQueue<RunningQuery>(
+//            );
 
     /**
      * 
@@ -480,7 +493,10 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      *             if the query engine is shutting down.
      */
     protected void assertRunning() {
-       
+
+        if (engineFuture.get() == null)
+            throw new IllegalStateException("Not initialized.");
+        
         if (shutdown)
             throw new IllegalStateException("Shutting down.");
 
@@ -517,7 +533,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
             while (true) {
                 try {
                     final RunningQuery q = priorityQueue.take();
-                    final long queryId = q.getQueryId();
+                    final UUID queryId = q.getQueryId();
                     if (q.isCancelled())
                         continue;
                     final IChunkMessage<IBindingSet> chunk = q.chunksIn.poll();
@@ -553,7 +569,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * chunk will be attached to the query and the query will be scheduled for
      * execution.
      * 
-     * @param chunk
+     * @param msg
      *            A chunk of intermediate results.
      * 
      * @throws IllegalArgumentException
@@ -561,25 +577,27 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * @throws IllegalStateException
      *             if the chunk is not materialized.
      */
-    void acceptChunk(final IChunkMessage<IBindingSet> chunk) {
+    protected void acceptChunk(final IChunkMessage<IBindingSet> msg) {
         
-        if (chunk == null)
+        if (msg == null)
             throw new IllegalArgumentException();
 
-        if (!chunk.isMaterialized())
+        if (!msg.isMaterialized())
             throw new IllegalStateException();
 
-        final RunningQuery q = runningQueries.get(chunk.getQueryId());
+        final RunningQuery q = runningQueries.get(msg.getQueryId());
         
         if(q == null)
             throw new IllegalStateException();
         
         // add chunk to the query's input queue on this node.
-        q.acceptChunk(chunk);
+        q.acceptChunk(msg);
+
+        assertRunning();
         
         // add query to the engine's task queue.
         priorityQueue.add(q);
-        
+
     }
 
     /**
@@ -697,20 +715,6 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * IQueryClient
      */
 
-//    public BOp getQuery(final long queryId) throws RemoteException {
-//        
-//        final RunningQuery q = runningQueries.get(queryId);
-//        
-//        if (q != null) {
-//            
-//            return q.getQuery();
-//        
-//        }
-//        
-//        return null;
-//        
-//    }
-
     public void startOp(final StartOpMessage msg) throws RemoteException {
         
         final RunningQuery q = runningQueries.get(msg.queryId);
@@ -770,9 +774,12 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      *             needs to talk to a federation. There should be nothing DS
      *             specific about the {@link FederatedQueryEngine}.
      */
-    public RunningQuery eval(final long queryId,
+    public RunningQuery eval(final UUID queryId,
             final BindingSetPipelineOp query,
             final IChunkMessage<IBindingSet> msg) throws Exception {
+
+        if (queryId == null)
+            throw new IllegalArgumentException();
 
         if (query == null)
             throw new IllegalArgumentException();
@@ -780,7 +787,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         if (msg == null)
             throw new IllegalArgumentException();
 
-        if (queryId != msg.getQueryId()) // @todo use equals() to compare UUIDs.
+        if (!queryId.equals(msg.getQueryId()))
             throw new IllegalArgumentException();
 
         final RunningQuery runningQuery = newRunningQuery(this, queryId,
@@ -813,6 +820,8 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
         runningQuery.startQuery(msg);
         
+        acceptChunk(msg);
+
         return runningQuery;
 
     }
@@ -826,13 +835,13 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * @return The {@link RunningQuery} -or- <code>null</code> if there is no
      *         query associated with that query identifier.
      */
-    protected RunningQuery getRunningQuery(final long queryId) {
+    protected RunningQuery getRunningQuery(final UUID queryId) {
 
         return runningQueries.get(queryId);
 
     }
 
-    public BindingSetPipelineOp getQuery(final long queryId) {
+    public BindingSetPipelineOp getQuery(final UUID queryId) {
      
         final RunningQuery q = getRunningQuery(queryId);
         
@@ -851,9 +860,12 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * @param runningQuery
      *            The {@link RunningQuery}.
      */
-    protected void putRunningQuery(final long queryId,
+    protected void putRunningQuery(final UUID queryId,
             final RunningQuery runningQuery) {
 
+        if (queryId == null)
+            throw new IllegalArgumentException();
+        
         if (runningQuery == null)
             throw new IllegalArgumentException();
         
@@ -865,7 +877,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * Factory for {@link RunningQuery}s.
      */
     protected RunningQuery newRunningQuery(final QueryEngine queryEngine,
-            final long queryId, final boolean controller,
+            final UUID queryId, final boolean controller,
             final IQueryClient clientProxy, final BindingSetPipelineOp query) {
 
         return new RunningQuery(this, queryId, true/* controller */,
