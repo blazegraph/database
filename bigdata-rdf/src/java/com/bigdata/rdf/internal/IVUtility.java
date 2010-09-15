@@ -136,10 +136,8 @@ public class IVUtility {
             return iv1.compareTo(iv2);
         
         // otherwise we need to try to convert them into comparable numbers
-        final AbstractLiteralIV num1 = 
-            (AbstractLiteralIV) iv1; 
-        final AbstractLiteralIV num2 = 
-            (AbstractLiteralIV) iv2; 
+        final AbstractLiteralIV num1 = (AbstractLiteralIV) iv1; 
+        final AbstractLiteralIV num2 = (AbstractLiteralIV) iv2; 
         
         // if one's a BigDecimal we should use the BigDecimal comparator for both
         if (dte1 == DTE.XSDDecimal || dte2 == DTE.XSDDecimal) {

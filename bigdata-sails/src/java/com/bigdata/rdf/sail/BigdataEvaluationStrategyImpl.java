@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
@@ -48,7 +49,9 @@ import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
 import com.bigdata.BigdataStatics;
+import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
@@ -61,6 +64,10 @@ import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.constraint.OR;
+import com.bigdata.bop.engine.LocalChunkMessage;
+import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.engine.Rule2BOpUtility;
+import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.solutions.ISortOrder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rdf.internal.DummyIV;
@@ -74,7 +81,6 @@ import com.bigdata.rdf.internal.constraints.InlineLT;
 import com.bigdata.rdf.internal.constraints.InlineNE;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.rules.RuleContextEnum;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -84,11 +90,13 @@ import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.spo.SPOStarJoin;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
-import com.bigdata.rdf.store.BigdataSolutionResolverator;
+import com.bigdata.rdf.store.BigdataBindingSetResolverator;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
@@ -97,17 +105,13 @@ import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.QueryOptions;
 import com.bigdata.relation.rule.Rule;
-import com.bigdata.relation.rule.eval.ActionEnum;
-import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
-import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
-import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.IRuleTaskFactory;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
 import com.bigdata.relation.rule.eval.RuleStats;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.IHit;
+import com.bigdata.striterator.ChunkedArraysIterator;
 import com.bigdata.striterator.DistinctFilter;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
@@ -473,6 +477,18 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
             return super.evaluate(union, bindings);
             
+        } catch (Exception ex) {
+            
+            // Use Sesame 2 evaluation
+
+            ex.printStackTrace();
+            
+            if (log.isInfoEnabled()) {
+                log.info("could not evaluate natively, punting to Sesame");
+            }
+            
+            return super.evaluate(union, bindings);
+            
         }
         
     }
@@ -590,6 +606,18 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
             return super.evaluate(join, bindings);
             
+        } catch (Exception ex) {
+            
+            // Use Sesame 2 evaluation
+            
+            ex.printStackTrace();
+            
+            if (log.isInfoEnabled()) {
+                log.info("could not evaluate natively, punting to Sesame"); 
+            }
+
+            return super.evaluate(join, bindings);
+            
         }
         
     }
@@ -678,6 +706,18 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             }
             if (log.isDebugEnabled()) {
                 log.debug(ex.getOperator());
+            }
+
+            return super.evaluate(join, bindings);
+            
+        } catch (Exception ex) {
+            
+            // Use Sesame 2 evaluation
+            
+            ex.printStackTrace();
+            
+            if (log.isInfoEnabled()) {
+                log.info("could not evaluate natively, punting to Sesame"); 
             }
 
             return super.evaluate(join, bindings);
@@ -1598,63 +1638,90 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
      */
     protected CloseableIteration<BindingSet, QueryEvaluationException> execute(
             final IStep step)
-            throws QueryEvaluationException {
+            throws Exception {
         
-        final boolean backchain = //
-        tripleSource.getDatabase().getAxioms().isRdfSchema()
-                && tripleSource.includeInferred
-                && tripleSource.conn.isQueryTimeExpander();
+        final BindingSetPipelineOp query = Rule2BOpUtility.convert(step);
         
-        if (log.isDebugEnabled()) {
-            log.debug("Running tupleExpr as native rule:\n" + step);
-            log.debug("backchain: " + backchain);
+        if (log.isInfoEnabled()) {
+            log.info(query);
         }
         
-        // run the query as a native rule.
-        final IChunkedOrderedIterator<ISolution> itr1;
-        try {
-            final IEvaluationPlanFactory planFactory = 
-                DefaultEvaluationPlanFactory2.INSTANCE;
-            
-            /*
-             * alternative evaluation orders for LUBM Q9 (default is 1 4, 2, 3,
-             * 0, 5). All three evaluation orders are roughly as good as one
-             * another. Note that tail[2] (z rdf:type ...) is entailed by the
-             * ontology and could be dropped from evaluation.
-             */
-            // final IEvaluationPlanFactory planFactory = new
-            // FixedEvaluationPlanFactory(
-            // // new int[] { 1, 4, 3, 0, 5, 2 } good
-            // // new int[] { 1, 3, 0, 4, 5, 2 } good
-            // );
-            
-            final IJoinNexusFactory joinNexusFactory = database
-                    .newJoinNexusFactory(RuleContextEnum.HighLevelQuery,
-                            ActionEnum.Query, IJoinNexus.BINDINGS, 
-                            null, // filter
-                            false, // justify
-                            backchain, //
-                            planFactory, //
-                            queryHints
-                    );
-            
-            final IJoinNexus joinNexus = joinNexusFactory.newInstance(database
-                    .getIndexManager());
-            itr1 = joinNexus.runQuery(step);
-            
-        } catch (Exception ex) {
-            throw new QueryEvaluationException(ex);
-        }
+        final int startId = query.getProperty(Predicate.Annotations.BOP_ID);
         
-        /*
-         * Efficiently resolve term identifiers in Bigdata ISolutions to RDF
-         * Values in Sesame 2 BindingSets and align the resulting iterator with
-         * the Sesame 2 API.
-         */
+        final QueryEngine queryEngine = tripleSource.getSail().getQueryEngine();
+        
+        final UUID queryId = UUID.randomUUID();
+        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
+                        startId, -1/* partitionId */,
+                        newBindingSetIterator(new HashBindingSet())));
+
+        final IAsynchronousIterator<IBindingSet[]> it1 = 
+            runningQuery.iterator();
+        
+        final IChunkedOrderedIterator<IBindingSet> it2 =
+            new ChunkedArraysIterator<IBindingSet>(it1);
+        
         CloseableIteration<BindingSet, QueryEvaluationException> result = 
             new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
-                new BigdataSolutionResolverator(database, itr1).start(database
+                new BigdataBindingSetResolverator(database, it2).start(database
                         .getExecutorService()));
+        
+//        final boolean backchain = //
+//        tripleSource.getDatabase().getAxioms().isRdfSchema()
+//                && tripleSource.includeInferred
+//                && tripleSource.conn.isQueryTimeExpander();
+//        
+//        if (log.isDebugEnabled()) {
+//            log.debug("Running tupleExpr as native rule:\n" + step);
+//            log.debug("backchain: " + backchain);
+//        }
+//        
+//        // run the query as a native rule.
+//        final IChunkedOrderedIterator<ISolution> itr1;
+//        try {
+//            final IEvaluationPlanFactory planFactory = 
+//                DefaultEvaluationPlanFactory2.INSTANCE;
+//            
+//            /*
+//             * alternative evaluation orders for LUBM Q9 (default is 1 4, 2, 3,
+//             * 0, 5). All three evaluation orders are roughly as good as one
+//             * another. Note that tail[2] (z rdf:type ...) is entailed by the
+//             * ontology and could be dropped from evaluation.
+//             */
+//            // final IEvaluationPlanFactory planFactory = new
+//            // FixedEvaluationPlanFactory(
+//            // // new int[] { 1, 4, 3, 0, 5, 2 } good
+//            // // new int[] { 1, 3, 0, 4, 5, 2 } good
+//            // );
+//            
+//            final IJoinNexusFactory joinNexusFactory = database
+//                    .newJoinNexusFactory(RuleContextEnum.HighLevelQuery,
+//                            ActionEnum.Query, IJoinNexus.BINDINGS, 
+//                            null, // filter
+//                            false, // justify
+//                            backchain, //
+//                            planFactory, //
+//                            queryHints
+//                    );
+//            
+//            final IJoinNexus joinNexus = joinNexusFactory.newInstance(database
+//                    .getIndexManager());
+//            itr1 = joinNexus.runQuery(step);
+//            
+//        } catch (Exception ex) {
+//            throw new QueryEvaluationException(ex);
+//        }
+//        
+//        /*
+//         * Efficiently resolve term identifiers in Bigdata ISolutions to RDF
+//         * Values in Sesame 2 BindingSets and align the resulting iterator with
+//         * the Sesame 2 API.
+//         */
+//        CloseableIteration<BindingSet, QueryEvaluationException> result = 
+//            new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
+//                new BigdataSolutionResolverator(database, itr1).start(database
+//                        .getExecutorService()));
         
         // use the basic filter iterator for remaining filters
         if (step instanceof ProxyRuleWithSesameFilters) {
@@ -1673,6 +1740,21 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         
         return result;
         
+    }
+
+    /**
+     * Return an {@link IAsynchronousIterator} that will read a single,
+     * empty {@link IBindingSet}.
+     * 
+     * @param bindingSet
+     *            the binding set.
+     */
+    protected ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+            final IBindingSet bindingSet) {
+
+        return new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { new IBindingSet[] { bindingSet } });
+
     }
 
     @SuppressWarnings("serial")

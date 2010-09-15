@@ -365,6 +365,16 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
 
     }
 
+    public Predicate<E> setBOpId(final int bopId) {
+
+        final Predicate<E> tmp = this.clone();
+
+        tmp.annotations.put(Annotations.BOP_ID, bopId);
+
+        return tmp;
+
+    }
+
     public String toString() {
         
         return toString(null/* bindingSet */);
@@ -377,6 +387,8 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
         
         final StringBuilder sb = new StringBuilder();
 
+        sb.append(getClass().getName());
+        
         sb.append("(");
 
         for (int i = 0; i < arity; i++) {

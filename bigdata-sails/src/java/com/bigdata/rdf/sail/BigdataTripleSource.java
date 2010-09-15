@@ -42,6 +42,12 @@ public class BigdataTripleSource implements TripleSource {
         
     }
     
+    public BigdataSail getSail() {
+        
+        return conn.getBigdataSail();
+        
+    }
+    
     /**
      * This wraps
      * {@link BigdataSailConnection#getStatements(Resource, URI, Value, boolean, Resource[])}.
