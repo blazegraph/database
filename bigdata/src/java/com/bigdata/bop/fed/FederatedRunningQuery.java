@@ -219,7 +219,7 @@ public class FederatedRunningQuery extends RunningQuery {
      * @param query
      */
     public FederatedRunningQuery(final FederatedQueryEngine queryEngine,
-            final long queryId, /*final long begin, */final boolean controller,
+            final UUID queryId, final boolean controller,
             final IQueryClient clientProxy, final BindingSetPipelineOp query) {
 
         super(queryEngine, queryId, /*begin, */controller, clientProxy, query);

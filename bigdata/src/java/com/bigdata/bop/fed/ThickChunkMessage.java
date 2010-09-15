@@ -35,6 +35,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.NoSuchElementException;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import com.bigdata.bop.IBindingSet;
@@ -61,7 +62,7 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
 
     final private IQueryClient queryController;
 
-    final private long queryId;
+    final private UUID queryId;
 
     final private int bopId;
     
@@ -75,7 +76,7 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
         return queryController;
     }
 
-    public long getQueryId() {
+    public UUID getQueryId() {
         return queryId;
     }
 
@@ -117,10 +118,13 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
      * @param source
      */
     public ThickChunkMessage(final IQueryClient queryController,
-            final long queryId, final int bopId, final int partitionId,
+            final UUID queryId, final int bopId, final int partitionId,
             final IBlockingBuffer<IBindingSet[]> source) {
 
         if (queryController == null)
+            throw new IllegalArgumentException();
+
+        if (queryId == null)
             throw new IllegalArgumentException();
 
         if (source == null)

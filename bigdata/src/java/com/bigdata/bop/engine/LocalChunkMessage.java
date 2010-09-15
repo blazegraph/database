@@ -1,6 +1,7 @@
 package com.bigdata.bop.engine;
 
 import java.io.Serializable;
+import java.util.UUID;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.fed.FederatedRunningQuery;
@@ -21,7 +22,7 @@ public class LocalChunkMessage<E> implements IChunkMessage<E> {
     /**
      * The query identifier.
      */
-    private final long queryId;
+    private final UUID queryId;
     
     /**
      * The target {@link BOp}.
@@ -42,7 +43,7 @@ public class LocalChunkMessage<E> implements IChunkMessage<E> {
         return queryController;
     }
 
-    public long getQueryId() {
+    public UUID getQueryId() {
         return queryId;
     }
 
@@ -59,10 +60,13 @@ public class LocalChunkMessage<E> implements IChunkMessage<E> {
     }
 
     public LocalChunkMessage(final IQueryClient queryController,
-            final long queryId, final int bopId, final int partitionId,
+            final UUID queryId, final int bopId, final int partitionId,
             final IAsynchronousIterator<E[]> source) {
 
         if (queryController == null)
+            throw new IllegalArgumentException();
+        
+        if (queryId == null)
             throw new IllegalArgumentException();
         
         if (source == null)

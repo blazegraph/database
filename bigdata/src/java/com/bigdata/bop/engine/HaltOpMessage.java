@@ -18,7 +18,7 @@ public class HaltOpMessage implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /** The identifier of the query. */
-    final public long queryId;
+    final public UUID queryId;
 
     /** The identifier of the operator. */
     final public int bopId;
@@ -101,7 +101,7 @@ public class HaltOpMessage implements Serializable {
      */
     public HaltOpMessage(
             //
-            final long queryId, final int bopId, final int partitionId,
+            final UUID queryId, final int bopId, final int partitionId,
             final UUID serviceId, Throwable cause, //
             final Integer sinkId, final int sinkChunksOut,// 
             final Integer altSinkId, final int altSinkChunksOut,// 

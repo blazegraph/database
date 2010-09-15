@@ -28,8 +28,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.engine;
 
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 
 import junit.framework.TestCase2;
 
@@ -49,6 +57,7 @@ import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
 import com.bigdata.bop.bset.CopyBindingSetOp;
+import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.fed.TestFederatedQueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.journal.BufferMode;
@@ -58,6 +67,7 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ICloseableIterator;
+import com.bigdata.util.concurrent.LatchedExecutor;
 import com.ibm.icu.impl.ByteBuffer;
 
 /**
@@ -66,6 +76,10 @@ import com.ibm.icu.impl.ByteBuffer;
  * Note: The {@link BOp}s are unit tested separately. This test suite is focused
  * on interactions when {@link BOp}s are chained together in a query, such as a
  * sequence of pipeline joins, a slice applied to a query, etc.
+ * 
+ * <pre>
+ * -Dlog4j.configuration=bigdata/src/resources/logging/log4j.properties
+ * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -197,7 +211,7 @@ public class TestQueryEngine extends TestCase2 {
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 }));
 
-        final long queryId = 1L;
+        final UUID queryId = UUID.randomUUID();
         final RunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                         startId, -1/* partitionId */,
@@ -284,7 +298,7 @@ public class TestQueryEngine extends TestCase2 {
                 new IConstant[] { new Constant<String>("Paul") }//
         ) };
 
-        final long queryId = 1L;
+        final UUID queryId = UUID.randomUUID();
         final RunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                         startId, -1 /* partitionId */,
@@ -422,7 +436,7 @@ public class TestQueryEngine extends TestCase2 {
         final int joinId2 = 4;
         final int predId2 = 5;
         
-        final BindingSetPipelineOp startOp = new CopyBindingSetOp(new BOp[] {},
+        final BindingSetPipelineOp startOp = new StartOp(new BOp[] {},
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
                         }));
@@ -472,7 +486,7 @@ public class TestQueryEngine extends TestCase2 {
         final BindingSetPipelineOp query = join2Op;
 
         // start the query.
-        final long queryId = 1L;
+        final UUID queryId = UUID.randomUUID();
         final IChunkMessage<IBindingSet> initialChunkMessage;
         {
 
@@ -567,6 +581,118 @@ public class TestQueryEngine extends TestCase2 {
 
     }
 
+    /**
+     * A stress test to look for an occasional non-termination in
+     * {@link #test_query_join2()}.
+     * 
+     * @throws Exception 
+     */
+    public void test_queryJoin2_stressTest() throws Exception {
+        
+        final long timeout = TimeUnit.MINUTES.toMillis(1);
+
+        final int ntrials = 1000;
+
+        final int poolSize = 1; // no concurrency.
+
+        final int nsuccess = doStressTest(timeout, ntrials, poolSize);
+
+        if (nsuccess < ntrials) {
+
+            /*
+             * Note: This test should run to completion using a single thread in
+             * order to detect problems with improper termination of a query.
+             */
+            
+            fail("Only completed " + nsuccess + " out of " + ntrials
+                    + " trials");
+
+        }
+
+    }
+
+    /**
+     * Concurrent stress test.
+     * 
+     * @throws Exception
+     */
+    public void test_queryJoin2_concurrentStressTest() throws Exception {
+        
+        final long timeout = 5000; // ms
+
+        final int ntrials = 1000;
+
+        final int poolSize = 10;
+
+        doStressTest(timeout, ntrials, poolSize);
+
+    }
+
+    /**
+     * 
+     * @param timeout
+     * @param ntrials
+     * @param poolSize
+     * @return The #of successful trials.
+     * @throws Exception
+     */
+    protected int doStressTest(final long timeout, final int ntrials,
+            final int poolSize) throws Exception {
+
+        final Executor service = new LatchedExecutor(jnl.getExecutorService(),
+                poolSize);
+        
+        final List<FutureTask<Void>> futures = new LinkedList<FutureTask<Void>>();
+        
+        for (int i = 0; i < ntrials; i++) {
+
+            final FutureTask<Void> ft = new FutureTask<Void>(new Runnable() {
+                public void run() {
+                    try {
+                        test_query_join2();
+                    } catch (Exception e) {
+                        // wrap exception.
+                        throw new RuntimeException(e);
+                    }
+                }
+            }, (Void) null);
+
+            futures.add(ft);
+            
+            service.execute(ft);
+
+        }
+        
+        Thread.sleep(timeout);
+        
+        int nerror = 0;
+        int ncancel = 0;
+        int nsuccess = 0;
+        for (FutureTask<Void> ft : futures) {
+            ft.cancel(true/* mayInterruptIfRunning */);
+            try {
+                ft.get();
+                nsuccess++;
+            } catch (CancellationException ex) {
+                ncancel++;
+            } catch (ExecutionException ex) {
+                nerror++;
+            }
+        }
+
+        final String msg = "nerror=" + nerror + ", ncancel=" + ncancel
+                + ", nsuccess=" + nsuccess;
+
+        if(log.isInfoEnabled())
+            log.info(msg);
+        
+        if (nerror > 0)
+            fail(msg);
+
+        return nsuccess;
+        
+    }
+    
     /**
      * @todo Write unit tests for optional joins, including where an alternative
      *       sink is specified in the {@link BOpContext} and is used when the

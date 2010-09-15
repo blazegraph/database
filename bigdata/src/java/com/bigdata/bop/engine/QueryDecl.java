@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.engine;
 
 import java.io.Serializable;
+import java.util.UUID;
 
 import com.bigdata.bop.BindingSetPipelineOp;
 
@@ -44,16 +45,19 @@ public class QueryDecl implements IQueryDecl, Serializable {
      */
     private static final long serialVersionUID = 1L;
 
-    private final long queryId;
+    private final UUID queryId;
 
     private final IQueryClient clientProxy;
 
     private final BindingSetPipelineOp query;
 
-    public QueryDecl(final IQueryClient clientProxy, final long queryId,
+    public QueryDecl(final IQueryClient clientProxy, final UUID queryId,
             final BindingSetPipelineOp query) {
 
         if (clientProxy == null)
+            throw new IllegalArgumentException();
+
+        if (queryId == null)
             throw new IllegalArgumentException();
 
         if (query == null)
@@ -75,7 +79,7 @@ public class QueryDecl implements IQueryDecl, Serializable {
         return clientProxy;
     }
 
-    public long getQueryId() {
+    public UUID getQueryId() {
         return queryId;
     }
 

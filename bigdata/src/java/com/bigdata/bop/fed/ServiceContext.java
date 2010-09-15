@@ -8,11 +8,15 @@ import java.util.UUID;
  */
 class ServiceContext extends AllocationContextKey {
     
-    private final Long queryId;
+    private final UUID queryId;
 
     private final UUID serviceUUID;
 
-    ServiceContext(final Long queryId, final UUID serviceUUID) {
+    ServiceContext(final UUID queryId, final UUID serviceUUID) {
+        if (queryId == null)
+            throw new IllegalArgumentException();
+        if (serviceUUID == null)
+            throw new IllegalArgumentException();
         this.queryId = queryId;
         this.serviceUUID = serviceUUID;
     }
