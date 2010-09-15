@@ -38,6 +38,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bset.CopyBindingSetOp;
+import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail;
@@ -94,12 +95,14 @@ public class Rule2BOpUtility {
 
         int bopId = 1;
         
-        BindingSetPipelineOp left = new CopyBindingSetOp(new BOp[] {},
+        final BindingSetPipelineOp startOp = new StartOp(new BOp[] {},
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, bopId++),//
                         }));
         
         Iterator<Predicate> tails = rule.getTail();
+
+        BindingSetPipelineOp left = startOp;
         
         while (tails.hasNext()) {
         
@@ -121,8 +124,72 @@ public class Rule2BOpUtility {
         
         System.err.println(toString(left));
         
+//        test_query_join2();
+        
         return left;
         
+    }
+    
+    public static void test_query_join2() {
+
+        final String namespace = "ns";
+        final int startId = 1;
+        final int joinId1 = 2;
+        final int predId1 = 3;
+        final int joinId2 = 4;
+        final int predId2 = 5;
+        
+        final BindingSetPipelineOp startOp = new StartOp(new BOp[] {},
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, startId),//
+                        }));
+        
+        final Predicate<?> pred1Op = new Predicate<E>(new IVariableOrConstant[] {
+                Var.var("x"), Var.var("y") }, NV
+                .asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.PARTITION_ID,
+                                Integer.valueOf(-1)),//
+                        new NV(Predicate.Annotations.OPTIONAL,
+                                Boolean.FALSE),//
+                        new NV(Predicate.Annotations.CONSTRAINT, null),//
+                        new NV(Predicate.Annotations.EXPANDER, null),//
+                        new NV(Predicate.Annotations.BOP_ID, predId1),//
+                        new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                }));
+        
+        final Predicate<?> pred2Op = new Predicate<E>(new IVariableOrConstant[] {
+                Var.var("y"), Var.var("z") }, NV
+                .asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.PARTITION_ID,
+                                Integer.valueOf(-1)),//
+                        new NV(Predicate.Annotations.OPTIONAL,
+                                Boolean.FALSE),//
+                        new NV(Predicate.Annotations.CONSTRAINT, null),//
+                        new NV(Predicate.Annotations.EXPANDER, null),//
+                        new NV(Predicate.Annotations.BOP_ID, predId2),//
+                        new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                }));
+        
+        final BindingSetPipelineOp join1Op = new PipelineJoin<E>(//
+                startOp, pred1Op,//
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, joinId1),//
+                        }));
+
+        final BindingSetPipelineOp join2Op = new PipelineJoin<E>(//
+                join1Op, pred2Op,//
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, joinId2),//
+                        }));
+
+        final BindingSetPipelineOp query = join2Op;
+        
+        System.err.println(toString(query));
+
     }
     
     private static String toString(BOp bop) {
