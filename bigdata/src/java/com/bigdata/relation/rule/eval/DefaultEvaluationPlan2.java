@@ -31,9 +31,7 @@ package com.bigdata.relation.rule.eval;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
-
 import org.apache.log4j.Logger;
-
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.journal.ITx;
@@ -64,7 +62,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
      * @todo not serializable but used by {@link #rangeCount(int)}, which is a
      *       problem.
      */
-    private final IJoinNexus joinNexus;
+    private final IRangeCountFactory rangeCountFactory;
 
     private final IRule rule;
 
@@ -145,15 +143,31 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
      * @param rule
      *            The rule.
      */
-    public DefaultEvaluationPlan2(IJoinNexus joinNexus, IRule rule) {
+    public DefaultEvaluationPlan2(final IJoinNexus joinNexus, 
+            final IRule rule) {
         
-        if (joinNexus == null)
+        this(joinNexus.getRangeCountFactory(), rule);
+        
+    }
+    
+    /**
+     * Computes an evaluation plan for the rule.
+     * 
+     * @param rangeCountFactory
+     *            The range count factory.
+     * @param rule
+     *            The rule.
+     */
+    public DefaultEvaluationPlan2(final IRangeCountFactory rangeCountFactory, 
+            final IRule rule) {
+        
+        if (rangeCountFactory == null)
             throw new IllegalArgumentException();
 
         if (rule == null)
             throw new IllegalArgumentException();
         
-        this.joinNexus = joinNexus;
+        this.rangeCountFactory = rangeCountFactory;
         
         this.rule = rule;
         
@@ -439,7 +453,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
                 
             }
             
-            final long rangeCount = joinNexus.getRangeCountFactory()
+            final long rangeCount = rangeCountFactory
                     .rangeCount(rule.getTail(tailIndex));
 
             this.rangeCount[tailIndex] = rangeCount;

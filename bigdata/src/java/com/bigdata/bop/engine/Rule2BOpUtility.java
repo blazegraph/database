@@ -27,7 +27,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.engine;
 
+import java.util.Iterator;
+import java.util.List;
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.Var;
+import com.bigdata.bop.ap.E;
+import com.bigdata.bop.ap.Predicate;
+import com.bigdata.bop.bset.CopyBindingSetOp;
+import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
@@ -60,10 +72,15 @@ public class Rule2BOpUtility {
      * 
      * @return
      */
-    public static BOp convert(final IStep step) {
+    public static BindingSetPipelineOp convert(final IStep step) {
+        
+        if (step instanceof Rule)
+            return convert((Rule) step);
+        else if (step instanceof Program)
+            return convert((Program) step);
         
         throw new UnsupportedOperationException();
-        
+
     }
 
     /**
@@ -73,12 +90,71 @@ public class Rule2BOpUtility {
      * 
      * @return
      */
-    public static BOp convert(final Rule rule) {
+    public static BindingSetPipelineOp convert(final Rule rule) {
 
-        throw new UnsupportedOperationException();
-
+        int bopId = 1;
+        
+        BindingSetPipelineOp left = new CopyBindingSetOp(new BOp[] {},
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, bopId++),//
+                        }));
+        
+        Iterator<Predicate> tails = rule.getTail();
+        
+        while (tails.hasNext()) {
+        
+            final int joinId = bopId++;
+            
+            final Predicate<?> pred = tails.next().setBOpId(bopId++);
+            
+            System.err.println(pred);
+            
+            final BindingSetPipelineOp joinOp = new PipelineJoin<E>(//
+                    left, pred,//
+                    NV.asMap(new NV[] {//
+                            new NV(Predicate.Annotations.BOP_ID, joinId),//
+                            }));
+            
+            left = joinOp;
+            
+        }
+        
+        System.err.println(toString(left));
+        
+        return left;
+        
     }
+    
+    private static String toString(BOp bop) {
+        
+        StringBuilder sb = new StringBuilder();
+        
+        toString(bop, sb, 0);
+        
+        // chop off the last \n
+        sb.setLength(sb.length()-1);
+        
+        return sb.toString();
+        
+    }
+    
+    private static void toString(final BOp bop, final StringBuilder sb, 
+            final int indent) {
+        
+        for (int i = 0; i < indent; i++) {
+            sb.append(' ');
+        }
+        sb.append(bop).append('\n');
 
+        if (bop != null) {
+            List<BOp> args = bop.args();
+            for (BOp arg : args) {
+                toString(arg, sb, indent+4);
+            }
+        }
+        
+    }
+    
     /**
      * Convert a program into an operator tree.
      * 
@@ -86,7 +162,7 @@ public class Rule2BOpUtility {
      * 
      * @return
      */
-    public static BOp convert(final Program program) {
+    public static BindingSetPipelineOp convert(final Program program) {
 
         throw new UnsupportedOperationException();
 

@@ -112,6 +112,7 @@ import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailConnectionListener;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
@@ -513,6 +514,11 @@ public class BigdataSail extends SailBase implements Sail {
      * {@link BigdataSailConnection} instances and across all transactions.
      */
     private Map<String, String> namespaces;
+
+    /**
+     * The query engine.
+     */
+    final private QueryEngine queryEngine;
     
     /**
      * When true, the RDFS closure will be maintained by the <em>SAIL</em>
@@ -914,6 +920,10 @@ public class BigdataSail extends SailBase implements Sail {
 
         namespaces = 
             Collections.synchronizedMap(new LinkedHashMap<String, String>());
+        
+        queryEngine = new QueryEngine(database.getIndexManager());
+        
+        queryEngine.init();
         
     }
     
@@ -1332,6 +1342,12 @@ public class BigdataSail extends SailBase implements Sail {
         
     }
     
+    public QueryEngine getQueryEngine() {
+        
+        return queryEngine;
+        
+    }
+    
     
     /**
      * Inner class implements the {@link SailConnection}. Some additional
@@ -1406,6 +1422,13 @@ public class BigdataSail extends SailBase implements Sail {
          */
         private Lock lock;
 
+        
+        public BigdataSail getBigdataSail() {
+            
+            return BigdataSail.this;
+            
+        }
+        
         /**
          * Return the assertion buffer.
          * <p>

@@ -2,7 +2,6 @@ package com.bigdata.bop;
 
 import java.io.ObjectStreamException;
 import java.util.UUID;
-
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.relation.rule.Rule;
 
