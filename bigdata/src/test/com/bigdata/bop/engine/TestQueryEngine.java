@@ -198,15 +198,10 @@ public class TestQueryEngine extends TestCase2 {
                 }));
 
         final long queryId = 1L;
-        final RunningQuery runningQuery = queryEngine.eval(queryId,query);
-
-        runningQuery.startQuery(new BindingSetChunk(
-                        queryEngine,
-                        queryId,
-                        startId,//
-                        -1, //partitionId
-                        new ThickAsynchronousIterator<IBindingSet[]>(
-                                new IBindingSet[][] { new IBindingSet[] { new HashBindingSet()} })));
+        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
+                        startId, -1/* partitionId */,
+                        newBindingSetIterator(new HashBindingSet())));
 
         // Wait until the query is done.
         final Map<Integer, BOpStats> statsMap = runningQuery.get();
@@ -290,12 +285,10 @@ public class TestQueryEngine extends TestCase2 {
         ) };
 
         final long queryId = 1L;
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query);
-
-        runningQuery.startQuery(new BindingSetChunk(queryEngine, queryId,
-                startId,//
-                -1, // partitionId
-                newBindingSetIterator(new HashBindingSet())));
+        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
+                        startId, -1 /* partitionId */,
+                        newBindingSetIterator(new HashBindingSet())));
 
         // verify solutions.
         assertSameSolutions(expected, runningQuery.iterator());
@@ -478,21 +471,22 @@ public class TestQueryEngine extends TestCase2 {
 
         final BindingSetPipelineOp query = join2Op;
 
-        final long queryId = 1L;
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query);
-
         // start the query.
+        final long queryId = 1L;
+        final IChunkMessage<IBindingSet> initialChunkMessage;
         {
-         
+
             final IBindingSet initialBindings = new HashBindingSet();
-            
+
             initialBindings.set(Var.var("x"), new Constant<String>("Mary"));
 
-            runningQuery.startQuery(new BindingSetChunk<IBindingSet>(
-                    queryEngine, queryId, startId,//
+            initialChunkMessage = new LocalChunkMessage<IBindingSet>(queryEngine,
+                    queryId, startId,//
                     -1, // partitionId
-                    newBindingSetIterator(initialBindings)));
+                    newBindingSetIterator(initialBindings));
         }
+        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+                initialChunkMessage);
 
         // verify solutions.
         {

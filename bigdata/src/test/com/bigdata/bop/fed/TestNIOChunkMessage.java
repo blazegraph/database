@@ -257,12 +257,6 @@ public class TestNIOChunkMessage extends TestCase2 {
             return null;
         }
 
-		@Override
-		public RunningQuery eval(long queryId, BindingSetPipelineOp query)
-				throws Exception, RemoteException {
-			return null;
-		}
-        
     }
 
     private static class MyNIOChunkMessage<E> extends NIOChunkMessage<E> {

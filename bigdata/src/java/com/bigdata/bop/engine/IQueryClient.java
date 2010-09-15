@@ -3,32 +3,12 @@ package com.bigdata.bop.engine;
 import java.rmi.RemoteException;
 
 import com.bigdata.bop.BindingSetPipelineOp;
-import com.bigdata.bop.IBindingSet;
 
 /**
  * Interface for a client executing queries (the query controller).
  */
 public interface IQueryClient extends IQueryPeer {
 
-    /**
-     * Evaluate a query which visits {@link IBindingSet}s, such as a join. This
-     * node will serve as the controller for the query.
-     * 
-     * @param queryId
-     *            The unique identifier for the query.
-     * @param query
-     *            The query to evaluate.
-     * 
-     * @return An iterator visiting {@link IBindingSet}s which result from
-     *         evaluating the query.
-     * 
-     * @throws IllegalStateException
-     *             if the {@link QueryEngine} has been {@link #shutdown()}.
-     * @throws Exception
-     * @throws RemoteException
-     */
-    RunningQuery eval(long queryId, BindingSetPipelineOp query) throws Exception, RemoteException;
-    
     /**
      * Return the query.
      * 

@@ -27,10 +27,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.fed;
 
+import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import junit.framework.TestCase2;
 
@@ -51,9 +56,8 @@ import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.bop.engine.BindingSetChunk;
-import com.bigdata.bop.engine.IQueryClient;
-import com.bigdata.bop.engine.IQueryPeer;
+import com.bigdata.bop.engine.IChunkMessage;
+import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.PipelineDelayOp;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.RunningQuery;
@@ -62,17 +66,21 @@ import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SortOp;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.Journal;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.ManagedResourceService;
+import com.bigdata.service.ResourceService;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.Dechunkerator;
+import com.bigdata.util.config.NicUtil;
 import com.ibm.icu.impl.ByteBuffer;
 
 /**
@@ -133,70 +141,129 @@ public class TestFederatedQueryEngine extends TestCase2 {
     // The separator key between the index partitions.
     private byte[] separatorKey;
 
-    private IQueryClient queryEngine;
-    
     private JiniClient<?> client;
 
-    private IDataService dataService0; 
-    private IDataService dataService1; 
+    /** The local persistence store for the {@link #queryEngine}. */
+    private Journal queryEngineStore;
+    
+    /** The local {@link ResourceService} for the {@link #queryEngine}. */
+    private ManagedResourceService queryEngineResourceService;
+    
+    /** The query controller. */
+    private FederatedQueryEngine queryEngine;
+    
+    private IDataService dataService0;
+
+    private IDataService dataService1;
 
     protected void setUp() throws Exception {
 
-    	client = new JiniClient(new String[]{"/nas/bigdata/bigdata-0.83.2/dist/bigdata/var/config/jini/bigdataStandalone.config"});
+        /*
+         * FIXME This is hardcoded to a specific location in the file system.
+         * 
+         * Also, the dependency on JiniClient means that we must move this test
+         * class into the bigdata-jini package.
+         */
+        client = new JiniClient(
+                new String[] { "/nas/bigdata/bigdata-0.83.2/dist/bigdata/var/config/jini/bigdataStandalone.config" });
+
+        final IBigdataFederation<?> fed = client.connect();
+
+        // create index manager for the query controller.
+        {
+            final Properties p = new Properties();
+            p.setProperty(Journal.Options.BUFFER_MODE, BufferMode.Transient
+                    .toString());
+            queryEngineStore = new Journal(p);
+        }
         
-    	final IBigdataFederation<?> fed = client.connect();
-    
-    	final int maxCount = 2;
-    	UUID[] dataServices = null;
-    	while((dataServices = fed.getDataServiceUUIDs(maxCount)).length < maxCount) {
-    		System.err.println("Waiting for "+maxCount+" data services.  There are "+dataServices.length+" discovered.");
-    		Thread.sleep(250/*ms*/);
+        // create resource service for the query controller.
+        {
+            queryEngineResourceService = new ManagedResourceService(
+                    new InetSocketAddress(InetAddress
+                            .getByName(NicUtil.getIpAddress("default.nic",
+                                    "default", true/* loopbackOk */)), 0/* port */
+                    ), 0/* requestServicePoolSize */) {
+
+                @Override
+                protected File getResource(UUID uuid) throws Exception {
+                    // Will not serve up files.
+                    return null;
+                }
+            };
+        }
+        
+        // create the query controller.
+        queryEngine = new FederatedQueryEngine(fed, queryEngineStore,
+                queryEngineResourceService);
+        
+        /*
+         * Discover the data services. We need their UUIDs in order to create
+         * the test relation split across an index partition located on each of
+         * the two data services.
+         */
+        final int maxCount = 2;
+        UUID[] dataServices = null;
+        final long begin = System.currentTimeMillis();
+        long elapsed = 0L;
+        while ((dataServices = fed.getDataServiceUUIDs(maxCount)).length < maxCount
+                && ((elapsed = System.currentTimeMillis() - begin) < TimeUnit.SECONDS
+                        .toMillis(60))) {
+            System.err.println("Waiting for " + maxCount
+                    + " data services.  There are " + dataServices.length
+                    + " discovered : elapsed=" + elapsed + "ms");
+            Thread.sleep(250/* ms */);
     	}
-    	
+
+        if (dataServices.length < maxCount)
+            throw new TimeoutException("Discovered " + dataServices.length
+                    + " data services in " + elapsed + "ms but require "
+                    + maxCount);
+        
         super.setUp();
 
-        dataService0 = fed.getDataService(dataServices[0]); 
-        dataService1 = fed.getDataService(dataServices[1]); 
-        {
-
-        	// @todo need to wait for the dataService to be running.
-//            assertTrue(((DataService) dataServer.getProxy())
-//                    .getResourceManager().awaitRunning());
-
-            // resolve the query engine on one of the data services.
-            while ((queryEngine = (IQueryClient) dataService0.getQueryEngine()) == null) {
- 
-                if (log.isInfoEnabled())
-                    log.info("Waiting for query engine on dataService0");
-                
-                Thread.sleep(250);
-                
-            }
-            
-            System.err.println("controller: " + queryEngine);
-            
-        }
-
-        // resolve the query engine on the other data services.
-        {
-
-            IQueryPeer other = null;
-            
-//            assertTrue(((DataService) dataServer.getProxy())
-//                    .getResourceManager().awaitRunning());
-            
-            while ((other = dataService1.getQueryEngine()) == null) {
-            
-                if (log.isInfoEnabled())
-                    log.info("Waiting for query engine on dataService1");
-                
-                Thread.sleep(250);
-                
-            }
-
-            System.err.println("other     : " + other);
-            
-        }
+//        dataService0 = fed.getDataService(dataServices[0]); 
+//        dataService1 = fed.getDataService(dataServices[1]); 
+//        {
+//
+//        	// @todo need to wait for the dataService to be running.
+////            assertTrue(((DataService) dataServer.getProxy())
+////                    .getResourceManager().awaitRunning());
+//
+//            // resolve the query engine on one of the data services.
+//            while ((queryEngine = (IQueryClient) dataService0.getQueryEngine()) == null) {
+//
+//                if (log.isInfoEnabled())
+//                    log.info("Waiting for query engine on dataService0");
+//
+//                Thread.sleep(250);
+//
+//            }
+//            
+//            System.err.println("controller: " + queryEngine);
+//            
+//        }
+//
+//        // resolve the query engine on the other data services.
+//        {
+//
+//            IQueryPeer other = null;
+//            
+////            assertTrue(((DataService) dataServer.getProxy())
+////                    .getResourceManager().awaitRunning());
+//            
+//            while ((other = dataService1.getQueryEngine()) == null) {
+//
+//                if (log.isInfoEnabled())
+//                    log.info("Waiting for query engine on dataService1");
+//
+//                Thread.sleep(250);
+//
+//            }
+//
+//            System.err.println("other     : " + other);
+//            
+//        }
 
         loadData();
         
@@ -213,7 +280,18 @@ public class TestFederatedQueryEngine extends TestCase2 {
         dataService0 = null;
         dataService1 = null;
         
-        queryEngine = null;
+        if (queryEngineResourceService != null) {
+            queryEngineResourceService.shutdownNow();
+            queryEngineResourceService = null;
+        }
+        if (queryEngineStore != null) {
+            queryEngineStore.destroy();
+            queryEngineStore = null;
+        }
+        if (queryEngine != null) {
+            queryEngine.shutdownNow();
+            queryEngine = null;
+        }
 
         super.tearDown();
         
@@ -256,19 +334,21 @@ public class TestFederatedQueryEngine extends TestCase2 {
          * Create the relation with the primary index key-range partitioned
          * using the given separator keys and data services.
          */
-        
-        final R rel = new R(client.getFederation(), namespace, ITx.UNISOLATED, new Properties());
 
-        if(client.getFederation()
-        .getResourceLocator().locate(namespace, ITx.UNISOLATED)==null) {
-        	
-        rel.create(separatorKeys, dataServices);
+        final R rel = new R(client.getFederation(), namespace, ITx.UNISOLATED,
+                new Properties());
 
-        /*
-         * Insert data into the appropriate index partitions.
-         */
-        rel.insert(new ChunkedArrayIterator<E>(a.length, a, null/* keyOrder */));
-        
+        if (client.getFederation().getResourceLocator().locate(namespace,
+                ITx.UNISOLATED) == null) {
+
+            rel.create(separatorKeys, dataServices);
+
+            /*
+             * Insert data into the appropriate index partitions.
+             */
+            rel
+                    .insert(new ChunkedArrayIterator<E>(a.length, a, null/* keyOrder */));
+
         }
 
     }
@@ -314,19 +394,13 @@ public class TestFederatedQueryEngine extends TestCase2 {
         final BindingSetPipelineOp query = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
-//                new NV(Predicate.Annotations.READ_TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
 
         final long queryId = 1L;
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query);
-
-        runningQuery.startQuery(new BindingSetChunk(
-                        queryEngine,
-                        queryId,
-                        startId,//
-                        -1, //partitionId
-                        new ThickAsynchronousIterator<IBindingSet[]>(
-                                new IBindingSet[][] { new IBindingSet[] { new HashBindingSet()} })));
+        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
+                        startId, -1 /* partitionId */,
+                        newBindingSetIterator(new HashBindingSet())));
 
         // Wait until the query is done.
         final Map<Integer, BOpStats> statsMap = runningQuery.get();
@@ -425,12 +499,11 @@ public class TestFederatedQueryEngine extends TestCase2 {
         ) };
 
         final long queryId = 1L;
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query);
-
-        runningQuery.startQuery(new BindingSetChunk(queryEngine, queryId,
-                startId,//
-                -1, // partitionId
-                newBindingSetIterator(new HashBindingSet())));
+        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
+                        startId,//
+                        -1, /* partitionId */
+                        newBindingSetIterator(new HashBindingSet())));
 
         // verify solutions.
         TestQueryEngine.assertSameSolutionsAnyOrder(expected,
@@ -618,22 +691,23 @@ public class TestFederatedQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.BOP_ID, sliceId),//
                         }));
 
-        final long queryId = 1L;
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query);
-
         // start the query.
+        final long queryId = 1L;
+        final IChunkMessage<IBindingSet> initialChunkMessage;
         {
-         
+
             final IBindingSet initialBindings = new HashBindingSet();
-            
+
             initialBindings.set(Var.var("x"), new Constant<String>("Mary"));
 
-            runningQuery.startQuery(new BindingSetChunk(queryEngine, queryId,
-                    startId,//
+            initialChunkMessage = new LocalChunkMessage<IBindingSet>(
+                    queryEngine, queryId, startId,//
                     -1, // partitionId
-                    newBindingSetIterator(initialBindings)));
+                    newBindingSetIterator(initialBindings));
 
         }
+        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+                initialChunkMessage);
 
         // verify solutions.
         {

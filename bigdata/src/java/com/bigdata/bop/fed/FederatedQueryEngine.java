@@ -122,20 +122,6 @@ public class FederatedQueryEngine extends QueryEngine {
     }
 
     /**
-     * Constructor used on a {@link DataService} (a query engine peer).
-     * 
-     * @param dataService
-     *            The data service.
-     */
-    public FederatedQueryEngine(final DataService dataService) {
-
-        this(dataService.getFederation(),
-                new DelegateIndexManager(dataService), dataService
-                        .getResourceManager().getResourceService());
-        
-    }
-
-    /**
      * Overridden to strengthen the return type.
      * <p>
      * {@inheritDoc}
@@ -151,6 +137,20 @@ public class FederatedQueryEngine extends QueryEngine {
 
         return getClass().getName() + "{serviceUUID=" + getServiceUUID() + "}";
 
+    }
+
+    /**
+     * Constructor used on a {@link DataService} (a query engine peer).
+     * 
+     * @param dataService
+     *            The data service.
+     */
+    public FederatedQueryEngine(final DataService dataService) {
+
+        this(dataService.getFederation(),
+                new DelegateIndexManager(dataService), dataService
+                        .getResourceManager().getResourceService());
+        
     }
     
     /**

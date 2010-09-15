@@ -42,7 +42,7 @@ import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IShardwisePipelineOp;
-import com.bigdata.bop.engine.BindingSetChunk;
+import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryPeer;
@@ -94,7 +94,7 @@ public class FederatedRunningQuery extends RunningQuery {
      * A map associating resources with running queries. When a query halts, the
      * resources listed in its resource map are released. Resources can include
      * {@link ByteBuffer}s backing either incoming or outgoing
-     * {@link BindingSetChunk}s, temporary files associated with the query, hash
+     * {@link LocalChunkMessage}s, temporary files associated with the query, hash
      * tables, etc.
      * 
      * @todo This map will eventually need to be moved into {@link RunningQuery}
@@ -604,7 +604,7 @@ public class FederatedRunningQuery extends RunningQuery {
              * query engine.
              */
 
-            final IChunkMessage<IBindingSet> msg = new BindingSetChunk<IBindingSet>(
+            final IChunkMessage<IBindingSet> msg = new LocalChunkMessage<IBindingSet>(
                     getQueryController(), getQueryId(), sinkId, partitionId,
                     source.iterator());
 
