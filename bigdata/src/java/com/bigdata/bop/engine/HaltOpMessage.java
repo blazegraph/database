@@ -72,7 +72,7 @@ public class HaltOpMessage implements Serializable {
      * operator.
      */
     final public int altSinkChunksOut;
-
+    
     /**
      * The statistics for the execution of the bop against the partition on the
      * service.
@@ -117,6 +117,23 @@ public class HaltOpMessage implements Serializable {
         this.altSinkId = altSinkId;
         this.altSinkChunksOut = altSinkChunksOut;
         this.taskStats = taskStats;
+    }
+
+    public String toString() {
+        final StringBuilder sb = new StringBuilder(getClass().getName());
+        sb.append("{queryId=" + queryId);
+        sb.append(",bopId=" + bopId);
+        sb.append(",partitionId=" + partitionId);
+        sb.append(",serviceId=" + serviceId);
+        if (cause != null)
+            sb.append(",cause=" + cause);
+        sb.append(",sinkId=" + sinkId);
+        sb.append(",sinkChunksOut=" + sinkChunksOut);
+        sb.append(",altSinkId=" + altSinkId);
+        sb.append(",altSinkChunksOut=" + altSinkChunksOut);
+        sb.append(",stats=" + taskStats);
+        sb.append("}");
+        return sb.toString();
     }
 
 }

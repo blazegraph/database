@@ -776,7 +776,7 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
                 if (altSink != null && altSink != queryBuffer
                         && !altSink.isEmpty()) {
                     /*
-                     * Handle alt sink output , sending appropriate chunk
+                     * Handle alt sink output, sending appropriate chunk
                      * message(s).
                      * 
                      * Note: This maps output over shards/nodes in s/o.
