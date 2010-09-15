@@ -538,8 +538,8 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      */
     protected void lifeCycleSetUpOperator(final int bopId) {
      
-        System.err.println("lifeCycleSetUpOperator: queryId=" + queryId
-                + ", bopId=" + bopId);
+        if (log.isTraceEnabled())
+            log.trace("queryId=" + queryId + ", bopId=" + bopId);
 
     }
 
@@ -556,8 +556,8 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      */
     protected void lifeCycleTearDownOperator(final int bopId) {
 
-        System.err.println("lifeCycleTearDownOperator: queryId=" + queryId
-                + ", bopId=" + bopId);
+        if (log.isTraceEnabled())
+            log.trace("queryId=" + queryId + ", bopId=" + bopId);
 
     }
 
@@ -567,7 +567,8 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      */
     protected void lifeCycleSetUpQuery() {
 
-        System.err.println("lifeCycleSetUpQuery: queryId=" + queryId);
+        if (log.isTraceEnabled())
+            log.trace("queryId=" + queryId);
 
     }
 
@@ -577,7 +578,8 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      */
     protected void lifeCycleTearDownQuery() {
 
-        System.err.println("lifeCycleTearDownQuery: queryId=" + queryId);
+        if (log.isTraceEnabled())
+            log.trace("queryId=" + queryId);
 
     }
     
