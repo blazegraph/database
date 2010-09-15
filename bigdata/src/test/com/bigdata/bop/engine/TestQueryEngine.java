@@ -38,6 +38,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import junit.framework.TestCase2;
 
@@ -639,6 +640,12 @@ public class TestQueryEngine extends TestCase2 {
     protected int doStressTest(final long timeout, final int ntrials,
             final int poolSize) throws Exception {
 
+        // start time in nanos.
+        final long begin = System.nanoTime();
+
+        // timeout in nanos.
+        final long nanos = TimeUnit.MILLISECONDS.toNanos(timeout);
+        
         final Executor service = new LatchedExecutor(jnl.getExecutorService(),
                 poolSize);
         
@@ -646,9 +653,12 @@ public class TestQueryEngine extends TestCase2 {
         
         for (int i = 0; i < ntrials; i++) {
 
+            final int trial = i;
             final FutureTask<Void> ft = new FutureTask<Void>(new Runnable() {
                 public void run() {
                     try {
+                        if (log.isInfoEnabled())
+                            log.info("trial=" + trial);
                         test_query_join2();
                     } catch (Exception e) {
                         // wrap exception.
@@ -662,26 +672,30 @@ public class TestQueryEngine extends TestCase2 {
             service.execute(ft);
 
         }
-        
-        Thread.sleep(timeout);
-        
+
         int nerror = 0;
         int ncancel = 0;
+        int ntimeout = 0;
         int nsuccess = 0;
         for (FutureTask<Void> ft : futures) {
-            ft.cancel(true/* mayInterruptIfRunning */);
+            // remaining nanoseconds.
+            final long remaining = nanos - (System.nanoTime() - begin);
+            if (remaining <= 0)
+                ft.cancel(true/* mayInterruptIfRunning */);
             try {
-                ft.get();
+                ft.get(remaining, TimeUnit.NANOSECONDS);
                 nsuccess++;
             } catch (CancellationException ex) {
                 ncancel++;
+            } catch (TimeoutException ex) {
+                ntimeout++;
             } catch (ExecutionException ex) {
                 nerror++;
             }
         }
 
         final String msg = "nerror=" + nerror + ", ncancel=" + ncancel
-                + ", nsuccess=" + nsuccess;
+                + ", ntimeout=" + ntimeout + ", nsuccess=" + nsuccess;
 
         if(log.isInfoEnabled())
             log.info(msg);

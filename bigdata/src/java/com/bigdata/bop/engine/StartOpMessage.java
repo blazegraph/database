@@ -48,4 +48,10 @@ public class StartOpMessage implements Serializable {
         this.nchunks = nchunks;
     }
 
+    public String toString() {
+        return getClass().getName() + "{queryId=" + queryId + ",bopId=" + bopId
+                + ",partitionId=" + partitionId + ",serviceId=" + serviceId
+                + ",nchunks=" + nchunks + "}";
+    }
+
 }
