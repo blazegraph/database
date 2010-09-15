@@ -368,14 +368,16 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
             // validate the stats map.
             assertNotNull(statsMap);
             assertEquals(1, statsMap.size());
-            System.err.println(statsMap.toString());
+            if (log.isInfoEnabled())
+                log.info(statsMap.toString());
         }
 
         // validate the query solution stats.
         {
             final BOpStats stats = statsMap.get(startId);
             assertNotNull(stats);
-            System.err.println(stats.toString());
+            if (log.isInfoEnabled())
+                log.info(stats.toString());
 
             // query solution stats details.
             assertEquals(1L, stats.chunksIn.get());
@@ -475,14 +477,16 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
             // validate the stats map.
             assertNotNull(statsMap);
             assertEquals(2, statsMap.size());
-            System.err.println(statsMap.toString());
+            if (log.isInfoEnabled())
+                log.info(statsMap.toString());
         }
 
         // validate the stats for the start operator.
         {
             final BOpStats stats = statsMap.get(startId);
             assertNotNull(stats);
-            System.err.println("start: "+stats.toString());
+            if (log.isInfoEnabled())
+                log.info("start: "+stats.toString());
 
             // verify query solution stats details.
             assertEquals(1L, stats.chunksIn.get());
@@ -491,24 +495,12 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
             assertEquals(1L, stats.chunksOut.get());
         }
 
-//        // validate the stats for the access path.
-//        {
-//            final BOpStats stats = statsMap.get(predId);
-//            assertNotNull(stats);
-//            System.err.println("pred : "+stats.toString());
-//
-//            // verify query solution stats details.
-//            assertEquals(1L, stats.chunksIn.get());
-//            assertEquals(1L, stats.unitsIn.get());
-//            assertEquals(1L, stats.unitsOut.get());
-//            assertEquals(1L, stats.chunksOut.get());
-//        }
-
         // validate the stats for the join operator.
         {
             final BOpStats stats = statsMap.get(joinId);
             assertNotNull(stats);
-            System.err.println("join : "+stats.toString());
+            if (log.isInfoEnabled())
+                log.info("join : "+stats.toString());
 
             // verify query solution stats details.
             assertEquals(1L, stats.chunksIn.get());
@@ -698,14 +690,16 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
             // validate the stats map.
             assertNotNull(statsMap);
             assertEquals(3, statsMap.size());
-            System.err.println(statsMap.toString());
+            if (log.isInfoEnabled())
+                log.info(statsMap.toString());
         }
 
         // validate the stats for the start operator.
         {
             final BOpStats stats = statsMap.get(startId);
             assertNotNull(stats);
-            System.err.println("start: " + stats.toString());
+            if (log.isInfoEnabled())
+                log.info("start: " + stats.toString());
 
             // verify query solution stats details.
             assertEquals(1L, stats.chunksIn.get());
@@ -714,24 +708,12 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
             assertEquals(1L, stats.chunksOut.get());
         }
 
-        // // validate the stats for the access path.
-        // {
-        // final BOpStats stats = statsMap.get(predId);
-        // assertNotNull(stats);
-        // System.err.println("pred : "+stats.toString());
-        //
-        // // verify query solution stats details.
-        // assertEquals(1L, stats.chunksIn.get());
-        // assertEquals(1L, stats.unitsIn.get());
-        // assertEquals(1L, stats.unitsOut.get());
-        // assertEquals(1L, stats.chunksOut.get());
-        // }
-
         // validate the stats for the 1st join operator.
         {
             final BOpStats stats = statsMap.get(joinId1);
             assertNotNull(stats);
-            System.err.println("join1: " + stats.toString());
+            if (log.isInfoEnabled())
+                log.info("join1: " + stats.toString());
 
             // verify query solution stats details.
             assertEquals(1L, stats.chunksIn.get());
@@ -744,7 +726,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         {
             final BOpStats stats = statsMap.get(joinId2);
             assertNotNull(stats);
-            System.err.println("join2: " + stats.toString());
+            if (log.isInfoEnabled())
+                log.info("join2: " + stats.toString());
 
             // verify query solution stats details.
             assertEquals(1L, stats.chunksIn.get()); // @todo depends on where the shards are.
@@ -757,7 +740,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         {
             final BOpStats stats = statsMap.get(sliceId);
             assertNotNull(stats);
-            System.err.println("slice: " + stats.toString());
+            if (log.isInfoEnabled())
+                log.info("slice: " + stats.toString());
 
             // verify query solution stats details.
             assertEquals(1L, stats.chunksIn.get()); // @todo?
