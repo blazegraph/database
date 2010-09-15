@@ -180,12 +180,6 @@ public class TestThickChunkMessage extends TestCase2 {
                 throws RemoteException {
             return null;
         }
-        
-		@Override
-		public RunningQuery eval(long queryId, BindingSetPipelineOp query)
-				throws Exception, RemoteException {
-			return null;
-		}
 
     }
     

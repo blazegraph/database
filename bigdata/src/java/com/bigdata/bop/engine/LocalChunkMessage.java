@@ -10,8 +10,10 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
  * An non-{@link Serializable} chunk of intermediate results which are ready to
  * be consumed by some {@link BOp} in a specific query (this is only used in
  * query evaluation for the standalone database).
+ * 
+ * @todo test suite
  */
-public class BindingSetChunk<E> implements IChunkMessage<E> {
+public class LocalChunkMessage<E> implements IChunkMessage<E> {
 
     /** The query controller. */
     private final IQueryClient queryController;
@@ -56,7 +58,7 @@ public class BindingSetChunk<E> implements IChunkMessage<E> {
         return true;
     }
 
-    public BindingSetChunk(final IQueryClient queryController,
+    public LocalChunkMessage(final IQueryClient queryController,
             final long queryId, final int bopId, final int partitionId,
             final IAsynchronousIterator<E[]> source) {
 

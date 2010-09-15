@@ -45,6 +45,7 @@ import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.bset.Union;
+import com.bigdata.bop.fed.FederatedQueryEngine;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.view.FusedView;
@@ -500,7 +501,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      *       evaluation.
      *       <p>
      *       Chunk concatenation could be performed here if we (a) mark the
-     *       {@link BindingSetChunk} with a flag to indicate when it has been
+     *       {@link LocalChunkMessage} with a flag to indicate when it has been
      *       accepted; and (b) rip through the incoming chunks for the query for
      *       the target bop and combine them to feed the task. Chunks which have
      *       already been assigned would be dropped when take() discovers them.
@@ -734,17 +735,56 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         
     }
 
+    /**
+     * Evaluate a query which visits {@link IBindingSet}s, such as a join. This
+     * node will serve as the controller for the query.
+     * 
+     * @param queryId
+     *            The unique identifier for the query.
+     * @param query
+     *            The query to evaluate.
+     * 
+     * @return An iterator visiting {@link IBindingSet}s which result from
+     *         evaluating the query.
+     * @param msg
+     *            A message providing access to the initial {@link IBindingSet
+     *            binding set(s)} used to begin query evaluation.
+     * 
+     * @throws IllegalStateException
+     *             if the {@link QueryEngine} has been {@link #shutdown()}.
+     * @throws Exception
+     * @throws RemoteException
+     * 
+     *             FIXME The test suites need to be modified to create a local
+     *             {@link FederatedQueryEngine} object which fronts for an
+     *             {@link IIndexManager} which is local to the client - not on a
+     *             data service at all. This is necessary in order for the unit
+     *             test (or application code) to directly access the
+     *             RunningQuery reference, which is needed to use get() (to wait
+     *             for the query), iterator() (to drain the query), etc.
+     *             <p>
+     *             This will also give us a place to hang query-local resources
+     *             on the client.
+     *             <p>
+     *             This has to be a {@link FederatedQueryEngine} because it
+     *             needs to talk to a federation. There should be nothing DS
+     *             specific about the {@link FederatedQueryEngine}.
+     */
     public RunningQuery eval(final long queryId,
-            final BindingSetPipelineOp query) throws Exception {
+            final BindingSetPipelineOp query,
+            final IChunkMessage<IBindingSet> msg) throws Exception {
 
         if (query == null)
             throw new IllegalArgumentException();
 
-        final RunningQuery runningQuery = newRunningQuery(this, queryId,
-//                System.currentTimeMillis()/* begin */,
-                true/* controller */, this/* clientProxy */, query);
+        if (msg == null)
+            throw new IllegalArgumentException();
 
-        assertRunning();
+        if (queryId != msg.getQueryId()) // @todo use equals() to compare UUIDs.
+            throw new IllegalArgumentException();
+
+        final RunningQuery runningQuery = newRunningQuery(this, queryId,
+                true/* controller */, this/* clientProxy */, query);
 
         final long timeout = query.getProperty(BOp.Annotations.TIMEOUT,
                 BOp.Annotations.DEFAULT_TIMEOUT);
@@ -767,8 +807,12 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
         }
 
+        assertRunning();
+
         putRunningQuery(queryId, runningQuery);
 
+        runningQuery.startQuery(msg);
+        
         return runningQuery;
 
     }

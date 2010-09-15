@@ -366,7 +366,7 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
         /*
          * Note: The partitionId will always be -1 in scale-up.
          */
-        final BindingSetChunk<IBindingSet> chunk = new BindingSetChunk<IBindingSet>(
+        final LocalChunkMessage<IBindingSet> chunk = new LocalChunkMessage<IBindingSet>(
                 clientProxy, queryId, sinkId, -1/* partitionId */, sink
                         .iterator());
 
@@ -646,11 +646,9 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
 
     /**
      * Invoked once by the query controller with the initial
-     * {@link BindingSetChunk} which gets the query moving.
-     * 
-     * @todo this should reject multiple invocations for a given query instance.
+     * {@link IChunkMessage} which gets the query moving.
      */
-    public void startQuery(final IChunkMessage<IBindingSet> msg) {
+    void startQuery(final IChunkMessage<IBindingSet> msg) {
 
         if (!controller)
             throw new UnsupportedOperationException();
