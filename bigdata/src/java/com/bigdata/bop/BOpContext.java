@@ -168,7 +168,7 @@ public class BOpContext<E> {
      *       Perhaps the right thing is to expose an object with a richer API
      *       for obtaining various kinds of iterators or even access to the
      *       direct {@link ByteBuffer}s backing the data (for high volume joins,
-     *       exernal merge sorts, etc).
+     *       external merge sorts, etc).
      */
     public final IAsynchronousIterator<E[]> getSource() {
         return source;

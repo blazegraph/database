@@ -178,6 +178,10 @@ public class TestSliceOp extends TestCase2 {
                     new NV(SliceOp.Annotations.LIMIT, 3L),//
                 }));
         
+        assertEquals("offset", 1L, query.getOffset());
+        
+        assertEquals("limit", 3L, query.getLimit());
+
         // the expected solutions
         final IBindingSet[] expected = new IBindingSet[] {//
                 new ArrayBindingSet(//

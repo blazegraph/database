@@ -97,7 +97,7 @@ import com.bigdata.util.concurrent.LatchedExecutor;
 public class PipelineJoin<E> extends BindingSetPipelineOp implements
         IShardwisePipelineOp<E> {
 
-    static private final Logger log = Logger.getLogger(PipelineJoin.class);
+    static private final transient Logger log = Logger.getLogger(PipelineJoin.class);
 
     /**
      * 

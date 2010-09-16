@@ -511,7 +511,7 @@ public class NIOChunkMessage<E> implements IChunkMessage<E>, Serializable {
         }
 
         public boolean isExhausted() {
-            return hasNext();
+            return !hasNext();
         }
 
         public E[] next(long timeout, TimeUnit unit)

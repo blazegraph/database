@@ -42,13 +42,14 @@ import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IShardwisePipelineOp;
-import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryPeer;
+import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.DirectBufferPoolAllocator.IAllocationContext;
+import com.bigdata.journal.TemporaryStoreFactory;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -89,13 +90,23 @@ public class FederatedRunningQuery extends RunningQuery {
      * this query.
      */
     private final UUID queryControllerUUID;
-    
+
     /**
      * A map associating resources with running queries. When a query halts, the
      * resources listed in its resource map are released. Resources can include
      * {@link ByteBuffer}s backing either incoming or outgoing
-     * {@link LocalChunkMessage}s, temporary files associated with the query, hash
-     * tables, etc.
+     * {@link LocalChunkMessage}s, temporary files associated with the query,
+     * hash tables, etc.
+     * 
+     * @todo The {@link IAllocationContext} allows us to automatically release
+     *       native {@link ByteBuffer}s used by the query. Such buffers do not
+     *       need to be part of this map. This means that the only real use for
+     *       the map will be temporary persistent resources, such as graphs or
+     *       hash tables backed by a local file or the intermediate outputs of a
+     *       sort operator. We may be able to manage the local persistent data
+     *       structures using the {@link TemporaryStoreFactory} and manage the
+     *       life cycle of the intermediate results for sort within its operator
+     *       implementation.
      * 
      * @todo This map will eventually need to be moved into {@link RunningQuery}
      *       in order to support temporary graphs or other disk-backed resources
@@ -111,8 +122,9 @@ public class FederatedRunningQuery extends RunningQuery {
      * 
      * @todo Only use the values in the map for transient objects, such as a
      *       hash table which is not backed by the disk. For {@link ByteBuffer}s
-     *       we want to make the references go through the {@link ResourceService}
-     *       . For files, through the {@link ResourceManager}.
+     *       we want to make the references go through the
+     *       {@link ResourceService} . For files, through the
+     *       {@link ResourceManager}.
      * 
      * @todo We need to track the resources in use by the query so they can be
      *       released when the query terminates. This includes: buffers; joins
@@ -292,7 +304,7 @@ public class FederatedRunningQuery extends RunningQuery {
         
         if(serviceUUID.equals(getQueryEngine().getServiceUUID())) {
         
-            // Return a hard reference to the query engine (NOT a proxy).
+            // Return a hard reference to this query engine (NOT a proxy).
             return getQueryEngine();
             
         } else if (serviceUUID.equals(queryControllerUUID)) {
@@ -369,6 +381,9 @@ public class FederatedRunningQuery extends RunningQuery {
         
         switch (bop.getEvaluationContext()) {
         case ANY: {
+            /*
+             * This operator may be evaluated anywhere.
+             */
             return super.handleOutputChunk(sinkId, sink);
         }
         case HASHED: {
@@ -490,11 +505,7 @@ public class FederatedRunningQuery extends RunningQuery {
             sendChunkMessage(queryControllerUUID, sinkId, -1/* partitionId */,
                     allocationContext, sink);
 
-            /*
-             * Chunks send to the query controller do not keep the query
-             * running.
-             */
-            return 0;
+            return 1;
 
         }
         default:
@@ -588,7 +599,7 @@ public class FederatedRunningQuery extends RunningQuery {
         if (source.isEmpty())
             throw new RuntimeException();
 
-        // The peer to be notified.
+        // The peer to whom we send the message.
         final IQueryPeer peerProxy = getQueryPeer(serviceUUID);
 
         if (peerProxy == null)

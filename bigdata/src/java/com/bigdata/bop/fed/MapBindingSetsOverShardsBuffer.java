@@ -395,8 +395,10 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
                 slice[j] = bset;
 
                 if (log.isTraceEnabled())
-                    log.trace("Mapping: keyOrder=" + keyOrder + ",bset=" + bset
-                            + " onto " + split.pmd.getPartitionId());
+                    log
+                            .trace("Mapping: keyOrder=" + keyOrder + ",bset="
+                                    + bset + " onto partitionId="
+                                    + split.pmd.getPartitionId());
 
             }
 

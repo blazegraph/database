@@ -51,7 +51,6 @@ import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NoSuchBOpException;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.bset.CopyBindingSetOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
@@ -125,14 +124,12 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
 
     /**
      * The buffer used for the overall output of the query pipeline.
-     * 
-     * FIXME SCALEOUT: This should only exist on the query controller. Other
-     * nodes will send {@link IChunkMessage}s to the query controller. s/o will
-     * use an operator with {@link BOpEvaluationContext#CONTROLLER} in order to
-     * ensure that the results are transferred to the query controller. When a
-     * {@link SliceOp} is used, this is redundant. The operator in other cases
-     * can be a {@link CopyBindingSetOp} whose {@link BOpEvaluationContext} has
-     * been overridden.
+     * <p>
+     * Note: In scale out, this only exists on the query controller. In order to
+     * ensure that the results are transferred to the query controller, the
+     * top-level operator in the query plan must specify
+     * {@link BOpEvaluationContext#CONTROLLER}. For example, {@link SliceOp}
+     * uses this {@link BOpEvaluationContext}.
      */
     final private IBlockingBuffer<IBindingSet[]> queryBuffer;
 
@@ -330,7 +327,14 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
         
         runState = controller ? new RunState(this) : null;
         
-        this.queryBuffer = newQueryBuffer();
+        // Note: only exists on the query controller.
+        this.queryBuffer = controller ? newQueryBuffer() : null;
+        
+//        System.err
+//                .println("new RunningQuery:: queryId=" + queryId
+//                        + ", isController=" + controller + ", queryController="
+//                        + clientProxy + ", queryEngine="
+//                        + queryEngine.getServiceUUID());
         
     }
 
@@ -619,6 +623,12 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
         /** Alias for the {@link ChunkTask}'s logger. */
         private final Logger log = chunkTaskLog;
 
+        /**
+         * The message with the materialized chunk to be consumed by the
+         * operator.
+         */
+        final IChunkMessage<IBindingSet> msg;
+        
         /** The index of the bop which is being evaluated. */
         private final int bopId;
 
@@ -682,13 +692,20 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
          * by {@link PipelineOp#eval(BOpContext)} in order to handle the outputs
          * written on those sinks.
          * 
-         * @param chunk
+         * @param msg
          *            A message containing the materialized chunk and metadata
          *            about the operator which will consume that chunk.
+         * 
+         * @throws IllegalStateException
+         *             unless {@link IChunkMessage#isMaterialized()} is
+         *             <code>true</code>.
          */
-        public ChunkTask(final IChunkMessage<IBindingSet> chunk) {
-            bopId = chunk.getBOpId();
-            partitionId = chunk.getPartitionId();
+        public ChunkTask(final IChunkMessage<IBindingSet> msg) {
+            if(!msg.isMaterialized())
+                throw new IllegalStateException();
+            this.msg = msg;
+            bopId = msg.getBOpId();
+            partitionId = msg.getPartitionId();
             bop = bopIndex.get(bopId);
             if (bop == null) {
                 throw new NoSuchBOpException(bopId);
@@ -740,9 +757,9 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
 
             altSink = altSinkId == null ? null : op.newBuffer();
             
-            // context
+            // context : @todo pass in IChunkMessage or IChunkAccessor
             context = new BOpContext<IBindingSet>(RunningQuery.this,
-                    partitionId, op.newStats(), chunk.getChunkAccessor()
+                    partitionId, op.newStats(), msg.getChunkAccessor()
                             .iterator(), sink, altSink);
 
             // FutureTask for operator execution (not running yet).
@@ -762,8 +779,7 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
                 clientProxy.startOp(new StartOpMessage(queryId,
                         bopId, partitionId, serviceId, fanIn));
                 if (log.isDebugEnabled())
-                    log.debug("Running chunk: queryId=" + queryId + ", bopId="
-                            + bopId + ", bop=" + bop);
+                    log.debug("Running chunk: " + msg);
                 ft.run(); // run
                 ft.get(); // verify success
                 if (sink != null && sink != queryBuffer && !sink.isEmpty()) {
@@ -835,14 +851,20 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
         } // run()
         
     } // class ChunkTask
-    
+
     /**
      * Return an iterator which will drain the solutions from the query. The
      * query will be cancelled if the iterator is
      * {@link ICloseableIterator#close() closed}.
+     * 
+     * @throws UnsupportedOperationException
+     *             if this is not the query controller.
      */
     public IAsynchronousIterator<IBindingSet[]> iterator() {
 
+        if(!controller)
+            throw new UnsupportedOperationException();
+        
         return queryBuffer.iterator();
         
     }
@@ -872,11 +894,35 @@ public class RunningQuery implements Future<Map<Integer,BOpStats>>, IRunningQuer
      * <li>must not cause the solutions to be discarded before the client can
      * consume them.</li>
      * </ul>
+     * 
+     * FIXME SCALEOUT: Each query engine peer touched by the running query (or
+     * known to have an operator task running at the time that the query was
+     * halted) must be notified that the query has been terminated and the
+     * receiving query engines must interrupt any running tasks which they have
+     * locally for that query.
+     * <p>
+     * Since this involves RMI to the nodes, we should not issue those RMIs
+     * while holding the {@link #runStateLock} (and this could even deadlock
+     * with callback from those nodes). Perhaps
+     * {@link RunState#haltOp(HaltOpMessage)} should throw back the
+     * {@link HaltOpMessage} or a {@link TimeoutException} if the deadline has
+     * expired and then let {@link RunningQuery#haltOp(HaltOpMessage)} handle
+     * the termination of the query, which it can do without holding the lock.
+     * <p>
+     * When the controller sends a node a terminate signal for an operator, it
+     * should not bother to RMI back to the controller (unless this is done for
+     * the purposes of confirmation, which is available from the RMI return in
+     * any case).
+     * 
+     * FIXME SCALEOUT: Life cycle methods for operators must have hooks for the
+     * operator implementations which are evaluated on the query controller
+     * (here) but also on the nodes on which the query will run (for hash
+     * partitioned operators).
      */
     final public boolean cancel(final boolean mayInterruptIfRunning) {
         // halt the query.
         boolean cancelled = future.cancel(mayInterruptIfRunning);
-        // cancel any running operators for this query.
+        // cancel any running operators for this query on this node.
         for (Future<?> f : operatorFutures.values()) {
             if (f.cancel(mayInterruptIfRunning))
                 cancelled = true;

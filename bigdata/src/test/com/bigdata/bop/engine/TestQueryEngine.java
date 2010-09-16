@@ -61,6 +61,7 @@ import com.bigdata.bop.bset.CopyBindingSetOp;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.fed.TestFederatedQueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -139,12 +140,12 @@ public class TestQueryEngine extends TestCase2 {
         final R rel = new R(store, namespace, ITx.UNISOLATED, new Properties());
         rel.create();
 
-        // data to insert.
+        // data to insert (in key order for convenience).
         final E[] a = {//
-                new E("John", "Mary"),// 
-                new E("Mary", "Paul"),// 
-                new E("Paul", "Leon"),// 
-                new E("Leon", "Paul"),// 
+                new E("John", "Mary"),// [0]
+                new E("Leon", "Paul"),// [1]
+                new E("Mary", "Paul"),// [2]
+                new E("Paul", "Leon"),// [3]
         };
 
         // insert data (the records are not pre-sorted).
@@ -270,7 +271,7 @@ public class TestQueryEngine extends TestCase2 {
         final int predId = 3;
         final BindingSetPipelineOp query = new PipelineJoin<E>(
         // left
-                new CopyBindingSetOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
                         })),
                 // right
@@ -373,22 +374,140 @@ public class TestQueryEngine extends TestCase2 {
     }
 
     /**
-     * @todo Test ability to impose a limit/offset slice on a query.
-     *       <p>
-     *       Note: While the logic for visiting only the solutions selected by
-     *       the slice can be tested against a mock object, the integration by
-     *       which a slice halts a query when it is satisfied has to be tested
-     *       against a {@link QueryEngine}.
-     *       <p>
-     *       This must also be tested in scale-out to make sure that the data
-     *       backing the solutions is not discarded before the caller can use
-     *       those data. [This could be handled by materializing binding set
-     *       objects out of a {@link ByteBuffer} rather than using a live decode
-     *       of the data in that {@link ByteBuffer}.]
+     * Run a join with a slice. The slice is always evaluated on the query
+     * controller so adding it to the query plan touches a slightly different
+     * code path from adding another join (joins are evaluated shardwise, at
+     * least in scale-out).
+     * <p>
+     * Note: While the logic for visiting only the solutions selected by the
+     * slice can be tested against a mock object, the integration by which a
+     * slice halts a query when it is satisfied has to be tested against a
+     * {@link QueryEngine}.
+     * <p>
+     * This must also be tested in scale-out to make sure that the data backing
+     * the solutions is not discarded before the caller can use those data.
+     * [This could be handled by materializing binding set objects out of a
+     * {@link ByteBuffer} rather than using a live decode of the data in that
+     * {@link ByteBuffer}.]
      */
-    public void test_query_slice() {
+    public void test_query_slice() throws Exception {
 
-        fail("write test");
+        final Var<?> x = Var.var("x");
+        final Var<?> y = Var.var("y");
+
+        final int startId = 1;
+        final int joinId = 2;
+        final int predId = 3;
+        final int sliceId = 4;
+
+        final StartOp startOp = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new NV(Predicate.Annotations.BOP_ID, startId),//
+                }));
+
+        final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
+                x, y }, NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.PARTITION_ID, Integer
+                                .valueOf(-1)),//
+                        new NV(Predicate.Annotations.OPTIONAL, Boolean.FALSE),//
+                        new NV(Predicate.Annotations.CONSTRAINT, null),//
+                        new NV(Predicate.Annotations.EXPANDER, null),//
+                        new NV(Predicate.Annotations.BOP_ID, predId),//
+                        new NV(Predicate.Annotations.TIMESTAMP,
+                                ITx.READ_COMMITTED),//
+                }));
+
+        final PipelineJoin<E> joinOp = new PipelineJoin<E>(startOp/* left */,
+                predOp/* right */,
+                // join annotations
+                NV.asMap(new NV[] { //
+                        new NV(Predicate.Annotations.BOP_ID, joinId),//
+                        })//
+        );
+
+        final BindingSetPipelineOp query = new SliceOp(new BOp[] { joinOp },
+        // slice annotations
+                NV.asMap(new NV[] { //
+                        new NV(BOp.Annotations.BOP_ID, sliceId),//
+                                new NV(SliceOp.Annotations.OFFSET, 0L),//
+                                new NV(SliceOp.Annotations.LIMIT, 2L),//
+                        })//
+        );
+
+        // the expected solutions.
+        final IBindingSet[] expected = new IBindingSet[] {//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("John"),
+                                new Constant<String>("Mary") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Leon"),
+                                new Constant<String>("Paul") }//
+                ) };
+
+        final UUID queryId = UUID.randomUUID();
+        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
+                        startId, -1 /* partitionId */,
+                        newBindingSetIterator(new HashBindingSet())));
+
+        // verify solutions.
+        assertSameSolutions(expected, runningQuery.iterator());
+
+        // Wait until the query is done.
+        final Map<Integer, BOpStats> statsMap = runningQuery.get();
+        {
+            // validate the stats map.
+            assertNotNull(statsMap);
+            assertEquals(3, statsMap.size());
+            if (log.isInfoEnabled())
+                log.info(statsMap.toString());
+        }
+
+        // validate the stats for the start operator.
+        {
+            final BOpStats stats = statsMap.get(startId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("start: " + stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(1L, stats.unitsIn.get());
+            assertEquals(1L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+
+        // validate the stats for the join operator.
+        {
+            final BOpStats stats = statsMap.get(joinId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("join : " + stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(1L, stats.unitsIn.get());
+            assertEquals(4L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+
+        // validate the stats for the slice operator.
+        {
+            final BOpStats stats = statsMap.get(sliceId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("slice: " + stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(4L, stats.unitsIn.get());
+            assertEquals(2L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
 
     }
 
@@ -788,7 +907,7 @@ public class TestQueryEngine extends TestCase2 {
                 if (!actual.hasNext()) {
 
                     fail(msg
-                            + ": Index exhausted while expecting more object(s)"
+                            + ": Iterator exhausted while expecting more object(s)"
                             + ": index=" + j);
 
                 }
