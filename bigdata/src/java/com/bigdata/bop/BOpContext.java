@@ -638,6 +638,14 @@ public class BOpContext<E> {
 
             }
 
+            if (log.isTraceEnabled()) {
+
+                log.debug("Accepted by "
+                        + constraint.getClass().getSimpleName() + " : "
+                        + bindingSet);
+
+            }
+
         }
 
         return true;

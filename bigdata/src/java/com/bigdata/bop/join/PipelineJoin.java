@@ -1730,10 +1730,14 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
                         }
 
                         if (log.isDebugEnabled())
-                            log.debug("Accepted element for " + naccepted
-                                    + " of " + bindingSets.length
-                                    + " possible bindingSet combinations: "
-                                    + e.toString() + ", joinOp=" + joinOp);
+                            if (naccepted == 0) {
+                                log.debug("Rejected element: " + e.toString());
+                            } else {
+                                log.debug("Accepted element for " + naccepted
+                                        + " of " + bindingSets.length
+                                        + " possible bindingSet combinations: "
+                                        + e.toString());
+                            }
                     }
 
                     // if something is accepted in the chunk return true.
