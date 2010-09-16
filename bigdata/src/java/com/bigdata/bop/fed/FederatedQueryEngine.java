@@ -359,18 +359,18 @@ public class FederatedQueryEngine extends QueryEngine {
                                     + getServiceUUID() + ", msg=" + msg);
                 }
                 
-                // request from the query controller.
+                // request from the query controller (RMI).
                 final BindingSetPipelineOp query = msg.getQueryController()
                         .getQuery(msg.getQueryId());
 
                 q = newRunningQuery(FederatedQueryEngine.this, queryId,
-                        isController, msg.getQueryController(), query);
+                        false/* controller */, msg.getQueryController(), query);
 
                 final RunningQuery tmp = runningQueries.putIfAbsent(queryId, q);
                 
                 if(tmp != null) {
                     
-                    // another thread won this race.
+                    // another thread won this race : @todo memoize, RMI is too expensive.
                     q = (FederatedRunningQuery) tmp;
                     
                 }
@@ -424,8 +424,8 @@ public class FederatedQueryEngine extends QueryEngine {
             final boolean controller, final IQueryClient clientProxy,
             final BindingSetPipelineOp query) {
 
-        return new FederatedRunningQuery(this, queryId, true/* controller */,
-                this/* clientProxy */, query);
+        return new FederatedRunningQuery(this, queryId, controller,
+                clientProxy, query);
 
     }
 

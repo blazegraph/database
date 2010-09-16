@@ -235,6 +235,7 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
             
         }
 
+        @SuppressWarnings("unchecked")
         public boolean hasNext() {
 
             if (current != null)
@@ -293,7 +294,7 @@ public class ThickChunkMessage<E> implements IChunkMessage<E>, Serializable {
         }
 
         public boolean isExhausted() {
-            return hasNext();
+            return !hasNext();
         }
 
         public E[] next(long timeout, TimeUnit unit)

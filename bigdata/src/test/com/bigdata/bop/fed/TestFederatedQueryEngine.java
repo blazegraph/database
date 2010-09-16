@@ -509,6 +509,20 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
             assertEquals(1L, stats.chunksOut.get()); // @todo this depends on which index partitions we read on.
         }
 
+        // validate the stats for the slice operator.
+        {
+            final BOpStats stats = statsMap.get(sliceId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("slice: "+stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(2L, stats.unitsIn.get());
+            assertEquals(2L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+
     }
 
     /**

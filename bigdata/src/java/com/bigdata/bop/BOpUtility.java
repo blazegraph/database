@@ -33,9 +33,6 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp.Annotations;
 import com.bigdata.bop.engine.BOpStats;
@@ -54,7 +51,7 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class BOpUtility {
 
-    private static final Logger log = Logger.getLogger(BOpUtility.class);
+//    private static final Logger log = Logger.getLogger(BOpUtility.class);
     
     /**
      * Pre-order recursive visitation of the operator tree (arguments only, no

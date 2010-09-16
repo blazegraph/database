@@ -132,24 +132,24 @@ public class SliceOp extends BindingSetPipelineOp {
 //
 //        if (!(args[0] instanceof BindingSetPipelineOp))
 //            throw new IllegalArgumentException();
-        
+
     }
 
     /**
-     * @see Annotations#OFFSET 
+     * @see Annotations#OFFSET
      */
     public long getOffset() {
-        
-        return (Long) getRequiredProperty(Annotations.OFFSET);
-        
+
+        return getProperty(Annotations.OFFSET, Annotations.DEFAULT_OFFSET);
+
     }
 
     /**
-     * @see Annotations#LIMIT 
+     * @see Annotations#LIMIT
      */
     public long getLimit() {
-        
-        return (Long) getRequiredProperty(Annotations.LIMIT);
+
+        return getProperty(Annotations.LIMIT, Annotations.DEFAULT_LIMIT);
         
     }
     

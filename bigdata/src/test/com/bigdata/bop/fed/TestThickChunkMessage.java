@@ -70,6 +70,52 @@ public class TestThickChunkMessage extends TestCase2 {
     }
 
     /**
+     * Unit test for a message with a single chunk containing a single empty
+     * binding set.
+     */
+    public void test_oneChunkWithEmptyBindingSet() {
+
+        final List<IBindingSet> data = new LinkedList<IBindingSet>();
+        {
+            data.add(new HashBindingSet());
+        }
+        
+        final IQueryClient queryController = new MockQueryController();
+        final UUID queryId = UUID.randomUUID();
+        final int bopId = 1;
+        final int partitionId = 2;
+        final IBlockingBuffer<IBindingSet[]> source = new BlockingBuffer<IBindingSet[]>(
+                10);
+
+        // populate the source.
+        source.add(data.toArray(new IBindingSet[0]));
+        
+        // close the source.
+        source.close();
+        
+        // build the chunk.
+        final IChunkMessage<IBindingSet> msg = new ThickChunkMessage<IBindingSet>(
+                queryController, queryId, bopId, partitionId, source);
+
+        assertTrue(queryController == msg.getQueryController());
+
+        assertEquals(queryId, msg.getQueryId());
+        
+        assertEquals(bopId, msg.getBOpId());
+        
+        assertEquals(partitionId, msg.getPartitionId());
+
+        // the data is inline with the message.
+        assertTrue(msg.isMaterialized());
+
+        // verify the iterator.
+        assertSameIterator(data.toArray(new IBindingSet[0]),
+                new Dechunkerator<IBindingSet>(msg.getChunkAccessor()
+                        .iterator()));
+
+    }
+
+    /**
      * Unit test for a message with a single chunk of binding sets.
      */
     public void test_oneChunk() {

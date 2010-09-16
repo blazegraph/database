@@ -179,9 +179,9 @@ class RunState {
             TableLog.tableLog.info("\n\nqueryId=" + queryId + "\n");
             // TableLog.tableLog.info(query.getQuery().toString()+"\n");
             TableLog.tableLog.info(getTableHeader());
-            TableLog.tableLog
-                    .info(getTableRow("startQ", serviceId, msg.getBOpId(),
-                            -1/* shardId */, 1/* fanIn */, null/* stats */));
+            TableLog.tableLog.info(getTableRow("startQ", serviceId, msg
+                    .getBOpId(), -1/* shardId */, 1/* fanIn */,
+                    null/* cause */, null/* stats */));
         }
 
 //        System.err.println("startQ : nstep="+nsteps+", bopId=" + bopId
@@ -258,8 +258,9 @@ class RunState {
 
         if (TableLog.tableLog.isInfoEnabled()) {
             TableLog.tableLog
-                    .info(getTableRow("startOp", msg.serviceId, msg.bopId,
-                            msg.partitionId, msg.nchunks/* fanIn */, null/* stats */));
+.info(getTableRow("startOp", msg.serviceId,
+                    msg.bopId, msg.partitionId, msg.nchunks/* fanIn */,
+                    null/* cause */, null/* stats */));
         }
 
         // check deadline.
@@ -363,7 +364,8 @@ class RunState {
 
         if (TableLog.tableLog.isInfoEnabled()) {
             TableLog.tableLog.info(getTableRow("haltOp", msg.serviceId,
-                    msg.bopId, msg.partitionId, fanOut, msg.taskStats));
+                    msg.bopId, msg.partitionId, fanOut, msg.cause,
+                    msg.taskStats));
         }
 
 //        if (log.isTraceEnabled())
@@ -409,6 +411,7 @@ class RunState {
             query.cancel(true/* mayInterruptIfRunning */);
 
         }
+        
         return isDone;
     }
 
@@ -484,6 +487,8 @@ class RunState {
 
         sb.append("\tbop");
 
+        sb.append("\tcause");
+
         sb.append("\tstats");
 
         sb.append('\n');
@@ -510,13 +515,18 @@ class RunState {
      *            specific index partition.
      * @param fanIO
      *            The fanIn (startQ,startOp) or fanOut (haltOp).
+     * @param cause
+     *            The {@link Throwable} in a {@link HaltOpMessage} and
+     *            <code>null</code> for other messages or if the
+     *            {@link Throwable} was null.
      * @param stats
      *            The statistics from the operator evaluation and
-     *            <code>null</code> unless {@link #haltOp(HaltOpMessage)} is
-     *            the invoker.
+     *            <code>null</code> unless {@link #haltOp(HaltOpMessage)} is the
+     *            invoker.
      */
     private String getTableRow(final String label, final UUID serviceId,
             final int bopId, final int shardId, final int fanIO,
+            final Throwable cause,
             final BOpStats stats) {
 
         final StringBuilder sb = new StringBuilder();
@@ -558,12 +568,19 @@ class RunState {
         sb.append('\t');
         sb.append(serviceId == null ? "N/A" : serviceId.toString());
 
+        // the operator.
         sb.append('\t');
         sb.append(query.bopIndex.get(bopId));
+
+        // the thrown cause.
+        sb.append('\t');
+        if (cause != null)
+            sb.append(cause.getLocalizedMessage());
         
+        // the statistics.
+        sb.append('\t');
         if (stats != null) {
             // @todo use a multi-column version of stats.
-            sb.append('\t');
             sb.append(stats.toString());
         }            
         
