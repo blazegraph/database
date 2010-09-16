@@ -63,12 +63,6 @@ public class BOpStats implements Serializable {
 //     */
 //    private final long startTime;
     
-//    /**
-//     * The index partition for which these statistics were collected or -1
-//     * if the statistics are aggregated across index partitions.
-//     */
-//    public final int partitionId;
-
     /**
      * #of chunks in.
      */
@@ -116,7 +110,7 @@ public class BOpStats implements Serializable {
         sb.append(",unitsIn=" + unitsIn.estimate_get());
         sb.append(",chunksOut=" + chunksOut.estimate_get());
         sb.append(",unitsOut=" + unitsOut.estimate_get());
-        toString(sb);
+        toString(sb); // extension hook
         sb.append("}");
         return sb.toString();
     }

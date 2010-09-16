@@ -30,6 +30,7 @@ package com.bigdata.bop.solutions;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 
@@ -55,10 +56,17 @@ import com.bigdata.service.IBigdataFederation;
  * <p>
  * Note: When running on an {@link IBigdataFederation}, this operator must be
  * imposed on the query controller so it can count the solutions as they flow
- * through.
+ * through - see {@link #getEvaluationContext()}.
+ * <p>
+ * Note: {@link SliceOp} is safe for concurrent invocations for the same query.
+ * Multiple chunks may flow through multiple invocations of the operator so long
+ * as they use the same {@link BOpStats} object.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo unit test with stress test for concurrent {@link SliceOp} invocations
+ *       against a streaming chunk producer.
  * 
  * @todo If this operator is invoked for each chunk output by a query onto the
  *       pipeline then it will over produce unless (A) it is given the same
@@ -156,6 +164,54 @@ public class SliceOp extends BindingSetPipelineOp {
         return getProperty(Annotations.LIMIT, Annotations.DEFAULT_LIMIT);
         
     }
+
+    /**
+     * Extends {@link BOpStats} to capture the state of the {@link SliceOp}.
+     */
+    public static class SliceStats extends BOpStats {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 1L;
+
+        public final AtomicLong nseen = new AtomicLong();
+
+        public final AtomicLong naccepted = new AtomicLong();
+
+        @Override
+        public void add(final BOpStats o) {
+
+            super.add(o);
+            
+            if (o instanceof SliceStats) {
+            
+                final SliceStats t = (SliceStats) o;
+                
+                nseen.addAndGet(t.nseen.get());
+                
+                naccepted.addAndGet(t.naccepted.get());
+                
+            }
+            
+        }
+
+        @Override
+        protected void toString(final StringBuilder sb) {
+
+            sb.append(",nseed=" + nseen);
+
+            sb.append(",naccepted=" + naccepted);
+
+        }
+        
+    }
+    
+    public SliceStats newStats() {
+        
+        return new SliceStats();
+        
+    }
     
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
@@ -179,12 +235,14 @@ public class SliceOp extends BindingSetPipelineOp {
         /** #of solutions to accept. */
         private final long limit;
 
-        /** #of solutions visited. */
-        private long nseen;
-
-        /** #of solutions accepted. */
-        private long naccepted;
-
+//        /** #of solutions visited. */
+//        private long nseen;
+//
+//        /** #of solutions accepted. */
+//        private long naccepted;
+//
+        private final SliceStats stats;
+        
         SliceTask(final SliceOp op, final BOpContext<IBindingSet> context) {
 
             this.op = op;
@@ -201,6 +259,8 @@ public class SliceOp extends BindingSetPipelineOp {
             if (limit <= 0)
                 throw new IllegalArgumentException(Annotations.LIMIT);
 
+            this.stats = (SliceStats) context.getStats();
+            
         }
 
         public Void call() throws Exception {
@@ -211,14 +271,9 @@ public class SliceOp extends BindingSetPipelineOp {
             final IAsynchronousIterator<IBindingSet[]> source = context
                     .getSource();
 
-            /*
-             * @todo This needs to be wrapping to automatically update the #of
-             * chunks actually output in order to have correct reporting. Review
-             * all of the other operators for this same issue.
-             */
             final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
 
-            final BOpStats stats = context.getStats();
+//            final BOpStats stats = context.getStats();
 
             try {
 
@@ -230,17 +285,20 @@ public class SliceOp extends BindingSetPipelineOp {
                 
                 while (source.hasNext()) {
 
+                    /*
+                     * @todo batch each chunk through a lock for better
+                     * concurrency (avoids CAS contention).
+                     */
                     final IBindingSet[] chunk = source.next();
-
+                    
                     stats.chunksIn.increment();
 
                     for (int i = 0; i < chunk.length; i++) {
 
                         stats.unitsIn.increment();
 
-                        if (nseen < offset) {
+                        if (stats.nseen.incrementAndGet() <= offset) {
                             // skip solution.
-                            nseen++;
                             if(log.isTraceEnabled())
                                 log.trace(toString());
                             continue;
@@ -258,9 +316,7 @@ public class SliceOp extends BindingSetPipelineOp {
 
 //                        stats.unitsOut.increment();
 
-                        naccepted++;
-                        nseen++;
-                        if (naccepted >= limit) {
+                        if (stats.naccepted.incrementAndGet() >= limit) {
                             if (!out.isEmpty()) {
                                 out.flush();
 //                                stats.chunksOut.increment();
@@ -306,8 +362,8 @@ public class SliceOp extends BindingSetPipelineOp {
         public String toString() {
 
             return getClass().getName() + "{offset=" + offset + ",limit="
-                    + limit + ",nseen=" + nseen + ",naccepted=" + naccepted
-                    + "}";
+                    + limit + ",nseen=" + stats.nseen + ",naccepted="
+                    + stats.naccepted + "}";
             
         }
         

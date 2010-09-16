@@ -643,7 +643,9 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
      * state across distinct invocations and is cancelling the query as soon as
      * it exhausts its input. In order to have correct decision boundaries,
      * slice needs to be invoked either once, concurrently if using {@link CAT}
-     * s, or in a series of presentations otherwise.
+     * s, or in a series of presentations otherwise (single-threaded operator or
+     * internal locking in the operator implementation on its {@link SliceOp} to
+     * achieve chunk-wise serialization of processing).
      * <p>
      * The easiest way to fix this is to have {@link SliceOp} specialize the
      * {@link BOpStats}s and carry its state there. That will also make it safe
