@@ -37,15 +37,17 @@ import com.bigdata.service.Split;
 
 /**
  * Interface for finding the {@link Split}s for an ordered set of unsigned
- * byte[] keys.
+ * byte[] keys. Each key MUST be fully specified, e.g., point lookup. This
+ * algorithm does NOT handle cases where multiple partitions must be scanned
+ * because they share the same prefix as the key.
  * <p>
- * The splitter processes the keys in order. In queries the MDI for the
- * partition spanning the first key. It then places all keys spanned by that
- * partition into that split. When it reaches the first key which is GTE the
- * rightSeparator, it queries the MDI for that key. Index partition Split, Move
- * and Joins should not be able to cause a problem for this algorithm. At the
- * worst, some tuples will be directed to a stale locator and the stale locator
- * exception is handled.
+ * The splitter processes the keys in order. It queries the
+ * {@link IMetadataIndex} for the partition spanning the first key. It then
+ * places all keys spanned by that partition into that split. When it reaches
+ * the first key which is GTE the rightSeparator, it queries the MDI for that
+ * key. Index partition Split, Move and Joins should not be able to cause a
+ * problem for this algorithm. At the worst, some tuples will be directed to a
+ * stale locator and the stale locator exception is handled.
  * <p>
  * The split operation is not atomic, however it is consistent in the following
  * sense. Any identified {@link Split}s will either be for a valid index
@@ -74,19 +76,20 @@ public interface ISplitter {
      *            The index of the last key in <i>keys</i> to be processed.
      * @param keys
      *            An array of keys. Each key is an interpreted as an unsigned
-     *            byte[]. All keys must be non-null. The keys must be in sorted
+     *            byte[] which fully specifies the desired tuple (no prefix
+     *            scans). All keys must be non-null. The keys must be in sorted
      *            order.
      * 
-     * @return The {@link Split}s that you can use to form requests based on
-     *         the identified first/last key and partition identified by this
+     * @return The {@link Split}s that you can use to form requests based on the
+     *         identified first/last key and partition identified by this
      *         process.
      */
     LinkedList<Split> splitKeys(final long ts, final int fromIndex,
             final int toIndex, final byte[][] keys);
 
     /**
-     * Identify the {@link Split}s for an ordered {@link KVO}[] such that
-     * there is one {@link Split} per index partition spanned by the data.
+     * Identify the {@link Split}s for an ordered {@link KVO}[] such that there
+     * is one {@link Split} per index partition spanned by the data.
      * 
      * @param ts
      *            The timestamp for the {@link IMetadataIndex} view that will be
@@ -98,11 +101,12 @@ public interface ISplitter {
      *            The index of the last key in <i>keys</i> to be processed.
      * @param keys
      *            An array of keys. Each key is an interpreted as an unsigned
-     *            byte[]. All keys must be non-null. The keys must be in sorted
+     *            byte[] which fully specifies the desired tuple (no prefix
+     *            scans). All keys must be non-null. The keys must be in sorted
      *            order.
      * 
-     * @return The {@link Split}s that you can use to form requests based on
-     *         the identified first/last key and partition identified by this
+     * @return The {@link Split}s that you can use to form requests based on the
+     *         identified first/last key and partition identified by this
      *         process.
      */
     LinkedList<Split> splitKeys(final long ts, final int fromIndex,

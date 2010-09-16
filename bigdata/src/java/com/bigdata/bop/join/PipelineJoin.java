@@ -277,7 +277,17 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
         return (IPredicate<E>) get(1);
 
     }
-    
+
+    /**
+     * Returns {@link BOpEvaluationContext#SHARDED}
+     */
+    @Override
+    final public BOpEvaluationContext getEvaluationContext() {
+        
+        return BOpEvaluationContext.SHARDED;
+        
+    }
+
     public IPredicate<E> getPredicate() {
         
         return right();
@@ -1771,12 +1781,12 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
             protected AbstractUnsynchronizedArrayBuffer<IBindingSet> initialValue() {
 
                 /*
-                 * Wrap the buffer provider to the constructor with a thread
+                 * Wrap the buffer provided to the constructor with a thread
                  * local buffer.
                  */
 
-                return new UnsyncLocalOutputBuffer<IBindingSet>(stats, joinOp
-                        .getChunkCapacity(), sink);
+                return new UnsyncLocalOutputBuffer<IBindingSet>(
+                        /* stats, */joinOp.getChunkCapacity(), sink);
 
             }
 
@@ -1790,15 +1800,5 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
         } // class TLBFactory
 
     }// class JoinTask
-
-    /**
-     * This is a shard wise operator.
-     */
-    @Override
-    public BOpEvaluationContext getEvaluationContext() {
-        
-        return BOpEvaluationContext.SHARDED;
-        
-    }
 
 }

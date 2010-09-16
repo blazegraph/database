@@ -34,12 +34,15 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.util.InnerCause;
 
 /**
  * The run state for a {@link RunningQuery}. This class is NOT thread-safe.
@@ -82,6 +85,24 @@ class RunState {
      */
     private final UUID queryId;
 
+    /**
+     * The query deadline.
+     * 
+     * @see BOp.Annotations#TIMEOUT
+     * @see RunningQuery#getDeadline()
+     */
+    private final long deadline;
+
+    /**
+     * Set to <code>true</code> iff the query evaluation is complete due to
+     * normal termination.
+     * <p>
+     * Note: This is package private to expose it to {@link RunningQuery}.
+     * 
+     * @see #haltOp(HaltOpMessage)
+     */
+    /*private*/ final AtomicBoolean allDone = new AtomicBoolean(false);
+    
     /**
      * The #of run state transitions which have occurred for this query.
      */
@@ -131,6 +152,8 @@ class RunState {
 
         this.queryId = query.getQueryId();
 
+        this.deadline = query.getDeadline();
+        
         // this.nops = query.bopIndex.size();
 
     }
@@ -193,8 +216,11 @@ class RunState {
     /**
      * @return <code>true</code> if this is the first time we will evaluate the
      *         op.
+     *         
+     * @throws TimeoutException 
+     *             if the deadline for the query has passed.
      */
-    public boolean startOp(final StartOpMessage msg) {
+    public boolean startOp(final StartOpMessage msg) throws TimeoutException {
 
         nsteps++;
 
@@ -257,24 +283,19 @@ class RunState {
 //                + ",fanIn=" + msg.nchunks);
 
         if (TableLog.tableLog.isInfoEnabled()) {
-            TableLog.tableLog
-.info(getTableRow("startOp", msg.serviceId,
+            TableLog.tableLog.info(getTableRow("startOp", msg.serviceId,
                     msg.bopId, msg.partitionId, msg.nchunks/* fanIn */,
                     null/* cause */, null/* stats */));
         }
 
         // check deadline.
-        final long deadline = query.getDeadline();
-        
         if (deadline < System.currentTimeMillis()) {
 
             if (log.isTraceEnabled())
                 log.trace("expired: queryId=" + queryId + ", deadline="
                         + deadline);
 
-            query.future.halt(new TimeoutException());
-
-            query.cancel(true/* mayInterruptIfRunning */);
+            throw new TimeoutException();
 
         }
         
@@ -282,10 +303,20 @@ class RunState {
     }
 
     /**
-     * Update termination criteria counters. @return <code>true</code> if the
-     * operator life cycle is over.
+     * Update termination criteria counters. If the query evaluation is over due
+     * to normal termination then {@link #allDone} is set to <code>true</code>
+     * as a side effect.
+     * 
+     * @return <code>true</code> if the operator life cycle is over.
+     * 
+     * @throws TimeoutException
+     *             if the deadline has expired.
+     * @throws ExecutionException
+     *             if the {@link HaltOpMessage#cause} was non-<code>null</code>,
+     *             if which case it wraps {@link HaltOpMessage#cause}.
      */
-    public boolean haltOp(final HaltOpMessage msg) {
+    public boolean haltOp(final HaltOpMessage msg) throws TimeoutException,
+            ExecutionException {
 
         nsteps++;
 
@@ -354,9 +385,6 @@ class RunState {
 
         }
 
-        // Figure out if this operator is done.
-        final boolean isDone = isOperatorDone(msg.bopId);
-
 //        System.err.println("haltOp : nstep=" + nsteps + ", bopId=" + msg.bopId
 //                + ",totalRunningTaskCount=" + totalRunningTaskCount
 //                + ",totalAvailableTaskCount=" + totalAvailableChunkCount
@@ -378,41 +406,53 @@ class RunState {
         /*
          * Test termination criteria
          */
-        final long deadline = query.getDeadline();
+
+        // true if this operator is done.
+        final boolean isOpDone = isOperatorDone(msg.bopId);
         
+        // true if the entire query is done.
+        final boolean isAllDone = totalRunningTaskCount == 0
+                && totalAvailableChunkCount == 0;
+
         if (msg.cause != null) {
 
-            // operator failed on this chunk.
-            log.error("Error: Canceling query: queryId=" + queryId + ",bopId="
-                    + msg.bopId + ",partitionId=" + msg.partitionId, msg.cause);
+//            /*
+//             * @todo probably just wrap and throw rather than logging since this
+//             * class does not have enough insight into non-error exceptions
+//             * while Haltable does.
+//             */
+//            if (!InnerCause.isInnerCause(msg.cause, InterruptedException.class)
+//                    && !InnerCause.isInnerCause(msg.cause,
+//                            TimeoutException.class)) {
+//
+//                // operator failed on this chunk.
+//                log.error("Error: Canceling query: queryId=" + queryId
+//                        + ",bopId=" + msg.bopId + ",partitionId="
+//                        + msg.partitionId, msg.cause);
+//            }
 
-            query.future.halt(msg.cause);
+            throw new ExecutionException(msg.cause);
 
-            query.cancel(true/* mayInterruptIfRunning */);
-
-        } else if (totalRunningTaskCount == 0 && totalAvailableChunkCount == 0) {
+        } else if (isAllDone) {
 
             // success (all done).
             if (log.isTraceEnabled())
                 log.trace("success: queryId=" + queryId);
 
-            query.future.halt(query.getStats());
-
-            query.cancel(true/* mayInterruptIfRunning */);
-
+            this.allDone.set(true);
+            
         } else if (deadline < System.currentTimeMillis()) {
 
             if (log.isTraceEnabled())
                 log.trace("expired: queryId=" + queryId + ", deadline="
                         + deadline);
 
-            query.future.halt(new TimeoutException());
-
-            query.cancel(true/* mayInterruptIfRunning */);
+            throw new TimeoutException();
 
         }
         
-        return isDone;
+        return isOpDone;
+
     }
 
     /**

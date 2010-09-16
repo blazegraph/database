@@ -47,6 +47,7 @@ import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.RunningQuery;
+import com.bigdata.bop.fed.shards.MapBindingSetsOverShardsBuffer;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.DirectBufferPoolAllocator.IAllocationContext;
 import com.bigdata.journal.TemporaryStoreFactory;
@@ -55,6 +56,7 @@ import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.rule.eval.pipeline.DistributedJoinTask;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ResourceService;
@@ -363,6 +365,14 @@ public class FederatedRunningQuery extends RunningQuery {
      * {@link ByteBuffer} and notifying the receiving service that there are
      * intermediate results which it can pull when it is ready to process them.
      * This pattern allows the receiver to impose flow control on the producer.
+     * 
+     * @todo Figure out how (or if) we will combine binding set streams emerging
+     *       from concurrent tasks executing on a given node destined for the
+     *       same shard/node. (There is code in the {@link DistributedJoinTask}
+     *       which does this for the same shard, but it does it on the receiver
+     *       side.) Pay attention to the #of threads running in the join, the
+     *       potential concurrency of threads targeting the same (bopId,shardId)
+     *       and how to best combine their data together.
      */
     @Override
     protected <E> int handleOutputChunk(final int sinkId,
@@ -405,20 +415,33 @@ public class FederatedRunningQuery extends RunningQuery {
              * 
              * @todo Set the capacity of the the "map" buffer to the size of the
              * data contained in the sink (in fact, we should just process the
-             * sink data in place).
+             * sink data in place using an expanded IChunkAccessor interface).
+             * 
+             * @todo high volume operators will need different capacity
+             * parameters.
+             * 
+             * FIXME the chunkSize will limit us to RMI w/ the payload inline
+             * when it is the same as the threshold for NIO chuck transfers.
+             * This needs to be adaptive and responsive to the actual data scale
+             * of the operator's outputs
              */
             @SuppressWarnings("unchecked")
             final IPredicate<E> pred = ((IShardwisePipelineOp) bop).getPredicate();
             final IKeyOrder<E> keyOrder = pred.getKeyOrder();
             final long timestamp = pred.getTimestamp(); 
             final int capacity = 1000;// @todo
-            final int capacity2 = 1000;// @todo
+            final int chunkOfChunksCapacity = 10;// @todo small queue
+            final int chunkSize = 100;// @todo modest chunks.
             final MapBindingSetsOverShardsBuffer<IBindingSet, E> mapper = new MapBindingSetsOverShardsBuffer<IBindingSet, E>(
                     getFederation(), pred, keyOrder, timestamp, capacity) {
                 @Override
-                IBuffer<IBindingSet[]> newBuffer(final PartitionLocator locator) {
-                    // @todo chunkCapacity and chunkOfChunksCapacity plus timeout stuff.
-                    return new BlockingBuffer<IBindingSet[]>(capacity2);
+                protected IBuffer<IBindingSet[]> newBuffer(final PartitionLocator locator) {
+                    return new BlockingBuffer<IBindingSet[]>(
+                            chunkOfChunksCapacity,//
+                            chunkSize,//
+                            BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT,//
+                            BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT//
+                    );
                 }
             };
             /*
@@ -454,17 +477,11 @@ public class FederatedRunningQuery extends RunningQuery {
              * 
              * @todo This stage should probably be integrated with the stage
              * which maps the binding sets over the shards (immediately above)
-             * to minimize copying or visiting in the data.
-             * 
-             * FIXME Review the definition of an "output chunk" from the
-             * perspective of the atomic query termination decision. I think
-             * that it probably corresponds to a "message" sent to a node. For
-             * each message sent, we must later observe the evaluate of the
-             * operator on that node+shard. If the receiver is permitted to
-             * combine messages, then it must tell us how many messages were
-             * consumed.
+             * to minimize copying or visiting in the data. This could be done
+             * by hooking the method which outputs a chunk to instead directly
+             * send the IChunkMessage.
              */
-            int nchunksout = 0;
+            int messageSendCount = 0;
             for (Map.Entry<PartitionLocator, IBuffer<IBindingSet[]>> e : mapper
                     .getSinks().entrySet()) {
 
@@ -484,11 +501,11 @@ public class FederatedRunningQuery extends RunningQuery {
                 sendChunkMessage(locator.getDataServiceUUID(), sinkId, locator
                         .getPartitionId(), allocationContext, shardSink);
                 
-                nchunksout++;
+                messageSendCount++;
 
             }
 
-            return nchunksout;
+            return messageSendCount;
 
         }
         case CONTROLLER: {

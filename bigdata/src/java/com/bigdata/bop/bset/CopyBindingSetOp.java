@@ -36,6 +36,7 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.engine.IChunkAccessor;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
@@ -82,40 +83,39 @@ public class CopyBindingSetOp extends BindingSetPipelineOp {
     }
 
     /**
-     * Copy the source to the sink. 
+     * Copy the source to the sink.
+     * 
+     * @todo Optimize this. When using an {@link IChunkAccessor} we should be
+     *       able to directly output the same chunk.
      */
     static private class CopyTask implements Callable<Void> {
 
-        private final BOpStats stats;
+        private final BOpContext<IBindingSet> context;
         
-        private final IAsynchronousIterator<IBindingSet[]> source;
-
-        private final IBlockingBuffer<IBindingSet[]> sink;
-
         CopyTask(final BOpContext<IBindingSet> context) {
         
-            stats = context.getStats();
+            this.context = context;
             
-            this.source = context.getSource();
-            
-            this.sink = context.getSink();
-
         }
 
         public Void call() throws Exception {
+            final IAsynchronousIterator<IBindingSet[]> source = context.getSource();
+            final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
             try {
+                final BOpStats stats = context.getStats();
                 while (source.hasNext()) {
                     final IBindingSet[] chunk = source.next();
                     stats.chunksIn.increment();
                     stats.unitsIn.add(chunk.length);
                     sink.add(chunk);
-                    stats.chunksOut.increment();
-                    stats.unitsOut.add(chunk.length);
+//                    stats.chunksOut.increment();
+//                    stats.unitsOut.add(chunk.length);
                 }
                 sink.flush();
                 return null;
             } finally {
                 sink.close();
+                source.close();
             }
         }
 

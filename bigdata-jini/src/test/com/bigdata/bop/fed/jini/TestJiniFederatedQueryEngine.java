@@ -402,7 +402,8 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
                         newBindingSetIterator(new HashBindingSet())));
 
         // Wait until the query is done.
-        final Map<Integer, BOpStats> statsMap = runningQuery.get();
+        runningQuery.get();
+        final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
         {
             // validate the stats map.
             assertNotNull(statsMap);
@@ -511,7 +512,8 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
                 new Dechunkerator<IBindingSet>(runningQuery.iterator()));
 
         // Wait until the query is done.
-        final Map<Integer,BOpStats> statsMap = runningQuery.get();
+        runningQuery.get();
+        final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
         {
             // validate the stats map.
             assertNotNull(statsMap);
@@ -724,7 +726,8 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
         }
 
         // Wait until the query is done.
-        final Map<Integer, BOpStats> statsMap = runningQuery.get();
+        runningQuery.get();
+        final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
         {
             // validate the stats map.
             assertNotNull(statsMap);

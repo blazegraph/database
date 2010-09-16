@@ -85,7 +85,7 @@ class UnsyncDistributedOutputBuffer<E extends IBindingSet> extends
      */
     protected void handleChunk(final E[] chunk) {
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("chunkSize=" + chunk.length);
         
         int bindingSetsOut = 0;
@@ -115,13 +115,11 @@ class UnsyncDistributedOutputBuffer<E extends IBindingSet> extends
 
                 final PartitionLocator locator = itr.next();
 
-                if (DEBUG)
-                    log
-                            .debug("adding bindingSet to buffer: nextOrderIndex="
-                                    + nextOrderIndex
-                                    + ", partitionId="
-                                    + locator.getPartitionId()
-                                    + ", bindingSet=" + bindingSet);
+                if (log.isTraceEnabled())
+                    log.trace("adding bindingSet to buffer: nextOrderIndex="
+                            + nextOrderIndex + ", partitionId="
+                            + locator.getPartitionId() + ", bindingSet="
+                            + bindingSet);
 
                 // obtain sink JoinTask from cache or dataService.
                 final JoinTaskSink sink;

@@ -61,15 +61,15 @@ public abstract class AbstractNode<T extends AbstractNode
      * Log for node and leaf operations.
      * <dl>
      * <dt>info</dt>
-     * <dd> A high level trace of insert, split, joint, and remove operations.
-     * You MUST test on {@link #INFO} before generating log messages at this
-     * level to avoid string concatenation operations would otherwise kill
-     * performance.</dd>
+     * <dd>A high level trace of insert, split, joint, and remove operations.
+     * You MUST test on {@link Logger#isInfoEnabled()} before generating log
+     * messages at this level to avoid string concatenation operations would
+     * otherwise kill performance.</dd>
      * <dt></dt>
-     * <dd> A low level trace including a lot of dumps of leaf and node state. *
-     * You MUST test on {@link #DEBUG} before generating log messages at this
-     * level to avoid string concatenation operations would otherwise kill
-     * performance.</dd>
+     * <dd>A low level trace including a lot of dumps of leaf and node state. *
+     * You MUST test on {@link Logger#isDebugEnabled()} before generating log
+     * messages at this level to avoid string concatenation operations would
+     * otherwise kill performance.</dd>
      * </dl>
      * 
      * @see BTree#log

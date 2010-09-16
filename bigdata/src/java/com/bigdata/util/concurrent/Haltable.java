@@ -352,14 +352,17 @@ public class Haltable<V> implements Future<V> {
     /**
      * This logs all unexpected causes @ WARN (anything not reported as normal
      * termination by {@link #isNormalTerminationCause(Throwable)}), not just
-     * the first cause.
+     * the first cause. All exceptions are logged @ TRACE.
      */
     protected void logCause(final boolean isFirstCause, final Throwable cause) {
         if (log.isEnabledFor(Level.WARN)) {
             if (error) {
                 log.warn(this + " : isFirstCause=" + isFirstCause + " : "
                         + cause, cause);
-            }
+            } 
+        } else if(log.isTraceEnabled()) {
+            log.trace(this + " : isFirstCause=" + isFirstCause + " : " + cause,
+                    cause);
         }
     }
 

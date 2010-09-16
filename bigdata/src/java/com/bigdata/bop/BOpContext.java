@@ -236,6 +236,9 @@ public class BOpContext<E> {
      * @todo modify to accept {@link IChunkMessage} or an interface available
      *       from getChunk() on {@link IChunkMessage} which provides us with
      *       flexible mechanisms for accessing the chunk data.
+     *       <p>
+     *       When doing that, modify to automatically track the {@link BOpStats}
+     *       as the <i>source</i> is consumed.
      */
 //    * @throws IllegalArgumentException
 //    *             if the <i>indexManager</i> is <code>null</code>

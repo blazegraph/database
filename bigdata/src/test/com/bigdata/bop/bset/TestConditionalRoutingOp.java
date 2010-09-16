@@ -76,25 +76,9 @@ public class TestConditionalRoutingOp extends TestCase2 {
         super(name);
     }
 
-//    @Override
-//    public Properties getProperties() {
-//
-//        final Properties p = new Properties(super.getProperties());
-//
-//        p.setProperty(Journal.Options.BUFFER_MODE, BufferMode.Transient
-//                .toString());
-//
-//        return p;
-//        
-//    }
-
-//    Journal jnl = null;
-
     List<IBindingSet> data = null;
 
     public void setUp() throws Exception {
-
-//        jnl = new Journal(getProperties());
 
         setUpData();
 
@@ -144,11 +128,6 @@ public class TestConditionalRoutingOp extends TestCase2 {
 
     public void tearDown() throws Exception {
 
-//        if (jnl != null) {
-//            jnl.destroy();
-//            jnl = null;
-//        }
-        
         // clear reference.
         data = null;
 
@@ -205,8 +184,8 @@ public class TestConditionalRoutingOp extends TestCase2 {
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
 
-        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer();
-        final IBlockingBuffer<IBindingSet[]> sink2 = query.newBuffer();
+        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer(stats);
+        final IBlockingBuffer<IBindingSet[]> sink2 = query.newBuffer(stats);
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, null/* indexManager */),
@@ -216,7 +195,6 @@ public class TestConditionalRoutingOp extends TestCase2 {
         final FutureTask<Void> ft = query.eval(context);
         
         // execute task.
-//        jnl.getExecutorService().execute(ft);
         ft.run();
 
         TestQueryEngine.assertSameSolutions(expected, sink.iterator());

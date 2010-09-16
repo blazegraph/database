@@ -62,10 +62,10 @@ public class TestAll extends TestCase {
         final TestSuite suite = new TestSuite("scale-out operator evaluation");
 
         // unit tests for mapping binding sets over shards. 
-        suite.addTestSuite(TestMapBindingSetsOverShards.class);
+        suite.addTest(com.bigdata.bop.fed.shards.TestAll.suite());
 
         // unit tests for mapping binding sets over nodes. 
-        suite.addTestSuite(TestMapBindingSetsOverNodes.class);
+        suite.addTest(com.bigdata.bop.fed.nodes.TestAll.suite());
 
         /*
          * Chunk message tests.
@@ -78,12 +78,14 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestNIOChunkMessage.class);
 
         /*
-         * unit tests for the federated query engine.
+         * Unit tests for the federated query engine against an embedded
+         * federation with a single data service.
          * 
-         * @todo test suite not running yet and may require a federation to be
-         * already running, which is a PITA.
+         * Note: The multi-data service test suites are located in the
+         * bigdata-jini module since they must be executed against a full
+         * federation.
          */
-//        suite.addTestSuite(TestFederatedQueryEngine.class);
+        suite.addTestSuite(TestFederatedQueryEngine.class);
         
         return suite;
         

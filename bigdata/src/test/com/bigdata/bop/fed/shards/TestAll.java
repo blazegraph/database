@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -21,45 +21,53 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-/*
- * Created on Aug 18, 2010
- */
+package com.bigdata.bop.fed.shards;
 
-package com.bigdata.bop.fed;
 
-import com.bigdata.service.AbstractEmbeddedFederationTestCase;
-import com.bigdata.service.DataService;
+import com.bigdata.bop.fed.shards.TestMapBindingSetsOverShards;
+
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 /**
- * Unit tests for mapping binding sets over nodes. For the purpose of this test
- * suite there is only a single node, but it runs with 2 {@link DataService}s
- * which is what we mean by "nodes" in this context. Unlike mapping binding sets
- * over shards, we can test this operation at very low data scales.
- * 
+ * Aggregates test suites into increasing dependency order.
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestMapBindingSetsOverNodes extends
-        AbstractEmbeddedFederationTestCase {
+public class TestAll extends TestCase {
 
     /**
      * 
      */
-    public TestMapBindingSetsOverNodes() {
-        super();
+    public TestAll() {
+        
     }
 
     /**
-     * @param name
+     * @param arg0
      */
-    public TestMapBindingSetsOverNodes(final String name) {
-        super(name);
+    public TestAll(String arg0) {
+     
+        super(arg0);
+        
     }
 
-    public void test_something() {
-        
-        fail("write tests");
-        
+    /**
+     * Returns a test that will run each of the implementation specific test
+     * suites in turn.
+     */
+    public static Test suite()
+    {
+
+        final TestSuite suite = new TestSuite("map binding sets over shards");
+
+        // unit tests for mapping binding sets over shards.
+        suite.addTestSuite(TestMapBindingSetsOverShards.class);
+
+        return suite;
+
     }
-    
+
 }

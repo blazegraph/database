@@ -323,12 +323,18 @@ public class BOpBase implements BOp {
         final Object tmp = annotations.get(name);
 
         if (tmp == null)
-            throw new IllegalArgumentException("Required property: " + name);
+            throw new IllegalStateException("Required property: " + name);
 
         return tmp;
         
     }
 
+    public int getId() {
+        
+        return (Integer) getRequiredProperty(Annotations.BOP_ID);
+        
+    }
+    
     public String toString() {
         
         final StringBuilder sb = new StringBuilder();

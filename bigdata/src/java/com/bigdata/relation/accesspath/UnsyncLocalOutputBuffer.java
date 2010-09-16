@@ -14,24 +14,24 @@ import com.bigdata.bop.engine.BOpStats;
 public class UnsyncLocalOutputBuffer<E extends IBindingSet> extends
     AbstractUnsynchronizedArrayBuffer<E> {//UnsynchronizedOutputBuffer<E> {
 
-    private final BOpStats stats;
+//    private final BOpStats stats;
     private final IBlockingBuffer<E[]> syncBuffer;
 
+//    * @param stats
+//    *            Statistics object
     /**
-     * @param stats
-     *            Statistics object
      * @param capacity
      *            The capacity of this buffer.
      * @param syncBuffer
      *            The thread-safe buffer onto which this buffer writes when
      *            it overflows.
      */
-    public UnsyncLocalOutputBuffer(final BOpStats stats,
+    public UnsyncLocalOutputBuffer(//final BOpStats stats,
             final int capacity, final IBlockingBuffer<E[]> syncBuffer) {
 
         super(capacity);
 
-        this.stats = stats;
+//        this.stats = stats;
         
         this.syncBuffer = syncBuffer;
 
@@ -49,8 +49,8 @@ public class UnsyncLocalOutputBuffer<E extends IBindingSet> extends
 
         syncBuffer.add(chunk);
 
-        stats.chunksOut.increment();
-        stats.unitsOut.add(chunk.length);
+//        stats.chunksOut.increment();
+//        stats.unitsOut.add(chunk.length);
 
     }
     
