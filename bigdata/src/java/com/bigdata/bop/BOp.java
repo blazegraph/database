@@ -137,7 +137,7 @@ public interface BOp extends Cloneable, Serializable {
 	 * 
 	 * @return The value of the annotation.
 	 * 
-	 * @throws IllegalArgumentException
+	 * @throws IllegalStateException
 	 *             if the named annotation is not bound.
 	 * 
 	 * @todo Note: This variant without generics is required for some java
@@ -152,6 +152,14 @@ public interface BOp extends Cloneable, Serializable {
      */
     BOp clone();
 
+    /**
+     * Return the {@link Annotations#BOP_ID}.
+     * 
+     * @throws IllegalStateException
+     *             if that annotation is not bound.
+     */
+    int getId();
+    
     /**
      * Return the evaluation context for the operator. The default is
      * {@link BOpEvaluationContext#ANY}. Operators which must be mapped against

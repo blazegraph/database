@@ -59,9 +59,13 @@ public interface IPipelineOp<E> extends BOp {
      * operators which write on the database) then the operator MAY return an
      * immutable empty buffer.
      * 
+     * @param stats
+     *            The statistics on this object will automatically be updated as
+     *            elements and chunks are output onto the returned buffer.
+     * 
      * @return The buffer.
      */
-    IBlockingBuffer<E[]> newBuffer();
+    IBlockingBuffer<E[]> newBuffer(BOpStats stats);
 
     /**
      * Return a {@link FutureTask} which computes the operator against the

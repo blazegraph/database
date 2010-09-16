@@ -209,10 +209,67 @@ abstract public class PipelineOp<E> extends BOpBase implements IPipelineOp<E> {
 
     }
 
-    public IBlockingBuffer<E[]> newBuffer() {
+    public IBlockingBuffer<E[]> newBuffer(final BOpStats stats) {
 
-        return new BlockingBuffer<E[]>(getChunkOfChunksCapacity(),
-                getChunkCapacity(), getChunkTimeout(), chunkTimeoutUnit);
+        if (stats == null)
+            throw new IllegalArgumentException();
+        
+        return new BlockingBufferWithStats<E[]>(getChunkOfChunksCapacity(),
+                getChunkCapacity(), getChunkTimeout(), chunkTimeoutUnit, stats);
+
+    }
+
+    private static class BlockingBufferWithStats<E> extends BlockingBuffer<E> {
+
+        private final BOpStats stats;
+
+        /**
+         * @param chunkOfChunksCapacity
+         * @param chunkCapacity
+         * @param chunkTimeout
+         * @param chunktimeoutunit
+         * @param stats
+         */
+        public BlockingBufferWithStats(int chunkOfChunksCapacity,
+                int chunkCapacity, long chunkTimeout,
+                TimeUnit chunktimeoutunit, final BOpStats stats) {
+
+            this.stats = stats;
+            
+        }
+
+        /**
+         * Overridden to track {@link BOpStats#unitsOut} and
+         * {@link BOpStats#chunksOut}.
+         * <p>
+         * Note: {@link BOpStats#chunksOut} will report the #of chunks added to
+         * this buffer. However, the buffer MAY combine chunks either on add()
+         * or when drained by the iterator so the actual #of chunks read back
+         * from the iterator MAY differ.
+         * <p>
+         * {@inheritDoc}
+         */
+        @Override
+        public boolean add(final E e, final long timeout, final TimeUnit unit)
+                throws InterruptedException {
+
+            final boolean ret = super.add(e, timeout, unit);
+
+            if (e.getClass().getComponentType() != null) {
+
+                stats.unitsOut.add(((Object[]) e).length);
+
+            } else {
+
+                stats.unitsOut.increment();
+
+            }
+
+            stats.chunksOut.increment();
+
+            return ret;
+
+        }
 
     }
 

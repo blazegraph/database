@@ -183,8 +183,8 @@ public class ConditionalRoutingOp extends BindingSetPipelineOp {
                             sink.add(def);
                         else
                             sink.add(Arrays.copyOf(def, ndef));
-                        stats.chunksOut.increment();
-                        stats.unitsOut.add(ndef);
+//                        stats.chunksOut.increment();
+//                        stats.unitsOut.add(ndef);
                     }
 
                     if (nalt > 0) {
@@ -192,8 +192,8 @@ public class ConditionalRoutingOp extends BindingSetPipelineOp {
                             sink2.add(alt);
                         else
                             sink2.add(Arrays.copyOf(alt, nalt));
-                        stats.chunksOut.increment();
-                        stats.unitsOut.add(nalt);
+//                        stats.chunksOut.increment();
+//                        stats.unitsOut.add(nalt);
                     }
                     
                 }

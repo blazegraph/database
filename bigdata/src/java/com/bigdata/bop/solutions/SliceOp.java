@@ -31,6 +31,8 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
@@ -79,6 +81,8 @@ import com.bigdata.service.IBigdataFederation;
  */
 public class SliceOp extends BindingSetPipelineOp {
 
+    private final static transient Logger log = Logger.getLogger(SliceOp.class);
+    
     /**
      * 
      */
@@ -192,18 +196,26 @@ public class SliceOp extends BindingSetPipelineOp {
             this.limit = op.getLimit();
 
             if (offset < 0)
-                throw new IllegalArgumentException();
+                throw new IllegalArgumentException(Annotations.OFFSET);
 
             if (limit <= 0)
-                throw new IllegalArgumentException();
+                throw new IllegalArgumentException(Annotations.LIMIT);
 
         }
 
         public Void call() throws Exception {
 
+            if(log.isTraceEnabled())
+                log.trace(toString());
+
             final IAsynchronousIterator<IBindingSet[]> source = context
                     .getSource();
 
+            /*
+             * @todo This needs to be wrapping to automatically update the #of
+             * chunks actually output in order to have correct reporting. Review
+             * all of the other operators for this same issue.
+             */
             final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
 
             final BOpStats stats = context.getStats();
@@ -229,24 +241,29 @@ public class SliceOp extends BindingSetPipelineOp {
                         if (nseen < offset) {
                             // skip solution.
                             nseen++;
+                            if(log.isTraceEnabled())
+                                log.trace(toString());
                             continue;
                         }
 
-                        if (out.add2(chunk[i])) {
+                        final IBindingSet bset = chunk[i];
+                        
+                        if (out.add2(bset)) {
                             // chunk was output.
-                            stats.chunksOut.increment();
+//                            stats.chunksOut.increment();
                         }
 
-//                        System.err.println("accept: " + chunk[i]);
+                        if(log.isTraceEnabled())
+                            log.trace(toString() + ":" + bset);
 
-                        stats.unitsOut.increment();
+//                        stats.unitsOut.increment();
 
                         naccepted++;
                         nseen++;
                         if (naccepted >= limit) {
                             if (!out.isEmpty()) {
                                 out.flush();
-                                stats.chunksOut.increment();
+//                                stats.chunksOut.increment();
                             }
                             halt = true;
                             break;
@@ -256,10 +273,13 @@ public class SliceOp extends BindingSetPipelineOp {
                     
                 }
 
+                out.flush();
                 sink.flush();
+//                stats.chunksOut.increment();
 
                 if (halt)
-                    cancelQuery();
+                    throw new InterruptedException();
+//                    cancelQuery();
                 
                 return null;
                 
@@ -271,18 +291,26 @@ public class SliceOp extends BindingSetPipelineOp {
 
         }
 
-        /**
-         * Cancel the query evaluation. This is invoked when the slice has been
-         * satisfied. At that point we want to halt not only the {@link SliceOp}
-         * but also the entire query since it does not need to produce any more
-         * results.
-         */
-        private void cancelQuery() {
+//        /**
+//         * Cancel the query evaluation. This is invoked when the slice has been
+//         * satisfied. At that point we want to halt not only the {@link SliceOp}
+//         * but also the entire query since it does not need to produce any more
+//         * results.
+//         */
+//        private void cancelQuery() {
+//
+//            context.halt();
+//            
+//        }
 
-            context.halt();
+        public String toString() {
+
+            return getClass().getName() + "{offset=" + offset + ",limit="
+                    + limit + ",nseen=" + nseen + ",naccepted=" + naccepted
+                    + "}";
             
         }
-
+        
     }
 
     /**

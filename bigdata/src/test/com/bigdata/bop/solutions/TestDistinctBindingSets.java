@@ -201,7 +201,7 @@ public class TestDistinctBindingSets extends TestCase2 {
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
 
-        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer();
+        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer(stats);
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, null/* indexManager */),

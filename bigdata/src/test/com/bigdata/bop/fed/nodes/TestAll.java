@@ -21,7 +21,10 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.bop.engine;
+package com.bigdata.bop.fed.nodes;
+
+
+import com.bigdata.bop.fed.shards.TestMapBindingSetsOverShards;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -58,22 +61,13 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("query engine");
+        final TestSuite suite = new TestSuite("map binding sets over nodes");
 
-        // test suite for the bop statistics class.
-        suite.addTestSuite(TestBOpStats.class);
-        
-        // test suite for some pipeline evaluation utility methods.
-        suite.addTestSuite(TestPipelineUtility.class);
-
-        // test suite for query evaluation (basic JOINs).
-        suite.addTestSuite(TestQueryEngine.class);
-
-        // test suite for query evaluation (DISTINCT, ORDER BY, GROUP BY).
-        suite.addTestSuite(TestQueryEngine2.class);
+        // unit tests for mapping binding sets over nodes.
+        suite.addTestSuite(TestMapBindingSetsOverNodes.class);
 
         return suite;
-        
+
     }
-    
+
 }

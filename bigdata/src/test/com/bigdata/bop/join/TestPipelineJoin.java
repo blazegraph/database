@@ -214,7 +214,7 @@ public class TestPipelineJoin extends TestCase2 {
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { new IBindingSet[] { new HashBindingSet()} });
 
-        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer();
+        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer(stats);
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, jnl/* indexManager */
@@ -311,7 +311,7 @@ public class TestPipelineJoin extends TestCase2 {
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { new IBindingSet[] { new HashBindingSet() } });
 
-        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer();
+        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer(stats);
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, jnl/* indexManager */),
@@ -434,7 +434,7 @@ public class TestPipelineJoin extends TestCase2 {
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { new IBindingSet[] { new HashBindingSet() } });
 
-        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer();
+        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer(stats);
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, jnl/* indexManager */),
@@ -549,9 +549,9 @@ public class TestPipelineJoin extends TestCase2 {
                 ),//
         };
 
-        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer();
-
         final PipelineJoinStats stats = query.newStats();
+
+        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer(stats);
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, jnl/* indexManager */),
@@ -668,11 +668,11 @@ public class TestPipelineJoin extends TestCase2 {
                 ),//
         };
 
-        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer();
-
-        final IBlockingBuffer<IBindingSet[]> sink2 = query.newBuffer();
-
         final PipelineJoinStats stats = query.newStats();
+
+        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer(stats);
+
+        final IBlockingBuffer<IBindingSet[]> sink2 = query.newBuffer(stats);
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, jnl/* indexManager */),

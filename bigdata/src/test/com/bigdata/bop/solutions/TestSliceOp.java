@@ -49,6 +49,7 @@ import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
+import com.bigdata.util.InnerCause;
 
 /**
  * Unit tests for {@link SliceOp}.
@@ -71,25 +72,9 @@ public class TestSliceOp extends TestCase2 {
         super(name);
     }
 
-//    @Override
-//    public Properties getProperties() {
-//
-//        final Properties p = new Properties(super.getProperties());
-//
-//        p.setProperty(Journal.Options.BUFFER_MODE, BufferMode.Transient
-//                .toString());
-//
-//        return p;
-//        
-//    }
-//
-//    Journal jnl = null;
-
     ArrayList<IBindingSet> data;
 
     public void setUp() throws Exception {
-
-//        jnl = new Journal(getProperties());
 
         setUpData();
 
@@ -145,11 +130,6 @@ public class TestSliceOp extends TestCase2 {
     }
 
     public void tearDown() throws Exception {
-
-//        if (jnl != null) {
-//            jnl.destroy();
-//            jnl = null;
-//        }
         
         // clear reference.
         data = null;
@@ -161,10 +141,9 @@ public class TestSliceOp extends TestCase2 {
      * 
      * @throws ExecutionException 
      * @throws InterruptedException 
-     * 
-     * @todo correct rejection tests for bad offset/limit values.
      */
-    public void test_slice() throws InterruptedException, ExecutionException {
+    public void test_slice_offset1_limit3() throws InterruptedException,
+            ExecutionException {
 
         final Var<?> x = Var.var("x");
         final Var<?> y = Var.var("y");
@@ -205,7 +184,7 @@ public class TestSliceOp extends TestCase2 {
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
 
-        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer();
+        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer(stats);
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, null/* indexManager */
@@ -215,20 +194,151 @@ public class TestSliceOp extends TestCase2 {
         // get task.
         final FutureTask<Void> ft = query.eval(context);
         
-        // execute task.
-//        jnl.getExecutorService().execute(ft);
         ft.run();
 
         TestQueryEngine.assertSameSolutions(expected, sink.iterator());
         
         assertTrue(ft.isDone());
         assertFalse(ft.isCancelled());
-        ft.get(); // verify nothing thrown.
+        try {
+            ft.get(); // verify nothing thrown.
+            fail("Expecting inner cause : " + InterruptedException.class);
+        } catch (Throwable t) {
+            if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+                if (log.isInfoEnabled())
+                    log.info("Ignoring expected exception: " + t, t);
+            } else {
+                fail("Expecting inner cause : " + InterruptedException.class);
+            }
+        }
 
         assertEquals(1L, stats.chunksIn.get());
         assertEquals(4L, stats.unitsIn.get());
         assertEquals(3L, stats.unitsOut.get());
         assertEquals(1L, stats.chunksOut.get());
+
+    }
+
+    public void test_slice_offset0_limitAll() throws InterruptedException,
+            ExecutionException {
+
+        final Var<?> x = Var.var("x");
+        final Var<?> y = Var.var("y");
+
+        final int bopId = 1;
+
+        final SliceOp query = new SliceOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new NV(SliceOp.Annotations.BOP_ID, bopId),//
+//                        new NV(SliceOp.Annotations.OFFSET, 1L),//
+//                        new NV(SliceOp.Annotations.LIMIT, 3L),//
+                }));
+
+        assertEquals("offset", 0L, query.getOffset());
+
+        assertEquals("limit", Long.MAX_VALUE, query.getLimit());
+
+        // the expected solutions
+        final IBindingSet[] expected =  data.toArray(new IBindingSet[0]);
+        
+        final BOpStats stats = query.newStats();
+
+        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
+
+        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer(stats);
+
+        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                new MockRunningQuery(null/* fed */, null/* indexManager */
+                ), -1/* partitionId */, stats, source, sink, null/* sink2 */);
+
+        // get task.
+        final FutureTask<Void> ft = query.eval(context);
+
+        ft.run();
+
+        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
+
+        assertTrue(ft.isDone());
+        assertFalse(ft.isCancelled());
+        ft.get(); // verify nothing thrown.
+
+        assertEquals(1L, stats.chunksIn.get());
+        assertEquals(6L, stats.unitsIn.get());
+        assertEquals(6L, stats.unitsOut.get());
+        assertEquals(1L, stats.chunksOut.get());
+
+    }
+
+    public void test_slice_correctRejection_badOffset() throws InterruptedException {
+
+        final int bopId = 1;
+
+        final SliceOp query = new SliceOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new NV(SliceOp.Annotations.BOP_ID, bopId),//
+                        new NV(SliceOp.Annotations.OFFSET, -1L),//
+                        new NV(SliceOp.Annotations.LIMIT, 3L),//
+                }));
+
+        assertEquals("offset", -1L, query.getOffset());
+
+        assertEquals("limit", 3L, query.getLimit());
+
+        final BOpStats stats = query.newStats();
+
+        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
+
+        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer(stats);
+
+        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                new MockRunningQuery(null/* fed */, null/* indexManager */
+                ), -1/* partitionId */, stats, source, sink, null/* sink2 */);
+
+        // get task.
+        try {
+            query.eval(context);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+        }
+
+    }
+
+    public void test_slice_correctRejection_badLimit()
+            throws InterruptedException {
+
+        final int bopId = 1;
+
+        final SliceOp query = new SliceOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new NV(SliceOp.Annotations.BOP_ID, bopId),//
+                        new NV(SliceOp.Annotations.OFFSET, 1L),//
+                        new NV(SliceOp.Annotations.LIMIT, 0L),//
+                }));
+
+        assertEquals("offset", 1L, query.getOffset());
+
+        assertEquals("limit", 0L, query.getLimit());
+
+        final BOpStats stats = query.newStats();
+
+        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
+
+        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer(stats);
+
+        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                new MockRunningQuery(null/* fed */, null/* indexManager */
+                ), -1/* partitionId */, stats, source, sink, null/* sink2 */);
+
+        // get task.
+        try {
+            query.eval(context);
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+        }
 
     }
 

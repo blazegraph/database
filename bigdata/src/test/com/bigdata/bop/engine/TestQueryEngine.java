@@ -57,7 +57,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
-import com.bigdata.bop.bset.CopyBindingSetOp;
+import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.fed.TestFederatedQueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
@@ -208,7 +208,7 @@ public class TestQueryEngine extends TestCase2 {
     public void test_query_startRun() throws Exception {
 
         final int startId = 1;
-        final BindingSetPipelineOp query = new CopyBindingSetOp(new BOp[] {}, NV
+        final BindingSetPipelineOp query = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 }));
@@ -220,7 +220,8 @@ public class TestQueryEngine extends TestCase2 {
                         newBindingSetIterator(new HashBindingSet())));
 
         // Wait until the query is done.
-        final Map<Integer, BOpStats> statsMap = runningQuery.get();
+        runningQuery.get();
+        final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
         {
             // validate the stats map.
             assertNotNull(statsMap);
@@ -312,7 +313,8 @@ public class TestQueryEngine extends TestCase2 {
         assertSameSolutions(expected, runningQuery.iterator());
 
         // Wait until the query is done.
-        final Map<Integer,BOpStats> statsMap = runningQuery.get();
+        runningQuery.get();
+        final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
         {
             // validate the stats map.
             assertNotNull(statsMap);
@@ -458,7 +460,8 @@ public class TestQueryEngine extends TestCase2 {
         assertSameSolutions(expected, runningQuery.iterator());
 
         // Wait until the query is done.
-        final Map<Integer, BOpStats> statsMap = runningQuery.get();
+        runningQuery.get();
+        final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
         {
             // validate the stats map.
             assertNotNull(statsMap);
@@ -504,7 +507,7 @@ public class TestQueryEngine extends TestCase2 {
 
             // verify query solution stats details.
             assertEquals(1L, stats.chunksIn.get());
-            assertEquals(4L, stats.unitsIn.get());
+            assertEquals(2L, stats.unitsIn.get()); // @todo use non-zero offset?
             assertEquals(2L, stats.unitsOut.get());
             assertEquals(1L, stats.chunksOut.get());
         }
@@ -553,6 +556,7 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.BOP_ID, startId),//
                         }));
         
+        // @todo the KEY_ORDER should be bound before evaluation.
         final Predicate<?> pred1Op = new Predicate<E>(new IVariableOrConstant[] {
                 Var.var("x"), Var.var("y") }, NV
                 .asMap(new NV[] {//
@@ -631,7 +635,8 @@ public class TestQueryEngine extends TestCase2 {
         }
 
         // Wait until the query is done.
-        final Map<Integer, BOpStats> statsMap = runningQuery.get();
+        runningQuery.get();
+        final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
         {
             // validate the stats map.
             assertNotNull(statsMap);
@@ -799,9 +804,9 @@ public class TestQueryEngine extends TestCase2 {
         final String msg = "nerror=" + nerror + ", ncancel=" + ncancel
                 + ", ntimeout=" + ntimeout + ", nsuccess=" + nsuccess;
 
-        if(log.isInfoEnabled())
-            log.info(msg);
-        
+        System.err
+                .println(getClass().getName() + "." + getName() + " : " + msg);
+
         if (nerror > 0)
             fail(msg);
 
@@ -813,8 +818,17 @@ public class TestQueryEngine extends TestCase2 {
      * @todo Write unit tests for optional joins, including where an alternative
      *       sink is specified in the {@link BOpContext} and is used when the
      *       join fails.
-     * */
+     */
     public void test_query_join2_optionals() {
+
+        fail("write test");
+
+    }
+
+    /**
+     * @todo Write unit tests for the {@link ConditionalRoutingOp}?
+     */
+    public void test_query_join2_conditionalRouting() {
 
         fail("write test");
 

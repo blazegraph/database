@@ -296,8 +296,8 @@ public class DistinctBindingSetOp extends BindingSetPipelineOp {
 
                         sink.add(b);
 
-                        stats.unitsOut.add(naccepted);
-                        stats.chunksOut.increment();
+//                        stats.unitsOut.add(naccepted);
+//                        stats.chunksOut.increment();
 
                     }
 

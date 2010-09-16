@@ -48,10 +48,10 @@ public abstract class AbstractUnsynchronizedArrayBuffer<E> implements IBuffer<E>
      */
     protected static final boolean INFO = log.isInfoEnabled();
 
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    protected static final boolean DEBUG = log.isDebugEnabled();
+//    /**
+//     * True iff the {@link #log} level is DEBUG or less.
+//     */
+//    protected static final boolean DEBUG = log.isDebugEnabled();
 
     /**
      * The capacity of the internal buffer each time it is allocated.
@@ -174,7 +174,7 @@ public abstract class AbstractUnsynchronizedArrayBuffer<E> implements IBuffer<E>
 
         if (!accept(e)) {
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("reject: " + e.toString());
 
             return false;
@@ -208,7 +208,7 @@ public abstract class AbstractUnsynchronizedArrayBuffer<E> implements IBuffer<E>
             
         }
 
-        if(DEBUG) {
+        if(log.isDebugEnabled()) {
             
             log.debug("accept: " + e);
             
