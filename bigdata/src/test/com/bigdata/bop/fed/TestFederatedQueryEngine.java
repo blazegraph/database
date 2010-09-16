@@ -44,6 +44,7 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
@@ -52,6 +53,7 @@ import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
 import com.bigdata.bop.bset.StartOp;
+import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.LocalChunkMessage;
@@ -63,6 +65,7 @@ import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SortOp;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.counters.CAT;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -331,6 +334,21 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
     }
 
     /**
+     * Return an {@link IAsynchronousIterator} that will read a single, chunk
+     * containing all of the specified {@link IBindingSet}s.
+     * 
+     * @param bindingSets
+     *            the binding sets.
+     */
+    protected ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+            final IBindingSet[] bindingSets) {
+
+        return new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { bindingSets });
+
+    }
+
+    /**
      * Starts and stops the {@link QueryEngine}, but does not validate the
      * semantics of shutdown() versus shutdownNow() since we need to be
      * evaluating query mixes in order to verify the semantics of those
@@ -404,6 +422,92 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
     }
 
     /**
+     * Unit test uses a {@link StartOp} to copy some binding sets through a
+     * {@link SliceOp} without involving any joins or access path reads. For
+     * this test, the binding sets never leave the query controller.
+     * 
+     * @throws Exception
+     */
+    public void test_query_startThenSlice() throws Exception {
+        
+        final int startId = 1;
+        final int sliceId = 4;
+
+        final StartOp startOp = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new NV(Predicate.Annotations.BOP_ID, startId),//
+                }));
+
+        final BindingSetPipelineOp query = new SliceOp(new BOp[] { startOp },
+                // slice annotations
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, sliceId),//
+                        })//
+        );
+
+        // the expected solutions (order is not reliable due to concurrency).
+        final IBindingSet[] expected = new IBindingSet[] {//
+            new ArrayBindingSet(//
+                new IVariable[] { Var.var("value") },//
+                new IConstant[] { new Constant<String>("Paul") }//
+                ), //
+            new ArrayBindingSet(//
+                new IVariable[] { Var.var("value") },//
+                new IConstant[] { new Constant<String>("John") }//
+        ) };
+
+        final UUID queryId = UUID.randomUUID();
+        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
+                        startId,//
+                        -1, /* partitionId */
+                        newBindingSetIterator(expected)));
+
+        // verify solutions.
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+                new Dechunkerator<IBindingSet>(runningQuery.iterator()));
+
+        // Wait until the query is done.
+        runningQuery.get();
+        final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
+        {
+            // validate the stats map.
+            assertNotNull(statsMap);
+            assertEquals(2, statsMap.size());
+            if (log.isInfoEnabled())
+                log.info(statsMap.toString());
+        }
+
+        // validate the stats for the start operator.
+        {
+            final BOpStats stats = statsMap.get(startId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("start: "+stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals((long) expected.length, stats.unitsIn.get());
+            assertEquals((long) expected.length, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+
+        // validate the stats for the slice operator.
+        {
+            final BOpStats stats = statsMap.get(sliceId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("slice: " + stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals((long) expected.length, stats.unitsIn.get());
+            assertEquals((long) expected.length, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+
+    }
+    
+    /**
      * Test the ability run a simple join. There are three operators. One feeds
      * an empty binding set[] into the join, another is the predicate for the
      * access path on which the join will read (it probes the index once for
@@ -448,7 +552,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         );
         
         final BindingSetPipelineOp query = new SliceOp(new BOp[] { joinOp },
-        // slice annotations
+                // slice annotations
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, sliceId),//
                         })//
@@ -533,16 +637,24 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
     /**
      * Test the ability run a simple join which is mapped across two index
-     * partitions. There are three operators. One feeds an empty binding set[]
-     * in which the 2nd column of the relation is bound into the join, another
-     * is the predicate for the access path on which the join will read (it will
-     * read everything since the primary key is on the first column then the
-     * second column and hence can not be used to select the index partition for
-     * this access path), and the third is the join itself.
+     * partitions.
      * 
-     * @throws Exception
+     * FIXME This is failing because the {@link SliceOp} is not remembering its
+     * state across distinct invocations and is cancelling the query as soon as
+     * it exhausts its input. In order to have correct decision boundaries,
+     * slice needs to be invoked either once, concurrently if using {@link CAT}
+     * s, or in a series of presentations otherwise.
+     * <p>
+     * The easiest way to fix this is to have {@link SliceOp} specialize the
+     * {@link BOpStats}s and carry its state there. That will also make it safe
+     * for concurrent evaluation within the same query, and we will have to
+     * write a unit test for that.
+     * <p>
+     * I am not yet convinced that the problem with the test failure is double
+     * invocation of {@link SliceOp}. It could also be that we are not invoking
+     * it the 2nd time.
      */
-    public void test_query_join1_2shards() throws Exception {
+    public void test_query_join_withConstraint_readsOn2shards() throws Exception {
 
         final Var<?> x = Var.var("x");
         final Var<?> y = Var.var("y");
@@ -556,15 +668,22 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 }));
 
+        /*
+         * 
+         * Note: Since the index on which this reads is formed as (column1 +
+         * column2) the probe key will be [null] if it does not bind the first
+         * column. Therefore, in order to have the 2nd column constraint we have
+         * to model it as an IElementFilter on the predicate.
+         */
         final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
-                x, new Constant<String>("Paul")}, NV
+                x, y}, NV
                 .asMap(new NV[] {//
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
                         new NV(Predicate.Annotations.PARTITION_ID, Integer
                                 .valueOf(-1)),//
                         new NV(Predicate.Annotations.OPTIONAL, Boolean.FALSE),//
-                        new NV(Predicate.Annotations.CONSTRAINT, null),//
+                        new NV(Predicate.Annotations.CONSTRAINT,null),//
                         new NV(Predicate.Annotations.EXPANDER, null),//
                         new NV(Predicate.Annotations.BOP_ID, predId),//
                         new NV(Predicate.Annotations.TIMESTAMP,
@@ -578,6 +697,10 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 // join annotations
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, joinId),//
+                        // impose constraint on the join.
+                        new NV(PipelineJoin.Annotations.CONSTRAINTS,
+                                new IConstraint[] { new EQConstant(y,
+                                        new Constant<String>("Paul")) }),//
                         })//
         );
         
@@ -590,31 +713,16 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
         // the expected solutions (order is not reliable due to concurrency).
         final IBindingSet[] expected = new IBindingSet[] {//
-//                new ArrayBindingSet(//
-//                        new IVariable[] { x, y },//
-//                        new IConstant[] { new Constant<String>("John"),
-//                                new Constant<String>("Mary") }//
-//                ), //
                 new ArrayBindingSet(//
                         new IVariable[] { x, y },//
-                        new IConstant[] { new Constant<String>("John"),
+                        new IConstant[] { new Constant<String>("Leon"),
                                 new Constant<String>("Paul") }//
                 ), // 
-//                new ArrayBindingSet(//
-//                        new IVariable[] { x, y },//
-//                        new IConstant[] { new Constant<String>("Mary"),
-//                                new Constant<String>("John") }//
-//                ), //
                 new ArrayBindingSet(//
                         new IVariable[] { x, y },//
                         new IConstant[] { new Constant<String>("Mary"),
                                 new Constant<String>("Paul") }//
                 ), //
-//                new ArrayBindingSet(//
-//                        new IVariable[] { x, y },//
-//                        new IConstant[] { new Constant<String>("Paul"),
-//                                new Constant<String>("Leon") }//
-//                ), //
                 };
 //        // partition0
 //        new E("John", "Mary"),// 
@@ -628,7 +736,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         {
             final IBindingSet initialBindingSet = new HashBindingSet();
 
-            initialBindingSet.set(y, new Constant<String>("Paul"));
+//            initialBindingSet.set(y, new Constant<String>("Paul"));
             
             final UUID queryId = UUID.randomUUID();
 

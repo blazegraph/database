@@ -70,15 +70,21 @@ public class EQConstant extends BOpConstraint {
         
     }
     
-    public boolean accept(final IBindingSet s) {
+    public boolean accept(final IBindingSet bset) {
+        
+        final IVariable<?> var = (IVariable<?>) get(0)/* var */;
         
         // get binding for the variable.
-        final IConstant<?> tmp = s.get((IVariable<?>) get(0)/* var */);
+        final IConstant<?> asBound = bset.get(var);
     
-        if (tmp == null)
+        if (asBound == null)
             return true; // not yet bound.
     
-        return tmp.equals(get(1));
+        final IConstant<?> cnst = (IConstant<?>) get(1);
+        
+        final boolean ret = asBound.equals(cnst);
+        
+        return ret;
 
    }
 

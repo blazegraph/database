@@ -50,6 +50,7 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
@@ -59,6 +60,7 @@ import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.R;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
 import com.bigdata.bop.bset.StartOp;
+import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.fed.TestFederatedQueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
@@ -68,6 +70,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.striterator.ChunkedArrayIterator;
+import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.concurrent.LatchedExecutor;
 import com.ibm.icu.impl.ByteBuffer;
@@ -508,6 +511,173 @@ public class TestQueryEngine extends TestCase2 {
             // verify query solution stats details.
             assertEquals(1L, stats.chunksIn.get());
             assertEquals(2L, stats.unitsIn.get()); // @todo use non-zero offset?
+            assertEquals(2L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+
+    }
+
+    /**
+     * A join with an {@link IConstraint}.
+     */
+    public void test_query_join_withConstraint() throws Exception {
+
+        final Var<?> x = Var.var("x");
+        final Var<?> y = Var.var("y");
+        
+        final int startId = 1;
+        final int joinId = 2;
+        final int predId = 3;
+        final int sliceId = 4;
+
+        final StartOp startOp = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new NV(Predicate.Annotations.BOP_ID, startId),//
+                }));
+
+        /*
+         * 
+         * Note: Since the index on which this reads is formed as (column1 +
+         * column2) the probe key will be [null] if it does not bind the first
+         * column. Therefore, in order to have the 2nd column constraint we have
+         * to model it as an IElementFilter on the predicate.
+         */
+        final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
+                x, y}, NV
+                .asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.PARTITION_ID, Integer
+                                .valueOf(-1)),//
+                        new NV(Predicate.Annotations.OPTIONAL, Boolean.FALSE),//
+                        new NV(Predicate.Annotations.CONSTRAINT,null),//
+                        new NV(Predicate.Annotations.EXPANDER, null),//
+                        new NV(Predicate.Annotations.BOP_ID, predId),//
+                        new NV(Predicate.Annotations.TIMESTAMP,
+                                ITx.READ_COMMITTED),//
+                        new NV(Predicate.Annotations.KEY_ORDER,
+                                R.primaryKeyOrder),//
+                }));
+
+        final PipelineJoin<E> joinOp = new PipelineJoin<E>(startOp/* left */,
+                predOp/* right */,
+                // join annotations
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, joinId),//
+                        // impose constraint on the join.
+                        new NV(PipelineJoin.Annotations.CONSTRAINTS,
+                                new IConstraint[] { new EQConstant(y,
+                                        new Constant<String>("Paul")) }),//
+                        })//
+        );
+        
+        final BindingSetPipelineOp query = new SliceOp(new BOp[] { joinOp },
+        // slice annotations
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, sliceId),//
+                        })//
+        );
+
+        // the expected solutions (order is not reliable due to concurrency).
+        final IBindingSet[] expected = new IBindingSet[] {//
+//                new ArrayBindingSet(//
+//                        new IVariable[] { x, y },//
+//                        new IConstant[] { new Constant<String>("John"),
+//                                new Constant<String>("Mary") }//
+//                ), //
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Leon"),
+                                new Constant<String>("Paul") }//
+                ), // 
+//                new ArrayBindingSet(//
+//                        new IVariable[] { x, y },//
+//                        new IConstant[] { new Constant<String>("Mary"),
+//                                new Constant<String>("John") }//
+//                ), //
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Mary"),
+                                new Constant<String>("Paul") }//
+                ), //
+//                new ArrayBindingSet(//
+//                        new IVariable[] { x, y },//
+//                        new IConstant[] { new Constant<String>("Paul"),
+//                                new Constant<String>("Leon") }//
+//                ), //
+        };
+//        new E("John", "Mary"),// [0]
+//        new E("Leon", "Paul"),// [1]
+//        new E("Mary", "Paul"),// [2]
+//        new E("Paul", "Leon"),// [3]
+
+        final RunningQuery runningQuery;
+        {
+            final IBindingSet initialBindingSet = new HashBindingSet();
+
+//            initialBindingSet.set(y, new Constant<String>("Paul"));
+            
+            final UUID queryId = UUID.randomUUID();
+
+            runningQuery = queryEngine.eval(queryId, query,
+                    new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
+                            startId,//
+                            -1, /* partitionId */
+                            newBindingSetIterator(initialBindingSet)));
+        }
+
+        // verify solutions.
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+                new Dechunkerator<IBindingSet>(runningQuery.iterator()));
+
+        // Wait until the query is done.
+        runningQuery.get();
+        final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
+        {
+            // validate the stats map.
+            assertNotNull(statsMap);
+            assertEquals(3, statsMap.size());
+            if (log.isInfoEnabled())
+                log.info(statsMap.toString());
+        }
+
+        // validate the stats for the start operator.
+        {
+            final BOpStats stats = statsMap.get(startId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("start: "+stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(1L, stats.unitsIn.get());
+            assertEquals(1L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+
+        // validate the stats for the join operator.
+        {
+            final BOpStats stats = statsMap.get(joinId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("join : "+stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(1L, stats.unitsIn.get());
+            assertEquals(2L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+
+        // validate the stats for the slice operator.
+        {
+            final BOpStats stats = statsMap.get(sliceId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("slice: "+stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(2L, stats.unitsIn.get());
             assertEquals(2L, stats.unitsOut.get());
             assertEquals(1L, stats.chunksOut.get());
         }
