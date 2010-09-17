@@ -72,7 +72,7 @@ public class QuoteOp extends BOpBase {
      */
     public QuoteOp(final BOp op) {
 
-        super(new BOp[] { op });
+        super(new BOp[] { op }, null/*annotations*/);
 
         if (op == null)
             throw new IllegalArgumentException();
