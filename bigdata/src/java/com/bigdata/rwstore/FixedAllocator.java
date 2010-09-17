@@ -117,6 +117,7 @@ public class FixedAllocator implements Allocator {
 
 		if (hasFree()) {
 			m_freeList.add(this);
+			m_freeWaiting = false;
 		}
 	}
 
@@ -190,6 +191,7 @@ public class FixedAllocator implements Allocator {
 				// added back
 				if ((m_freeTransients == m_freeBits) && (m_freeTransients != 0)) {
 					m_freeList.add(this);
+					m_freeWaiting = false;
 				}
 
 				m_freeTransients = 0;
@@ -325,9 +327,7 @@ public class FixedAllocator implements Allocator {
 
 	public String getStats(final AtomicLong counter) {
 
-        final StringBuilder sb = new StringBuilder("Block size : " + m_size
-                + " start : " + getStartAddr() + " free : " + m_freeBits
-                + "\r\n");
+        final StringBuilder sb = new StringBuilder(getSummaryStats());
 
 		final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
 		while (iter.hasNext()) {
@@ -336,10 +336,18 @@ public class FixedAllocator implements Allocator {
 				break;
 			}
             sb.append(block.getStats(null) + "\r\n");
-			counter.addAndGet(block.getAllocBits() * m_size);
+            if (counter != null)
+            	counter.addAndGet(block.getAllocBits() * m_size);
 		}
 
 		return sb.toString();
+	}
+
+	public String getSummaryStats() {
+
+        return"Block size : " + m_size
+                + " start : " + getStartAddr() + " free : " + m_freeBits
+                + "\r\n";
 	}
 
 	public boolean verify(int addr) {
@@ -372,6 +380,8 @@ public class FixedAllocator implements Allocator {
 		return false;
 	}
 
+	private boolean m_freeWaiting = true;
+	
 	public boolean free(final int addr, final int size) {
 		if (addr < 0) {
 			final int offset = ((-addr) & RWStore.OFFSET_BITS_MASK) - 3; // bit adjust
@@ -382,7 +392,13 @@ public class FixedAllocator implements Allocator {
 			
 			if (((AllocBlock) m_allocBlocks.get(block))
 					.freeBit(offset % nbits)) { // bit adjust
-				if (m_freeBits++ == 0) {
+				
+				// Only add back to the free list if at least 3000 bits avail
+				if (m_freeBits++ == 0 && false) {
+					m_freeWaiting = false;
+					m_freeList.add(this);
+				} else if (m_freeWaiting && m_freeBits == 3000) {
+					m_freeWaiting = false;
 					m_freeList.add(this);
 				}
 			} else {
@@ -445,6 +461,13 @@ public class FixedAllocator implements Allocator {
 	    		if (log.isTraceEnabled())
 	    			log.trace("Remove from free list");
 				m_freeList.remove(this);
+				m_freeWaiting = true;
+
+				// Should have been first on list, now check for first
+				if (m_freeList.size() > 0) {
+					FixedAllocator nxt = (FixedAllocator) m_freeList.get(0);
+					System.out.println("Freelist head: " + nxt.getSummaryStats());
+				}
 			}
 
 			addr += (count * 32 * m_bitSize);

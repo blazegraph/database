@@ -50,6 +50,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
+import com.bigdata.io.writecache.BufferedWrite;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.CommitRecordIndex;
@@ -327,6 +328,8 @@ public class RWStore implements IStore {
 
 	private ReopenFileChannel m_reopener = null;
 
+	BufferedWrite m_bufferedWrite;
+	
 	class WriteCacheImpl extends WriteCache.FileChannelScatteredWriteCache {
         public WriteCacheImpl(final ByteBuffer buf,
                 final boolean useChecksum,
@@ -335,7 +338,7 @@ public class RWStore implements IStore {
                 throws InterruptedException {
 
             super(buf, useChecksum, m_quorum!=null&&m_quorum
-                    .isHighlyAvailable(), bufferHasData, opener);
+                    .isHighlyAvailable(), bufferHasData, opener, m_bufferedWrite);
 
         }
 
@@ -379,6 +382,7 @@ public class RWStore implements IStore {
 	 * @param fileMetadataView
 	 * @param readOnly
 	 * @param quorum
+	 * @throws InterruptedException 
 	 */
 
 	public RWStore(final FileMetadataView fileMetadataView, final boolean readOnly,
@@ -411,6 +415,12 @@ public class RWStore implements IStore {
 			m_reopener = new ReopenFileChannel(m_fd, m_raf, "rw");
 		} catch (IOException e1) {
 			throw new RuntimeException(e1);
+		}
+		
+		try {
+			m_bufferedWrite = new BufferedWrite(this);
+		} catch (InterruptedException e1) {
+			m_bufferedWrite = null;
 		}
 
 		int buffers = m_fmv.getFileMetadata().writeCacheBufferCount;
@@ -2122,6 +2132,7 @@ public class RWStore implements IStore {
 			str.append("Allocation: " + stats[i].m_blockSize);
 			str.append(", slots: "  + stats[i].m_filledSlots + "/" + stats[i].m_reservedSlots);
 			str.append(", storage: "  + filled + "/" + reserved);
+			str.append(", usage: "  + (filled * 100 / reserved) + "%");
 			str.append("\n");
 		}
 		str.append("Total - file: " + convertAddr(m_fileSize) + ", slots: " + tfilledSlots + "/" + treservedSlots + ", storage: " + tfilled + "/"  + treserved + "\n");
@@ -2938,6 +2949,19 @@ public class RWStore implements IStore {
 			ret = new ContextAllocation(m_freeFixed.length, null, context);
 			
 			m_contexts.put(context, ret);
+		}
+		
+		return ret;
+	}
+
+	
+	public int getSlotSize(int data_len) {
+		int i = 0;
+
+		int ret = m_minFixedAlloc;
+		while (data_len > ret) {
+			i++;
+			ret = 64 * m_allocSizes[i];
 		}
 		
 		return ret;

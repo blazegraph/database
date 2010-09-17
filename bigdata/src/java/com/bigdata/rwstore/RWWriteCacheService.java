@@ -32,6 +32,7 @@ import java.nio.channels.FileChannel;
 import org.apache.log4j.Logger;
 
 import com.bigdata.io.IReopenChannel;
+import com.bigdata.io.writecache.BufferedWrite;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.io.writecache.WriteCache.FileChannelScatteredWriteCache;
@@ -53,7 +54,6 @@ public class RWWriteCacheService extends WriteCacheService {
 
         super(nbuffers, true/* useChecksum */, fileExtent, opener,
                 quorum);
-        
     }
 
     /**
@@ -72,7 +72,7 @@ public class RWWriteCacheService extends WriteCacheService {
         return new FileChannelScatteredWriteCache(buf, true/* useChecksum */,
         		highlyAvailable,
         		bufferHasData,
-                (IReopenChannel<FileChannel>) opener);
+                (IReopenChannel<FileChannel>) opener, null);
 
     }
     

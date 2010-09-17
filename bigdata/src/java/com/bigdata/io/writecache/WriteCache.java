@@ -1579,6 +1579,12 @@ abstract public class WriteCache implements IWriteCache {
 	 * for the RW mode. Look into putting a thread pool to work on the scattered
 	 * writes. This could be part of a refactor to apply a thread pool to IOs
 	 * and related to prefetch and {@link Memoizer} behaviors.
+	 * 
+	 * FIXME To maximize IO rates we should attempt to elide/merge contiguous
+	 * writes.  To do this can double-buffer in writeOnChannel.  This also
+	 * provides an opportunity to write the full slot size of the RWStore that
+	 * may have advantages, particularly for an SSD, since it may avoid a
+	 * pre-write read to populate the write sector.
 	 */
 	public static class FileChannelScatteredWriteCache extends WriteCache {
 
@@ -1587,6 +1593,7 @@ abstract public class WriteCache implements IWriteCache {
 		 */
 		private final IReopenChannel<FileChannel> opener;
 
+		private final BufferedWrite m_bufferedWrite;
 		/**
 		 * @param baseOffset
 		 *            An offset
@@ -1596,7 +1603,8 @@ abstract public class WriteCache implements IWriteCache {
 		 * @throws InterruptedException
 		 */
 		public FileChannelScatteredWriteCache(final ByteBuffer buf, final boolean useChecksum,
-				final boolean isHighlyAvailable, final boolean bufferHasData, final IReopenChannel<FileChannel> opener)
+				final boolean isHighlyAvailable, final boolean bufferHasData, final IReopenChannel<FileChannel> opener,
+				final BufferedWrite bufferedWrite)
 				throws InterruptedException {
 
 			super(buf, true/* scatteredWrites */, useChecksum, isHighlyAvailable, bufferHasData);
@@ -1605,6 +1613,8 @@ abstract public class WriteCache implements IWriteCache {
 				throw new IllegalArgumentException();
 
 			this.opener = opener;
+			
+			m_bufferedWrite = bufferedWrite;
 
 		}
 
@@ -1646,11 +1656,21 @@ abstract public class WriteCache implements IWriteCache {
 				view.position(pos);
 
 				final long offset = entry.getKey(); // offset in file to update
-				
-				nwrites += FileChannelUtility.writeAll(opener, view, offset);
+				if (m_bufferedWrite == null) {
+					nwrites += FileChannelUtility.writeAll(opener, view, offset);
+				} else {
+					m_bufferedWrite.write(offset, view, opener);
+				}
 				// if (log.isInfoEnabled())
 				// log.info("writing to: " + offset);
 				registerWriteStatus(offset, md.recordLength, 'W');
+			}
+
+			if (m_bufferedWrite != null) {
+				m_bufferedWrite.flush(opener);
+				
+				if (log.isTraceEnabled())
+					log.trace(m_bufferedWrite.getStats(null, true));
 			}
 
 			final WriteCacheCounters counters = this.counters.get();
