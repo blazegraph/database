@@ -283,8 +283,8 @@ public class HashBindingSet implements IBindingSet {
             
 //            if (!o.isBound(vars[i]))
 //                return false;
-
-            if (!val.equals(o.get(var)))
+            IConstant<?> o_val = o.get ( var ) ;
+            if (null == o_val || !val.equals(o_val))
                 return false;
             
         }

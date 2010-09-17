@@ -65,7 +65,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestConstant.class);
 
         // test binding set impls.
-        suite.addTestSuite(TestBindingSet.class);
+        suite.addTestSuite(TestArrayBindingSet.class);
+        suite.addTestSuite(TestHashBindingSet.class);
 
         // unit tests for ctor existence and deep copy semantics
         suite.addTestSuite(TestDeepCopy.class);
