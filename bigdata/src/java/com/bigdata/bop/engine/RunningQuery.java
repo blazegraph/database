@@ -414,10 +414,16 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
          * Note: The partitionId will always be -1 in scale-up.
          */
         final int partitionId = -1;
-        
+
         /*
          * FIXME Raise this into an annotation that we can tweak from the unit
          * tests and then debug the problem.
+         * 
+         * FIXME Add an annotation or method to mark operators which must be
+         * evaluated using operator-at-a-time evaluation. SORT is the main
+         * example here (it must be operator at a time of necessity) but other
+         * operators may implemented with operator at a time assumptions. This
+         * might be on PipelineOp and could be trinary {Chunked,Blocked,All}.
          */
         final boolean oneMessagePerChunk = false;
         
