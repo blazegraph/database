@@ -54,6 +54,7 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
@@ -64,6 +65,7 @@ import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.fed.TestFederatedQueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
+import com.bigdata.bop.solutions.SliceOp.SliceStats;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -90,6 +92,8 @@ import com.ibm.icu.impl.ByteBuffer;
  * @version $Id$
  * 
  * @see TestFederatedQueryEngine
+ * 
+ * @todo write a unit and stress tests for deadlines.
  */
 public class TestQueryEngine extends TestCase2 {
 
@@ -185,6 +189,35 @@ public class TestQueryEngine extends TestCase2 {
 
         return new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { new IBindingSet[] { bindingSet } });
+
+    }
+
+    /**
+     * Return an {@link IAsynchronousIterator} that will read a single, chunk
+     * containing all of the specified {@link IBindingSet}s.
+     * 
+     * @param bindingSets
+     *            the binding sets.
+     */
+    protected ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+            final IBindingSet[] bindingSets) {
+
+        return new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { bindingSets });
+
+    }
+
+    /**
+     * Return an {@link IAsynchronousIterator} that will read a single, chunk
+     * containing all of the specified {@link IBindingSet}s.
+     * 
+     * @param bindingSetChunks
+     *            the chunks of binding sets.
+     */
+    protected ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+            final IBindingSet[][] bindingSetChunks) {
+
+        return new ThickAsynchronousIterator<IBindingSet[]>(bindingSetChunks);
 
     }
 
@@ -352,6 +385,187 @@ public class TestQueryEngine extends TestCase2 {
             assertEquals(1L, stats.unitsIn.get());
             assertEquals(1L, stats.unitsOut.get());
             assertEquals(1L, stats.chunksOut.get());
+        }
+
+    }
+
+    /**
+     * Test the ability run a simple join when multiple binding sets are
+     * submitted as the initial input. The access path associated with the join
+     * does not have any constants but the join picks up bindings from the input
+     * binding sets and uses them to constrain the access path.
+     */
+    public void test_query_join1_multipleChunksIn() throws Exception {
+
+        final Var<?> x = Var.var("x");
+        final Var<?> y = Var.var("y");
+        
+        final int startId = 1;
+        final int joinId = 2;
+        final int predId = 3;
+
+        /*
+         * Enforce a constraint on the source such that it hands 3 each source
+         * chunk to the join operator as a separate chunk
+         * 
+         * @todo This is not enough to force the query engine to run the join
+         * operator once per source chunk. Instead, it takes the output of the
+         * source operator, which is N chunks, and sends them all to a single
+         * invocation of the join task. To do better than that we have to send
+         * multiple chunk messages rather than just one.
+         */
+        final int nsources = 3;
+        final StartOp startOp = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(PipelineOp.Annotations.CHUNK_CAPACITY, 1),//
+                new NV(PipelineOp.Annotations.CHUNK_OF_CHUNKS_CAPACITY, nsources),//
+                }));
+
+        final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
+                x, y }, NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.PARTITION_ID, Integer
+                                .valueOf(-1)),//
+                        new NV(Predicate.Annotations.OPTIONAL, Boolean.FALSE),//
+                        new NV(Predicate.Annotations.CONSTRAINT, null),//
+                        new NV(Predicate.Annotations.EXPANDER, null),//
+                        new NV(Predicate.Annotations.BOP_ID, predId),//
+                        new NV(Predicate.Annotations.TIMESTAMP,
+                                ITx.READ_COMMITTED),//
+                }));
+        
+        final PipelineJoin<E> joinOp = new PipelineJoin<E>(
+                startOp/* left */, predOp/* right */,
+                // join annotations
+                NV.asMap(new NV[] { //
+                        new NV(Predicate.Annotations.BOP_ID, joinId),//
+//                        new NV(PipelineOp.Annotations.CHUNK_CAPACITY, 1),//
+//                        new NV(PipelineOp.Annotations.CHUNK_OF_CHUNKS_CAPACITY, 1),//
+                        })//
+        );
+        
+        final int sliceId = 4;
+        final SliceOp sliceOp = new SliceOp(new BOp[] { joinOp },
+                // slice annotations
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, sliceId),//
+                        })//
+        );
+        
+        final BindingSetPipelineOp query = sliceOp;
+
+        /*
+         * Source binding sets.
+         * 
+         * Note: We can't bind y in advance for the primary index!
+         */
+        final IBindingSet[] source = new IBindingSet[] {//
+                new HashBindingSet(new ArrayBindingSet(//
+                        new IVariable[] { x },//
+                        new IConstant[] { new Constant<String>("Paul") }//
+                )),//
+                new HashBindingSet(new ArrayBindingSet(//
+                        new IVariable[] { x },//
+                        new IConstant[] { new Constant<String>("Leon") }//
+                )),
+                new HashBindingSet(new ArrayBindingSet(//
+                        new IVariable[] { x },//
+                        new IConstant[] { new Constant<String>("Mary") }//
+                )),
+        };
+        // Put each source binding set into a chunk by itself.
+        final IBindingSet[][] sources = new IBindingSet[source.length][];
+        for (int i = 0; i < sources.length; i++) {
+            sources[i] = new IBindingSet[] { source[i] };
+        }
+        assertEquals(nsources,source.length);
+        assertEquals(nsources,sources.length);
+
+//        new E("John", "Mary"),// [0]
+//        new E("Leon", "Paul"),// [1]
+//        new E("Mary", "Paul"),// [2]
+//        new E("Paul", "Leon"),// [3]
+        
+        // the expected solution (just one).
+        final IBindingSet[] expected = new IBindingSet[] {//
+        new ArrayBindingSet(//
+                new IVariable[] { x, y },//
+                new IConstant[] { //
+                new Constant<String>("Paul"), new Constant<String>("Leon") }//
+        ),//
+        new ArrayBindingSet(//
+                new IVariable[] { x, y },//
+                new IConstant[] { //
+                new Constant<String>("Leon"), new Constant<String>("Paul") }//
+        ),
+        new ArrayBindingSet(//
+                new IVariable[] { x, y },//
+                new IConstant[] { //
+                new Constant<String>("Mary"), new Constant<String>("Paul") }//
+        ),
+        };
+
+        final UUID queryId = UUID.randomUUID();
+        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
+                        startId, -1 /* partitionId */,
+                        newBindingSetIterator(sources)));
+
+        // verify solutions.
+        assertSameSolutionsAnyOrder(expected, new Dechunkerator<IBindingSet>(
+                runningQuery.iterator()));
+
+        // Wait until the query is done.
+        runningQuery.get();
+        final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
+        {
+            // validate the stats map.
+            assertNotNull(statsMap);
+            assertEquals(3, statsMap.size());
+            if (log.isInfoEnabled())
+                log.info(statsMap.toString());
+        }
+
+        // validate the stats for the start operator.
+        {
+            final BOpStats stats = statsMap.get(startId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("start: "+stats.toString());
+
+            assertEquals(3L, stats.chunksIn.get());
+            assertEquals(3L, stats.unitsIn.get());
+            assertEquals(3L, stats.unitsOut.get());
+            assertEquals(3L, stats.chunksOut.get());
+        }
+
+        // validate the stats for the join operator.
+        {
+            final BOpStats stats = statsMap.get(joinId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("join : "+stats.toString());
+
+//            assertEquals(3L, stats.chunksIn.get());
+            assertEquals(3L, stats.unitsIn.get());
+            assertEquals(3L, stats.unitsOut.get());
+//            assertEquals(3L, stats.chunksOut.get());
+        }
+
+        // validate the stats for the slice operator.
+        {
+            final SliceStats stats = (SliceStats) statsMap.get(sliceId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("slice: "+stats.toString());
+
+            assertEquals(3L, stats.nseen.get());
+            assertEquals(3L, stats.naccepted.get());
+//            assertEquals(3L, stats.chunksIn.get());
+            assertEquals(3L, stats.unitsIn.get());
+            assertEquals(3L, stats.unitsOut.get());
+//            assertEquals(3L, stats.chunksOut.get());
         }
 
     }

@@ -99,5 +99,34 @@ public class TestBOpStats extends TestCase2 {
         assertEquals("chunksOut", 4L, totals.chunksOut.get());
 
     }
+
+    public void test_addToSelf() {
+        
+        final BOpStats stats = new BOpStats();
+        
+        assertEquals("chunksIn", 0L, stats.chunksIn.get());
+        assertEquals("unitsIn", 0L, stats.unitsIn.get());
+        assertEquals("unitsOut", 0L, stats.unitsOut.get());
+        assertEquals("chunksOut", 0L, stats.chunksOut.get());
+
+        stats.chunksIn.increment();
+        stats.unitsIn.increment();
+        stats.unitsIn.increment();
+        
+        assertEquals("chunksIn", 1L, stats.chunksIn.get());
+        assertEquals("unitsIn", 2L, stats.unitsIn.get());
+        assertEquals("unitsOut", 0L, stats.unitsOut.get());
+        assertEquals("chunksOut", 0L, stats.chunksOut.get());
+
+        // add to self.
+        stats.add(stats);
+
+        // verify no change.
+        assertEquals("chunksIn", 1L, stats.chunksIn.get());
+        assertEquals("unitsIn", 2L, stats.unitsIn.get());
+        assertEquals("unitsOut", 0L, stats.unitsOut.get());
+        assertEquals("chunksOut", 0L, stats.chunksOut.get());
+
+    }
     
 }

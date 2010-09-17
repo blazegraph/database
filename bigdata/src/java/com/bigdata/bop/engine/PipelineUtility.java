@@ -149,6 +149,9 @@ public class PipelineUtility {
 
         }
 
+        if (log.isInfoEnabled())
+            log.info("Operator can not be triggered: op=" + op);
+
         return true;
 
     }
