@@ -88,10 +88,6 @@ public class MemorySortOp extends SortOp {
                 // sort.
                 Arrays.sort(all, comparator);
 
-                // update counters.
-                stats.unitsOut.add(all.length);
-                stats.chunksOut.increment();
-
                 // write output and flush.
                 sink.add(all);
                 sink.flush();

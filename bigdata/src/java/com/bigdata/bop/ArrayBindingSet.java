@@ -435,10 +435,8 @@ public class ArrayBindingSet implements IBindingSet {
         
         for(int i=0; i<nbound; i++) {
             
-//            if (!o.isBound(vars[i]))
-//                return false;
-
-            if (!vals[i].equals(o.get(vars[i])))
+            IConstant<?> o_val = o.get ( vars [ i ] ) ;
+            if ( null == o_val || !vals[i].equals( o_val ))
                 return false;
             
         }
