@@ -65,7 +65,6 @@ import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SortOp;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.counters.CAT;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -106,6 +105,9 @@ import com.bigdata.util.config.NicUtil;
  *          thompsonbry $
  * 
  * @todo reuse the stress test from {@link TestQueryEngine}.
+ * 
+ * @todo there should be a stress test of {@link SliceOp} with a non-zero offset
+ *       in order to verify that it is properly synchronized.
  */
 public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase {
 
@@ -428,7 +430,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
      * 
      * @throws Exception
      */
-    public void test_query_startThenSlice() throws Exception {
+    public void test_query_startThenSlice_noJoins() throws Exception {
         
         final int startId = 1;
         final int sliceId = 4;
@@ -508,14 +510,335 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
     }
     
     /**
-     * Test the ability run a simple join. There are three operators. One feeds
-     * an empty binding set[] into the join, another is the predicate for the
-     * access path on which the join will read (it probes the index once for
-     * "Mary" and binds "Paul" and "John" when it does so), and the third is the
-     * join itself (there are two solutions, which are "value=Paul" and
-     * value="John").
+     * Test the ability run a simple join which is mapped across two index
+     * partitions. There are three operators. One feeds an empty binding set[]
+     * into the join, another is the predicate for the access path on which the
+     * join will read (no variables are bound so it will read everything), and
+     * the third is the join itself.
+     * 
+     * @throws Exception
      */
-    public void test_query_join1() throws Exception {
+    public void test_query_join_2shards_nothingBoundOnAccessPath() throws Exception {
+
+        final Var<?> x = Var.var("x") ;
+        final Var<?> y = Var.var("y") ;
+        
+        final int startId = 1;
+        final int joinId = 2;
+        final int predId = 3;
+        final int sliceId = 4;
+
+        final StartOp startOp = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new NV(Predicate.Annotations.BOP_ID, startId),//
+                }));
+
+        // access path has has no constants and no constraint.
+        final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
+                x, y}, NV
+                .asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.PARTITION_ID, Integer
+                                .valueOf(-1)),//
+                        new NV(Predicate.Annotations.OPTIONAL, Boolean.FALSE),//
+                        new NV(Predicate.Annotations.CONSTRAINT, null),//
+                        new NV(Predicate.Annotations.EXPANDER, null),//
+                        new NV(Predicate.Annotations.BOP_ID, predId),//
+                        new NV(Predicate.Annotations.TIMESTAMP,
+                                ITx.READ_COMMITTED),//
+                        new NV(Predicate.Annotations.KEY_ORDER,
+                                R.primaryKeyOrder),//
+                }));
+
+        final PipelineJoin<E> joinOp = new PipelineJoin<E>(startOp/* left */,
+                predOp/* right */,
+                // join annotations
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, joinId),//
+                        })//
+        );
+        
+        final BindingSetPipelineOp query = new SliceOp(new BOp[] { joinOp },
+        // slice annotations
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, sliceId),//
+                        })//
+        );
+
+        // the expected solutions (order is not reliable due to concurrency).
+        final IBindingSet[] expected = new IBindingSet[] {//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { //
+                                new Constant<String>("John"),
+                                new Constant<String>("Mary") }//
+                ), //
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] {//
+                                new Constant<String>("Leon"),
+                                new Constant<String>("Paul") }//
+                ), // 
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { //
+                                new Constant<String>("Mary"),
+                                new Constant<String>("John") }//
+                ), //
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] {//
+                                new Constant<String>("Mary"),
+                                new Constant<String>("Paul") }//
+                ), //
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { //
+                                new Constant<String>("Paul"),
+                                new Constant<String>("Leon") }//
+                ), //
+                };
+//        // partition0
+//        new E("John", "Mary"),// 
+//        new E("Leon", "Paul"),// 
+//        // partition1
+//        new E("Mary", "John"),// 
+//        new E("Mary", "Paul"),// 
+//        new E("Paul", "Leon"),// 
+
+        // run query with empty binding set, so nothing is bound on the join.
+        final UUID queryId = UUID.randomUUID();
+        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
+                        startId,//
+                        -1, /* partitionId */
+                        newBindingSetIterator(new HashBindingSet())));
+
+        // verify solutions.
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+                new Dechunkerator<IBindingSet>(runningQuery.iterator()));
+
+        // Wait until the query is done.
+        runningQuery.get();
+        final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
+        {
+            // validate the stats map.
+            assertNotNull(statsMap);
+            assertEquals(3, statsMap.size());
+            if (log.isInfoEnabled())
+                log.info(statsMap.toString());
+        }
+
+        // validate the stats for the start operator.
+        {
+            final BOpStats stats = statsMap.get(startId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("start: "+stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(1L, stats.unitsIn.get());
+            assertEquals(1L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+
+        // validate the stats for the join operator.
+        {
+            final BOpStats stats = statsMap.get(joinId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("join : "+stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(1L, stats.unitsIn.get());
+            assertEquals(5L, stats.unitsOut.get());
+            assertEquals(2L, stats.chunksOut.get()); // since we read on both shards.
+        }
+
+        // validate the stats for the slice operator.
+        {
+            final BOpStats stats = statsMap.get(sliceId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("slice: "+stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(2L, stats.chunksIn.get()); // from both shards.
+            assertEquals(5L, stats.unitsIn.get());
+            assertEquals(5L, stats.unitsOut.get());
+            assertEquals(2L, stats.chunksOut.get());
+        }
+
+    }
+
+    /**
+     * Test the ability run a simple join which is mapped across two index
+     * partitions. The join is constrained to filter for only solutions in which
+     * [y==Paul].
+     */
+    public void test_query_join_2shards_nothingBoundOnAccessPath_withConstraint()
+            throws Exception {
+
+        final Var<?> x = Var.var("x");
+        final Var<?> y = Var.var("y");
+        
+        final int startId = 1;
+        final int joinId = 2;
+        final int predId = 3;
+        final int sliceId = 4;
+
+        final StartOp startOp = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new NV(Predicate.Annotations.BOP_ID, startId),//
+                }));
+
+        /*
+         * Note: Since the index on which this reads is formed as (column1 +
+         * column2) the probe key will be [null] if it does not bind the first
+         * column. Therefore, in order to have the 2nd column constraint we have
+         * to model it as an IElementFilter on the predicate.
+         */
+        final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
+                x, y}, NV
+                .asMap(new NV[] {//
+                        new NV(Predicate.Annotations.RELATION_NAME,
+                                new String[] { namespace }),//
+                        new NV(Predicate.Annotations.PARTITION_ID, Integer
+                                .valueOf(-1)),//
+                        new NV(Predicate.Annotations.OPTIONAL, Boolean.FALSE),//
+                        new NV(Predicate.Annotations.CONSTRAINT,null),//
+                        new NV(Predicate.Annotations.EXPANDER, null),//
+                        new NV(Predicate.Annotations.BOP_ID, predId),//
+                        new NV(Predicate.Annotations.TIMESTAMP,
+                                ITx.READ_COMMITTED),//
+                        new NV(Predicate.Annotations.KEY_ORDER,
+                                R.primaryKeyOrder),//
+                }));
+
+        final PipelineJoin<E> joinOp = new PipelineJoin<E>(startOp/* left */,
+                predOp/* right */,
+                // join annotations
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, joinId),//
+                        // impose constraint on the join.
+                        new NV(PipelineJoin.Annotations.CONSTRAINTS,
+                                new IConstraint[] { new EQConstant(y,
+                                        new Constant<String>("Paul")) }),//
+                        })//
+        );
+        
+        final BindingSetPipelineOp query = new SliceOp(new BOp[] { joinOp },
+        // slice annotations
+                NV.asMap(new NV[] {//
+                        new NV(Predicate.Annotations.BOP_ID, sliceId),//
+                        })//
+        );
+
+        // the expected solutions (order is not reliable due to concurrency).
+        final IBindingSet[] expected = new IBindingSet[] {//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Leon"),
+                                new Constant<String>("Paul") }//
+                ), // 
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Mary"),
+                                new Constant<String>("Paul") }//
+                ), //
+        };
+//        // partition0
+//        new E("John", "Mary"),// 
+//        new E("Leon", "Paul"),// 
+//        // partition1
+//        new E("Mary", "John"),// 
+//        new E("Mary", "Paul"),// 
+//        new E("Paul", "Leon"),// 
+
+        final RunningQuery runningQuery;
+        {
+            final IBindingSet initialBindingSet = new HashBindingSet();
+
+//            initialBindingSet.set(y, new Constant<String>("Paul"));
+            
+            final UUID queryId = UUID.randomUUID();
+
+            runningQuery = queryEngine.eval(queryId, query,
+                    new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
+                            startId,//
+                            -1, /* partitionId */
+                            newBindingSetIterator(initialBindingSet)));
+        }
+
+        // verify solutions.
+        TestQueryEngine.assertSameSolutionsAnyOrder(expected,
+                new Dechunkerator<IBindingSet>(runningQuery.iterator()));
+
+        // Wait until the query is done.
+        runningQuery.get();
+        final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
+        {
+            // validate the stats map.
+            assertNotNull(statsMap);
+            assertEquals(3, statsMap.size());
+            if (log.isInfoEnabled())
+                log.info(statsMap.toString());
+        }
+
+        // validate the stats for the start operator.
+        {
+            final BOpStats stats = statsMap.get(startId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("start: "+stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(1L, stats.chunksIn.get());
+            assertEquals(1L, stats.unitsIn.get());
+            assertEquals(1L, stats.unitsOut.get());
+            assertEquals(1L, stats.chunksOut.get());
+        }
+
+        // validate the stats for the join operator.
+        {
+            final BOpStats stats = statsMap.get(joinId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("join : "+stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(2L, stats.chunksIn.get()); // since we read on two shards.
+            assertEquals(1L, stats.unitsIn.get()); // a single empty binding set.
+            assertEquals(5L, stats.unitsOut.get()); // each of the tuples will be read.
+            assertEquals(2L, stats.chunksOut.get()); // since we read on both shards.
+        }
+
+        // validate the stats for the slice operator.
+        {
+            final BOpStats stats = statsMap.get(sliceId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("slice: "+stats.toString());
+
+            // verify query solution stats details.
+            assertEquals(2L, stats.chunksIn.get()); // from both shards.
+            assertEquals(2L, stats.unitsIn.get()); 
+            assertEquals(2L, stats.unitsOut.get());
+            assertEquals(2L, stats.chunksOut.get());
+        }
+
+    }
+
+    /**
+     * Test the ability run a simple join reading on a single shard. There are
+     * three operators. One feeds an empty binding set[] into the join, another
+     * is the predicate for the access path on which the join will read (it
+     * probes the index once for "Mary" and binds "Paul" and "John" when it does
+     * so), and the third is the join itself (there are two solutions, which are
+     * "value=Paul" and value="John").
+     */
+    public void test_query_join_1shard() throws Exception {
 
         final int startId = 1;
         final int joinId = 2;
@@ -526,6 +849,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 }));
 
+        // Note: tuples with "Mary" in the 1st column are on partition1.
         final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
                 new Constant<String>("Mary"), Var.var("value") }, NV
                 .asMap(new NV[] {//
@@ -636,336 +960,6 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
     }
 
     /**
-     * Test the ability run a simple join which is mapped across two index
-     * partitions.
-     * 
-     * FIXME This is failing because the {@link SliceOp} is not remembering its
-     * state across distinct invocations and is cancelling the query as soon as
-     * it exhausts its input. In order to have correct decision boundaries,
-     * slice needs to be invoked either once, concurrently if using {@link CAT}
-     * s, or in a series of presentations otherwise (single-threaded operator or
-     * internal locking in the operator implementation on its {@link SliceOp} to
-     * achieve chunk-wise serialization of processing).
-     * <p>
-     * The easiest way to fix this is to have {@link SliceOp} specialize the
-     * {@link BOpStats}s and carry its state there. That will also make it safe
-     * for concurrent evaluation within the same query, and we will have to
-     * write a unit test for that.
-     * <p>
-     * I am not yet convinced that the problem with the test failure is double
-     * invocation of {@link SliceOp}. It could also be that we are not invoking
-     * it the 2nd time.
-     */
-    public void test_query_join_withConstraint_readsOn2shards() throws Exception {
-
-        final Var<?> x = Var.var("x");
-        final Var<?> y = Var.var("y");
-        
-        final int startId = 1;
-        final int joinId = 2;
-        final int predId = 3;
-        final int sliceId = 4;
-
-        final StartOp startOp = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
-                new NV(Predicate.Annotations.BOP_ID, startId),//
-                }));
-
-        /*
-         * 
-         * Note: Since the index on which this reads is formed as (column1 +
-         * column2) the probe key will be [null] if it does not bind the first
-         * column. Therefore, in order to have the 2nd column constraint we have
-         * to model it as an IElementFilter on the predicate.
-         */
-        final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
-                x, y}, NV
-                .asMap(new NV[] {//
-                        new NV(Predicate.Annotations.RELATION_NAME,
-                                new String[] { namespace }),//
-                        new NV(Predicate.Annotations.PARTITION_ID, Integer
-                                .valueOf(-1)),//
-                        new NV(Predicate.Annotations.OPTIONAL, Boolean.FALSE),//
-                        new NV(Predicate.Annotations.CONSTRAINT,null),//
-                        new NV(Predicate.Annotations.EXPANDER, null),//
-                        new NV(Predicate.Annotations.BOP_ID, predId),//
-                        new NV(Predicate.Annotations.TIMESTAMP,
-                                ITx.READ_COMMITTED),//
-                        new NV(Predicate.Annotations.KEY_ORDER,
-                                R.primaryKeyOrder),//
-                }));
-
-        final PipelineJoin<E> joinOp = new PipelineJoin<E>(startOp/* left */,
-                predOp/* right */,
-                // join annotations
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, joinId),//
-                        // impose constraint on the join.
-                        new NV(PipelineJoin.Annotations.CONSTRAINTS,
-                                new IConstraint[] { new EQConstant(y,
-                                        new Constant<String>("Paul")) }),//
-                        })//
-        );
-        
-        final BindingSetPipelineOp query = new SliceOp(new BOp[] { joinOp },
-        // slice annotations
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, sliceId),//
-                        })//
-        );
-
-        // the expected solutions (order is not reliable due to concurrency).
-        final IBindingSet[] expected = new IBindingSet[] {//
-                new ArrayBindingSet(//
-                        new IVariable[] { x, y },//
-                        new IConstant[] { new Constant<String>("Leon"),
-                                new Constant<String>("Paul") }//
-                ), // 
-                new ArrayBindingSet(//
-                        new IVariable[] { x, y },//
-                        new IConstant[] { new Constant<String>("Mary"),
-                                new Constant<String>("Paul") }//
-                ), //
-                };
-//        // partition0
-//        new E("John", "Mary"),// 
-//        new E("Leon", "Paul"),// 
-//        // partition1
-//        new E("Mary", "John"),// 
-//        new E("Mary", "Paul"),// 
-//        new E("Paul", "Leon"),// 
-
-        final RunningQuery runningQuery;
-        {
-            final IBindingSet initialBindingSet = new HashBindingSet();
-
-//            initialBindingSet.set(y, new Constant<String>("Paul"));
-            
-            final UUID queryId = UUID.randomUUID();
-
-            runningQuery = queryEngine.eval(queryId, query,
-                    new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
-                            startId,//
-                            -1, /* partitionId */
-                            newBindingSetIterator(initialBindingSet)));
-        }
-
-        // verify solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected,
-                new Dechunkerator<IBindingSet>(runningQuery.iterator()));
-
-        // Wait until the query is done.
-        runningQuery.get();
-        final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
-        {
-            // validate the stats map.
-            assertNotNull(statsMap);
-            assertEquals(3, statsMap.size());
-            if (log.isInfoEnabled())
-                log.info(statsMap.toString());
-        }
-
-        // validate the stats for the start operator.
-        {
-            final BOpStats stats = statsMap.get(startId);
-            assertNotNull(stats);
-            if (log.isInfoEnabled())
-                log.info("start: "+stats.toString());
-
-            // verify query solution stats details.
-            assertEquals(1L, stats.chunksIn.get());
-            assertEquals(1L, stats.unitsIn.get());
-            assertEquals(1L, stats.unitsOut.get());
-            assertEquals(1L, stats.chunksOut.get());
-        }
-
-        // validate the stats for the join operator.
-        {
-            final BOpStats stats = statsMap.get(joinId);
-            assertNotNull(stats);
-            if (log.isInfoEnabled())
-                log.info("join : "+stats.toString());
-
-            // verify query solution stats details.
-            assertEquals(1L, stats.chunksIn.get());
-            assertEquals(1L, stats.unitsIn.get());
-            assertEquals(5L, stats.unitsOut.get());
-            assertEquals(2L, stats.chunksOut.get()); // since we read on both shards.
-        }
-
-        // validate the stats for the slice operator.
-        {
-            final BOpStats stats = statsMap.get(sliceId);
-            assertNotNull(stats);
-            if (log.isInfoEnabled())
-                log.info("slice: "+stats.toString());
-
-            // verify query solution stats details.
-            assertEquals(2L, stats.chunksIn.get()); // from both shards.
-            assertEquals(5L, stats.unitsIn.get());
-            assertEquals(5L, stats.unitsOut.get());
-            assertEquals(2L, stats.chunksOut.get());
-        }
-
-    }
-
-    /**
-     * Test the ability run a simple join which is mapped across two index
-     * partitions. There are three operators. One feeds an empty binding set[]
-     * into the join, another is the predicate for the access path on which the
-     * join will read (no variables are bound so it will read everything), and
-     * the third is the join itself.
-     * 
-     * @throws Exception
-     */
-    public void test_query_join1_2shards_nothingBoundOnAccessPath() throws Exception {
-
-        final Var<?> x = Var.var("x") ;
-        final Var<?> y = Var.var("y") ;
-        
-        final int startId = 1;
-        final int joinId = 2;
-        final int predId = 3;
-        final int sliceId = 4;
-
-        final StartOp startOp = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
-                new NV(Predicate.Annotations.BOP_ID, startId),//
-                }));
-
-        final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
-                x, y}, NV
-                .asMap(new NV[] {//
-                        new NV(Predicate.Annotations.RELATION_NAME,
-                                new String[] { namespace }),//
-                        new NV(Predicate.Annotations.PARTITION_ID, Integer
-                                .valueOf(-1)),//
-                        new NV(Predicate.Annotations.OPTIONAL, Boolean.FALSE),//
-                        new NV(Predicate.Annotations.CONSTRAINT, null),//
-                        new NV(Predicate.Annotations.EXPANDER, null),//
-                        new NV(Predicate.Annotations.BOP_ID, predId),//
-                        new NV(Predicate.Annotations.TIMESTAMP,
-                                ITx.READ_COMMITTED),//
-                        new NV(Predicate.Annotations.KEY_ORDER,
-                                R.primaryKeyOrder),//
-                }));
-
-        final PipelineJoin<E> joinOp = new PipelineJoin<E>(startOp/* left */,
-                predOp/* right */,
-                // join annotations
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, joinId),//
-                        })//
-        );
-        
-        final BindingSetPipelineOp query = new SliceOp(new BOp[] { joinOp },
-        // slice annotations
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, sliceId),//
-                        })//
-        );
-
-        // the expected solutions (order is not reliable due to concurrency).
-        final IBindingSet[] expected = new IBindingSet[] {//
-                new ArrayBindingSet(//
-                        new IVariable[] { x, y },//
-                        new IConstant[] { new Constant<String>("John"),
-                                new Constant<String>("Mary") }//
-                ), //
-                new ArrayBindingSet(//
-                        new IVariable[] { x, y },//
-                        new IConstant[] { new Constant<String>("John"),
-                                new Constant<String>("Paul") }//
-                ), // 
-                new ArrayBindingSet(//
-                        new IVariable[] { x, y },//
-                        new IConstant[] { new Constant<String>("Mary"),
-                                new Constant<String>("John") }//
-                ), //
-                new ArrayBindingSet(//
-                        new IVariable[] { x, y },//
-                        new IConstant[] { new Constant<String>("Mary"),
-                                new Constant<String>("Paul") }//
-                ), //
-                new ArrayBindingSet(//
-                        new IVariable[] { x, y },//
-                        new IConstant[] { new Constant<String>("Paul"),
-                                new Constant<String>("Leon") }//
-                ), //
-                };
-//        // partition0
-//        new E("John", "Mary"),// 
-//        new E("Leon", "Paul"),// 
-//        // partition1
-//        new E("Mary", "John"),// 
-//        new E("Mary", "Paul"),// 
-//        new E("Paul", "Leon"),// 
-
-        final UUID queryId = UUID.randomUUID();
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
-                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
-                        startId,//
-                        -1, /* partitionId */
-                        newBindingSetIterator(new HashBindingSet())));
-
-        // verify solutions.
-        TestQueryEngine.assertSameSolutionsAnyOrder(expected,
-                new Dechunkerator<IBindingSet>(runningQuery.iterator()));
-
-        // Wait until the query is done.
-        runningQuery.get();
-        final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
-        {
-            // validate the stats map.
-            assertNotNull(statsMap);
-            assertEquals(3, statsMap.size());
-            if (log.isInfoEnabled())
-                log.info(statsMap.toString());
-        }
-
-        // validate the stats for the start operator.
-        {
-            final BOpStats stats = statsMap.get(startId);
-            assertNotNull(stats);
-            if (log.isInfoEnabled())
-                log.info("start: "+stats.toString());
-
-            // verify query solution stats details.
-            assertEquals(1L, stats.chunksIn.get());
-            assertEquals(1L, stats.unitsIn.get());
-            assertEquals(1L, stats.unitsOut.get());
-            assertEquals(1L, stats.chunksOut.get());
-        }
-
-        // validate the stats for the join operator.
-        {
-            final BOpStats stats = statsMap.get(joinId);
-            assertNotNull(stats);
-            if (log.isInfoEnabled())
-                log.info("join : "+stats.toString());
-
-            // verify query solution stats details.
-            assertEquals(1L, stats.chunksIn.get());
-            assertEquals(1L, stats.unitsIn.get());
-            assertEquals(5L, stats.unitsOut.get());
-            assertEquals(2L, stats.chunksOut.get()); // since we read on both shards.
-        }
-
-        // validate the stats for the slice operator.
-        {
-            final BOpStats stats = statsMap.get(sliceId);
-            assertNotNull(stats);
-            if (log.isInfoEnabled())
-                log.info("slice: "+stats.toString());
-
-            // verify query solution stats details.
-            assertEquals(2L, stats.chunksIn.get()); // from both shards.
-            assertEquals(5L, stats.unitsIn.get());
-            assertEquals(5L, stats.unitsOut.get());
-            assertEquals(2L, stats.chunksOut.get());
-        }
-
-    }
-
-    /**
      * @todo Test the ability close the iterator draining a result set before
      *       the query has finished executing and verify that the query is
      *       correctly terminated [this is difficult to test without having
@@ -982,26 +976,6 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
      *       of the data in that {@link ByteBuffer}.]
      */
     public void test_query_closeIterator() {
-
-        fail("write test");
-
-    }
-
-    /**
-     * @todo Test ability to impose a limit/offset slice on a query.
-     *       <p>
-     *       Note: While the logic for visiting only the solutions selected by
-     *       the slice can be tested against a mock object, the integration by
-     *       which a slice halts a query when it is satisfied has to be tested
-     *       against a {@link QueryEngine}.
-     *       <p>
-     *       This must also be tested in scale-out to make sure that the data
-     *       backing the solutions is not discarded before the caller can use
-     *       those data. [This could be handled by materializing binding set
-     *       objects out of a {@link ByteBuffer} rather than using a live decode
-     *       of the data in that {@link ByteBuffer}.]
-     */
-    public void test_query_slice() {
 
         fail("write test");
 

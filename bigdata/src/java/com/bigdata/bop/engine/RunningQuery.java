@@ -55,6 +55,7 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
+import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.service.IBigdataFederation;
@@ -135,8 +136,8 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
     /**
      * The buffer used for the overall output of the query pipeline.
      * <p>
-     * Note: In scale out, this only exists on the query controller. In order to
-     * ensure that the results are transferred to the query controller, the
+     * Note: This only exists on the query controller. In order to ensure that
+     * the results are transferred to the query controller in scale-out, the
      * top-level operator in the query plan must specify
      * {@link BOpEvaluationContext#CONTROLLER}. For example, {@link SliceOp}
      * uses this {@link BOpEvaluationContext}.
@@ -393,8 +394,8 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
      * <p>
      * The default implementation supports a standalone database. The generated
      * chunk is left on the Java heap and handed off synchronously using
-     * {@link QueryEngine#add(IChunkMessage)}. That method will queue the chunk
-     * for asynchronous processing.
+     * {@link QueryEngine#acceptChunk(IChunkMessage)}. That method will queue
+     * the chunk for asynchronous processing.
      * 
      * @param sinkId
      *            The identifier of the target operator.
@@ -412,9 +413,44 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
         /*
          * Note: The partitionId will always be -1 in scale-up.
          */
+        final int partitionId = -1;
+        
+        /*
+         * FIXME Raise this into an annotation that we can tweak from the unit
+         * tests and then debug the problem.
+         */
+        final boolean oneMessagePerChunk = false;
+        
+        if (oneMessagePerChunk) {
+
+            final IAsynchronousIterator<IBindingSet[]> itr = sink.iterator();
+
+            int nchunks = 0;
+            
+            while (itr.hasNext()) {
+
+                final IBlockingBuffer<IBindingSet[]> tmp = new BlockingBuffer<IBindingSet[]>(
+                        1);
+
+                tmp.add(itr.next());
+                
+                tmp.close();
+                
+                final LocalChunkMessage<IBindingSet> chunk = new LocalChunkMessage<IBindingSet>(
+                        clientProxy, queryId, sinkId, partitionId, tmp.iterator());
+
+                queryEngine.acceptChunk(chunk);
+
+                nchunks++;
+                
+            }
+            
+            return nchunks;
+            
+        }
+        
         final LocalChunkMessage<IBindingSet> chunk = new LocalChunkMessage<IBindingSet>(
-                clientProxy, queryId, sinkId, -1/* partitionId */, sink
-                        .iterator());
+                clientProxy, queryId, sinkId, partitionId, sink.iterator());
 
         queryEngine.acceptChunk(chunk);
 
@@ -539,8 +575,10 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
         // update per-operator statistics.
         final BOpStats tmp = statsMap.putIfAbsent(msg.bopId, msg.taskStats);
 
-        if (tmp != null)
+        if (tmp != null && tmp != msg.taskStats) {
+            // combine, but do not add to self.
             tmp.add(msg.taskStats);
+        }
 
         Throwable cause = null;
         boolean allDone = false;
@@ -828,7 +866,25 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
                                 + bop);
             }
 
-            final BOpStats stats = op.newStats();
+            /*
+             * Setup the BOpStats object. For some operators, e.g., SliceOp,
+             * this MUST be the same object across all invocations of that
+             * instance of that operator for this query. This is marked by the
+             * PipelineOp#isSharedState() method and is handled by a
+             * putIfAbsent() pattern when that method returns true.
+             * 
+             * Note: RunState#haltOp() avoids adding a BOpStats object to itself
+             * since that would cause double counting when the same object is
+             * used for each invocation of the operator.
+             */
+            final BOpStats stats;
+            if (((PipelineOp<?>) bop).isSharedState()) {
+                final BOpStats foo = op.newStats();
+                final BOpStats bar = statsMap.putIfAbsent(bopId, foo);
+                stats = (bar == null ? foo : bar);
+            } else {
+                stats = op.newStats();
+            }
             
             sink = (p == null ? queryBuffer : op.newBuffer(stats));
 
@@ -853,8 +909,8 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
             int sinkChunksOut = 0;
             int altSinkChunksOut = 0;
             try {
-                clientProxy.startOp(new StartOpMessage(queryId,
-                        bopId, partitionId, serviceId, fanIn));
+                clientProxy.startOp(new StartOpMessage(queryId, bopId,
+                        partitionId, serviceId, fanIn));
                 if (log.isDebugEnabled())
                     log.debug("Running chunk: " + msg);
                 ft.run(); // run

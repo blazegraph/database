@@ -91,12 +91,16 @@ public class BOpStats implements Serializable {
     }
 
     /**
-     * Combine the statistics (addition).
+     * Combine the statistics (addition), but do NOT add to self.
      * 
      * @param o
      *            Another statistics object.
      */
     public void add(final BOpStats o) {
+        if (this == o) {
+            // Do not add to self!
+            return;
+        }
         chunksIn.add(o.chunksIn.get());
         unitsIn.add(o.unitsIn.get());
         unitsOut.add(o.unitsOut.get());

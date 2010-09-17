@@ -207,7 +207,7 @@ public class TestSliceOp extends TestCase2 {
 //                        new IVariable[] { x, y },//
 //                        new IConstant[] { new Constant<String>("Leon"),
 //                                new Constant<String>("Paul") }//
-//                ),
+//                ),ne
         };
 
         final SliceStats stats = query.newStats();

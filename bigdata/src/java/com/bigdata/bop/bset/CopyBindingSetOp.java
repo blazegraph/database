@@ -108,8 +108,6 @@ public class CopyBindingSetOp extends BindingSetPipelineOp {
                     stats.chunksIn.increment();
                     stats.unitsIn.add(chunk.length);
                     sink.add(chunk);
-//                    stats.chunksOut.increment();
-//                    stats.unitsOut.add(chunk.length);
                 }
                 sink.flush();
                 return null;

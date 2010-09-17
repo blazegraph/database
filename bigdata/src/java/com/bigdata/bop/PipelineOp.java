@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -107,9 +108,12 @@ abstract public class PipelineOp<E> extends BOpBase implements IPipelineOp<E> {
         /**
          * The default for {@link #CHUNK_TIMEOUT}.
          * 
-         * @todo this is probably much larger than we want. Try 10ms.
+         * @todo Experiment with values for this. Low values will push chunks
+         *       through quickly. High values will cause chunks to be combined
+         *       and move larger chunks around. [But if we factor BlockingBuffer
+         *       out of the query engine then this will go away].
          */
-        int DEFAULT_CHUNK_TIMEOUT = 1000;
+        int DEFAULT_CHUNK_TIMEOUT = 20;
 
         /**
          * If the estimated rangeCount for an {@link AccessPath#iterator()} is
@@ -125,9 +129,10 @@ abstract public class PipelineOp<E> extends BOpBase implements IPipelineOp<E> {
         /**
          * Default for {@link #FULLY_BUFFERED_READ_THRESHOLD}.
          * 
-         * @todo try something closer to the branching factor, e.g., 100.
+         * @todo Experiment with this. It should probably be something close to
+         *       the branching factor, e.g., 100.
          */
-        int DEFAULT_FULLY_BUFFERED_READ_THRESHOLD = 1000;
+        int DEFAULT_FULLY_BUFFERED_READ_THRESHOLD = 100;
 
         /**
          * Flags for the iterator ({@link IRangeQuery#KEYS},
@@ -203,6 +208,24 @@ abstract public class PipelineOp<E> extends BOpBase implements IPipelineOp<E> {
      */
     protected static transient final TimeUnit chunkTimeoutUnit = TimeUnit.MILLISECONDS;
 
+    /**
+     * Return <code>true</code> iff {@link #newStats()} must be shared across
+     * all invocations of {@link #eval(BOpContext)} for this operator for a
+     * given query (default <code>false</code>).
+     * <p>
+     * Note: {@link BOp#getEvaluationContext()} MUST be overridden to return
+     * {@link BOpEvaluationContext#CONTROLLER} if this method is overridden to
+     * return <code>true</code>.
+     * <p>
+     * When <code>true</code>, the {@link QueryEngine} will impose the necessary
+     * constraints when the operator is evaluated.
+     */
+    public boolean isSharedState() {
+    
+        return false;
+        
+    }
+    
     public BOpStats newStats() {
 
         return new BOpStats();
@@ -227,13 +250,16 @@ abstract public class PipelineOp<E> extends BOpBase implements IPipelineOp<E> {
          * @param chunkOfChunksCapacity
          * @param chunkCapacity
          * @param chunkTimeout
-         * @param chunktimeoutunit
+         * @param chunkTimeoutUnit
          * @param stats
          */
         public BlockingBufferWithStats(int chunkOfChunksCapacity,
                 int chunkCapacity, long chunkTimeout,
-                TimeUnit chunktimeoutunit, final BOpStats stats) {
+                TimeUnit chunkTimeoutUnit, final BOpStats stats) {
 
+            super(chunkOfChunksCapacity, chunkCapacity, chunkTimeout,
+                    chunkTimeoutUnit);
+            
             this.stats = stats;
             
         }

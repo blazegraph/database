@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.solutions;
 
-import java.math.BigInteger;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
@@ -41,7 +40,6 @@ import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -67,21 +65,11 @@ import com.bigdata.service.IBigdataFederation;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo Unit test with stress test for concurrent {@link SliceOp} invocations
- *       against a streaming chunk producer. Make sure that the same
- *       {@link SliceStats} are used for each concurrent invocation of the same
- *       query.
- * 
- * @todo What is sufficient serialization to make SLICE(ORDER_BY(...)) stable?
- *       The {@link SortOp} will impose a total ordering and will know how to
- *       deliver that total ordering to another operator. The {@link SliceOp}
- *       needs to accept the chunks from the {@link SortOp} in the order in
- *       which they were sent. This should work as long as we do not reorder the
- *       chunks for a given operator in the {@link QueryEngine} when they are
- *       received by the query controller.
- * 
- * @todo If we allow complex operator trees in which "subqueries" can also use a
- *       slice then either then need to run as their own query with their own
+ * @todo Slice is not safe for subqueries - the entire query is cancelled when
+ *       the slice is satisfied.
+ *       <p>
+ *       If we allow complex operator trees in which "subqueries" can also use a
+ *       slice then either they need to run as their own query with their own
  *       {@link RunningQuery} state or the API for cancelling a running query as
  *       used here needs to only cancel evaluation of the child operators.
  *       Otherwise we could cancel all operator evaluation for the query,
@@ -166,6 +154,20 @@ public class SliceOp extends BindingSetPipelineOp {
     }
 
     /**
+     * Overridden to return <code>true</code> since the correct decision
+     * semantics for the slice depend on concurrent invocations for the same
+     * query having the same {@link SliceStats} object.
+     * <p>
+     * {@inheritDoc}
+     */
+    @Override
+    final public boolean isSharedState() {
+        
+        return true;
+        
+    }
+    
+    /**
      * Extends {@link BOpStats} to capture the state of the {@link SliceOp}.
      */
     public static class SliceStats extends BOpStats {
@@ -184,6 +186,11 @@ public class SliceOp extends BindingSetPipelineOp {
         @Override
         public void add(final BOpStats o) {
 
+            if (this == o) {
+                // Do not add to self!
+                return;
+            }
+            
             super.add(o);
             
             if (o instanceof SliceStats) {
@@ -201,7 +208,7 @@ public class SliceOp extends BindingSetPipelineOp {
         @Override
         protected void toString(final StringBuilder sb) {
 
-            sb.append(",nseed=" + nseen);
+            sb.append(",nseen=" + nseen);
 
             sb.append(",naccepted=" + naccepted);
 
@@ -237,14 +244,8 @@ public class SliceOp extends BindingSetPipelineOp {
         /** #of solutions to accept. */
         private final long limit;
 
-        private final long last;
-        
-//        /** #of solutions visited. */
-//        private long nseen;
-//
-//        /** #of solutions accepted. */
-//        private long naccepted;
-//
+//        private final long last;
+
         private final SliceStats stats;
         
         SliceTask(final SliceOp op, final BOpContext<IBindingSet> context) {
@@ -266,9 +267,9 @@ public class SliceOp extends BindingSetPipelineOp {
             this.stats = (SliceStats) context.getStats();
             
 //            this.last = offset + limit;
-            this.last = BigInteger.valueOf(offset).add(
-                    BigInteger.valueOf(limit)).min(
-                    BigInteger.valueOf(Long.MAX_VALUE)).longValue();
+//            this.last = BigInteger.valueOf(offset).add(
+//                    BigInteger.valueOf(limit)).min(
+//                    BigInteger.valueOf(Long.MAX_VALUE)).longValue();
 
         }
 
@@ -281,8 +282,6 @@ public class SliceOp extends BindingSetPipelineOp {
                     .getSource();
 
             final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
-
-//            final BOpStats stats = context.getStats();
 
             try {
 
@@ -326,8 +325,10 @@ public class SliceOp extends BindingSetPipelineOp {
 
                 sink.flush();
 
-                if (halt)
+                if (halt) {
+                    log.error("Slice will interrupt query.");// @todo remove.
                     throw new InterruptedException();
+                }
                 // cancelQuery();
 
                 return null;
