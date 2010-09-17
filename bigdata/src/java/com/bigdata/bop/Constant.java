@@ -29,8 +29,7 @@ package com.bigdata.bop;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-final public class Constant<E/* extends Comparable<E> */> extends BOpBase
-        implements IConstant<E> {
+final public class Constant<E> extends BOpBase implements IConstant<E> {
 
     /**
      * 
@@ -73,7 +72,7 @@ final public class Constant<E/* extends Comparable<E> */> extends BOpBase
     
     public Constant(final E value) {
         
-        super(new BOp[]{});
+        super(new BOp[] {}, null/* annotations */);
         
         if (value == null)
             throw new IllegalArgumentException();
@@ -130,25 +129,6 @@ final public class Constant<E/* extends Comparable<E> */> extends BOpBase
         return value.hashCode();
         
     }
-    
-//    public int compareTo(IVariableOrConstant arg0) {
-//
-//        // order vars before ids
-//        if(arg0 instanceof Var) return 1;
-//        
-//        // @todo ordering only among constants of the same class?
-//        Constant o = (Constant)arg0;
-//        
-//        /*
-//         * Note: logic avoids possible overflow of [long] by not computing the
-//         * difference between two longs.
-//         */
-//        
-//        int ret = id < o.id ? -1 : id > o.id ? 1 : 0;
-//        
-//        return ret;
-//        
-//    }
 
     final public E get() {
         
@@ -167,11 +147,5 @@ final public class Constant<E/* extends Comparable<E> */> extends BOpBase
         throw new UnsupportedOperationException();
         
     }
-
-//  public int compareTo(IConstant<E> o) {
-//  
-//      return value.compareTo(o.get());
-//      
-//  }
     
 }

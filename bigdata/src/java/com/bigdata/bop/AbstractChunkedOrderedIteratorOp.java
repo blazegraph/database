@@ -46,12 +46,12 @@ abstract public class AbstractChunkedOrderedIteratorOp<E> extends BOpBase
         
     }
 
-    /**
-     * @param args
-     */
-    protected AbstractChunkedOrderedIteratorOp(BOp[] args) {
-        super(args);
-    }
+//    /**
+//     * @param args
+//     */
+//    protected AbstractChunkedOrderedIteratorOp(BOp[] args) {
+//        super(args);
+//    }
 
     /**
      * Required shallow copy constructor.

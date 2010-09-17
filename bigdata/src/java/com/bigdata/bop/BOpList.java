@@ -58,8 +58,8 @@ public class BOpList extends BOpBase {
         
     }
 
-    public BOpList(final BOp[] args) {
-        super(args);
-    }
+//    public BOpList(final BOp[] args) {
+//        super(args);
+//    }
 
 }

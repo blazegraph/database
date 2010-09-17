@@ -48,7 +48,6 @@ import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.bset.Union;
-import com.bigdata.bop.fed.FederatedQueryEngine;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.view.FusedView;
@@ -757,22 +756,6 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * @throws IllegalStateException
      *             if the {@link QueryEngine} has been {@link #shutdown()}.
      * @throws Exception
-     * @throws RemoteException
-     * 
-     *             FIXME The test suites need to be modified to create a local
-     *             {@link FederatedQueryEngine} object which fronts for an
-     *             {@link IIndexManager} which is local to the client - not on a
-     *             data service at all. This is necessary in order for the unit
-     *             test (or application code) to directly access the
-     *             RunningQuery reference, which is needed to use get() (to wait
-     *             for the query), iterator() (to drain the query), etc.
-     *             <p>
-     *             This will also give us a place to hang query-local resources
-     *             on the client.
-     *             <p>
-     *             This has to be a {@link FederatedQueryEngine} because it
-     *             needs to talk to a federation. There should be nothing DS
-     *             specific about the {@link FederatedQueryEngine}.
      */
     public RunningQuery eval(final UUID queryId,
             final BindingSetPipelineOp query,

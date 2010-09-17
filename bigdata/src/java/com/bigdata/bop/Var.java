@@ -58,7 +58,7 @@ final public class Var<E> extends BOpBase implements IVariable<E>,
      */
     private Var(final String name) {
 
-        super(new BOp[]{});
+        super(new BOp[] {}, null/* annotations */);
         
         assert name != null;
 

@@ -135,6 +135,8 @@ public class BOpBase implements BOp {
     }
 
     /**
+     * Deep copy constructor (required).
+     * <p>
      * Each {@link BOp} MUST implement a public copy constructor with the
      * signature:
      * 
@@ -168,18 +170,22 @@ public class BOpBase implements BOp {
         // deep copy the annotations.
         annotations = deepCopy(op.annotations);
     }
-    
-    /**
-     * @param args
-     *            The arguments to the operator.
-     */
-    public BOpBase(final BOp[] args) {
-       
-        this(args, null/* annotations */);
-        
-    }
+
+//    /**
+//     * @param args
+//     *            The arguments to the operator.
+//     *            
+//     * @deprecated Use the shallow copy constructor.
+//     */
+//    public BOpBase(final BOp[] args) {
+//       
+//        this(args, null/* annotations */);
+//        
+//    }
 
     /**
+     * Shallow copy constructor (required).
+     * 
      * @param args
      *            The arguments to the operator.
      * @param annotations
