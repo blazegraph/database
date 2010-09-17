@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.solutions;
 
+import java.math.BigInteger;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
@@ -40,6 +41,7 @@ import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -65,20 +67,18 @@ import com.bigdata.service.IBigdataFederation;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo unit test with stress test for concurrent {@link SliceOp} invocations
- *       against a streaming chunk producer.
+ * @todo Unit test with stress test for concurrent {@link SliceOp} invocations
+ *       against a streaming chunk producer. Make sure that the same
+ *       {@link SliceStats} are used for each concurrent invocation of the same
+ *       query.
  * 
- * @todo If this operator is invoked for each chunk output by a query onto the
- *       pipeline then it will over produce unless (A) it is given the same
- *       {@link BOpStats} each time; and (B) it is not invoked for two chunks
- *       concurrently.
- *       <p>
- *       A safer way to impose the slice constraint is by wrapping the query
- *       buffer on the query controller. Once the slice is satisfied, it can
- *       just cancel the query. The only drawback of this approach is that the
- *       wrapping a buffer is not really the same as applying a {@link BOp} to
- *       the pipeline so it falls outside of the standard operator evaluation
- *       logic.
+ * @todo What is sufficient serialization to make SLICE(ORDER_BY(...)) stable?
+ *       The {@link SortOp} will impose a total ordering and will know how to
+ *       deliver that total ordering to another operator. The {@link SliceOp}
+ *       needs to accept the chunks from the {@link SortOp} in the order in
+ *       which they were sent. This should work as long as we do not reorder the
+ *       chunks for a given operator in the {@link QueryEngine} when they are
+ *       received by the query controller.
  * 
  * @todo If we allow complex operator trees in which "subqueries" can also use a
  *       slice then either then need to run as their own query with their own
@@ -175,8 +175,10 @@ public class SliceOp extends BindingSetPipelineOp {
          */
         private static final long serialVersionUID = 1L;
 
+        /** #of solutions visited. */
         public final AtomicLong nseen = new AtomicLong();
 
+        /** #of solutions accepted. */
         public final AtomicLong naccepted = new AtomicLong();
 
         @Override
@@ -235,6 +237,8 @@ public class SliceOp extends BindingSetPipelineOp {
         /** #of solutions to accept. */
         private final long limit;
 
+        private final long last;
+        
 //        /** #of solutions visited. */
 //        private long nseen;
 //
@@ -261,6 +265,11 @@ public class SliceOp extends BindingSetPipelineOp {
 
             this.stats = (SliceStats) context.getStats();
             
+//            this.last = offset + limit;
+            this.last = BigInteger.valueOf(offset).add(
+                    BigInteger.valueOf(limit)).min(
+                    BigInteger.valueOf(Long.MAX_VALUE)).longValue();
+
         }
 
         public Void call() throws Exception {
@@ -277,96 +286,175 @@ public class SliceOp extends BindingSetPipelineOp {
 
             try {
 
-                // buffer forms chunks which get flushed onto the sink.
+                /*
+                 * buffer forms chunks which get flushed onto the sink.
+                 * 
+                 * @todo if we have visibility into the #of source chunks, then
+                 * do not buffer more than min(#source,#needed).
+                 */
                 final UnsynchronizedArrayBuffer<IBindingSet> out = new UnsynchronizedArrayBuffer<IBindingSet>(
                         sink, op.getChunkCapacity());
 
                 boolean halt = false;
                 
-                while (source.hasNext()) {
+                while (source.hasNext() && !halt) {
+
+                    final IBindingSet[] chunk = source.next();
 
                     /*
-                     * @todo batch each chunk through a lock for better
-                     * concurrency (avoids CAS contention).
+                     * Batch each chunk through a lock for better concurrency
+                     * (avoids CAS contention).
+                     * 
+                     * Note: This is safe because the source chunk is already
+                     * materialized and the sink will not block (that is part of
+                     * the bop evaluation contract).
                      */
-                    final IBindingSet[] chunk = source.next();
-                    
-                    stats.chunksIn.increment();
-
-                    for (int i = 0; i < chunk.length; i++) {
-
-                        stats.unitsIn.increment();
-
-                        if (stats.nseen.incrementAndGet() <= offset) {
-                            // skip solution.
-                            if(log.isTraceEnabled())
-                                log.trace(toString());
-                            continue;
-                        }
-
-                        final IBindingSet bset = chunk[i];
+                    synchronized (stats) {
                         
-                        if (out.add2(bset)) {
-                            // chunk was output.
-//                            stats.chunksOut.increment();
-                        }
+                        if (handleChunk(out, chunk)) {
 
-                        if(log.isTraceEnabled())
-                            log.trace(toString() + ":" + bset);
-
-//                        stats.unitsOut.increment();
-
-                        if (stats.naccepted.incrementAndGet() >= limit) {
-                            if (!out.isEmpty()) {
-                                out.flush();
-//                                stats.chunksOut.increment();
-                            }
                             halt = true;
-                            break;
+
                         }
 
                     }
-                    
+
                 }
 
-                out.flush();
+                if (!out.isEmpty())
+                    out.flush();
+
                 sink.flush();
-//                stats.chunksOut.increment();
 
                 if (halt)
                     throw new InterruptedException();
-//                    cancelQuery();
-                
+                // cancelQuery();
+
                 return null;
-                
+
             } finally {
-                
+
                 sink.close();
-                
+
             }
 
         }
 
-//        /**
-//         * Cancel the query evaluation. This is invoked when the slice has been
-//         * satisfied. At that point we want to halt not only the {@link SliceOp}
-//         * but also the entire query since it does not need to produce any more
-//         * results.
-//         */
-//        private void cancelQuery() {
-//
-//            context.halt();
-//            
-//        }
+        /**
+         * <p>
+         * Apply the slice semantics to a chunk of binding sets.
+         * </p>
+         * <h2>example</h2>
+         * <p>
+         * offset=2, limit=3, last=3+2=5. The number line represents the
+         * observed binding sets. The first binding set is at index ZERO (0).
+         * The initial conditions are: nseen(S)=0 and naccepted(A)=0. S is
+         * placed beneath each observation and paired with the value of A for
+         * that observation. The offset is satisfied when S=2 and observation
+         * ONE (1) is the first observation accepted. The limit is satisfied
+         * when A=3, which occurs at observation FOUR (4) which is also
+         * S=last=5. The observation on which the limit is satisfied is accepted
+         * and the slice halts as no more observations should be made. {2,3,4}
+         * are accepted.
+         * </p>
+         * 
+         * <pre>
+         *  0 1 2 3 4 5 6 7 8 9
+         *  S=1, A=0
+         * </pre>
+         * 
+         * <pre>
+         *  0 1 2 3 4 5 6 7 8 9
+         *    S=2, A=0
+         * </pre>
+         * 
+         * <pre>
+         *  0 1 2 3 4 5 6 7 8 9
+         *      S=3, A=1 {2}
+         * </pre>
+         * 
+         * <pre>
+         *  0 1 2 3 4 5 6 7 8 9
+         *        S=4, A=2 {2,3}
+         * </pre>
+         * 
+         * <pre>
+         *  0 1 2 3 4 5 6 7 8 9
+         *          S=5, A=3 {2,3,4}
+         * </pre>
+         * <p>
+         * Note: The caller MUST be synchronized on the <em>shared</em>
+         * {@link SliceStats} in order for the decision process to be thread
+         * safe.
+         * 
+         * @param chunk
+         *            The chunk of binding sets.
+         * 
+         * @return <code>true</code> if the slice is satisfied and the query
+         *         should halt.
+         */
+        private boolean handleChunk(
+                final UnsynchronizedArrayBuffer<IBindingSet> out,
+                final IBindingSet[] chunk) {
+
+            stats.chunksIn.increment();
+
+            for (int i = 0; i < chunk.length; i++) {
+
+                if (stats.naccepted.get() >= limit)
+                    return true; // nothing more will be accepted.
+
+                stats.unitsIn.increment();
+
+                final long S = stats.nseen.incrementAndGet();
+                
+                if (S <= offset)
+                    continue; // skip solution.
+
+                final long A = stats.naccepted.get();
+
+                if (A < limit) {
+
+                    final IBindingSet bset = chunk[i];
+
+                    out.add(bset);
+
+                    stats.naccepted.incrementAndGet();
+
+                    if (log.isTraceEnabled())
+                        log.trace(toString() + ":" + bset);
+
+                }
+
+            } // next bindingSet
+
+            return false;
+
+        }
+
+        // /**
+        // * Cancel the query evaluation. This is invoked when the slice has
+        // been
+        // * satisfied. At that point we want to halt not only the {@link
+        // SliceOp}
+        // * but also the entire query since it does not need to produce any
+        // more
+        // * results.
+        // */
+        // private void cancelQuery() {
+        //
+        // context.halt();
+        //            
+        // }
 
         public String toString() {
 
             return getClass().getName() + "{offset=" + offset + ",limit="
                     + limit + ",nseen=" + stats.nseen + ",naccepted="
                     + stats.naccepted + "}";
-            
+
         }
-        
+
     }
 
     /**
@@ -374,9 +462,9 @@ public class SliceOp extends BindingSetPipelineOp {
      */
     @Override
     public BOpEvaluationContext getEvaluationContext() {
-        
+
         return BOpEvaluationContext.CONTROLLER;
-        
+
     }
 
 }
