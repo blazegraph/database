@@ -1780,7 +1780,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
                     case RW:
                         return new FileChannelScatteredWriteCache(buf,
                                 useChecksum, isHighlyAvailable, bufferHasData,
-                                (IReopenChannel<FileChannel>) opener);
+                                (IReopenChannel<FileChannel>) opener, null);
                     default:
                         throw new UnsupportedOperationException();
                     }
