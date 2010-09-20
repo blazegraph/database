@@ -41,6 +41,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.journal.ITx;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.ISolutionExpander;
@@ -93,7 +94,7 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
             final String relationName) {
 
         this(values, relationName, -1/* partitionId */, false/* optional */,
-                null/* constraint */, null/* expander */);
+                null/* constraint */, null/* expander */, ITx.READ_COMMITTED);
 
     }
 
@@ -116,7 +117,7 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
     public Predicate(final IVariableOrConstant<?>[] values,
             final String relationName, final int partitionId,
             final boolean optional, final IElementFilter<E> constraint,
-            final ISolutionExpander<E> expander) {
+            final ISolutionExpander<E> expander, final long timestamp) {
 
         this(values, NV.asMap(new NV[] {//
                 new NV(Annotations.RELATION_NAME,new String[]{relationName}),//
@@ -124,6 +125,7 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
                 new NV(Annotations.OPTIONAL,optional),//
                 new NV(Annotations.CONSTRAINT,constraint),//
                 new NV(Annotations.EXPANDER,expander),//
+                new NV(Annotations.TIMESTAMP, timestamp)
         }));
         
         if (relationName == null)

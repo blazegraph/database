@@ -49,6 +49,7 @@ import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
 import com.bigdata.BigdataStatics;
+import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
@@ -64,7 +65,9 @@ import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.constraint.OR;
+import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.LocalChunkMessage;
+import com.bigdata.bop.engine.MockRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.Rule2BOpUtility;
 import com.bigdata.bop.engine.RunningQuery;
@@ -94,6 +97,7 @@ import com.bigdata.rdf.store.BigdataBindingSetResolverator;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
@@ -1640,13 +1644,12 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             final IStep step)
             throws Exception {
         
-        final BindingSetPipelineOp query = Rule2BOpUtility.convert(step);
+        final int startId = 1;
+        final BindingSetPipelineOp query = Rule2BOpUtility.convert(step, startId);
         
         if (log.isInfoEnabled()) {
             log.info(query);
         }
-        
-        final int startId = query.getProperty(Predicate.Annotations.BOP_ID);
         
         final QueryEngine queryEngine = tripleSource.getSail().getQueryEngine();
         
@@ -1655,7 +1658,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
                         startId, -1/* partitionId */,
                         newBindingSetIterator(new HashBindingSet())));
-
+        
         final IAsynchronousIterator<IBindingSet[]> it1 = 
             runningQuery.iterator();
         
