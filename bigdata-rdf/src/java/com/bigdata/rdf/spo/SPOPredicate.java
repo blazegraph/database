@@ -32,6 +32,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.ISolutionExpander;
@@ -51,19 +52,19 @@ public class SPOPredicate extends Predicate<ISPO> {
      */
     private static final long serialVersionUID = 1L;
 
-    /**
-     * The arity is 3 unless the context position was given (as either a
-     * variable or bound to a constant) in which case it is 4.
-     * 
-     * @todo rather than having a conditional arity, modify the SPOPredicate
-     *       constructor to pass on either args[3] or args[3] depending on
-     *       whether we are using triples or quads.
-     */
-    public final int arity() {
-        
-        return get(3/*c*/) == null ? 3 : 4;
-        
-    }
+//    /**
+//     * The arity is 3 unless the context position was given (as either a
+//     * variable or bound to a constant) in which case it is 4.
+//     * 
+//     * @todo rather than having a conditional arity, modify the SPOPredicate
+//     *       constructor to pass on either args[3] or args[3] depending on
+//     *       whether we are using triples or quads.
+//     */
+//    public final int arity() {
+//        
+//        return get(3/*c*/) == null ? 3 : 4;
+//        
+//    }
 
     /**
      * Required shallow copy constructor.
@@ -230,12 +231,12 @@ public class SPOPredicate extends Predicate<ISPO> {
             ) {
         
         super(
-//                (c == null ? new IVariableOrConstant[] { s, p, o }
-//                : new IVariableOrConstant[] { s, p, o, c }), 
+                (c == null ? new IVariableOrConstant[] { s, p, o }
+                : new IVariableOrConstant[] { s, p, o, c }), 
                 
-                new IVariableOrConstant[] { s, p, o, c },
+//                new IVariableOrConstant[] { s, p, o, c },
                 
-        relationName[0], partitionId, optional, constraint, expander);
+        relationName[0], partitionId, optional, constraint, expander, ITx.READ_COMMITTED);
 
 //        if (relationName == null)
 //            throw new IllegalArgumentException();

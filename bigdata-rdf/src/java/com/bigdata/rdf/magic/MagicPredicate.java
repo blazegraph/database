@@ -30,6 +30,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.ISolutionExpander;
@@ -120,7 +121,7 @@ public class MagicPredicate extends Predicate<IMagicTuple> {
             IVariableOrConstant<IV>... terms//
             ) {
         
-        super(terms, relationName[0], partitionId, false, constraint, expander);
+        super(terms, relationName[0], partitionId, false, constraint, expander, ITx.READ_COMMITTED);
         
     }
 

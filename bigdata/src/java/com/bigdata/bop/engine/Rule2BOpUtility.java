@@ -73,10 +73,10 @@ public class Rule2BOpUtility {
      * 
      * @return
      */
-    public static BindingSetPipelineOp convert(final IStep step) {
+    public static BindingSetPipelineOp convert(final IStep step, final int startId) {
         
         if (step instanceof Rule)
-            return convert((Rule) step);
+            return convert((Rule) step, startId);
         else if (step instanceof Program)
             return convert((Program) step);
         
@@ -91,9 +91,9 @@ public class Rule2BOpUtility {
      * 
      * @return
      */
-    public static BindingSetPipelineOp convert(final Rule rule) {
+    public static BindingSetPipelineOp convert(final Rule rule, final int startId) {
 
-        int bopId = 1;
+        int bopId = startId;
         
         final BindingSetPipelineOp startOp = new StartOp(new BOp[] {},
                 NV.asMap(new NV[] {//

@@ -136,24 +136,28 @@ public class TestBOps extends ProxyBigdataSailTestCase {
                     "select * " +
                     "WHERE { " +
                     "  ?s rdf:type ns:Person . " +
-                    "  ?s ns:likes ?likes . " +
-                    "  ?s rdfs:label ?label . " +
+                    "  ?s ns:likes ns:RDF . " +
+//                    "  ?s rdfs:label ?label . " +
                     "}";
                 
                 final TupleQuery tupleQuery = 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 TupleQueryResult result = tupleQuery.evaluate();
+                
+                while (result.hasNext()) {
+                    System.err.println(result.next());
+                }
  
                 Collection<BindingSet> solution = new LinkedList<BindingSet>();
                 solution.add(createBindingSet(new Binding[] {
                     new BindingImpl("s", mike),
-                    new BindingImpl("likes", rdf),
-                    new BindingImpl("label", l1)
+//                    new BindingImpl("likes", rdf),
+//                    new BindingImpl("label", l1)
                 }));
                 solution.add(createBindingSet(new Binding[] {
                     new BindingImpl("s", bryan),
-                    new BindingImpl("likes", rdf),
-                    new BindingImpl("label", l2)
+//                    new BindingImpl("likes", rdf),
+//                    new BindingImpl("label", l2)
                 }));
                 
                 compare(result, solution);
