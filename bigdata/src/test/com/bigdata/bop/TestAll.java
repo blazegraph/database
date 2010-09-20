@@ -92,6 +92,9 @@ public class TestAll extends TestCase {
         // join operators.
         suite.addTest(com.bigdata.bop.join.TestAll.suite());
 
+        // Specialized RDF join operators : @todo move to bigdata-rdf.
+        suite.addTest(com.bigdata.bop.rdf.join.TestAll.suite());
+
         // aggregation operators.
         suite.addTest(com.bigdata.bop.solutions.TestAll.suite());
 

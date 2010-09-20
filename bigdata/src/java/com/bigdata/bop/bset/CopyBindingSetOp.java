@@ -41,14 +41,13 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 /**
- * This operator copies its source to its sink. It is used to feed the first
- * join in the pipeline. The operator should have no children but may be
- * decorated with annotations as necessary.
+ * This operator copies its source to its sink. Specializations exist which are
+ * used to feed the the initial set of intermediate results into a pipeline (
+ * {@link StartOp}) and which are used to replicate intermediate results to more
+ * than one sink ({@link Tee}).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo unit tests.
  */
 public class CopyBindingSetOp extends BindingSetPipelineOp {
 
@@ -99,8 +98,10 @@ public class CopyBindingSetOp extends BindingSetPipelineOp {
         }
 
         public Void call() throws Exception {
-            final IAsynchronousIterator<IBindingSet[]> source = context.getSource();
+            final IAsynchronousIterator<IBindingSet[]> source = context
+                    .getSource();
             final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
+            final IBlockingBuffer<IBindingSet[]> sink2 = context.getSink2();
             try {
                 final BOpStats stats = context.getStats();
                 while (source.hasNext()) {
@@ -108,11 +109,17 @@ public class CopyBindingSetOp extends BindingSetPipelineOp {
                     stats.chunksIn.increment();
                     stats.unitsIn.add(chunk.length);
                     sink.add(chunk);
+                    if (sink2 != null)
+                        sink2.add(chunk);
                 }
                 sink.flush();
+                if (sink2 != null)
+                    sink2.flush();
                 return null;
             } finally {
                 sink.close();
+                if (sink2 != null)
+                    sink2.close();
                 source.close();
             }
         }

@@ -176,5 +176,14 @@ public class TestCopyBindingSets extends TestCase2 {
         assertEquals(1L, stats.chunksOut.get());
 
     }
+    
+    /**
+     * {@link Tee} is just a specialized {@link CopyBindingSetOp} which requires
+     * that the alternate sink is also specified.  Write a unit test of those
+     * semantics for {@link CopyBindingSetOp}.
+     */
+    public void test_copyToSinkAndAltSink() {
+        fail("write test");
+    }
 
 }

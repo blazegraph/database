@@ -121,6 +121,7 @@ public class TestBOps extends ProxyBigdataSailTestCase {
              * that go around the sail.
              */
             cxn.flush();//commit();
+            cxn.commit();//
             
             if (log.isInfoEnabled()) {
                 log.info("\n" + sail.getDatabase().dumpStore());
