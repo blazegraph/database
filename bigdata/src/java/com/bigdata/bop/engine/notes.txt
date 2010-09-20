@@ -1,0 +1,160 @@
+RunningQuery:
+
+         * FIXME Raise this into an annotation that we can tweak from the unit
+         * tests and then debug the problem.
+         * 
+         * FIXME Add an annotation or method to mark operators which must be
+         * evaluated using operator-at-a-time evaluation. SORT is the main
+         * example here (it must be operator at a time of necessity) but other
+         * operators may implemented with operator at a time assumptions. This
+         * might be on PipelineOp and could be trinary {Chunked,Blocked,All}.
+
+Note: Many of the maxParallel annotations related to thread consumption will go
+away with Java7 and async file IO.  Other annotations, such as the #of 1M buffers
+to allocate to an operator, need to be introduced to handle high volume queries.
+
+Note: UNION, STEPS, and STAR(transitive closure) are all evaluated on the query
+controller.
+
+---
+UNION(ops)[maxParallel(default all)]
+
+Executes each of the operands in the union as subqueries.  Each subquery is run
+as a separate RunningQuery but is linked to the parent query in which the UNION
+is being evaluated.  The subqueries do not receive bindings from the parent and
+may be executed independently.
+
+---
+STEPS(ops)[maxParallel(default 1)]
+
+The operands are executed as independent subqueries. Unlike UNION, STEPS does
+not copy its source binding sets.
+
+---
+
+STAR(op) [maxItr(default all)]
+
+Evaluate the operand until its mutation count remains unchanged from one round
+to the next.  The operand must write on a resource.  The fixed point is determined
+by examining BOPStats.mutationCount.
+
+Do with INSERT/REMOVE since all involve mutation.
+
+---
+DataSetJoin([left,var])[graphs={graphIds}; maxParallel=50]
+
+SPARQL specific join binds var to each of the given graphIds values for each
+source binding set.  This join operator is useful when the multiplicity of the
+graphIds set is modest (between 2 and ~5000).  This differs from a pipeline join
+by joining against inline data and by being more specialized (it lacks a pred).
+An alternative would be to develop an inline access path and then specify a std
+predicate which references the data in its annotation.  That could then generalize
+to a predicate which references persistent data, query or tx local data, or inline
+data.  However, the DataSetJoin is still far simpler since it just binds the var
+and send out the asBound binding set and does not need to worry about internal
+parallelism, alternative sinks, or chunking.
+
+Note: SPARQL default graph queries require us to apply a
+distinct {s,p,o} filter to each default graph access path.  For scale-out, that
+is a distributed distinct access path filter.  A DHT is used when the scale is
+moderate.  A distributed external merge sort SORT is used when the scale is very
+large.  
+
+Special cases exist for:
+
+ - Whenever C is a constant, we are guaranteed that the SPO will be distinct and
+   do not need to apply a distributed distinct filter.
+   
+ - The SPOC access path can be optimized because we know that C is strictly 
+   ascending.  We can note the last observed {s,p,o} and skip to the next possible
+   o in the index (o:=o+1) using an advancer pattern (this could also just scan
+   until o changes).  These are the possibly distinct {s,p,o} triples, which can
+   then be sent to the DHT unless we have a guarantee that S never crosses a 
+   shard boundary (this is trivially true for standalone can this constraint can
+   be imposed on scale-out, but can cause problems if some subjects are very
+   highly referenced).
+
+ - ?
+
+---
+INSERT(op,pred) : insert elements into an index.
+DELETE(op,pred) : remove elements from an index.
+
+The access path mutation operators construct elements from the source binding 
+sets and the asBBound predicates.  For each element so constructed, they insert/
+remove the corresponding element into/from the access path.  These operators
+update a mutation counter IFF the access path was modified for the constructed
+element.  STAR relies on the mutation operator to detect a fixed point.
+
+The mutation access paths need to use the appropriate concurrency control to 
+ensure the constraint on the mutable B+Tree is respected.   This is either
+the UnisolatedReadWriteIndex or the LockManager/ConcurrencyManager.
+
+The basic mutation operators write on an access path and may be combined using
+STEPS in order to update all of the indices associated with a relation.
+
+  - For incremental TM, we also need to construct an element for the just index
+    from the rule and assert it onto that index.
+    
+  - For the lexicon, we also need to write on the full text index.
+  
+  - For SIDs mode, we also need to capture the logic to ground the statements by
+    binding the SIDs.
+
+  - triggers could be integrated here.  perhaps events backed by a queue which
+    could be either restart safe or query local?
+
+----
+Parallel distributed closure : TBD.  Review notes posted on trak.
+
+----
+done. TEE(op):[sinkRef=X; altSinkRef=Y]
+
+Pipeline operator copies its source to both sink and altSink.  The sink and the
+altSink must both be ancestors of the operator.  The sinkRef MAY be omitted when
+one of the targets is the immediate parent of the TEE.  Evaluation scope: ANY.
+
+TM rules.  JOIN of AP UNION is the same as the UNION of JOINs of the APs. This
+gets translated into a pattern of routing in the pipeline such that the two JOINs
+appear one after the other and the first join has its default sink _overridden_
+to reference the same target as the second join.  This has the effect of creating
+a union of their outputs at the receiver and the benefit that the JOINs run in
+parallel.
+
+- We MUST also satisfy the requirement that the source binding sets are seen by
+both joins.  This can be done using an operator which copies its source binding
+sets to both its default and alternative sinks.  That would be an ANY scope op.
+
+This is basically an OR "pattern". 
+
+----
+Lexicon joins - 
+
+====
+Features:
+
+ - operator-at-once evaluation. The operator is triggered once its possible
+   triggers are done.  This is just an application of the same utility method
+   which we use to decide when a query is done.
+ 
+ - subquery evaluation (linked parent to child). a subquery may be cancelled
+   by a slice without cancelling the parent.  cancelling the parent terminates
+   all subqueries.  whenever a query or subquery is terminated, we need to go
+   through its operator and query life cycle tear down methods (unit tests).
+ 
+ - default graph access path using DHT.  See DataSetJoin, which has some notes.
+ 
+ - query and connection local resources: creating, destroying and using resources.
+   references to query local resources permit reuse of intermediate results across
+   different.
+   
+   CREATE FOO AS TEMP GRAPH ON LOCAL TEMP STORE SPO ONLY SHARED LEXICON
+ 
+ - "thick" resources which can be sent along with the query or access either by
+   RMI or copied to the node where the query is running on demand.  (This could
+   be just alternative access path instantiations which are selected by the query
+   optimizer or defaulted based on the amount of data to be moved to/from the
+   node if not specified.)
+
+ - The predicate could have fromRevision/toRevision annotations which would be
+   used for fast computation of the delta between two historical commit points.

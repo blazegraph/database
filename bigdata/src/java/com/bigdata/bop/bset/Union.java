@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
@@ -40,42 +41,29 @@ import com.bigdata.relation.RelationFusedView;
 import com.bigdata.util.concurrent.Haltable;
 
 /**
- * The union of two or more {@link BindingSetPipelineOp} operators.
+ * UNION(ops)[maxParallel(default all)]
+ * <p>
+ * Executes each of the operands in the union as a subqueries. Each subquery is
+ * run as a separate query but is linked to the parent query in which the UNION
+ * is being evaluated. The subqueries do not receive bindings from the parent
+ * and may be executed independently. By default, the subqueries are run with
+ * unlimited parallelism.
+ * <p>
+ * UNION is useful when independent queries are evaluated and their outputs are
+ * merged. Outputs from the UNION operator flow to the parent operator and will
+ * be mapped across shards or nodes as appropriate for the parent. UNION runs on
+ * the query controller. In order to avoid routing intermediate results through
+ * the controller, the {@link BindingSetPipelineOp.Annotations#SINK_REF} of each
+ * child operand should be overriden to specify the parent of the UNION
+ * operator.
+ * <p>
+ * UNION can not be used when the intermediate results must be routed into the
+ * subqueries.  However, a {@link Tee} pattern may help in such cases.  For
+ * example, a {@link Tee} may be used to create a union of pipeline joins for
+ * two access paths during truth maintenance.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo I have some basic questions about the ability to use a UNION of two
- *       predicates in scale-out. I think that this might be more accurately
- *       modeled as the UNION of two joins. That is, rather than:
- * 
- *       <pre>
- *       JOIN( ...,
- *             UNION( foo.spo(A,loves,B),
- *                    bar.spo(A,loves,B) )
- *             )
- * </pre>
- * 
- *       using
- * 
- *       <pre>
- *       UNION( JOIN( ..., foo.spo(A,loves,B) ),
- *              JOIN( ..., bar.spo(A,loves,B) )
- *              )
- * </pre>
- * 
- *       which would be a binding set union rather than an element union.
- * 
- * @todo The union of access paths was historically handled by
- *       {@link RelationFusedView}. That class should be removed once queries
- *       are rewritten to use the union of joins.
- * 
- * @todo The {@link TMUtility} will have to be updated to use this operator
- *       rather than specifying multiple source "names" for the relation of the
- *       predicate.
- * 
- * @todo The FastClosureRuleTask will also need to be updated to use a
- *       {@link Union} over the joins rather than a {@link RelationFusedView}.
  */
 public class Union extends BindingSetPipelineOp {
 
@@ -101,35 +89,35 @@ public class Union extends BindingSetPipelineOp {
 
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
-        return new FutureTask<Void>(new UnionTask(this, context));
-        
+//        return new FutureTask<Void>(new UnionTask(this, context));
+        throw new UnsupportedOperationException();
     }
 
-    /**
-     * Pipeline union impl.
-     * 
-     * FIXME All this does is copy its inputs to its outputs. Since we only run
-     * one chunk of input at a time, it seems that the easiest way to implement
-     * a union is to have the operators in the union just target the same sink.
-     */
-    private static class UnionTask extends Haltable<Void> implements Callable<Void> {
-
-        public UnionTask(//
-                final Union op,//
-                final BOpContext<IBindingSet> context
-                ) {
-
-            if (op == null)
-                throw new IllegalArgumentException();
-            if (context == null)
-                throw new IllegalArgumentException();
-        }
-        
-        public Void call() throws Exception {
-            // TODO Auto-generated method stub
-            throw new UnsupportedOperationException();
-        }
-
-    }
+//    /**
+//     * Pipeline union impl.
+//     * 
+//     * FIXME All this does is copy its inputs to its outputs. Since we only run
+//     * one chunk of input at a time, it seems that the easiest way to implement
+//     * a union is to have the operators in the union just target the same sink.
+//     */
+//    private static class UnionTask extends Haltable<Void> implements Callable<Void> {
+//
+//        public UnionTask(//
+//                final Union op,//
+//                final BOpContext<IBindingSet> context
+//                ) {
+//
+//            if (op == null)
+//                throw new IllegalArgumentException();
+//            if (context == null)
+//                throw new IllegalArgumentException();
+//        }
+//        
+//        public Void call() throws Exception {
+//            // TODO Auto-generated method stub
+//            throw new UnsupportedOperationException();
+//        }
+//
+//    }
     
 }

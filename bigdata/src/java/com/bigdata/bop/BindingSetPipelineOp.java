@@ -48,8 +48,15 @@ abstract public class BindingSetPipelineOp extends
 
         /**
          * The value of the annotation is the {@link BOp.Annotations#BOP_ID} of
-         * the ancestor in the operator tree which serves as an alternative sink
-         * for binding sets.
+         * the ancestor in the operator tree which serves as the default sink
+         * for binding sets (default is the parent).
+         */
+        String SINK_REF = BindingSetPipelineOp.class.getName() + ".sinkRef";
+
+        /**
+         * The value of the annotation is the {@link BOp.Annotations#BOP_ID} of
+         * the ancestor in the operator tree which serves as the alternative
+         * sink for binding sets (default is no alternative sink).
          */
         String ALT_SINK_REF = BindingSetPipelineOp.class.getName()
                 + ".altSinkRef";
