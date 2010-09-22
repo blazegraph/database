@@ -29,6 +29,7 @@ package com.bigdata.rdf.sail;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Properties;
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
@@ -44,6 +45,7 @@ import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.impl.BindingImpl;
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.vocab.NoVocabulary;
 
@@ -137,28 +139,302 @@ public class TestBOps extends ProxyBigdataSailTestCase {
                     "select * " +
                     "WHERE { " +
                     "  ?s rdf:type ns:Person . " +
-                    "  ?s ns:likes ns:RDF . " +
-//                    "  ?s rdfs:label ?label . " +
+                    "  ?s ns:likes ?likes . " +
+                    "  ?s rdfs:label ?label . " +
                     "}";
                 
                 final TupleQuery tupleQuery = 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
                 TupleQueryResult result = tupleQuery.evaluate();
                 
-                while (result.hasNext()) {
-                    System.err.println(result.next());
-                }
+//                while (result.hasNext()) {
+//                    System.err.println(result.next());
+//                }
  
                 Collection<BindingSet> solution = new LinkedList<BindingSet>();
                 solution.add(createBindingSet(new Binding[] {
                     new BindingImpl("s", mike),
-//                    new BindingImpl("likes", rdf),
-//                    new BindingImpl("label", l1)
+                    new BindingImpl("likes", rdf),
+                    new BindingImpl("label", l1)
                 }));
                 solution.add(createBindingSet(new Binding[] {
                     new BindingImpl("s", bryan),
-//                    new BindingImpl("likes", rdf),
+                    new BindingImpl("likes", rdf),
+                    new BindingImpl("label", l2)
+                }));
+                
+                compare(result, solution);
+                
+            }
+            
+        } finally {
+            cxn.close();
+            sail.__tearDownUnitTest();
+        }
+
+    }
+    
+    public void testSimpleConstraint() throws Exception {
+
+        final BigdataSail sail = getSail();
+        sail.initialize();
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+        final BigdataSailRepositoryConnection cxn = 
+            (BigdataSailRepositoryConnection) repo.getConnection();
+        cxn.setAutoCommit(false);
+        
+        try {
+    
+            final ValueFactory vf = sail.getValueFactory();
+            
+            final String ns = BD.NAMESPACE;
+            
+            URI jill = new URIImpl(ns+"Jill");
+            URI jane = new URIImpl(ns+"Jane");
+            URI person = new URIImpl(ns+"Person");
+            URI age = new URIImpl(ns+"age");
+            URI IQ = new URIImpl(ns+"IQ");
+            Literal l1 = new LiteralImpl("Jill");
+            Literal l2 = new LiteralImpl("Jane");
+            Literal age1 = vf.createLiteral(20);
+            Literal age2 = vf.createLiteral(30);
+            Literal IQ1 = vf.createLiteral(130);
+            Literal IQ2 = vf.createLiteral(140);
+/**/
+            cxn.setNamespace("ns", ns);
+            
+            cxn.add(jill, RDF.TYPE, person);
+            cxn.add(jill, RDFS.LABEL, l1);
+            cxn.add(jill, age, age1);
+            cxn.add(jill, IQ, IQ1);
+            cxn.add(jane, RDF.TYPE, person);
+            cxn.add(jane, RDFS.LABEL, l2);
+            cxn.add(jane, age, age2);
+            cxn.add(jane, IQ, IQ2);
+
+            /*
+             * Note: The either flush() or commit() is required to flush the
+             * statement buffers to the database before executing any operations
+             * that go around the sail.
+             */
+            cxn.flush();//commit();
+            cxn.commit();//
+            
+            if (log.isInfoEnabled()) {
+                log.info("\n" + sail.getDatabase().dumpStore());
+            }
+
+            {
+                
+                String query = 
+                    "PREFIX rdf: <"+RDF.NAMESPACE+"> " +
+                    "PREFIX rdfs: <"+RDFS.NAMESPACE+"> " +
+                    "PREFIX ns: <"+ns+"> " +
+                    
+                    "select * " +
+                    "WHERE { " +
+                    "  ?s rdf:type ns:Person . " +
+                    "  ?s ns:age ?age . " +
+                    "  ?s ns:IQ ?iq . " +
+                    "  ?s rdfs:label ?label . " +
+                    "  FILTER( ?age < 25 && ?iq > 125 ) . " +
+                    "}";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                TupleQueryResult result = tupleQuery.evaluate();
+                
+//                while (result.hasNext()) {
+//                    System.err.println(result.next());
+//                }
+ 
+                Collection<BindingSet> solution = new LinkedList<BindingSet>();
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("s", jill),
+                    new BindingImpl("age", age1),
+                    new BindingImpl("iq", IQ1),
+                    new BindingImpl("label", l1)
+                }));
+                
+                compare(result, solution);
+                
+            }
+            
+        } finally {
+            cxn.close();
+            sail.__tearDownUnitTest();
+        }
+
+    }
+    
+    public void testSimpleOptional() throws Exception {
+
+        final BigdataSail sail = getSail();
+        sail.initialize();
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+        final BigdataSailRepositoryConnection cxn = 
+            (BigdataSailRepositoryConnection) repo.getConnection();
+        cxn.setAutoCommit(false);
+        
+        try {
+    
+            final ValueFactory vf = sail.getValueFactory();
+            
+            final String ns = BD.NAMESPACE;
+            
+            URI mike = new URIImpl(ns+"Mike");
+            URI bryan = new URIImpl(ns+"Bryan");
+            URI person = new URIImpl(ns+"Person");
+            URI likes = new URIImpl(ns+"likes");
+            URI rdf = new URIImpl(ns+"RDF");
+            Literal l1 = new LiteralImpl("Mike");
+            Literal l2 = new LiteralImpl("Bryan");
+/**/
+            cxn.setNamespace("ns", ns);
+            
+            cxn.add(mike, RDF.TYPE, person);
+            cxn.add(mike, likes, rdf);
+            cxn.add(mike, RDFS.LABEL, l1);
+            cxn.add(bryan, RDF.TYPE, person);
+            cxn.add(bryan, likes, rdf);
+//            cxn.add(bryan, RDFS.LABEL, l2);
+
+            /*
+             * Note: The either flush() or commit() is required to flush the
+             * statement buffers to the database before executing any operations
+             * that go around the sail.
+             */
+            cxn.flush();//commit();
+            cxn.commit();//
+            
+            if (log.isInfoEnabled()) {
+                log.info("\n" + sail.getDatabase().dumpStore());
+            }
+
+            {
+                
+                String query = 
+                    "PREFIX rdf: <"+RDF.NAMESPACE+"> " +
+                    "PREFIX rdfs: <"+RDFS.NAMESPACE+"> " +
+                    "PREFIX ns: <"+ns+"> " +
+                    
+                    "select * " +
+                    "WHERE { " +
+                    "  ?s rdf:type ns:Person . " +
+                    "  ?s ns:likes ?likes . " +
+                    "  OPTIONAL { ?s rdfs:label ?label . } " +
+                    "}";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                TupleQueryResult result = tupleQuery.evaluate();
+                
+//                while (result.hasNext()) {
+//                    System.err.println(result.next());
+//                }
+ 
+                Collection<BindingSet> solution = new LinkedList<BindingSet>();
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("s", mike),
+                    new BindingImpl("likes", rdf),
+                    new BindingImpl("label", l1)
+                }));
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("s", bryan),
+                    new BindingImpl("likes", rdf),
 //                    new BindingImpl("label", l2)
+                }));
+                
+                compare(result, solution);
+                
+            }
+            
+        } finally {
+            cxn.close();
+            sail.__tearDownUnitTest();
+        }
+
+    }
+    
+    public void testOrEquals() throws Exception {
+
+        final BigdataSail sail = getSail();
+        sail.initialize();
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+        final BigdataSailRepositoryConnection cxn = 
+            (BigdataSailRepositoryConnection) repo.getConnection();
+        cxn.setAutoCommit(false);
+        
+        try {
+    
+            final ValueFactory vf = sail.getValueFactory();
+    
+            final LexiconRelation lex = sail.getDatabase().getLexiconRelation();
+            
+            final String ns = BD.NAMESPACE;
+            
+            URI mike = new URIImpl(ns+"Mike");
+            URI bryan = new URIImpl(ns+"Bryan");
+            URI martyn = new URIImpl(ns+"Martyn");
+            URI person = new URIImpl(ns+"Person");
+            URI p = new URIImpl(ns+"p");
+            Literal l1 = new LiteralImpl("Mike");
+            Literal l2 = new LiteralImpl("Bryan");
+            Literal l3 = new LiteralImpl("Martyn");
+/**/
+            cxn.setNamespace("ns", ns);
+            
+            cxn.add(mike, RDF.TYPE, person);
+            cxn.add(mike, RDFS.LABEL, l1);
+            cxn.add(bryan, RDF.TYPE, person);
+            cxn.add(bryan, RDFS.COMMENT, l2);
+            cxn.add(martyn, RDF.TYPE, person);
+            cxn.add(martyn, p, l3);
+
+            /*
+             * Note: The either flush() or commit() is required to flush the
+             * statement buffers to the database before executing any operations
+             * that go around the sail.
+             */
+            cxn.flush();//commit();
+            cxn.commit();//
+            
+            if (log.isInfoEnabled()) {
+                log.info("\n" + sail.getDatabase().dumpStore());
+            }
+
+            {
+                
+                String query = 
+                    "PREFIX rdf: <"+RDF.NAMESPACE+"> " +
+                    "PREFIX rdfs: <"+RDFS.NAMESPACE+"> " +
+                    "PREFIX ns: <"+ns+"> " +
+                    
+                    "select * " +
+                    "WHERE { " +
+                    "  ?s rdf:type ns:Person . " +
+                    "  ?s ?p ?label . " +
+                    "  FILTER ( ?p = rdfs:label || ?p = rdfs:comment ) . " +
+                    "}";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                TupleQueryResult result = tupleQuery.evaluate();
+                
+//                while (result.hasNext()) {
+//                    System.err.println(result.next());
+//                }
+ 
+                Collection<BindingSet> solution = new LinkedList<BindingSet>();
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("s", mike),
+                    new BindingImpl("p", RDFS.LABEL),
+                    new BindingImpl("label", l1)
+                }));
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("s", bryan),
+                    new BindingImpl("p", RDFS.COMMENT),
+                    new BindingImpl("label", l2)
                 }));
                 
                 compare(result, solution);

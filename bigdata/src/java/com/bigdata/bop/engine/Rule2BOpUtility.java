@@ -27,26 +27,34 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.engine;
 
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpContextBase;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
-import com.bigdata.bop.bset.CopyBindingSetOp;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.join.PipelineJoin;
-import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.Program;
-import com.bigdata.relation.rule.Rule;
+import com.bigdata.relation.rule.eval.DefaultEvaluationPlan2;
+import com.bigdata.relation.rule.eval.IRangeCountFactory;
 
 /**
  * Utility class converts {@link IRule}s to {@link BOp}s.
@@ -63,6 +71,8 @@ import com.bigdata.relation.rule.Rule;
  */
 public class Rule2BOpUtility {
 
+    protected static final Logger log = Logger.getLogger(Rule2BOpUtility.class);
+    
     /**
      * Convert an {@link IStep} into an operator tree. This should handle
      * {@link IRule}s and {@link IProgram}s as they are currently implemented
@@ -73,12 +83,11 @@ public class Rule2BOpUtility {
      * 
      * @return
      */
-    public static BindingSetPipelineOp convert(final IStep step, final int startId) {
+    public static BindingSetPipelineOp convert(final IStep step, 
+            final int startId, final QueryEngine queryEngine) {
         
-        if (step instanceof Rule)
-            return convert((Rule) step, startId);
-        else if (step instanceof Program)
-            return convert((Program) step);
+        if (step instanceof IRule)
+            return convert((IRule) step, startId, queryEngine);
         
         throw new UnsupportedOperationException();
 
@@ -91,7 +100,8 @@ public class Rule2BOpUtility {
      * 
      * @return
      */
-    public static BindingSetPipelineOp convert(final Rule rule, final int startId) {
+    public static BindingSetPipelineOp convert(final IRule rule, 
+            final int startId, final QueryEngine queryEngine) {
 
         int bopId = startId;
         
@@ -100,96 +110,117 @@ public class Rule2BOpUtility {
                         new NV(Predicate.Annotations.BOP_ID, bopId++),//
                         }));
         
-        Iterator<Predicate> tails = rule.getTail();
+        /*
+         * First put the tails in the correct order based on the logic in
+         * DefaultEvaluationPlan2.
+         */
+        final BOpContextBase context = new BOpContextBase(queryEngine);
+        final DefaultEvaluationPlan2 plan = new DefaultEvaluationPlan2(
+                new IRangeCountFactory() {
 
+            public long rangeCount(final IPredicate pred) {
+                return context.getRelation(pred).getAccessPath(pred)
+                                .rangeCount(false);
+            }
+            
+        }, rule);
+        
+        final int[] order = plan.getOrder();
+        
+        /*
+         * Map the constraints from the variables they use.  This way, we can
+         * properly attach constraints to only the first tail in which the
+         * variable appears.  This way we only run the appropriate constraint
+         * once, instead of for every tail. 
+         */
+        final Map<IVariable<?>, Collection<IConstraint>> constraintsByVar = 
+            new HashMap<IVariable<?>, Collection<IConstraint>>();
+        for (int i = 0; i < rule.getConstraintCount(); i++) {
+            final IConstraint c = rule.getConstraint(i);
+            
+            if (log.isDebugEnabled()) {
+                log.debug(c);
+            }
+            
+            final Set<IVariable<?>> uniqueVars = new HashSet<IVariable<?>>();
+            final Iterator<IVariable<?>> vars = BOpUtility.getSpannedVariables(c);
+            while (vars.hasNext()) {
+                final IVariable<?> v = vars.next();
+                uniqueVars.add(v);
+            }
+            
+            for (IVariable<?> v : uniqueVars) {
+
+                if (log.isDebugEnabled()) {
+                    log.debug(v);
+                }
+                
+                Collection<IConstraint> constraints = constraintsByVar.get(v);
+                if (constraints == null) {
+                    constraints = new LinkedList<IConstraint>();
+                    constraintsByVar.put(v, constraints);
+                }
+                constraints.add(c);
+            }
+        }
+        
         BindingSetPipelineOp left = startOp;
         
-        while (tails.hasNext()) {
-        
+        for (int i = 0; i < order.length; i++) {
+            
             final int joinId = bopId++;
             
-            final Predicate<?> pred = tails.next().setBOpId(bopId++);
+            // assign a bop id to the predicate
+            final IPredicate<?> pred = rule.getTail(order[i]).setBOpId(bopId++);
             
-            System.err.println(pred);
+            /*
+             * Collect all the constraints for this predicate based on which
+             * variables make their first appearance in this tail
+             */
+            final Collection<IConstraint> constraints = 
+                new LinkedList<IConstraint>();
+            
+            /*
+             * Peek through the predicate's args to find its variables. Use
+             * these to attach constraints to the join based on the variables
+             * that make their first appearance in this tail.
+             */
+            for (BOp arg : pred.args()) {
+                if (arg instanceof IVariable) {
+                    final IVariable<?> v = (IVariable) arg;
+                    /*
+                     * We do a remove because we don't ever need to run these
+                     * constraints again during subsequent joins once they
+                     * have been run once at the initial appearance of the
+                     * variable.
+                     * 
+                     * FIXME revisit this when we dynamically re-order running
+                     *          joins
+                     */ 
+                    if (constraintsByVar.containsKey(v))
+                        constraints.addAll(constraintsByVar.remove(v));
+                }
+            }
             
             final BindingSetPipelineOp joinOp = new PipelineJoin<E>(//
                     left, pred,//
                     NV.asMap(new NV[] {//
-                            new NV(Predicate.Annotations.BOP_ID, joinId),//
+                            new NV(BOp.Annotations.BOP_ID, joinId),//
+                            new NV(PipelineJoin.Annotations.CONSTRAINTS, 
+                                    constraints.size() > 0 ? 
+                                            constraints.toArray(new IConstraint[constraints.size()]) : null),//
+                            new NV(PipelineJoin.Annotations.OPTIONAL, pred.isOptional()),//
                             }));
             
             left = joinOp;
             
         }
         
+        // just for now while i'm debugging
         System.err.println(toString(left));
-        
-//        test_query_join2();
         
         return left;
         
-    }
-    
-    public static void test_query_join2() {
-
-        final String namespace = "ns";
-        final int startId = 1;
-        final int joinId1 = 2;
-        final int predId1 = 3;
-        final int joinId2 = 4;
-        final int predId2 = 5;
-        
-        final BindingSetPipelineOp startOp = new StartOp(new BOp[] {},
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, startId),//
-                        }));
-        
-        final Predicate<?> pred1Op = new Predicate<E>(new IVariableOrConstant[] {
-                Var.var("x"), Var.var("y") }, NV
-                .asMap(new NV[] {//
-                        new NV(Predicate.Annotations.RELATION_NAME,
-                                new String[] { namespace }),//
-                        new NV(Predicate.Annotations.PARTITION_ID,
-                                Integer.valueOf(-1)),//
-                        new NV(Predicate.Annotations.OPTIONAL,
-                                Boolean.FALSE),//
-                        new NV(Predicate.Annotations.CONSTRAINT, null),//
-                        new NV(Predicate.Annotations.EXPANDER, null),//
-                        new NV(Predicate.Annotations.BOP_ID, predId1),//
-                        new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
-                }));
-        
-        final Predicate<?> pred2Op = new Predicate<E>(new IVariableOrConstant[] {
-                Var.var("y"), Var.var("z") }, NV
-                .asMap(new NV[] {//
-                        new NV(Predicate.Annotations.RELATION_NAME,
-                                new String[] { namespace }),//
-                        new NV(Predicate.Annotations.PARTITION_ID,
-                                Integer.valueOf(-1)),//
-                        new NV(Predicate.Annotations.OPTIONAL,
-                                Boolean.FALSE),//
-                        new NV(Predicate.Annotations.CONSTRAINT, null),//
-                        new NV(Predicate.Annotations.EXPANDER, null),//
-                        new NV(Predicate.Annotations.BOP_ID, predId2),//
-                        new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
-                }));
-        
-        final BindingSetPipelineOp join1Op = new PipelineJoin<E>(//
-                startOp, pred1Op,//
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, joinId1),//
-                        }));
-
-        final BindingSetPipelineOp join2Op = new PipelineJoin<E>(//
-                join1Op, pred2Op,//
-                NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, joinId2),//
-                        }));
-
-        final BindingSetPipelineOp query = join2Op;
-        
-        System.err.println(toString(query));
-
     }
     
     private static String toString(BOp bop) {
@@ -218,6 +249,13 @@ public class Rule2BOpUtility {
             for (BOp arg : args) {
                 toString(arg, sb, indent+4);
             }
+            IConstraint[] constraints = 
+                bop.getProperty(PipelineJoin.Annotations.CONSTRAINTS);
+            if (constraints != null) {
+                for (IConstraint c : constraints) {
+                    toString(c, sb, indent+4);
+                }
+            }
         }
         
     }
@@ -228,6 +266,8 @@ public class Rule2BOpUtility {
      * @param program
      * 
      * @return
+     * 
+     * FIXME What is the pattern for UNION?
      */
     public static BindingSetPipelineOp convert(final Program program) {
 
