@@ -403,4 +403,13 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      */
     public int hashCode();
     
+    /**
+     * Sets the {@link com.bigdata.bop.BOp.Annotations#BOP_ID} annotation.
+     * 
+     * @param bopId
+     *            The bop id.
+     *            
+     * @return The newly annotated {@link IPredicate}.
+     */
+    public IPredicate<E> setBOpId(int bopId);
 }

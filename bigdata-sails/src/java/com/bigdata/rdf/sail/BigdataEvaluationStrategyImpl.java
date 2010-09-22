@@ -592,6 +592,11 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             IStep query = createNativeQuery(join);
             
             if (query == null) {
+                
+                if (log.isDebugEnabled()) {
+                    log.debug("query == null");
+                }
+                
                 return new EmptyIteration<BindingSet, QueryEvaluationException>();
             }
 
@@ -1522,8 +1527,12 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             result = com.bigdata.bop.Var.var(name);
         } else {
             final IV iv = val.getIV();
-            if (iv == null)
+            if (iv == null) {
+                if (log.isDebugEnabled()) {
+                    log.debug("null IV: " + val);
+                }
                 return null;
+            }
             result = new Constant<IV>(iv);
         }
         return result;
@@ -1584,6 +1593,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         if (log.isDebugEnabled()) {
             log.debug("var: " + var);
             log.debug("constant: " + constant);
+            log.debug("constant.getIV(): " + constant.getIV());
         }
         if (var == null || constant == null || constant.getIV() == null) {
             if (log.isDebugEnabled()) {
@@ -1644,14 +1654,15 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             final IStep step)
             throws Exception {
         
+        final QueryEngine queryEngine = tripleSource.getSail().getQueryEngine();
+        
         final int startId = 1;
-        final BindingSetPipelineOp query = Rule2BOpUtility.convert(step, startId);
+        final BindingSetPipelineOp query = 
+            Rule2BOpUtility.convert(step, startId, queryEngine);
         
         if (log.isInfoEnabled()) {
             log.info(query);
         }
-        
-        final QueryEngine queryEngine = tripleSource.getSail().getQueryEngine();
         
         final UUID queryId = UUID.randomUUID();
         final RunningQuery runningQuery = queryEngine.eval(queryId, query,
