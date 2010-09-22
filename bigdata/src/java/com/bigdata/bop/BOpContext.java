@@ -27,14 +27,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.bop;
 
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.RunningQuery;
-import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IRangeQuery;
@@ -113,6 +114,16 @@ public class BOpContext<E> {
      */
     public final IIndexManager getIndexManager() {
         return runningQuery.getIndexManager();
+    }
+
+    /**
+     * Return the {@link Executor} on to which the operator may submit tasks.
+     * <p>
+     * Note: The is the {@link ExecutorService} associated with the
+     * <em>local</em> {@link #getIndexManager() index manager}.
+     */
+    public final Executor getExecutorService() {
+        return runningQuery.getIndexManager().getExecutorService();
     }
 
 //    /**
@@ -386,7 +397,7 @@ public class BOpContext<E> {
 
         if (predicate == null)
             throw new IllegalArgumentException();
-
+        // FIXME This should be as assigned by the query planner so the query is fully declarative.
         final IKeyOrder keyOrder = relation.getKeyOrder((IPredicate) predicate);
 
         if (keyOrder == null)
@@ -617,7 +628,7 @@ public class BOpContext<E> {
      * 
      * @return <code>true</code> iff the constraints are satisfied.
      */
-    private boolean isConsistent(final IConstraint[] constraints,
+    public boolean isConsistent(final IConstraint[] constraints,
             final IBindingSet bindingSet) {
 
         for (int i = 0; i < constraints.length; i++) {
@@ -652,25 +663,27 @@ public class BOpContext<E> {
 
     }
 
-    /**
-     * Cancel the running query (normal termination).
-     * <p>
-     * Note: This method provides a means for an operator to indicate that the
-     * query should halt immediately. It used used by {@link SliceOp}, which
-     * needs to terminate the entire query once the slice has been satisfied.
-     * (If {@link SliceOp} just jumped out of its own evaluation loop then the
-     * query would not produce more results, but it would continue to run and
-     * the over produced results would just be thrown away.)
-     * <p>
-     * Note: When an individual {@link BOp} evaluation throws an exception, the
-     * {@link QueryEngine} will catch that exception and halt query evaluation
-     * with that thrown cause.
-     */
-    public void halt() {
-
-        runningQuery.halt();
-        
-    }
+//    /**
+//     * Cancel the running query (normal termination).
+//     * <p>
+//     * Note: This method provides a means for an operator to indicate that the
+//     * query should halt immediately. It used used by {@link SliceOp}, which
+//     * needs to terminate the entire query once the slice has been satisfied.
+//     * (If {@link SliceOp} just jumped out of its own evaluation loop then the
+//     * query would not produce more results, but it would continue to run and
+//     * the over produced results would just be thrown away.)
+//     * <p>
+//     * Note: When an individual {@link BOp} evaluation throws an exception, the
+//     * {@link QueryEngine} will catch that exception and halt query evaluation
+//     * with that thrown cause.
+//     * 
+//     * @see IRunningQuery#halt()
+//     */
+//    public void halt() {
+//
+//        runningQuery.halt();
+//        
+//    }
     
 /*
  * I've replaced this with AbstractSplitter for the moment.
