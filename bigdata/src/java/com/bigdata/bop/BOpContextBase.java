@@ -27,7 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.bop;
 
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+
 import org.apache.log4j.Logger;
+
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
@@ -53,7 +57,7 @@ import com.bigdata.striterator.IKeyOrder;
  */
 public class BOpContextBase {
 
-    static private final Logger log = Logger.getLogger(BOpContextBase.class);
+    static private final transient Logger log = Logger.getLogger(BOpContextBase.class);
 
     private final QueryEngine queryEngine;
 
@@ -63,7 +67,7 @@ public class BOpContextBase {
      * wise and this {@link IIndexManager} MUST be able to read on the
      * {@link ILocalBTreeView}.
      */
-    public IIndexManager getIndexManager() {
+    final public IIndexManager getIndexManager() {
         return queryEngine.getIndexManager();
     }
     
@@ -73,8 +77,18 @@ public class BOpContextBase {
      * {@link IBigdataFederation}, this reference provides access to the
      * scale-out view of the indices and to other bigdata services.
      */
-    public IBigdataFederation<?> getFederation() {
+    final public IBigdataFederation<?> getFederation() {
         return queryEngine.getFederation();
+    }
+
+    /**
+     * Return the {@link Executor} on to which the operator may submit tasks.
+     * <p>
+     * Note: The is the {@link ExecutorService} associated with the
+     * <em>local</em> {@link #getIndexManager() index manager}.
+     */
+    public final Executor getExecutorService() {
+        return getIndexManager().getExecutorService();
     }
 
     /**

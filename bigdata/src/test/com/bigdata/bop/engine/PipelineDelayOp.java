@@ -6,14 +6,14 @@ import java.util.concurrent.FutureTask;
 
 import junit.framework.AssertionFailedError;
 
-import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 
 /**
  * Operator block evaluation for the specified {@link Annotations#DELAY} and
- * then throws an {@link AssertionFailedError}.
+ * then throws an {@link PipelineDelayError}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -32,10 +32,8 @@ public class PipelineDelayOp extends BindingSetPipelineOp {
          */
         String DELAY = PipelineDelayOp.class.getName() + ".delay";
 
-        long DEFAULT_DELAY = 2000;
-        
     }
-    
+
     /**
      * Deep copy constructor.
      * 
@@ -59,22 +57,44 @@ public class PipelineDelayOp extends BindingSetPipelineOp {
      * Return the delay.
      */
     public long delayMillis() {
-        final Long delay = (Long) annotations.get(Annotations.DELAY);
-        if (delay == null)
-            return Annotations.DEFAULT_DELAY;
-        return delay.longValue();
+
+        return (Long) getRequiredProperty(Annotations.DELAY);
+
     }
 
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
-        final FutureTask<Void> ft = new FutureTask<Void>(new Callable<Void>() {
-            public Void call() throws Exception {
-                Thread.sleep(delayMillis());
-                throw new AssertionFailedError();
-            }
-        });
-        
-        return ft;
+        return new FutureTask<Void>(new DelayTask(this, context));
+
+    }
+
+    private static class DelayTask implements Callable<Void> {
+
+        private final long delay;
+
+        public DelayTask(final PipelineDelayOp op,
+                final BOpContext<IBindingSet> context) {
+
+            this.delay = op.delayMillis();
+
+        }
+
+        public Void call() throws Exception {
+
+            Thread.sleep(delay);
+
+            throw new PipelineDelayError();
+
+        }
+
+    }
+
+    static class PipelineDelayError extends AssertionFailedError {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 1L;
 
     }
 

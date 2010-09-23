@@ -73,7 +73,7 @@ public class Haltable<V> implements Future<V> {
      * Exception used to indicate a {@link #cancel(boolean) cancelled}
      * computation.
      */
-    private static Throwable CANCELLED = new InterruptedException();
+    private static Throwable CANCELLED = new InterruptedException("CANCELLED");
 
     /**
      * Lock guarding the {@link #halted} condition and the various non-volatile,
@@ -142,13 +142,12 @@ public class Haltable<V> implements Future<V> {
      *             if the cause is <code>null</code>.
      */
     final public <T extends Throwable> T halt(final T cause) {
-        if (cause == null)
-            throw new IllegalArgumentException();
         final boolean didHalt;
         lock.lock();
         try {
             if (didHalt = !halt) {
-                firstCause = cause;
+                firstCause = (cause != null ? cause
+                        : new IllegalArgumentException());
                 try {
                     // signal *all* listeners.
                     halted.signalAll();

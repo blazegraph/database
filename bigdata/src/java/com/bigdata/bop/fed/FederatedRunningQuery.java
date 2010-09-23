@@ -188,6 +188,32 @@ public class FederatedRunningQuery extends RunningQuery {
     private final ConcurrentHashMap<AllocationContextKey, IAllocationContext> allocationContexts = new ConcurrentHashMap<AllocationContextKey, IAllocationContext>();
 
     /**
+     * The collection of {@link IQueryPeer}s which have accepted for processing
+     * at least one {@link IChunkMessage} or one life cycle event for this
+     * query. This collection is maintained only on the controller. The peers
+     * are responsible for notifying the controller when they first begin to do
+     * work for a query. This collection is used to notify peers participating
+     * in the evaluation of the query when the query has been terminated.
+     * 
+     * FIXME All of the cases below could be trapped by noticing when a peer
+     * requests the query from the controller using
+     * {@link IQueryClient#getQuery(UUID)}.  We would have to send along the
+     * proxy for the peer as well.
+     * 
+     * FIXME Notify the controller the first time a peer accepts a chunk. Note
+     * that peers may receive chunks from other peers and that it is possible
+     * for some peers to never receive a chunk directly from the query
+     * controller.
+     * 
+     * FIXME {@link RunningQuery#lifeCycleSetUpQuery()} methods should be
+     * registered here.
+     * 
+     * FIXME {@link RunningQuery#lifeCycleSetUpOperator(int)} methods should be
+     * registered here.
+     */
+    private final ConcurrentHashMap<IQueryPeer, IQueryPeer> peers; 
+    
+    /**
      * Extended to release all allocations associated with the specified
      * operator.
      * <p>
@@ -262,6 +288,9 @@ public class FederatedRunningQuery extends RunningQuery {
                     "The top-level of a query must be evaluated on the query controller.");
 
         }
+        
+        peers = isController() ? new ConcurrentHashMap<IQueryPeer, IQueryPeer>()
+                : null;
 
     }
 
@@ -375,26 +404,29 @@ public class FederatedRunningQuery extends RunningQuery {
      *       and how to best combine their data together.
      */
     @Override
-    protected <E> int handleOutputChunk(final int sinkId,
+    protected <E> int handleOutputChunk(final BOp bop, final int sinkId,
             final IBlockingBuffer<IBindingSet[]> sink) {
-
-        if (sink == null)
-            throw new IllegalArgumentException();
-
-        final BOp bop = bopIndex.get(sinkId);
 
         if (bop == null)
             throw new IllegalArgumentException();
 
+        if (sink == null)
+            throw new IllegalArgumentException();
+
+        final BOp targetOp = bopIndex.get(sinkId);
+
+        if (bop == null)
+            throw new IllegalStateException("Not found: " + sinkId);
+
         if(log.isTraceEnabled())
             log.trace("queryId=" + getQueryId() + ", sink=" + sinkId);
         
-        switch (bop.getEvaluationContext()) {
+        switch (targetOp.getEvaluationContext()) {
         case ANY: {
             /*
              * This operator may be evaluated anywhere.
              */
-            return super.handleOutputChunk(sinkId, sink);
+            return super.handleOutputChunk(bop, sinkId, sink);
         }
         case HASHED: {
             /*
@@ -426,7 +458,7 @@ public class FederatedRunningQuery extends RunningQuery {
              * of the operator's outputs
              */
             @SuppressWarnings("unchecked")
-            final IPredicate<E> pred = ((IShardwisePipelineOp) bop).getPredicate();
+            final IPredicate<E> pred = ((IShardwisePipelineOp) targetOp).getPredicate();
             final IKeyOrder<E> keyOrder = pred.getKeyOrder();
             final long timestamp = pred.getTimestamp(); 
             final int capacity = 1000;// @todo
@@ -526,7 +558,7 @@ public class FederatedRunningQuery extends RunningQuery {
 
         }
         default:
-            throw new AssertionError(bop.getEvaluationContext());
+            throw new AssertionError(targetOp.getEvaluationContext());
         }
         
     }
@@ -683,6 +715,48 @@ public class FederatedRunningQuery extends RunningQuery {
             throw new RuntimeException(e);
 
         }
+
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected boolean cancelQueryOnPeers(final Throwable cause) {
+
+        super.cancelQueryOnPeers(cause);
+
+        final UUID queryId = getQueryId();
+        
+        boolean cancelled = false;
+        
+        for (IQueryPeer peer : peers.values()) {
+
+            try {
+
+                peer.cancelQuery(queryId, cause);
+                
+            } catch (RemoteException e) {
+
+                /*
+                 * If we do not manage to notify the peer then the peer will not
+                 * release resources assigned to the query in a timely manner.
+                 * However, assuming the peer eventually manages to send some
+                 * data to another node which has been notified (or to the
+                 * controller), then the peer will receive a notice that the
+                 * query either has been cancelled or is unknown. Either way,
+                 * the peer will eventually release its resources allocated to
+                 * the query once it reconnects.
+                 */
+                log.error("Could not notify: " + peer, e);
+                
+            }
+            
+            cancelled = true;
+            
+        }
+        
+        return cancelled;
 
     }
 

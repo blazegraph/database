@@ -38,10 +38,8 @@ import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.constraint.INConstraint;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkAccessor;
-import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -65,34 +63,6 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  *       DataSetJoin is still far simpler since it just binds the var and send
  *       out the asBound binding set and does not need to worry about internal
  *       parallelism, alternative sinks, or chunking.
- * 
- * @todo SPARQL default graph queries require us to apply a distinct {s,p,o}
- *       filter to each default graph access path. For scale-out, that is a
- *       distributed distinct access path filter. A DHT is used when the scale
- *       is moderate. A distributed external merge sort SORT is used when the
- *       scale is very large.
- *       <p>
- *       Special cases exist for:
- *       <ul>
- * 
- *       <li>Whenever C is a constant, we are guaranteed that the SPO will be
- *       distinct and do not need to apply a distributed distinct filter.</li>
- *       <li>
- *       The SPOC access path can be optimized because we know that C is
- *       strictly ascending. We can note the last observed {s,p,o} and skip to
- *       the next possible o in the index (o:=o+1) using an advancer pattern
- *       (this could also just scan until o changes). These are the possibly
- *       distinct {s,p,o} triples, which can then be sent to the DHT unless we
- *       have a guarantee that S never crosses a shard boundary (this is
- *       trivially true for standalone can this constraint can be imposed on
- *       scale-out, but can cause problems if some subjects are very highly
- *       referenced).</li>
- *       <li>
- *       There will be some cases where we do better by doing a
- *       {@link PipelineJoin} and filtering using an {@link INConstraint}.
- *       However, this is probably only true for very small temporary graphs and
- *       in high volume scale-out joins where a cost analysis shows that it will
- *       be more efficient to read all the shards with the IN filter.</li>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

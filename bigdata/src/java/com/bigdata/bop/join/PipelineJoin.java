@@ -838,6 +838,15 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
 
                 try {
 
+                    if (chunk.length == 1) {
+                        
+                        // fast path if the chunk has a single binding set.
+                        runOneTask();
+                        
+                        return null;
+                        
+                    }
+                    
                     /*
                      * Aggregate the source bindingSets that license the same
                      * asBound predicate.
@@ -872,6 +881,43 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
                     throw new RuntimeException(t);
 
                 }
+
+            }
+
+            /**
+             * There is exactly one {@link IBindingSet} in the chunk, so run
+             * exactly one {@link AccessPathTask}.
+             * 
+             * @throws Exception
+             */
+            private void runOneTask() throws Exception {
+
+                if (chunk.length != 1)
+                    throw new AssertionError();
+                
+                final IBindingSet bindingSet = chunk[0];
+
+                // constrain the predicate to the given bindings.
+                IPredicate<?> predicate = right.asBound(bindingSet);
+
+                if (partitionId != -1) {
+
+                    /*
+                     * Constrain the predicate to the desired index
+                     * partition.
+                     * 
+                     * Note: we do this for scale-out joins since the access
+                     * path will be evaluated by a JoinTask dedicated to
+                     * this index partition, which is part of how we give
+                     * the JoinTask to gain access to the local index object
+                     * for an index partition.
+                     */
+
+                    predicate = predicate.setPartitionId(partitionId);
+
+                }
+
+                new AccessPathTask(predicate,Arrays.asList(chunk)).call();
 
             }
             

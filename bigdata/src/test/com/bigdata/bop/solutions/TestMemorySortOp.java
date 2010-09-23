@@ -149,7 +149,7 @@ public class TestMemorySortOp extends TestCase2 {
     ///////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////
     @SuppressWarnings("serial")
-    private class StringComparatorOp extends ComparatorOp
+    static private class StringComparatorOp extends ComparatorOp
     {
         public StringComparatorOp ( ISortOrder<?> sors [] )
         {

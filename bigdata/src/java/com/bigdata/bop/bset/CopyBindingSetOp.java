@@ -35,6 +35,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkAccessor;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
@@ -56,6 +57,16 @@ public class CopyBindingSetOp extends BindingSetPipelineOp {
      */
     private static final long serialVersionUID = 1L;
 
+    public interface Annotations extends BindingSetPipelineOp.Annotations {
+
+        /**
+         * An optional {@link IConstraint}[] which places restrictions on the
+         * legal patterns in the variable bindings.
+         */
+        String CONSTRAINTS = CopyBindingSetOp.class.getName() + ".constraints";
+
+    }
+
     /**
      * Deep copy constructor.
      * 
@@ -75,10 +86,19 @@ public class CopyBindingSetOp extends BindingSetPipelineOp {
         super(args, annotations);
     }
 
+    /**
+     * @see Annotations#CONSTRAINTS
+     */
+    public IConstraint[] constraints() {
+
+        return getProperty(Annotations.CONSTRAINTS, null/* defaultValue */);
+
+    }
+
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
-        return new FutureTask<Void>(new CopyTask(context));
-        
+        return new FutureTask<Void>(new CopyTask(this, context));
+
     }
 
     /**
@@ -90,11 +110,19 @@ public class CopyBindingSetOp extends BindingSetPipelineOp {
     static private class CopyTask implements Callable<Void> {
 
         private final BOpContext<IBindingSet> context;
-        
-        CopyTask(final BOpContext<IBindingSet> context) {
-        
+
+        /**
+         * The constraint (if any) specified for the join operator.
+         */
+        final private IConstraint[] constraints;
+
+        CopyTask(final CopyBindingSetOp op,
+                final BOpContext<IBindingSet> context) {
+
             this.context = context;
-            
+
+            this.constraints = op.constraints();
+
         }
 
         public Void call() throws Exception {
@@ -108,9 +136,10 @@ public class CopyBindingSetOp extends BindingSetPipelineOp {
                     final IBindingSet[] chunk = source.next();
                     stats.chunksIn.increment();
                     stats.unitsIn.add(chunk.length);
-                    sink.add(chunk);
+                    final IBindingSet[] tmp = applyConstraints(chunk);
+                    sink.add(tmp);
                     if (sink2 != null)
-                        sink2.add(chunk);
+                        sink2.add(tmp);
                 }
                 sink.flush();
                 if (sink2 != null)
@@ -124,6 +153,56 @@ public class CopyBindingSetOp extends BindingSetPipelineOp {
             }
         }
 
-    }
+        private IBindingSet[] applyConstraints(final IBindingSet[] chunk) {
+            
+            if (constraints == null) {
+
+                /*
+                 * No constraints, copy all binding sets.
+                 */
+                
+                return chunk;
+                
+            }
+            
+            /*
+             * Copy binding sets which satisfy the constraint(s).
+             */
+            
+            IBindingSet[] t = new IBindingSet[chunk.length];
+            
+            int j = 0;
+            
+            for (int i = 0; i < chunk.length; i++) {
+            
+                final IBindingSet bindingSet = chunk[i];
+                
+                if (context.isConsistent(constraints, bindingSet)) {
+                
+                    t[j++] = bindingSet;
+                    
+                }
+                
+            }
+
+            if (j != chunk.length) {
+
+                // allocate exact size array.
+                final IBindingSet[] tmp = (IBindingSet[]) java.lang.reflect.Array
+                        .newInstance(chunk[0].getClass(), j);
+
+                // make a dense copy.
+                System.arraycopy(t/* src */, 0/* srcPos */, tmp/* dst */,
+                        0/* dstPos */, j/* len */);
+
+                t = tmp;
+
+            }
+
+            return t;
+            
+        }
+
+    } // class CopyTask
 
 }

@@ -66,6 +66,9 @@ public class TestAll extends TestCase {
         // test suite for some pipeline evaluation utility methods.
         suite.addTestSuite(TestPipelineUtility.class);
 
+        // test suite for the RunState class, which decides query termination.
+        suite.addTestSuite(TestRunState.class);
+        
         // test suite for query evaluation (basic JOINs).
         suite.addTestSuite(TestQueryEngine.class);
 

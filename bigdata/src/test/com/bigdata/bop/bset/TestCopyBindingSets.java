@@ -39,8 +39,10 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.constraint.EQConstant;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.MockRunningQuery;
 import com.bigdata.bop.engine.TestQueryEngine;
@@ -135,8 +137,6 @@ public class TestCopyBindingSets extends TestCase2 {
     public void test_copyBindingSets() throws InterruptedException,
             ExecutionException {
 
-        final Var<?> x = Var.var("x");
-
         final int bopId = 1;
 
         final CopyBindingSetOp query = new CopyBindingSetOp(new BOp[] {}, NV
@@ -183,7 +183,78 @@ public class TestCopyBindingSets extends TestCase2 {
      * semantics for {@link CopyBindingSetOp}.
      */
     public void test_copyToSinkAndAltSink() {
+
         fail("write test");
+        
+    }
+
+    /**
+     * Unit test for copying the input to the output with an {@link IConstraint}
+     * .
+     * 
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    public void test_copyBindingSetsWithConstraint()
+            throws InterruptedException, ExecutionException {
+
+        final Var<?> x = Var.var("x");
+
+        final int bopId = 1;
+
+        final CopyBindingSetOp query = new CopyBindingSetOp(new BOp[] {}, NV
+                .asMap(new NV[] {//
+                        new NV(BOp.Annotations.BOP_ID, bopId),//
+                        new NV(CopyBindingSetOp.Annotations.CONSTRAINTS,
+                                new IConstraint[] {
+                                new EQConstant(x, new Constant<String>("Mary"))
+                        }),//
+                }));
+
+        // the expected solutions (default sink).
+        final List<IBindingSet> expected = new LinkedList<IBindingSet>();
+        {
+            {
+                final IBindingSet bset = new HashBindingSet();
+                bset.set(x, new Constant<String>("Mary"));
+                expected.add(bset);
+            }
+            {
+                final IBindingSet bset = new HashBindingSet();
+                bset.set(x, new Constant<String>("Mary"));
+                expected.add(bset);
+            }
+        }
+
+        final BOpStats stats = query.newStats();
+
+        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
+
+        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer(stats);
+
+        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                new MockRunningQuery(null/* fed */, null/* indexManager */),
+                -1/* partitionId */, stats, source, sink, null/* sink2 */);
+
+        // get task.
+        final FutureTask<Void> ft = query.eval(context);
+
+        // execute task.
+        ft.run();
+
+        TestQueryEngine.assertSameSolutions(expected
+                .toArray(new IBindingSet[] {}), sink.iterator());
+
+        assertTrue(ft.isDone());
+        assertFalse(ft.isCancelled());
+        ft.get(); // verify nothing thrown.
+
+        assertEquals(1L, stats.chunksIn.get());
+        assertEquals(6L, stats.unitsIn.get());
+        assertEquals(2L, stats.unitsOut.get());
+        assertEquals(1L, stats.chunksOut.get());
+
     }
 
 }

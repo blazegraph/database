@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop;
 
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -374,7 +375,7 @@ public class BOpUtility {
      * @param op
      *            A {@link BOp}.
      * 
-     * @return The index.
+     * @return The index, which is immutable and thread-safe.
      * 
      * @throws DuplicateBOpIdException
      *             if there are two or more {@link BOp}s having the same
@@ -412,7 +413,8 @@ public class BOpUtility {
                 throw new DuplicateBOpException(t.toString());
             }
         }
-        return map;
+        // wrap to ensure immutable and thread-safe.
+        return Collections.unmodifiableMap(map);
     }
 
     /**

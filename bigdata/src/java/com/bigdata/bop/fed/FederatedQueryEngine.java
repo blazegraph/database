@@ -31,10 +31,12 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.rmi.RemoteException;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
@@ -61,8 +63,6 @@ import com.bigdata.util.InnerCause;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: FederatedQueryEngine.java 3508 2010-09-05 17:02:34Z thompsonbry
  *          $
- * 
- * @todo DEFAULT_GRAPH_QUERY: buffer management for s/o DHT element[] movement
  */
 public class FederatedQueryEngine extends QueryEngine {
 
@@ -91,10 +91,10 @@ public class FederatedQueryEngine extends QueryEngine {
     private final ManagedResourceService resourceService;
 
     /**
-     * A priority queue of {@link IChunkMessage}s which needs to have their data
+     * A queue of {@link IChunkMessage}s which needs to have their data
      * materialized so an operator can consume those data on this node.
      */
-    final private PriorityBlockingQueue<IChunkMessage<?>> chunkMaterializationQueue = new PriorityBlockingQueue<IChunkMessage<?>>();
+    final private BlockingQueue<IChunkMessage<?>> chunkMaterializationQueue = new LinkedBlockingQueue<IChunkMessage<?>>();
 
     /**
      * The {@link Future} for the task draining the {@link #chunkMaterializationQueue}.
@@ -358,8 +358,13 @@ public class FederatedQueryEngine extends QueryEngine {
                             "Query not running on controller: thisService="
                                     + getServiceUUID() + ", msg=" + msg);
                 }
-                
-                // request from the query controller (RMI).
+
+                /*
+                 * Request the query from the query controller (RMI).
+                 * 
+                 * @todo RMI is too expensive. Apply a memoizer pattern to avoid
+                 * race conditions.
+                 */
                 final BindingSetPipelineOp query = msg.getQueryController()
                         .getQuery(msg.getQueryId());
 
@@ -370,7 +375,7 @@ public class FederatedQueryEngine extends QueryEngine {
                 
                 if(tmp != null) {
                     
-                    // another thread won this race : @todo memoize, RMI is too expensive.
+                    // another thread won this race.
                     q = (FederatedRunningQuery) tmp;
                     
                 }
@@ -412,6 +417,44 @@ public class FederatedQueryEngine extends QueryEngine {
         
         // queue up message to be materialized or otherwise handled later.
         chunkMaterializationQueue.add(msg);
+        
+    }
+
+    /**
+     * Overridden to cancel all running operators for the query on this node.
+     * <p>
+     * {@inheritDoc}
+     */
+    public void cancelQuery(final UUID queryId, final Throwable cause) {
+
+        // lookup query by id.
+        final FederatedRunningQuery q = getRunningQuery(queryId);
+
+        if (q == null)
+            return;
+
+        /*
+         * Queue the cancellation notice for asynchronous processing and return
+         * immediately.
+         * 
+         * @todo Optimization: When the controller sends a node a terminate
+         * signal for an operator, it should not bother to RMI back to the
+         * controller (unless this is done for the purposes of confirmation,
+         * which is available from the RMI return in any case). We could do this
+         * if we had local knowledge of whether the query was already cancelled
+         * (or that the notice was received from the query controller).
+         */
+
+        try {
+
+            getIndexManager().getExecutorService().execute(
+                    new CancelQuery(q, cause));
+
+        } catch (RejectedExecutionException ex) {
+
+            // ignore - the node is shutting down.
+
+        }
         
     }
 

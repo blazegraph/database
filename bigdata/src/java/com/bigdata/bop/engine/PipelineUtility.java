@@ -48,18 +48,16 @@ public class PipelineUtility {
     private static final Logger log = Logger.getLogger(PipelineUtility.class);
 
     /**
-     * Return <code>true</code> iff the <i>runningCountMap</i> AND
-     * <i>availableChunkMap</i> map are ZERO (0) for both the given operator and
-     * for all operators which proceed the given operator in the tree structure
-     * of its operands.
+     * Return <code>true</code> iff <i>availableChunkMap</i> map is ZERO (0) for
+     * the given operator and its descendants AND the <i>runningCountMap</i> is
+     * ZERO (0) for the operator and all descendants of the operator. For the
+     * purposes of this method, only {@link BOp#args() operands} are considered
+     * as descendants.
      * <p>
-     * Note: The movement of the intermediate binding set chunks forms an
-     * acyclic directed graph. We can decide whether or not a {@link BOp} in the
-     * query plan can be triggered by the current activity pattern by inspecting
-     * the {@link BOp} and its operands recursively. If neither the {@link BOp}
-     * nor any of its operands (recursively) has non-zero activity then the
-     * {@link BOp} can not be triggered and this method will return
-     * <code>true</code>.
+     * Note: The movement of the intermediate binding set chunks during query
+     * processing forms an acyclic directed graph. We can decide whether or not
+     * a {@link BOp} in the query plan can be triggered by the current activity
+     * pattern by inspecting the {@link BOp} and its operands recursively.
      * 
      * @param bopId
      *            The identifier for an operator which appears in the query
@@ -92,8 +90,10 @@ public class PipelineUtility {
 
         if (queryPlan == null)
             throw new IllegalArgumentException();
+
         if (queryIndex == null)
             throw new IllegalArgumentException();
+
         if (availableChunkCountMap == null)
             throw new IllegalArgumentException();
 
@@ -103,7 +103,7 @@ public class PipelineUtility {
             throw new NoSuchBOpException(bopId);
 
         final Iterator<BOp> itr = BOpUtility.preOrderIterator(op);
-        
+
         while (itr.hasNext()) {
 
             final BOp t = itr.next();
@@ -112,7 +112,16 @@ public class PipelineUtility {
 
             if (id == null)
                 continue;
+
             {
+
+                /*
+                 * If the operator is running then it is, defacto, "not done."
+                 * 
+                 * If any descendants of the operator are running, then they
+                 * could cause the operator to be re-triggered and it is "not
+                 * done."
+                 */
 
                 final AtomicLong runningCount = runningCountMap.get(id);
 
@@ -125,11 +134,16 @@ public class PipelineUtility {
                     return false;
 
                 }
-                
+
             }
 
             {
-            
+
+                /*
+                 * Any chunks available for the operator in question or any of
+                 * its descendants could cause that operator to be triggered.
+                 */
+
                 final AtomicLong availableChunkCount = availableChunkCountMap
                         .get(id);
 

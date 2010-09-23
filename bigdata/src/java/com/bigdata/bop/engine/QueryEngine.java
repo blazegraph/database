@@ -41,31 +41,16 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 
-import alice.tuprolog.Prolog;
-
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.bset.Union;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.spo.SPORelation;
-import com.bigdata.relation.IMutableRelation;
-import com.bigdata.relation.IRelation;
-import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.Program;
-import com.bigdata.relation.rule.eval.pipeline.DistributedJoinTask;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.ndx.IAsynchronousWriteBufferFactory;
-import com.bigdata.striterator.ChunkedArrayIterator;
-import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * A class managing execution of concurrent queries against a local
@@ -184,132 +169,6 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * 
- * FIXME Unit tests for non-distinct {@link IElementFilter}s on an
- * {@link IPredicate}, unit tests for distinct element filter on an
- * {@link IPredicate} which is capable of distributed operations. Do not use
- * distinct where not required (SPOC, only one graph, etc).
- * <p>
- * It seems like the right way to approach this is by unifying the stackable CTC
- * striterator pattern with the chunked iterator pattern and passing the query
- * engine (or the bop context) into the iterator construction process (or simply
- * requesting that the query engine construct the iterator stack).
- * <p>
- * In terms of harmonization, it is difficult to say which way would work
- * better. In the short term we could simply allow both and mask the differences
- * in how we construct the filters, but the conversion to/from striterators and
- * chunked iterators seems to waste a bit of effort.
- * <p>
- * The trickiest part of all of this is to allow a distributed filter pattern
- * where the filter gets created on a set of nodes identified by the operator
- * and the elements move among those nodes using the query engine's buffers.
- * <p>
- * To actually implement the distributed distinct filter we need to stack the
- * following:
- * 
- * <pre>
- * - ITupleIterator
- * - Resolve ITuple to Element (e.g., SPOC).
- * - Layer on optional IElementFilter associated with the IPredicate.
- * - Layer on SameVariableConstraint iff required (done by AccessPath) 
- * - Resolve SPO to SPO, stripping off the context position.
- * - Chunk SPOs (SPO[], IKeyOrder), where the key order is from the access path.
- * - Filter SPO[] using DHT constructed on specified nodes of the cluster.
- *   The SPO[] chunks should be packaged into NIO buffers and shipped to those
- *   nodes.  The results should be shipped back as a bit vectors packaged into
- *   a NIO buffers.
- * - Dechunk SPO[] to SPO since that is the current expectation for the filter
- *   stack.
- * - The result then gets wrapped as a {@link IChunkedOrderedIterator} by
- *   the AccessPath using a {@link ChunkedArrayIterator}.
- * </pre>
- * 
- * This stack is a bit complex(!). But it is certainly easy enough to generate
- * the necessary bits programmatically.
- * 
- * FIXME Handling the {@link Union} of binding sets. Consider whether the chunk
- * combiner logic from the {@link DistributedJoinTask} could be reused.
- * 
- * FIXME INSERT and DELETE which will construct elements using
- * {@link IRelation#newElement(java.util.List, IBindingSet)} from a binding set
- * and then use {@link IMutableRelation#insert(IChunkedOrderedIterator)} and
- * {@link IMutableRelation#delete(IChunkedOrderedIterator)}. For s/o, we first
- * need to move the bits into the right places so it makes sense to unpack the
- * processing of the loop over the elements and move the data around, writing on
- * each index as necessary. There could be eventually consistent approaches to
- * this as well. For justifications we need to update some additional indices,
- * in which case we are stuck going through {@link IRelation} rather than
- * routing data directly or using the {@link IAsynchronousWriteBufferFactory}.
- * For example, we could handle routing and writing in s/o as follows:
- * 
- * <pre>
- * INSERT(relation,bindingSets) 
- * 
- * expands to
- * 
- * SEQUENCE(
- * SELECT(s,p,o), // drop bindings that we do not need
- * PARALLEL(
- *   INSERT_INDEX(spo), // construct (s,p,o) elements and insert
- *   INSERT_INDEX(pos), // construct (p,o,s) elements and insert
- *   INSERT_INDEX(osp), // construct (o,s,p) elements and insert
- * ))
- * 
- * </pre>
- * 
- * The output of the SELECT operator would be automatically mapped against the
- * shards on which the next operators need to write. Since there is a nested
- * PARALLEL operator, the mapping will be against the shards of each of the
- * given indices. (A simpler operator would invoke
- * {@link SPORelation#insert(IChunkedOrderedIterator)}. Handling justifications
- * requires that we also formulate the justification chain from the pattern of
- * variable bindings in the rule).
- * 
- * FIXME Handle {@link Program}s. There are three flavors, which should probably
- * be broken into three operators: sequence(ops), set(ops), and closure(op). The
- * 'set' version would be parallelized, or at least have an annotation for
- * parallel evaluation. These things belong in the same broad category as the
- * join graph since they are operators which control the evaluation of other
- * operators (the current pipeline join also has that characteristic which it
- * uses to do the nested index subqueries).
- * 
- * FIXME SPARQL to BOP translation
- * <p>
- * The initial pass should translate from {@link IRule} to {@link BOp}s so we
- * can immediately begin running SPARQL queries against the {@link QueryEngine}.
- * A second pass should explore a rules base translation from the openrdf SPARQL
- * operator tree into {@link BOp}s, perhaps using an embedded {@link Prolog}
- * engine. What follows is a partial list of special considerations for that
- * translation:
- * <ul>
- * <li>Distinct can be trivially enforced for default graph queries against the
- * SPOC index.</li>
- * <li>Local distinct should wait until there is more than one tuple from the
- * index since a single tuple does not need to be made distinct using a hash
- * map.</li>
- * <li>Low volume distributed queries should use solution modifiers which
- * evaluate on the query controller node rather than using distributed sort,
- * distinct, slice, or aggregation operators.</li>
- * <li></li>
- * <li></li>
- * <li></li>
- * <li>High volume queries should use special operators (different
- * implementations of joins, use an external merge sort, etc).</li>
- * </ul>
- * 
- * FIXME SPARQL Coverage: Add native support for all SPARQL operators. A lot of
- * this can be picked up from Sesame. Some things, such as isIRI() can be done
- * natively against the {@link IV}. Likewise, there is already a set of
- * comparison methods for {@link IV}s which are inlined values. Add support for
- * <ul>
- * <li></li>
- * <li></li>
- * <li></li>
- * <li></li>
- * <li></li>
- * <li></li>
- * </ul>
  * 
  * @todo Expander patterns will continue to exist until we handle the standalone
  *       backchainers in a different manner for scale-out so add support for
@@ -536,6 +395,8 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
                     if (q.isCancelled())
                         continue;
                     final IChunkMessage<IBindingSet> chunk = q.chunksIn.poll();
+                    if (chunk == null)
+                        continue;
                     if (log.isTraceEnabled())
                         log.trace("Accepted chunk: " + chunk);
                     try {
@@ -820,6 +681,9 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     protected RunningQuery getRunningQuery(final UUID queryId) {
 
+        if(queryId == null)
+            throw new IllegalArgumentException();
+        
         return runningQueries.get(queryId);
 
     }
@@ -866,6 +730,15 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         return new RunningQuery(this, queryId, true/* controller */,
                 this/* clientProxy */, query);
 
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * The default implementation is a NOP.
+     */
+    public void cancelQuery(UUID queryId, Throwable cause) {
+        // NOP
     }
 
 }
