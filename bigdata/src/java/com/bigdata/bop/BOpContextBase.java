@@ -59,7 +59,10 @@ public class BOpContextBase {
 
     static private final transient Logger log = Logger.getLogger(BOpContextBase.class);
 
-    private final QueryEngine queryEngine;
+//    private final QueryEngine queryEngine;
+    
+    private final IBigdataFederation<?> fed;
+    private final IIndexManager indexManager;
 
     /**
      * The <strong>local</strong> {@link IIndexManager}. Query evaluation occurs
@@ -68,17 +71,18 @@ public class BOpContextBase {
      * {@link ILocalBTreeView}.
      */
     final public IIndexManager getIndexManager() {
-        return queryEngine.getIndexManager();
+        return indexManager;
     }
-    
+
     /**
      * The {@link IBigdataFederation} IFF the operator is being evaluated on an
-     * {@link IBigdataFederation}. When evaluating operations against an
-     * {@link IBigdataFederation}, this reference provides access to the
-     * scale-out view of the indices and to other bigdata services.
+     * {@link IBigdataFederation} and otherwise <code>null</code>. When
+     * evaluating operations against an {@link IBigdataFederation}, this
+     * reference provides access to the scale-out view of the indices and to
+     * other bigdata services.
      */
     final public IBigdataFederation<?> getFederation() {
-        return queryEngine.getFederation();
+        return fed;
     }
 
     /**
@@ -88,23 +92,37 @@ public class BOpContextBase {
      * <em>local</em> {@link #getIndexManager() index manager}.
      */
     public final Executor getExecutorService() {
-        return getIndexManager().getExecutorService();
+        return indexManager.getExecutorService();
+    }
+
+    public BOpContextBase(final QueryEngine queryEngine) {
+        
+        this(queryEngine.getFederation(), queryEngine.getIndexManager());
+        
     }
 
     /**
-     * 
+     * Core constructor.
+     * @param fed
      * @param indexManager
-     *            The <strong>local</strong> {@link IIndexManager}. Query
-     *            evaluation occurs against the local indices. In scale-out,
-     *            query evaluation proceeds shard wise and this
-     *            {@link IIndexManager} MUST be able to read on the
-     *            {@link ILocalBTreeView}.
-     * 
      */
-    public BOpContextBase(final QueryEngine queryEngine) {
-        this.queryEngine = queryEngine;
-    }
+    public BOpContextBase(final IBigdataFederation<?> fed,
+            final IIndexManager indexManager) {
 
+        /*
+         * @todo null is permitted here for the unit tests, but we should really
+         * mock the IIndexManager and pass in a non-null object here and then
+         * verify that the reference is non-null.
+         */
+//        if (indexManager == null)
+//            throw new IllegalArgumentException();
+
+        this.fed = fed;
+        
+        this.indexManager = indexManager;
+        
+    }
+    
     /**
      * Locate and return the view of the relation(s) identified by the
      * {@link IPredicate}.

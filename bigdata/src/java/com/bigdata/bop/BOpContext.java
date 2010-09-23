@@ -196,7 +196,7 @@ public class BOpContext<E> extends BOpContextBase {
             final BOpStats stats, final IAsynchronousIterator<E[]> source,
             final IBlockingBuffer<E[]> sink, final IBlockingBuffer<E[]> sink2) {
         
-        super(null);
+        super(runningQuery.getFederation(), runningQuery.getIndexManager());
         
         this.runningQuery = runningQuery;
 //        if (indexManager == null)
