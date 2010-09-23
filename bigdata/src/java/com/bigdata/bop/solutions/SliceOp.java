@@ -326,8 +326,8 @@ public class SliceOp extends BindingSetPipelineOp {
                 sink.flush();
 
                 if (halt) {
-                    log.error("Slice will interrupt query.");// @todo remove.
-                    throw new InterruptedException();
+//                    log.error("Slice will interrupt query.");// FIXME comment out this line.
+                    context.getRunningQuery().halt();//throw new InterruptedException();
                 }
                 // cancelQuery();
 

@@ -231,17 +231,18 @@ public class TestSliceOp extends TestCase2 {
         
         assertTrue(ft.isDone());
         assertFalse(ft.isCancelled());
-        try {
+//        try {
             ft.get(); // verify nothing thrown.
-            fail("Expecting inner cause : " + InterruptedException.class);
-        } catch (Throwable t) {
-            if (InnerCause.isInnerCause(t, InterruptedException.class)) {
-                if (log.isInfoEnabled())
-                    log.info("Ignoring expected exception: " + t, t);
-            } else {
-                fail("Expecting inner cause : " + InterruptedException.class);
-            }
-        }
+//            fail("Expecting inner cause : " + InterruptedException.class);
+//        } catch (Throwable t) {
+//            if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+//                if (log.isInfoEnabled())
+//                    log.info("Ignoring expected exception: " + t, t);
+//            } else {
+//                fail("Expecting inner cause " + InterruptedException.class
+//                        + ", not " + t, t);
+//            }
+//        }
 
         // check the slice stats first.
         assertEquals(limit, stats.naccepted.get());
@@ -322,17 +323,18 @@ public class TestSliceOp extends TestCase2 {
         
         assertTrue(ft.isDone());
         assertFalse(ft.isCancelled());
-        try {
+//        try {
             ft.get(); // verify nothing thrown.
-            fail("Expecting inner cause : " + InterruptedException.class);
-        } catch (Throwable t) {
-            if (InnerCause.isInnerCause(t, InterruptedException.class)) {
-                if (log.isInfoEnabled())
-                    log.info("Ignoring expected exception: " + t, t);
-            } else {
-                fail("Expecting inner cause : " + InterruptedException.class);
-            }
-        }
+//            fail("Expecting inner cause : " + InterruptedException.class);
+//        } catch (Throwable t) {
+//            if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+//                if (log.isInfoEnabled())
+//                    log.info("Ignoring expected exception: " + t, t);
+//            } else {
+//              fail("Expecting inner cause " + InterruptedException.class
+//              + ", not " + t, t);
+//            }
+//        }
 
         assertEquals(limit, stats.naccepted.get());
         assertEquals(offset+limit, stats.nseen.get());

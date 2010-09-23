@@ -67,21 +67,26 @@ public class BOpStats implements Serializable {
      * #of chunks in.
      */
     final public CAT chunksIn = new CAT();
+//    final public AtomicLong chunksIn = new AtomicLong();
 
     /**
      * #of units sets in (tuples, elements, binding sets, etc).
      */
     final public CAT unitsIn = new CAT();
+//    final public AtomicLong unitsIn = new AtomicLong();
 
     /**
      * #of chunks out.
      */
     final public CAT chunksOut = new CAT();
+//    final public AtomicLong chunksOut = new AtomicLong();
+
 
     /**
      * #of units sets in (tuples, elements, binding sets, etc).
      */
     final public CAT unitsOut = new CAT();
+//    final public AtomicLong unitsOut = new AtomicLong();
 
     /**
      * Constructor.
@@ -105,15 +110,20 @@ public class BOpStats implements Serializable {
         unitsIn.add(o.unitsIn.get());
         unitsOut.add(o.unitsOut.get());
         chunksOut.add(o.chunksOut.get());
+//        chunksIn.addAndGet(o.chunksIn.get());
+//        unitsIn.addAndGet(o.unitsIn.get());
+//        unitsOut.addAndGet(o.unitsOut.get());
+//        chunksOut.addAndGet(o.chunksOut.get());
     }
+    
     
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append(getClass().getName());
-        sb.append("{chunksIn=" + chunksIn.estimate_get());
-        sb.append(",unitsIn=" + unitsIn.estimate_get());
-        sb.append(",chunksOut=" + chunksOut.estimate_get());
-        sb.append(",unitsOut=" + unitsOut.estimate_get());
+        sb.append("{chunksIn=" + chunksIn.get());
+        sb.append(",unitsIn=" + unitsIn.get());
+        sb.append(",chunksOut=" + chunksOut.get());
+        sb.append(",unitsOut=" + unitsOut.get());
         toString(sb); // extension hook
         sb.append("}");
         return sb.toString();

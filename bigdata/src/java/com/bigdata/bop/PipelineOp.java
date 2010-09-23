@@ -209,6 +209,16 @@ abstract public class PipelineOp<E> extends BOpBase implements IPipelineOp<E> {
     protected static transient final TimeUnit chunkTimeoutUnit = TimeUnit.MILLISECONDS;
 
     /**
+     * Return the {@link PipelineType} of the operator (default
+     * {@link PipelineType#Vectored}).
+     */
+    public PipelineType getPipelineType() {
+       
+        return PipelineType.Vectored;
+        
+    }
+
+    /**
      * Return <code>true</code> iff {@link #newStats()} must be shared across
      * all invocations of {@link #eval(BOpContext)} for this operator for a
      * given query (default <code>false</code>).

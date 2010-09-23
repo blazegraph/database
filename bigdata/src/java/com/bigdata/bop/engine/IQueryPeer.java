@@ -49,4 +49,18 @@ public interface IQueryPeer extends Remote {
      */
     void bufferReady(IChunkMessage<IBindingSet> msg) throws RemoteException;
 
+    /**
+     * Notify a service that the query has been terminated. The peer MUST NOT
+     * cancel the query synchronously as that can lead to a deadlock with the
+     * query controller. Instead, the peer should queue a task to cancel the
+     * query and then return.
+     * 
+     * @param queryId
+     *            The query identifier.
+     * @param cause
+     *            The cause. When <code>null</code>, this is presumed to be
+     *            normal query termination.
+     */
+    void cancelQuery(UUID queryId, Throwable cause) throws RemoteException;
+
 }

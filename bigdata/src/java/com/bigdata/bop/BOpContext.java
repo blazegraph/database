@@ -27,31 +27,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.bop;
 
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.RunningQuery;
-import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
-import com.bigdata.btree.IRangeQuery;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.TimestampUtility;
-import com.bigdata.relation.IRelation;
-import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.relation.locator.IResourceLocator;
-import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.striterator.IKeyOrder;
 import com.ibm.icu.impl.ByteBuffer;
 
 /**
@@ -62,18 +49,10 @@ import com.ibm.icu.impl.ByteBuffer;
  */
 public class BOpContext<E> extends BOpContextBase {
 
-    static private final Logger log = Logger.getLogger(BOpContext.class);
+    static private final transient Logger log = Logger.getLogger(BOpContext.class);
 
     private final IRunningQuery runningQuery;
     
-//    private final IBigdataFederation<?> fed;
-//
-//    private final IIndexManager indexManager;
-//
-//    private final long readTimestamp;
-//
-//    private final long writeTimestamp;
-
     private final int partitionId;
 
     private final BOpStats stats;
@@ -95,59 +74,7 @@ public class BOpContext<E> extends BOpContextBase {
     public IRunningQuery getRunningQuery() {
         return runningQuery;
     }
-    
-    /**
-     * The {@link IBigdataFederation} IFF the operator is being evaluated on an
-     * {@link IBigdataFederation}. When evaluating operations against an
-     * {@link IBigdataFederation}, this reference provides access to the
-     * scale-out view of the indices and to other bigdata services.
-     */
-    @Override
-    public IBigdataFederation<?> getFederation() {
-        return runningQuery.getFederation();
-    }
-
-    /**
-     * The <strong>local</strong> {@link IIndexManager}. Query evaluation occurs
-     * against the local indices. In scale-out, query evaluation proceeds shard
-     * wise and this {@link IIndexManager} MUST be able to read on the
-     * {@link ILocalBTreeView}.
-     */
-    @Override
-    public IIndexManager getIndexManager() {
-        return runningQuery.getIndexManager();
-    }
-
-    /**
-     * Return the {@link Executor} on to which the operator may submit tasks.
-     * <p>
-     * Note: The is the {@link ExecutorService} associated with the
-     * <em>local</em> {@link #getIndexManager() index manager}.
-     */
-    public final Executor getExecutorService() {
-        return runningQuery.getIndexManager().getExecutorService();
-    }
-
-//    /**
-//     * The timestamp or transaction identifier against which the query is
-//     * reading.
-//     * 
-//     * @deprecated by {@link BOp.Annotations#TIMESTAMP}
-//     */
-//    public final long getReadTimestamp() {
-//        return runningQuery.getReadTimestamp();
-//    }
-//
-//    /**
-//     * The timestamp or transaction identifier against which the query is
-//     * writing.
-//     * 
-//     * @deprecated by {@link BOp.Annotations#TIMESTAMP}
-//     */
-//    public final long getWriteTimestamp() {
-//        return runningQuery.getWriteTimestamp();
-//    }
-
+ 
     /**
      * The index partition identifier -or- <code>-1</code> if the index is not
      * sharded.

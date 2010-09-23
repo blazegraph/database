@@ -54,7 +54,7 @@ import com.bigdata.util.concurrent.Haltable;
  * be mapped across shards or nodes as appropriate for the parent. UNION runs on
  * the query controller. In order to avoid routing intermediate results through
  * the controller, the {@link BindingSetPipelineOp.Annotations#SINK_REF} of each
- * child operand should be overriden to specify the parent of the UNION
+ * child operand should be overridden to specify the parent of the UNION
  * operator.
  * <p>
  * UNION can not be used when the intermediate results must be routed into the

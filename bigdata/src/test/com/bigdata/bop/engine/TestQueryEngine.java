@@ -66,6 +66,7 @@ import com.bigdata.bop.fed.TestFederatedQueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SliceOp.SliceStats;
+import com.bigdata.io.DirectBufferPoolAllocator.IAllocationContext;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -74,6 +75,7 @@ import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.ICloseableIterator;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.LatchedExecutor;
 import com.ibm.icu.impl.ByteBuffer;
 
@@ -282,7 +284,7 @@ public class TestQueryEngine extends TestCase2 {
 
         // Verify results.
         {
-            // the expected solution (just one empty binding set).
+            // the expected solution.
             final IBindingSet[] expected = new IBindingSet[] {//
             new HashBindingSet() //
             };
@@ -332,7 +334,7 @@ public class TestQueryEngine extends TestCase2 {
                         })//
         );
 
-        // the expected solution (just one).
+        // the expected solution.
         final IBindingSet[] expected = new IBindingSet[] {//
         new ArrayBindingSet(//
                 new IVariable[] { Var.var("value") },//
@@ -407,18 +409,13 @@ public class TestQueryEngine extends TestCase2 {
         /*
          * Enforce a constraint on the source such that it hands 3 each source
          * chunk to the join operator as a separate chunk
-         * 
-         * @todo This is not enough to force the query engine to run the join
-         * operator once per source chunk. Instead, it takes the output of the
-         * source operator, which is N chunks, and sends them all to a single
-         * invocation of the join task. To do better than that we have to send
-         * multiple chunk messages rather than just one.
          */
         final int nsources = 3;
         final StartOp startOp = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 new NV(PipelineOp.Annotations.CHUNK_CAPACITY, 1),//
                 new NV(PipelineOp.Annotations.CHUNK_OF_CHUNKS_CAPACITY, nsources),//
+                new NV(QueryEngineTestAnnotations.ONE_MESSAGE_PER_CHUNK, true),//
                 }));
 
         final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
@@ -479,15 +476,15 @@ public class TestQueryEngine extends TestCase2 {
         for (int i = 0; i < sources.length; i++) {
             sources[i] = new IBindingSet[] { source[i] };
         }
-        assertEquals(nsources,source.length);
-        assertEquals(nsources,sources.length);
+        assertEquals(nsources, source.length);
+        assertEquals(nsources, sources.length);
 
 //        new E("John", "Mary"),// [0]
 //        new E("Leon", "Paul"),// [1]
 //        new E("Mary", "Paul"),// [2]
 //        new E("Paul", "Leon"),// [3]
         
-        // the expected solution (just one).
+        // the expected solution.
         final IBindingSet[] expected = new IBindingSet[] {//
         new ArrayBindingSet(//
                 new IVariable[] { x, y },//
@@ -571,27 +568,125 @@ public class TestQueryEngine extends TestCase2 {
     }
 
     /**
-     * @todo Test the ability close the iterator draining a result set before
-     *       the query has finished executing and verify that the query is
-     *       correctly terminated [this is difficult to test without having
-     *       significant data scale since there is an implicit race between the
-     *       consumer and the producer to close out the query evaluation, but
-     *       the {@link PipelineDelayOp} can be used to impose sufficient
-     *       latency on the pipeline that the test can close the query buffer
-     *       iterator first].
-     *       <p>
-     *       This must also be tested in scale-out to make sure that the data
-     *       backing the solutions is not discarded before the caller can use
-     *       those data. [This could be handled by materializing binding set
-     *       objects out of a {@link ByteBuffer} rather than using a live decode
-     *       of the data in that {@link ByteBuffer}.]
+     * Test verifies the ability close the iterator draining a result set before
+     * the query has finished executing and also verify that the query is
+     * correctly terminated.
+     * <p>
+     * Note: This is difficult to test without having significant data scale
+     * since there is an implicit race between the consumer and the producer to
+     * close out the query evaluation, but the {@link PipelineDelayOp} can be
+     * used to impose sufficient latency on the pipeline that the test can close
+     * the query buffer iterator first.
+     * <p>
+     * Note: This must also be tested in scale-out to make sure that the data
+     * backing the solutions is not discarded before the caller can use those
+     * data.
+     * <p>
+     * This could be handled by: (a) materializing binding set objects out of a
+     * {@link ByteBuffer} rather than using a live decode of the data in that
+     * {@link ByteBuffer}; or by (b) using an special {@link IAllocationContext}
+     * which is scoped to the query results such that they are not released
+     * until the iterator draining the buffer is closed.
+     * 
+     * @throws Exception
      */
-    public void test_query_closeIterator() {
+    public void test_query_closeIterator() throws Exception {
+
+        final int startId = 1;
+        final int delayId = 2;
+
+        final Var<?> x = Var.var("x");
+        final Var<?> y = Var.var("y");
+
+        /*
+         * Enforce a constraint on the source such that it hands 3 each source
+         * chunk to the join operator as a separate chunk
+         */
+        final int nsources = 4;
+        final StartOp startOp = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(PipelineOp.Annotations.CHUNK_CAPACITY, 1),//
+                new NV(PipelineOp.Annotations.CHUNK_OF_CHUNKS_CAPACITY, nsources),//
+                new NV(QueryEngineTestAnnotations.ONE_MESSAGE_PER_CHUNK, true),//
+                }));
+
+        final PipelineDelayOp delayOp = new PipelineDelayOp(new BOp[]{startOp},
+                NV.asMap(new NV[] {//
+                        new NV(BOp.Annotations.BOP_ID, delayId),//
+                        new NV(PipelineDelayOp.Annotations.DELAY, 2000L/*ms*/),//
+                        }));
+        
+        // the source data.
+        final IBindingSet[] source = new IBindingSet[] {//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("John"),
+                                new Constant<String>("Mary") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Leon"),
+                                new Constant<String>("Paul") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Paul"),
+                                new Constant<String>("Mary") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Paul"),
+                                new Constant<String>("Mark") }//
+                )};
+        // Put each source binding set into a chunk by itself.
+        final IBindingSet[][] sources = new IBindingSet[source.length][];
+        for (int i = 0; i < sources.length; i++) {
+            sources[i] = new IBindingSet[] { source[i] };
+        }
+        assertEquals(nsources, source.length);
+        assertEquals(nsources, sources.length);
+        
+        final BindingSetPipelineOp query = delayOp; 
+        final UUID queryId = UUID.randomUUID();
+        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
+                        startId, -1 /* partitionId */,
+                        newBindingSetIterator(sources)));
+
+        assertFalse(runningQuery.isDone());
+        
+        final IAsynchronousIterator<IBindingSet[]> itr = runningQuery.iterator();
+        assertFalse(runningQuery.isDone());
+        
+        // eagerly terminate the query.
+        itr.close();
+        assertTrue(runningQuery.isCancelled());
+        try {
+            runningQuery.get();
+            fail("Expecting: " + CancellationException.class);
+        } catch (CancellationException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+        }
+
+    }
+
+    /**
+     * Test the ability of the query engine to defer the evaluation of a one
+     * shot operator until all inputs are available for that operator.
+     * 
+     * @todo We could do this using a mock operator and feeding a bunch of
+     *       chunks into the query by controlling the chunk size, as we do in
+     *       {@link #test_query_join1_multipleChunksIn()}. Make sure that the
+     *       mock operator is not evaluated until all inputs are available for
+     *       that operator.
+     */
+    public void test_oneShot_operator() {
 
         fail("write test");
 
     }
-
+    
     /**
      * Run a join with a slice. The slice is always evaluated on the query
      * controller so adding it to the query plan touches a slightly different
@@ -1005,7 +1100,7 @@ public class TestQueryEngine extends TestCase2 {
         // verify solutions.
         {
 
-            // the expected solution (just one).
+            // the expected solution.
             final IBindingSet[] expected = new IBindingSet[] {//
             new ArrayBindingSet(//
                     new IVariable[] { Var.var("x"), Var.var("y"), Var.var("z") },//
@@ -1074,16 +1169,16 @@ public class TestQueryEngine extends TestCase2 {
     }
 
     /**
-     * A stress test to look for an occasional non-termination in
-     * {@link #test_query_join2()}.
+     * A stress test of {@link #test_query_join2()} which runs a fixed number of
+     * presentations in a single thread.
      * 
-     * @throws Exception 
+     * @throws Exception
      */
     public void test_queryJoin2_stressTest() throws Exception {
         
-        final long timeout = TimeUnit.MINUTES.toMillis(1);
+        final long timeout = Long.MAX_VALUE;//TimeUnit.MINUTES.toMillis(1);
 
-        final int ntrials = 1000;
+        final int ntrials = 100;
 
         final int poolSize = 1; // no concurrency.
 
@@ -1104,13 +1199,14 @@ public class TestQueryEngine extends TestCase2 {
     }
 
     /**
-     * Concurrent stress test.
+     * Concurrent stress test of {@link #test_queryJoin2()} which runs a fixed
+     * number of trials on a pool of N=10 threads.
      * 
      * @throws Exception
      */
     public void test_queryJoin2_concurrentStressTest() throws Exception {
         
-        final long timeout = 5000; // ms
+        final long timeout = Long.MAX_VALUE; // ms
 
         final int ntrials = 1000;
 
@@ -1151,9 +1247,11 @@ public class TestQueryEngine extends TestCase2 {
                         if (log.isInfoEnabled())
                             log.info("trial=" + trial);
                         test_query_join2();
-                    } catch (Exception e) {
+                    } catch (Throwable t) {
+                        // log error.
+                        log.error("trial=" + trial + " : " + t, t);
                         // wrap exception.
-                        throw new RuntimeException(e);
+                        throw new RuntimeException(t);
                     }
                 }
             }, (Void) null);
@@ -1168,6 +1266,8 @@ public class TestQueryEngine extends TestCase2 {
         int ncancel = 0;
         int ntimeout = 0;
         int nsuccess = 0;
+        int ninterrupt = 0;
+        final LinkedList<ExecutionException> errors = new LinkedList<ExecutionException>();
         for (FutureTask<Void> ft : futures) {
             // remaining nanoseconds.
             final long remaining = nanos - (System.nanoTime() - begin);
@@ -1181,18 +1281,36 @@ public class TestQueryEngine extends TestCase2 {
             } catch (TimeoutException ex) {
                 ntimeout++;
             } catch (ExecutionException ex) {
-                nerror++;
+                if(InnerCause.isInnerCause(ex, InterruptedException.class)) {
+                    ninterrupt++;
+                } else if(InnerCause.isInnerCause(ex, CancellationException.class)) {
+                    ncancel++;
+                } else {
+                    nerror++;
+                    errors.add(ex);
+                }
             }
         }
 
         final String msg = "nerror=" + nerror + ", ncancel=" + ncancel
-                + ", ntimeout=" + ntimeout + ", nsuccess=" + nsuccess;
+                + ", ntimeout=" + ntimeout + ", ninterrupt=" + ninterrupt
+                + ", nsuccess=" + nsuccess;
 
+        if (nerror > 0) {
+            // write out the stack traces for the errors.
+            for (ExecutionException ex : errors) {
+                log.error("STACK TRACE FOR ERROR: " + ex, ex);
+            }
+            // write out the summary.
+            System.err.println("\n" + getClass().getName() + "." + getName()
+                    + " : " + msg);
+            // fail the test.
+            fail(msg);
+        }
+
+        // write out the summary.
         System.err
                 .println(getClass().getName() + "." + getName() + " : " + msg);
-
-        if (nerror > 0)
-            fail(msg);
 
         return nsuccess;
         

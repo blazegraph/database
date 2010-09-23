@@ -3,6 +3,8 @@ package com.bigdata.bop.engine;
 import java.io.Serializable;
 import java.util.UUID;
 
+import com.bigdata.bop.BOp;
+
 /**
  * A message sent to the {@link IQueryClient} when an operator is done executing
  * for some chunk of inputs.
@@ -53,7 +55,7 @@ public class HaltOpMessage implements Serializable {
      * scale-out, this is one per index partition over which the intermediate
      * results were mapped.
      */
-    final public int sinkChunksOut;
+    final public int sinkMessagesOut;
 
     /**
      * The operator identifier for the alternative sink -or- <code>null</code>
@@ -71,7 +73,7 @@ public class HaltOpMessage implements Serializable {
      * results were mapped. It is zero if there was no alternative sink for the
      * operator.
      */
-    final public int altSinkChunksOut;
+    final public int altSinkMessagesOut;
     
     /**
      * The statistics for the execution of the bop against the partition on the
@@ -91,10 +93,19 @@ public class HaltOpMessage implements Serializable {
      *            The node which executed the operator.
      * @param cause
      *            <code>null</code> unless execution halted abnormally.
-     * @param chunksOut
-     *            A map reporting the #of binding set chunks which were output
-     *            for each downstream operator for which at least one chunk of
-     *            output was produced.
+     * @param sinkId
+     *            The {@link BOp.Annotations#BOP_ID} of the default sink and
+     *            <code>null</code> if there is no sink (for example, if this is
+     *            the last operator in the pipeline).
+     * @param sinkMessagesOut
+     *            The number of {@link IChunkMessage} which were sent to the
+     *            operator for the default sink.
+     * @param altSinkId
+     *            The {@link BOp.Annotations#BOP_ID} of the alternative sink and
+     *            <code>null</code> if there is no alternative sink.
+     * @param altSinkMessagesOut
+     *            The number of {@link IChunkMessage} which were sent to the
+     *            operator for the alternative sink.
      * @param taskStats
      *            The statistics for the execution of that bop on that shard and
      *            service.
@@ -103,8 +114,8 @@ public class HaltOpMessage implements Serializable {
             //
             final UUID queryId, final int bopId, final int partitionId,
             final UUID serviceId, Throwable cause, //
-            final Integer sinkId, final int sinkChunksOut,// 
-            final Integer altSinkId, final int altSinkChunksOut,// 
+            final Integer sinkId, final int sinkMessagesOut,// 
+            final Integer altSinkId, final int altSinkMessagesOut,// 
             final BOpStats taskStats) {
 
         this.queryId = queryId;
@@ -113,9 +124,9 @@ public class HaltOpMessage implements Serializable {
         this.serviceId = serviceId;
         this.cause = cause;
         this.sinkId = sinkId;
-        this.sinkChunksOut = sinkChunksOut;
+        this.sinkMessagesOut = sinkMessagesOut;
         this.altSinkId = altSinkId;
-        this.altSinkChunksOut = altSinkChunksOut;
+        this.altSinkMessagesOut = altSinkMessagesOut;
         this.taskStats = taskStats;
     }
 
@@ -128,9 +139,9 @@ public class HaltOpMessage implements Serializable {
         if (cause != null)
             sb.append(",cause=" + cause);
         sb.append(",sinkId=" + sinkId);
-        sb.append(",sinkChunksOut=" + sinkChunksOut);
+        sb.append(",sinkChunksOut=" + sinkMessagesOut);
         sb.append(",altSinkId=" + altSinkId);
-        sb.append(",altSinkChunksOut=" + altSinkChunksOut);
+        sb.append(",altSinkChunksOut=" + altSinkMessagesOut);
         sb.append(",stats=" + taskStats);
         sb.append("}");
         return sb.toString();

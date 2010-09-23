@@ -3,6 +3,8 @@ package com.bigdata.bop.engine;
 import java.io.Serializable;
 import java.util.UUID;
 
+import com.bigdata.bop.PipelineType;
+
 /**
  * A message sent to the {@link IQueryClient} when an operator begins executing
  * for some chunk of inputs (an operator on a node against a shard for some
@@ -34,24 +36,39 @@ public class StartOpMessage implements Serializable {
     final public UUID serviceId;
 
     /**
-     * The #of chunks which form the input to that operator (for the atomic
-     * termination condition decision).
+     * The #of {@link IChunkMessage} accepted as the input for the operator.
+     * <p>
+     * Note: This should be ONE (1) unless {@link IChunkMessage} are being
+     * combined for the operator. {@link PipelineType#OneShot} operators often
+     * process multiple {@link IChunkMessage}s at once.
      */
-    final public int nchunks;
+    final public int nmessages;
 
     public StartOpMessage(final UUID queryId, final int opId,
-            final int partitionId, final UUID serviceId, final int nchunks) {
+            final int partitionId, final UUID serviceId, final int nmessages) {
+
+        if (queryId == null)
+            throw new IllegalArgumentException();
+        
+        if (nmessages <= 0)
+            throw new IllegalArgumentException();
+        
         this.queryId = queryId;
+        
         this.bopId = opId;
+    
         this.partitionId = partitionId;
+        
         this.serviceId = serviceId;
-        this.nchunks = nchunks;
+        
+        this.nmessages = nmessages;
+    
     }
 
     public String toString() {
         return getClass().getName() + "{queryId=" + queryId + ",bopId=" + bopId
                 + ",partitionId=" + partitionId + ",serviceId=" + serviceId
-                + ",nchunks=" + nchunks + "}";
+                + ",nchunks=" + nmessages + "}";
     }
 
 }

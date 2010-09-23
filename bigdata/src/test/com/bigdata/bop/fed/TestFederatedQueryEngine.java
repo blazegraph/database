@@ -104,10 +104,10 @@ import com.bigdata.util.config.NicUtil;
  * @version $Id: TestFederatedQueryEngine.java 3508 2010-09-05 17:02:34Z
  *          thompsonbry $
  * 
- * @todo reuse the stress test from {@link TestQueryEngine}.
+ * @todo reuse the stress tests from {@link TestQueryEngine}.
  * 
- * @todo there should be a stress test of {@link SliceOp} with a non-zero offset
- *       in order to verify that it is properly synchronized.
+ * @todo verify that the peers notify the query controller when they first
+ * register
  */
 public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase {
 

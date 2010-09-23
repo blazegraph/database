@@ -226,6 +226,10 @@ public class TestThickChunkMessage extends TestCase2 {
             return null;
         }
 
+        public void cancelQuery(UUID queryId, Throwable cause)
+                throws RemoteException {
+        }
+
     }
     
 }

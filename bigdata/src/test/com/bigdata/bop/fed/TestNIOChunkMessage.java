@@ -256,6 +256,10 @@ public class TestNIOChunkMessage extends TestCase2 {
             return null;
         }
 
+        public void cancelQuery(UUID queryId, Throwable cause)
+                throws RemoteException {
+        }
+
     }
 
     private static class MyNIOChunkMessage<E> extends NIOChunkMessage<E> {

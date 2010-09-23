@@ -167,7 +167,7 @@ public interface BOp extends Cloneable, Serializable {
      * override this method.
      */
     BOpEvaluationContext getEvaluationContext();
-
+    
     /**
      * Return <code>true</code> iff this operator is an access path which writes
      * on the database.

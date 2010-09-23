@@ -459,6 +459,15 @@ public class TestBOpUtility extends TestCase2 {
         assertFalse(map.containsValue(a3));
         assertEquals(4, map.size());
 
+        // verify map is immutable.
+        try {
+            map.put(Integer.valueOf(1),a1);
+            fail("Expecting: "+UnsupportedOperationException.class);
+        } catch(UnsupportedOperationException ex) {
+            if(log.isInfoEnabled())
+                log.info("Ignoring expected exception: "+ex);
+        }
+
     }
 
     /**

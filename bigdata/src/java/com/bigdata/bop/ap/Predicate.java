@@ -30,6 +30,8 @@ package com.bigdata.bop.ap;
 
 import java.util.Map;
 
+import cern.colt.Arrays;
+
 import com.bigdata.bop.AbstractChunkedOrderedIteratorOp;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
@@ -414,7 +416,15 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
             for (Map.Entry<String, Object> e : annotations.entrySet()) {
                 if (!first)
                     sb.append(", ");
-                sb.append(e.getKey() + "=" + e.getValue());
+                // @todo remove relation name hack when making relation name a scalar.
+                if (Annotations.RELATION_NAME.equals(e.getKey())
+                        && e.getValue() != null
+                        && e.getValue().getClass().isArray()) {
+                    sb.append(e.getKey() + "="
+                            + Arrays.toString((String[]) e.getValue()));
+                } else {
+                    sb.append(e.getKey() + "=" + e.getValue());
+                }
                 first = false;
             }
             sb.append("]");

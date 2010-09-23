@@ -56,7 +56,14 @@ public interface IRunningQuery {
     IIndexManager getIndexManager();
 
     /**
-     * Terminate query evaluation
+     * Cancel the running query (normal termination).
+     * <p>
+     * Note: This method provides a means for an operator to indicate that the
+     * query should halt immediately for reasons other than abnormal
+     * termination.
+     * <p>
+     * Note: For abnormal termination of a query, just throw an exception out of
+     * the query operator implementation.
      */
     void halt();
 

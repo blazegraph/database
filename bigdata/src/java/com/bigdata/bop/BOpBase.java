@@ -344,7 +344,8 @@ public class BOpBase implements BOp {
     public String toString() {
         
         final StringBuilder sb = new StringBuilder();
-        sb.append(getClass().getName());
+//        sb.append(getClass().getName());
+        sb.append(super.toString());
         sb.append("(");
         for (int i = 0; i < args.length; i++) {
             final BOp t = args[i];
