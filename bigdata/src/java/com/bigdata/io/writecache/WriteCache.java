@@ -1659,7 +1659,7 @@ abstract public class WriteCache implements IWriteCache {
 				if (m_bufferedWrite == null) {
 					nwrites += FileChannelUtility.writeAll(opener, view, offset);
 				} else {
-					m_bufferedWrite.write(offset, view, opener);
+					nwrites += m_bufferedWrite.write(offset, view, opener);
 				}
 				// if (log.isInfoEnabled())
 				// log.info("writing to: " + offset);
@@ -1667,7 +1667,7 @@ abstract public class WriteCache implements IWriteCache {
 			}
 
 			if (m_bufferedWrite != null) {
-				m_bufferedWrite.flush(opener);
+				nwrites += m_bufferedWrite.flush(opener);
 				
 				if (log.isTraceEnabled())
 					log.trace(m_bufferedWrite.getStats(null, true));

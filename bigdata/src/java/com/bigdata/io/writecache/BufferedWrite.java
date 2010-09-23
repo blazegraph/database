@@ -55,34 +55,38 @@ public class BufferedWrite {
 		m_data = DirectBufferPool.INSTANCE.acquire();
 	}
 	
-	public void write(final long offset, final ByteBuffer data, final IReopenChannel<FileChannel> opener) throws IOException {
+	public int write(final long offset, final ByteBuffer data, final IReopenChannel<FileChannel> opener) throws IOException {
+		int nwrites = 0;
+		
 		m_dataWrites++;
 		
 		int data_len = data.remaining();
 		int slot_len = m_store.getSlotSize(data_len);
 		
 		if (slot_len > m_data.remaining()) {
-			flush(opener);
+			nwrites += flush(opener);
 		}
 		
 		if (m_startAddr == -1) {
 			m_startAddr = m_endAddr = offset;
 		} else if (m_endAddr != offset) {
 			// if this is NOT a contiguous write then flush existing content
-			flush(opener);	
+			nwrites += flush(opener);	
 			m_startAddr = m_endAddr = offset;
 		}
 		m_data.put(data);
 		m_endAddr += slot_len;
 		long pos = m_endAddr - m_startAddr;
 		m_data.position((int) pos);
+		
+		return nwrites;
 	}
 	
-	public void flush(final IReopenChannel<FileChannel> opener) throws IOException {
+	public int flush(final IReopenChannel<FileChannel> opener) throws IOException {
 		m_dataBytes += m_data.position();
 		
 		m_data.flip();
-		FileChannelUtility.writeAll(opener, m_data, m_startAddr);
+		final int nwrites = FileChannelUtility.writeAll(opener, m_data, m_startAddr);
 		m_fileWrites++;
 		
 		m_data.position(0);
@@ -90,6 +94,8 @@ public class BufferedWrite {
 		
 		m_startAddr = -1;
 		m_endAddr = 0;
+		
+		return nwrites;
 	}
 	
 	public String getStats(StringBuffer buf, boolean reset) {
