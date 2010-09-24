@@ -69,10 +69,6 @@ import com.bigdata.striterator.IKeyOrder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestMapBindingSetsOverShards.java 3448 2010-08-18 20:55:58Z
  *          thompsonbry $
- * 
- *          FIXME More unit tests. It appears that none of these tests cover the
- *          case where there is a shared prefix, e.g., because at least one
- *          component of the selected key order is bound.
  */
 public class TestMapBindingSetsOverShards extends
         AbstractEmbeddedFederationTestCase {
@@ -297,13 +293,14 @@ public class TestMapBindingSetsOverShards extends
 //    }
 
     }
-    
+
     /**
-     * Unit test verifies that binding sets are correctly mapped over shards.
+     * Unit test verifies that binding sets are correctly mapped over shards
+     * when the target access path will be fully bound.
      * 
-     * @throws IOException 
+     * @throws IOException
      */
-    public void test_mapShards() throws IOException {
+    public void test_mapShards_fullyBound() throws IOException {
 
         // scale-out view of the relation.
         final R rel = (R) fed.getResourceLocator().locate(namespace,
@@ -363,6 +360,154 @@ public class TestMapBindingSetsOverShards extends
                 expectedPartition1.add(bset);
             }
         
+        }
+
+        final Predicate<E> pred = new Predicate<E>(new BOp[] { x, y }, NV
+                .asMap(new NV[] {//
+                new NV(Predicate.Annotations.RELATION_NAME,
+                        new String[] { namespace }) //
+                }));
+
+        final long tx = fed.getTransactionService().newTx(ITx.READ_COMMITTED);
+
+        try {
+            
+            final MockMapBindingSetsOverShardsBuffer<E> fixture = new MockMapBindingSetsOverShardsBuffer<E>(
+                    fed, pred, rel.getPrimaryKeyOrder(), tx, 100/* capacity */);
+
+            // write the binding sets on the fixture.
+            for (IBindingSet bindingSet : data) {
+
+                fixture.add(bindingSet);
+
+            }
+
+            // flush (verify #of binding sets reported by flush).
+            assertEquals((long) data.size(), fixture.flush());
+
+            /*
+             * Examine the output sinks, verifying that each binding set was
+             * mapped onto the correct index partition.
+             */
+            {
+
+                final List<Bundle> flushedChunks = fixture.flushedChunks;
+                final List<IBindingSet[]> actualPartition0 = new LinkedList<IBindingSet[]>();
+                final List<IBindingSet[]> actualPartition1 = new LinkedList<IBindingSet[]>();
+                for (Bundle b : flushedChunks) {
+                    if (b.locator.getPartitionId() == 0) {
+                        actualPartition0.add(b.bindingSets);
+                    } else if (b.locator.getPartitionId() == 1) {
+                        actualPartition1.add(b.bindingSets);
+                    } else {
+                        fail("Not expecting: " + b.locator);
+                    }
+                }
+
+                final int nflushed = flushedChunks.size();
+                
+//                assertEquals("#of sinks", 2, nflushed);
+
+                // partition0
+                {
+
+//                    assertEquals("#of binding sets", partition0.size(),
+//                            bundle0.bindingSets.length);
+
+                    TestQueryEngine.assertSameSolutionsAnyOrder(
+                            expectedPartition0.toArray(new IBindingSet[0]),
+                            new Dechunkerator<IBindingSet>(actualPartition0
+                                    .iterator()));
+
+                }
+                
+                // partition1
+                {
+//                    final Bundle bundle1 = flushedChunks.get(1);
+//
+//                    assertEquals("partitionId", 1/* partitionId */,
+//                            bundle1.locator.getPartitionId());
+
+//                    assertEquals("#of binding sets", partition1.size(),
+//                            bundle1.bindingSets.length);
+
+                    TestQueryEngine.assertSameSolutionsAnyOrder(
+                            expectedPartition1.toArray(new IBindingSet[0]),
+                            new Dechunkerator<IBindingSet>(actualPartition1
+                                    .iterator()));
+                }
+
+            }
+        
+        } finally {
+
+            fed.getTransactionService().abort(tx);
+            
+        }
+
+    }
+
+    /**
+     * Unit test verifies that binding sets are correctly mapped over shards
+     * when only one component of the key is bound (the key has two components,
+     * this unit test only binds the first component in the key).
+     * 
+     * @throws IOException
+     */
+    public void test_mapShards_oneBound() throws IOException {
+
+        // scale-out view of the relation.
+        final R rel = (R) fed.getResourceLocator().locate(namespace,
+                ITx.UNISOLATED);
+
+        /*
+         * Setup the binding sets to be mapped across the shards.
+         */
+        final Var<?> x = Var.var("x");
+        final Var<?> y = Var.var("y");
+
+        final List<IBindingSet> data = new LinkedList<IBindingSet>();
+        final List<IBindingSet> expectedPartition0 = new LinkedList<IBindingSet>();
+        final List<IBindingSet> expectedPartition1 = new LinkedList<IBindingSet>();
+        {
+            IBindingSet bset = null;
+            { // partition0
+                bset = new HashBindingSet();
+                bset.set(x, new Constant<String>("John"));
+//                bset.set(y, new Constant<String>("Mary"));
+                data.add(bset);
+                expectedPartition0.add(bset);
+            }
+            { // partition1
+                bset = new HashBindingSet();
+                bset.set(x, new Constant<String>("Mary"));
+//                bset.set(y, new Constant<String>("Paul"));
+                data.add(bset);
+                expectedPartition1.add(bset);
+            }
+            { // partition1
+                bset = new HashBindingSet();
+                bset.set(x, new Constant<String>("Paul"));
+//                bset.set(y, new Constant<String>("John"));
+                data.add(bset);
+                expectedPartition1.add(bset);
+            }
+            { // partition0
+                bset = new HashBindingSet();
+                bset.set(x, new Constant<String>("Leon"));
+//                bset.set(y, new Constant<String>("Paul"));
+                data.add(bset);
+                expectedPartition0.add(bset);
+            }
+        
+//            // partition0
+//            new E("John", "Mary"),// 
+//            new E("Leon", "Paul"),// 
+//            // partition1
+//            new E("Mary", "John"),// 
+//            new E("Mary", "Paul"),// 
+//            new E("Paul", "Leon"),// 
+
         }
 
         final Predicate<E> pred = new Predicate<E>(new BOp[] { x, y }, NV
