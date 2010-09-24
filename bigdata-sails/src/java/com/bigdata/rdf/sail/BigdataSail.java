@@ -996,6 +996,8 @@ public class BigdataSail extends SailBase implements Sail {
         
         assertOpen();
         
+        queryEngine.shutdown();
+        
         super.shutDown();
         
     }
