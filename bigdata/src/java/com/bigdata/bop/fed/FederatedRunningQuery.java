@@ -415,7 +415,7 @@ public class FederatedRunningQuery extends RunningQuery {
 
         final BOp targetOp = bopIndex.get(sinkId);
 
-        if (bop == null)
+        if (targetOp == null)
             throw new IllegalStateException("Not found: " + sinkId);
 
         if(log.isTraceEnabled())
@@ -724,11 +724,9 @@ public class FederatedRunningQuery extends RunningQuery {
     @Override
     protected boolean cancelQueryOnPeers(final Throwable cause) {
 
-        super.cancelQueryOnPeers(cause);
+        boolean cancelled = super.cancelQueryOnPeers(cause);
 
         final UUID queryId = getQueryId();
-        
-        boolean cancelled = false;
         
         for (IQueryPeer peer : peers.values()) {
 

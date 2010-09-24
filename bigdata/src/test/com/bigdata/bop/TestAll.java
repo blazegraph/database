@@ -108,7 +108,7 @@ public class TestAll extends TestCase {
          * Note: This is tested later once we have gone through the core unit
          * tests for the services.
          */
-        //suite.addTest( com.bigdata.bop.fed.TestAll.suite() );
+        suite.addTest( com.bigdata.bop.fed.TestAll.suite() );
 
         return suite;
         
