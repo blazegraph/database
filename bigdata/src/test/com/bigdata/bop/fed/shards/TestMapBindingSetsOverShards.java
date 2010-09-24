@@ -64,11 +64,15 @@ import com.bigdata.striterator.Dechunkerator;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
- * Unit tests for {@link MapBindingSetsOverShardsBuffer}. 
+ * Unit tests for {@link MapBindingSetsOverShardsBuffer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestMapBindingSetsOverShards.java 3448 2010-08-18 20:55:58Z
  *          thompsonbry $
+ * 
+ *          FIXME More unit tests. It appears that none of these tests cover the
+ *          case where there is a shared prefix, e.g., because at least one
+ *          component of the selected key order is bound.
  */
 public class TestMapBindingSetsOverShards extends
         AbstractEmbeddedFederationTestCase {

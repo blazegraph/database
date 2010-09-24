@@ -107,7 +107,10 @@ import com.bigdata.util.config.NicUtil;
  * @todo reuse the stress tests from {@link TestQueryEngine}.
  * 
  * @todo verify that the peers notify the query controller when they first
- * register
+ *       register
+ * 
+ *       FIXME Write test of an RMI based join (this is used for some default
+ *       graph query patterns).
  */
 public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase {
 
@@ -651,9 +654,9 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 log.info("join : "+stats.toString());
 
             // verify query solution stats details.
-            assertEquals(1L, stats.chunksIn.get());
-            assertEquals(1L, stats.unitsIn.get());
-            assertEquals(5L, stats.unitsOut.get());
+            assertEquals(2L, stats.chunksIn.get()); // two shards.
+            assertEquals(2L, stats.unitsIn.get()); // two shards, one empty bset each.
+            assertEquals(5L, stats.unitsOut.get()); // total of 5 tuples read across both shards.
             assertEquals(2L, stats.chunksOut.get()); // since we read on both shards.
         }
 
@@ -809,9 +812,9 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
             // verify query solution stats details.
             assertEquals(2L, stats.chunksIn.get()); // since we read on two shards.
-            assertEquals(1L, stats.unitsIn.get()); // a single empty binding set.
-            assertEquals(5L, stats.unitsOut.get()); // each of the tuples will be read.
-            assertEquals(2L, stats.chunksOut.get()); // since we read on both shards.
+            assertEquals(2L, stats.unitsIn.get()); // a single empty binding set for each.
+            assertEquals(2L, stats.unitsOut.get()); // one tuple on each shard will satisfy the constraint.
+            assertEquals(2L, stats.chunksOut.get()); // since we read on both shards and both shards have one tuple which joins.
         }
 
         // validate the stats for the slice operator.
@@ -831,12 +834,12 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
     }
 
     /**
-     * Test the ability run a simple join reading on a single shard. There are
-     * three operators. One feeds an empty binding set[] into the join, another
-     * is the predicate for the access path on which the join will read (it
-     * probes the index once for "Mary" and binds "Paul" and "John" when it does
-     * so), and the third is the join itself (there are two solutions, which are
-     * "value=Paul" and value="John").
+     * Test the ability to run a simple join reading on a single shard. There
+     * are three operators. One feeds an empty binding set[] into the join,
+     * another is the predicate for the access path on which the join will read
+     * (it probes the index once for "Mary" and binds "Paul" and "John" when it
+     * does so), and the third is the join itself (there are two solutions,
+     * which are value="Paul" and value="John").
      */
     public void test_query_join_1shard() throws Exception {
 
@@ -1096,15 +1099,15 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         // verify solutions.
         {
 
-            // the expected solution (just one).
+            // the expected solutions.
             final IBindingSet[] expected = new IBindingSet[] {//
-            new ArrayBindingSet(//
+            new ArrayBindingSet(// partition1
                     new IVariable[] { Var.var("x"), Var.var("y"), Var.var("z") },//
                     new IConstant[] { new Constant<String>("Mary"),
                             new Constant<String>("Paul"),
                             new Constant<String>("Leon") }//
             ),//
-            new ArrayBindingSet(//
+            new ArrayBindingSet(// partition0
                     new IVariable[] { Var.var("x"), Var.var("y"), Var.var("z") },//
                     new IConstant[] { new Constant<String>("Mary"),
                             new Constant<String>("John"),
@@ -1114,6 +1117,13 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
             TestQueryEngine.assertSameSolutionsAnyOrder(expected,
                     new Dechunkerator<IBindingSet>(runningQuery.iterator()));
 
+//          // partition0
+//          new E("John", "Mary"),// 
+//          new E("Leon", "Paul"),// 
+//          // partition1
+//          new E("Mary", "John"),// 
+//          new E("Mary", "Paul"),// 
+//          new E("Paul", "Leon"),// 
         }
 
         // Wait until the query is done.
@@ -1122,7 +1132,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         {
             // validate the stats map.
             assertNotNull(statsMap);
-            assertEquals(3, statsMap.size());
+            assertEquals(4, statsMap.size());
             if (log.isInfoEnabled())
                 log.info(statsMap.toString());
         }
@@ -1149,10 +1159,10 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 log.info("join1: " + stats.toString());
 
             // verify query solution stats details.
-            assertEquals(1L, stats.chunksIn.get());
-            assertEquals(1L, stats.unitsIn.get());
+            assertEquals(1L, stats.chunksIn.get()); // reads only on one shard.
+            assertEquals(1L, stats.unitsIn.get()); // the initial binding set.
             assertEquals(2L, stats.unitsOut.get());
-            assertEquals(1L, stats.chunksOut.get()); // @todo depends on where the shards are.
+            assertEquals(1L, stats.chunksOut.get()); // one chunk out, but will be mapped over two shards.
         }
 
         // validate the stats for the 2nd join operator.
@@ -1163,10 +1173,10 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 log.info("join2: " + stats.toString());
 
             // verify query solution stats details.
-            assertEquals(1L, stats.chunksIn.get()); // @todo depends on where the shards are.
-            assertEquals(2L, stats.unitsIn.get());
-            assertEquals(2L, stats.unitsOut.get());
-            assertEquals(1L, stats.chunksOut.get()); // @todo depends on where the shards are.
+            assertEquals(2L, stats.chunksIn.get()); // one chunk per shard on which we will read.
+            assertEquals(2L, stats.unitsIn.get()); // one binding set in per shard.
+            assertEquals(2L, stats.unitsOut.get()); // one solution per shard.
+            assertEquals(2L, stats.chunksOut.get()); // since join ran on two shards and each had one solution.
         }
 
         // validate stats for the sliceOp (on the query controller)
@@ -1177,10 +1187,10 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 log.info("slice: " + stats.toString());
 
             // verify query solution stats details.
-            assertEquals(1L, stats.chunksIn.get()); // @todo?
-            assertEquals(2L, stats.unitsIn.get());
-            assertEquals(2L, stats.unitsOut.get());
-            assertEquals(1L, stats.chunksOut.get()); // @todo?
+            assertEquals(2L, stats.chunksIn.get()); // one chunk from each shard of join2 with a solution.
+            assertEquals(2L, stats.unitsIn.get()); // one solution per shard for join2.
+            assertEquals(2L, stats.unitsOut.get()); // slice passes all units.
+            assertEquals(2L, stats.chunksOut.get()); // slice runs twice.
         }
         
     }

@@ -37,7 +37,7 @@ class Bundle<F> implements Comparable<Bundle<F>> {
 
         this.fromKey = keyOrder.getFromKey(keyBuilder, asBound);
 
-        this.toKey = keyOrder.getFromKey(keyBuilder, asBound);
+        this.toKey = keyOrder.getToKey(keyBuilder, asBound);
 
     }
 
@@ -94,4 +94,14 @@ class Bundle<F> implements Comparable<Bundle<F>> {
 
     private int hash = 0;
 
+    public String toString() {
+        StringBuilder sb = new StringBuilder(super.toString());
+        sb.append("{bindingSet="+bindingSet);
+        sb.append(",asBound="+asBound);
+        sb.append(",fromKey="+BytesUtil.toString(fromKey));
+        sb.append(",toKey="+BytesUtil.toString(toKey));
+        sb.append("}");
+        return sb.toString();
+    }
+    
 }

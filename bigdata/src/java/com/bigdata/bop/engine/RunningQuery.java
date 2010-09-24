@@ -78,6 +78,12 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
             .getLogger(ChunkTask.class);
 
     /**
+     * Error message used when an operation which must be performed on the query
+     * controller is attempted on some other {@link IQueryPeer}.
+     */
+    static protected final String ERR_NOT_CONTROLLER = "Operator only permitted on the query controller";
+    
+    /**
      * The class executing the query on this node.
      */
     final private QueryEngine queryEngine;
@@ -1160,8 +1166,10 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
                  */
                 // cancel any running operators for this query on this node.
                 cancelled |= cancelRunningOperators(mayInterruptIfRunning);
-                // cancel any running operators for this query on other nodes.
-                cancelled |= cancelQueryOnPeers(future.getCause());
+                if (controller) {
+                    // cancel query on other peers.
+                    cancelled |= cancelQueryOnPeers(future.getCause());
+                }
                 if (queryBuffer != null) {
                     /*
                      * Close the query buffer so the iterator draining the query
@@ -1216,13 +1224,12 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
         return cancelled;
         
     }
-    
+
     /**
      * Cancel the query on each node where it is known to be running.
      * <p>
      * Note: The default implementation verifies that the caller is holding the
-     * {@link #lock} but is otherwise a NOP. This is overridden for
-     * scale-out.
+     * {@link #lock} but is otherwise a NOP. This is overridden for scale-out.
      * 
      * @param cause
      *            When non-<code>null</code>, the cause.
@@ -1230,11 +1237,15 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
      * @return <code>true</code> iff something was cancelled.
      * 
      * @throws IllegalMonitorStateException
-     *             unless the {@link #lock} is held by the current
-     *             thread.
+     *             unless the {@link #lock} is held by the current thread.
+     * @throws UnsupportedOperationException
+     *             unless this is the query controller.
      */
     protected boolean cancelQueryOnPeers(final Throwable cause) {
 
+        if (!controller)
+            throw new UnsupportedOperationException(ERR_NOT_CONTROLLER);
+        
         if (!lock.isHeldByCurrentThread())
             throw new IllegalMonitorStateException();
 
