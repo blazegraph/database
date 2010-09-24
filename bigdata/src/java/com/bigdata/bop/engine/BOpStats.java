@@ -119,7 +119,7 @@ public class BOpStats implements Serializable {
     
     public String toString() {
         final StringBuilder sb = new StringBuilder();
-        sb.append(getClass().getName());
+        sb.append(super.toString());
         sb.append("{chunksIn=" + chunksIn.get());
         sb.append(",unitsIn=" + unitsIn.get());
         sb.append(",chunksOut=" + chunksOut.get());

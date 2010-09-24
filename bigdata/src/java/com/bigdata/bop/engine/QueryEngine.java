@@ -413,7 +413,17 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
                         continue;
                     }
                 } catch (InterruptedException e) {
-                    log.warn("Interrupted.");
+                    /*
+                     * Note: Uncomment the stack trace here if you want to find
+                     * where the query was interrupted.
+                     * 
+                     * Note: If you want to find out who interrupted the query,
+                     * then you can instrument BlockingBuffer#close() in
+                     * PipelineOp#newBuffer(stats).
+                     */
+                    log.warn("Interrupted."
+//                            ,e
+                            );
                     return;
                 } catch (Throwable ex) {
                     // log and continue

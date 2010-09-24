@@ -195,7 +195,7 @@ public interface BOp extends Cloneable, Serializable {
          * identifier for the {@link BOp} within the context of its owning
          * query.
          */
-        String BOP_ID = BOp.class.getName()+".bopId";
+        String BOP_ID = BOp.class.getName() + ".bopId";
 
         /**
          * The timeout for the operator evaluation (milliseconds).
@@ -210,8 +210,8 @@ public interface BOp extends Cloneable, Serializable {
          *       be interpreted with respect to the time when the query began to
          *       execute.
          */
-        String TIMEOUT = BOp.class.getName()+".timeout";
-        
+        String TIMEOUT = BOp.class.getName() + ".timeout";
+
         /**
          * The default timeout for operator evaluation.
          */
@@ -233,9 +233,9 @@ public interface BOp extends Cloneable, Serializable {
          * @see #TIMESTAMP
          */
         String MUTATION = BOp.class.getName() + ".mutation";
-        
+
         boolean DEFAULT_MUTATION = false;
-        
+
         /**
          * The timestamp (or transaction identifier) used by this operator if it
          * reads or writes on the database.

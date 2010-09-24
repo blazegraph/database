@@ -52,10 +52,11 @@ class QueryResultIterator<E> implements IAsynchronousIterator<E> {
              * Note: DO NOT halt the query here!!!! That will cause it to not
              * accept any more messages. Just close the source iterator.
              */
+            src.close();
 //            try {
 //                runningQuery.halt();
 //            } finally {
-                src.close();
+//                src.close();
 //            }
         }
     }

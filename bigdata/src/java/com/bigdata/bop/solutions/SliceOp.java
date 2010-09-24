@@ -275,69 +275,68 @@ public class SliceOp extends BindingSetPipelineOp {
 
         public Void call() throws Exception {
 
-            if(log.isTraceEnabled())
-                log.trace(toString());
-
             final IAsynchronousIterator<IBindingSet[]> source = context
                     .getSource();
 
             final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
 
-            try {
+            /*
+             * buffer forms chunks which get flushed onto the sink.
+             * 
+             * @todo if we have visibility into the #of source chunks, then do
+             * not buffer more than min(#source,#needed).
+             */
+            final UnsynchronizedArrayBuffer<IBindingSet> out = new UnsynchronizedArrayBuffer<IBindingSet>(
+                    sink, op.getChunkCapacity());
+
+            while (source.hasNext()) {
+
+                final IBindingSet[] chunk = source.next();
 
                 /*
-                 * buffer forms chunks which get flushed onto the sink.
+                 * Batch each chunk through a lock for better concurrency
+                 * (avoids CAS contention).
                  * 
-                 * @todo if we have visibility into the #of source chunks, then
-                 * do not buffer more than min(#source,#needed).
+                 * Note: This is safe because the source chunk is already
+                 * materialized and the sink will not block (that is part of the
+                 * bop evaluation contract).
+                 * 
+                 * Note: We need to be careful here with concurrent close of the
+                 * sink (which is the shared queryBuffer) by concurrent
+                 * SliceOps. The problem is that the slice can count off the
+                 * solutions without having them flushed all the way through to
+                 * the queryBuffer, but we can not close the query buffer until
+                 * we actually see the last solution added to the query buffer.
+                 * This is why the slice flushes the buffer while it is
+                 * synchronized.
                  */
-                final UnsynchronizedArrayBuffer<IBindingSet> out = new UnsynchronizedArrayBuffer<IBindingSet>(
-                        sink, op.getChunkCapacity());
+                synchronized (stats) {
 
-                boolean halt = false;
-                
-                while (source.hasNext() && !halt) {
+                    if (log.isTraceEnabled())
+                        log.trace(toString() + ": stats=" + stats + ", sink="
+                                + sink);
 
-                    final IBindingSet[] chunk = source.next();
+                    final boolean halt = handleChunk(out, chunk);
 
-                    /*
-                     * Batch each chunk through a lock for better concurrency
-                     * (avoids CAS contention).
-                     * 
-                     * Note: This is safe because the source chunk is already
-                     * materialized and the sink will not block (that is part of
-                     * the bop evaluation contract).
-                     */
-                    synchronized (stats) {
-                        
-                        if (handleChunk(out, chunk)) {
+                    if (!out.isEmpty())
+                        out.flush();
 
-                            halt = true;
+                    sink.flush();
 
-                        }
+                    if (halt) {
+
+                        if (log.isInfoEnabled())
+                            log.info("Slice will interrupt query.");
+
+                        context.getRunningQuery().halt();
 
                     }
 
                 }
 
-                if (!out.isEmpty())
-                    out.flush();
-
-                sink.flush();
-
-                if (halt) {
-//                    log.error("Slice will interrupt query.");// FIXME comment out this line.
-                    context.getRunningQuery().halt();//throw new InterruptedException();
-                }
-                // cancelQuery();
-
-                return null;
-
-            } finally {
-
-                sink.close();
-
             }
+
+            return null;
 
         }
 
@@ -400,6 +399,8 @@ public class SliceOp extends BindingSetPipelineOp {
 
             stats.chunksIn.increment();
 
+//            int nadded = 0;
+            
             for (int i = 0; i < chunk.length; i++) {
 
                 if (stats.naccepted.get() >= limit)
@@ -420,6 +421,8 @@ public class SliceOp extends BindingSetPipelineOp {
 
                     out.add(bset);
 
+//                    nadded++;
+                    
                     stats.naccepted.incrementAndGet();
 
                     if (log.isTraceEnabled())
@@ -428,29 +431,14 @@ public class SliceOp extends BindingSetPipelineOp {
                 }
 
             } // next bindingSet
-
+            
             return false;
 
         }
 
-        // /**
-        // * Cancel the query evaluation. This is invoked when the slice has
-        // been
-        // * satisfied. At that point we want to halt not only the {@link
-        // SliceOp}
-        // * but also the entire query since it does not need to produce any
-        // more
-        // * results.
-        // */
-        // private void cancelQuery() {
-        //
-        // context.halt();
-        //            
-        // }
-
         public String toString() {
 
-            return getClass().getName() + "{offset=" + offset + ",limit="
+            return super.toString() + "{offset=" + offset + ",limit="
                     + limit + ",nseen=" + stats.nseen + ",naccepted="
                     + stats.naccepted + "}";
 
