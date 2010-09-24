@@ -483,15 +483,17 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             
         } catch (Exception ex) {
             
-            // Use Sesame 2 evaluation
-
-            ex.printStackTrace();
+            throw new QueryEvaluationException(ex);
             
-            if (log.isInfoEnabled()) {
-                log.info("could not evaluate natively, punting to Sesame");
-            }
-            
-            return super.evaluate(union, bindings);
+//            // Use Sesame 2 evaluation
+//
+//            ex.printStackTrace();
+//            
+//            if (log.isInfoEnabled()) {
+//                log.info("could not evaluate natively, punting to Sesame");
+//            }
+//            
+//            return super.evaluate(union, bindings);
             
         }
         
@@ -617,15 +619,17 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             
         } catch (Exception ex) {
             
-            // Use Sesame 2 evaluation
+            throw new QueryEvaluationException(ex);
             
-            ex.printStackTrace();
-            
-            if (log.isInfoEnabled()) {
-                log.info("could not evaluate natively, punting to Sesame"); 
-            }
-
-            return super.evaluate(join, bindings);
+//            // Use Sesame 2 evaluation
+//            
+//            ex.printStackTrace();
+//            
+//            if (log.isInfoEnabled()) {
+//                log.info("could not evaluate natively, punting to Sesame"); 
+//            }
+//
+//            return super.evaluate(join, bindings);
             
         }
         
@@ -721,15 +725,17 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             
         } catch (Exception ex) {
             
-            // Use Sesame 2 evaluation
+            throw new QueryEvaluationException(ex);
             
-            ex.printStackTrace();
-            
-            if (log.isInfoEnabled()) {
-                log.info("could not evaluate natively, punting to Sesame"); 
-            }
-
-            return super.evaluate(join, bindings);
+//            // Use Sesame 2 evaluation
+//            
+//            ex.printStackTrace();
+//            
+//            if (log.isInfoEnabled()) {
+//                log.info("could not evaluate natively, punting to Sesame"); 
+//            }
+//
+//            return super.evaluate(join, bindings);
             
         }
         
