@@ -475,7 +475,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
         final StringBuilder sb = new StringBuilder();
 
-        sb.append("BlockingBuffer");
+        sb.append(super.toString());
+//        sb.append("BlockingBuffer");
 
         sb.append("{ open=" + open);
 

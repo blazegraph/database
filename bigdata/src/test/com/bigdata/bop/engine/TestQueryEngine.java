@@ -405,6 +405,7 @@ public class TestQueryEngine extends TestCase2 {
         final int startId = 1;
         final int joinId = 2;
         final int predId = 3;
+        final int sliceId = 4;
 
         /*
          * Enforce a constraint on the source such that it hands 3 each source
@@ -442,7 +443,6 @@ public class TestQueryEngine extends TestCase2 {
                         })//
         );
         
-        final int sliceId = 4;
         final SliceOp sliceOp = new SliceOp(new BOp[] { joinOp },
                 // slice annotations
                 NV.asMap(new NV[] {//
@@ -509,6 +509,8 @@ public class TestQueryEngine extends TestCase2 {
                         startId, -1 /* partitionId */,
                         newBindingSetIterator(sources)));
 
+//        runningQuery.get();
+        
         // verify solutions.
         assertSameSolutionsAnyOrder(expected, new Dechunkerator<IBindingSet>(
                 runningQuery.iterator()));
@@ -685,6 +687,131 @@ public class TestQueryEngine extends TestCase2 {
 
         fail("write test");
 
+    }
+
+    /**
+     * Unit test runs chunks into a slice without a limit. This verifies that
+     * the query terminates properly even though the slice is willing to accept
+     * more data.
+     * 
+     * @throws Exception
+     */
+    public void test_query_slice_noLimit() throws Exception {
+
+        final Var<?> x = Var.var("x");
+        final Var<?> y = Var.var("y");
+
+        final int startId = 1;
+        final int sliceId = 2;
+
+        /*
+         * Enforce a constraint on the source such that it hands 3 each source
+         * chunk to the join operator as a separate chunk
+         */
+        final int nsources = 4;
+        final StartOp startOp = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(PipelineOp.Annotations.CHUNK_CAPACITY, 1),//
+                new NV(PipelineOp.Annotations.CHUNK_OF_CHUNKS_CAPACITY, nsources),//
+                new NV(QueryEngineTestAnnotations.ONE_MESSAGE_PER_CHUNK, true),//
+                }));
+
+        final SliceOp sliceOp = new SliceOp(new BOp[] { startOp },
+                // slice annotations
+                        NV.asMap(new NV[] { //
+                                new NV(BOp.Annotations.BOP_ID, sliceId),//
+                                        new NV(SliceOp.Annotations.OFFSET, 0L),//
+                                        new NV(SliceOp.Annotations.LIMIT, Long.MAX_VALUE),//
+                                })//
+                );
+        
+        // the source data.
+        final IBindingSet[] source = new IBindingSet[] {//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("John"),
+                                new Constant<String>("Mary") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Leon"),
+                                new Constant<String>("Paul") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Paul"),
+                                new Constant<String>("Mary") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Paul"),
+                                new Constant<String>("Mark") }//
+                )};
+        // Put each source binding set into a chunk by itself.
+        final IBindingSet[][] sources = new IBindingSet[source.length][];
+        for (int i = 0; i < sources.length; i++) {
+            sources[i] = new IBindingSet[] { source[i] };
+        }
+        assertEquals(nsources, source.length);
+        assertEquals(nsources, sources.length);
+        
+        final BindingSetPipelineOp query = sliceOp; 
+        final UUID queryId = UUID.randomUUID();
+        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
+                        startId, -1 /* partitionId */,
+                        newBindingSetIterator(sources)));
+
+        //
+        //
+        //
+        
+        // the expected solutions.
+        final IBindingSet[] expected = source;
+
+        // verify solutions.
+        assertSameSolutionsAnyOrder(expected, new Dechunkerator<IBindingSet>(
+                runningQuery.iterator()));
+
+        // Wait until the query is done.
+        runningQuery.get();
+        final Map<Integer, BOpStats> statsMap = runningQuery.getStats();
+        {
+            // validate the stats map.
+            assertNotNull(statsMap);
+            assertEquals(2, statsMap.size());
+            if (log.isInfoEnabled())
+                log.info(statsMap.toString());
+        }
+
+        // validate the stats for the start operator.
+        {
+            final BOpStats stats = statsMap.get(startId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("start: " + stats.toString());
+
+            // verify query solution stats details.
+            assertEquals((long)nsources, stats.chunksIn.get());
+            assertEquals((long)nsources, stats.unitsIn.get());
+            assertEquals((long)nsources, stats.unitsOut.get());
+            assertEquals((long)nsources, stats.chunksOut.get());
+        }
+
+        // validate the stats for the slice operator.
+        {
+            final BOpStats stats = statsMap.get(sliceId);
+            assertNotNull(stats);
+            if (log.isInfoEnabled())
+                log.info("slice: " + stats.toString());
+
+            // verify query solution stats details.
+            assertEquals((long)nsources, stats.chunksIn.get());
+            assertEquals((long)nsources, stats.unitsIn.get());
+            assertEquals((long)nsources, stats.unitsOut.get());
+            assertEquals((long)nsources, stats.chunksOut.get());
+        }
+        
     }
     
     /**

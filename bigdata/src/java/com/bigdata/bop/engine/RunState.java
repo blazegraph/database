@@ -338,9 +338,6 @@ class RunState {
 
         messagesProduced(msg.getBOpId(), 1/* nmessages */);
 
-        if (log.isInfoEnabled())
-            log.info(msg.toString());
-
         if (TableLog.tableLog.isInfoEnabled()) {
             /*
              * Note: RunState is only used by the query controller so this will
@@ -359,8 +356,11 @@ class RunState {
                     null/* cause */, null/* stats */));
         }
 
-        if (debug)
-            System.err.println("startQ : " + toString());
+        if(log.isInfoEnabled())
+            log.info("startQ : " + toString());
+
+        if (log.isTraceEnabled())
+            log.trace(msg.toString());
 
     }
 
@@ -397,18 +397,17 @@ class RunState {
 
         messagesConsumed(msg.bopId, msg.nmessages);
 
-        if (log.isTraceEnabled())
-            log.trace(msg.toString());
-
         if (TableLog.tableLog.isInfoEnabled()) {
             TableLog.tableLog.info(getTableRow("startOp", msg.serviceId,
                     msg.bopId, msg.partitionId, msg.nmessages/* fanIn */,
                     null/* cause */, null/* stats */));
         }
 
-        if (debug)
-            System.err
-                    .println("startOp: " + toString() + " : bop=" + msg.bopId);
+        if (log.isInfoEnabled())
+            log.info("startOp: " + toString() + " : bop=" + msg.bopId);
+
+        if (log.isTraceEnabled())
+            log.trace(msg.toString());
 
         return firstTime;
 
@@ -470,9 +469,6 @@ class RunState {
         if (isAllDone)
             this.allDone.set(true);
 
-        if (log.isTraceEnabled())
-            log.trace(msg.toString());
-
         if (TableLog.tableLog.isInfoEnabled()) {
             final int fanOut = msg.sinkMessagesOut + msg.altSinkMessagesOut;
             TableLog.tableLog.info(getTableRow("haltOp", msg.serviceId,
@@ -480,9 +476,12 @@ class RunState {
                     msg.taskStats));
         }
 
-        if (debug)
-            System.err.println("haltOp : " + toString() + " : bop=" + msg.bopId
+        if (log.isInfoEnabled())
+            log.info("haltOp : " + toString() + " : bop=" + msg.bopId
                     + ",isOpDone=" + isOpDone);
+
+        if (log.isTraceEnabled())
+            log.trace(msg.toString());
 
         if (msg.cause != null) {
 

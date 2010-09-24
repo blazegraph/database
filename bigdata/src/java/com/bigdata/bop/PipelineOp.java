@@ -30,6 +30,9 @@ package com.bigdata.bop;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.Priority;
+
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.btree.IRangeQuery;
@@ -307,6 +310,22 @@ abstract public class PipelineOp<E> extends BOpBase implements IPipelineOp<E> {
 
         }
 
+        /**
+         * You can uncomment a line in this method to see who is closing the
+         * buffer.
+         * <p>
+         * {@inheritDoc}
+         */
+        @Override
+        public void close() {
+
+//            if (isOpen())
+//                log.error(toString(), new RuntimeException("STACK TRACE"));
+
+            super.close();
+            
+        }
+        
     }
 
 }

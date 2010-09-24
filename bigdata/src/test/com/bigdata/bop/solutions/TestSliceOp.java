@@ -54,13 +54,14 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.engine.MockRunningQuery;
 import com.bigdata.bop.engine.TestQueryEngine;
 import com.bigdata.bop.solutions.SliceOp.SliceStats;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -219,7 +220,7 @@ public class TestSliceOp extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, null/* indexManager */
-                ), -1/* partitionId */, stats,
+                , sink), -1/* partitionId */, stats,
                 source, sink, null/* sink2 */);
 
         // get task.
@@ -311,7 +312,7 @@ public class TestSliceOp extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, null/* indexManager */
-                ), -1/* partitionId */, stats,
+                , sink), -1/* partitionId */, stats,
                 source, sink, null/* sink2 */);
 
         // get task.
@@ -323,18 +324,7 @@ public class TestSliceOp extends TestCase2 {
         
         assertTrue(ft.isDone());
         assertFalse(ft.isCancelled());
-//        try {
-            ft.get(); // verify nothing thrown.
-//            fail("Expecting inner cause : " + InterruptedException.class);
-//        } catch (Throwable t) {
-//            if (InnerCause.isInnerCause(t, InterruptedException.class)) {
-//                if (log.isInfoEnabled())
-//                    log.info("Ignoring expected exception: " + t, t);
-//            } else {
-//              fail("Expecting inner cause " + InterruptedException.class
-//              + ", not " + t, t);
-//            }
-//        }
+        ft.get(); // verify nothing thrown.
 
         assertEquals(limit, stats.naccepted.get());
         assertEquals(offset+limit, stats.nseen.get());
@@ -346,23 +336,33 @@ public class TestSliceOp extends TestCase2 {
 
     }
 
-    public void test_slice_offset0_limitAll() throws InterruptedException,
+    /**
+     * Unit test where the offset is never satisfied. For this test, all binding
+     * sets will be consumed but none will be emitted.
+     * 
+     * @throws InterruptedException
+     * @throws ExecutionException
+     */
+    public void test_slice_offsetNeverSatisfied() throws InterruptedException,
             ExecutionException {
 
         final int bopId = 1;
 
+        final long offset = 100L;
+        final long limit = 3L;
+        
         final SliceOp query = new SliceOp(new BOp[] {}, NV.asMap(new NV[] {//
                 new NV(SliceOp.Annotations.BOP_ID, bopId),//
-//                        new NV(SliceOp.Annotations.OFFSET, 1L),//
-//                        new NV(SliceOp.Annotations.LIMIT, 3L),//
+                        new NV(SliceOp.Annotations.OFFSET, offset),//
+                        new NV(SliceOp.Annotations.LIMIT, limit),//
                 }));
 
-        assertEquals("offset", 0L, query.getOffset());
+        assertEquals("offset", offset, query.getOffset());
 
-        assertEquals("limit", Long.MAX_VALUE, query.getLimit());
+        assertEquals("limit", limit, query.getLimit());
 
-        // the expected solutions
-        final IBindingSet[] expected =  data.toArray(new IBindingSet[0]);
+        // the expected solutions (none)
+        final IBindingSet[] expected = new IBindingSet[0];
         
         final SliceStats stats = query.newStats();
 
@@ -373,18 +373,181 @@ public class TestSliceOp extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, null/* indexManager */
-                ), -1/* partitionId */, stats, source, sink, null/* sink2 */);
+                , sink), -1/* partitionId */, stats, source, sink, null/* sink2 */);
 
         // get task.
         final FutureTask<Void> ft = query.eval(context);
 
         ft.run();
 
-        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
-
+        /*
+         * Note: When the slice does not have a limit (or if we write a test
+         * where the #of source binding sets can not satisfy the offset and/or
+         * limit) then the sink WILL NOT be closed by the slice. Therefore, in
+         * order for the iterator to terminate we first check the Future of the
+         * SliceTask and then _close_ the sink before consuming the iterator.
+         */
         assertTrue(ft.isDone());
         assertFalse(ft.isCancelled());
         ft.get(); // verify nothing thrown.
+        sink.close(); // close the sink so the iterator will terminate!
+
+        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
+
+        assertEquals(1L, stats.chunksIn.get());
+        assertEquals(6L, stats.unitsIn.get());
+        assertEquals(0L, stats.unitsOut.get());
+        assertEquals(0L, stats.chunksOut.get());
+        assertEquals(6L, stats.nseen.get());
+        assertEquals(0L, stats.naccepted.get());
+
+    }
+
+    /**
+     * Unit test where the offset plus the limit is never satisfied. For this
+     * test, all binding sets will be consumed and some will be emitted, but the
+     * slice is never satisfied.
+     * 
+     * @throws InterruptedException
+     * @throws ExecutionException
+     */
+    public void test_slice_offsetPlusLimitNeverSatisfied() throws InterruptedException,
+            ExecutionException {
+
+        final Var<?> x = Var.var("x");
+        final Var<?> y = Var.var("y");
+
+        final int bopId = 1;
+
+        final long offset = 2L;
+        final long limit = 10L;
+        
+        final SliceOp query = new SliceOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new NV(SliceOp.Annotations.BOP_ID, bopId),//
+                        new NV(SliceOp.Annotations.OFFSET, offset),//
+                        new NV(SliceOp.Annotations.LIMIT, limit),//
+                }));
+
+        assertEquals("offset", offset, query.getOffset());
+
+        assertEquals("limit", limit, query.getLimit());
+
+        // the expected solutions
+        final IBindingSet[] expected = new IBindingSet[] {//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Mary"),
+                                new Constant<String>("Jane") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Paul"),
+                                new Constant<String>("Leon") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Paul"),
+                                new Constant<String>("John") }//
+                ),//
+                new ArrayBindingSet(//
+                        new IVariable[] { x, y },//
+                        new IConstant[] { new Constant<String>("Leon"),
+                                new Constant<String>("Paul") }//
+                ),//
+        };
+
+        final SliceStats stats = query.newStats();
+
+        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
+
+        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer(stats);
+
+        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                new MockRunningQuery(null/* fed */, null/* indexManager */
+                , sink), -1/* partitionId */, stats, source, sink, null/* sink2 */);
+
+        // get task.
+        final FutureTask<Void> ft = query.eval(context);
+
+        ft.run();
+
+        /*
+         * Note: When the slice does not have a limit (or if we write a test
+         * where the #of source binding sets can not satisfy the offset and/or
+         * limit) then the sink WILL NOT be closed by the slice. Therefore, in
+         * order for the iterator to terminate we first check the Future of the
+         * SliceTask and then _close_ the sink before consuming the iterator.
+         */
+        assertTrue(ft.isDone());
+        assertFalse(ft.isCancelled());
+        ft.get(); // verify nothing thrown.
+        sink.close(); // close the sink so the iterator will terminate!
+
+        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
+
+        assertEquals(1L, stats.chunksIn.get());
+        assertEquals(6L, stats.unitsIn.get());
+        assertEquals(4L, stats.unitsOut.get());
+        assertEquals(1L, stats.chunksOut.get());
+        assertEquals(6L, stats.nseen.get());
+        assertEquals(4L, stats.naccepted.get());
+
+    }
+
+    /**
+     * Unit test where the slice accepts everything.
+     * 
+     * @throws InterruptedException
+     * @throws ExecutionException
+     */
+    public void test_slice_offset0_limitAll() throws InterruptedException,
+            ExecutionException {
+
+        final int bopId = 1;
+
+        final SliceOp query = new SliceOp(new BOp[] {}, NV.asMap(new NV[] {//
+                new NV(SliceOp.Annotations.BOP_ID, bopId),//
+                // new NV(SliceOp.Annotations.OFFSET, 1L),//
+                // new NV(SliceOp.Annotations.LIMIT, 3L),//
+                }));
+
+        assertEquals("offset", 0L, query.getOffset());
+
+        assertEquals("limit", Long.MAX_VALUE, query.getLimit());
+
+        // the expected solutions
+        final IBindingSet[] expected = data.toArray(new IBindingSet[0]);
+
+        final SliceStats stats = query.newStats();
+
+        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
+
+        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer(stats);
+
+        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                new MockRunningQuery(null/* fed */, null/* indexManager */
+                , sink), -1/* partitionId */, stats, source, sink, null/* sink2 */);
+
+        // get task.
+        final FutureTask<Void> ft = query.eval(context);
+
+        ft.run();
+
+        /*
+         * Note: When the slice does not have a limit (or if we write a test
+         * where the #of source binding sets can not satisfy the offset and/or
+         * limit) then the sink WILL NOT be closed by the slice. Therefore, in
+         * order for the iterator to terminate we first check the Future of the
+         * SliceTask and then _close_ the sink before consuming the iterator.
+         */
+        assertTrue(ft.isDone());
+        assertFalse(ft.isCancelled());
+        ft.get(); // verify nothing thrown.
+        sink.close(); // close the sink so the iterator will terminate!
+
+        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
 
         assertEquals(1L, stats.chunksIn.get());
         assertEquals(6L, stats.unitsIn.get());
@@ -395,7 +558,8 @@ public class TestSliceOp extends TestCase2 {
 
     }
 
-    public void test_slice_correctRejection_badOffset() throws InterruptedException {
+    public void test_slice_correctRejection_badOffset()
+            throws InterruptedException {
 
         final int bopId = 1;
 
@@ -418,7 +582,7 @@ public class TestSliceOp extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, null/* indexManager */
-                ), -1/* partitionId */, stats, source, sink, null/* sink2 */);
+                , sink), -1/* partitionId */, stats, source, sink, null/* sink2 */);
 
         // get task.
         try {
@@ -455,7 +619,7 @@ public class TestSliceOp extends TestCase2 {
 
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
                 new MockRunningQuery(null/* fed */, null/* indexManager */
-                ), -1/* partitionId */, stats, source, sink, null/* sink2 */);
+                , sink), -1/* partitionId */, stats, source, sink, null/* sink2 */);
 
         // get task.
         try {
@@ -516,8 +680,6 @@ public class TestSliceOp extends TestCase2 {
 
         final SliceStats stats = query.newStats();
 
-        final IRunningQuery q = new MockRunningQuery(null/* fed */, null/* indexManager */);
-
         // start time in nanos.
         final long begin = System.nanoTime();
 
@@ -540,9 +702,14 @@ public class TestSliceOp extends TestCase2 {
                 final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                         new IBindingSet[][] { chunk });
 
+                final IBlockingBuffer<IBindingSet[]> sink = new BlockingBuffer<IBindingSet[]>(
+                        chunk.length);
+
+                final IRunningQuery q = new MockRunningQuery(null/* fed */,
+                        null/* indexManager */, sink);
+
                 final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
-                        q, -1/* partitionId */, stats, source,
-                        new BlockingBuffer<IBindingSet[]>(chunk.length), null/* sink2 */);
+                        q, -1/* partitionId */, stats, source, sink, null/* sink2 */);
 
                 final FutureTask<Void> ft = query.eval(context);
 
@@ -608,6 +775,31 @@ public class TestSliceOp extends TestCase2 {
             
         }
         
+    }
+
+    private static class MockRunningQuery extends
+            com.bigdata.bop.engine.MockRunningQuery {
+        
+        private final IBlockingBuffer<IBindingSet[]> sink;
+        
+        public MockRunningQuery(final IBigdataFederation<?> fed,
+                final IIndexManager indexManager,
+                final IBlockingBuffer<IBindingSet[]> sink) {
+
+            super(fed, indexManager);
+
+            this.sink = sink;
+
+        }
+
+        /**
+         * Overridden to close the sink so the slice will terminate.
+         */
+        @Override
+        public void halt() {
+            sink.close();
+        }
+
     }
 
 }
