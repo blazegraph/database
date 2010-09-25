@@ -32,6 +32,7 @@ import junit.framework.TestCase2;
 import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -78,12 +79,14 @@ public class TestMemorySortOp extends TestCase2 {
 
         ISortOrder<?> sors [] = new ISortOrder [] { new SortOrder ( x, true ), new SortOrder ( y, false ) } ;
 
-        SortOp query = new MemorySortOp ( new BOp [] {}
-                                        , NV.asMap ( new NV [] { new NV ( MemorySortOp.Annotations.BOP_ID, 1 )
-                                                               , new NV ( MemorySortOp.Annotations.COMPARATOR, new StringComparatorOp ( sors ) )
-                                                               }
-                                                   )
-                                        ) ;
+        SortOp query = new MemorySortOp(new BOp[] {}, NV.asMap(new NV[] {
+                new NV(MemorySortOp.Annotations.BOP_ID, 1),
+                new NV(MemorySortOp.Annotations.COMPARATOR,
+                        new StringComparatorOp(sors)),
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                        }//
+        ));
 
         //
         // the test data

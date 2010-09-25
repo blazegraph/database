@@ -30,16 +30,17 @@ package com.bigdata.bop.solutions;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
 
 /**
- * Base class for operators which sort binding sets.  
+ * Base class for operators which sort binding sets.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo Define a distributed (external) merge sort operator.
  */
 abstract public class SortOp extends BindingSetPipelineOp {
 
@@ -84,16 +85,4 @@ abstract public class SortOp extends BindingSetPipelineOp {
     
     }
     
-    /**
-     * This operator must be evaluated on the query controller.
-     * 
-     * @todo Define a distributed (external) merge sort operator.
-     */
-    @Override
-    public BOpEvaluationContext getEvaluationContext() {
-        
-        return BOpEvaluationContext.CONTROLLER;
-        
-    }
-
 }

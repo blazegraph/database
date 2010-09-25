@@ -38,6 +38,7 @@ import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -50,7 +51,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
- * The evaluation context for the operator (NOT serializable).
+ * Base class for the bigdata operation evaluation context (NOT serializable).
  * 
  * @param <E>
  *            The generic type of the objects processed by the operator.
@@ -147,12 +148,13 @@ public class BOpContextBase {
      *       order to support mutation operator we will also have to pass in the
      *       {@link #writeTimestamp} or differentiate this in the method name.
      */
-    public IRelation getRelation(final IPredicate<?> pred) {
+    @SuppressWarnings("unchecked")
+    public <E> IRelation<E> getRelation(final IPredicate<E> pred) {
 
         /*
          * Note: This uses the federation as the index manager when locating a
-         * resource for scale-out. However, s/o reads must use the local index
-         * manager when actually obtaining the index view for the relation.
+         * resource for scale-out since that let's us look up the relation in
+         * the global row store, which is being used as a catalog.
          */
         final IIndexManager tmp = getFederation() == null ? getIndexManager()
                 : getFederation();
@@ -160,7 +162,7 @@ public class BOpContextBase {
         final long timestamp = (Long) pred
                 .getRequiredProperty(BOp.Annotations.TIMESTAMP);
 
-        return (IRelation<?>) tmp.getResourceLocator().locate(
+        return (IRelation<E>) tmp.getResourceLocator().locate(
                 pred.getOnlyRelationName(), timestamp);
 
     }
@@ -194,11 +196,25 @@ public class BOpContextBase {
      * Obtain an access path reading from relation for the specified predicate
      * (from the tail of some rule).
      * <p>
-     * Note that passing in the {@link IRelation} is important since it
-     * otherwise must be discovered using the {@link IResourceLocator}. By
-     * requiring the caller to resolve it before hand and pass it into this
-     * method the contention and demand on the {@link IResourceLocator} cache is
-     * reduced.
+     * Note: Passing in the {@link IRelation} is important since it otherwise
+     * must be discovered using the {@link IResourceLocator}. By requiring the
+     * caller to resolve it before hand and pass it into this method the
+     * contention and demand on the {@link IResourceLocator} cache is reduced.
+     * <p>
+     * <h2>Scale-Out</h2>
+     * <p>
+     * Note: You MUST be extremely careful when using expanders with a local
+     * access path for a shared-partitioned or hash-partitioned index. Only
+     * expanders whose semantics remain valid with a partial view of the index
+     * will behave as expected. Here are some examples that DO NOT work:
+     * <ul>
+     * <li>"DISTINCT" on a partitioned local access path is not coherent</li>
+     * <li>Expanders which generate reads against keys not found on that shard
+     * are not coherent.</li>
+     * </ul>
+     * If you have requirements such as these, then either use a remote access
+     * path or change your query plan design more radically to take advantage of
+     * efficient shard-wise scans in scale-out.
      * 
      * @param relation
      *            The relation.
@@ -211,18 +227,38 @@ public class BOpContextBase {
      * 
      * @todo replaces
      *       {@link IJoinNexus#getTailAccessPath(IRelation, IPredicate)}.
+     * 
+     * @todo Reconcile with IRelation#getAccessPath(IPredicate) once the bop
+     *       conversion is done. It has much of the same logic (this also
+     *       handles remote access paths now).
+     * 
+     * @todo Support mutable relation views.
      */
-    @SuppressWarnings("unchecked")
-    public IAccessPath<?> getAccessPath(final IRelation<?> relation,
-            final IPredicate<?> predicate) {
+//    @SuppressWarnings("unchecked")
+    public <E> IAccessPath<E> getAccessPath(final IRelation<E> relation,
+            final IPredicate<E> predicate) {
 
         if (relation == null)
             throw new IllegalArgumentException();
 
         if (predicate == null)
             throw new IllegalArgumentException();
-        // FIXME This should be as assigned by the query planner so the query is fully declarative.
-        final IKeyOrder keyOrder = relation.getKeyOrder((IPredicate) predicate);
+
+        /*
+         * FIXME This should be as assigned by the query planner so the query is
+         * fully declarative.
+         */
+        final IKeyOrder<E> keyOrder;
+        {
+            final IKeyOrder<E> tmp = predicate.getKeyOrder();
+            if (tmp != null) {
+                // use the specified index.
+                keyOrder = tmp;
+            } else {
+                // ask the relation for the best index.
+                keyOrder = relation.getKeyOrder(predicate);
+            }
+        }
 
         if (keyOrder == null)
             throw new RuntimeException("No access path: " + predicate);
@@ -233,26 +269,24 @@ public class BOpContextBase {
                 .getRequiredProperty(BOp.Annotations.TIMESTAMP);
         
         final int flags = predicate.getProperty(
-                PipelineOp.Annotations.FLAGS,
-                PipelineOp.Annotations.DEFAULT_FLAGS)
+                IPredicate.Annotations.FLAGS,
+                IPredicate.Annotations.DEFAULT_FLAGS)
                 | (TimestampUtility.isReadOnly(timestamp) ? IRangeQuery.READONLY
                         : 0);
         
         final int chunkOfChunksCapacity = predicate.getProperty(
-                PipelineOp.Annotations.CHUNK_OF_CHUNKS_CAPACITY,
-                PipelineOp.Annotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY);
+                BufferAnnotations.CHUNK_OF_CHUNKS_CAPACITY,
+                BufferAnnotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY);
 
         final int chunkCapacity = predicate.getProperty(
-                PipelineOp.Annotations.CHUNK_CAPACITY,
-                PipelineOp.Annotations.DEFAULT_CHUNK_CAPACITY);
+                BufferAnnotations.CHUNK_CAPACITY,
+                BufferAnnotations.DEFAULT_CHUNK_CAPACITY);
 
         final int fullyBufferedReadThreshold = predicate.getProperty(
-                PipelineOp.Annotations.FULLY_BUFFERED_READ_THRESHOLD,
-                PipelineOp.Annotations.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD);
+                IPredicate.Annotations.FULLY_BUFFERED_READ_THRESHOLD,
+                IPredicate.Annotations.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD);
         
-        final IIndexManager indexManager = getIndexManager();
-        
-        if (predicate.getPartitionId() != -1) {
+        if (partitionId != -1) {
 
             /*
              * Note: This handles a read against a local index partition. For
@@ -269,12 +303,14 @@ public class BOpContextBase {
 //            return ((AbstractRelation<?>) relation)
 //                    .getAccessPathForIndexPartition(indexManager,
 //                            (IPredicate) predicate);
+
             /*
-             * @todo This condition should probably be an error since the expander
-             * will be ignored.
+             * @todo This is an error since expanders are currently ignored on
+             * shard-wise access paths. While it is possible to enable expanders
+             * for shard-wise access paths.
              */
-//            if (predicate.getSolutionExpander() != null)
-//                throw new IllegalArgumentException();
+            if (predicate.getSolutionExpander() != null)
+                throw new IllegalArgumentException();
             
             final String namespace = relation.getNamespace();//predicate.getOnlyRelationName();
 
@@ -286,60 +322,70 @@ public class BOpContextBase {
             final ILocalBTreeView ndx = (ILocalBTreeView) indexManager
                     .getIndex(name, timestamp);
 
-            return new AccessPath(relation, indexManager, timestamp,
+            return new AccessPath<E>(relation, indexManager, timestamp,
                     predicate, keyOrder, ndx, flags, chunkOfChunksCapacity,
                     chunkCapacity, fullyBufferedReadThreshold).init();
 
         }
 
-        /*
-         * Find the best access path for the predicate for that relation.
-         * 
-         * @todo Replace this with IRelation#getAccessPath(IPredicate) once the
-         * bop conversion is done. It is the same logic.
-         */
-        IAccessPath accessPath;
-        {
-
 //          accessPath = relation.getAccessPath((IPredicate) predicate);
 
-            final IIndex ndx = relation.getIndex(keyOrder);
+        // Decide on a local or remote view of the index.
+        final IIndexManager indexManager;
+        if (predicate.isRemoteAccessPath()) {
+            // use federation in scale-out for a remote access path.
+            indexManager = fed != null ? fed : this.indexManager;
+        } else {
+            indexManager = this.indexManager;
+        }
 
-            if (ndx == null) {
-            
-                throw new IllegalArgumentException("no index? relation="
-                        + relation.getNamespace() + ", timestamp="
-                        + timestamp + ", keyOrder=" + keyOrder + ", pred="
-                        + predicate + ", indexManager=" + getIndexManager());
+        // Obtain the index.
+        final String fqn = AbstractRelation.getFQN(relation, keyOrder);
+        final IIndex ndx = AbstractRelation.getIndex(indexManager, fqn, timestamp);
 
-            }
+        if (ndx == null) {
 
-            accessPath = new AccessPath((IRelation) relation, indexManager,
-                    timestamp, (IPredicate) predicate,
-                    (IKeyOrder) keyOrder, ndx, flags, chunkOfChunksCapacity,
-                    chunkCapacity, fullyBufferedReadThreshold).init();
+            throw new IllegalArgumentException("no index? relation="
+                    + relation.getNamespace() + ", timestamp=" + timestamp
+                    + ", keyOrder=" + keyOrder + ", pred=" + predicate
+                    + ", indexManager=" + getIndexManager());
 
         }
-        
-        /*
-         * @todo No expander's for bops, at least not right now. They could be
-         * added in easily enough, which would support additional features for
-         * standalone query evaluation (runtime materialization of some
-         * entailments).
-         * 
-         * FIXME temporarily enabled expanders (mikep)
-         */
-         final ISolutionExpander<?> expander = predicate.getSolutionExpander();
-                    
-         if (expander != null) {
-                        
-             // allow the predicate to wrap the access path
-             accessPath = expander.getAccessPath(accessPath);
-                        
-         }
 
-        // return that access path.
+        // Obtain the access path for that relation and index.
+        final IAccessPath<E> accessPath = new AccessPath<E>(
+                relation, indexManager, timestamp,
+                predicate, keyOrder, ndx, flags,
+                chunkOfChunksCapacity, chunkCapacity,
+                fullyBufferedReadThreshold).init();
+
+        // optionally wrap with an expander pattern.
+        return expander(predicate, accessPath);
+
+    }
+
+    /**
+     * Optionally wrap with an expander pattern.
+     * 
+     * @param predicate
+     * @param accessPath
+     * @return
+     * @param <E>
+     */
+    private <E> IAccessPath<E> expander(final IPredicate<E> predicate,
+            final IAccessPath<E> accessPath) {
+
+        final ISolutionExpander<E> expander = predicate.getSolutionExpander();
+
+        if (expander != null) {
+
+            // allow the predicate to wrap the access path
+            return expander.getAccessPath(accessPath);
+
+        }
+
         return accessPath;
+        
     }
 
 }

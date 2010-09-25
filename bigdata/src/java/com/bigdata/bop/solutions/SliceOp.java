@@ -36,7 +36,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.BOpStats;
@@ -132,6 +131,15 @@ public class SliceOp extends BindingSetPipelineOp {
 //
 //        if (!(args[0] instanceof BindingSetPipelineOp))
 //            throw new IllegalArgumentException();
+
+        switch (getEvaluationContext()) {
+        case CONTROLLER:
+            break;
+        default:
+            throw new UnsupportedOperationException(
+                    Annotations.EVALUATION_CONTEXT + "="
+                            + getEvaluationContext());
+        }
 
     }
 
@@ -446,14 +454,14 @@ public class SliceOp extends BindingSetPipelineOp {
 
     }
 
-    /**
-     * This operator must be evaluated on the query controller.
-     */
-    @Override
-    public BOpEvaluationContext getEvaluationContext() {
-
-        return BOpEvaluationContext.CONTROLLER;
-
-    }
+//    /**
+//     * This operator must be evaluated on the query controller.
+//     */
+//    @Override
+//    public BOpEvaluationContext getEvaluationContext() {
+//
+//        return BOpEvaluationContext.CONTROLLER;
+//
+//    }
 
 }

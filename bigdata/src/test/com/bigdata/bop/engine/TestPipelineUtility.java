@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import junit.framework.TestCase2;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IVariableOrConstant;
@@ -43,6 +44,7 @@ import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.bop.solutions.SliceOp;
 
 /**
  * Test suite for {@link TestPipelineUtility}.
@@ -81,6 +83,8 @@ public class TestPipelineUtility extends TestCase2 {
         final BindingSetPipelineOp startOp = new StartOp(new BOp[] {},
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
                         }));
         
         final Predicate<?> pred1Op = new Predicate<E>(new IVariableOrConstant[] {

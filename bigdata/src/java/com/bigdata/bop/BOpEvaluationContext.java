@@ -22,7 +22,11 @@ public enum BOpEvaluationContext {
      * The operator may be evaluated anywhere, including piecewise evaluation on
      * any node of the cluster where its inputs are available. This is used for
      * operators which do not need to concentrate or coordinate their inputs
-     * such as {@link ConditionalRoutingOp}.
+     * such as {@link ConditionalRoutingOp}. It may also be used in combination
+     * with a remote access path to impose a DISTINCT filter across one or more
+     * shards or nodes.
+     * 
+     * @see IPredicate.Annotations#REMOTE_ACCESS_PATH
      */
     ANY,
     /**

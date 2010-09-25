@@ -42,14 +42,9 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
-import com.bigdata.btree.IRangeQuery;
 import com.bigdata.journal.ITx;
-import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.ISolutionExpander;
-import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.service.IBigdataFederation;
-import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -183,8 +178,9 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
 
     public int getPartitionId() {
         
-        return (Integer)annotations.get(Annotations.PARTITION_ID);
-        
+        return (Integer) getProperty(Annotations.PARTITION_ID,
+                Annotations.DEFAULT_PARTITION_ID);
+
     }
     
     @SuppressWarnings("unchecked")
@@ -255,6 +251,11 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
             }
         }
         return nunbound;
+    }
+
+    final public boolean isRemoteAccessPath() {
+        return getProperty(Annotations.REMOTE_ACCESS_PATH,
+                Annotations.DEFAULT_REMOTE_ACCESS_PATH);
     }
     
     public Predicate<E> asBound(final IBindingSet bindingSet) {
@@ -492,28 +493,5 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
      * Caches the hash code.
      */
     private int hash = 0;
-
-    /**
-     * @todo This does not allow us to override the iterator behavior based on
-     *       the annotations. It also provides expander logic for scaleup and
-     *       handles reading on a shard. It ignores the {@link IKeyOrder}
-     *       associated with the {@link IPredicate} and there is no way to
-     *       specify the {@link IRangeQuery} flags.
-     */
-    @SuppressWarnings("unchecked")
-    public IChunkedOrderedIterator<E> eval(final IBigdataFederation<?> fed,
-            final IJoinNexus joinNexus) {
-
-        // Resolve the relation name to the IRelation object.
-        final IRelation<E> relation = (IRelation<E>) joinNexus
-                .getTailRelationView(this/* predicate */);
-
-        if (relation == null)
-            throw new RuntimeException("Not found: " + getOnlyRelationName());
-
-        return joinNexus.getTailAccessPath(relation, this/* predicate */)
-                .iterator();
-
-    }
 
 }

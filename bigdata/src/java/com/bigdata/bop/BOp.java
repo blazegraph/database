@@ -161,10 +161,8 @@ public interface BOp extends Cloneable, Serializable {
     int getId();
     
     /**
-     * Return the evaluation context for the operator. The default is
-     * {@link BOpEvaluationContext#ANY}. Operators which must be mapped against
-     * shards, mapped against nodes, or evaluated on the query controller must
-     * override this method.
+     * Return the evaluation context for the operator as specified by
+     * {@link Annotations#EVALUATION_CONTEXT}.
      */
     BOpEvaluationContext getEvaluationContext();
     
@@ -243,6 +241,14 @@ public interface BOp extends Cloneable, Serializable {
          * @see #MUTATION
          */
         String TIMESTAMP = BOp.class.getName() + ".timestamp";
+
+        /**
+         * This annotation determines where an operator will be evaluated
+         * (default {@value #DEFAULT_EVALUATION_CONTEXT}).
+         */
+        String EVALUATION_CONTEXT = BOp.class.getName() + ".evaluationContext";
+
+        BOpEvaluationContext DEFAULT_EVALUATION_CONTEXT = BOpEvaluationContext.ANY;
 
         /**
          * For hash partitioned operators, this is the set of the member nodes

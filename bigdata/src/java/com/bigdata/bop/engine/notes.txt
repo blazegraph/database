@@ -1,14 +1,36 @@
 RunningQuery:
 
-- FIXME Raise this into an annotation that we can tweak from the unit
-        tests and then debug the problem.  [Write unit tests at the
-        RunState level.]
-          
-- FIXME Add an annotation or method to mark operators which must be
-        evaluated using operator-at-a-time evaluation. SORT is the
-        main example here (it must be operator at a time of necessity)
-        but other operators may implemented with operator at a time
-        assumptions.  Add a unit tests for sort on the query engine.
+  - TestJiniFederatedQueryEngine.
+
+  - Join=ANY, Predicate=RMI.
+
+  - Unit tests of the default and named graph access path patterns.
+
+  - Cost model for the default graph and named graph access path
+    patterns so we can choose the right one for each query.
+
+  - Subqueries {Union,Steps,Star}.  Implement subquery support. (We
+    can't test Star until we have the mutation API in place.)
+
+  - PipelineType {Vectored,OneShot}.
+
+        A vectored operator processes its inputs in chunks, producing
+        output chunks each time it runs.
+
+	An one shot operator runs exactly once for a given query and
+	must wait for all of its inputs to become available before it
+	can begin.  For example, SORT is a one shot operator.
+
+  - Mutation {Insert, Delete}.  Concurrency control.  Scale-out
+    mutation operators must go through the ConcurrencyManager in order
+    to respect the isolation levels imposed within AbstractTask.  For
+    standalone, we can using either UnisolatedReadWriteIndex or the
+    ConcurrencyManager as appropriate (but how can we tell which is
+    appropriate!?!).
+
+  - Mutation {Create, Destroy}.  This gets into resource management,
+    so defer for the moment but tackle in the context of RDFS closure
+    using STAR.
 
   - MemoryType {Chunked,Blocked}.  
 
@@ -55,16 +77,6 @@ RunningQuery:
      * to share data with other devices, including GPUs.
      */
     Blocked,
-
-
-  - PipelineType {Vectored,OneShot}.
-
-        A vectored operator processes its inputs in chunks, producing
-        output chunks each time it runs.
-
-	An one shot operator runs exactly once for a given query and
-	must wait for all of its inputs to become available before it
-	can begin.  For example, SORT is a one shot operator.
 
 Note: Many of the maxParallel annotations related to thread
 consumption will go away with Java7 and async file IO.  Other
@@ -210,7 +222,11 @@ Scale-out:
     unbound and then applies an IN filter.  This works better because
     we can handle the reads on the SPOC index with C unbound very
     efficiently in scale-out by using a multi-block iterator on the
-    index segments.
+    index segments.  [However, we must still impose DISTINCT on the
+    access path.]
+
+  - For very high volume operations we could do distributed merge
+    sorts to impose distinct and do operator at a time processing.
 
 - @todo Add annotation to Predicate to indicate the use of an RMI
   access path in scale-out.  Modify PipelineJoin such that it can be
@@ -318,9 +334,6 @@ Lexicon joins -
 ====
 Features:
 
- - (***) Fix termination problems in RunningQuery relating to binding
-   set chunk / chunk message multiplicity.
-
  - operator-at-once evaluation. The operator is triggered once its possible
    triggers are done.  This is just an application of the same utility method
    which we use to decide when a query is done.
@@ -349,7 +362,6 @@ Features:
  - The Predicate could have fromRevision/toRevision annotations which would be
    used for fast computation of the delta between two historical commit points.
 
-   
    
  * FIXME Unit tests for non-distinct {@link IElementFilter}s on an
  * {@link IPredicate}, unit tests for distinct element filter on an

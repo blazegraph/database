@@ -33,7 +33,6 @@ import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
@@ -44,7 +43,6 @@ import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -293,6 +291,9 @@ public class InsertOp<E> extends BindingSetPipelineOp implements
          * 
          *       FIXME This must obtain the appropriate lock for the mutable
          *       index in scale-out.
+         * 
+         *       FIXME Allow remote writes as well if a remote access path is
+         *       marked on the {@link IPredicate}.
          */
         public <T> ILocalBTreeView getMutableLocalIndexView(
                 final IRelation<T> relation, final IKeyOrder<T> keyOrder,
@@ -361,14 +362,14 @@ public class InsertOp<E> extends BindingSetPipelineOp implements
 //  
 //  a[i] = e;
 
-    /**
-     * This is a shard wise operator.
-     */
-    @Override
-    public BOpEvaluationContext getEvaluationContext() {
-        
-        return BOpEvaluationContext.SHARDED;
-        
-    }
+//    /**
+//     * This is a shard wise operator.
+//     */
+//    @Override
+//    public BOpEvaluationContext getEvaluationContext() {
+//        
+//        return BOpEvaluationContext.SHARDED;
+//        
+//    }
 
 }

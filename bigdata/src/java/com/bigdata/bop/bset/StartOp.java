@@ -3,7 +3,6 @@ package com.bigdata.bop.bset;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpEvaluationContext;
 
 /**
  * A version of {@link CopyBindingSetOp} which is always evaluated on the query
@@ -21,11 +20,18 @@ public class StartOp extends CopyBindingSetOp {
 	}
 
 	public StartOp(BOp[] args, Map<String, Object> annotations) {
-		super(args, annotations);
-	}
 
-	final public BOpEvaluationContext getEvaluationContext() {
-        return BOpEvaluationContext.CONTROLLER;
-    }
+	    super(args, annotations);
+        
+	    switch (getEvaluationContext()) {
+        case CONTROLLER:
+            break;
+        default:
+            throw new UnsupportedOperationException(
+                    Annotations.EVALUATION_CONTEXT + "="
+                            + getEvaluationContext());
+        }
+
+	}
 
 }

@@ -34,9 +34,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
-import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
@@ -189,6 +187,15 @@ public class JoinGraph extends BindingSetPipelineOp {
         if (sampleSize <= 0)
             throw new IllegalArgumentException();
 
+        switch (getEvaluationContext()) {
+        case CONTROLLER:
+            break;
+        default:
+            throw new UnsupportedOperationException(
+                    Annotations.EVALUATION_CONTEXT + "="
+                            + getEvaluationContext());
+        }
+
         V = new Vertex[v.length];
 
         for (int i = 0; i < v.length; i++) {
@@ -261,16 +268,6 @@ public class JoinGraph extends BindingSetPipelineOp {
             throw new UnsupportedOperationException();
         }
 
-    }
-
-    /**
-     * This operator must be evaluated on the query controller.
-     */
-    @Override
-    public BOpEvaluationContext getEvaluationContext() {
-        
-        return BOpEvaluationContext.CONTROLLER;
-        
     }
 
 }

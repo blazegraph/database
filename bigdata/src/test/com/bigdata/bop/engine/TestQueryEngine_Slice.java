@@ -34,6 +34,7 @@ import java.util.UUID;
 import junit.framework.TestCase2;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.EmptyBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NV;
@@ -166,6 +167,8 @@ public class TestQueryEngine_Slice extends TestCase2 {
                 new NV(SliceOp.Annotations.BOP_ID, sliceId),//
                         new NV(SliceOp.Annotations.OFFSET, offset),//
                         new NV(SliceOp.Annotations.LIMIT, limit),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
                 }));
 
         final UUID queryId = UUID.randomUUID();
