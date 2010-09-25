@@ -28,15 +28,10 @@
 
 package com.bigdata.relation;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicLong;
 
+import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
@@ -49,25 +44,10 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.journal.TemporaryStore;
-import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.rdf.spo.JustificationRemover;
-import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOAccessPath;
-import com.bigdata.rdf.spo.SPOIndexRemover;
-import com.bigdata.rdf.spo.SPOIndexWriter;
-import com.bigdata.rdf.spo.SPOKeyOrder;
-import com.bigdata.rdf.spo.SPORelation;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.eval.ISolution;
-import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.InsertSolutionBuffer;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -102,8 +82,25 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
      */
     public String getFQN(final IKeyOrder<? extends E> keyOrder) {
         
-        return getNamespace() + "." + keyOrder.getIndexName();
+        return getFQN(this, keyOrder);
         
+    }
+
+    /**
+     * The fully qualified name of the index.
+     * 
+     * @param relation
+     *            The relation.
+     * @param keyOrder
+     *            The natural index order.
+     * 
+     * @return The index name.
+     */
+    static public <E> String getFQN(final IRelation<E> relation,
+            final IKeyOrder<? extends E> keyOrder) {
+
+        return relation.getNamespace() + "." + keyOrder.getIndexName();
+
     }
 
     /**
@@ -130,17 +127,7 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
     }
 
     /**
-     * Return the named index using the timestamp for this view of the relation
-     * (core impl).
-     * <p>
-     * While both the {@link IBigdataFederation} imposes the
-     * {@link ConcurrencyManager} on all access to a named index, neither the
-     * {@link Journal} nor the {@link TemporaryRawStore} does this. Therefore
-     * this method encapsulates the unisolated index for the latter classes in
-     * order to impose the correct concurrency constraints. It does this using
-     * an {@link UnisolatedReadWriteIndex}. This allows the caller to use the
-     * returned index view without regard to concurrency controls (it will
-     * appear to be a thread-safe object).
+     * Return the named index using the timestamp for this view of the relation.
      * 
      * @param fqn
      *            The fully qualified name of the index.
@@ -150,6 +137,8 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
      * 
      * @throws IllegalArgumentException
      *             if <i>name</i> is <code>null</code>.
+     * 
+     * @see BOpContextBase#getIndex(IIndexManager, String, long)
      * 
      * @todo hard references to the indices must be dropped when an abort is
      *       processed. this is a bit awkward. the abort() could be raised into
@@ -161,12 +150,49 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
      */
     public IIndex getIndex(final String fqn) {
 
-        if (fqn == null)
-            throw new IllegalArgumentException();
-
         final IIndexManager indexManager = getIndexManager();
 
         final long timestamp = getTimestamp();
+
+        return getIndex(indexManager, fqn, timestamp);
+        
+    }
+
+    /**
+     * Return the named index using the timestamp for this view of the relation.
+     * <p>
+     * While both the {@link IBigdataFederation} imposes the
+     * {@link ConcurrencyManager} on all access to a named index, neither the
+     * {@link Journal} nor the {@link TemporaryRawStore} does this. Therefore
+     * this method encapsulates the unisolated index for the latter classes in
+     * order to impose the correct concurrency constraints. It does this using
+     * an {@link UnisolatedReadWriteIndex}. This allows the caller to use the
+     * returned index view without regard to concurrency controls (it will
+     * appear to be a thread-safe object).
+     * 
+     * @param indexManager
+     *            indexManager
+     * @param fqn
+     *            The fully qualified name of the index.
+     * @param timestamp
+     *            The timestamp of the view.
+     * 
+     * @return The named index -or- <code>null</code> iff the named index does
+     *         not exist as of that timestamp.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>indexManager</i> is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             if <i>name</i> is <code>null</code>.
+     */
+    static public IIndex getIndex(final IIndexManager indexManager,
+            final String fqn, final long timestamp) {
+
+        if (indexManager == null)
+            throw new IllegalArgumentException();
+        
+        if (fqn == null)
+            throw new IllegalArgumentException();
 
         IIndex ndx = indexManager.getIndex(fqn, timestamp);
 

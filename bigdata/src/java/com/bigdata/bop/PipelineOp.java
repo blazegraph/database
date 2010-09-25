@@ -30,16 +30,10 @@ package com.bigdata.bop;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Priority;
-
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.btree.IRangeQuery;
-import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
-import com.bigdata.relation.accesspath.IBuffer;
 
 /**
  * An pipeline operator reads from a source and writes on a sink. This is an
@@ -62,102 +56,7 @@ abstract public class PipelineOp<E> extends BOpBase implements IPipelineOp<E> {
     /**
      * Well known annotations pertaining to the binding set pipeline.
      */
-    public interface Annotations extends BOp.Annotations {
-
-        /**
-         * The maximum #of chunks that can be buffered before an the producer
-         * would block (default {@value #DEFAULT_CHUNK_OF_CHUNKS_CAPACITY}).
-         * Note that partial chunks may be combined into full chunks whose
-         * nominal capacity is specified by {@link #CHUNK_CAPACITY}.
-         * 
-         * @see #DEFAULT_CHUNK_OF_CHUNKS_CAPACITY
-         */
-        String CHUNK_OF_CHUNKS_CAPACITY = PipelineOp.class.getName()
-                + ".chunkOfChunksCapacity";
-
-        /**
-         * Default for {@link #CHUNK_OF_CHUNKS_CAPACITY}
-         * 
-         * @todo was 100. dialed down to reduce heap consumption for arrays.
-         *       test performance @ 100 and 1000.
-         */
-        int DEFAULT_CHUNK_OF_CHUNKS_CAPACITY = 100;
-
-        /**
-         * Sets the capacity of the {@link IBuffer}s used to accumulate a chunk
-         * of {@link IBindingSet}s (default {@value #CHUNK_CAPACITY}). Partial
-         * chunks may be automatically combined into full chunks.
-         * 
-         * @see #DEFAULT_CHUNK_CAPACITY
-         * @see #CHUNK_OF_CHUNKS_CAPACITY
-         */
-        String CHUNK_CAPACITY = PipelineOp.class.getName() + ".chunkCapacity";
-
-        /**
-         * Default for {@link #CHUNK_CAPACITY}
-         */
-        int DEFAULT_CHUNK_CAPACITY = 100;
-
-        /**
-         * The timeout in milliseconds that the {@link BlockingBuffer} will wait
-         * for another chunk to combine with the current chunk before returning
-         * the current chunk (default {@value #DEFAULT_CHUNK_TIMEOUT}). This may
-         * be ZERO (0) to disable the chunk combiner.
-         * 
-         * @see #DEFAULT_CHUNK_TIMEOUT
-         */
-        String CHUNK_TIMEOUT = PipelineOp.class.getName() + ".chunkTimeout";
-
-        /**
-         * The default for {@link #CHUNK_TIMEOUT}.
-         * 
-         * @todo Experiment with values for this. Low values will push chunks
-         *       through quickly. High values will cause chunks to be combined
-         *       and move larger chunks around. [But if we factor BlockingBuffer
-         *       out of the query engine then this will go away].
-         */
-        int DEFAULT_CHUNK_TIMEOUT = 20;
-
-        /**
-         * If the estimated rangeCount for an {@link AccessPath#iterator()} is
-         * LTE this threshold then use a fully buffered (synchronous) iterator.
-         * Otherwise use an asynchronous iterator whose capacity is governed by
-         * {@link #CHUNK_OF_CHUNKS_CAPACITY}.
-         * 
-         * @see #DEFAULT_FULLY_BUFFERED_READ_THRESHOLD
-         */
-        String FULLY_BUFFERED_READ_THRESHOLD = PipelineOp.class.getName()
-                + ".fullyBufferedReadThreshold";
-
-        /**
-         * Default for {@link #FULLY_BUFFERED_READ_THRESHOLD}.
-         * 
-         * @todo Experiment with this. It should probably be something close to
-         *       the branching factor, e.g., 100.
-         */
-        int DEFAULT_FULLY_BUFFERED_READ_THRESHOLD = 100;
-
-        /**
-         * Flags for the iterator ({@link IRangeQuery#KEYS},
-         * {@link IRangeQuery#VALS}, {@link IRangeQuery#PARALLEL}).
-         * <p>
-         * Note: The {@link IRangeQuery#PARALLEL} flag here is an indication
-         * that the iterator may run in parallel across the index partitions.
-         * This only effects scale-out and only for simple triple patterns since
-         * the pipeline join does something different (it runs inside the index
-         * partition using the local index, not the client's view of a
-         * distributed index).
-         * 
-         * @see #DEFAULT_FLAGS
-         */
-        String FLAGS = PipelineOp.class.getName() + ".flags";
-
-        /**
-         * The default flags will visit the keys and values of the non-deleted
-         * tuples and allows parallelism in the iterator (when supported).
-         */
-        final int DEFAULT_FLAGS = IRangeQuery.KEYS | IRangeQuery.VALS
-                | IRangeQuery.PARALLEL;
+    public interface Annotations extends BOp.Annotations, BufferAnnotations {
 
     }
 

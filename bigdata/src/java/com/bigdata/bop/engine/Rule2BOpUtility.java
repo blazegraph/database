@@ -38,6 +38,7 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContextBase;
+import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.IConstraint;
@@ -48,6 +49,7 @@ import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
@@ -108,6 +110,8 @@ public class Rule2BOpUtility {
         final BindingSetPipelineOp startOp = new StartOp(new BOp[] {},
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, bopId++),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
                         }));
         
         /*
@@ -210,6 +214,9 @@ public class Rule2BOpUtility {
                                     constraints.size() > 0 ? 
                                             constraints.toArray(new IConstraint[constraints.size()]) : null),//
                             new NV(PipelineJoin.Annotations.OPTIONAL, pred.isOptional()),//
+                            // Note: shard-partitioned joins!
+                            new NV( Predicate.Annotations.EVALUATION_CONTEXT,
+                                    BOpEvaluationContext.SHARDED),//
                             }));
             
             left = joinOp;

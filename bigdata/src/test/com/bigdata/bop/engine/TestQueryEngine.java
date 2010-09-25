@@ -45,6 +45,7 @@ import junit.framework.TestCase2;
 import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
@@ -249,6 +250,8 @@ public class TestQueryEngine extends TestCase2 {
         final BindingSetPipelineOp query = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         final UUID queryId = UUID.randomUUID();
@@ -312,6 +315,8 @@ public class TestQueryEngine extends TestCase2 {
         // left
                 new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
                         })),
                 // right
                 new Predicate<E>(new IVariableOrConstant[] {
@@ -417,6 +422,8 @@ public class TestQueryEngine extends TestCase2 {
                 new NV(PipelineOp.Annotations.CHUNK_CAPACITY, 1),//
                 new NV(PipelineOp.Annotations.CHUNK_OF_CHUNKS_CAPACITY, nsources),//
                 new NV(QueryEngineTestAnnotations.ONE_MESSAGE_PER_CHUNK, true),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
@@ -447,6 +454,8 @@ public class TestQueryEngine extends TestCase2 {
                 // slice annotations
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, sliceId),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
                         })//
         );
         
@@ -610,6 +619,8 @@ public class TestQueryEngine extends TestCase2 {
                 new NV(PipelineOp.Annotations.CHUNK_CAPACITY, 1),//
                 new NV(PipelineOp.Annotations.CHUNK_OF_CHUNKS_CAPACITY, nsources),//
                 new NV(QueryEngineTestAnnotations.ONE_MESSAGE_PER_CHUNK, true),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         final PipelineDelayOp delayOp = new PipelineDelayOp(new BOp[]{startOp},
@@ -714,6 +725,8 @@ public class TestQueryEngine extends TestCase2 {
                 new NV(PipelineOp.Annotations.CHUNK_CAPACITY, 1),//
                 new NV(PipelineOp.Annotations.CHUNK_OF_CHUNKS_CAPACITY, nsources),//
                 new NV(QueryEngineTestAnnotations.ONE_MESSAGE_PER_CHUNK, true),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         final SliceOp sliceOp = new SliceOp(new BOp[] { startOp },
@@ -722,6 +735,8 @@ public class TestQueryEngine extends TestCase2 {
                                 new NV(BOp.Annotations.BOP_ID, sliceId),//
                                         new NV(SliceOp.Annotations.OFFSET, 0L),//
                                         new NV(SliceOp.Annotations.LIMIT, Long.MAX_VALUE),//
+                                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                                BOpEvaluationContext.CONTROLLER),//
                                 })//
                 );
         
@@ -843,6 +858,8 @@ public class TestQueryEngine extends TestCase2 {
 
         final StartOp startOp = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         final Predicate<E> predOp = new Predicate<E>(new IVariableOrConstant[] {
@@ -873,6 +890,8 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(BOp.Annotations.BOP_ID, sliceId),//
                                 new NV(SliceOp.Annotations.OFFSET, 0L),//
                                 new NV(SliceOp.Annotations.LIMIT, 2L),//
+                                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                        BOpEvaluationContext.CONTROLLER),//
                         })//
         );
 
@@ -968,6 +987,8 @@ public class TestQueryEngine extends TestCase2 {
 
         final StartOp startOp = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         /*
@@ -1010,6 +1031,8 @@ public class TestQueryEngine extends TestCase2 {
         // slice annotations
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, sliceId),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
                         })//
         );
 
@@ -1131,10 +1154,8 @@ public class TestQueryEngine extends TestCase2 {
     }
 
     /**
-     * @todo Test the ability run a query reading on an access path using a
-     *       DISTINCT filter for selected variables on that access path (the
-     *       DISTINCT filter is a different from most other access path filters
-     *       since it stateful and is applied across all chunks on all shards).
+     * FIXME Test the ability run a query reading on an access path using a
+     * DISTINCT filter (this is just stacking a striterator on the access path).
      */
     public void test_query_join1_distinctAccessPath() {
         
@@ -1160,6 +1181,8 @@ public class TestQueryEngine extends TestCase2 {
         final BindingSetPipelineOp startOp = new StartOp(new BOp[] {},
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
                         }));
         
         // @todo the KEY_ORDER should be bound before evaluation.

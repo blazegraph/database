@@ -30,6 +30,7 @@ package com.bigdata.bop;
 
 import java.io.Serializable;
 
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
@@ -61,7 +62,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
     /**
      * Interface declaring well known annotations.
      */
-    public interface Annotations extends BOp.Annotations {
+    public interface Annotations extends BOp.Annotations, BufferAnnotations {
 
         /**
          * The name of the relation on which the predicate will read.
@@ -104,6 +105,85 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * not address a specific shard.
          */
         String PARTITION_ID = "partitionId";
+        
+        int DEFAULT_PARTITION_ID = -1;
+
+        /**
+         * Boolean option determines whether the predicate will use a local
+         * access path or a remote access path (default
+         * {@value #DEFAULT_REMOTE_ACCESS_PATH}).
+         * <p>
+         * <em>Local access paths</em> are much more efficient and should be
+         * used for most purposes. However, it is not possible to impose certain
+         * kinds of filters on a sharded or hash partitioned operations across
+         * local access paths. In particular, a DISTINCT filter can not be
+         * imposed using sharded or hash partitioned.
+         * <p>
+         * When the access path is local, the parent operator must be annotated
+         * to use a {@link BOpEvaluationContext#SHARDED shard wise} or
+         * {@link BOpEvaluationContext#HASHED node-wise} mapping of the binding
+         * sets.
+         * <p>
+         * <em>Remote access paths</em> use a scale-out index view. This view
+         * makes the scale-out index appear as if it were monolithic rather than
+         * sharded or hash partitioned. The monolithic view of a scale-out index
+         * can be used to impose a DISTINCT filter since all tuples will flow
+         * back to the caller.
+         * <p>
+         * When the access path is remote, the parent operator should use
+         * {@link BOpEvaluationContext#ANY} to prevent the binding sets from
+         * being moved around when the access path is remote.
+         * 
+         * @see BOpEvaluationContext
+         */
+        String REMOTE_ACCESS_PATH = "remoteAccessPath";
+        
+        boolean DEFAULT_REMOTE_ACCESS_PATH = false;
+        
+        /**
+         * If the estimated rangeCount for an {@link AccessPath#iterator()} is
+         * LTE this threshold then use a fully buffered (synchronous) iterator.
+         * Otherwise use an asynchronous iterator whose capacity is governed by
+         * {@link #CHUNK_OF_CHUNKS_CAPACITY}.
+         * 
+         * @see #DEFAULT_FULLY_BUFFERED_READ_THRESHOLD
+         */
+        String FULLY_BUFFERED_READ_THRESHOLD = PipelineOp.class.getName()
+                + ".fullyBufferedReadThreshold";
+
+        /**
+         * Default for {@link #FULLY_BUFFERED_READ_THRESHOLD}.
+         * 
+         * @todo Experiment with this. It should probably be something close to
+         *       the branching factor, e.g., 100.
+         */
+        int DEFAULT_FULLY_BUFFERED_READ_THRESHOLD = 100;
+
+        /**
+         * Flags for the iterator ({@link IRangeQuery#KEYS},
+         * {@link IRangeQuery#VALS}, {@link IRangeQuery#PARALLEL}).
+         * <p>
+         * Note: The {@link IRangeQuery#PARALLEL} flag here is an indication
+         * that the iterator may run in parallel across the index partitions.
+         * This only effects scale-out and only for simple triple patterns since
+         * the pipeline join does something different (it runs inside the index
+         * partition using the local index, not the client's view of a
+         * distributed index).
+         * 
+         * @see #DEFAULT_FLAGS
+         */
+        String FLAGS = PipelineOp.class.getName() + ".flags";
+
+        /**
+         * The default flags will visit the keys and values of the non-deleted
+         * tuples and allows parallelism in the iterator (when supported).
+         * 
+         * @todo consider making parallelism something that the query planner
+         *       must specify explicitly.
+         */
+        final int DEFAULT_FLAGS = IRangeQuery.KEYS | IRangeQuery.VALS
+                | IRangeQuery.PARALLEL;
+
     }
     
     /**
@@ -273,6 +353,13 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      * @return The #of unbound arguments for that {@link IKeyOrder}.
      */
     public int getVariableCount(IKeyOrder<E> keyOrder);
+    
+    /**
+     * Return <code>true</code> if this is a remote access path.
+     * 
+     * @see Annotations#REMOTE_ACCESS_PATH
+     */
+    public boolean isRemoteAccessPath();
     
     /**
      * Return the variable or constant at the specified index.

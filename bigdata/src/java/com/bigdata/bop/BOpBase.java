@@ -362,16 +362,11 @@ public class BOpBase implements BOp {
 
     }
 
-    /**
-     * The default implementation returns {@link BOpEvaluationContext#ANY} and
-     * must be overridden by operators which have a different {@link BOpEvaluationContext}.
-     * <p>
-     * {@inheritDoc}
-     */
-    public BOpEvaluationContext getEvaluationContext() {
-        
-        return BOpEvaluationContext.ANY;
-        
+    final public BOpEvaluationContext getEvaluationContext() {
+
+        return getProperty(Annotations.EVALUATION_CONTEXT,
+                Annotations.DEFAULT_EVALUATION_CONTEXT);
+
     }
 
     public final boolean isMutation() {

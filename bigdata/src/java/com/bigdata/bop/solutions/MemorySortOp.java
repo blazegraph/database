@@ -45,6 +45,15 @@ public class MemorySortOp extends SortOp {
 
         super(args, annotations);
 
+        switch (getEvaluationContext()) {
+        case CONTROLLER:
+            break;
+        default:
+            throw new UnsupportedOperationException(
+                    Annotations.EVALUATION_CONTEXT + "="
+                            + getEvaluationContext());
+        }
+
     }
     
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {

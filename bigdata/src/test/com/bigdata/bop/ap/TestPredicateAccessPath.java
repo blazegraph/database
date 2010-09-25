@@ -31,19 +31,25 @@ import java.util.Properties;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.ap.Predicate.Annotations;
+import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.engine.MockRunningQuery;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.eval.ActionEnum;
-import com.bigdata.relation.rule.eval.DefaultRuleTaskFactory;
-import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.relation.rule.eval.IJoinNexusFactory;
-import com.bigdata.relation.rule.eval.NOPEvaluationPlanFactory;
+import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
@@ -53,10 +59,19 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * data and verifies the ability to access that data using some different access
  * paths. This sets the ground for testing the evaluation of {@link Predicate}s
  * with various constraints, filters, etc.
+ * <p>
+ * Note: Tests of remote access path reads are done in the context of a bigdata
+ * federation since there must be a data service in play for a remote access
+ * path.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TestPredicateAccessPath.java 3466 2010-08-27 14:28:04Z
  *          thompsonbry $
+ * 
+ * @todo test read-committed access paths.
+ * @todo test read historical access paths.
+ * @todo test unisolated (writable) access paths.
+ * @todo test fully isolated access paths.
  */
 public class TestPredicateAccessPath extends TestCase2 {
 
@@ -202,10 +217,12 @@ public class TestPredicateAccessPath extends TestCase2 {
         // visit that access path, verifying the elements and order.
         if (log.isInfoEnabled())
             log.info("accessPath=" + accessPath);
+        
         final E[] expected = new E[] {//
                 new E("Mary", "John"),// 
                 new E("Mary", "Paul"),// 
         };
+
         final IChunkedOrderedIterator<E> itr = accessPath.iterator();
         try {
             int n = 0;
@@ -224,34 +241,47 @@ public class TestPredicateAccessPath extends TestCase2 {
     }
 
     /**
-     * Verify the Predicate evaluation using an {@link IJoinNexus}.
-     * 
-     * @deprecated This unit test will go away once we migrate away from the
-     *             {@link IJoinNexus}. The {@link Predicate} will be evaluated
-     *             by the join operator as it applies the appropriate bindings.
+     * Verify lookup and read on an {@link IPredicate}.
      */
     public void test_predicate_eval() {
 
-        final IJoinNexusFactory joinNexusFactory = new MockJoinNexusFactory(
-                ActionEnum.Query,//
-                ITx.UNISOLATED,// writeTimestamp
-                ITx.READ_COMMITTED,// readTimestamp,
-                new Properties(),// ,
-                IJoinNexus.ALL,// solutionFlags,
-                null,// solutionFilter,
-                NOPEvaluationPlanFactory.INSTANCE,//
-                DefaultRuleTaskFactory.PIPELINE//
-        );
-
         final Predicate<E> pred = new Predicate<E>(new IVariableOrConstant[] {
-                new Constant<String>("Mary"), Var.var("value") }, namespace);
+                new Constant<String>("Mary"), Var.var("value") }, 
+                NV.asMap(new NV[] {//
+                        new NV(Annotations.RELATION_NAME,new String[]{namespace}),//
+                        new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                        new NV(Annotations.REMOTE_ACCESS_PATH, false),//
+                }));
 
         final E[] expected = new E[] {//
                 new E("Mary", "John"),// 
                 new E("Mary", "Paul"),// 
         };
-        final IChunkedOrderedIterator<E> itr = pred.eval(null/* fed */,
-                joinNexusFactory.newInstance(jnl));
+        
+        final BOpStats statIsIgnored = new BOpStats();
+
+        final IAsynchronousIterator<IBindingSet[]> sourceIsIgnored = new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { new IBindingSet[0] });
+
+        final IBlockingBuffer<IBindingSet[]> sinkIsIgnored = new BlockingBuffer<IBindingSet[]>(
+                1/* capacity */);
+
+        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                new MockRunningQuery(null/* fed */, jnl/* indexManager */
+                ), -1/* partitionId */, statIsIgnored,
+                sourceIsIgnored, sinkIsIgnored, null/* sink2 */);
+
+        // lookup relation
+        final R relation = (R) context.getRelation(pred);
+
+        // obtain access path for that relation.
+        final IAccessPath<E> ap = context.getAccessPath(relation, pred);
+        
+        // obtain range count from the access path.
+        assertEquals(2L, ap.rangeCount(true/* exact */));
+        
+        // verify the data visited by the access path.
+        final IChunkedOrderedIterator<E> itr = ap.iterator();
         try {
             int n = 0;
             while (itr.hasNext()) {

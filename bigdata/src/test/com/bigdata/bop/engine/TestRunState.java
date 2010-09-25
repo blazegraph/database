@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import junit.framework.TestCase2;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.HashBindingSet;
@@ -48,6 +49,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bset.StartOp;
+import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 
@@ -163,6 +165,8 @@ public class TestRunState extends TestCase2 {
         final BindingSetPipelineOp startOp = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         final BindingSetPipelineOp query = startOp;
@@ -204,6 +208,8 @@ public class TestRunState extends TestCase2 {
         final BindingSetPipelineOp startOp = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         final BindingSetPipelineOp query = startOp;
@@ -279,6 +285,8 @@ public class TestRunState extends TestCase2 {
         final BindingSetPipelineOp startOp = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         final BindingSetPipelineOp query = startOp;
@@ -397,11 +405,15 @@ public class TestRunState extends TestCase2 {
         final BindingSetPipelineOp startOp = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         final BindingSetPipelineOp otherOp = new StartOp(new BOp[] { startOp },
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, otherId),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
                         }));
 
         final BindingSetPipelineOp query = otherOp;
@@ -558,6 +570,8 @@ public class TestRunState extends TestCase2 {
         final BindingSetPipelineOp startOp = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         final BindingSetPipelineOp query = startOp;
@@ -637,6 +651,8 @@ public class TestRunState extends TestCase2 {
         final BindingSetPipelineOp startOp = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         final BindingSetPipelineOp query = startOp;
@@ -716,6 +732,8 @@ public class TestRunState extends TestCase2 {
         final BindingSetPipelineOp startOp = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         final BindingSetPipelineOp query = startOp;
@@ -803,6 +821,8 @@ public class TestRunState extends TestCase2 {
         final BindingSetPipelineOp startOp = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         final BindingSetPipelineOp query = startOp;

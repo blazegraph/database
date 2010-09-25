@@ -42,6 +42,7 @@ import junit.framework.TestCase2;
 import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
@@ -393,6 +394,8 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
         final BindingSetPipelineOp query = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         final UUID queryId = UUID.randomUUID();
@@ -460,6 +463,8 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
         // left
                 new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
                         })),
                 // right
                 new Predicate<E>(new IVariableOrConstant[] {
@@ -481,11 +486,16 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
                 // join annotations
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, joinId),//
+                        // Note: shard-partitioned joins!
+                        new NV( Predicate.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.SHARDED),//
                         })//
         )},
         // slice annotations
         NV.asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, sliceId),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 })//
         );
 
@@ -635,6 +645,8 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
         final BindingSetPipelineOp startOp = new StartOp(new BOp[] {},
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
                         }));
         
         final Predicate<?> pred1Op = new Predicate<E>(new IVariableOrConstant[] {
@@ -671,17 +683,25 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
                 startOp, pred1Op,//
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, joinId1),//
+                        // Note: shard-partitioned joins!
+                        new NV( Predicate.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.SHARDED),//
                         }));
 
         final BindingSetPipelineOp join2Op = new PipelineJoin<E>(//
                 join1Op, pred2Op,//
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, joinId2),//
+                        // Note: shard-partitioned joins!
+                        new NV( Predicate.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.SHARDED),//
                         }));
 
         final BindingSetPipelineOp query = new SliceOp(new BOp[] { join2Op },
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, sliceId),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
                         }));
 
         // start the query.

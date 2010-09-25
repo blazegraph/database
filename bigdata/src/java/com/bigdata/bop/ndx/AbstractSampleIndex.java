@@ -88,7 +88,17 @@ abstract public class AbstractSampleIndex<E> extends PipelineOp<E> {
 
         if (limit <= 0)
             throw new IllegalArgumentException();
-        
+
+        switch (getEvaluationContext()) {
+        case HASHED:
+        case SHARDED:
+            break;
+        default:
+            throw new UnsupportedOperationException(
+                    Annotations.EVALUATION_CONTEXT + "="
+                            + getEvaluationContext());
+        }
+
     }
     
     @SuppressWarnings("unchecked")
@@ -104,14 +114,14 @@ abstract public class AbstractSampleIndex<E> extends PipelineOp<E> {
         
     }
 
-    /**
-     * This is a shard wise operator.
-     */
-    @Override
-    public BOpEvaluationContext getEvaluationContext() {
-        
-        return BOpEvaluationContext.SHARDED;
-        
-    }
+//    /**
+//     * This is a shard wise operator.
+//     */
+//    @Override
+//    public BOpEvaluationContext getEvaluationContext() {
+//        
+//        return BOpEvaluationContext.SHARDED;
+//        
+//    }
     
 }

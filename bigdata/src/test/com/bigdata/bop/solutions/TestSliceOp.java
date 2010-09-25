@@ -44,6 +44,7 @@ import junit.framework.TestCase2;
 import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.EmptyBindingSet;
 import com.bigdata.bop.HashBindingSet;
@@ -171,6 +172,8 @@ public class TestSliceOp extends TestCase2 {
                     new NV(SliceOp.Annotations.BOP_ID, bopId),//
                     new NV(SliceOp.Annotations.OFFSET, offset),//
                     new NV(SliceOp.Annotations.LIMIT, limit),//
+                    new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
                 }));
         
         assertEquals("offset", offset, query.getOffset());
@@ -279,6 +282,8 @@ public class TestSliceOp extends TestCase2 {
                     new NV(SliceOp.Annotations.BOP_ID, bopId),//
                     new NV(SliceOp.Annotations.OFFSET, offset),//
                     new NV(SliceOp.Annotations.LIMIT, limit),//
+                    new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
                 }));
         
         assertEquals("offset", offset, query.getOffset());
@@ -353,8 +358,10 @@ public class TestSliceOp extends TestCase2 {
         
         final SliceOp query = new SliceOp(new BOp[] {}, NV.asMap(new NV[] {//
                 new NV(SliceOp.Annotations.BOP_ID, bopId),//
-                        new NV(SliceOp.Annotations.OFFSET, offset),//
-                        new NV(SliceOp.Annotations.LIMIT, limit),//
+                new NV(SliceOp.Annotations.OFFSET, offset),//
+                new NV(SliceOp.Annotations.LIMIT, limit),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         assertEquals("offset", offset, query.getOffset());
@@ -424,8 +431,10 @@ public class TestSliceOp extends TestCase2 {
         
         final SliceOp query = new SliceOp(new BOp[] {}, NV.asMap(new NV[] {//
                 new NV(SliceOp.Annotations.BOP_ID, bopId),//
-                        new NV(SliceOp.Annotations.OFFSET, offset),//
-                        new NV(SliceOp.Annotations.LIMIT, limit),//
+                new NV(SliceOp.Annotations.OFFSET, offset),//
+                new NV(SliceOp.Annotations.LIMIT, limit),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         assertEquals("offset", offset, query.getOffset());
@@ -510,6 +519,8 @@ public class TestSliceOp extends TestCase2 {
                 new NV(SliceOp.Annotations.BOP_ID, bopId),//
                 // new NV(SliceOp.Annotations.OFFSET, 1L),//
                 // new NV(SliceOp.Annotations.LIMIT, 3L),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         assertEquals("offset", 0L, query.getOffset());
@@ -567,6 +578,8 @@ public class TestSliceOp extends TestCase2 {
                 new NV(SliceOp.Annotations.BOP_ID, bopId),//
                         new NV(SliceOp.Annotations.OFFSET, -1L),//
                         new NV(SliceOp.Annotations.LIMIT, 3L),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
                 }));
 
         assertEquals("offset", -1L, query.getOffset());
@@ -602,8 +615,10 @@ public class TestSliceOp extends TestCase2 {
 
         final SliceOp query = new SliceOp(new BOp[] {}, NV.asMap(new NV[] {//
                 new NV(SliceOp.Annotations.BOP_ID, bopId),//
-                        new NV(SliceOp.Annotations.OFFSET, 1L),//
-                        new NV(SliceOp.Annotations.LIMIT, 0L),//
+                new NV(SliceOp.Annotations.OFFSET, 1L),//
+                new NV(SliceOp.Annotations.LIMIT, 0L),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         assertEquals("offset", 1L, query.getOffset());
@@ -674,8 +689,10 @@ public class TestSliceOp extends TestCase2 {
         final int bopId = 1;
         final SliceOp query = new SliceOp(new BOp[] {}, NV.asMap(new NV[] {//
                 new NV(SliceOp.Annotations.BOP_ID, bopId),//
-                        new NV(SliceOp.Annotations.OFFSET, offset),//
-                        new NV(SliceOp.Annotations.LIMIT, limit),//
+                new NV(SliceOp.Annotations.OFFSET, offset),//
+                new NV(SliceOp.Annotations.LIMIT, limit),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         final SliceStats stats = query.newStats();

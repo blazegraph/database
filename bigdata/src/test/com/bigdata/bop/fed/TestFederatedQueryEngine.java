@@ -39,6 +39,7 @@ import java.util.UUID;
 import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
@@ -106,11 +107,11 @@ import com.bigdata.util.config.NicUtil;
  * 
  * @todo reuse the stress tests from {@link TestQueryEngine}.
  * 
- * @todo verify that the peers notify the query controller when they first
- *       register
- * 
- *       FIXME Write test of an RMI based join (this is used for some default
- *       graph query patterns).
+ *       FIXME It is difficult to verify from within a unit test that a remote
+ *       access path was used. Access paths are obtained by the join operator
+ *       when they execute. Since that is either another thread and callable or
+ *       another node, service, thread and callable it is difficult to verify
+ *       that the access path was either remote or local.
  */
 public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase {
 
@@ -379,6 +380,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         final BindingSetPipelineOp query = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         final UUID queryId = UUID.randomUUID();
@@ -440,12 +443,16 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
         final StartOp startOp = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         final BindingSetPipelineOp query = new SliceOp(new BOp[] { startOp },
                 // slice annotations
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, sliceId),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
                         })//
         );
 
@@ -533,6 +540,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
         final StartOp startOp = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         // access path has has no constants and no constraint.
@@ -558,6 +567,9 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 // join annotations
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, joinId),//
+                        // Note: shard-partitioned joins!
+                        new NV( Predicate.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.SHARDED),//
                         })//
         );
         
@@ -565,6 +577,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         // slice annotations
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, sliceId),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
                         })//
         );
 
@@ -694,6 +708,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
         final StartOp startOp = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         /*
@@ -724,6 +740,9 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 // join annotations
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, joinId),//
+                        // Note: shard-partitioned joins!
+                        new NV( Predicate.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.SHARDED),//
                         // impose constraint on the join.
                         new NV(PipelineJoin.Annotations.CONSTRAINTS,
                                 new IConstraint[] { new EQConstant(y,
@@ -735,6 +754,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         // slice annotations
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, sliceId),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
                         })//
         );
 
@@ -850,6 +871,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
 
         final StartOp startOp = new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
+                new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
                 }));
 
         // Note: tuples with "Mary" in the 1st column are on partition1.
@@ -875,6 +898,9 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 // join annotations
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, joinId),//
+                        // Note: shard-partitioned joins!
+                        new NV( Predicate.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.SHARDED),//
                         })//
         );
         
@@ -882,6 +908,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 // slice annotations
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, sliceId),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
                         })//
         );
 
@@ -995,10 +1023,11 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
     }
 
     /**
-     * @todo Test the ability run a query reading on an access path using a
-     *       DISTINCT filter for selected variables on that access path (the
-     *       DISTINCT filter is a different from most other access path filters
-     *       since it stateful and is applied across all chunks on all shards).
+     * FIXME Test the ability run a query reading on an access path using a
+     * DISTINCT filter on that access path. For scale-out, this means using an
+     * RMI access path, stacking a distinct filter on the access path, and
+     * marking the join evaluation context as ANY since we do not push the
+     * binding sets to the shards when using RMI access paths.
      */
     public void test_query_join1_distinctAccessPath() {
         
@@ -1025,6 +1054,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         final BindingSetPipelineOp startOp = new StartOp(new BOp[] {},
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
                         }));
         
         final Predicate<?> pred1Op = new Predicate<E>(new IVariableOrConstant[] {
@@ -1063,17 +1094,25 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 startOp, pred1Op,//
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, joinId1),//
+                        // Note: shard-partitioned joins!
+                        new NV( Predicate.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.SHARDED),//
                         }));
 
         final BindingSetPipelineOp join2Op = new PipelineJoin<E>(//
                 join1Op, pred2Op,//
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, joinId2),//
+                        // Note: shard-partitioned joins!
+                        new NV( Predicate.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.SHARDED),//
                         }));
 
         final BindingSetPipelineOp query = new SliceOp(new BOp[] { join2Op },
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, sliceId),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
                         }));
 
         // start the query.

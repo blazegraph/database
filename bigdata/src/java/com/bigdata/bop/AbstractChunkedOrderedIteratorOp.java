@@ -90,12 +90,12 @@ abstract public class AbstractChunkedOrderedIteratorOp<E> extends BOpBase
 
     }
 
-    protected int getFullyBufferedReadThreshold() {
-
-        return getProperty(Annotations.FULLY_BUFFERED_READ_THRESHOLD,
-                Annotations.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD);
-
-    }
+//    protected int getFullyBufferedReadThreshold() {
+//
+//        return getProperty(Annotations.FULLY_BUFFERED_READ_THRESHOLD,
+//                Annotations.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD);
+//
+//    }
 
     protected long getChunkTimeout() {
         

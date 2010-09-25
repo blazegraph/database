@@ -77,6 +77,9 @@ public class TestAll extends TestCase {
         // The payload is transfered using NIO and the ResourceService.
         suite.addTestSuite(TestNIOChunkMessage.class);
 
+        // unit tests for a remote access path.
+        suite.addTestSuite(TestRemoteAccessPath.class);
+        
         /*
          * Unit tests for the federated query engine against an embedded
          * federation with a single data service.

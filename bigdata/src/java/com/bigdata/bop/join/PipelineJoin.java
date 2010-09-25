@@ -87,6 +87,12 @@ import com.bigdata.util.concurrent.LatchedExecutor;
  * Note: In order to support pipelining, query plans need to be arranged in a
  * "left-deep" manner and there may not be intervening operators between the
  * pipeline join operator and the {@link IPredicate} on which it will read.
+ * <p>
+ * Note: In scale-out, the {@link PipelineJoin} is generally annotated as a
+ * {@link BOpEvaluationContext#SHARDED} or {@link BOpEvaluationContext#HASHED}
+ * operator and the {@link IPredicate} is annotated for local access paths. If
+ * you need to use remote access paths, then the {@link PipelineJoin} should be
+ * annotated as a {@link BOpEvaluationContext#ANY} operator.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -278,15 +284,15 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
 
     }
 
-    /**
-     * Returns {@link BOpEvaluationContext#SHARDED}
-     */
-    @Override
-    final public BOpEvaluationContext getEvaluationContext() {
-        
-        return BOpEvaluationContext.SHARDED;
-        
-    }
+    //    /**
+    //     * Returns {@link BOpEvaluationContext#SHARDED}
+    //     */
+    //    @Override
+    //    final public BOpEvaluationContext getEvaluationContext() {
+    //        
+    //        return BOpEvaluationContext.SHARDED;
+    //        
+    //    }
 
     public IPredicate<E> getPredicate() {
         
@@ -339,14 +345,14 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
     
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
-        return new FutureTask<Void>(new JoinTask(this, context));
+        return new FutureTask<Void>(new JoinTask<E>(this, context));
         
     }
 
     /**
      * Pipeline join impl.
      */
-    private static class JoinTask extends Haltable<Void> implements Callable<Void> {
+    private static class JoinTask<E> extends Haltable<Void> implements Callable<Void> {
 
         /**
          * The join that is being executed.
@@ -394,12 +400,12 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
         /**
          * The source for the elements to be joined.
          */
-        final private IPredicate<?> right;
+        final private IPredicate<E> right;
 
         /**
          * The relation associated with the {@link #right} operand.
          */
-        final private IRelation<?> relation;
+        final private IRelation<E> relation;
         
         /**
          * The partition identifier -or- <code>-1</code> if we are not reading
@@ -476,7 +482,7 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
          * @param context
          */
         public JoinTask(//
-                final PipelineJoin<?> joinOp,//
+                final PipelineJoin<E> joinOp,//
                 final BOpContext<IBindingSet> context
                 ) {
 
@@ -851,7 +857,7 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
                      * Aggregate the source bindingSets that license the same
                      * asBound predicate.
                      */
-                    final Map<IPredicate<?>, Collection<IBindingSet>> map = combineBindingSets(chunk);
+                    final Map<IPredicate<E>, Collection<IBindingSet>> map = combineBindingSets(chunk);
 
                     /*
                      * Generate an AccessPathTask from each distinct asBound
@@ -898,7 +904,7 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
                 final IBindingSet bindingSet = chunk[0];
 
                 // constrain the predicate to the given bindings.
-                IPredicate<?> predicate = right.asBound(bindingSet);
+                IPredicate<E> predicate = right.asBound(bindingSet);
 
                 if (partitionId != -1) {
 
@@ -917,7 +923,8 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
 
                 }
 
-                new AccessPathTask(predicate,Arrays.asList(chunk)).call();
+                new JoinTask.AccessPathTask(predicate, Arrays.asList(chunk))
+                        .call();
 
             }
             
@@ -937,13 +944,13 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
              *         bindingSets in the chunk from which the predicate was
              *         generated.
              */
-            protected Map<IPredicate<?>, Collection<IBindingSet>> combineBindingSets(
+            protected Map<IPredicate<E>, Collection<IBindingSet>> combineBindingSets(
                     final IBindingSet[] chunk) {
 
                 if (log.isDebugEnabled())
                     log.debug("chunkSize=" + chunk.length);
 
-                final Map<IPredicate<?>, Collection<IBindingSet>> map = new LinkedHashMap<IPredicate<?>, Collection<IBindingSet>>(
+                final Map<IPredicate<E>, Collection<IBindingSet>> map = new LinkedHashMap<IPredicate<E>, Collection<IBindingSet>>(
                         chunk.length);
 
                 for (IBindingSet bindingSet : chunk) {
@@ -951,7 +958,7 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
                     halted();
 
                     // constrain the predicate to the given bindings.
-                    IPredicate<?> predicate = right.asBound(bindingSet);
+                    IPredicate<E> predicate = right.asBound(bindingSet);
 
                     if (partitionId != -1) {
 
@@ -1025,16 +1032,16 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
              * @throws Exception
              */
             protected AccessPathTask[] getAccessPathTasks(
-                    final Map<IPredicate<?>, Collection<IBindingSet>> map) {
+                    final Map<IPredicate<E>, Collection<IBindingSet>> map) {
 
                 final int n = map.size();
 
                 if (log.isDebugEnabled())
                     log.debug("#distinct predicates=" + n);
 
-                final AccessPathTask[] tasks = new AccessPathTask[n];
+                final AccessPathTask[] tasks = new JoinTask.AccessPathTask[n];
 
-                final Iterator<Map.Entry<IPredicate<?>, Collection<IBindingSet>>> itr = map
+                final Iterator<Map.Entry<IPredicate<E>, Collection<IBindingSet>>> itr = map
                         .entrySet().iterator();
 
                 int i = 0;
@@ -1043,7 +1050,7 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
 
                     halted();
 
-                    final Map.Entry<IPredicate<?>, Collection<IBindingSet>> entry = itr
+                    final Map.Entry<IPredicate<E>, Collection<IBindingSet>> entry = itr
                             .next();
 
                     tasks[i++] = new AccessPathTask(entry.getKey(), entry
@@ -1203,7 +1210,7 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
              * {@link IPredicate} for this join dimension. The asBound
              * {@link IPredicate} is {@link IAccessPath#getPredicate()}.
              */
-            final private IAccessPath<?> accessPath;
+            final private IAccessPath<E> accessPath;
 
             /**
              * Return the <em>fromKey</em> for the {@link IAccessPath} generated
@@ -1215,7 +1222,7 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
              */
             protected byte[] getFromKey() {
 
-                return ((AccessPath<?>) accessPath).getFromKey();
+                return ((AccessPath<E>) accessPath).getFromKey();
 
             }
             
@@ -1239,7 +1246,7 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
                 if (this == o)
                     return true;
                 
-                if (!(o instanceof AccessPathTask))
+                if (!(o instanceof JoinTask.AccessPathTask))
                     return false;
 
                 return accessPath.getPredicate().equals(
@@ -1262,7 +1269,7 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
              *            join dimension that all result in the same asBound
              *            {@link IPredicate}.
              */
-            public AccessPathTask(final IPredicate<?> predicate,
+            public AccessPathTask(final IPredicate<E> predicate,
                     final Collection<IBindingSet> bindingSets) {
 
                 if (predicate == null)
