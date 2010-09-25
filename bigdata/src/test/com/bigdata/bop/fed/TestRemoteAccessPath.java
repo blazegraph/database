@@ -67,7 +67,7 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * @version $Id$
  * 
  * @todo test read-committed access paths.
- * @todo test read historical access paths.
+ * @todo test read historical access paths (read-only tx).
  * @todo test unisolated (writable) access paths.
  * @todo test fully isolated access paths.
  */
@@ -97,12 +97,11 @@ public class TestRemoteAccessPath extends AbstractEmbeddedFederationTestCase {
     
     /** The query controller. */
     private FederatedQueryEngine queryEngine;
-    
+
     /**
-     * The read only transaction identifier used for the test (initially set to
-     * an invalid value).
+     * The timestamp or transaction identifier used for the test.
      */
-    private long tx = Long.MAX_VALUE;
+    private long tx = ITx.READ_COMMITTED;
     
     public Properties getProperties() {
 
@@ -179,8 +178,11 @@ public class TestRemoteAccessPath extends AbstractEmbeddedFederationTestCase {
 
         loadData();
 
-        // read-only transaction from the most recent commit point on the db.
-        tx = fed.getTransactionService().newTx(ITx.READ_COMMITTED);
+        /*
+         * Optionally obtain a read-only transaction from the some commit point
+         * on the db.
+         */
+//        tx = fed.getTransactionService().newTx(ITx.READ_COMMITTED);
         
     }
 
@@ -198,8 +200,10 @@ public class TestRemoteAccessPath extends AbstractEmbeddedFederationTestCase {
             queryEngine = null;
         }
 
-        if (tx != Long.MAX_VALUE)
+        if (tx != ITx.READ_COMMITTED && tx != ITx.UNISOLATED) {
+            // Some kind of transaction.
             fed.getTransactionService().abort(tx);
+        }
 
         super.tearDown();
         

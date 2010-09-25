@@ -123,7 +123,7 @@ Standalone:
 	  For standalone the decision should be based on whether more
 	  leaves would be read (the tuple range count may be used as a
 	  proxy for this) by issuing individual subqueries for the
-	  specific as bound predicates or by leaving with C unbound.
+	  specific as bound predicates or by reading with C unbound.
 
 	  For scale-out, the decision is different since we can use
 	  multi-block iterators on the index segments and do fewer
@@ -158,14 +158,11 @@ Scale-out:
 SPARQL default graph query patterns.  
 
 Note: Default graph queries require us to apply a distinct {s,p,o}
-filter to each default graph access path.
+filter to each default graph access path.  The default graph queries
+uses an expander pattern.  See DefaultGraphSolutionExpander and its
+inner classes.
 
-Standalone: 
-
-  The default graph queries uses an expander pattern.  See
-  DefaultGraphSolutionExpander and its inner classes.
-
-  The following special cases exist:
+The following special cases exist:
 
   - The default graph data set is empty (no graphs were identified
     which are known to the database), in which case an empty access
@@ -173,89 +170,66 @@ Standalone:
 
   - The default graph data set includes a single graph which is known
     to the database.  C is bound and we impose a filter which strips
-    off the context position.  See StripContextAccessPath.
+    off the context position.  Because C takes on only one value, a
+    distinct filter is not required.  This means that scale-out can
+    use normal pipeline joins.
 
-  - The default graph data set includes all graphs.  C is left unbound
-    and we impose a distinct SPO filter which strips off the context
-    position. See MergeAllGraphsAccessPath.
+    See StripContextAccessPath.
 
-  - The default graph data set includes more than a threshold number
-    of graphs.  C is left unbound and we impose a distinct SPO filter
-    which strips off the context position.  See
-    MergeAllGraphsAccessPath.
+  - ___C index: We know that C is strictly ascending in index order
+    within each triple.  Use an advancer pattern or ignore quads until
+    the data changes to a new triple.  Apply a filter to strip off the
+    context position.
 
-    FIXME The threshold for this case is 200, which is WAY too
-	  low. 
-	  
-	  For standalone the decision should be based on whether more
-	  leaves would be read (the tuple range count may be used as a
-	  proxy for this) by issuing individual subqueries for the
-	  specific as bound predicates or by leaving with C unbound.
+    The same optimization works in scale-out using shard-wise pipeline
+    joins if the ___C index was created with the constraint that the
+    all quads for a given triple are on the same shard.
 
-	  For scale-out, the decision is different since we can use
-	  multi-block iterators on the index segments and do fewer
-	  disk seeks.
+  - SCALEOUT and VERY HIGH VOLUME: Use a distributed external merge
+    sort to impose distinct and do operator at a time processing.
 
-  - The default graph data set includes more than one graph but less
-    than some threshold #of graphs.  Parallel subtasks are evaluated
-    for each graph in the data set and write on a shared
-    BlockingBuffer.  The BlockingBuffer is wrapped with an
-    SPORelation.distinctSPOIterator().  See
-    DefaultGraphParallelEvaluationAccessPath.
+  - SCAN and FILTER: The default graph data set includes all graphs OR
+    the cost of scanning with C unbound is less than the cost of
+    subqueries with C bound (for scale-out, subquery cost must be
+    estimated for a remote access path).  C is left unbound and we
+    impose a distinct SPO filter which strips off the context
+    position.  Unless all graphs are being merged, we also apply an IN
+    filter.
 
-    Note: This works out better for standalone because the queries are
-    much more selective, even when there are a large number of graphs
-    in the default graph data set.
+    SCALEOUT: The join evaluation context is ANY, uses a remote access
+              path, and the access path should be configured to move a
+              lot of data efficiently over the remote range iterator.
 
-Scale-out:
+              - It is possible to partition the IN filter based on the
+	        shard on which it will be applied (split the ordered
+	        list of contexts based on the contexts found in a
+	        given shard).
 
-  Special cases exist for:
-  
-  - The SPOC index when s, p, and o are bound and we have a guarantee
-    that an SPO prefix is never split (standalone or when the
-    appropriate ISimpleSplitHandler is defined for the SPOC index).
-    In this case we can use the normal pipelined join and apply an
-    optimized distinct filter because we know that C is strictly
-    ascending.
+    See MergeAllGraphsAccessPath.
 
-  - High volume access paths: Based on a cost analysis, leave C
-    unbound and then applies an IN filter.  This works better because
-    we can handle the reads on the SPOC index with C unbound very
-    efficiently in scale-out by using a multi-block iterator on the
-    index segments.  [However, we must still impose DISTINCT on the
-    access path.]
+  - SUBQUERY: Parallel subtasks are evaluated for each graph in the
+    data set and write on a shared BlockingBuffer.  The BlockingBuffer
+    is wrapped with an SPORelation.distinctSPOIterator().
 
-  - For very high volume operations we could do distributed merge
-    sorts to impose distinct and do operator at a time processing.
+    SCALEOUT: Mark the join evaluation context as ANY and mark the
+	      access path as remote.
 
-- @todo Add annotation to Predicate to indicate the use of an RMI
-  access path in scale-out.  Modify PipelineJoin such that it can be
-  used as an ANY operator -or- a SHARDED operator.  For default graph
-  queries, we need to make the join ANY and the predicate use RMI.
+              Tune the capacity for the remote access path iterator.
+	      When the remote access path will be selective, the
+	      capacity should be small and we will pay a high price if
+	      there are a lot of nested subqueries.  When the remote
+	      access path is less selective the capacity should be
+	      larger to reduce the #of RMI requests made per access
+	      path.
 
-- @todo Create a cost plan for leaving C unbound and then filtering
-  for standalone and scale-out.  These will have different cost
-  profiles.  Normalize the range count to the expected number of
-  leaves. For standalone, the expected number of seeks is predicted by
-  the standard log linear model and the expected #of transfers is one
-  per seek.  For scale-out, the expected #of seeks is two (per shard)
-  and the expected #of transfers is one per 1M of leaves.  For
-  scale-out, we must also factor in the RMI cost for doing RMI based
-  subqueries.  This has been pretty substantial in the past, but that
-  might also have to do with unisolated vs read committed vs read-only
-  tx views.
+	      Note: The way the code is written, the access path will
+	      do RMI for the range count before issuing the RMI
+	      iterator request.  Look at ways to optimize this.
 
-- @todo The current named and default graph solution expanders use a
-  threshold for filtering which is WAY too low.  Raise this into the
-  query rewrite based on the cost plan, per above.
+    See DefaultGraphParallelEvaluationAccessPath.
 
 - @todo Lazily create the hash map for the distinctSPOIterator when we
   observe the 2nd distinct SPO value.
-
-- @todo An optimized distinct filter for SPOC.  We can note the last
-  observed {s,p,o} and skip to the next possible o in the index
-  (o:=o+1) using an advancer pattern (this could also just scan until
-  o changes).
 
 ---
 UNION(ops)[maxParallel(default all)]
