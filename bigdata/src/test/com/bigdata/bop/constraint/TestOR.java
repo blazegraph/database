@@ -29,6 +29,14 @@ package com.bigdata.bop.constraint;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.bop.ArrayBindingSet;
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.Var;
+
 /**
  * Unit tests for {@link OR}.
  * 
@@ -50,8 +58,44 @@ public class TestOR extends TestCase2 {
         super(name);
     }
 
-    public void test_something() {
-        fail("write tests");
+    /**
+     * Unit test for {@link OR#OR(IConstraint,IConstraint)}
+     */
+    public void testConstructor ()
+    {
+        IConstraint eq = new EQ ( Var.var ( "x" ), Var.var ( "y" ) ) ;
+        IConstraint ne = new EQ ( Var.var ( "x" ), Var.var ( "y" ) ) ;
+
+        try { assertTrue ( null != new OR ( null, eq ) ) ; fail ( "IllegalArgumentException expected, lhs was null" ) ; }
+        catch ( IllegalArgumentException e ) {}
+
+        try { assertTrue ( null != new OR ( eq, null ) ) ; fail ( "IllegalArgumentException expected, rhs was null" ) ; }
+        catch ( IllegalArgumentException e ) {}
+
+        assertTrue ( null != new OR ( eq, ne ) ) ;
     }
-    
+
+    /**
+     * Unit test for {@link OR#accept(IBindingSet)}
+     */
+    public void testAccept ()
+    {
+        Var<?> x = Var.var ( "x" ) ;
+        Var<?> y = Var.var ( "y" ) ;
+        Constant<Integer> val1 = new Constant<Integer> ( 1 ) ;
+        Constant<Integer> val2 = new Constant<Integer> ( 2 ) ;
+
+        IConstraint eq = new EQ ( x, y ) ;
+        IConstraint eqc = new EQConstant ( y, val2 ) ;
+
+        OR op = new OR ( eq, eqc ) ;
+
+        IBindingSet eqlhs = new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { val1, val1 } ) ;
+        IBindingSet eqrhs = new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { val1, val2 } ) ;
+        IBindingSet ne = new ArrayBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { val2, val1 } ) ;
+
+        assertTrue ( op.accept ( eqlhs ) ) ;
+        assertTrue ( op.accept ( eqrhs ) ) ;
+        assertFalse ( op.accept ( ne ) ) ;
+    }    
 }

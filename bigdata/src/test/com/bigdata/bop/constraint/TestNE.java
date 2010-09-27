@@ -29,6 +29,13 @@ package com.bigdata.bop.constraint;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.bop.ArrayBindingSet;
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.Var;
+
 /**
  * Unit tests for {@link NE}.
  * 
@@ -50,8 +57,40 @@ public class TestNE extends TestCase2 {
         super(name);
     }
 
-    public void test_something() {
-        fail("write tests");
+    /**
+     * Unit test for {@link NE#NE(IVariable,IVariable)}
+     */
+    public void testConstructor ()
+    {
+        try { assertTrue ( null != new NE ( null, Var.var ( "y" ) ) ) ; fail ( "IllegalArgumentException expected, lhs was null" ) ; }
+        catch ( IllegalArgumentException e ) {}
+
+        try { assertTrue ( null != new NE ( Var.var ( "x" ), null ) ) ; fail ( "IllegalArgumentException expected, rhs was null" ) ; }
+        catch ( IllegalArgumentException e ) {}
+
+        try { assertTrue ( null != new NE ( Var.var ( "x" ), Var.var ( "x" ) ) ) ; fail ( "IllegalArgumentException expected, lhs identical to rhs" ) ; }
+        catch ( IllegalArgumentException e ) {}
+
+        assertTrue ( null != new NE ( Var.var ( "x" ), Var.var ( "y" ) ) ) ;
     }
-    
+
+    /**
+     * Unit test for {@link NE#accept(IBindingSet)}
+     */
+    public void testAccept ()
+    {
+        Var<?> x = Var.var ( "x" ) ;
+        Var<?> y = Var.var ( "y" ) ;
+        Var<?> vars [] = new Var<?> [] { x, y } ;
+
+        NE op = new NE ( x, y ) ;
+
+        IBindingSet eq = new ArrayBindingSet ( vars, new IConstant [] { new Constant<String> ( "1" ), new Constant<String> ( "1" ) } ) ;
+        IBindingSet ne = new ArrayBindingSet ( vars, new IConstant [] { new Constant<String> ( "1" ), new Constant<String> ( "2" ) } ) ;
+        IBindingSet nb = new ArrayBindingSet ( new IVariable<?> [] { x }, new IConstant [] { new Constant<String> ( "1" ) } ) ;
+
+        assertTrue ( op.accept ( ne ) ) ;
+        assertFalse ( op.accept ( eq ) ) ;
+        assertTrue ( op.accept ( nb ) ) ;
+    }
 }

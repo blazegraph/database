@@ -29,6 +29,13 @@ package com.bigdata.bop.constraint;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.bop.ArrayBindingSet;
+import com.bigdata.bop.Constant;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.Var;
+
 /**
  * Unit tests for {@link NEConstant}.
  * 
@@ -50,8 +57,40 @@ public class TestNEConstant extends TestCase2 {
         super(name);
     }
 
-    public void test_something() {
-        fail("write tests");
+    /**
+     * Unit test for {@link NEConstant#NEConstant(IVariable,IConstant)}
+     */
+    public void testConstructor ()
+    {
+        try { assertTrue ( null != new NEConstant ( null, new Constant<String> ( "1" ) ) ) ; fail ( "IllegalArgumentException expected, lhs was null" ) ; }
+        catch ( IllegalArgumentException e ) {}
+
+        try { assertTrue ( null != new NEConstant ( Var.var ( "x" ), null ) ) ; fail ( "IllegalArgumentException expected, rhs was null" ) ; }
+        catch ( IllegalArgumentException e ) {}
+
+        assertTrue ( null != new NEConstant ( Var.var ( "x" ), new Constant<String> ( "1" ) ) ) ;
     }
-    
+
+    /**
+     * Unit test for {@link NEConstant#accept(IBindingSet)}
+     */
+    public void testAccept ()
+    {
+        Var<?> var = Var.var ( "x" ) ;
+        Constant<String> val1 = new Constant<String> ( "1" ) ;
+        Constant<String> val2 = new Constant<String> ( "2" ) ;
+        Constant<Integer> val3 = new Constant<Integer> ( 1 ) ;
+
+        NEConstant op = new NEConstant ( var, val1 ) ;
+
+        IBindingSet eq = new ArrayBindingSet ( new IVariable<?> [] { var }, new IConstant [] { val1 } ) ;
+        IBindingSet ne1 = new ArrayBindingSet ( new IVariable<?> [] { var }, new IConstant [] { val2 } ) ;
+        IBindingSet ne2 = new ArrayBindingSet ( new IVariable<?> [] { var }, new IConstant [] { val3 } ) ;
+        IBindingSet nb = new ArrayBindingSet ( new IVariable<?> [] {}, new IConstant [] {} ) ;
+
+        assertFalse ( op.accept ( eq ) ) ;
+        assertTrue ( op.accept ( ne1 ) ) ;
+        assertTrue ( op.accept ( ne2 ) ) ;
+        assertTrue ( op.accept ( nb ) ) ;
+    }    
 }
