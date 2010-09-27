@@ -33,17 +33,35 @@ import java.util.*;
 
 public class Sorterator implements Iterator {
 
-	Iterator m_iter;
+	private final Iterator m_iter;
+	protected final Object m_context;
 	
-  public Sorterator(Iterator iter, Sorter sorter) {
-  	TreeSet set = new TreeSet(sorter);
-  	
-  	while (iter.hasNext()) {
-  		set.add(iter.next());
-  	}
-  	
-    m_iter = set.iterator();
-  }
+    public Sorterator(Iterator iter, Object context, Sorter sorter) {
+
+        this.m_context = context;
+
+        // materialize the objects to be sorted.
+        LinkedList tmp = new LinkedList();
+        
+        while(iter.hasNext()) {
+            tmp.add(iter.next());
+        }
+        
+        Object[] a = tmp.toArray();
+        
+        Arrays.sort(a, sorter/*.getComparator()*/);
+        
+        m_iter = Arrays.asList(a).iterator();
+        
+//        TreeSet set = new TreeSet(sorter);
+//
+//        while (iter.hasNext()) {
+//            set.add(iter.next());
+//        }
+//
+//        m_iter = set.iterator();
+
+    }
 
   public boolean hasNext() {
   	return m_iter.hasNext();

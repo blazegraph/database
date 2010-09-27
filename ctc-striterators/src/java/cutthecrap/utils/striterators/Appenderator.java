@@ -33,13 +33,15 @@ import java.util.*;
 
 public class Appenderator implements Iterator {
 
-	Iterator m_src;
-	Iterator m_xtra;
+	private final Iterator m_src;
+	protected final Object   m_ctx;
+	private final Iterator m_xtra;
 	
-	Iterator m_current;
+	private Iterator m_current;
 
-  public Appenderator(Iterator src, Iterator xtra) {
+  public Appenderator(Iterator src, Object ctx, Iterator xtra) {
     m_src = src;
+    m_ctx = ctx;
     m_xtra = xtra;
 
     m_current = m_src;

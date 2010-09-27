@@ -25,17 +25,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package cutthecrap.utils.striterators;
 
-import java.util.*;
+import java.util.Iterator;
 
 /**
  * @author Martyn Cutcher
  */
-public abstract class Visitor implements IFilter {
+public abstract class Visitor extends FilterBase {
 
 	//-------------------------------------------------------------
 
-	final public Iterator filter(Iterator src) {
-		return new Visitorator(src, this);
+    @Override
+    final public Iterator filterOnce(Iterator src, Object context) {
+        return new Visitorator(src, context, this);
 	}
 
 	protected abstract void visit(Object obj);

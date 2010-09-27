@@ -32,8 +32,9 @@ import java.util.Comparator;
  * Used with Mergerator by Striterator to merge returned objects.
  */
 
-public class Merger implements IFilter {
-	protected Iterator m_xtra = null;
+public class Merger extends FilterBase {
+	
+    protected Iterator m_xtra = null; // @todo Non-Serializable.
 	protected Comparator m_comparator = null;
 
 	public Merger()	{}
@@ -45,8 +46,9 @@ public class Merger implements IFilter {
 	
 	//-------------------------------------------------------------
 
-	final public Iterator filter(Iterator src) {
-		return new Mergerator(src, m_xtra, m_comparator);
+	@Override
+	final public Iterator filterOnce(Iterator src, Object context) {
+		return new Mergerator(src, m_xtra, context, m_comparator);
 	}
 
 	//-------------------------------------------------------------

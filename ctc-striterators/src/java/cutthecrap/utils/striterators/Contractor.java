@@ -31,9 +31,17 @@ import java.util.Iterator;
  * Used with a Contractorator to contract an Expanded iterator
  * 
  * The Contractorator will call contract on this object
+ * 
  * @author Martyn Cutcher
+ * 
+ * @todo CONTRACTOR annotation and allow it to be set as an argument, moving
+ *       contract() onto the contractorator.
+ * 
+ * @todo CONTRACTOR should be able to break an iterator into many chunks, not
+ *       just one.  Maybe the API should return an Iterator from an Iterator
+ *       in which the chunkiness is changed?
  */
-public abstract class Contractor implements IFilter {
+public abstract class Contractor extends FilterBase {
 
 	protected Object m_state = null;
 
@@ -45,8 +53,9 @@ public abstract class Contractor implements IFilter {
 	
 	//-------------------------------------------------------------
 
-	public Iterator filter(Iterator src) {
-		return new Contractorator(src, this);
+	@Override
+    public Iterator filterOnce(Iterator src, Object context) {
+        return new Contractorator(src, context, this);
 	}
 
 	//-------------------------------------------------------------

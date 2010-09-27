@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package cutthecrap.utils.striterators;
 
-import java.util.*;
+import java.util.LinkedHashSet;
 
 /******************************************************************************
  * UniquenessFilter
@@ -33,7 +33,10 @@ import java.util.*;
  * Derived from Filter, and ensures no duplication, not to be used with large sets!
  */
 public class UniquenessFilter extends Filter {
-	ArrayList m_members = new ArrayList();
+
+    private static final long serialVersionUID = 424197241022124358L;
+//    ArrayList m_members = new ArrayList();
+    private final LinkedHashSet<Object> m_members = new LinkedHashSet<Object>();
 	
   public UniquenessFilter() {
   	super(null);
@@ -43,11 +46,12 @@ public class UniquenessFilter extends Filter {
 	 * Just make sure that the current object has not already been returned
 	 **/
   protected boolean isValid(Object obj) {
-  	if (m_members.contains(obj)) {
-  		return false;
-  	}
-  	m_members.add(obj);
-  	
-  	return true;
+      return m_members.add(obj);
+//  	if (m_members.contains(obj)) {
+//  		return false;
+//  	}
+//  	m_members.add(obj);
+//  	
+//  	return true;
   }
 }

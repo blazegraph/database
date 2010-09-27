@@ -32,11 +32,13 @@ import java.util.Iterator;
  */
 public class Visitorator implements Iterator {
 
-	Iterator m_iter;
-	Visitor m_visitor;
+    private final Iterator m_iter;
+    protected final Object m_context;
+	private final Visitor m_visitor;
 	
-	public Visitorator(Iterator iter, Visitor visitor) {
+	public Visitorator(Iterator iter, Object context, Visitor visitor) {
 		m_iter = iter;
+		m_context = context;
 		m_visitor = visitor;
 	}
 

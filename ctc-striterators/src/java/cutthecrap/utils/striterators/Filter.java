@@ -28,25 +28,30 @@ package cutthecrap.utils.striterators;
 import java.util.Iterator;
 
 /**
- * Used with Filterator by Striterator to filter returned objects.
+ * Used with Filterator by Striterator to filter returned objects. This can
+ * represent either a single {@link IFilter} or a chain of {@link IFilter}s.
  */
-public abstract class Filter implements IFilter {
+public abstract class Filter extends FilterBase {
 
-	protected Object m_state = null;
-
+	/**
+     * 
+     */
+    private static final long serialVersionUID = 7584586850408369853L;
+    
 	public Filter()	{}
 
 	public Filter(Object state) {
-		m_state = state;
+		super(state);
 	}
 
 	//-------------------------------------------------------------
 
-	final public Iterator filter(Iterator src) {
-		return new Filterator(src, this);
-	}
+	@Override
+    protected Iterator filterOnce(Iterator src, final Object context) {
+        return new Filterator(src, context, this);
+    }
 
-	//-------------------------------------------------------------
+    // -------------------------------------------------------------
 
-	protected abstract boolean isValid(Object obj);
+    protected abstract boolean isValid(Object obj);
 }
