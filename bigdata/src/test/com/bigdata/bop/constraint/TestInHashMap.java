@@ -27,7 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.constraint;
 
-import junit.framework.TestCase2;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IVariable;
 
 /**
  * Unit tests for {@link INHashMap}.
@@ -35,8 +36,8 @@ import junit.framework.TestCase2;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestInHashMap extends TestCase2 {
-
+public class TestInHashMap extends TestINConstraint
+{
     /**
      * 
      */
@@ -50,8 +51,8 @@ public class TestInHashMap extends TestCase2 {
         super(name);
     }
 
-    public void test_something() {
-        fail("write tests");
+    @Override protected INConstraint newINConstraint ( IVariable<?> var, IConstant<?> vals [] )
+    {
+        return new INHashMap ( var, vals ) ;
     }
-    
 }

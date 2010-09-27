@@ -114,4 +114,15 @@ public class TestEQ extends TestCase2 {
         
     }
 
+    public void test_eval_correct_unblound() {
+
+        final EQ op = new EQ(Var.var("x"), Var.var("y"));
+
+        final IBindingSet bs1 = new ArrayBindingSet(//
+                new IVariable[] { Var.var("x") }, //
+                new IConstant[] { new Constant<String>("1") });
+
+        assertFalse(op.accept(bs1));
+        
+    }
 }
