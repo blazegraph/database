@@ -43,12 +43,14 @@ import java.util.NoSuchElementException;
  * @author Martyn Cutcher
  */
 public class Contractorator implements Iterator {
-	Iterator m_src;
-	Contractor m_contractor;
-	Object m_next;
+	private final Iterator m_src;
+	protected final Object   m_ctx;
+	private final Contractor m_contractor;
+	private Object m_next;
 
-	public Contractorator(Iterator src, Contractor contractor) {
+	public Contractorator(Iterator src, final Object ctx, Contractor contractor) {
 		m_src = src;
+		m_ctx = ctx;
 		m_contractor = contractor;
 
 		m_next = m_contractor.contract(m_src);

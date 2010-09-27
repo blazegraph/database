@@ -35,11 +35,13 @@ import java.util.*;
 
 public class Mapperator implements Iterator {
 
-	Iterator m_iter;
-	Mapper m_mapper;
+	final private Iterator m_iter;
+	final protected Object m_context;
+	final private Mapper m_mapper;
 	
-  public Mapperator(Iterator iter, Mapper mapper) {
+  public Mapperator(Iterator iter, Object context, Mapper mapper) {
     m_iter = iter;
+    m_context = context;
     m_mapper = mapper;
   }
 

@@ -33,14 +33,16 @@ import java.util.*;
  **/
 public class Mergerator implements Iterator {
 
-	Iterator m_setA;
-	Iterator m_setB;
-	Comparator m_comparator;
+	final private Iterator m_setA;
+	final private Iterator m_setB;
+	final protected Object m_context;
+	final private Comparator m_comparator;
 	
-	Object m_valA = null;
-	Object m_valB = null;
+	private Object m_valA = null;
+	private Object m_valB = null;
 	
-  public Mergerator(Iterator setA, Iterator setB, Comparator comparator) {
+  public Mergerator(Iterator setA, Iterator setB, Object context, Comparator comparator) {
+    m_context = context;
     m_setA = setA;
     m_setB = setB;
 

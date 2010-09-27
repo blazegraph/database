@@ -35,19 +35,19 @@ import java.util.Iterator;
  * Cannot be instantiated directly since an implementation of the resolve method is required.
  */
 
-public abstract class Resolver implements IFilter {
-	protected Object m_state = null;
+public abstract class Resolver extends FilterBase {
 	
 	public Resolver()	{}
 
 	public Resolver(Object state) {
-		m_state = state;
+		super(state);
 	}
 	
 	//-------------------------------------------------------------
 
-	final public Iterator filter(Iterator src) {
-		return new Resolverator(src, this);
+	@Override
+    final public Iterator filterOnce(Iterator src, Object context) {
+        return new Resolverator(src, context, this);
 	}
 
 	//-------------------------------------------------------------

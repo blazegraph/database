@@ -39,13 +39,14 @@ import java.util.*;
 
 public class Expanderator implements Iterator {
 
-	Iterator m_src;
-	Iterator m_child = null;
+	private final Iterator m_src;
+	private Iterator m_child = null;
+	protected final Object m_context;
+	private final Expander m_expander;
 	
-	Expander m_expander;
-	
-  public Expanderator(Iterator src, Expander expander) {
+  public Expanderator(Iterator src, Object context, Expander expander) {
     m_src = src;
+    m_context = context;
     m_expander = expander;
   }
 

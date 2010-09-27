@@ -25,8 +25,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package cutthecrap.utils.striterators;
 
-import java.util.Iterator;
 import java.lang.reflect.Method;
+import java.util.Iterator;
 
 /**
  * Mapper
@@ -34,9 +34,9 @@ import java.lang.reflect.Method;
  * Used with Mapperator by Striterator to map instance methods against member objects.
  */
 
-public class Mapper implements IFilter {
+public class Mapper extends FilterBase {
 	protected Object m_client = null;
-	protected Method m_method = null;
+	protected Method m_method = null; // @todo Not serializable. Defer reflection?
 	protected Object[] m_args = {null};
 	
 	public Mapper(Object client, Method method) {
@@ -46,9 +46,10 @@ public class Mapper implements IFilter {
 	
 	//-------------------------------------------------------------
 
-	final public Iterator filter(Iterator src) {
-		return new Mapperator(src, this);
-	}
+	@Override
+    final public Iterator filterOnce(Iterator src, Object context) {
+        return new Mapperator(src, context, this);
+    }
 
 	//-------------------------------------------------------------
 

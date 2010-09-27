@@ -25,9 +25,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package cutthecrap.utils.striterators;
 
-import java.util.Iterator;
-import java.util.Enumeration;
 import java.lang.reflect.Method;
+import java.util.Enumeration;
+import java.util.Iterator;
+import java.util.List;
 
 /**
  * Striterator
@@ -38,25 +39,47 @@ import java.lang.reflect.Method;
  *	The <code>addTypeFilter</code> method allows easy specification of a class type restriction.
  */
 public class Striterator implements IStriterator {
-	Iterator m_src = null;
+    private List<IFilter> filters = null; // Note: NOT serializable.
+    private transient Iterator realSource;
+	private transient Iterator m_src = null;
 
-	/** Constructor takes source iterator **/
-	public Striterator(Iterator src) {
-		m_src = src;
-	}
+    /**
+     * Deserialization constructor.
+     */
+    public Striterator() {
+        this.realSource = null;
+    }
 
-	public Striterator(Enumeration src) {
-		this(new EnumIterator(src));
-	}
+    /** Constructor takes source iterator **/
+	public Striterator(final Iterator src) {
+	    this.realSource = src;
+    }
 
-	/** delegates hasNext request to source iterator **/
-	public boolean hasNext() {
-		return m_src.hasNext();
-	}
+    public Striterator(final Enumeration src) {
+        this(new EnumIterator(src));
+    }
 
-	/** delegates next request to source iterator **/
-	public Object next() {
-		return m_src.next();
+    /**
+     * 
+     * @param src
+     * @param filter
+     */
+    public Striterator(final Iterator src, final List<IFilter> filters) {
+        this.realSource = src;
+    }
+
+    /** delegates hasNext request to source iterator **/
+    public boolean hasNext() {
+        if (m_src == null)
+            compile(realSource);
+        return m_src.hasNext();
+    }
+
+    /** delegates next request to source iterator **/
+    public Object next() {
+        if (m_src == null)
+            compile(realSource);
+        return m_src.next();
 	}
 
 	/** Enumeration version of hasNext() **/
@@ -75,12 +98,27 @@ public class Striterator implements IStriterator {
 	}
 
 	/** creates a Filterator to apply the filter **/
-	public IStriterator addFilter(IFilter filter) {
-		m_src = filter.filter(m_src);
-		
-		return this;
+	public IStriterator addFilter(final IFilter filter) {
+        if (filters != null)
+            filters.add(filter);
+
+        return this;
 	}
 
+    public void compile(final Iterator src) {
+        compile(src, null/* context */);
+    }
+
+    public void compile(final Iterator src, final Object context) {
+        if (m_src != null)
+            throw new IllegalStateException();
+        m_src = realSource = src;
+        if (filters != null)
+            for (IFilter filter : filters) {
+                m_src = filter.filter(m_src, context);
+            }
+    }
+	
 	/** check each object against cls.isInstance(object) **/
 	public IStriterator addTypeFilter(Class cls) {
 		addFilter(new Filter(cls) {

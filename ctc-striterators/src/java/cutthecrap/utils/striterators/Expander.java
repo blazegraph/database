@@ -35,22 +35,22 @@ import java.util.Iterator;
  * Derivations must implement expand method.
  */
 
-public abstract class Expander implements IFilter {
-	protected Object m_state = null;
+public abstract class Expander extends FilterBase {
 
 	public Expander()	{	}
 
 	public Expander(Object state) {
-		m_state = state;
+		super(state);
 	}
 	
 	//-------------------------------------------------------------
 
-	final public Iterator filter(Iterator src) {
-		return new Expanderator(src, this);
-	}
+    @Override
+    final public Iterator filterOnce(Iterator src, Object context) {
+        return new Expanderator(src, context, this);
+    }
 
-	//-------------------------------------------------------------
+    // -------------------------------------------------------------
 
-	protected abstract Iterator expand(Object obj);
+    protected abstract Iterator expand(Object obj);
 }

@@ -32,16 +32,20 @@ import java.io.Serializable;
 /**
  * Provides the hook interface that allows use by Striterators
  */
-public interface IFilter extends Serializable	{
+public interface IFilter extends Serializable, IPropertySet {
 	/**
 	 * <p>The filter method is provided to allow the creation of the filtering iterator.</p>
 	 *
 	 * <p>Any implementation should follow the following pattern:</p>
 	 * <pre>
-	 *  public Iterator filter(Iterator src) {
-	 *		return new Filterator(src, this);
+	 *  public Iterator filter(Iterator src, Object context) {
+	 *		return new Filterator(src, context, this);
 	 *	}
 	 *  </pre>
+	 *  This pattern makes the source iterator, the evaluation context, and the
+	 *  {@link IPropertySet} annotations visible to the runtime striterator
+	 *  implementation.
 	 **/
-	public abstract Iterator filter(Iterator src);
+	public abstract Iterator filter(Iterator src, Object context);
+	
 }

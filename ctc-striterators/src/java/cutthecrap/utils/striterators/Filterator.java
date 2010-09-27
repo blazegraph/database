@@ -42,13 +42,15 @@ import java.util.*;
 
 public class Filterator implements Iterator {
 
-	Iterator m_src;
-	Object m_value = null;
+	private Iterator m_src;
+	private Object m_value = null;
 
-	protected Filter m_filter = null;
+	final protected Object m_context;
+	final protected Filter m_filter;
 
-	public Filterator(Iterator src, Filter filter) {
+	public Filterator(final Iterator src, final Object context, final Filter filter) {
 		m_src = src;
+		m_context = context;
 		m_filter = filter;
 
 		m_value = getNext();

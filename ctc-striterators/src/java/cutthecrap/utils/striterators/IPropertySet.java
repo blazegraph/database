@@ -1,7 +1,6 @@
-/*
-Striterator - transformation and mapping patterns over java Iterators
+/**
 
-Copyright (C) SYSTAP, LLC 2010.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -22,32 +21,27 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
+/*
+ * Created on Sep 27, 2010
+ */
 
 package cutthecrap.utils.striterators;
 
-import java.util.Iterator;
-
 /**
- * Appender
- *
- * Used with Appenderator by Striterator to filter returned objects.
+ * Interface for access to named property values.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
+public interface IPropertySet {
 
-public class Appender extends FilterBase {
-	protected Iterator m_xtra = null;
+    /**
+     * Return the value of a named property.
+     * 
+     * @param name
+     *            The property name.
+     *            
+     * @return The property value.
+     */
+    Object getProperty(String name);
 
-	public Appender()	{}
-
-	public Appender(Iterator xtra) {
-		m_xtra = xtra;
-	}
-	
-	//-------------------------------------------------------------
-
-	@Override
-    final public Iterator filterOnce(Iterator src, Object context) {
-        return new Appenderator(src, context, (Iterator) m_xtra);
-	}
-
-	//-------------------------------------------------------------
 }

@@ -35,11 +35,13 @@ import java.util.*;
 
 public class Resolverator implements Iterator {
 
-	Iterator m_iter;
-	Resolver m_resolver;
+	private final Iterator m_iter;
+	protected final Object m_context;
+	private final Resolver m_resolver;
 	
-  public Resolverator(Iterator iter, Resolver resolver) {
+  public Resolverator(Iterator iter, Object context, Resolver resolver) {
     m_iter = iter;
+    m_context = context;
     m_resolver = resolver;
   }
 

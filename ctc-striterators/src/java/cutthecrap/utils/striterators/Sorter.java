@@ -25,7 +25,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package cutthecrap.utils.striterators;
 
-import java.util.*;
+import java.util.Comparator;
+import java.util.Iterator;
 
 /**
  * <p>Used with Sorterator by Striterator to sort iterations.</p>
@@ -37,17 +38,40 @@ import java.util.*;
  *	for sets that may be very large.</p>
  */
 
-public abstract class Sorter implements IFilter, Comparator {
-  public Sorter() {
-  }
-  
-  //-------------------------------------------------------------
+abstract public class Sorter extends FilterBase implements Comparator {
+ 
+//    /**
+//     * Annotation giving the {@link Comparator} to be applied.
+//     */
+//    static final public String COMPARATOR = Sorter.class.getName()
+//            + ".comparator";
 
-  final public Iterator filter(Iterator src) {
-  	return new Sorterator(src, this);
-  }
+    public Sorter() {
+    }
 
-  //-------------------------------------------------------------
+//    public Sorter(Comparator c) {
+//        
+//        setProperty(COMPARATOR, c);
+//        
+//    }
 
-  public abstract int compare(Object o1, Object o2);
+    // -------------------------------------------------------------
+
+    @Override
+    final public Iterator filterOnce(Iterator src, Object context) {
+
+        return new Sorterator(src, context, this);
+        
+    }
+
+    // -------------------------------------------------------------
+
+//    public Comparator getComparator() {
+//    
+//        return (Comparator) getRequiredProperty(COMPARATOR);
+//        
+//    }
+    
+    public abstract int compare(Object o1, Object o2);
+
 }
