@@ -37,6 +37,8 @@ import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.Rio;
 
+import com.bigdata.rdf.model.BigdataURI;
+
 /**
  * Parses data but does not load it into the indices.
  * 
@@ -73,6 +75,8 @@ public class BasicRioLoader implements IRioLoader {
     Vector<RioLoaderListener> listeners;
 
     private final ValueFactory valueFactory;
+    
+    protected String defaultGraph;
     
     public BasicRioLoader(final ValueFactory valueFactory) {
         
@@ -153,18 +157,20 @@ public class BasicRioLoader implements IRioLoader {
     }
 
     final public void loadRdf(final InputStream is, final String baseURI,
-            final RDFFormat rdfFormat, final RDFParserOptions options)
+            final RDFFormat rdfFormat, final String defaultGraph,
+            final RDFParserOptions options)
             throws Exception {
 
-        loadRdf2(is, baseURI, rdfFormat, options);
+        loadRdf2(is, baseURI, rdfFormat, defaultGraph, options);
         
     }
     
     final public void loadRdf(final Reader reader, final String baseURI,
-            final RDFFormat rdfFormat, final RDFParserOptions options)
+            final RDFFormat rdfFormat, final String defaultGraph,
+            final RDFParserOptions options)
             throws Exception {
 
-        loadRdf2(reader, baseURI, rdfFormat, options);
+        loadRdf2(reader, baseURI, rdfFormat, defaultGraph, options);
         
     }
 
@@ -180,7 +186,7 @@ public class BasicRioLoader implements IRioLoader {
      * @throws Exception
      */
     protected void loadRdf2(final Object source, final String baseURI,
-            final RDFFormat rdfFormat, final RDFParserOptions options)
+            final RDFFormat rdfFormat, final String defaultGraph, final RDFParserOptions options)
             throws Exception {
 
         if (source == null)
@@ -198,6 +204,8 @@ public class BasicRioLoader implements IRioLoader {
         if (log.isInfoEnabled())
             log.info("format=" + rdfFormat + ", options=" + options);
         
+        this.defaultGraph = defaultGraph ;
+
         final RDFParser parser = getParser(rdfFormat);
 
         // apply options to the parser
@@ -212,7 +220,7 @@ public class BasicRioLoader implements IRioLoader {
         
         // Note: reset so that rates are correct for each source loaded.
         stmtsAdded = 0;
-                
+
         try {
 
             before();
