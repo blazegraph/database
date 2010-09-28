@@ -47,14 +47,14 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.NOPTupleSerializer;
 import com.bigdata.btree.TestTuple;
 import com.bigdata.btree.filter.Advancer;
-import com.bigdata.btree.filter.FilterConstructor;
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.striterator.Resolver;
 import com.bigdata.striterator.Striterator;
+
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * Test suite for {@link FusedView}.
@@ -908,7 +908,7 @@ public class TestFusedView extends AbstractBTreeTestCase {
         btree2.insert(k7, v7);
         btree1.insert(k9, v9);
 
-        final FilterConstructor filter = new FilterConstructor().addFilter(new TupleFilter(){
+        final TupleFilter filter = new TupleFilter(){
             private static final long serialVersionUID = 1L;
             @Override
             protected boolean isValid(ITuple tuple) {
@@ -918,7 +918,7 @@ public class TestFusedView extends AbstractBTreeTestCase {
                     return false;
                 }
                 return true;
-            }});
+            }};
 
         assertTrue(view.contains(k3));
         assertTrue(view.contains(k5));
@@ -1114,25 +1114,25 @@ public class TestFusedView extends AbstractBTreeTestCase {
          * the [k5] tuple from btree2 is dropped from the fused tuple iterator.
          */
         final AtomicInteger count = new AtomicInteger(0);
-        IFilterConstructor filterCtor = new FilterConstructor().addFilter(new TupleFilter(){
+        final IFilter filter = new TupleFilter(){
             private static final long serialVersionUID = 1L;
             @Override
             protected boolean isValid(ITuple tuple) {
                 count.incrementAndGet();
                 return true;
-            }});
+            }};
         
         // forward : counts four distinct tuples.
         count.set(0);
         assertSameIterator(new byte[][] { v3a, v5a, v7a, v9a }, view
-                .rangeIterator(null, null,0/*capacity*/,IRangeQuery.DEFAULT,filterCtor));
+                .rangeIterator(null, null,0/*capacity*/,IRangeQuery.DEFAULT,filter));
         assertEquals(4,count.get());
 
         // reverse : counts four distinct tuples.
         count.set(0);
         assertSameIterator(new byte[][] { v9a, v7a, v5a, v3a }, view.rangeIterator(null,
                 null, 0/* capacity */,
-                IRangeQuery.DEFAULT | IRangeQuery.REVERSE, filterCtor));
+                IRangeQuery.DEFAULT | IRangeQuery.REVERSE, filter));
         assertEquals(4,count.get());
 
     }

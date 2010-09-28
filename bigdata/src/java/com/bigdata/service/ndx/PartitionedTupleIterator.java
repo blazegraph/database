@@ -36,7 +36,6 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.Tuple;
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.AbstractKeyRangeIndexProcedure;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.PartitionLocator;
@@ -44,6 +43,8 @@ import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.util.InnerCause;
+
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * Class supports range query across one or more index partitions. Each
@@ -117,7 +118,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
      */
     private final int flags;
     
-    private final IFilterConstructor filter;
+    private final IFilter filter;
     
     /**
      * <code>true</code> iff {@link IRangeQuery#REVERSE} was specified by the
@@ -266,7 +267,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
     public PartitionedTupleIterator(final IScaleOutClientIndex ndx,
             final long ts, final boolean isReadConsistentTx, final byte[] fromKey,
             final byte[] toKey, final int capacity, final int flags,
-            final IFilterConstructor filter) {
+            final IFilter filter) {
 
         if (ndx == null) {
 
@@ -572,7 +573,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
                 protected ResultSet getResultSet(final long timestamp,
                         final byte[] fromKey, final byte[] toKey,
                         final int capacity, final int flags,
-                        final IFilterConstructor filter) {
+                        final IFilter filter) {
 
                     final ResultSet tmp = super.getResultSet(timestamp,
                             fromKey, toKey, capacity, flags, filter);

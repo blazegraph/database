@@ -3,7 +3,6 @@ package com.bigdata.service;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.RangeCountProcedure;
 import com.bigdata.journal.ITx;
@@ -12,6 +11,8 @@ import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.service.ndx.RawDataServiceTupleIterator;
+
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * An implementation that performs NO caching. All methods read through to the
@@ -199,7 +200,7 @@ public class NoCacheMetadataIndexView implements IMetadataIndex {
      */
     // not so interesting to cache, but could cache the iterator results on the scale-out index.
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IFilterConstructor filter) {
+            int capacity, int flags, IFilter filter) {
 
         return new RawDataServiceTupleIterator(getMetadataService(),//
                 MetadataService.getMetadataIndexName(name), //

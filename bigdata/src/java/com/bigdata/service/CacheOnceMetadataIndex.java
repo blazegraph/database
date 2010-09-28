@@ -34,12 +34,13 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.service.ndx.RawDataServiceTupleIterator;
+
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * Implementation caches all locators but does not allow stale locators. This is
@@ -238,7 +239,7 @@ public class CacheOnceMetadataIndex implements IMetadataIndex {
     }
 
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IFilterConstructor filter) {
+            int capacity, int flags, IFilter filter) {
 
         return mdi.rangeIterator(fromKey, toKey, capacity, flags, filter);
 

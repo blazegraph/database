@@ -70,8 +70,6 @@ public class TestAll extends TestCase {
          * FIXME add more unit tests
          */
        
-        suite.addTestSuite(TestSameVariableConstraint.class);
-        
         suite.addTestSuite(TestArrayBuffer.class);
         
         suite.addTestSuite(TestBlockingBuffer.class);

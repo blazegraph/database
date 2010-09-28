@@ -29,13 +29,14 @@ package com.bigdata.btree;
 
 import java.util.Iterator;
 
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.Split;
+
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * A fly-weight wrapper that does not permit write operations and reads through
@@ -106,7 +107,7 @@ public class ReadOnlyIndex extends DelegateIndex {
      * {@link IRangeQuery#REMOVEALL} and {@link Iterator#remove()} are disabled.
      */
     final public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IFilterConstructor filter) {
+            int capacity, int flags, IFilter filter) {
 
         if ((flags & REMOVEALL) != 0) {
 

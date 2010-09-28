@@ -53,7 +53,7 @@ abstract public class TupleUpdater<E> extends TupleFilter<E> {
      */
     abstract protected void update(IIndex ndx, ITuple<E> tuple);
 
-    protected class Updaterator extends TupleFilter.Filterator<E> {
+    protected class Updaterator extends TupleFilter.TupleFilterator<E> {
 
         public Updaterator(final ITupleIterator<E> src, final Object context,
                 final TupleFilter<E> filter) {

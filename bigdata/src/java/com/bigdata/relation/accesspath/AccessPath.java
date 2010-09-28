@@ -37,19 +37,20 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.ap.filter.BOpFilterBase;
+import com.bigdata.bop.ap.filter.BOpTupleFilter;
+import com.bigdata.bop.ap.filter.SameVariableConstraint;
+import com.bigdata.bop.ap.filter.SameVariableConstraintFilter;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IBloomFilter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IRangeQuery;
-import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.Tuple;
-import com.bigdata.btree.filter.FilterConstructor;
-import com.bigdata.btree.filter.IFilterConstructor;
-import com.bigdata.btree.filter.ITupleFilter;
-import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.TimestampUtility;
@@ -64,6 +65,7 @@ import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
+import cutthecrap.utils.striterators.IFilter;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
@@ -186,23 +188,21 @@ public class AccessPath<R> implements IAccessPath<R> {
      * {@link IAccessPath} to be empty.
      */
     private long rangeCount = -1L;
-    
-    /**
-     * The filter derived from the {@link IElementFilter}.
-     */
-    final protected FilterConstructor<R> filter;
 
-//    /**
-//     * A copy of the filter derived from the {@link IElementFilter}.
-//     */
-//    public FilterConstructor<R> getFilter() {
-//
-//        if (filter == null)
-//            return null;
-//
-//        return filter.clone();
-//        
-//    }
+    /**
+     * The filter derived from optional
+     * {@link IPredicate.Annotations#INDEX_LOCAL_FILTER}. If there are shared
+     * variables in the {@link IPredicate} then a {@link SameVariableConstraint}
+     * is added regardless of whether the {@link IPredicate} specified a filter
+     * or not.
+     */
+    final protected BOpFilterBase indexLocalFilter;
+
+    /**
+     * The filter derived from optional
+     * {@link IPredicate.Annotations#ACCESS_PATH_FILTER}.
+     */
+    final protected BOpFilterBase accessPathFilter;
     
     /**
      * Used to detect failure to call {@link #init()}.
@@ -354,42 +354,51 @@ public class AccessPath<R> implements IAccessPath<R> {
         this.historicalRead = TimestampUtility.isReadOnly(timestamp);
 
         this.isFullyBoundForKey = predicate.isFullyBound(keyOrder);
-        
-        final IElementFilter<R> constraint = predicate.getConstraint();
 
-        /*
-         * Optional constraint enforces the "same variable" constraint. The
-         * constraint will be null unless at least one variable appears in more
-         * than one position in the predicate.
-         */
-        final SameVariableConstraint<R> sameVarConstraint = SameVariableConstraint
-                .newInstance(predicate);
-       
-        if (constraint == null && sameVarConstraint == null) {
-
-            filter = null;
-
-        } else {
+        {
 
             /*
-             * Stack filters.
+             * The filter to be evaluated at the index (optional).
+             * 
+             * Note: This MUST be an implementation which is "aware" of the
+             * reuse of tuples within tuple iterators. That is why it is being
+             * cast to a BOpTupleIterator.
              */
-            filter = new FilterConstructor<R>();
+            final BOpTupleFilter indexLocalFilter = (BOpTupleFilter<?>) predicate
+                    .getProperty(IPredicate.Annotations.INDEX_LOCAL_FILTER);
 
-            if (constraint != null) {
-
-                filter.addFilter(new ElementFilter<R>(constraint));
-
-            }
+            /*
+             * Optional constraint enforces the "same variable" constraint. The
+             * constraint will be null unless at least one variable appears in
+             * more than one position in the predicate.
+             */
+            final SameVariableConstraint<R> sameVarConstraint = SameVariableConstraint
+                    .newInstance(predicate);
 
             if (sameVarConstraint != null) {
 
-                filter.addFilter(new ElementFilter<R>(sameVarConstraint));
+                /*
+                 * Stack filters.
+                 */
+                this.indexLocalFilter = new SameVariableConstraintFilter(
+                        (indexLocalFilter == null ? new BOp[0]
+                                : new BOp[] { indexLocalFilter }),
+                                NV.asMap(new NV[] { new NV(
+                                        SameVariableConstraintFilter.Annotations.FILTER,
+                                        sameVarConstraint) }));
 
+            } else {
+                
+                this.indexLocalFilter = indexLocalFilter;
+                
             }
-
+            
         }
-        
+
+        // optional filter to be evaluated by the AccessPath.
+        this.accessPathFilter = (BOpFilterBase) predicate
+                .getProperty(IPredicate.Annotations.ACCESS_PATH_FILTER);
+
         final IKeyBuilder keyBuilder = ndx.getIndexMetadata()
                 .getTupleSerializer().getKeyBuilder();
 
@@ -399,49 +408,59 @@ public class AccessPath<R> implements IAccessPath<R> {
         
     }
 
-    /**
-     * Align the predicate's {@link IElementFilter} constraint with
-     * {@link ITupleFilter} so that the {@link IElementFilter} can be evaluated
-     * close to the data by an {@link ITupleIterator}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * @param <R>
-     *            The generic type of the elements presented to the filter.
-     */
-    public static class ElementFilter<R> extends TupleFilter<R> {
-        
-        private static final long serialVersionUID = 1L;
-
-        private final IElementFilter<R> constraint;
-        
-        public ElementFilter(final IElementFilter<R> constraint) {
-            
-            if (constraint == null)
-                throw new IllegalArgumentException();
-            
-            this.constraint = constraint;
-            
-        }
-        
-        public boolean isValid(final ITuple<R> tuple) {
-            
-            final R obj = (R) tuple.getObject();
-        
-            return constraint.accept( obj );
-            
-        }
-
-    }
+//    /**
+//     * Align the predicate's {@link IElementFilter} constraint with
+//     * {@link ITupleFilter} so that the {@link IElementFilter} can be evaluated
+//     * close to the data by an {@link ITupleIterator}.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     * @param <R>
+//     *            The generic type of the elements presented to the filter.
+//     */
+//    public static class ElementFilter<R> extends TupleFilter<R> {
+//        
+//        private static final long serialVersionUID = 1L;
+//
+//        private final IElementFilter<R> constraint;
+//        
+//        public ElementFilter(final IElementFilter<R> constraint) {
+//            
+//            if (constraint == null)
+//                throw new IllegalArgumentException();
+//            
+//            this.constraint = constraint;
+//            
+//        }
+//        
+//        public boolean isValid(final ITuple<R> tuple) {
+//            
+//            final R obj = (R) tuple.getObject();
+//        
+//            return constraint.accept( obj );
+//            
+//        }
+//
+//    }
 
     public String toString() {
 
-        return getClass().getName() + "{predicate=" + predicate + ", keyOrder="
-                + keyOrder + ", flags=" + Tuple.flagString(flags)
+        return getClass().getName()
+                + "{predicate="
+                + predicate
+                + ", keyOrder="
+                + keyOrder
+                + ", flags="
+                + Tuple.flagString(flags)
                 + ", fromKey="
                 + (fromKey == null ? "n/a" : BytesUtil.toString(fromKey))
                 + ", toKey="
-                + (toKey == null ? "n/a" : BytesUtil.toString(toKey) + "}");
+                + (toKey == null ? "n/a" : BytesUtil.toString(toKey)
+                        + ", indexLocalFilter="
+                        + (indexLocalFilter == null ? "n/a" : indexLocalFilter)
+                        + ", accessPathFilter="
+                        + (accessPathFilter == null ? "n/a" : accessPathFilter)
+                        + "}");
 
     }
     
@@ -846,12 +865,19 @@ public class AccessPath<R> implements IAccessPath<R> {
         // The raw tuple iterator: the impl depends on the IIndex impl (BTree,
         // IndexSegment, ClientIndexView, or DataServiceIndexView).
         final ITupleIterator<R> tupleItr = rangeIterator(capacity, flags,
-                filter);
+                indexLocalFilter);
         
         // Wrap raw tuple iterator with resolver that materializes the elements
         // from the visited tuples.
         final Iterator<R> src = new Striterator(tupleItr)
                 .addFilter(new TupleObjectResolver());
+        
+        if (accessPathFilter != null) {
+            /*
+             * Chain in the optional access path filter stack.
+             */
+            ((Striterator) src).addFilter(accessPathFilter);
+        }
 
         if (fullyBufferedRead) {
 
@@ -1091,11 +1117,11 @@ public class AccessPath<R> implements IAccessPath<R> {
                 while (src.hasNext()) {
 
                     final R[] chunk = itr.nextChunk();
-                    
+
                     nchunks++;
-                    nelements+=chunk.length;
-                    
-                    if(log.isDebugEnabled())
+                    nelements += chunk.length;
+
+                    if (log.isDebugEnabled())
                         log.debug("#chunks=" + nchunks + ", chunkSize="
                             + chunk.length + ", nelements=" + nelements);
 
@@ -1133,16 +1159,17 @@ public class AccessPath<R> implements IAccessPath<R> {
         assertInitialized();
 
         long n = 0L;
-        
-        if(exact) {
+
+        final boolean hasFilter = (indexLocalFilter != null || accessPathFilter != null);
+        if (exact) {
 
             /*
              * @todo we can cache exact range counts also, but we can not return
              * a cached estimated range count when an exact range count is
              * requested.
              */
-            
-            if (filter != null) {
+
+            if (hasFilter) {
 
                 /*
                  * If there is a filter, then we need to visit the elements and
@@ -1189,8 +1216,8 @@ public class AccessPath<R> implements IAccessPath<R> {
 
         if (log.isDebugEnabled()) {
 
-            log.debug("exact=" + exact + ", filter=" + (filter != null)
-                    + ", n=" + n + " : " + toString());
+            log.debug("exact=" + exact + ", filter=" + hasFilter + ", n=" + n
+                    + " : " + toString());
 
         }
 
@@ -1221,13 +1248,13 @@ public class AccessPath<R> implements IAccessPath<R> {
     
     final public ITupleIterator<R> rangeIterator() {
 
-        return rangeIterator(0/* capacity */, flags, filter);
+        return rangeIterator(0/* capacity */, flags, indexLocalFilter);
 
     }
 
     @SuppressWarnings( { "unchecked" })
     protected ITupleIterator<R> rangeIterator(final int capacity,
-            final int flags, final IFilterConstructor<R> filter) {
+            final int flags, final IFilter filter) {
 
         assertInitialized();
 
@@ -1267,7 +1294,7 @@ public class AccessPath<R> implements IAccessPath<R> {
          * they would also belong here.
          */
         final ITupleIterator<?> itr = rangeIterator(0/* capacity */,
-                IRangeQuery.REMOVEALL, filter);
+                IRangeQuery.REMOVEALL, indexLocalFilter);
 
         long n = 0;
 

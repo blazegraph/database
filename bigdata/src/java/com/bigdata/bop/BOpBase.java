@@ -89,13 +89,19 @@ public class BOpBase implements BOp {
      * arguments or annotations would have to explicitly overrides
      * {@link #clone()} in order to set those fields based on the arguments on
      * the cloned {@link BOpBase} class.
+     * <p>
+     * Note: This must be at least "effectively" final per the effectively
+     * immutable contract for {@link BOp}s.
      */
-    protected final BOp[] args;
+    private final BOp[] args;
 
     /**
      * The operator annotations.
+     * <p>
+     * Note: This must be at least "effectively" final per the effectively
+     * immutable contract for {@link BOp}s.
      */
-    protected final Map<String,Object> annotations;
+    private final Map<String,Object> annotations;
     
     /**
      * Check the operator argument.
@@ -134,6 +140,13 @@ public class BOpBase implements BOp {
         }
     }
 
+//    /**
+//     * Deserialization constructor (required).
+//     */
+//    public BOpBase() {
+//        
+//    }
+    
     /**
      * Deep copy constructor (required).
      * <p>
@@ -215,6 +228,29 @@ public class BOpBase implements BOp {
     public BOp get(final int index) {
         
         return args[index];
+        
+    }
+    
+    /**
+     * Set the value of an operand.
+     * <p>
+     * Note: This protected to facilitate copy-on-write patterns. It is not
+     * public to prevent arbitrary changes to operators outside of methods which
+     * clone the operator and return the modified version. This is part of the
+     * effectively immutable contract for {@link BOp}s.
+     * 
+     * @param index
+     *            The index.
+     * @param op
+     *            The operand.
+     *            
+     * @return The old value.
+     * 
+     * @todo thread safety and visibility....
+     */
+    final protected void set(final int index, final BOp op) {
+        
+        this.args[index] = op;
         
     }
     
@@ -341,6 +377,30 @@ public class BOpBase implements BOp {
         
     }
 
+    /**
+     * Set an annotation.
+     * <p>
+     * Note: This protected to facilitate copy-on-write patterns. It is not
+     * public to prevent arbitrary changes to operators outside of methods which
+     * clone the operator and return the modified version. This is part of the
+     * effectively immutable contract for {@link BOp}s.
+     * 
+     * @param name
+     *            The name.
+     * @param value
+     *            The value.
+     * 
+     * @return The old value.
+     * 
+     * @todo thread safety and visibility for concurrent access to and
+     *       modifications of the annotations map.
+     */
+    protected void setProperty(final String name, final Object value) {
+        
+        annotations.put(name,value);
+        
+    }
+    
     public int getId() {
         
         return (Integer) getRequiredProperty(Annotations.BOP_ID);

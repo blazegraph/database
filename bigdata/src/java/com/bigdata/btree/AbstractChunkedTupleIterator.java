@@ -34,7 +34,6 @@ import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
@@ -43,6 +42,8 @@ import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rawstore.IBlock;
+
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * A chunked iterator that proceeds a {@link ResultSet} at a time. This
@@ -99,7 +100,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
     /**
      * Optional filter.
      */
-    protected final IFilterConstructor filter;
+    protected final IFilter filter;
 
     /**
      * The #of range query operations executed.
@@ -253,7 +254,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
     
     public AbstractChunkedTupleIterator(final byte[] fromKey,
             final byte[] toKey, int capacity, final int flags,
-            final IFilterConstructor filter) {
+            final IFilter filter) {
 
         if (capacity < 0) {
 
@@ -286,7 +287,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
      * @return
      */
     abstract protected ResultSet getResultSet(long timestamp,byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IFilterConstructor filter);
+            int capacity, int flags, IFilter filter);
 
     /**
      * Issues the original range query.

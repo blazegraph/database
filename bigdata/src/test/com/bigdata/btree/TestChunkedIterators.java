@@ -31,8 +31,6 @@ package com.bigdata.btree;
 import java.util.Properties;
 import java.util.UUID;
 
-import com.bigdata.btree.filter.FilterConstructor;
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -40,6 +38,8 @@ import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
+
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * Test suite for {@link AbstractChunkedTupleIterator} and its concrete
@@ -439,8 +439,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
         /*
          * Filter selects only the even keys.
          */
-        final IFilterConstructor filter = new FilterConstructor()
-                .addFilter(new TupleFilter() {
+        final IFilter filter = new TupleFilter() {
 
                     private static final long serialVersionUID = 1L;
 
@@ -458,7 +457,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
 
                     }
 
-                });
+                };
               
         /*
          * Range delete the keys matching the filter.
@@ -866,7 +865,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
      */
     protected int doDeserializationTest(final BTree ndx, final byte[] fromKey,
             final byte[] toKey, final int capacity, final int flags,
-            final IFilterConstructor filterCtor) {
+            final IFilter filterCtor) {
 
         // the ground truth iterator.
         final ITupleIterator<String> itre = ndx.rangeIterator(fromKey, toKey, capacity,
@@ -881,7 +880,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
                 fromKey, toKey, capacity, flags, filterCtor) {
             
             protected ResultSet getResultSet(long timestamp, byte[] fromKey,
-                    byte[] toKey, int capacity, int flags, IFilterConstructor filter) {
+                    byte[] toKey, int capacity, int flags, IFilter filter) {
 
                 final ResultSet rset = super.getResultSet(timestamp, fromKey, toKey,
                         capacity, flags, filter);

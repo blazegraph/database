@@ -49,7 +49,6 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
@@ -87,6 +86,8 @@ import com.bigdata.service.IBigdataClient.Options;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
 import com.bigdata.service.ndx.pipeline.IndexAsyncWriteStats;
 import com.bigdata.service.ndx.pipeline.IndexWriteTask;
+
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * Abstract base class for the {@link IScaleOutClientIndex} implementation(s).
@@ -629,7 +630,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
      */
     public ITupleIterator rangeIterator(final byte[] fromKey,
             final byte[] toKey, int capacity, final int flags,
-            final IFilterConstructor filter) {
+            final IFilter filter) {
 
         if (capacity == 0) {
 

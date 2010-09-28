@@ -30,11 +30,17 @@ package com.bigdata.relation.accesspath;
 
 import java.io.Serializable;
 
+import cutthecrap.utils.striterators.IFilter;
+
 /**
  * Filter for accepting or rejecting visited elements.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo Can we replace this with an interface declared by CTC with isValid() or
+ *       just the CTC {@link IFilter} so we allow non-filtering striterators to
+ *       be applied as well?
  */
 public interface IElementFilter<E> extends // BOp,
         Serializable {

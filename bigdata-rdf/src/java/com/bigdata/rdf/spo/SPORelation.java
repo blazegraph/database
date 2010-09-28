@@ -58,7 +58,6 @@ import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.isolation.IConflictResolver;
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -1344,13 +1343,12 @@ public class SPORelation extends AbstractRelation<ISPO> {
     public IChunkedIterator<IV> distinctTermScan(
             final IKeyOrder<ISPO> keyOrder, final ITermIVFilter termIdFilter) {
 
-        final FilterConstructor<SPO> filter = new FilterConstructor<SPO>();
+        final DistinctTermAdvancer filter = new DistinctTermAdvancer(keyArity);
         
         /*
          * Layer in the logic to advance to the tuple that will have the
          * next distinct term identifier in the first position of the key.
          */
-        filter.addFilter(new DistinctTermAdvancer(keyArity));
 
         if (termIdFilter != null) {
 
@@ -1445,7 +1443,6 @@ public class SPORelation extends AbstractRelation<ISPO> {
             final IKeyOrder<ISPO> keyOrder, final IV[] knownTerms,
             final ITermIVFilter termIdFilter) {
 
-        final FilterConstructor<SPO> filter = new FilterConstructor<SPO>();
         final int nterms = knownTerms.length;
 
         final IKeyBuilder keyBuilder = KeyBuilder.newInstance();
@@ -1464,7 +1461,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
          * Layer in the logic to advance to the tuple that will have the next
          * distinct term identifier in the first position of the key.
          */
-        filter.addFilter(new DistinctMultiTermAdvancer(getKeyArity(), nterms));
+        final DistinctMultiTermAdvancer filter = new DistinctMultiTermAdvancer(
+                getKeyArity(), nterms);
 
         if (termIdFilter != null) {
 

@@ -35,11 +35,12 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
+
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * Implementation caches all locators and then updates them on demand as stale
@@ -246,7 +247,7 @@ public class CachingMetadataIndex extends CacheOnceMetadataIndex {
      * behavior to be gated by an {@link UnisolatedReadWriteIndex}.
      */
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IFilterConstructor filter) {
+            int capacity, int flags, IFilter filter) {
 
         final Lock lock = readWriteLock.readLock();
         

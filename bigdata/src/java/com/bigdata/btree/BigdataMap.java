@@ -37,7 +37,6 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.SortedMap;
 
-import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.ConcurrencyManager;
@@ -381,7 +380,7 @@ public class BigdataMap<K, V> extends AbstractMap<K, V> implements SortedMap<K, 
 
         final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey,
                 0/* capacity */, IRangeQuery.VALS/* flags */,
-                new FilterConstructor().addFilter(new TupleFilter() {
+                new TupleFilter() {
 
                     private static final long serialVersionUID = 1L;
 
@@ -391,7 +390,7 @@ public class BigdataMap<K, V> extends AbstractMap<K, V> implements SortedMap<K, 
                         return BytesUtil.bytesEqual(tuple.getValue(), val);
 
                     }
-                }));
+                });
 
         while(itr.hasNext()) {
 

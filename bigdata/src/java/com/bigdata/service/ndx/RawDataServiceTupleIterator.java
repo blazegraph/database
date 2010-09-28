@@ -34,7 +34,6 @@ import java.util.Iterator;
 import com.bigdata.btree.AbstractChunkedTupleIterator;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ResultSet;
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
@@ -42,6 +41,8 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.IDataService;
+
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * Class supports range query across against an unpartitioned index on an
@@ -143,7 +144,7 @@ public class RawDataServiceTupleIterator<E> extends AbstractChunkedTupleIterator
             final String name, final long timestamp,
             final boolean readConsistent, final byte[] fromKey,
             final byte[] toKey, final int capacity, final int flags,
-            final IFilterConstructor filter) {
+            final IFilter filter) {
 
         super(fromKey, toKey, capacity, flags, filter);
         
@@ -193,7 +194,7 @@ public class RawDataServiceTupleIterator<E> extends AbstractChunkedTupleIterator
     @Override
     protected ResultSet getResultSet(final long timestamp,
             final byte[] fromKey, final byte[] toKey, final int capacity,
-            final int flags, final IFilterConstructor filter) {
+            final int flags, final IFilter filter) {
 
         if (INFO)
             log.info("name=" + name + ", fromKey="

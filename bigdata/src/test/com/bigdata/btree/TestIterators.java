@@ -29,7 +29,6 @@ package com.bigdata.btree;
 
 import org.apache.log4j.Level;
 
-import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.TestKeyBuilder;
 
@@ -481,41 +480,38 @@ public class TestIterators extends AbstractBTreeTestCase {
         // visit everything except v3.
         assertSameIterator(new byte[][] { v5, v7 },//
                 btree.rangeIterator(null/* fromKey */, null/* toKey */,
-                        0/* capacity */, flags, new FilterConstructor()
-                                .addFilter(new TupleFilter() {
+                        0/* capacity */, flags, new TupleFilter() {
                                     private static final long serialVersionUID = 1L;
 
                                     public boolean isValid(ITuple tuple) {
                                         return !BytesUtil.bytesEqual(v3, tuple
                                                 .getValue());
                                     }
-                                })));
+                                }));
         
         // visit everything except v5.
         assertSameIterator(new byte[][] { v3, v7 },//
                 btree.rangeIterator(null/* fromKey */, null/* toKey */,
-                        0/* capacity */, flags, new FilterConstructor()
-                                .addFilter(new TupleFilter() {
+                        0/* capacity */, flags, new TupleFilter() {
                                     private static final long serialVersionUID = 1L;
 
                                     public boolean isValid(ITuple tuple) {
                                         return !BytesUtil.bytesEqual(v5, tuple
                                                 .getValue());
                                     }
-                                })));
+                                }));
         
         // visit everything except v7.
         assertSameIterator(new byte[][] { v3, v5 },//
                 btree.rangeIterator(null/* fromKey */, null/* toKey */,
-                        0/* capacity */, flags, new FilterConstructor()
-                                .addFilter(new TupleFilter() {
+                        0/* capacity */, flags, new TupleFilter() {
                                     private static final long serialVersionUID = 1L;
 
                                     public boolean isValid(ITuple tuple) {
                                         return !BytesUtil.bytesEqual(v7, tuple
                                                 .getValue());
                                     }
-                                })));
+                                }));
 
     }
     

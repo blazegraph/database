@@ -492,24 +492,7 @@ Features:
  * <li></li>
  * </ul>
 
-
-Martyn,
-
-Rationalizing CTC striterators, bigdata striterators, and access paths:
-
-Dropped the ctc_utils jar and added the source files to the classpath.
-
-I've added an IPropertySet interface:
-
-Object getProperty(String name).
-
-There are currently several varieties of IFilter.  Each one knows how to create its corresponding implementation class.  This exactly parallels the bops, where a concrete bop such as MemorySortOp, knows how to create the corresponding runtime class, MemorySortOp.SortTask.  I've added a filterOnce() method to provide the semantics of wrapping an iterator with just that IFilter.  The existing filter() method now wraps the chain, starting with _this_ IFilter and then wrapping anything which was added to the chain.  The chain is empty if nothing was added.  I've modified the various IFilter implementations to conform with this.
-
-I've modified all of the implementation classes (Appenderator, etc.) to accept the new context argument regardless of whether they use it.  I have also modified them to always have the reference to the IFilter object so the IPropertySet will be accessible.
-
-Modified Uniqueness filter to use a linked hash map.
-
-Modified Sorter uses Arrays.sort() rather than TreeSort.
+------------------------------------------------------------
 
 Some problems:
 
@@ -527,21 +510,43 @@ Here is what I have not done yet:
 
 Write unit tests to sanity check these changes.
 
-Write BOp versions of Append, Expand, etc.  These will extend BOpBase.
+done. Replace (I)FilterConstructor with IFilter.  FilterConstructor
+implemented clone.  I am not sure that I can recall why.  Presumably
+because a cloned would have a distinct filter chain.  We can not
+easily override clone() on FilterBase because of all the derived
+versions.  We could have a deep copy constructor pattern, which is
+what I did for the BOpBase class and then use that for clone.
 
-The following places directly invoke filterOnce(src,ctx).  The first two should be modified to pass in the correct context object.  That might require raising a context object into an IRangeIterator parameter.
+Write unit tests at the IPredicate/AccessPath level to use stackable
+filters (for the LOCAL and REMOTE access paths).  Write unit tests for
+correct range counts with and without local/remote filters.  Write
+unit tests for caching of those range counts.
 
-AbstractBTree#2933
-FusedView#1281
-TestRemoverator#86
+- The stacking of the BOpFilters may be counter intuitive or just
+  wrong.
 
-Replace (I)FilterConstructor with IFilter.  FilterConstructor implemented clone.  I am not sure that I can recall why.  Presumably because a cloned would have a distinct filter chain.  We can not easily override clone() on FilterBase because of all the derived versions.  We could have a deep copy constructor pattern, which is what I did for the BOpBase class and then use that for clone.
+- TestPredicateAccessPath#test_localFilter() does not report the
+  correct tuples.  This is weirdness with reuse of the same backing
+  Tuple object.  See TupleFilter and BOpFilter.  The filter that is
+  being applied in the unit test does not protect against the tuple
+  reuse. It would be best to automatically wrap such asserts.  E.g.,
+  BOpTupleFilter.  It would also be good to catch runtime type
+  problems with this.  E.g., if the source iterator is ITupleFilter
+  then it is an error to wrap with BOpFilter.  You must use
+  BOpTupleFilter instead.
 
-Replace the IPredicate "CONSTRAINT" with "REMOTE_FILTERS" (an IFilter which is evaluated at the BTree) and "LOCAL_FILTERS" (an IFilter which is evaluated against the range iterator once it is materialized on the local node).  If the index is local, then the same concepts apply but we do not have to serialize the REMOTE_FILTERS.  For the moment, the AccessPath automatically resolves ITuples to relation elements and adds the SameVariableConstraint if necessary.  We might shift the burden of responsibility for this to the query planner in the future.
+- Write BOp versions for TupleResolver, ...
 
-Write unit tests at the IPredicate/AccessPath level to use stackable filters.
+- All of the Filterators need to use deferred prefetch.  Prefetch
+  during the constructor causes problems when we are stacking filters
+  using FilterBase.
 
-Fixed the build.xml script to accomodate the class path changes.
+IPredicate#getConstraint() must go.  This will require touching the
+backchainer classes.  The (SPO|Magic)Predicate contructors should also
+be touched up since they will otherwise DROP the local and remote
+filters.
 
-Thanks,
-Bryan
+Reconcile IElementFilter and implementations.
+
+Reconcile the com.bigdata.striterators package.  Can we get rid of it?
+Incrementally?

@@ -52,9 +52,9 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.btree.ReadOnlyIndex;
 import com.bigdata.btree.Tuple;
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.Reverserator;
 import com.bigdata.btree.filter.TupleRemover;
+import com.bigdata.btree.filter.WrappedTupleIterator;
 import com.bigdata.btree.isolation.IsolatedFusedView;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
@@ -67,6 +67,8 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.Split;
+
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * <p>
@@ -1087,7 +1089,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
             byte[] toKey, //
             final int capacity, //
             final int flags,//
-            final IFilterConstructor filter//
+            final IFilter filter//
             ) {
 
         if (fromKey == null || toKey == null) {
@@ -1258,7 +1260,8 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
              * REMOVEALL (those are the assumptions for the flags).
              */
             
-            src = filter.newInstance(src);
+            src = new WrappedTupleIterator(filter
+                    .filter(src, null/* context */));
             
         }
         

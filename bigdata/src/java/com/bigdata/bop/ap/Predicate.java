@@ -139,7 +139,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
     
     public String getOnlyRelationName() {
         
-        final String[] relationName = (String[]) annotations.get(Annotations.RELATION_NAME);
+        final String[] relationName = (String[]) getRequiredProperty(Annotations.RELATION_NAME);
         
         if (relationName.length != 1)
             throw new IllegalStateException();
@@ -150,7 +150,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
     
     public String getRelationName(final int index) {
 
-        final String[] relationName = (String[]) annotations.get(Annotations.RELATION_NAME);
+        final String[] relationName = (String[]) getRequiredProperty(Annotations.RELATION_NAME);
 
         return relationName[index];
         
@@ -160,7 +160,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
     public int getRelationCount() {
         
-        final String[] relationName = (String[]) annotations.get(Annotations.RELATION_NAME);
+        final String[] relationName = (String[]) getRequiredProperty(Annotations.RELATION_NAME);
       
         return relationName.length;
         
@@ -171,7 +171,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 //      throw new UnsupportedOperationException();
       final Predicate<E> tmp = this.clone();
 
-      tmp.annotations.put(Annotations.RELATION_NAME, relationName);
+      tmp.setProperty(Annotations.RELATION_NAME, relationName);
 
       return tmp;
       
@@ -200,7 +200,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
     final public boolean isOptional() {
 
-        return (Boolean) annotations.get(Annotations.OPTIONAL);
+        return (Boolean) getProperty(Annotations.OPTIONAL,Boolean.FALSE);
         
     }
 
@@ -215,14 +215,14 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
     @SuppressWarnings("unchecked")
     final public IElementFilter<E> getConstraint() {
 
-        return (IElementFilter<E>) annotations.get(Annotations.CONSTRAINT);
+        return (IElementFilter<E>) getProperty(Annotations.CONSTRAINT);
 
     }
 
     @SuppressWarnings("unchecked")
     final public ISolutionExpander<E> getSolutionExpander() {
         
-        return (ISolutionExpander<E>) annotations.get(Annotations.EXPANDER);
+        return (ISolutionExpander<E>) getProperty(Annotations.EXPANDER);
         
     }
 
@@ -304,16 +304,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
                 continue;
             }
 
-            // bound from the binding set.
-//            try {
-//                final Field f = tmp.getClass().getField("args");
-//                f.setAccessible(true);
-//                final BOp[] targs = (BOp[]) f.get(tmp);
-//                targs[i] = val.clone();
-//            } catch (Exception ex) {
-//                throw new RuntimeException(ex);
-//            }
-            tmp.args[i] = val.clone();
+            tmp.set(i, val.clone());
 
         }
         
@@ -325,30 +316,12 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
         return get(index).get(bindingSet);
 
-//        if (bindingSet == null)
-//            throw new IllegalArgumentException();
-//        
-//        final IVariableOrConstant<?> t = get(index);
-//
-//        final IConstant<?> c;
-//        if (t.isVar()) {
-//
-//            c = bindingSet.get((IVariable<?>) t);
-//
-//        } else {
-//
-//            c = (IConstant<?>) t;
-//
-//        }
-//
-//        return c == null ? null : c.get();
-
     }
 
     @SuppressWarnings("unchecked")
     public IKeyOrder<E> getKeyOrder() {
 
-        return (IKeyOrder<E>) annotations.get(Annotations.KEY_ORDER);
+        return (IKeyOrder<E>) getProperty(Annotations.KEY_ORDER);
 
     }
 
@@ -356,7 +329,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
         final Predicate<E> tmp = this.clone();
 
-        tmp.annotations.put(Annotations.KEY_ORDER, keyOrder);
+        tmp.setProperty(Annotations.KEY_ORDER, keyOrder);
 
         return tmp;
 
@@ -373,7 +346,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
         final Predicate<E> tmp = this.clone();
 
-        tmp.annotations.put(Annotations.PARTITION_ID, partitionId);
+        tmp.setProperty(Annotations.PARTITION_ID, partitionId);
 
         return tmp;
 
@@ -383,7 +356,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
         final Predicate<E> tmp = this.clone();
 
-        tmp.annotations.put(Annotations.BOP_ID, bopId);
+        tmp.setProperty(Annotations.BOP_ID, bopId);
 
         return tmp;
 
@@ -420,6 +393,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
         sb.append(")");
 
+        final Map<String,Object> annotations = annotations();
         if (!annotations.isEmpty()) {
             sb.append("[");
             boolean first = true;

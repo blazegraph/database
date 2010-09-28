@@ -79,7 +79,7 @@ abstract public class TupleFilter<E> extends FilterBase implements ITupleFilter<
     @Override
     public ITupleIterator<E> filterOnce(final Iterator src,Object context) {
 
-        return new TupleFilter.Filterator((ITupleIterator) src, context, this);
+        return new TupleFilter.TupleFilterator((ITupleIterator) src, context, this);
 
     }
 
@@ -93,7 +93,7 @@ abstract public class TupleFilter<E> extends FilterBase implements ITupleFilter<
      * @version $Id$
      * @param <E>
      */
-    static protected class Filterator<E> implements ITupleIterator<E> {
+    static public class TupleFilterator<E> implements ITupleIterator<E> {
 
         /**
          * The source iterator.
@@ -124,7 +124,7 @@ abstract public class TupleFilter<E> extends FilterBase implements ITupleFilter<
          */
         final private AbstractTuple<E> returnValue;
         
-        public Filterator(final ITupleIterator<E> src, final Object context,
+        public TupleFilterator(final ITupleIterator<E> src, final Object context,
                 final TupleFilter<E> filter) {
 
             this.src = src;

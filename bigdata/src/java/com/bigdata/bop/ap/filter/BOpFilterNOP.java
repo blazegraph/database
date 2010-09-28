@@ -31,21 +31,15 @@ import java.util.Iterator;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.btree.ITupleIterator;
-
-import cutthecrap.utils.striterators.Filter;
-import cutthecrap.utils.striterators.Filterator;
 
 /**
- * Used to filter for objects which satisfy some criteria.
- * <p>
- * <strong>WARNING : DO NOT USE THIS CLASS ON {@link ITupleIterator}s - use
- * {@link BOpTupleFilter} instead.</strong>
+ * A filter which does nothing. This may be used to stack existing
+ * {@link BOpFilterBase} operators.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class BOpFilter extends BOpFilterBase {
+public class BOpFilterNOP extends BOpFilterBase {
 
     /**
      * 
@@ -55,7 +49,7 @@ abstract public class BOpFilter extends BOpFilterBase {
 //    /**
 //     * Deserialization.
 //     */
-//    public BOpFilter() {
+//    public BOpFilterNOP() {
 //        super();
 //    }
     
@@ -64,7 +58,7 @@ abstract public class BOpFilter extends BOpFilterBase {
      * 
      * @param op
      */
-    public BOpFilter(BOpFilter op) {
+    public BOpFilterNOP(BOpFilterNOP op) {
         super(op);
     }
 
@@ -74,34 +68,13 @@ abstract public class BOpFilter extends BOpFilterBase {
      * @param args
      * @param annotations
      */
-    public BOpFilter(BOp[] args, Map<String, Object> annotations) {
+    public BOpFilterNOP(BOp[] args, Map<String, Object> annotations) {
         super(args, annotations);
     }
 
     @Override
-    final protected Iterator filterOnce(Iterator src, final Object context) {
-        
-        return new Filterator(src, context, new FilterImpl());
-        
-    }
-
-    /**
-     * Return <code>true</code> iff the object should be accepted.
-     * 
-     * @param obj
-     *            The object.
-     */
-    protected abstract boolean isValid(Object obj);
-
-    private class FilterImpl extends Filter {
-
-        private static final long serialVersionUID = 1L;
-
-        @Override
-        protected boolean isValid(Object obj) {
-            return BOpFilter.this.isValid(obj);
-        }
-
+    final protected Iterator filterOnce(Iterator src, Object context) {
+        return src;
     }
 
 }

@@ -35,7 +35,6 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.ITimestampService;
@@ -1025,9 +1024,7 @@ public class SparseRowStore implements IRowStoreConstants {
                 (byte[]) toKey, //
                 capacity, // max #of rows to fetch at a time.
                 flags, // 
-                new FilterConstructor<ITPV>()
-                        .addFilter(new AtomicRowFilter(
-                        schema, fromTime, toTime, nameFilter))))
+                new AtomicRowFilter(schema, fromTime, toTime, nameFilter)))
                 .addFilter(new Resolver() {
                     private static final long serialVersionUID = 1L;
                     @Override

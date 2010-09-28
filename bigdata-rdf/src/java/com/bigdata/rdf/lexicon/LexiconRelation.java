@@ -63,7 +63,6 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.PrefixFilter;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -958,9 +957,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                                 0/* capacity */,
                                 IRangeQuery.DEFAULT | IRangeQuery.CURSOR,
                                 // prefix filter.
-                                new FilterConstructor<BigdataValue>()
-                                        .addFilter(new PrefixFilter<BigdataValue>(
-                                                keys))))
+                                new PrefixFilter<BigdataValue>(keys)))
                 .addFilter(new Resolver() {
 
                     private static final long serialVersionUID = 1L;

@@ -31,14 +31,13 @@ import java.util.Iterator;
 
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.IndexSegment.IndexSegmentTupleCursor;
-import com.bigdata.btree.filter.FilterConstructor;
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.ITupleFilter;
 import com.bigdata.btree.filter.TupleRemover;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ndx.IClientIndex;
 
+import cutthecrap.utils.striterators.IFilter;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
@@ -175,18 +174,18 @@ public interface IRangeQuery {
      * is NOT specified AND there are NO {@link ITupleFilter}s).
      */
     public static final int READONLY = 1 << 3;
-    
+
     /**
      * Flag specifies that entries visited by the iterator in the key range will
      * be <em>removed</em> from the index. This flag may be combined with
      * {@link #KEYS} or {@link #VALS} in order to return the keys and/or values
-     * for the deleted entries. When a {@link FilterConstructor} is specified,
-     * the filter stack will be applied first and then {@link #REMOVEALL} will
-     * cause a {@link TupleRemover} to be layered on top. You can achieve other
-     * stacked iterator semantics using {@link FilterConstructor}, including
-     * causing {@link ITuple}s to be removed at a different layer in the stack.
-     * Note however, that removal for a local {@link BTree} will require that
-     * the {@link TupleRemover} is stacked directly over an {@link ITupleCursor}.
+     * for the deleted entries. When a {@link IFilter} is specified, the filter
+     * stack will be applied first and then {@link #REMOVEALL} will cause a
+     * {@link TupleRemover} to be layered on top. You can achieve other stacked
+     * iterator semantics using {@link IFilter}, including causing
+     * {@link ITuple}s to be removed at a different layer in the stack. Note
+     * however, that removal for a local {@link BTree} will require that the
+     * {@link TupleRemover} is stacked directly over an {@link ITupleCursor}.
      * <p>
      * Note: This semantics of this flag require that the entries are atomically
      * removed within the isolation level of the operation. In particular, if
@@ -368,7 +367,7 @@ public interface IRangeQuery {
      *      performing filtering or other operations.
      */
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IFilterConstructor filterCtor);
+            int capacity, int flags, IFilter filterCtor);
 
 //    /**
 //     * An iterator that is mapped over a set of key ranges.

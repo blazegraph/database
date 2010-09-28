@@ -108,7 +108,7 @@ abstract public class AbstractSampleIndex<E> extends AbstractAccessPathOp<E> {
 
     public int limit() {
      
-        return (Integer) annotations.get(Annotations.LIMIT);
+        return (Integer) getRequiredProperty(Annotations.LIMIT);
         
     }
 
