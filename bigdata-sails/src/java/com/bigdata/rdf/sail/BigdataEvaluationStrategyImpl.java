@@ -2,6 +2,7 @@ package com.bigdata.rdf.sail;
 
 import info.aduna.iteration.CloseableIteration;
 import info.aduna.iteration.EmptyIteration;
+
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -15,6 +16,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
@@ -48,8 +50,8 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
+
 import com.bigdata.BigdataStatics;
-import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BindingSetPipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
@@ -65,9 +67,7 @@ import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.constraint.OR;
-import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.LocalChunkMessage;
-import com.bigdata.bop.engine.MockRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.Rule2BOpUtility;
 import com.bigdata.bop.engine.RunningQuery;
@@ -97,7 +97,6 @@ import com.bigdata.rdf.store.BigdataBindingSetResolverator;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
