@@ -522,9 +522,7 @@ public abstract class ResourceService {
     synchronized public void shutdownNow() {
 
         if (!isOpen()) {
-
-            log.warn("Not running");
-
+            return;
         }
 
         if (log.isInfoEnabled())
