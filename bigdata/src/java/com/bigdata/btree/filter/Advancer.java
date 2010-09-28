@@ -12,6 +12,8 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.KeyOutOfRangeException;
 import com.bigdata.io.ByteArrayBuffer;
 
+import cutthecrap.utils.striterators.FilterBase;
+
 /**
  * Used to write logic that advances an {@link ITupleCursor} to another key
  * after it visits some element. For example, the "distinct term scan" for
@@ -26,11 +28,14 @@ import com.bigdata.io.ByteArrayBuffer;
  *       the key for the last visited tuple and then issue remove(key)
  *       against the underlying index.
  */
-abstract public class Advancer<E> implements ITupleFilter<E> {
+abstract public class Advancer<E> extends FilterBase implements ITupleFilter<E> {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
 
     protected transient static final Logger log = Logger.getLogger(Advancer.class);
-
-    protected transient static final boolean INFO = log.isInfoEnabled();
 
     /**
      * Set by {@link #filter(ITupleCursor)}.
@@ -48,11 +53,13 @@ abstract public class Advancer<E> implements ITupleFilter<E> {
      * @return
      */
     @SuppressWarnings("unchecked")
-    final public ITupleIterator<E> filter(final Iterator src) {
+    @Override
+    final public ITupleIterator<E> filterOnce(final Iterator src,
+            final Object context) {
 
         this.src = (ITupleCursor<E>) src;
 
-        return new Advancer.Advancerator<E>(this.src, this);
+        return new Advancer.Advancerator<E>(this.src, context, this);
 
     }
 
@@ -75,6 +82,7 @@ abstract public class Advancer<E> implements ITupleFilter<E> {
     private static class Advancerator<E> implements ITupleIterator<E> {
 
         final private ITupleCursor<E> src;
+        final protected Object context;
 
         final private Advancer<E> filter;
 
@@ -95,10 +103,13 @@ abstract public class Advancer<E> implements ITupleFilter<E> {
          */
         final private ByteArrayBuffer kbuf = new ByteArrayBuffer();
 
-        public Advancerator(final ITupleCursor<E> src, final Advancer<E> filter) {
+        public Advancerator(final ITupleCursor<E> src, Object context,
+                final Advancer<E> filter) {
 
             this.src = src;
 
+            this.context = context;
+            
             this.filter = filter;
 
         }
@@ -115,7 +126,7 @@ abstract public class Advancer<E> implements ITupleFilter<E> {
 
             final ITuple<E> tuple = src.next();
 
-            if (INFO) {
+            if (log.isInfoEnabled()) {
 
                 log.info("next: " + tuple);
 
@@ -156,7 +167,7 @@ abstract public class Advancer<E> implements ITupleFilter<E> {
 
             final byte[] key = this.kbuf.toByteArray();
 
-            if (INFO) {
+            if (log.isInfoEnabled()) {
 
                 log.info("key=" + BytesUtil.toString(key));
 

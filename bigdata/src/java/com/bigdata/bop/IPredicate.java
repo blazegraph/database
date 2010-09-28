@@ -30,29 +30,25 @@ package com.bigdata.bop;
 
 import java.io.Serializable;
 
+import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.mdi.PartitionLocator;
-import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.ISolutionExpander;
-import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IEvaluationPlan;
-import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.pipeline.JoinMasterTask;
-import com.bigdata.service.AbstractScaleOutFederation;
-import com.bigdata.service.DataService;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
  * An immutable constraint on the elements visited using an {@link IAccessPath}.
  * The slots in the predicate corresponding to variables are named and those
- * names establish binding patterns access {@link IPredicate}s in the context
- * of a {@link IRule}. Access is provided to slots by ordinal index regardless
- * of whether or not they are named variables.
+ * names establish binding patterns access {@link IPredicate}s. Access is
+ * provided to slots by ordinal index regardless of whether or not they are
+ * named variables.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -189,17 +185,11 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
     /**
      * Resource identifier (aka namespace) identifies the {@link IRelation}
      * associated with this {@link IPredicate}.
-     * <p>
-     * This is more or less ignored when the {@link IRule} is executed as a
-     * query.
-     * <p>
-     * When the {@link IRule} is executed as an {@link ActionEnum#Insert} or
-     * {@link ActionEnum#Delete} then this identifies the target
-     * {@link IMutableRelation} on which the computed {@link ISolution}s will be
-     * written.
      * 
      * @throws IllegalStateException
      *             if there is more than on element in the view.
+     * 
+     * @see Annotations#RELATION_NAME
      * 
      * @todo Rename as getRelationName()
      */
@@ -227,28 +217,11 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
     /**
      * The index partition identifier and <code>-1</code> if no partition
      * identifier was specified.
-     * <p>
-     * Note: The ability to specify an index partition identifier for a
-     * predicate is provided in support of scale-out JOIN strategies. The
-     * {@link AccessPath} and the {@link JoinMasterTask} are both aware
-     * of this property. The {@link JoinMasterTask} sets the partition
-     * identifier in order to request an access path backed by the name of the
-     * local index object on a {@link DataService} rather than the name of the
-     * scale-out index.
-     * <p>
-     * The index partition can not be specified until a choice has been made
-     * concerning which {@link IAccessPath} to use for a predicate without an
-     * index partition constraint. The {@link IAccessPath} choice is therefore
-     * made by the {@link IEvaluationPlan} using the scale-out index view and an
-     * {@link AbstractScaleOutFederation#locatorScan(String, long, byte[], byte[], boolean)}
-     * is used to identify the index partitions on which the {@link IAccessPath}
-     * will read. The index partition is then set on a constrained
-     * {@link IPredicate} for each target index partition and the JOINs are then
-     * distributed to the {@link DataService}s on which those index partitions
-     * reside.
      * 
      * @return The index partition identifier -or- <code>-1</code> if the
      *         predicate is not locked to a specific index partition.
+     * 
+     * @see Annotations#PARTITION_ID
      * 
      * @see PartitionLocator
      * @see AccessPath
@@ -268,9 +241,10 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      *             if the index partition identified is a negative integer.
      * @throws IllegalStateException
      *             if the index partition identifier was already specified.
+     * @see Annotations#PARTITION_ID
      */
     public IPredicate<E> setPartitionId(int partitionId);
-    
+
     /**
      * <code>true</code> iff the predicate is optional when evaluated as the
      * right-hand side of a join. An optional predicate will match once after
@@ -285,8 +259,10 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      * More control over the behavior of optionals may be gained through the use
      * of an {@link ISolutionExpander} pattern.
      * 
-     * @return <code>true</code> iff this predicate is optional when
-     *         evaluating a JOIN.
+     * @return <code>true</code> iff this predicate is optional when evaluating
+     *         a JOIN.
+     * 
+     * @deprecated By {@link PipelineJoin.Annotations#OPTIONAL}
      */
     public boolean isOptional();
 
@@ -296,6 +272,8 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      * 
      * @return The {@link ISolutionExpander}.
      * 
+     * @see Annotations#EXPANDER
+     * 
      * @todo replace with {@link ISolutionExpander#getAccessPath(IAccessPath)},
      *       which is the only method declared by {@link ISolutionExpander}.
      */
@@ -303,6 +281,8 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
     
     /**
      * An optional constraint on the visitable elements.
+     * 
+     * @see Annotations#CONSTRAINT
      * 
      * @todo rename as get(Element)Filter().
      */
@@ -328,6 +308,8 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      *            The {@link IKeyOrder}.
      * 
      * @return The new {@link IPredicate}.
+     * 
+     * @see Annotations#KEY_ORDER
      */
     public IPredicate<E> setKeyOrder(final IKeyOrder<E> keyOrder);
     
@@ -499,4 +481,5 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      * @return The newly annotated {@link IPredicate}.
      */
     public IPredicate<E> setBOpId(int bopId);
+
 }

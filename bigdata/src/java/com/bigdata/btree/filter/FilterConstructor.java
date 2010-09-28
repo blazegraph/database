@@ -90,9 +90,9 @@ public class FilterConstructor<E> implements IFilterConstructor<E>, Cloneable {
      */
     private static class WrappedTupleIterator<E> implements ITupleIterator<E> {
 
-        final private Iterator src;
+        final private Iterator<E> src;
 
-        public WrappedTupleIterator(final Iterator src) {
+        public WrappedTupleIterator(final Iterator<E> src) {
 
             if (src == null)
                 throw new IllegalArgumentException();

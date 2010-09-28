@@ -32,9 +32,10 @@ abstract public class TupleUpdater<E> extends TupleFilter<E> {
     }
 
     @SuppressWarnings("unchecked")
-    public ITupleIterator<E> filter(Iterator src) {
+    @Override
+    public ITupleIterator<E> filterOnce(Iterator src, Object context) {
 
-        return new Updaterator((ITupleCursor<E>) src);
+        return new Updaterator((ITupleCursor<E>) src, context, this);
 
     }
 
@@ -52,17 +53,19 @@ abstract public class TupleUpdater<E> extends TupleFilter<E> {
      */
     abstract protected void update(IIndex ndx, ITuple<E> tuple);
 
-    protected class Updaterator extends TupleFilter.Filterator {
+    protected class Updaterator extends TupleFilter.Filterator<E> {
 
-        public Updaterator(ITupleIterator<E> src) {
+        public Updaterator(final ITupleIterator<E> src, final Object context,
+                final TupleFilter<E> filter) {
 
-            super(src);
+            super(src, context, filter);
 
         }
 
-        protected void visit(ITuple tuple) {
+        @Override
+        protected void visit(final ITuple<E> tuple) {
 
-            final IIndex ndx = ((ITupleCursor) src).getIndex();
+            final IIndex ndx = ((ITupleCursor<E>) src).getIndex();
 
             update(ndx, tuple);
 

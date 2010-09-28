@@ -152,6 +152,7 @@ public class TestFilterBase extends TestCase {
         assertNotNull(actual);
         assertTrue("src", actual.src == src);
         assertTrue("context", actual.context == context);
+        assertTrue("filter", actual.filter == fixture);
 
     }
 
@@ -162,22 +163,59 @@ public class TestFilterBase extends TestCase {
      * being LIFO.
      */
     public void test_filter2() {
-        
-        final FilterBase fixture = new MockFilterBase();
-        final FilterBase fixture2 = new MockFilterBase();
-        final FilterBase fixture3 = new MockFilterBase();
 
-        final Object context = new Object();
+        // create filters w/ state objects (helps visual inspection in debugger).
+        final Object s1 = "s1";
+        final Object s2 = "s2";
+        final Object s3 = "s3";
+        final FilterBase fixture1 = new MockFilterBase(s1);
+        final FilterBase fixture2 = new MockFilterBase(s2);
+        final FilterBase fixture3 = new MockFilterBase(s3);
+
+        // chain 2 filters to the first.
+        fixture1.addFilter(fixture2);
+        fixture1.addFilter(fixture3);
+        
+        // verify the filter chain.
+        assertNotNull(fixture1.filterChain);
+        assertEquals(2, fixture1.filterChain.size());
+        assertTrue(fixture2 == fixture1.filterChain.get(0));
+        assertTrue(fixture3 == fixture1.filterChain.get(1));
+
+        // verify other filter chains are empty.
+        assertNull(fixture2.filterChain);
+        assertNull(fixture3.filterChain);
+        
+        final Object context = "context";
 
         final Iterator src = EmptyIterator.DEFAULT;
 
-        final MockIterator actual = (MockIterator) fixture.filter(src, context);
-
-//        assertNotNull(actual);
-//        assertTrue("src", actual.src == src);
-//        assertTrue("context", actual.context == context);
-
-        fail("write test");
+        /*
+         * Create and verify the iterator stack.
+         * 
+         * Note: The iterator are created in the order in filter chain order,
+         * but each iterator wraps the previous iterator. This has the effect of
+         * building an iterator stack which is the reverse of the filter chain.
+         * 
+         * logical filter chain: filter1, filter2, filter3
+         * 
+         * logical iterator stack: itr1(filter3), itr2(filter2), itr3(filter1).
+         */
+        final MockIterator actual1 = (MockIterator) fixture1.filter(src, context);
+        final MockIterator actual2 = (MockIterator) actual1.src;
+        final MockIterator actual3 = (MockIterator) actual2.src;
+        // itr3 (bottom of the stack)
+        assertTrue("src", actual3.src == src);
+        assertTrue("context", actual3.context == context);
+        assertTrue("filter", actual3.filter == fixture1);
+        // itr2
+        assertTrue("src", actual2.src == actual3);
+        assertTrue("context", actual2.context == context);
+        assertTrue("filter", actual2.filter == fixture2);
+        // itr1 (top of the stack)
+        assertTrue("src", actual1.src == actual2);
+        assertTrue("context", actual1.context == context);
+        assertTrue("filter", actual1.filter == fixture3);
     }
 
     /**
@@ -200,7 +238,9 @@ public class TestFilterBase extends TestCase {
         
         @Override
         protected Iterator filterOnce(Iterator src, Object context) {
-            return new MockIterator(src, context);
+            
+            return new MockIterator(src, context, this);
+            
         }
         
     }
@@ -211,11 +251,15 @@ public class TestFilterBase extends TestCase {
 
         final Object context;
 
-        public MockIterator(Iterator src,Object context) {
+        final MockFilterBase filter;
+        
+        public MockIterator(Iterator src, Object context, MockFilterBase filter) {
 
             this.src = src;
 
             this.context = context;
+            
+            this.filter = filter;
             
         }
         

@@ -34,20 +34,20 @@ package com.bigdata.btree;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ReadOnlyEntryIterator implements ITupleIterator {
+public class ReadOnlyEntryIterator<E> implements ITupleIterator<E> {
 
-    private final ITupleIterator src;
+    private final ITupleIterator<E> src;
     
     /**
      * 
      */
-    public ReadOnlyEntryIterator(ITupleIterator src) {
+    public ReadOnlyEntryIterator(final ITupleIterator<E> src) {
         
         this.src = src;
         
     }
 
-    public ITuple next() {
+    public ITuple<E> next() {
         
         return src.next();
         

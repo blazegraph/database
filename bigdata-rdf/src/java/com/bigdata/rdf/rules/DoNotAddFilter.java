@@ -50,7 +50,7 @@ import com.bigdata.rdf.vocab.Vocabulary;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DoNotAddFilter extends SPOFilter {
+public class DoNotAddFilter<E extends ISPO> extends SPOFilter<E> {
 
 //    protected static final Logger log = Logger.getLogger(DoNotAddFilter.class);
 //    
@@ -122,7 +122,7 @@ public class DoNotAddFilter extends SPOFilter {
 
     }
     
-    public boolean accept(final Object o) {
+    public boolean accept(final ISPO o) {
         
         if (!canAccept(o)) {
             

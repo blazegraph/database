@@ -34,7 +34,6 @@ import java.util.NoSuchElementException;
 import org.apache.log4j.Logger;
 
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.lexicon.ITermIVFilter;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
@@ -44,7 +43,6 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedIterator;
@@ -53,7 +51,7 @@ import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.striterator.IKeyOrder;
 
 import cutthecrap.utils.striterators.Filter;
-import cutthecrap.utils.striterators.IFilter;
+import cutthecrap.utils.striterators.FilterBase;
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
 
@@ -814,7 +812,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
      * @version $Id$
      * @param <E>
      */
-    public static class PushbackFilter<E> implements IFilter {
+    public static class PushbackFilter<E> extends FilterBase {
 
         /**
          * 
@@ -822,7 +820,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
         private static final long serialVersionUID = -8010263934867149205L;
 
         @SuppressWarnings("unchecked")
-        public PushbackIterator<E> filter(Iterator src) {
+        public PushbackIterator<E> filterOnce(Iterator src, Object context) {
 
             return new PushbackIterator<E>((Iterator<E>) src);
 
@@ -853,7 +851,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
          */
         private E buffer;
 
-        public PushbackIterator(Iterator<E> src) {
+        public PushbackIterator(final Iterator<E> src) {
 
             if (src == null)
                 throw new IllegalArgumentException();

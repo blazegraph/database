@@ -17,7 +17,7 @@ import com.bigdata.rdf.vocab.Vocabulary;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RdfTypeRdfsResourceFilter extends SPOFilter implements Externalizable {
+public class RdfTypeRdfsResourceFilter<E extends ISPO> extends SPOFilter<E> implements Externalizable {
 
     /**
      * 
@@ -38,7 +38,7 @@ public class RdfTypeRdfsResourceFilter extends SPOFilter implements Externalizab
      * 
      * @param vocab
      */
-    public RdfTypeRdfsResourceFilter(Vocabulary vocab) {
+    public RdfTypeRdfsResourceFilter(final Vocabulary vocab) {
         
         this.rdfType = vocab.get(RDF.TYPE);
         
@@ -46,7 +46,7 @@ public class RdfTypeRdfsResourceFilter extends SPOFilter implements Externalizab
         
     }
 
-    public boolean accept(final Object o) {
+    public boolean accept(final E o) {
         
         if (!canAccept(o)) {
             

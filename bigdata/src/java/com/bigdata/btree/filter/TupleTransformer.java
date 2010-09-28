@@ -34,6 +34,8 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.filter.LookaheadTupleFilter.ILookaheadTupleIterator;
 
+import cutthecrap.utils.striterators.FilterBase;
+
 /**
  * Abstract base class for an {@link ITupleFilter} that transforms the data type
  * of the keys and/or values.
@@ -52,7 +54,8 @@ import com.bigdata.btree.filter.LookaheadTupleFilter.ILookaheadTupleIterator;
  *       one out) and patterns with a M:1 (many in, one out) and 1:M (1 in, many
  *       out)?
  */
-abstract public class TupleTransformer<E,F> implements ITupleFilter<F> {
+abstract public class TupleTransformer<E, F> extends FilterBase implements
+        ITupleFilter<F> {
 
     /** The serialization provider for the transformed tuples. */
     final protected ITupleSerializer<? extends Object/*key*/,F/*val*/> tupleSer;
@@ -76,13 +79,15 @@ abstract public class TupleTransformer<E,F> implements ITupleFilter<F> {
      *            The source iterator.
      */
     @SuppressWarnings("unchecked")
-    public ITupleIterator<F> filter(Iterator src) {
+    @Override
+    public ITupleIterator<F> filterOnce(Iterator src, final Object context) {
 
         // layer in one-step lookahead.
-        src = new LookaheadTupleFilter().filter((ITupleIterator<E>)src);
+        src = new LookaheadTupleFilter().filterOnce((ITupleIterator<E>) src,
+                context);
         
         // the transformer.
-        return newTransformer((ILookaheadTupleIterator<E>)src);
+        return newTransformer((ILookaheadTupleIterator<E>) src, context);
         
     }
 
@@ -91,7 +96,8 @@ abstract public class TupleTransformer<E,F> implements ITupleFilter<F> {
      * from the lookahead source whose tuples are of the source type and visits
      * the transformed tuples.
      */
-    abstract protected ITupleIterator<F> newTransformer(ILookaheadTupleIterator<E> src);
+    abstract protected ITupleIterator<F> newTransformer(
+            final ILookaheadTupleIterator<E> src, final Object context);
     
 //    /**
 //     * Return <code>true</code> iff another tuple of the transformed type can

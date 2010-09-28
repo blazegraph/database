@@ -2930,7 +2930,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                     // remove all visited tuples.
                     return true;
                 }
-            }.filter(src);
+            }.filterOnce(src, null/* context */);
 
         }
         

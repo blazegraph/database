@@ -1278,7 +1278,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
                     // remove all visited tuples.
                     return true;
                 }
-            }.filter(src);
+            }.filterOnce(src, null/* context */);
 
         }
         

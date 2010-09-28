@@ -39,7 +39,7 @@ import com.bigdata.relation.accesspath.IElementFilter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-final public class ExplicitSPOFilter extends SPOFilter {
+final public class ExplicitSPOFilter<E extends ISPO> extends SPOFilter<ISPO> {
 
     /**
      * 
@@ -58,7 +58,7 @@ final public class ExplicitSPOFilter extends SPOFilter {
         
     }
     
-    public boolean accept(final Object o) {
+    public boolean accept(final ISPO o) {
         
         if (!canAccept(o)) {
             

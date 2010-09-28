@@ -40,7 +40,7 @@ import com.bigdata.relation.accesspath.IElementFilter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class NoAxiomFilter extends SPOFilter {
+public class NoAxiomFilter<E extends ISPO> extends SPOFilter<E> {
 
     /**
      * 
@@ -50,7 +50,7 @@ public class NoAxiomFilter extends SPOFilter {
     /**
      * Shared instance.
      */
-    static public final transient NoAxiomFilter INSTANCE = new NoAxiomFilter();
+    static public final transient NoAxiomFilter<ISPO> INSTANCE = new NoAxiomFilter<ISPO>();
     
     /**
      * De-serialization ctor.
@@ -59,7 +59,7 @@ public class NoAxiomFilter extends SPOFilter {
         
     }
     
-    public boolean accept(final Object o) {
+    public boolean accept(final ISPO o) {
         
         if (!canAccept(o)) {
             

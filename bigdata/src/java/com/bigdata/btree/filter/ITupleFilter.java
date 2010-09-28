@@ -53,7 +53,9 @@ public interface ITupleFilter<E> extends IFilter {
 
     /**
      * Strengthened return type.
+     * <p>
+     * {@inheritDoc}
      */
-    public ITupleIterator<E> filter(Iterator src);
+    public ITupleIterator<E> filterOnce(Iterator src, Object context);
 
 }

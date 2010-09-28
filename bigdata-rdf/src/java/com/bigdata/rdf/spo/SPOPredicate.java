@@ -462,7 +462,7 @@ public class SPOPredicate extends Predicate<ISPO> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private static class WrappedSPOFilter extends SPOFilter {
+    private static class WrappedSPOFilter<E extends ISPO> extends SPOFilter<E> {
 
         /**
          * 
@@ -480,7 +480,7 @@ public class SPOPredicate extends Predicate<ISPO> {
             
         }
 
-        public boolean accept(final Object o) {
+        public boolean accept(final E o) {
             
             if (!canAccept(o)) {
                 

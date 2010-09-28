@@ -5,6 +5,7 @@ import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 
 import org.openrdf.model.URI;
 
+import com.bigdata.bop.constraint.INHashMap;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.store.IRawTripleStore;
@@ -21,9 +22,11 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * 
  * @see InGraphBinarySearchFilter
  * 
+ * @todo reconcile with {@link INHashMap}.
+ * 
  * @todo tighten serialization?
  */
-public final class InGraphHashSetFilter extends SPOFilter {
+public final class InGraphHashSetFilter<E extends ISPO> extends SPOFilter<E> {
 
     /**
      * 
@@ -61,7 +64,7 @@ public final class InGraphHashSetFilter extends SPOFilter {
         
     }
 
-    public boolean accept(final Object o) {
+    public boolean accept(final ISPO o) {
         
         if (!canAccept(o)) {
             
