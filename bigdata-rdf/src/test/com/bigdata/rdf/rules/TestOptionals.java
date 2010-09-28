@@ -78,16 +78,16 @@ public class TestOptionals extends AbstractInferenceEngineTestCase {
         super(name);
     }
     
-    public void test_optionals_nextedSubquery() 
-    {
-     
-        final Properties p = new Properties(getProperties());
-
-        p.setProperty(AbstractRelation.Options.NESTED_SUBQUERY, "true");
-        
-        doOptionalsTest(p);
-
-    } 
+//    public void test_optionals_nextedSubquery() 
+//    {
+//     
+//        final Properties p = new Properties(getProperties());
+//
+//        p.setProperty(AbstractRelation.Options.NESTED_SUBQUERY, "true");
+//        
+//        doOptionalsTest(p);
+//
+//    } 
     
     public void test_optionals_pipeline() 
     {

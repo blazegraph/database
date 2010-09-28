@@ -632,7 +632,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 
                     if (vmd.mergePriority > 0 || forceCompactingMerges) {
 
-			if(forceCompactingMerges && vmd.getAction().equals(OverflowActionEnum.Copy)) {
+			if(forceCompactingMerges && OverflowActionEnum.Copy.equals(vmd.getAction())) {
 
 			    vmd.clearCopyAction();
 

@@ -223,6 +223,7 @@ implements Serializable {
                     jobState.valuesInitialCapacity,//
                     jobState.bnodesInitialCapacity,//
                     jobState.getRDFFormat(), // 
+                    jobState.defaultGraph,
                     parserOptions,//
                     false, // deleteAfter is handled by the master!
                     jobState.parserPoolSize, //  

@@ -78,11 +78,11 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
         super(arg0);
     }
 
-    public IBigdataClient<?> client;
-    public IBigdataFederation<?> fed;
-    public IMetadataService metadataService;
-    public IDataService dataService0;
-    public IDataService dataService1;
+    protected IBigdataClient<?> client;
+    protected IBigdataFederation<?> fed;
+    protected IMetadataService metadataService;
+    protected IDataService dataService0;
+    protected IDataService dataService1;
 
     public Properties getProperties() {
         
@@ -356,9 +356,10 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
              * FIXME You can change this constant if you are debugging so that
              * the test will not terminate too soon, but change it back so that
              * the test will terminate quickly when run automatically. The value
-             * should be [2000] ms.
+             * should be only a few seconds. 2000 ms is sometimes to little, so
+             * I have raised this value to 5000 ms.
              */
-            if (elapsed > 2000) {
+            if (elapsed > 5000) {
 
                 fail("No overflow after " + elapsed + "ms?");
 

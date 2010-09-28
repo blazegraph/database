@@ -161,6 +161,7 @@ public class EDSAsyncLoader {
                     valuesInitialCapacity,//
                     bnodesInitialCapacity,//
                     RDFFormat.RDFXML, // defaultFormat
+                    null, // defaultGraph
                     parserOptions, // parserOptions
                     false, // deleteAfter
                     poolSize, // parserPoolSize,

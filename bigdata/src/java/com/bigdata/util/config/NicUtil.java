@@ -26,27 +26,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.util.config;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.net.InterfaceAddress;
-import java.net.MalformedURLException;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Enumeration;
-import java.util.Collections;
-import java.util.logging.LogRecord;
 
 import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-
-import net.jini.config.Configuration;
-import net.jini.config.ConfigurationException;
-import com.sun.jini.config.Config;
-import com.sun.jini.logging.Levels;
 
 /**
  * Utility class that provides a set of static convenience methods
@@ -400,34 +392,34 @@ public class NicUtil {
         return macAddr;
     }
 
-    /**
-     * Three-argument version of <code>getInetAddress</code> that retrieves
-     * the desired interface name from the given <code>Configuration</code>
-     * parameter.
-     */
-    public static InetAddress getInetAddress(Configuration config,
-                                             String        componentName,
-                                             String        nicNameEntry)
-    {
-        String nicName = "NoNetworkInterfaceName";
-        try {
-            nicName = (String)Config.getNonNullEntry(config,
-                                                     componentName,
-                                                     nicNameEntry,
-                                                     String.class,
-                                                     "eth0");
-        } catch(ConfigurationException e) {
-            jiniConfigLogger.log(WARNING, e
-                                 +" - [componentName="+componentName
-                                 +", nicNameEntry="+nicNameEntry+"]");
-            utilLogger.log(Level.WARN, e
-                           +" - [componentName="+componentName
-                           +", nicNameEntry="+nicNameEntry+"]");
-            e.printStackTrace();
-            return null;
-        }
-        return ( getInetAddress(nicName, 0, null, false) );
-    }
+//    /**
+//     * Three-argument version of <code>getInetAddress</code> that retrieves
+//     * the desired interface name from the given <code>Configuration</code>
+//     * parameter.
+//     */
+//    public static InetAddress getInetAddress(Configuration config,
+//                                             String        componentName,
+//                                             String        nicNameEntry)
+//    {
+//        String nicName = "NoNetworkInterfaceName";
+//        try {
+//            nicName = (String)Config.getNonNullEntry(config,
+//                                                     componentName,
+//                                                     nicNameEntry,
+//                                                     String.class,
+//                                                     "eth0");
+//        } catch(ConfigurationException e) {
+//            jiniConfigLogger.log(WARNING, e
+//                                 +" - [componentName="+componentName
+//                                 +", nicNameEntry="+nicNameEntry+"]");
+//            utilLogger.log(Level.WARN, e
+//                           +" - [componentName="+componentName
+//                           +", nicNameEntry="+nicNameEntry+"]");
+//            e.printStackTrace();
+//            return null;
+//        }
+//        return ( getInetAddress(nicName, 0, null, false) );
+//    }
 
     // What follows are a number of versions of the getIpAddress method
     // provided for convenience.
