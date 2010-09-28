@@ -59,15 +59,16 @@ public enum BufferMode {
     Transient(false/* stable */, true/* fullyBuffered */,StoreTypeEnum.WORM),
 
     /**
+     * <strong>This mode is not being actively developed and should not be used
+     * outside of unit tests.</strong>
      * <p>
-     * A direct buffer is allocated for the file image. Writes are applied
-     * to the buffer. The buffer tracks dirty slots regardless of the
-     * transaction that wrote them and periodically writes dirty slots
-     * through to disk. On commit, any dirty index or allocation nodes are
-     * written onto the buffer and all dirty slots on the buffer. Dirty
-     * slots in the buffer are then synchronously written to disk, the
-     * appropriate root block is updated, and the file is (optionally)
-     * flushed to disk.
+     * A direct buffer is allocated for the file image. Writes are applied to
+     * the buffer. The buffer tracks dirty slots regardless of the transaction
+     * that wrote them and periodically writes dirty slots through to disk. On
+     * commit, any dirty index or allocation nodes are written onto the buffer
+     * and all dirty slots on the buffer. Dirty slots in the buffer are then
+     * synchronously written to disk, the appropriate root block is updated, and
+     * the file is (optionally) flushed to disk.
      * </p>
      * <p>
      * This option offers wires an image of the journal file into memory and
@@ -79,6 +80,9 @@ public enum BufferMode {
     Direct(true/* stable */, true/* fullyBuffered */,StoreTypeEnum.WORM),
 
     /**
+     * <strong>This mode is not being actively developed and should not be used
+     * outside of unit tests. Memory mapped IO has the fatal weakness under Java
+     * that you can not reliably close or extend the backing file.</strong>
      * <p>
      * A memory-mapped buffer is allocated for the file image. Writes are
      * applied to the buffer. Reads read from the buffer. On commit, the map is
