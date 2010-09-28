@@ -830,8 +830,6 @@ public class EmbeddedFederation<T> extends AbstractScaleOutFederation<T> {
         if (log.isInfoEnabled())
             log.info("begin");
 
-        super.shutdown();
-        
         if (abstractTransactionService != null) {
 
             abstractTransactionService.shutdown();
@@ -865,6 +863,8 @@ public class EmbeddedFederation<T> extends AbstractScaleOutFederation<T> {
 //        // Note: don't clear ref until all down since nextTimestamp() still active.
 //        abstractTransactionService = null;
 
+        super.shutdown();
+        
         if (log.isInfoEnabled())
             log.info("done");
 
