@@ -76,6 +76,7 @@
 			<src path="${bigdata.dir}/bigdata-jini/src/java" />
 			<src path="${bigdata.dir}/bigdata-rdf/src/java" />
 			<src path="${bigdata.dir}/bigdata-sails/src/java" />
+			<src path="${bigdata.dir}/ctc-striterators/src/java" />
 			<!-- Do not include the unit tests @todo conditionally include?
             <src path="${bigdata.dir}/bigdata/src/test"/>
             <src path="${bigdata.dir}/bigdata-jini/src/test"/>
@@ -105,6 +106,10 @@
 			</fileset>
 			<fileset dir="${bigdata.dir}/bigdata-sails/src/resources/sesame-server">
 				<include name="META-INF/**" />
+			</fileset>
+			<fileset dir="${bigdata.dir}/ctc-striterators/src/java">
+				<exclude name="**/*.java" />
+				<exclude name="**/package.html" />
 			</fileset>
 		</copy>
 	</target>
@@ -150,6 +155,7 @@
 			<fileset dir="bigdata-jini/src/java" />
 			<fileset dir="bigdata-rdf/src/java" />
 			<fileset dir="bigdata-sails/src/java" />
+			<fileset dir="ctc-striterators/src/java" />
 		</jar>
 		<bnd output="${build.dir}/bundles/com.bigata-${osgi.version}.jar" classpath="${build.dir}/classes" eclipse="false" failok="false" exceptions="true" files="${basedir}/osgi/bigdata.bnd" />
 
@@ -183,6 +189,7 @@
 			<packageset dir="${bigdata.dir}/bigdata-rdf/src/java" />
 			<packageset dir="${bigdata.dir}/bigdata-sails/src/java" />
 			<packageset dir="${bigdata.dir}/bigdata-sails/src/samples" />
+			<packageset dir="${bigdata.dir}/ctc-striterators/src/java" />
 			<doctitle>
 				<![CDATA[<h1>bigdata&#174;</h1>]]></doctitle>
 		<bottom>
@@ -234,6 +241,9 @@
 <copy toDir="${build.dir}/bigdata-sails/src">
 	<fileset dir="${bigdata.dir}/bigdata-sails/src" />
 </copy>
+<copy toDir="${build.dir}/ctc-striterators/src">
+	<fileset dir="${bigdata.dir}/ctc-striterators/src" />
+</copy>
 <!-- common files for the root of the archive. -->
 <copy tofile="${build.dir}/build.properties" file="build.properties" />
 <copy tofile="${build.dir}/build.xml" file="build.xml" />
@@ -265,6 +275,7 @@
 		<exclude name="bigdata-jini/src/**" />
 		<exclude name="bigdata-rdf/src/**" />
 		<exclude name="bigdata-sails/src/**" />
+		<exclude name="ctc-striterators/src/**" />
 		<exclude name="classes/**" />
 		<include name="${version}.jar" />
 		<include name="lib/**" />
@@ -288,6 +299,7 @@
 		<include name="bigdata-jini/src/**" />
 		<include name="bigdata-rdf/src/**" />
 		<include name="bigdata-sails/src/**" />
+		<include name="ctc-striterators/src/**" />
 		<include name="lgpl-utils/src/**" />
 		<include name="src/**" />
 		<exclude name="classes/**" />
@@ -448,6 +460,7 @@ an "NOP" bash script or edit your crontab.
 		<include name="bigdata-jini/LEGAL/*" />
 		<include name="bigdata-rdf/LEGAL/*" />
 		<include name="bigdata-sails/LEGAL/*" />
+		<include name="ctc-striterators/LEGAL/*" />
 	</fileset>
 </copy>
 <!-- install JARs. -->
@@ -1058,6 +1071,9 @@ ${postInstallMessage}</echo>
 <copy toDir="${build.dir}/bigdata-sails/src">
 	<fileset dir="${bigdata.dir}/bigdata-sails/src" />
 </copy>
+<copy toDir="${build.dir}/ctc-striterators/src">
+	<fileset dir="${bigdata.dir}/ctc-striterators/src" />
+</copy>
 <copy toDir="${build.dir}/lgpl-utils/src">
 	<fileset dir="${bigdata.dir}/lgpl-utils/src" />
 </copy>
@@ -1126,6 +1142,7 @@ ${postInstallMessage}</echo>
 		<include name="bigdata-jini/src/**" />
 		<include name="bigdata-rdf/src/**" />
 		<include name="bigdata-sails/src/**" />
+		<include name="ctc-striterators/src/**" />
 		<include name="lgpl-utils/src/**" />
 		<include name="bigdata/lib/**" />
 		<include name="bigdata-jini/lib/**" />
@@ -1191,6 +1208,7 @@ ${postInstallMessage}</echo>
 		<include name="bigdata-jini/LEGAL/*" />
 		<include name="bigdata-rdf/LEGAL/*" />
 		<include name="bigdata-sails/LEGAL/*" />
+		<include name="ctc-striterators/LEGAL/*" />
 	</fileset>
 </copy>
 
@@ -1420,6 +1438,7 @@ ${postInstallMessage}</echo>
 	<src path="${bigdata.dir}/bigdata-jini/src/test" />
 	<src path="${bigdata.dir}/bigdata-rdf/src/test" />
 	<src path="${bigdata.dir}/bigdata-sails/src/test" />
+	<src path="${bigdata.dir}/ctc-striterators/src/test" />
 	<!--
         <src path="${bigdata.dir}/bigdata-gom/src/test"/>
 -->
