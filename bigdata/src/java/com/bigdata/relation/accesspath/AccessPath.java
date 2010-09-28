@@ -77,8 +77,7 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * @param R
- *            The generic type of the [R]elation elements of the
- *            {@link IRelation}.
+ *            The generic type of the elements of the {@link IRelation}.
  * 
  * @todo This needs to be more generalized so that you can use a index that is
  *       best without being optimal by specifying a low-level filter to be
@@ -234,50 +233,7 @@ public class AccessPath<R> implements IAccessPath<R> {
         
     }
     
-//    protected void setFromKey(final byte[] fromKey) {
-//        
-//        assertNotInitialized();
-//
-//        if (pmd != null) {
-//
-//            /*
-//             * The predicate is constrained to an index partition, so constrain
-//             * the fromKey so that it lies within that index partition.
-//             */
-//            
-//            this.fromKey = AbstractKeyRangeIndexProcedure.constrainFromKey(fromKey,
-//                    pmd);
-//
-//        } else {
-//
-//            this.fromKey = fromKey;
-//            
-//        }
-//
-//    }
-//    
-//    protected void setToKey(final byte[] toKey) {
-//        
-//        assertNotInitialized();
-//        
-//        if (pmd != null) {
-//
-//            /*
-//             * The predicate is constrained to an index partition, so constrain
-//             * the toKey so that it lies within that index partition.
-//             */
-//            
-//            this.toKey = AbstractKeyRangeIndexProcedure.constrainToKey(toKey, pmd);
-//
-//        } else {
-//
-//            this.toKey = toKey;
-//            
-//        }
-//        
-//    }
-    
-    public IKeyOrder<R> getKeyOrder() {
+    final public IKeyOrder<R> getKeyOrder() {
         
         return keyOrder;
         
@@ -393,7 +349,6 @@ public class AccessPath<R> implements IAccessPath<R> {
 
         this.chunkCapacity = chunkCapacity;
 
-//        this.fullyBufferedReadThreshold = 100000;
         this.fullyBufferedReadThreshold = fullyBufferedReadThreshold;
         
         this.historicalRead = TimestampUtility.isReadOnly(timestamp);
@@ -416,6 +371,9 @@ public class AccessPath<R> implements IAccessPath<R> {
 
         } else {
 
+            /*
+             * Stack filters.
+             */
             filter = new FilterConstructor<R>();
 
             if (constraint != null) {
@@ -1074,10 +1032,6 @@ public class AccessPath<R> implements IAccessPath<R> {
     static private class ChunkConsumerTask<R> implements Callable<Void> {
 
         static protected final Logger log = Logger.getLogger(ChunkConsumerTask.class);
-
-//        static protected final boolean log.isInfoEnabled() = log.isInfoEnabled(); 
-//        
-//        static protected final boolean log.isDebugEnabled() = log.isDebugEnabled(); 
         
         private final AccessPath<R> accessPath;
 

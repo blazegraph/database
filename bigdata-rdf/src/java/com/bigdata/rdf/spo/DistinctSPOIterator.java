@@ -16,9 +16,17 @@ import com.bigdata.striterator.ICloseableIterator;
  * Iterator using a {@link BTree} filter out duplicate (s,p,o) tuples.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: DistinctSPOIterator.java 3472 2010-08-31 16:21:47Z thompsonbry
+ *          $
  * 
  * @see SPORelation#distinctSPOIterator(ICloseableIterator)
+ * 
+ * @deprecated By a simple distinct filter and a filter which strips off the
+ *             context position from an SPOC. Stack them together and it does
+ *             the same thing. (The fall back to the B+Tree might still be
+ *             interesting if we do not have a persistent hash map to fall back
+ *             on instead and we want streaming results. Otherwise use an
+ *             external merge sort.)
  */
 public class DistinctSPOIterator implements ICloseableIterator<ISPO> {
 

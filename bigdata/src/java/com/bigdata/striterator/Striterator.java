@@ -67,7 +67,7 @@ public class Striterator<I extends Iterator<E>, E> implements IStriterator<I,E> 
     /**
      * @param src The source iterator.
      */
-    public Striterator(I src) {
+    public Striterator(final I src) {
 
         if (src == null)
             throw new IllegalArgumentException();
@@ -79,8 +79,8 @@ public class Striterator<I extends Iterator<E>, E> implements IStriterator<I,E> 
     /**
      * Wraps the enumeration as an iterator.
      * 
-     * <strong>Ctor must be overriden for derived classes that specialize the
-     * type of the iterator.</strong>
+     * <strong>The constructor must be overridden for derived classes that
+     * specialize the type of the iterator.</strong>
      * 
      * @param srcEnum
      *            The source enumeration.
@@ -107,7 +107,7 @@ public class Striterator<I extends Iterator<E>, E> implements IStriterator<I,E> 
     }
 
     @SuppressWarnings("unchecked")
-    public IStriterator<I, E> addFilter(IFilter<I, ?, E> filter) {
+    public IStriterator<I, E> addFilter(final IFilter<I, ?, E> filter) {
 
         src = (I)filter.filter((I) src);
 

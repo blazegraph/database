@@ -213,7 +213,8 @@ public abstract class FilterBase implements IFilter, Cloneable {
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append(super.toString());
-        sb.append("{annotations=" + annotations);
+        sb.append("{state=" + m_state);
+        sb.append(",annotations=" + annotations);
         sb.append(",filterChain=" + filterChain);
         sb.append("}");
         return sb.toString();

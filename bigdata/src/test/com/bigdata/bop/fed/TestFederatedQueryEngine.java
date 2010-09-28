@@ -69,6 +69,7 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.rdf.spo.DistinctSPOIterator;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.service.AbstractEmbeddedFederationTestCase;
@@ -1028,6 +1029,10 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
      * RMI access path, stacking a distinct filter on the access path, and
      * marking the join evaluation context as ANY since we do not push the
      * binding sets to the shards when using RMI access paths.
+     * 
+     * @see DistinctSPOIterator, which should stack as a striterator. It might
+     *      be best to break it up into something to strip off the context
+     *      position and a distincterator.
      */
     public void test_query_join1_distinctAccessPath() {
         

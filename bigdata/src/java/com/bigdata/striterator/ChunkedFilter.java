@@ -46,10 +46,15 @@ import java.util.NoSuchElementException;
  *            will differ from {@link E} iff the filter is transforming the
  *            element type.
  *            
- * @todo This class is redundent with the {@link ChunkedConvertingIterator}
+ * @todo This class is redundant with the {@link ChunkedConvertingIterator}
  */
 abstract public class ChunkedFilter<I extends IChunkedIterator<E>, E, F>
         implements IFilter<I, E, F> {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
 
     /**
      * Caller's object.
@@ -72,7 +77,7 @@ abstract public class ChunkedFilter<I extends IChunkedIterator<E>, E, F>
 
     }
 
-    public ChunkedFilter(Object state) {
+    public ChunkedFilter(final Object state) {
 
         this(state, null/* keyOrder */);
 
@@ -85,7 +90,7 @@ abstract public class ChunkedFilter<I extends IChunkedIterator<E>, E, F>
      * @param keyOrder
      *            The natural sort order for the filtered iterator (optional).
      */
-    public ChunkedFilter(Object state, IKeyOrder<F> keyOrder) {
+    public ChunkedFilter(final Object state, final IKeyOrder<F> keyOrder) {
 
         this.state = state;
 
@@ -93,7 +98,7 @@ abstract public class ChunkedFilter<I extends IChunkedIterator<E>, E, F>
 
     }
 
-    public IChunkedOrderedIterator<F> filter(I src) {
+    public IChunkedOrderedIterator<F> filter(final I src) {
 
         return new ChunkedFilteringIterator<I, E, F>(src, this);
 
@@ -103,7 +108,7 @@ abstract public class ChunkedFilter<I extends IChunkedIterator<E>, E, F>
      * @todo the need for this variant is worrysome - it is required if you do
      *       NOT specify the generic types and then try to use this class.
      */
-    public IChunkedOrderedIterator<F> filter(Iterator src) {
+    public IChunkedOrderedIterator<F> filter(final Iterator src) {
         
         return new ChunkedFilteringIterator<I, E, F>((I) src, this);
         

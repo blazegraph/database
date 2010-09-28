@@ -72,9 +72,9 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> implements
     protected static transient final Logger log = Logger
             .getLogger(AtomicRowFilter.class);
 
-    protected static transient final boolean INFO = log.isInfoEnabled();
-
-    protected static transient final boolean DEBUG = log.isDebugEnabled();
+//    protected static transient final boolean INFO = log.isInfoEnabled();
+//
+//    protected static transient final boolean DEBUG = log.isDebugEnabled();
     
     private final Schema schema;
 
@@ -119,10 +119,10 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> implements
 
     @Override
     protected ITupleIterator<TPS> newTransformer(
-            ILookaheadTupleIterator<TPV> src) {
+            ILookaheadTupleIterator<TPV> src, final Object context) {
 
-        return new Transformerator<TPV, TPS>(src);
-        
+        return new Transformerator<TPV, TPS>(src, context);
+
     }
     
     private class Transformerator<E extends TPV/* src */, F extends TPS/* out */>
@@ -147,6 +147,8 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> implements
     
     private final ILookaheadTupleIterator<E> src;
     
+    private final Object context;
+    
     /**
      * Builds iterator that reads the source tuples and visits the transformed
      * tuples.
@@ -154,12 +156,14 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> implements
      * @param src
      *            Visits the source tuples.
      */
-    public Transformerator(final ILookaheadTupleIterator<E> src) {
+    public Transformerator(final ILookaheadTupleIterator<E> src, final Object context) {
 
-            if (src == null)
-                throw new IllegalArgumentException();
+        if (src == null)
+            throw new IllegalArgumentException();
 
-            this.src = src;
+        this.src = src;
+        
+        this.context = context;
         
     }
     
@@ -336,7 +340,7 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> implements
 
             // Skip property names that have been filtered out.
 
-            if (DEBUG) {
+            if (log.isDebugEnabled()) {
 
                 log.debug("Skipping property: name=" + col + " (filtered)");
 
@@ -355,7 +359,7 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> implements
 
             if (columnValueTimestamp < fromTime) {
 
-                if (DEBUG) {
+                if (log.isDebugEnabled()) {
 
                     log.debug("Ignoring earlier revision: col=" + col
                             + ", fromTime=" + fromTime + ", timestamp="
@@ -369,7 +373,7 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> implements
 
             if (toTime != CURRENT_ROW && columnValueTimestamp >= toTime) {
 
-                if (DEBUG) {
+                if (log.isDebugEnabled()) {
 
                     log.debug("Ignoring later revision: col=" + col
                             + ", toTime=" + toTime + ", timestamp="
@@ -398,7 +402,7 @@ public class AtomicRowFilter extends TupleTransformer<TPV, TPS> implements
 
         tps.set(col, columnValueTimestamp, v);
 
-        if (INFO)
+        if (log.isInfoEnabled())
                 log.info("Accept: name=" + col + ", timestamp="
                         + columnValueTimestamp + ", value=" + v + ", key="
                         + BytesUtil.toString(key));

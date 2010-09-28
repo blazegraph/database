@@ -13,6 +13,8 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.btree.keys.SuccessorUtil;
 
+import cutthecrap.utils.striterators.FilterBase;
+
 /**
  * <p>
  * Filter visits all {@link ITuple}s whose keys begin with any of the specified
@@ -103,16 +105,12 @@ import com.bigdata.btree.keys.SuccessorUtil;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @see TestPrefixFilter
  */
-public class PrefixFilter<E> implements ITupleFilter<E> {
+public class PrefixFilter<E> extends FilterBase implements ITupleFilter<E> {
     
     protected transient static final Logger log = Logger
             .getLogger(PrefixFilter.class);
 
-    protected transient static final boolean INFO = log.isInfoEnabled();
-    
     private static final long serialVersionUID = 1828228416774862469L;
 
     /**
@@ -163,9 +161,10 @@ public class PrefixFilter<E> implements ITupleFilter<E> {
     }
 
     @SuppressWarnings("unchecked")
-    public ITupleIterator<E> filter(Iterator src) {
+    @Override
+    public ITupleIterator<E> filterOnce(Iterator src, Object context) {
 
-        return new PrefixFilterator<E>((ITupleCursor<E>) src, this);
+        return new PrefixFilterator<E>((ITupleCursor<E>) src, context, this);
 
     }
 
@@ -177,8 +176,10 @@ public class PrefixFilter<E> implements ITupleFilter<E> {
          * successor of the last key prefix (formed by adding one bit, not by
          * appending a <code>nul</code> byte).
          */
-        protected final ITupleCursor<E> src;
+        private final ITupleCursor<E> src;
 
+        private final Object context;
+        
         private final PrefixFilter<E> filter;
 
         /**
@@ -204,7 +205,8 @@ public class PrefixFilter<E> implements ITupleFilter<E> {
          * @param filter
          *            The filter to be applied.
          */
-        public PrefixFilterator(ITupleCursor<E> src, PrefixFilter<E> filter) {
+        public PrefixFilterator(final ITupleCursor<E> src,
+                final Object context, final PrefixFilter<E> filter) {
 
             if (src == null)
                 throw new IllegalArgumentException();
@@ -214,6 +216,8 @@ public class PrefixFilter<E> implements ITupleFilter<E> {
 
             this.src = src;
 
+            this.context = context;
+            
             this.filter = filter;
 
             this.index = 0;
@@ -238,7 +242,7 @@ public class PrefixFilter<E> implements ITupleFilter<E> {
 
                 if (BytesUtil.compareBytes(key, toKey) >= 0) {
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("Scanned beyond prefix: toKey="
                                 + BytesUtil.toString(toKey) + ", tuple="
                                 + tuple);
@@ -261,7 +265,7 @@ public class PrefixFilter<E> implements ITupleFilter<E> {
 
                     }
 
-                    if(INFO)
+                    if(log.isInfoEnabled())
                         log.info("No more prefixes.");
 
                     return false;
@@ -277,7 +281,7 @@ public class PrefixFilter<E> implements ITupleFilter<E> {
 
             // no more tuples (at least in this index partition).
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("No more tuples.");
 
             return false;
@@ -303,7 +307,7 @@ public class PrefixFilter<E> implements ITupleFilter<E> {
             current = src.seek(prefix);
 //            current = src.tuple();
 
-            if (INFO) {
+            if (log.isInfoEnabled()) {
 
                 log.info("index=" + index + ", prefix="
                         + BytesUtil.toString(prefix) + ", current=" + current);

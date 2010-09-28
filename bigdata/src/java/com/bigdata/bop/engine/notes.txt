@@ -2,15 +2,41 @@ RunningQuery:
 
   - TestJiniFederatedQueryEngine.
 
-  - Join=ANY, Predicate=RMI.
+  - Reconcile IElementFilter, FilterConstructor, and stackable
+    striterators for access paths and raw iterators.  We should be
+    able to use any of the striterator patterns!
 
-  - Unit tests of the default and named graph access path patterns.
+    There are a lot of partially duplicated classes which need to be
+    cleared up.  This can be tested on the individual striterator /
+    filter and also on the local and remote access paths.  
 
-  - Cost model for the default graph and named graph access path
-    patterns so we can choose the right one for each query.
+    Note: Some filters can be sent with a remote iterator request (for
+    example, the advancer), but most are applied after we convert from
+    tuples into elements.
 
-  - Subqueries {Union,Steps,Star}.  Implement subquery support. (We
-    can't test Star until we have the mutation API in place.)
+    IFilterConstructor only works with ITupleIterator.
+
+    IElementFilter only filters. It can not resolve, transform, chunk,
+    etc. It is currently sent with the iterator to the B+Tree.  See
+    AccessPath#iterator().
+
+  - Break the DistinctSPOIterator into a Distinct(Element)Filter and a
+    StripContextFilter.
+
+  - AbstractTuple#getObject() should cache the materialized object
+    since some patterns used by an AccessPath may request the object
+    multiple times.  Of course, caching implies that we must clear the
+    reference when advancing the iterator.  Check TupleFilter and
+    friends since there might need to be more than once class which
+    caches the object.  Clear the reference when the iterator is
+    exhausted.
+
+  - Adapt the code to use the cost models and decision trees and write
+    Unit tests of the default and named graph access path patterns.
+
+  - Implement subquery support and subquery operators {Union, Steps,
+    Star}. (We can't test Star until we have the mutation API in
+    place.)
 
   - PipelineType {Vectored,OneShot}.
 
@@ -27,6 +53,10 @@ RunningQuery:
     standalone, we can using either UnisolatedReadWriteIndex or the
     ConcurrencyManager as appropriate (but how can we tell which is
     appropriate!?!).
+
+    Note: AccessPath currently does not allow inserts (just
+    deletes). Hopefully it can be extended to allow INSERT and UPDATE
+    so we can use the same abstraction for mutation operators.
 
   - Mutation {Create, Destroy}.  This gets into resource management,
     so defer for the moment but tackle in the context of RDFS closure
@@ -461,4 +491,57 @@ Features:
  * <li></li>
  * <li></li>
  * </ul>
-   
+
+
+Martyn,
+
+Rationalizing CTC striterators, bigdata striterators, and access paths:
+
+Dropped the ctc_utils jar and added the source files to the classpath.
+
+I've added an IPropertySet interface:
+
+Object getProperty(String name).
+
+There are currently several varieties of IFilter.  Each one knows how to create its corresponding implementation class.  This exactly parallels the bops, where a concrete bop such as MemorySortOp, knows how to create the corresponding runtime class, MemorySortOp.SortTask.  I've added a filterOnce() method to provide the semantics of wrapping an iterator with just that IFilter.  The existing filter() method now wraps the chain, starting with _this_ IFilter and then wrapping anything which was added to the chain.  The chain is empty if nothing was added.  I've modified the various IFilter implementations to conform with this.
+
+I've modified all of the implementation classes (Appenderator, etc.) to accept the new context argument regardless of whether they use it.  I have also modified them to always have the reference to the IFilter object so the IPropertySet will be accessible.
+
+Modified Uniqueness filter to use a linked hash map.
+
+Modified Sorter uses Arrays.sort() rather than TreeSort.
+
+Some problems:
+
+- Should Appender simply pass the other iterator as m_state to the FilterBase?
+
+- Mapper uses non-Serializable "Method".  We should provide defered reflection for the method.
+
+- Merger uses non-Serializable "Iterator".
+
+- Sorter and Resolver should use an annotation pattern so we can create instances from Prolog of the operator.  I do not think we can do this when the operator is abstract.  Maybe we can have two "Resolver" classes, two "Sorter" classes, etc.  The simple one can be used for inline programming.  The other one will extend BOpBase and implement IFilter and will be used for query.
+
+- CONTRACTOR should be able to break an iterator into many chunks, not just one.  Maybe the API should return an Iterator from an Iterator in which the chunkiness is changed (from element to element[])?
+
+Here is what I have not done yet:
+
+Write unit tests to sanity check these changes.
+
+Write BOp versions of Append, Expand, etc.  These will extend BOpBase.
+
+The following places directly invoke filterOnce(src,ctx).  The first two should be modified to pass in the correct context object.  That might require raising a context object into an IRangeIterator parameter.
+
+AbstractBTree#2933
+FusedView#1281
+TestRemoverator#86
+
+Replace (I)FilterConstructor with IFilter.  FilterConstructor implemented clone.  I am not sure that I can recall why.  Presumably because a cloned would have a distinct filter chain.  We can not easily override clone() on FilterBase because of all the derived versions.  We could have a deep copy constructor pattern, which is what I did for the BOpBase class and then use that for clone.
+
+Replace the IPredicate "CONSTRAINT" with "REMOTE_FILTERS" (an IFilter which is evaluated at the BTree) and "LOCAL_FILTERS" (an IFilter which is evaluated against the range iterator once it is materialized on the local node).  If the index is local, then the same concepts apply but we do not have to serialize the REMOTE_FILTERS.  For the moment, the AccessPath automatically resolves ITuples to relation elements and adds the SameVariableConstraint if necessary.  We might shift the burden of responsibility for this to the query planner in the future.
+
+Write unit tests at the IPredicate/AccessPath level to use stackable filters.
+
+Fixed the build.xml script to accomodate the class path changes.
+
+Thanks,
+Bryan

@@ -37,6 +37,8 @@ import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
 
+import cutthecrap.utils.striterators.FilterBase;
+
 /**
  * Lookahead filter for an {@link ITuple}. You can push back a single
  * {@link ITuple} onto the filter.
@@ -46,7 +48,7 @@ import com.bigdata.btree.ITupleSerializer;
  * 
  * @todo unit tests.
  */
-public class LookaheadTupleFilter<E> implements ITupleFilter<E> {
+public class LookaheadTupleFilter<E> extends FilterBase implements ITupleFilter<E> {
 
     private static final long serialVersionUID = -5551926378159692251L;
 
@@ -77,14 +79,15 @@ public class LookaheadTupleFilter<E> implements ITupleFilter<E> {
     }
     
     @SuppressWarnings("unchecked")
-    public ILookaheadTupleIterator<E> filter(Iterator src) {
+    @Override
+    public ILookaheadTupleIterator<E> filterOnce(Iterator src, Object context) {
 
         if(src instanceof ITupleCursor) {
         
-            return new LookaheadTupleCursor((ITupleCursor)src);
+            return new LookaheadTupleCursor((ITupleCursor)src, context);
         }
         
-        return new LookaheadTupleIterator((ITupleIterator)src);
+        return new LookaheadTupleIterator((ITupleIterator)src, context);
         
     }
 
@@ -98,12 +101,13 @@ public class LookaheadTupleFilter<E> implements ITupleFilter<E> {
     static private class LookaheadTupleCursor<E> implements ILookaheadTupleIterator<E> {
 
         private final ITupleCursor<E> src;
+        private final Object context;
         private boolean pushbackAllowed = false;
         
-        public LookaheadTupleCursor(ITupleCursor<E> src) {
+        public LookaheadTupleCursor(ITupleCursor<E> src, Object context) {
             
             this.src = src;
-            
+            this.context = context;
         }
 
         public void pushback() {
@@ -151,6 +155,7 @@ public class LookaheadTupleFilter<E> implements ITupleFilter<E> {
     static private class LookaheadTupleIterator<E> implements ILookaheadTupleIterator<E> {
 
         private final ITupleIterator<E> src;
+        private final Object context;
         
         /**
          * <code>true</code> iff pushback is allowed. when <code>true</code>,
@@ -171,9 +176,10 @@ public class LookaheadTupleFilter<E> implements ITupleFilter<E> {
         /**
          * @param src
          */
-        public LookaheadTupleIterator(ITupleIterator<E> src) {
-            
+        public LookaheadTupleIterator(ITupleIterator<E> src, Object context) {
+
             this.src = src;
+            this.context = context;
             
         }
 

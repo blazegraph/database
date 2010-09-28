@@ -33,8 +33,6 @@ import com.bigdata.btree.filter.Advancer;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
-import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.store.IRawTripleStore;
 

@@ -7,6 +7,8 @@ import java.io.ObjectOutput;
 import java.util.Arrays;
 import java.util.HashSet;
 import org.openrdf.model.URI;
+
+import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
 
@@ -21,8 +23,10 @@ import com.bigdata.rdf.model.BigdataURI;
  * @version $Id$
  * 
  * @see InGraphHashSetFilter
+ * 
+ * @todo reconcile with {@link INBinarySearch}
  */
-public final class InGraphBinarySearchFilter extends SPOFilter
+public final class InGraphBinarySearchFilter<E extends ISPO> extends SPOFilter<E>
         implements Externalizable {
 
     /**
@@ -74,7 +78,7 @@ public final class InGraphBinarySearchFilter extends SPOFilter
         
     }
 
-    public boolean accept(final Object o) {
+    public boolean accept(final ISPO o) {
         
         if (!canAccept(o)) {
             

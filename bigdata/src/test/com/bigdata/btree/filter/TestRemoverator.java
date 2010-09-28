@@ -83,7 +83,7 @@ public class TestRemoverator extends AbstractTupleCursorTestCase {
                 // all visited tuples will be removed.
                 return true;
             }
-        }.filter(newCursor(btree));
+        }.filterOnce(newCursor(btree), null/* context */);
         
         assertTrue(itr.hasNext());
 

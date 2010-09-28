@@ -8,6 +8,8 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 
+import cutthecrap.utils.striterators.FilterBase;
+
 /**
  * Visits all elements visited by the source iterator and removes those
  * matching the filter.
@@ -23,13 +25,20 @@ import com.bigdata.btree.ITupleIterator;
  * @version $Id$
  * @param <E>
  */
-abstract public class TupleRemover<E> implements ITupleFilter<E> {
+abstract public class TupleRemover<E> extends FilterBase implements ITupleFilter<E> {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
 
     @SuppressWarnings("unchecked")
-    public ITupleIterator<E> filter(Iterator src) {
+    @Override
+    public ITupleIterator<E> filterOnce(final Iterator src, Object context) {
 
-        return new TupleRemover.Removerator<E>((ITupleIterator<E>) src, this);
-        
+        return new TupleRemover.Removerator<E>((ITupleIterator<E>) src,
+                context, this);
+
     }
     
     /**
@@ -55,6 +64,11 @@ abstract public class TupleRemover<E> implements ITupleFilter<E> {
          * The source iterator.
          */
         private final ITupleIterator<E> src;
+
+        /**
+         * The context object (ignored).
+         */
+        private final Object ctx;
         
         /**
          * The filter to be applied.
@@ -65,9 +79,12 @@ abstract public class TupleRemover<E> implements ITupleFilter<E> {
          * @param src
          * @param filter
          */
-        public Removerator(ITupleIterator<E> src, TupleRemover<E> filter) {
-        
+        public Removerator(final ITupleIterator<E> src, final Object context,
+                final TupleRemover<E> filter) {
+
             this.src = src;
+            
+            this.ctx = context;
             
             this.filter = filter;
         

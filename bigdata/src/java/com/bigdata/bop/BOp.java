@@ -31,6 +31,8 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
+import cutthecrap.utils.striterators.IPropertySet;
+
 /**
  * An operator, such as a constant, variable, join, sort, filter, etc.
  * <p>
@@ -53,7 +55,7 @@ import java.util.Map;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface BOp extends Cloneable, Serializable {
+public interface BOp extends Cloneable, Serializable, IPropertySet {
 
     /**
      * The #of arguments to the operation.
@@ -114,7 +116,7 @@ public interface BOp extends Cloneable, Serializable {
      * @return The value of the annotation and <code>null</code> if the
      *         annotation is not bound.
      */
-    <T> T getProperty(final String name);
+    //<T> T getProperty(final String name);
 
 //    /**
 //     * Return the value of the named annotation.

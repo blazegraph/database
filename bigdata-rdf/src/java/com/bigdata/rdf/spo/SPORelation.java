@@ -617,6 +617,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
      *            details.
      * 
      * @return The SPO index.
+     * 
+     * @deprecated Comment out when we drop the {@link DistinctSPOIterator}.
      */
     public BTree getSPOOnlyBTree(final boolean bloomFilter) {
         

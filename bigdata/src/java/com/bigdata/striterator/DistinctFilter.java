@@ -32,6 +32,7 @@ import java.io.Serializable;
 import java.util.Arrays;
 import java.util.UUID;
 
+import com.bigdata.bop.solutions.DistinctBindingSetOp;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IndexMetadata;
@@ -69,6 +70,8 @@ import com.bigdata.relation.rule.eval.ISolution;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by {@link DistinctBindingSetOp}
  */
 abstract public class DistinctFilter<E> implements IChunkConverter<E, E> {
 

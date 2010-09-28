@@ -1156,6 +1156,10 @@ public class TestQueryEngine extends TestCase2 {
     /**
      * FIXME Test the ability run a query reading on an access path using a
      * DISTINCT filter (this is just stacking a striterator on the access path).
+     * 
+     * @see DistinctSPOIterator, which should stack as a striterator. It might
+     *      be best to break it up into something to strip off the context
+     *      position and a distincterator.
      */
     public void test_query_join1_distinctAccessPath() {
         

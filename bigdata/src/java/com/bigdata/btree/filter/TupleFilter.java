@@ -17,6 +17,7 @@ import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.Tuple;
 
 import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.FilterBase;
 
 /**
  * <p>
@@ -47,14 +48,19 @@ import cutthecrap.utils.striterators.Filter;
  *            The type of the elements visited by the iterator (tuples of some
  *            sort).
  */
-abstract public class TupleFilter<E> implements ITupleFilter<E> {
+abstract public class TupleFilter<E> extends FilterBase implements ITupleFilter<E> {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
 
     protected static transient final Logger log = Logger.getLogger(TupleFilter.class);
     
-    /**
-     * Optional state specified by the ctor.
-     */
-    protected Object state;
+//    /**
+//     * Optional state specified by the ctor.
+//     */
+//    protected Object state;
    
     public TupleFilter() {
 
@@ -62,16 +68,18 @@ abstract public class TupleFilter<E> implements ITupleFilter<E> {
         
     }
 
-    public TupleFilter(Object state) {
+    public TupleFilter(final Object state) {
                 
-        this.state = state;
+//        this.state = state;
+        super(state);
         
     }
     
     @SuppressWarnings("unchecked")
-    public ITupleIterator<E> filter(Iterator src) {
+    @Override
+    public ITupleIterator<E> filterOnce(final Iterator src,Object context) {
 
-        return new TupleFilter.Filterator((ITupleIterator) src);
+        return new TupleFilter.Filterator((ITupleIterator) src, context, this);
 
     }
 
@@ -85,7 +93,7 @@ abstract public class TupleFilter<E> implements ITupleFilter<E> {
      * @version $Id$
      * @param <E>
      */
-    protected class Filterator implements ITupleIterator<E> {
+    static protected class Filterator<E> implements ITupleIterator<E> {
 
         /**
          * The source iterator.
@@ -93,9 +101,16 @@ abstract public class TupleFilter<E> implements ITupleFilter<E> {
         protected final ITupleIterator<E> src;
 
         /**
+         * The context.
+         */
+        protected final Object context;
+        
+        protected final TupleFilter<E> filter;
+        
+        /**
          * The next value to be returned by {@link #next()}.
          */
-        private ITuple nextValue = null;
+        private ITuple<E> nextValue = null;
 
         /**
          * The {@link ITuple} instance that will actually be returned to the
@@ -107,11 +122,14 @@ abstract public class TupleFilter<E> implements ITupleFilter<E> {
          * of the data must be made in order to avoid side-effects from the
          * one-step lookahead used by the filter.
          */
-        final private AbstractTuple returnValue;
+        final private AbstractTuple<E> returnValue;
         
-        public Filterator(final ITupleIterator<E> src) {
+        public Filterator(final ITupleIterator<E> src, final Object context,
+                final TupleFilter<E> filter) {
 
             this.src = src;
+            this.context = context;
+            this.filter = filter;
 
             /*
              * One step lookahead.
@@ -161,7 +179,7 @@ abstract public class TupleFilter<E> implements ITupleFilter<E> {
 
         }
 
-        @SuppressWarnings("unchecked")
+//        @SuppressWarnings("unchecked")
         public ITuple<E> next() {
 
             if (!hasNext())
@@ -182,7 +200,7 @@ abstract public class TupleFilter<E> implements ITupleFilter<E> {
             visit(returnValue);
             
             // return the private instance containing a copy of the data.
-            return (ITuple<E>)returnValue;
+            return (ITuple<E>) returnValue;
 
         }
 
@@ -193,7 +211,7 @@ abstract public class TupleFilter<E> implements ITupleFilter<E> {
          * @param tuple
          *            The tuple that will be visited.
          */
-        protected void visit(ITuple<E> tuple) {
+        protected void visit(final ITuple<E> tuple) {
            
             // NOP
             
@@ -220,7 +238,7 @@ abstract public class TupleFilter<E> implements ITupleFilter<E> {
          */
         public void remove() {
 
-            if(src instanceof ITupleCursor) {
+            if(src instanceof ITupleCursor<?>) {
 
                 /*
                  * The ITupleCursor supports traversal with concurrent
@@ -262,13 +280,13 @@ abstract public class TupleFilter<E> implements ITupleFilter<E> {
          * 
          * @return The next object to be visited.
          */
-        protected ITuple getNext() {
+        protected ITuple<E> getNext() {
 
             while (src.hasNext()) {
 
                 final ITuple<E> next = src.next();
 
-                if (!isValid(next)) {
+                if (!filter.isValid(next)) {
 
                     if(log.isInfoEnabled()) {
                         
@@ -286,7 +304,7 @@ abstract public class TupleFilter<E> implements ITupleFilter<E> {
                     
                 }
                 
-                return (ITuple) next;
+                return next;
                 
             }
 

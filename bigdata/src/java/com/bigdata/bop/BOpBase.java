@@ -305,10 +305,16 @@ public class BOpBase implements BOp {
 
     }
 
-    @SuppressWarnings("unchecked")
-    public <T> T getProperty(final String name) {
+//    @SuppressWarnings("unchecked")
+//    public <T> T getProperty(final String name) {
+//
+//        return (T) annotations.get(name);
+//
+//    }
 
-        return (T) annotations.get(name);
+    public Object getProperty(final String name) {
+
+        return annotations.get(name);
 
     }
 
