@@ -21,6 +21,9 @@
 		<fileset dir="${bigdata.dir}/bigdata-sails/lib">
 			<include name="**/*.jar" />
 		</fileset>
+		<fileset dir="${bigdata.dir}/ctc-striterator/lib">
+			<include name="**/*.jar" />
+		</fileset>
 	</path>
 
 	<!-- runtime classpath w/o install. -->
