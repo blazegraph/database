@@ -35,6 +35,7 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
@@ -306,35 +307,68 @@ public class TestPredicateAccessPath extends TestCase2 {
      */
     public void test_filter() {
 
-//        final IAccessPath<E> accessPath = rel.getAccessPath(new Predicate<E>(
-//                new IVariableOrConstant[] { new Constant<String>("Mary"),
-//                        Var.var("value") }, namespace));
-//
-//        // verify the range count.
-//        assertEquals(2, accessPath.rangeCount(true/* exact */));
-//
-//        // visit that access path, verifying the elements and order.
-//        if (log.isInfoEnabled())
-//            log.info("accessPath=" + accessPath);
-//        final E[] expected = new E[] {//
-//        new E("Mary", "Paul"),// 
-//        };
-//        final IChunkedOrderedIterator<E> itr = accessPath.iterator();
-//        try {
-//            int n = 0;
-//            while (itr.hasNext()) {
-//                final E e = itr.next();
-//                if (log.isInfoEnabled())
-//                    log.info(n + " : " + e);
-//                assertEquals(expected[n], e);
-//                n++;
-//            }
-//            assertEquals(expected.length, n);
-//        } finally {
-//            itr.close();
-//        }
+        final IVariable<?> x = Var.var("x");
+        final IVariable<?> y = Var.var("y");
+        
+        final Predicate<E> pred = new Predicate<E>(new IVariableOrConstant[] {
+                x, y }, NV.asMap(new NV[] {//
+                        new NV(Annotations.RELATION_NAME,new String[]{namespace}),//
+                        new NV(Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
+                        new NV(Annotations.REMOTE_ACCESS_PATH, false),//
+                        new NV(Annotations.CONSTRAINT, new IElementFilter<E>() {
+                            
+                            public boolean canAccept(Object o) {
+                                return true;
+                            }
+                            
+                            public boolean accept(E e) {
+                                return e.name.equals("Mary");
+                            }
+                        })
+                }));
 
-        fail("write test");
+        final E[] expected = new E[] {//
+                new E("Mary", "John"),// 
+                new E("Mary", "Paul"),// 
+        };
+        
+        final BOpStats statIsIgnored = new BOpStats();
+
+        final IAsynchronousIterator<IBindingSet[]> sourceIsIgnored = new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { new IBindingSet[0] });
+
+        final IBlockingBuffer<IBindingSet[]> sinkIsIgnored = new BlockingBuffer<IBindingSet[]>(
+                1/* capacity */);
+
+        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                new MockRunningQuery(null/* fed */, jnl/* indexManager */
+                ), -1/* partitionId */, statIsIgnored,
+                sourceIsIgnored, sinkIsIgnored, null/* sink2 */);
+
+        // lookup relation
+        final R relation = (R) context.getRelation(pred);
+
+        // obtain access path for that relation.
+        final IAccessPath<E> ap = context.getAccessPath(relation, pred);
+        
+        // obtain range count from the access path.
+        assertEquals(2L, ap.rangeCount(true/* exact */));
+        
+        // verify the data visited by the access path.
+        final IChunkedOrderedIterator<E> itr = ap.iterator();
+        try {
+            int n = 0;
+            while (itr.hasNext()) {
+                final E e = itr.next();
+                if (log.isInfoEnabled())
+                    log.info(n + " : " + e);
+                assertEquals(expected[n], e);
+                n++;
+            }
+            assertEquals(expected.length,n);
+        } finally {
+            itr.close();
+        }
         
     }
 
