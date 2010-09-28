@@ -125,7 +125,7 @@ public abstract class TestINConstraint extends TestCase2
 
         assertTrue ( op.accept ( in ) ) ;
         assertFalse ( op.accept ( notin ) ) ;
-        assertFalse ( op.accept ( nb ) ) ;
+        assertTrue ( op.accept ( nb ) ) ;
     }
 
     protected abstract INConstraint newINConstraint ( IVariable<?> var, IConstant<?> vals [] ) ;

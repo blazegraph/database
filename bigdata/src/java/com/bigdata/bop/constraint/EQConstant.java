@@ -78,7 +78,7 @@ public class EQConstant extends BOpConstraint {
         final IConstant<?> asBound = bset.get(var);
     
         if (asBound == null)
-            return false; // not bound.
+            return true; // not yet bound.
     
         final IConstant<?> cnst = (IConstant<?>) get(1);
         

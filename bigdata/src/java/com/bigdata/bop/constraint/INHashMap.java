@@ -159,8 +159,8 @@ public class INHashMap<T> extends INConstraint<T> {
 
         if (x == null) {
 
-            // not bound.
-            return false;
+            // not yet bound.
+            return true;
             
         }
 
