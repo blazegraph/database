@@ -45,7 +45,6 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.join.PipelineJoin;
@@ -206,7 +205,7 @@ public class Rule2BOpUtility {
                 }
             }
             
-            final BindingSetPipelineOp joinOp = new PipelineJoin<E>(//
+            final BindingSetPipelineOp joinOp = new PipelineJoin(//
                     left, pred,//
                     NV.asMap(new NV[] {//
                             new NV(BOp.Annotations.BOP_ID, joinId),//
@@ -256,8 +255,8 @@ public class Rule2BOpUtility {
             for (BOp arg : args) {
                 toString(arg, sb, indent+4);
             }
-            IConstraint[] constraints = 
-                bop.getProperty(PipelineJoin.Annotations.CONSTRAINTS);
+            IConstraint[] constraints = (IConstraint[]) bop
+                    .getProperty(PipelineJoin.Annotations.CONSTRAINTS);
             if (constraints != null) {
                 for (IConstraint c : constraints) {
                     toString(c, sb, indent+4);
