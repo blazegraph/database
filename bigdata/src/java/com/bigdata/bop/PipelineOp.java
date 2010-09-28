@@ -32,7 +32,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.bop.ap.E;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.relation.accesspath.BlockingBuffer;
