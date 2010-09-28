@@ -27,8 +27,10 @@ package cutthecrap.utils.striterators;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 
 /**
@@ -40,7 +42,7 @@ import java.util.List;
  *	The <code>addTypeFilter</code> method allows easy specification of a class type restriction.
  */
 public class Striterator implements IStriterator {
-    private List<IFilter> filters = null; // Note: NOT serializable.
+	volatile List<IFilter> filters = null; // Note: NOT serializable.
     private transient Iterator realSource;
 	private transient Iterator m_src = null;
 
@@ -101,9 +103,20 @@ public class Striterator implements IStriterator {
 
 	/** creates a Filterator to apply the filter **/
 	public IStriterator addFilter(final IFilter filter) {
-        if (filters == null)
-        	filters = new ArrayList<IFilter>();
-        	
+        if (filters == null) {
+            synchronized (this) {
+                /*
+                 * Note: double-checked locking pattern and volatile field are
+                 * used to ensure visibility in combination with lazy create of
+                 * the backing list.
+                 */
+                if (filters == null) {
+                	filters = Collections
+                            .synchronizedList(new LinkedList<IFilter>());
+                }
+            }
+        }
+        
         filters.add(filter);
 
         return this;
