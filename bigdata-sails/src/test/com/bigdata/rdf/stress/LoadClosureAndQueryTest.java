@@ -1204,7 +1204,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
         try {
 
             dataLoader.loadFiles(dataDir, null/* baseURI */,
-                    null/* rdfFormat */, filter);
+                    null/* rdfFormat */, null, /* defaultGraph */filter);
 
         } catch (IOException ex) {
             

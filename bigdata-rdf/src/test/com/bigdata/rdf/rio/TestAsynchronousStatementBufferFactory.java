@@ -400,6 +400,7 @@ public class TestAsynchronousStatementBufferFactory extends
                 valuesInitialCapacity,//
                 bnodesInitialCapacity,//
                 RDFFormat.RDFXML, // defaultFormat
+                null, // defaultGraph
                 parserOptions, // 
                 false, // deleteAfter
                 parallel?5:1,  // parserPoolSize,

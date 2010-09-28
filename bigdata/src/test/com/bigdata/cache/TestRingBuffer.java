@@ -28,9 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.cache;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -65,7 +63,7 @@ public class TestRingBuffer extends TestCase2 {
     public void test_ctor() {
         
         try {
-            new RingBuffer(0);
+            new RingBuffer<String>(0);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             if (log.isInfoEnabled())
@@ -73,14 +71,14 @@ public class TestRingBuffer extends TestCase2 {
         }
         
         try {
-            new RingBuffer(-1);
+            new RingBuffer<String>(-1);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring excepted exception: " + ex);
         }
 
-        final RingBuffer b = new RingBuffer(1);
+        final RingBuffer<String> b = new RingBuffer<String>(1);
 
         assertEquals("capacity", 1, b.capacity());
         assertEquals("size", 0, b.size());
@@ -304,8 +302,6 @@ public class TestRingBuffer extends TestCase2 {
      * remove(0) : [ _, _, _ ] : head=0; tail=0; size=0, returns [c] (empty, head==tail)
      * </pre>
      * 
-     * @todo must also test when remove not at the tail!
-     * 
      * When removing the tail, head := (head-1) % capacity.
      */
     public void test_removeNth() {
@@ -313,7 +309,7 @@ public class TestRingBuffer extends TestCase2 {
         final String a = "a";
         final String b = "b";
         final String c = "c";
-        final String d = "d";
+//        final String d = "d";
         
         final RingBuffer<String> buffer = new RingBuffer<String>(3);
 
@@ -429,8 +425,8 @@ public class TestRingBuffer extends TestCase2 {
 
         try {
             buffer.add(null);
-            fail("Expecting: " + IllegalArgumentException.class);
-        } catch (IllegalArgumentException ex) {
+            fail("Expecting: " + NullPointerException.class);
+        } catch (NullPointerException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }
@@ -442,8 +438,8 @@ public class TestRingBuffer extends TestCase2 {
 
         try {
             buffer.offer(null);
-            fail("Expecting: " + IllegalArgumentException.class);
-        } catch (IllegalArgumentException ex) {
+            fail("Expecting: " + NullPointerException.class);
+        } catch (NullPointerException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }
@@ -619,9 +615,9 @@ public class TestRingBuffer extends TestCase2 {
     
     public void test_toArray1_nonempty() {
         Object [] intArr = new Object[] {
-        		new Integer(1),
-        		new Integer(2),
-        		new Integer(3)
+        		Integer.valueOf(1),
+        		Integer.valueOf(2),
+        		Integer.valueOf(3)
         };
         final RingBuffer<Object> buffer = new RingBuffer<Object>(intArr.length);
         buffer.addAll(Arrays.asList(intArr));
@@ -631,9 +627,9 @@ public class TestRingBuffer extends TestCase2 {
     
     public void test_toArray1_nonempty_oversized() {
         Object [] intArr = new Object[] {
-        		new Integer(1),
-        		new Integer(2),
-        		new Integer(3)
+        		Integer.valueOf(1),
+        		Integer.valueOf(2),
+        		Integer.valueOf(3)
         };
         final RingBuffer<Object> buffer = new RingBuffer<Object>(intArr.length);
         buffer.addAll(Arrays.asList(intArr));
@@ -685,7 +681,7 @@ public class TestRingBuffer extends TestCase2 {
     
     // see https://sourceforge.net/apps/trac/bigdata/ticket/101
     public void test_remove_get_order() {
-        String[] expected = new String[] {
+        final String[] expected = new String[] {
         		"a", "b", "c", "d"
         };
 	    final RingBuffer<String> b = new RingBuffer<String>(expected.length);
@@ -698,8 +694,8 @@ public class TestRingBuffer extends TestCase2 {
 	    
 	    //Remove entries in MRU to LRU order -- differs from javadoc order
 	    for (int i=(expected.length-1); i >= 0; i--) {
-	    	String getString = b.get(i);
-	    	String removeString = b.remove(i);
+	    	final String getString = b.get(i);
+	    	final String removeString = b.remove(i);
 	    	assertSame(getString, removeString);	    	
 	    }
 	    assertTrue(b.isEmpty());
@@ -973,8 +969,16 @@ public class TestRingBuffer extends TestCase2 {
    	    assertTrue(b.contains("c"));
     }
     
-    //TODO - check for exception on contains(null) once implemented
-    
+    public void test_contains_null() {
+        final RingBuffer<String> b = new RingBuffer<String>(1);
+        try {
+            b.contains(null);
+            fail("Expecting: " + NullPointerException.class);
+        } catch (NullPointerException ex) {
+            if (log.isInfoEnabled())
+                log.info("Ignoring excepted exception: " + ex);
+        }
+    }
     
     public void test_contains_all_null() {
     	final RingBuffer<String> b = new RingBuffer<String>(1);	
@@ -988,14 +992,16 @@ public class TestRingBuffer extends TestCase2 {
     }
     
     public void test_contains_all_this() {
-    	final RingBuffer<String> b = new RingBuffer<String>(1);	
-        try {
-            b.containsAll(b);
-            fail("Expecting: " + IllegalArgumentException.class);
-        } catch (IllegalArgumentException ex) {
-            if (log.isInfoEnabled())
-                log.info("Ignoring excepted exception: " + ex);
-        }
+    	final RingBuffer<String> b = new RingBuffer<String>(1);
+    	// Note: This is a tautology.
+    	assertTrue(b.containsAll(b));
+//        try {
+//            b.containsAll(b);
+//            fail("Expecting: " + IllegalArgumentException.class);
+//        } catch (IllegalArgumentException ex) {
+//            if (log.isInfoEnabled())
+//                log.info("Ignoring excepted exception: " + ex);
+//        }
     }
 
     public void test_contains_all_empty() {

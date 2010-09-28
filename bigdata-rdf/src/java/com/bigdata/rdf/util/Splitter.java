@@ -714,7 +714,7 @@ public class Splitter {
                     try {
                         // run the parser.
                         new MyLoader(buffer).loadRdf(reader, baseURL,
-                                defaultRDFFormat, s.parserOptions);
+                                defaultRDFFormat, null, s.parserOptions);
                     } finally {
                         reader.close();
                     }

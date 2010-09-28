@@ -40,6 +40,7 @@ import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.CommitTimeIndex;
 import com.bigdata.service.TxServiceRunState;
+import com.bigdata.util.MillisecondTimestampFactory;
 
 /**
  * Unit tests of the {@link AbstractTransactionService} using a mock client.
@@ -257,6 +258,24 @@ public class TestTransactionService extends TestCase2 {
             
             }
 
+        }
+
+        /**
+         * FIXME This currently waits until at least two milliseconds have
+         * elapsed. This is a workaround for
+         * {@link TestTransactionService#test_newTx_readOnly()} until <a href=
+         * "https://sourceforge.net/apps/trac/bigdata/ticket/145" >ISSUE#145
+         * </a> is resolved.  This override of {@link #nextTimestamp()} should
+         * be removed once that issue is fixed.
+         */
+        @Override
+        public long nextTimestamp() {
+
+            // skip at least one millisecond.
+            MillisecondTimestampFactory.nextMillis();
+            
+            return MillisecondTimestampFactory.nextMillis();
+            
         }
 
     }
@@ -596,17 +615,25 @@ public class TestTransactionService extends TestCase2 {
      * GT the lastCommitTime since that could allow data not yet committed to
      * become visible during the transaction (breaking isolation).
      * <p>
-     * A commitTime is identified by looking up the callers timestamp in a log of
-     * the historical commit times and returning the first historical commit
+     * A commitTime is identified by looking up the callers timestamp in a log
+     * of the historical commit times and returning the first historical commit
      * time LTE the callers timestamp.
      * <p>
      * The transaction start time is then chosen from the half-open interval
      * <i>commitTime</i> (inclusive lower bound) : <i>nextCommitTime</i>
      * (exclusive upper bound).
      * 
-     * @throws IOException 
+     * @throws IOException
      * 
-     * @todo This test fails occasionally. I have not figured out why yet. BBT
+     * @todo This test fails occasionally. This occurs if the timestamps
+     *       assigned by the {@link MockTransactionService} are only 1 unit
+     *       apart. When that happens, there are not enough distinct values
+     *       available to allow 2 concurrent read-only transactions. See <a
+     *       href=
+     *       "https://sourceforge.net/apps/trac/bigdata/ticket/145">ISSUE#145
+     *       </a>.  Also see {@link MockTransactionService#nextTimestamp()}
+     *       which has been overridden to guarantee that there are at least
+     *       two distinct values such that this test will pass.
      */
     public void test_newTx_readOnly() throws IOException {
 

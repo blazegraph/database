@@ -558,10 +558,17 @@ public class SPO implements ISPO {
             final int p = this.p.hashCode();
             
             final int o = this.o.hashCode();
-            
-            // Note: historical behavior was (s,p,o) based hash.
-            hashCode = 961 * ((int) (s ^ (s >>> 32))) + 31
-                    * ((int) (p ^ (p >>> 32))) + ((int) (o ^ (o >>> 32)));
+
+            /*
+             * Note: The historical behavior was based on the int64 term
+             * identifiers. Since the hash code is now computed from the int32
+             * hash codes of the (s,p,o) IV objects, the original bit math was
+             * resulting in a hash code which was always zero (any 32 bit value
+             * shifted right by 32 bits is zero).
+             */
+            hashCode = 961 * s + 31 * p + o;
+//            hashCode = 961 * ((int) (s ^ (s >>> 32))) + 31
+//                    * ((int) (p ^ (p >>> 32))) + ((int) (o ^ (o >>> 32)));
 
         }
 
