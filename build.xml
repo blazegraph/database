@@ -155,7 +155,6 @@
 
 		<bndwrap jars="${build.dir}/lib/unimi/colt-1.2.0.jar" output="${build.dir}/bundles/colt-1.2.0.jar" definitions="${basedir}/osgi/" />
 		<bndwrap jars="${build.dir}/lib/unimi/fastutil-5.1.5.jar" output="${build.dir}/bundles/fastutil-5.1.5.jar" definitions="${basedir}/osgi/" />
-		<bndwrap jars="${build.dir}/lib/ctc_utils-5-4-2005.jar" output="${build.dir}/bundles/ctc_utils-5-4-2005.jar" definitions="${basedir}/osgi/" />
 		<bndwrap jars="${build.dir}/lib/cweb-commons-1.1-b2-dev.jar" output="${build.dir}/bundles/cweb-commons-1.1.2.jar" definitions="${basedir}/osgi/" />
 		<bndwrap jars="${build.dir}/lib/cweb-extser-0.1-b2-dev.jar" output="${build.dir}/bundles/cweb-extser-1.1.2.jar" definitions="${basedir}/osgi/" />
 		<bndwrap jars="${build.dir}/lib/dsi-utils-1.0.6-020610.jar" output="${build.dir}/bundles/dsi-utils-1.0.6-020610.jar" definitions="${basedir}/osgi/" />
@@ -901,7 +900,6 @@ ${postInstallMessage}</echo>
 <!-- Utility libraries -->
 
 <copy file="${bigdata.lib}/unimi/colt-1.2.0.jar" tofile="${dist.lib}/colt.jar" />
-<copy file="${bigdata.lib}/ctc_utils-5-4-2005.jar" tofile="${dist.lib}/ctc_utils.jar" />
 <copy file="${bigdata.lib}/cweb-commons-1.1-b2-dev.jar" tofile="${dist.lib}/cweb-commons.jar" />
 <copy file="${bigdata.lib}/cweb-extser-0.1-b2-dev.jar" tofile="${dist.lib}/cweb-extser.jar" />
 <copy file="${bigdata.lib}/high-scale-lib-v1.1.2.jar" tofile="${dist.lib}/highscalelib.jar" />
@@ -1391,7 +1389,7 @@ ${postInstallMessage}</echo>
 <mkdir dir="${bigdata-test.lib}" />
 <property name="bigdata-test.jar" location="${bigdata-test.lib}/bigdata-test.jar" />
 
-<property name="javac.test.classpath" value="${classes.dir}${path.separator}${junit.jar}${path.separator}${cweb-junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/ctc_utils.jar${path.separator}${dist.lib}/cweb-commons.jar${path.separator}${dist.lib}/cweb-extser.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/iris.jar${path.separator}${dist.lib}/jgrapht.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar" />
+<property name="javac.test.classpath" value="${classes.dir}${path.separator}${junit.jar}${path.separator}${cweb-junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/cweb-commons.jar${path.separator}${dist.lib}/cweb-extser.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/iris.jar${path.separator}${dist.lib}/jgrapht.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar" />
 
 <echo>javac
 </echo>
@@ -1605,7 +1603,6 @@ ${postInstallMessage}</echo>
 	<pathelement location="${dist.lib}/colt.jar" />
 	<pathelement location="${dist.lib}/cweb-commons.jar" />
 	<pathelement location="${dist.lib}/cweb-extser.jar" />
-	<pathelement location="${dist.lib}/ctc_utils.jar" />
 	<pathelement location="${dist.lib}/highscalelib.jar" />
 	<pathelement location="${dist.lib}/dsiutils.jar" />
 	<pathelement location="${dist.lib}/lgplutils.jar" />
@@ -1627,7 +1624,7 @@ ${postInstallMessage}</echo>
 	<pathelement location="${dist.lib}/zookeeper.jar" />
 </path>
 
-<property name="run.class.path" value="${junit.jar}${path.separator}${bigdata-test.jar}${path.separator}${cweb-junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/cweb-commons.jar${path.separator}${dist.lib}/cweb-extser.jar${path.separator}${dist.lib}/ctc_utils.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/iris.jar${path.separator}${dist.lib}/jgrapht.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar" />
+<property name="run.class.path" value="${junit.jar}${path.separator}${bigdata-test.jar}${path.separator}${cweb-junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/cweb-commons.jar${path.separator}${dist.lib}/cweb-extser.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/iris.jar${path.separator}${dist.lib}/jgrapht.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar" />
 
 <echo>    classpath:    ${run.class.path}
 </echo>
@@ -1719,7 +1716,6 @@ ${postInstallMessage}</echo>
 
 	<sysproperty key="classserver.jar" value="${dist.lib}/classserver.jar" />
 	<sysproperty key="colt.jar" value="${dist.lib}/colt.jar" />
-	<sysproperty key="ctc_utils.jar" value="${dist.lib}/ctc_utils.jar" />
 	<sysproperty key="cweb-commons.jar" value="${dist.lib}/cweb-commons.jar" />
 	<sysproperty key="cweb-extser.jar" value="${dist.lib}/cweb-extser.jar" />
 	<sysproperty key="highscalelib.jar" value="${dist.lib}/highscalelib.jar" />
@@ -1820,7 +1816,6 @@ ${postInstallMessage}</echo>
 	<pathelement location="${dist.lib}/colt.jar" />
 	<pathelement location="${dist.lib}/cweb-commons.jar" />
 	<pathelement location="${dist.lib}/cweb-extser.jar" />
-	<pathelement location="${dist.lib}/ctc_utils.jar" />
 	<pathelement location="${dist.lib}/highscalelib.jar" />
 	<pathelement location="${dist.lib}/dsiutils.jar" />
 	<pathelement location="${dist.lib}/lgplutils.jar" />
@@ -1839,7 +1834,7 @@ ${postInstallMessage}</echo>
 	<pathelement location="${dist.lib}/nxparser.jar" />
 	<pathelement location="${dist.lib}/zookeeper.jar" />
 </path>
-<property name="run.class.path" value="${junit.jar}${path.separator}${bigdata-test.jar}${path.separator}${cweb-junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/cweb-commons.jar${path.separator}${dist.lib}/cweb-extser.jar${path.separator}${dist.lib}/ctc_utils.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/iris.jar${path.separator}${dist.lib}/jgrapht.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar" />
+<property name="run.class.path" value="${junit.jar}${path.separator}${bigdata-test.jar}${path.separator}${cweb-junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/cweb-commons.jar${path.separator}${dist.lib}/cweb-extser.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/iris.jar${path.separator}${dist.lib}/jgrapht.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/nxparser.jar${path.separator}${dist.lib}/zookeeper.jar" />
 <!-- Generate the LUBM dataset. 
 		<mkdir dir="${data}"/>
 		<java classname="edu.lehigh.swat.bench.uba.Generator" dir="${data}" fork="yes">
