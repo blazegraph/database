@@ -73,13 +73,13 @@ public class EQ extends BOpConstraint {
         final IConstant<?> x = s.get((IVariable<?>) get(0)/* x */);
 
         if (x == null)
-            return false; // not bound.
+            return true; // not yet bound.
 
         // get binding for "y".
         final IConstant<?> y = s.get((IVariable<?>) get(1)/* y */);
 
         if (y == null)
-            return false; // not bound.
+            return true; // not yet bound.
         
         return x.equals(y); 
 

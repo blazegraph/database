@@ -114,7 +114,7 @@ public class TestEQ extends TestCase2 {
         
     }
 
-    public void test_eval_correct_unblound() {
+    public void test_eval_correct_unbound() {
 
         final EQ op = new EQ(Var.var("x"), Var.var("y"));
 
@@ -122,7 +122,7 @@ public class TestEQ extends TestCase2 {
                 new IVariable[] { Var.var("x") }, //
                 new IConstant[] { new Constant<String>("1") });
 
-        assertFalse(op.accept(bs1));
+        assertTrue(op.accept(bs1));
         
     }
 }

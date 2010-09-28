@@ -91,6 +91,6 @@ public class TestEQConstant extends TestCase2 {
         assertTrue ( op.accept ( eq ) ) ;
         assertFalse ( op.accept ( ne1 ) ) ;
         assertFalse ( op.accept ( ne2 ) ) ;
-        assertFalse ( op.accept ( nb ) ) ;
+        assertTrue ( op.accept ( nb ) ) ;
     }    
 }
