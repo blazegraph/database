@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package cutthecrap.utils.striterators;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.List;
@@ -72,6 +73,7 @@ public class Striterator implements IStriterator {
     public boolean hasNext() {
         if (m_src == null)
             compile(realSource);
+        
         return m_src.hasNext();
     }
 
@@ -99,8 +101,10 @@ public class Striterator implements IStriterator {
 
 	/** creates a Filterator to apply the filter **/
 	public IStriterator addFilter(final IFilter filter) {
-        if (filters != null)
-            filters.add(filter);
+        if (filters == null)
+        	filters = new ArrayList<IFilter>();
+        	
+        filters.add(filter);
 
         return this;
 	}
