@@ -43,7 +43,16 @@ import java.util.NoSuchElementException;
 
 public class Filterator implements Iterator {
 
-	private Iterator m_src;
+	final private Iterator m_src;
+	
+	/**
+	 * Flag set once {@link #getNext()} is invoked at least once.
+	 */
+	private boolean didInit = false;
+	
+	/**
+	 * Pre-fetched, but initial prefetch must not be done in the constructor.
+	 */
 	private Object m_value = null;
 
 	final protected Object m_context;
@@ -54,12 +63,19 @@ public class Filterator implements Iterator {
 		m_context = context;
 		m_filter = filter;
 
-		m_value = getNext();
+        /*
+         * Note: eager initialization causes problems when we are stacking
+         * filters.
+         */
+//		m_value = getNext();
 	}
 
 	//-------------------------------------------------------------
 
-	public boolean hasNext() {
+    public boolean hasNext() {
+        if (!didInit) {
+            m_value = getNext();
+        }
 		return m_value != null;
 	}
 
@@ -85,8 +101,9 @@ public class Filterator implements Iterator {
 	//-------------------------------------------------------------
 
 	protected Object getNext() {
+        didInit = true;
 		while (m_src.hasNext()) {
-			Object next = m_src.next();
+			final Object next = m_src.next();
 
 			if (m_filter.isValid(next)) {
 				return next;

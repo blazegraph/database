@@ -54,9 +54,9 @@ import com.bigdata.btree.IndexSegment.IndexSegmentTupleCursor;
 import com.bigdata.btree.data.IAbstractNodeData;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.Reverserator;
 import com.bigdata.btree.filter.TupleRemover;
+import com.bigdata.btree.filter.WrappedTupleIterator;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
@@ -91,6 +91,8 @@ import com.bigdata.service.DataService;
 import com.bigdata.service.Split;
 import com.bigdata.util.concurrent.Computable;
 import com.bigdata.util.concurrent.Memoizer;
+
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * <p>
@@ -2699,7 +2701,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     final public ITupleIterator rangeIterator(Object fromKey, Object toKey,
             final int capacity,//
             final int flags,//
-            final IFilterConstructor filter//
+            final IFilter filter//
     ) {
 
         fromKey = fromKey == null ? null : metadata.getTupleSerializer()
@@ -2728,7 +2730,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * iterator.
      * <p>
      * Note:
-     * {@link FusedView#rangeIterator(byte[], byte[], int, int, IFilterConstructor)}
+     * {@link FusedView#rangeIterator(byte[], byte[], int, int, IFilter)}
      * is also responsible for constructing an {@link ITupleIterator} in a
      * manner similar to this method. If you are updating the logic here, then
      * check the logic in that method as well!
@@ -2741,7 +2743,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             final byte[] toKey,//
             final int capacityIsIgnored,//
             final int flags,//
-            final IFilterConstructor filter//
+            final IFilter filter//
             ) {
 
 //        btreeCounters.nrangeIterator.incrementAndGet();
@@ -2911,8 +2913,9 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
              * REMOVEALL (those are the assumptions for the flags).
              */
             
-            src = filter.newInstance(src);
-            
+            src = new WrappedTupleIterator(filter
+                    .filter(src, null/* context */));
+
         }
         
         if ((flags & REMOVEALL) != 0) {

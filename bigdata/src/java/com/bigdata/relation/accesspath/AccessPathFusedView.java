@@ -29,6 +29,7 @@ package com.bigdata.relation.accesspath;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
@@ -51,8 +52,14 @@ import cutthecrap.utils.striterators.Striterator;
  * 
  * FIXME review impl and write tests.
  * 
+ * FIXME Does not support {@link IPredicate.Annotations#ACCESS_PATH_FILTER}
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by {@link BOp}s using the UNION of JOINs. However, also note that
+ *             this is only used for TM and that the focus store is always local
+ *             for TM.
  */
 public class AccessPathFusedView<E> implements IAccessPath<E> {
 
@@ -173,10 +180,10 @@ public class AccessPathFusedView<E> implements IAccessPath<E> {
                 new ITupleIterator[] {//
                         path1
                                 .rangeIterator(capacity, path1.flags,
-                                        path1.filter),//
+                                        path1.indexLocalFilter),//
                         path2
                                 .rangeIterator(capacity, path2.flags,
-                                        path2.filter) //
+                                        path2.indexLocalFilter) //
                 });
 
     }

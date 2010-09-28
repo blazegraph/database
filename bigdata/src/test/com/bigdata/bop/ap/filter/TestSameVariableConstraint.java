@@ -45,12 +45,13 @@ Modifications:
  * Created on Sep 30, 2009
  */
 
-package com.bigdata.relation.accesspath;
+package com.bigdata.bop.ap.filter;
 
 import junit.framework.TestCase2;
 
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.ap.filter.SameVariableConstraint;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;

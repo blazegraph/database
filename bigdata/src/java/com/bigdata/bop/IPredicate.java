@@ -31,12 +31,13 @@ package com.bigdata.bop;
 import java.io.Serializable;
 
 import com.bigdata.bop.ap.filter.BOpFilterBase;
+import com.bigdata.bop.ap.filter.BOpTupleFilter;
 import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.filter.IFilterConstructor;
+import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
@@ -47,6 +48,9 @@ import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.eval.IEvaluationPlan;
 import com.bigdata.relation.rule.eval.pipeline.JoinMasterTask;
 import com.bigdata.striterator.IKeyOrder;
+
+import cutthecrap.utils.striterators.FilterBase;
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * An immutable constraint on the elements visited using an {@link IAccessPath}.
@@ -114,22 +118,34 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * change the type of the visited objects will result in a runtime
          * exception.
          * <p>
+         * Note: This filter must be "aware" of the reuse of tuples within tuple
+         * iterators. See {@link BOpTupleFilter} and {@link TupleFilter} for
+         * starting points.
+         * <p>
          * You can chain {@link BOpFilterBase} filters by nesting them inside of
-         * one another.
+         * one another. You can chain {@link FilterBase} filters together as
+         * well.
          * 
          * @see #ACCESS_PATH_FILTER
          * 
-         * @see IRangeQuery#rangeIterator(byte[], byte[], int, int,
-         *      IFilterConstructor)
+         * @see IRangeQuery#rangeIterator(byte[], byte[], int, int, IFilter)
          */
         String INDEX_LOCAL_FILTER = "indexLocalFilter";
 
         /**
          * An optional {@link BOpFilterBase} to be applied to the elements of
-         * the relation as they are materialized from the index. Unlike
-         * {@link #INDEX_LOCAL_FILTER}, this an {@link #ACCESS_PATH_FILTER} is never
-         * sent to a remote index for evaluation. This makes it possible to
-         * impose {@link DistinctFilter} across a {@link #REMOTE_ACCESS_PATH}.
+         * the relation as they are materialized from the index. {@link ITuple}s
+         * are automatically resolved into relation "elements" before this
+         * filter is applied.
+         * <p>
+         * Unlike {@link #INDEX_LOCAL_FILTER}, this an
+         * {@link #ACCESS_PATH_FILTER} is never sent to a remote index for
+         * evaluation. This makes it possible to impose {@link DistinctFilter}
+         * across a {@link #REMOTE_ACCESS_PATH}.
+         * <p>
+         * You can chain {@link BOpFilterBase} filters by nesting them inside of
+         * one another. You can chain {@link FilterBase} filters together as
+         * well.
          */
         String ACCESS_PATH_FILTER = "accessPathFilter";
 

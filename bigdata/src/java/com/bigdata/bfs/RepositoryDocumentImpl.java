@@ -144,7 +144,7 @@ public class RepositoryDocumentImpl implements DocumentHeader, Document
      */
     public RepositoryDocumentImpl(final BigdataFileSystem repo, final String id) {
 
-        this(repo, id, repo.getFilleMetadataIndex().read(
+        this(repo, id, repo.getFileMetadataIndex().read(
                 BigdataFileSystem.metadataSchema, id,
                 IRowStoreConstants.MIN_TIMESTAMP,
                 IRowStoreConstants.CURRENT_ROW, null/* filter */));

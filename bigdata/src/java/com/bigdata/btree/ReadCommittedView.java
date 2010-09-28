@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
@@ -41,6 +40,8 @@ import com.bigdata.journal.Journal;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.StoreManager.ManagedJournal;
+
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * A view of a named index that replaces its view for each high-level request if
@@ -288,7 +289,7 @@ public class ReadCommittedView implements ILocalBTreeView {
     }
 
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IFilterConstructor filterCtor) {
+            int capacity, int flags, IFilter filterCtor) {
         
         return getIndex().rangeIterator(fromKey, toKey, capacity, flags,
                 filterCtor);

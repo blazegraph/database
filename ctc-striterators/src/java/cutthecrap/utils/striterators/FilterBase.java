@@ -77,20 +77,6 @@ public abstract class FilterBase implements IFilter, Cloneable {
     public FilterBase(final Object state) {
         m_state = state;
     }
-
-//    public FilterBase clone() {
-//        
-//        final FilterBase inst = new FilterBase(m_state);
-//        
-//        for(IFilter filter : filterChain) {
-//            
-//            inst.addFilter(filter);
-//            
-//        }
-//        
-//        return inst;
-//        
-//    }
     
     /**
      * Add a filter to the end of this filter chain.

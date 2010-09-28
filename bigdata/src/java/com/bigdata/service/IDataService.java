@@ -36,7 +36,6 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
@@ -52,6 +51,8 @@ import com.bigdata.resources.StoreManager;
 import com.bigdata.service.ndx.ClientIndexView;
 import com.bigdata.service.ndx.DataServiceTupleIterator;
 import com.bigdata.sparse.SparseRowStore;
+
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * <p>
@@ -394,7 +395,7 @@ public interface IDataService extends ITxCommitProtocol, IService, IRemoteExecut
      *                error.
      */
     public ResultSet rangeIterator(long tx, String name, byte[] fromKey,
-            byte[] toKey, int capacity, int flags, IFilterConstructor filter)
+            byte[] toKey, int capacity, int flags, IFilter filter)
             throws InterruptedException, ExecutionException, IOException;
     
     /**

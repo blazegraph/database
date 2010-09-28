@@ -186,8 +186,7 @@ public class TestTupleFilters extends AbstractBTreeTestCase {
         /*
          * Filter selects only the even keys.
          */
-        final IFilterConstructor filter = new FilterConstructor()
-                .addFilter(new TupleFilter() {
+        final TupleFilter filter = new TupleFilter() {
 
                     private static final long serialVersionUID = 1L;
 
@@ -205,7 +204,7 @@ public class TestTupleFilters extends AbstractBTreeTestCase {
 
                     }
 
-                });
+                };
         
         /*
          * Range delete the keys matching the filter.

@@ -26,7 +26,6 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
@@ -52,7 +51,6 @@ import com.bigdata.sparse.ITPV;
 import com.bigdata.sparse.LogicalRowSplitHandler;
 import com.bigdata.sparse.Schema;
 import com.bigdata.sparse.SparseRowStore;
-import com.bigdata.sparse.TPS.TPV;
 
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
@@ -375,7 +373,7 @@ public class BigdataFileSystem extends
     /**
      * The index in which the file metadata is stored (the index must exist).
      */
-    public SparseRowStore getFilleMetadataIndex() {
+    public SparseRowStore getFileMetadataIndex() {
 
         if (fileMetadataIndex == null) {
 
@@ -553,7 +551,7 @@ public class BigdataFileSystem extends
         metadata.put(FileMetadataSchema.VERSION, AutoIncIntegerCounter.INSTANCE);
         
         // write the metadata (atomic operation).
-        final ITPS tps = getFilleMetadataIndex().write(metadataSchema, metadata,
+        final ITPS tps = getFileMetadataIndex().write(metadataSchema, metadata,
                 AUTO_TIMESTAMP_UNIQUE, null/* filter */, null/*precondition*/);
 
         final int version = (Integer) tps.get(FileMetadataSchema.VERSION).getValue();
@@ -646,7 +644,7 @@ public class BigdataFileSystem extends
      */
     public ITPS readMetadata(final String id, final long timestamp) {
 
-        return getFilleMetadataIndex()
+        return getFileMetadataIndex()
                 .read(metadataSchema, id, timestamp/* fromTime */,
                         timestamp + 1/* toTime */, null/* filter */);
 
@@ -677,7 +675,7 @@ public class BigdataFileSystem extends
         // remove the version identifier if any - we do not want this modified!
         metadata.remove(FileMetadataSchema.VERSION);
         
-        return getFilleMetadataIndex().write(metadataSchema, metadata,
+        return getFileMetadataIndex().write(metadataSchema, metadata,
                 AUTO_TIMESTAMP_UNIQUE, null/* filter */,null/*precondition*/).asMap();
         
     }
@@ -752,7 +750,7 @@ public class BigdataFileSystem extends
             // delete marker.
             metadata.put(FileMetadataSchema.VERSION, null);
 
-            getFilleMetadataIndex().write(metadataSchema, metadata, AUTO_TIMESTAMP_UNIQUE,
+            getFileMetadataIndex().write(metadataSchema, metadata, AUTO_TIMESTAMP_UNIQUE,
                     null/* filter */, null/*precondition*/);
             
         }
@@ -905,7 +903,7 @@ public class BigdataFileSystem extends
     public Iterator<? extends DocumentHeader> getDocumentHeaders(String fromId,
             String toId) {
 
-        return new Striterator(getFilleMetadataIndex().rangeIterator(metadataSchema,
+        return new Striterator(getFileMetadataIndex().rangeIterator(metadataSchema,
                 fromId, toId)).addFilter(new Resolver() {
 
                     private static final long serialVersionUID = 1L;
@@ -956,14 +954,13 @@ public class BigdataFileSystem extends
              * range by replacing its VERSION column value with a null value
              * (and updating the timestamp in the key).
              */
-            getFilleMetadataIndex().getIndex().rangeIterator(
+            getFileMetadataIndex().getIndex().rangeIterator(
                     fromKey,
                     toKey,
                     0/* capacity */,
                     IRangeQuery.CURSOR,
-                    new FilterConstructor<TPV>()
-                            .addFilter(new FileVersionDeleter(
-                                    IRowStoreConstants.AUTO_TIMESTAMP_UNIQUE)));
+                    new FileVersionDeleter(
+                            IRowStoreConstants.AUTO_TIMESTAMP_UNIQUE));
             
         }
         

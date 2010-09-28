@@ -62,6 +62,7 @@ abstract public class BOpFilterBase extends BOpBase implements IFilter {
     }
 
     /**
+     * Deep copy.
      * @param op
      */
     public BOpFilterBase(BOpFilterBase op) {
@@ -69,6 +70,7 @@ abstract public class BOpFilterBase extends BOpBase implements IFilter {
     }
 
     /**
+     * Shallow copy.
      * @param args
      * @param annotations
      */
@@ -82,7 +84,7 @@ abstract public class BOpFilterBase extends BOpBase implements IFilter {
         src = filterOnce(src, context);
         
         // wrap source with each additional filter from the filter chain.
-        for (BOp arg : args) {
+        for (BOp arg : args()) {
         
             src = ((BOpFilterBase) arg).filter(src, context);
             

@@ -39,8 +39,6 @@ import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.NOPTupleSerializer;
 import com.bigdata.btree.TestTuple;
-import com.bigdata.btree.filter.FilterConstructor;
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.TestKeyBuilder;
@@ -568,8 +566,7 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
         ndx.submit(0/* fromIndex */, nentries/* toIndex */, keys, vals,
                 BatchInsertConstructor.RETURN_NO_VALUES, null/* handler */);
 
-        final IFilterConstructor filter = new FilterConstructor()
-                .addFilter(new TupleFilter() {
+        final TupleFilter filter = new TupleFilter() {
 
                     private static final long serialVersionUID = 1L;
 
@@ -587,7 +584,7 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
 
                     }
 
-                });
+                };
                 
         /*
          * Range delete the keys matching the filter.
@@ -862,14 +859,14 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
         /*
          * Filter that excludes tuples in the 3rd index partition.
          */
-        final FilterConstructor filter = new FilterConstructor().addFilter(new TupleFilter(){
+        final TupleFilter filter = new TupleFilter(){
             @Override
             protected boolean isValid(ITuple tuple) {
                 final byte[] key = tuple.getKey();
                 if (key[0] >= 7 && key[0] < 10)
                     return false;
                 return true;
-            }});
+            }};
         
         // forward scan w/ filter
         {

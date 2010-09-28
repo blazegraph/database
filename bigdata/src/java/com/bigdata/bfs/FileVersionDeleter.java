@@ -30,7 +30,7 @@ public class FileVersionDeleter extends TupleUpdater<TPV> {
     private final long timestamp;
     
     /**
-     * The timestamp choosen on the server (not serialized).
+     * The timestamp chosen on the server (not serialized).
      */
     transient private long choosenTimestamp;
     

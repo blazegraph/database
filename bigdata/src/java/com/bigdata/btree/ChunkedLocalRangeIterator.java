@@ -32,11 +32,12 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.ITupleFilter;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
+
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * Chunked range iterator running against a local index or index view.
@@ -70,7 +71,7 @@ public class ChunkedLocalRangeIterator<E> extends AbstractChunkedTupleIterator<E
      * @param filter
      */
     public ChunkedLocalRangeIterator(IIndex ndx, byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IFilterConstructor filter) {
+            int capacity, int flags, IFilter filter) {
         
         super(fromKey, toKey, capacity, flags, filter);
         
@@ -92,7 +93,7 @@ public class ChunkedLocalRangeIterator<E> extends AbstractChunkedTupleIterator<E
     @Override
     protected ResultSet getResultSet(final long timestamp,
             final byte[] fromKey, final byte[] toKey, final int capacity,
-            final int flags, final IFilterConstructor filter) {
+            final int flags, final IFilter filter) {
 
         /*
          * Note: This turns off the REMOVEALL flag unless CURSOR was also

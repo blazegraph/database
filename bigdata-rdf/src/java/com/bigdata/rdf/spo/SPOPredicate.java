@@ -404,16 +404,7 @@ public class SPOPredicate extends Predicate<ISPO> {
 
         final SPOPredicate tmp = this.clone();
 
-        // bound from the binding set.
-//        try {
-//            final Field f = tmp.getClass().getField("args");
-//            f.setAccessible(true);
-//            final BOp[] targs = (BOp[]) f.get(tmp);
-//            targs[3] = c;
-//        } catch (Exception ex) {
-//            throw new RuntimeException(ex);
-//        }
-        tmp.args[3/*c*/] = c;
+        tmp.set(3/*c*/, c);
         
         return tmp;
 
@@ -445,7 +436,7 @@ public class SPOPredicate extends Predicate<ISPO> {
         final IElementFilter<ISPO> wrappedConstraint = getConstraint() == null ? newConstraint
                 : new WrappedSPOFilter(newConstraint, getConstraint());
 
-        tmp.annotations.put(Annotations.CONSTRAINT, wrappedConstraint);
+        tmp.setProperty(Annotations.CONSTRAINT, wrappedConstraint);
 
         return tmp;
         

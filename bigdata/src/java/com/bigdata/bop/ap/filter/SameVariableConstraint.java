@@ -1,4 +1,4 @@
-package com.bigdata.relation.accesspath;
+package com.bigdata.bop.ap.filter;
 
 import java.io.Externalizable;
 import java.io.IOException;
@@ -17,6 +17,7 @@ import com.bigdata.bop.IElement;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.relation.accesspath.IAccessPath;
 
 /**
  * Filter imposes the "same variable" constraint on the elements visited by an
@@ -38,13 +39,7 @@ import com.bigdata.bop.IVariableOrConstant;
  *            The generic type of the elements that will be tested by the
  *            filter.
  */
-public class SameVariableConstraint<E> implements IElementFilter<E>,
-        Externalizable {
-
-    /**
-     * 
-     */
-    private static final long serialVersionUID = 7284343752802648779L;
+public class SameVariableConstraint<E> implements Externalizable {
 
     /**
      * The predicate template.
@@ -111,9 +106,9 @@ public class SameVariableConstraint<E> implements IElementFilter<E>,
 
     }
 
-    public boolean canAccept(final Object o) {
-        return true;
-    }
+//    public boolean canAccept(final Object o) {
+//        return true;
+//    }
 
     public boolean accept(final E e) {
 

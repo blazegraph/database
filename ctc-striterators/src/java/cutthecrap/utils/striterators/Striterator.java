@@ -178,4 +178,16 @@ public class Striterator implements IStriterator {
 	public IStriterator map(Object client, Method method) {
 		return addFilter(new Mapper(client, method));
 	}
+
+    /**
+     * Human readable representation of the filter chain.
+     */
+    public String toString() {
+        final StringBuilder sb = new StringBuilder();
+        sb.append(super.toString());
+        sb.append("{filterChain=" + filters);
+        sb.append("}");
+        return sb.toString();
+    }
+
 }

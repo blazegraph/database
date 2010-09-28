@@ -31,21 +31,42 @@ import java.util.Iterator;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.btree.AbstractBTree;
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
-
-import cutthecrap.utils.striterators.Filter;
-import cutthecrap.utils.striterators.Filterator;
+import com.bigdata.btree.Tuple;
+import com.bigdata.btree.filter.TupleFilter;
+import com.bigdata.btree.filter.TupleFilter.TupleFilterator;
 
 /**
- * Used to filter for objects which satisfy some criteria.
  * <p>
- * <strong>WARNING : DO NOT USE THIS CLASS ON {@link ITupleIterator}s - use
- * {@link BOpTupleFilter} instead.</strong>
+ * Filter supporting {@link ITupleIterator}s.
+ * </p>
+ * <p>
+ * <strong>Warning: Unlike {@link BOpFilter}, this class correctly uses a second
+ * {@link Tuple} instance to perform filtering.<strong> This is necessary since
+ * the {@link Tuple} instance for the base {@link ITupleIterator}
+ * implementations for the {@link AbstractBTree} is reused by next() on each
+ * call and the {@link TupleFilter} uses one-step lookahead. Failure to use a
+ * second {@link Tuple} instance will result in <em>overwrite</em> of the
+ * current {@link Tuple} with data from the lookahead {@link Tuple}.
+ * </p>
+ * <p>
+ * Note: You must specify {@link IRangeQuery#KEYS} and/or
+ * {@link IRangeQuery#VALS} in order to filter on the keys and/or values
+ * associated with the visited tuples.
+ * </p>
+ * <p>
+ * Note: YOu must specify {@link IRangeQuery#CURSOR} to enabled
+ * {@link Iterator#remove()} for a <em>local</em> {@link BTree}
+ * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class BOpFilter extends BOpFilterBase {
+abstract public class BOpTupleFilter<E> extends BOpFilterBase {
 
     /**
      * 
@@ -64,7 +85,7 @@ abstract public class BOpFilter extends BOpFilterBase {
      * 
      * @param op
      */
-    public BOpFilter(BOpFilter op) {
+    public BOpTupleFilter(BOpTupleFilter op) {
         super(op);
     }
 
@@ -74,15 +95,16 @@ abstract public class BOpFilter extends BOpFilterBase {
      * @param args
      * @param annotations
      */
-    public BOpFilter(BOp[] args, Map<String, Object> annotations) {
+    public BOpTupleFilter(BOp[] args, Map<String, Object> annotations) {
         super(args, annotations);
     }
 
     @Override
     final protected Iterator filterOnce(Iterator src, final Object context) {
-        
-        return new Filterator(src, context, new FilterImpl());
-        
+
+        return new TupleFilterator((ITupleIterator<E>) src, context,
+                new FilterImpl());
+
     }
 
     /**
@@ -91,15 +113,17 @@ abstract public class BOpFilter extends BOpFilterBase {
      * @param obj
      *            The object.
      */
-    protected abstract boolean isValid(Object obj);
+    protected abstract boolean isValid(ITuple<E> obj);
 
-    private class FilterImpl extends Filter {
+    private class FilterImpl extends TupleFilter<E> {
 
         private static final long serialVersionUID = 1L;
 
         @Override
-        protected boolean isValid(Object obj) {
-            return BOpFilter.this.isValid(obj);
+        protected boolean isValid(ITuple<E> tuple) {
+
+            return BOpTupleFilter.this.isValid(tuple);
+
         }
 
     }

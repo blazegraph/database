@@ -36,7 +36,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
@@ -51,6 +50,8 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.Split;
+
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * <p>
@@ -608,7 +609,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
      * will acquire the exclusive write lock.
      */
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int capacity, int flags, IFilterConstructor filter) {
+            int capacity, int flags, IFilter filter) {
 
         if (capacity == 0) {
          
@@ -657,7 +658,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
     private class ChunkedIterator<E> extends ChunkedLocalRangeIterator<E> {
 
         private ChunkedIterator(IIndex ndx, byte[] fromKey, byte[] toKey,
-                int capacity, int flags, IFilterConstructor filter) {
+                int capacity, int flags, IFilter filter) {
             
             super(ndx, fromKey, toKey, capacity, flags, filter);
             
@@ -709,7 +710,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
          */
         @Override
         protected ResultSet getResultSet(long timestamp, byte[] fromKey,
-                byte[] toKey, int capacity, int flags, IFilterConstructor filter) {
+                byte[] toKey, int capacity, int flags, IFilter filter) {
 
             final boolean mutation = (flags & IRangeQuery.REMOVEALL) != 0;
 

@@ -29,12 +29,13 @@ package com.bigdata.service.ndx;
 
 import java.util.Iterator;
 
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.IDataService;
+
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * Class supports range query across against an unpartitioned index on an
@@ -76,7 +77,7 @@ public class DataServiceTupleIterator<E> extends RawDataServiceTupleIterator<E> 
     public DataServiceTupleIterator(final IScaleOutClientIndex ndx,
             final IDataService dataService, final String name,
             final long timestamp, final byte[] fromKey, final byte[] toKey,
-            final int capacity, final int flags, final IFilterConstructor filter) {
+            final int capacity, final int flags, final IFilter filter) {
 
         super(dataService, name, timestamp, false/* readConsistent */, fromKey,
                 toKey, capacity, flags, filter);
@@ -110,7 +111,7 @@ public class DataServiceTupleIterator<E> extends RawDataServiceTupleIterator<E> 
      * <p>
      * Note: The {@link StaleLocatorException} CAN NOT arise from any other
      * method since only
-     * {@link #getResultSet(byte[], byte[], int, int, IFilterConstructor)}
+     * {@link #getResultSet(byte[], byte[], int, int, IFilter)}
      * actually reads from the {@link IDataService} and ALL calls to that method
      * are driven by {@link #hasNext()}.
      * <p>

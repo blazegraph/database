@@ -156,9 +156,8 @@ public class TestPrefixFilter extends TestCase2 {
             final ITupleIterator<String> itr = btree.rangeIterator(
                     null/* fromKey */, null/* toKey */, 0/* capacity */,
                     IRangeQuery.DEFAULT | IRangeQuery.CURSOR,
-                    new FilterConstructor<String>()
-                            .addFilter(new PrefixFilter<String>(
-                                    asPrefixKey("Mike"))));
+                    new PrefixFilter<String>(
+                                    asPrefixKey("Mike")));
             
 //            ITupleIterator<String> itr = new CompletionScan<String>(
 //                    // source cursor.
@@ -187,9 +186,8 @@ public class TestPrefixFilter extends TestCase2 {
             final ITupleIterator<String> itr = btree.rangeIterator(
                     null/* fromKey */, null/* toKey */, 0/* capacity */,
                     IRangeQuery.DEFAULT | IRangeQuery.CURSOR,
-                    new FilterConstructor<String>()
-                            .addFilter(new PrefixFilter<String>(
-                                    asPrefixKey("Bryan"))));
+                    new PrefixFilter<String>(
+                                    asPrefixKey("Bryan")));
             
 //            ITupleIterator<String> itr = new CompletionScan<String>(
 //                    // source cursor.
@@ -218,9 +216,8 @@ public class TestPrefixFilter extends TestCase2 {
             final ITupleIterator<String> itr = btree.rangeIterator(
                     null/* fromKey */, null/* toKey */, 0/* capacity */,
                     IRangeQuery.DEFAULT | IRangeQuery.CURSOR,
-                    new FilterConstructor<String>()
-                            .addFilter(new PrefixFilter<String>(
-                                    asPrefixKey("Mi"))));
+                    new PrefixFilter<String>(
+                                    asPrefixKey("Mi")));
 
 //            ITupleIterator<String> itr = new CompletionScan<String>(
 //                    // source cursor.
@@ -260,9 +257,8 @@ public class TestPrefixFilter extends TestCase2 {
             final ITupleIterator<String> itr = btree.rangeIterator(
                     null/* fromKey */, null/* toKey */, 0/* capacity */,
                     IRangeQuery.DEFAULT | IRangeQuery.CURSOR,
-                    new FilterConstructor<String>()
-                            .addFilter(new PrefixFilter<String>(
-                                    asPrefixKey("Ma"))));
+                    new PrefixFilter<String>(
+                                    asPrefixKey("Ma")));
             
 //            ITupleIterator<String> itr = new CompletionScan<String>(
 //                    // source cursor.
@@ -317,12 +313,11 @@ public class TestPrefixFilter extends TestCase2 {
             final ITupleIterator<String> itr = btree.rangeIterator(
                     null/* fromKey */, null/* toKey */, 0/* capacity */,
                     IRangeQuery.DEFAULT | IRangeQuery.CURSOR,
-                    new FilterConstructor<String>()
-                            .addFilter(new PrefixFilter<String>(
+                    new PrefixFilter<String>(
                                     new byte[][] {
                                             asPrefixKey("Bryan"),
                                                 asPrefixKey("Mike") }
-                                    )));
+                                    ));
 
 //            ITupleIterator<String> itr = new CompletionScan<String>(
 //                    // source cursor.

@@ -50,7 +50,6 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
@@ -85,6 +84,8 @@ import com.bigdata.resources.IndexManager.IIndexManagerCounters;
 import com.bigdata.resources.ResourceManager.IResourceManagerCounters;
 import com.bigdata.resources.StoreManager.ManagedJournal;
 import com.bigdata.service.jini.DataServer;
+
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * An implementation of a network-capable {@link IDataService}. The service is
@@ -1578,7 +1579,7 @@ abstract public class DataService extends AbstractService
     }
     
     public ResultSet rangeIterator(long tx, String name, byte[] fromKey,
-            byte[] toKey, int capacity, int flags, IFilterConstructor filter)
+            byte[] toKey, int capacity, int flags, IFilter filter)
             throws InterruptedException, ExecutionException {
 
         setupLoggingContext();
@@ -1730,11 +1731,11 @@ abstract public class DataService extends AbstractService
         private final byte[] toKey;
         private final int capacity;
         private final int flags;
-        private final IFilterConstructor filter;
+        private final IFilter filter;
         
         public RangeIteratorTask(ConcurrencyManager concurrencyManager,
                 long startTime, String name, byte[] fromKey, byte[] toKey,
-                int capacity, int flags, IFilterConstructor filter) {
+                int capacity, int flags, IFilter filter) {
 
             super(concurrencyManager, startTime, name);
 

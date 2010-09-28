@@ -31,7 +31,7 @@ package com.bigdata.striterator;
 import java.util.Iterator;
 
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.filter.IFilterConstructor;
+//import com.bigdata.btree.filter.IFilter;
 
 /**
  * Chunked streaming iterator.
@@ -41,7 +41,7 @@ import com.bigdata.btree.filter.IFilterConstructor;
  *       really need to introduce custom compression for chunk-at-a-time results
  *       streamed back from the server. If the filters are to be specified on
  *       the client and applied on the server, then an
- *       {@link IFilterConstructor} will be needed to construct the filter stack
+ *       {@link IFilter} will be needed to construct the filter stack
  *       on the server.
  *       
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

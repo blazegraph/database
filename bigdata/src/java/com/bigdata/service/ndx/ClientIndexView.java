@@ -53,7 +53,6 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
-import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.AbstractKeyRangeIndexProcedure;
@@ -97,7 +96,8 @@ import com.bigdata.service.ndx.pipeline.IndexWriteTask;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.ExecutionHelper;
-import com.bigdata.util.concurrent.MappedTaskExecutor;
+
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * <p>
@@ -686,7 +686,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      */
     public ITupleIterator rangeIterator(final byte[] fromKey,
             final byte[] toKey, int capacity, final int flags,
-            final IFilterConstructor filter) {
+            final IFilter filter) {
 
         if (capacity == 0) {
 
@@ -812,7 +812,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
     private ITupleIterator parallelRangeIterator(final long ts,
             final boolean isReadConsistentTx, final byte[] fromKey,
             final byte[] toKey, final int capacity, final int flags,
-            final IFilterConstructor filter) {
+            final IFilter filter) {
 
         /*
          * Set up the buffer for aggregating the results from the range
@@ -949,7 +949,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
         final private int flags;
 
-        final private IFilterConstructor filter;
+        final private IFilter filter;
 
         final private BlockingBuffer<ITuple<?>[]> queryBuffer;
 
@@ -961,7 +961,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
         public ParallelRangeIteratorTask(final long ts,
                 final boolean isReadConsistentTx, final byte[] fromKey,
                 final byte[] toKey, final int capacity, final int flags,
-                final IFilterConstructor filter,
+                final IFilter filter,
                 final BlockingBuffer<ITuple<?>[]> queryBuffer) {
 
             this.ts = ts;
