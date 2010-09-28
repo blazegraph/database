@@ -80,6 +80,7 @@
 			<src path="${bigdata.dir}/bigdata-jini/src/java" />
 			<src path="${bigdata.dir}/bigdata-rdf/src/java" />
 			<src path="${bigdata.dir}/bigdata-sails/src/java" />
+			<src path="${bigdata.dir}/ctc-striterators/src/java" />
 			<!-- Do not include the unit tests @todo conditionally include?
             <src path="${bigdata.dir}/bigdata/src/test"/>
             <src path="${bigdata.dir}/bigdata-jini/src/test"/>
