@@ -22,36 +22,30 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 19, 2010
+ * Created on Sep 28, 2010
  */
 
-package com.bigdata.bop.ndx;
+package com.bigdata.bop;
 
-import junit.framework.TestCase2;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Test suite for {@link SampleLocalBTree}.
+ * Annotations for an operator using an internal concurrent hash map.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestSampleLocalBTree extends TestCase2 {
+public interface ConcurrentHashMapAnnotations extends HashMapAnnotations {
 
     /**
+     * The concurrency level of the {@link ConcurrentHashMap} used to impose the
+     * distinct constraint.
      * 
+     * @see #DEFAULT_CONCURRENCY_LEVEL
      */
-    public TestSampleLocalBTree() {
-    }
+    String CONCURRENCY_LEVEL = ConcurrentHashMapAnnotations.class.getName()
+            + ".concurrencyLevel";
 
-    /**
-     * @param name
-     */
-    public TestSampleLocalBTree(String name) {
-        super(name);
-    }
-    
-    public void test_something() {
-        fail("write tests");
-    }
+    int DEFAULT_CONCURRENCY_LEVEL = 16;
 
 }

@@ -60,7 +60,10 @@ public class TestAll extends TestCase {
         // test suite for the internal representation of RDF Values.
         suite.addTest( com.bigdata.rdf.internal.TestAll.suite() );
 
-        // test RDF Value and Statement object model (Sesame compliant).
+        // test suite for RDF specific operators.
+        suite.addTest( com.bigdata.bop.rdf.TestAll.suite() );
+
+        // test RDF Value and Statement object model (Sesame compliance).
         suite.addTest( com.bigdata.rdf.model.TestAll.suite() );
         
         // test various RDF database implementations.

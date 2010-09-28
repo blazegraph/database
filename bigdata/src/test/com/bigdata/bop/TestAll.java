@@ -83,6 +83,9 @@ public class TestAll extends TestCase {
         // index operators.
         suite.addTest(com.bigdata.bop.ndx.TestAll.suite());
 
+        // access path filters
+        suite.addTest(com.bigdata.bop.ap.filter.TestAll.suite());
+
         // access path operators
         suite.addTest(com.bigdata.bop.ap.TestAll.suite());
 
@@ -91,9 +94,6 @@ public class TestAll extends TestCase {
 
         // join operators.
         suite.addTest(com.bigdata.bop.join.TestAll.suite());
-
-        // Specialized RDF join operators : @todo move to bigdata-rdf.
-        suite.addTest(com.bigdata.bop.rdf.join.TestAll.suite());
 
         // aggregation operators.
         suite.addTest(com.bigdata.bop.solutions.TestAll.suite());

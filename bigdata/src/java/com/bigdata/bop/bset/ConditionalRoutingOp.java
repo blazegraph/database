@@ -32,10 +32,9 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.engine.BOpStats;
@@ -55,7 +54,7 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ConditionalRoutingOp extends BindingSetPipelineOp {
+public class ConditionalRoutingOp extends PipelineOp {
 
     /**
      * 

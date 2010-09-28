@@ -43,7 +43,7 @@ import junit.framework.TestCase2;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NV;
@@ -162,14 +162,14 @@ public class TestRunState extends TestCase2 {
        
         final int startId = 1;
 
-        final BindingSetPipelineOp startOp = new StartOp(new BOp[] {}, NV
+        final PipelineOp startOp = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 }));
 
-        final BindingSetPipelineOp query = startOp;
+        final PipelineOp query = startOp;
         
         final UUID queryId = UUID.randomUUID();
 
@@ -205,14 +205,14 @@ public class TestRunState extends TestCase2 {
        
         final int startId = 1;
 
-        final BindingSetPipelineOp startOp = new StartOp(new BOp[] {}, NV
+        final PipelineOp startOp = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 }));
 
-        final BindingSetPipelineOp query = startOp;
+        final PipelineOp query = startOp;
 
         final UUID queryId = UUID.randomUUID();
 
@@ -282,14 +282,14 @@ public class TestRunState extends TestCase2 {
 
         final int startId = 1;
 
-        final BindingSetPipelineOp startOp = new StartOp(new BOp[] {}, NV
+        final PipelineOp startOp = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 }));
 
-        final BindingSetPipelineOp query = startOp;
+        final PipelineOp query = startOp;
         
         final UUID queryId = UUID.randomUUID();
 
@@ -402,21 +402,21 @@ public class TestRunState extends TestCase2 {
         final int startId = 1;
         final int otherId = 2;
 
-        final BindingSetPipelineOp startOp = new StartOp(new BOp[] {}, NV
+        final PipelineOp startOp = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 }));
 
-        final BindingSetPipelineOp otherOp = new StartOp(new BOp[] { startOp },
+        final PipelineOp otherOp = new StartOp(new BOp[] { startOp },
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, otherId),//
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         }));
 
-        final BindingSetPipelineOp query = otherOp;
+        final PipelineOp query = otherOp;
 
         final UUID queryId = UUID.randomUUID();
 
@@ -567,14 +567,14 @@ public class TestRunState extends TestCase2 {
 
         final int startId = 1;
 
-        final BindingSetPipelineOp startOp = new StartOp(new BOp[] {}, NV
+        final PipelineOp startOp = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 }));
 
-        final BindingSetPipelineOp query = startOp;
+        final PipelineOp query = startOp;
 
         final UUID queryId = UUID.randomUUID();
 
@@ -648,14 +648,14 @@ public class TestRunState extends TestCase2 {
 
         final int startId = 1;
 
-        final BindingSetPipelineOp startOp = new StartOp(new BOp[] {}, NV
+        final PipelineOp startOp = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 }));
 
-        final BindingSetPipelineOp query = startOp;
+        final PipelineOp query = startOp;
         
         final UUID queryId = UUID.randomUUID();
 
@@ -729,14 +729,14 @@ public class TestRunState extends TestCase2 {
 
         final int startId = 1;
 
-        final BindingSetPipelineOp startOp = new StartOp(new BOp[] {}, NV
+        final PipelineOp startOp = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 }));
 
-        final BindingSetPipelineOp query = startOp;
+        final PipelineOp query = startOp;
         
         final UUID queryId = UUID.randomUUID();
 
@@ -818,14 +818,14 @@ public class TestRunState extends TestCase2 {
 
         final int startId = 1;
 
-        final BindingSetPipelineOp startOp = new StartOp(new BOp[] {}, NV
+        final PipelineOp startOp = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 }));
 
-        final BindingSetPipelineOp query = startOp;
+        final PipelineOp query = startOp;
         
         final UUID queryId = UUID.randomUUID();
 
@@ -943,7 +943,7 @@ public class TestRunState extends TestCase2 {
             return null;
         }
 
-        public BindingSetPipelineOp getQuery(UUID queryId)
+        public PipelineOp getQuery(UUID queryId)
                 throws RemoteException {
             return null;
         }

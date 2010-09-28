@@ -22,65 +22,57 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Sep 9, 2010
+ * Created on Sep 28, 2010
  */
 
-package com.bigdata.bop.engine;
+package com.bigdata.bop.rdf.filter;
 
-import java.io.Serializable;
-import java.util.UUID;
+import java.util.Map;
 
-import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.ap.filter.BOpResolver;
+import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPO;
 
 /**
- * Default implementation.
+ * Strips the context information from an {@link SPO}. This is used in default
+ * graph access paths.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class QueryDecl implements IQueryDecl, Serializable {
+public class StripContextFilter extends BOpResolver {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    private final UUID queryId;
-
-    private final IQueryClient clientProxy;
-
-    private final PipelineOp query;
-
-    public QueryDecl(final IQueryClient clientProxy, final UUID queryId,
-            final PipelineOp query) {
-
-        if (clientProxy == null)
-            throw new IllegalArgumentException();
-
-        if (queryId == null)
-            throw new IllegalArgumentException();
-
-        if (query == null)
-            throw new IllegalArgumentException();
-
-        this.clientProxy = clientProxy;
-
-        this.queryId = queryId;
-
-        this.query = query;
-
+    /**
+     * @param op
+     */
+    public StripContextFilter(StripContextFilter op) {
+        super(op);
     }
 
-    public PipelineOp getQuery() {
-        return query;
+    /**
+     * @param args
+     * @param annotations
+     */
+    public StripContextFilter(BOp[] args, Map<String, Object> annotations) {
+        super(args, annotations);
     }
 
-    public IQueryClient getQueryController() {
-        return clientProxy;
-    }
+    /**
+     * Strips the context position off of a visited {@link ISPO}.
+     */
+    @Override
+    protected Object resolve(final Object obj) {
 
-    public UUID getQueryId() {
-        return queryId;
+        final ISPO tmp = (ISPO) obj;
+
+        return new SPO(tmp.s(), tmp.p(), tmp.o());
+
     }
 
 }

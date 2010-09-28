@@ -42,7 +42,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
@@ -629,7 +629,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      * @throws Exception
      */
     public RunningQuery eval(final UUID queryId,
-            final BindingSetPipelineOp query,
+            final PipelineOp query,
             final IChunkMessage<IBindingSet> msg) throws Exception {
 
         if (queryId == null)
@@ -698,7 +698,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
     }
 
-    public BindingSetPipelineOp getQuery(final UUID queryId) {
+    public PipelineOp getQuery(final UUID queryId) {
      
         final RunningQuery q = getRunningQuery(queryId);
         
@@ -735,7 +735,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     protected RunningQuery newRunningQuery(final QueryEngine queryEngine,
             final UUID queryId, final boolean controller,
-            final IQueryClient clientProxy, final BindingSetPipelineOp query) {
+            final IQueryClient clientProxy, final PipelineOp query) {
 
         return new RunningQuery(this, queryId, true/* controller */,
                 this/* clientProxy */, query);

@@ -1,4 +1,4 @@
-package com.bigdata.bop.ndx;
+package com.bigdata.bop.ap;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;

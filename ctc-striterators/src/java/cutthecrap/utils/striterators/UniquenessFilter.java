@@ -29,8 +29,12 @@ import java.util.LinkedHashSet;
 
 /******************************************************************************
  * UniquenessFilter
- *
- * Derived from Filter, and ensures no duplication, not to be used with large sets!
+ * 
+ * Derived from Filter, and ensures no duplication, not to be used with large
+ * sets!
+ * 
+ * @todo Side effects can occur via {@link #m_members} across invocations with
+ *       this filter.
  */
 public class UniquenessFilter extends Filter {
 

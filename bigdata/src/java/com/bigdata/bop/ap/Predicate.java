@@ -32,7 +32,7 @@ import java.util.Map;
 
 import cern.colt.Arrays;
 
-import com.bigdata.bop.AbstractChunkedOrderedIteratorOp;
+import com.bigdata.bop.AbstractAccessPathOp;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
@@ -42,6 +42,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
+import com.bigdata.btree.ITuple;
 import com.bigdata.journal.ITx;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.ISolutionExpander;
@@ -53,7 +54,7 @@ import com.bigdata.striterator.IKeyOrder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
+public class Predicate<E> extends AbstractAccessPathOp<E> implements
         IPredicate<E> {
 
     /**
@@ -203,6 +204,14 @@ public class Predicate<E> extends AbstractChunkedOrderedIteratorOp<E> implements
         
     }
 
+    /**
+     * 
+     * @deprecated This is being replaced by two classes of filters. One which
+     *             is always evaluated local to the index and one which is
+     *             evaluated in the JVM in which the access path is evaluated
+     *             once the {@link ITuple}s have been resolved to elements of
+     *             the relation.
+     */
     @SuppressWarnings("unchecked")
     final public IElementFilter<E> getConstraint() {
 

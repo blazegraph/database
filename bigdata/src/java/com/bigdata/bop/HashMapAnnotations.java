@@ -22,27 +22,40 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Sep 8, 2010
+ * Created on Sep 28, 2010
  */
 
 package com.bigdata.bop;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
- * An interface for {@link PipelineOp}s which are mapped across
- * shards.
- * 
- * @param <E>
- *            The generic type of the elements in the relation on which the
- *            predicate will read or write.
+ * Annotations for an operator using an internal hash map.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IShardwisePipelineOp<E> {
+public interface HashMapAnnotations {
 
     /**
-     * The predicate which reads or writes on the shard.
+     * The initial capacity of the {@link ConcurrentHashMap} used to impose the
+     * distinct constraint.
+     * 
+     * @see #DEFAULT_INITIAL_CAPACITY
      */
-    IPredicate<E> getPredicate();
-    
+    String INITIAL_CAPACITY = HashMapAnnotations.class.getName()
+            + ".initialCapacity";
+
+    int DEFAULT_INITIAL_CAPACITY = 16;
+
+    /**
+     * The load factor of the {@link ConcurrentHashMap} used to impose the
+     * distinct constraint.
+     * 
+     * @see #DEFAULT_LOAD_FACTOR
+     */
+    String LOAD_FACTOR = HashMapAnnotations.class.getName() + ".loadFactor";
+
+    float DEFAULT_LOAD_FACTOR = .75f;
+
 }

@@ -22,47 +22,36 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Sep 4, 2010
+ * Created on Sep 28, 2010
  */
 
-package com.bigdata.bop.solutions;
+package com.bigdata.bop.ap.filter;
 
+import java.util.Iterator;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.PipelineOp;
+
+import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.Filterator;
 
 /**
- * Base class for operators which sort binding sets.
+ * Used to filter for objects which satisfy some criteria.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo Define a distributed (external) merge sort operator.
  */
-abstract public class SortOp extends PipelineOp {
+abstract public class BOpFilter extends BOpFilterBase {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends PipelineOp.Annotations {
-
-        /**
-         * The {@link ComparatorOp} which will impose the ordering on the
-         * binding sets.
-         * 
-         * @see ComparatorOp
-         */
-        String COMPARATOR = MemorySortOp.class.getName() + ".comparator";
-
-    }
-
     /**
      * @param op
      */
-    public SortOp(final SortOp op) {
+    public BOpFilter(BOpFilter op) {
         super(op);
     }
 
@@ -70,17 +59,34 @@ abstract public class SortOp extends PipelineOp {
      * @param args
      * @param annotations
      */
-    public SortOp(final BOp[] args, final Map<String, Object> annotations) {
+    public BOpFilter(BOp[] args, Map<String, Object> annotations) {
         super(args, annotations);
     }
 
-    /**
-     * @see Annotations#COMPARATOR
-     */
-    public ComparatorOp getComparator() {
-   
-        return (ComparatorOp) getRequiredProperty(Annotations.COMPARATOR);
-    
+    @Override
+    final protected Iterator filterOnce(Iterator src, final Object context) {
+        
+        return new Filterator(src, context, new FilterImpl());
+        
     }
-    
+
+    /**
+     * Return <code>true</code> iff the object should be accepted.
+     * 
+     * @param obj
+     *            The object.
+     */
+    protected abstract boolean isValid(Object obj);
+
+    private class FilterImpl extends Filter {
+
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        protected boolean isValid(Object obj) {
+            return BOpFilter.this.isValid(obj);
+        }
+
+    }
+
 }

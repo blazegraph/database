@@ -1,6 +1,6 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -21,44 +21,50 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-/*
- * Created on Aug 19, 2010
- */
-
-package com.bigdata.bop.ap;
+package com.bigdata.bop.rdf.filter;
 
 
-import junit.framework.TestCase2;
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 /**
- * Unit tests for {@link DistinctElementFilter}.
- * 
+ * Aggregates test suites into increasing dependency order.
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestDistinctElementFilter extends TestCase2 {
+public class TestAll extends TestCase {
 
     /**
      * 
      */
-    public TestDistinctElementFilter() {
+    public TestAll() {
+        
     }
 
     /**
-     * @param name
+     * @param arg0
      */
-    public TestDistinctElementFilter(String name) {
-        super(name);
+    public TestAll(String arg0) {
+     
+        super(arg0);
+        
     }
 
     /**
-     * @todo write unit tests for distinct based on purely local evaluation.
-     * 
-     * @todo write unit tests for distinct based on a hash partitioned DISTINCT
-     *       filter.
+     * Returns a test that will run each of the implementation specific test
+     * suites in turn.
      */
-    public void test_something() {
-        fail("write tests");
+    public static Test suite()
+    {
+
+        final TestSuite suite = new TestSuite("RDF filter operators");
+
+        suite.addTestSuite(TestStripContextFilter.class);
+
+        return suite;
+        
     }
     
 }

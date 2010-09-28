@@ -31,7 +31,7 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.rdf.rules.TMUtility;
 import com.bigdata.relation.RelationFusedView;
@@ -111,7 +111,7 @@ public class Tee extends CopyBindingSetOp {
 
         super(args, annotations);
 
-        getRequiredProperty(BindingSetPipelineOp.Annotations.ALT_SINK_REF);
+        getRequiredProperty(PipelineOp.Annotations.ALT_SINK_REF);
 
     }
     

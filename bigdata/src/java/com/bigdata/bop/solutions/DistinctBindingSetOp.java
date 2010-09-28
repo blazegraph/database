@@ -9,11 +9,12 @@ import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.ConcurrentHashMapAnnotations;
 import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -25,45 +26,16 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
  *          thompsonbry $
  */
-public class DistinctBindingSetOp extends BindingSetPipelineOp {
+public class DistinctBindingSetOp extends PipelineOp {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends BindingSetPipelineOp.Annotations {
+    public interface Annotations extends PipelineOp.Annotations,
+            ConcurrentHashMapAnnotations {
 
-        /**
-         * The initial capacity of the {@link ConcurrentHashMap} used to impose
-         * the distinct constraint.
-         * 
-         * @see #DEFAULT_INITIAL_CAPACITY
-         */
-        String INITIAL_CAPACITY = DistinctBindingSetOp.class.getName()+".initialCapacity";
-
-        int DEFAULT_INITIAL_CAPACITY = 16;
-
-        /**
-         * The load factor of the {@link ConcurrentHashMap} used to impose
-         * the distinct constraint.
-         * 
-         * @see #DEFAULT_LOAD_FACTOR
-         */
-        String LOAD_FACTOR = DistinctBindingSetOp.class.getName()+".loadFactor";
-
-        float DEFAULT_LOAD_FACTOR = .75f;
-
-        /**
-         * The concurrency level of the {@link ConcurrentHashMap} used to impose
-         * the distinct constraint.
-         * 
-         * @see #DEFAULT_CONCURRENCY_LEVEL
-         */
-        String CONCURRENCY_LEVEL = DistinctBindingSetOp.class.getName()+".concurrencyLevel";
-
-        int DEFAULT_CONCURRENCY_LEVEL = 16;
-        
         /**
          * The variables on which the distinct constraint will be imposed.
          * Binding sets with distinct values for the specified variables will be

@@ -46,7 +46,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
@@ -100,7 +100,7 @@ import com.bigdata.util.concurrent.LatchedExecutor;
  * @todo Break the star join logic out into its own join operator and test
  *       suite.
  */
-public class PipelineJoin<E> extends BindingSetPipelineOp implements
+public class PipelineJoin<E> extends PipelineOp implements
         IShardwisePipelineOp<E> {
 
     static private final transient Logger log = Logger.getLogger(PipelineJoin.class);
@@ -110,7 +110,7 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends BindingSetPipelineOp.Annotations {
+    public interface Annotations extends PipelineOp.Annotations {
 
         /**
          * An optional {@link IVariable}[] identifying the variables to be
@@ -128,7 +128,7 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
         /**
          * Marks the join as "optional" in the SPARQL sense. Binding sets which
          * fail the join will be routed to the alternative sink as specified by
-         * {@link BindingSetPipelineOp.Annotations#ALT_SINK_REF}.
+         * {@link PipelineOp.Annotations#ALT_SINK_REF}.
          * 
          * @see #DEFAULT_OPTIONAL
          */
@@ -251,7 +251,7 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
      * 
      * @param annotations
      */
-    public PipelineJoin(final BindingSetPipelineOp left,
+    public PipelineJoin(final PipelineOp left,
             final IPredicate<?> right, final Map<String, Object> annotations) {
 
         super(new BOp[] { left, right }, annotations);
@@ -268,9 +268,9 @@ public class PipelineJoin<E> extends BindingSetPipelineOp implements
      * The left hand operator, which is the previous join in the pipeline join
      * path.
      */
-    public BindingSetPipelineOp left() {
+    public PipelineOp left() {
 
-        return (BindingSetPipelineOp) get(0);
+        return (PipelineOp) get(0);
 
     }
 

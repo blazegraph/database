@@ -54,12 +54,13 @@ public interface QueryEngineTestAnnotations {
      * {@link RunState} termination conditions linked to having multiple
      * {@link IChunkMessage}s.
      * <p>
-     * Note: Just controlling the {@link PipelineOp.Annotations#CHUNK_CAPACITY}
-     * and {@link PipelineOp.Annotations#CHUNK_OF_CHUNKS_CAPACITY} is not enough
-     * to force the {@link QueryEngine} to run the an operator once per source
-     * chunk. The {@link QueryEngine} normally combines chunks together. You
-     * MUST also specify this annotation in order for the query engine to send
-     * multiple {@link IChunkMessage} rather than just one.
+     * Note: Just controlling the
+     * {@link PipelineOp.Annotations#CHUNK_CAPACITY} and
+     * {@link PipelineOp.Annotations#CHUNK_OF_CHUNKS_CAPACITY} is not
+     * enough to force the {@link QueryEngine} to run the an operator once per
+     * source chunk. The {@link QueryEngine} normally combines chunks together.
+     * You MUST also specify this annotation in order for the query engine to
+     * send multiple {@link IChunkMessage} rather than just one.
      */
     String ONE_MESSAGE_PER_CHUNK = QueryEngineTestAnnotations.class.getName()
             + ".oneMessagePerChunk";

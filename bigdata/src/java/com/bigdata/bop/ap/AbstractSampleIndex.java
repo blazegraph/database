@@ -25,11 +25,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 16, 2010
  */
 
-package com.bigdata.bop.ndx;
+package com.bigdata.bop.ap;
 
-
-import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.AbstractAccessPathOp;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
@@ -60,7 +58,7 @@ import com.bigdata.relation.accesspath.IAccessPath;
  * @todo This needs to operation on element chunks, not {@link IBindingSet}
  *       chunks. It also may not require pipelining.
  */
-abstract public class AbstractSampleIndex<E> extends PipelineOp<E> {
+abstract public class AbstractSampleIndex<E> extends AbstractAccessPathOp<E> {
 
     /**
      * 

@@ -22,53 +22,62 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 18, 2010
+ * Created on Sep 2, 2010
  */
 
 package com.bigdata.bop;
 
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.bop.ap.E;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 /**
- * An pipeline operator reads from a source and writes on a sink. This is an
- * abstract base class for pipelined operators regardless of the type of data
- * moving along the pipeline.
- * 
- * @param <E>
- *            The generic type of the objects processed by the operator.
+ * Abstract base class for pipeline operators where the data moving along the
+ * pipeline is chunks of {@link IBindingSet}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class PipelineOp<E> extends BOpBase implements IPipelineOp<E> {
+abstract public class PipelineOp extends BOpBase {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    /**
-     * Well known annotations pertaining to the binding set pipeline.
-     */
     public interface Annotations extends BOp.Annotations, BufferAnnotations {
+
+        /**
+         * The value of the annotation is the {@link BOp.Annotations#BOP_ID} of
+         * the ancestor in the operator tree which serves as the default sink
+         * for binding sets (default is the parent).
+         */
+        String SINK_REF = PipelineOp.class.getName() + ".sinkRef";
+
+        /**
+         * The value of the annotation is the {@link BOp.Annotations#BOP_ID} of
+         * the ancestor in the operator tree which serves as the alternative
+         * sink for binding sets (default is no alternative sink).
+         */
+        String ALT_SINK_REF = PipelineOp.class.getName()
+                + ".altSinkRef";
 
     }
 
     /**
-     * Deep copy constructor.
+     * Required deep copy constructor.
      * 
      * @param op
      */
-    protected PipelineOp(final PipelineOp<E> op) {
-
+    protected PipelineOp(final PipelineOp op) {
         super(op);
-
     }
 
     /**
@@ -84,6 +93,9 @@ abstract public class PipelineOp<E> extends BOpBase implements IPipelineOp<E> {
 
     }
 
+    /**
+     * @see BufferAnnotations#CHUNK_CAPACITY
+     */
     public int getChunkCapacity() {
         
         return getProperty(Annotations.CHUNK_CAPACITY,
@@ -91,6 +103,9 @@ abstract public class PipelineOp<E> extends BOpBase implements IPipelineOp<E> {
 
     }
 
+    /**
+     * @see BufferAnnotations#CHUNK_OF_CHUNKS_CAPACITY
+     */
     public int getChunkOfChunksCapacity() {
 
         return getProperty(Annotations.CHUNK_OF_CHUNKS_CAPACITY,
@@ -98,17 +113,15 @@ abstract public class PipelineOp<E> extends BOpBase implements IPipelineOp<E> {
 
     }
 
+    /**
+     * @see BufferAnnotations#CHUNK_TIMEOUT
+     */
     public long getChunkTimeout() {
         
         return getProperty(Annotations.CHUNK_TIMEOUT,
                 Annotations.DEFAULT_CHUNK_TIMEOUT);
         
     }
-
-    /**
-     * The {@link TimeUnit}s in which the {@link #chunkTimeout} is measured.
-     */
-    protected static transient final TimeUnit chunkTimeoutUnit = TimeUnit.MILLISECONDS;
 
     /**
      * Return the {@link PipelineType} of the operator (default
@@ -138,22 +151,61 @@ abstract public class PipelineOp<E> extends BOpBase implements IPipelineOp<E> {
         
     }
     
+    /**
+     * Return a new object which can be used to collect statistics on the
+     * operator evaluation (this may be overridden to return a more specific
+     * class depending on the operator).
+     */
     public BOpStats newStats() {
 
         return new BOpStats();
 
     }
 
-    public IBlockingBuffer<E[]> newBuffer(final BOpStats stats) {
+    /**
+     * Instantiate a buffer suitable as a sink for this operator. The buffer
+     * will be provisioned based on the operator annotations.
+     * <p>
+     * Note: if the operation swallows binding sets from the pipeline (such as
+     * operators which write on the database) then the operator MAY return an
+     * immutable empty buffer.
+     * 
+     * @param stats
+     *            The statistics on this object will automatically be updated as
+     *            elements and chunks are output onto the returned buffer.
+     * 
+     * @return The buffer.
+     */
+    public IBlockingBuffer<IBindingSet[]> newBuffer(final BOpStats stats) {
 
         if (stats == null)
             throw new IllegalArgumentException();
         
-        return new BlockingBufferWithStats<E[]>(getChunkOfChunksCapacity(),
-                getChunkCapacity(), getChunkTimeout(), chunkTimeoutUnit, stats);
+        return new BlockingBufferWithStats<IBindingSet[]>(
+                getChunkOfChunksCapacity(), getChunkCapacity(),
+                getChunkTimeout(), Annotations.chunkTimeoutUnit, stats);
 
     }
 
+    /**
+     * Return a {@link FutureTask} which computes the operator against the
+     * evaluation context. The caller is responsible for executing the
+     * {@link FutureTask} (this gives them the ability to hook the completion of
+     * the computation).
+     * 
+     * @param context
+     *            The evaluation context.
+     * 
+     * @return The {@link FutureTask} which will compute the operator's
+     *         evaluation.
+     * 
+     * @todo Modify to return a {@link Callable}s for now since we must run each
+     *       task in its own thread until Java7 gives us fork/join pools and
+     *       asynchronous file I/O. For the fork/join model we will probably
+     *       return the ForkJoinTask.
+     */
+    abstract public FutureTask<Void> eval(BOpContext<IBindingSet> context);
+    
     private static class BlockingBufferWithStats<E> extends BlockingBuffer<E> {
 
         private final BOpStats stats;

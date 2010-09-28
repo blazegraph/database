@@ -46,7 +46,7 @@ import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
@@ -55,7 +55,6 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
@@ -247,7 +246,7 @@ public class TestQueryEngine extends TestCase2 {
     public void test_query_startRun() throws Exception {
 
         final int startId = 1;
-        final BindingSetPipelineOp query = new StartOp(new BOp[] {}, NV
+        final PipelineOp query = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
@@ -311,7 +310,7 @@ public class TestQueryEngine extends TestCase2 {
         final int startId = 1;
         final int joinId = 2;
         final int predId = 3;
-        final BindingSetPipelineOp query = new PipelineJoin<E>(
+        final PipelineOp query = new PipelineJoin<E>(
         // left
                 new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
@@ -324,12 +323,6 @@ public class TestQueryEngine extends TestCase2 {
                         .asMap(new NV[] {//
                                 new NV(Predicate.Annotations.RELATION_NAME,
                                         new String[] { namespace }),//
-                                new NV(Predicate.Annotations.PARTITION_ID,
-                                        Integer.valueOf(-1)),//
-                                new NV(Predicate.Annotations.OPTIONAL,
-                                        Boolean.FALSE),//
-                                new NV(Predicate.Annotations.CONSTRAINT, null),//
-                                new NV(Predicate.Annotations.EXPANDER, null),//
                                 new NV(Predicate.Annotations.BOP_ID, predId),//
                                 new NV(Predicate.Annotations.TIMESTAMP,ITx.READ_COMMITTED),//
                         })),
@@ -430,11 +423,6 @@ public class TestQueryEngine extends TestCase2 {
                 x, y }, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
-                        new NV(Predicate.Annotations.PARTITION_ID, Integer
-                                .valueOf(-1)),//
-                        new NV(Predicate.Annotations.OPTIONAL, Boolean.FALSE),//
-                        new NV(Predicate.Annotations.CONSTRAINT, null),//
-                        new NV(Predicate.Annotations.EXPANDER, null),//
                         new NV(Predicate.Annotations.BOP_ID, predId),//
                         new NV(Predicate.Annotations.TIMESTAMP,
                                 ITx.READ_COMMITTED),//
@@ -459,7 +447,7 @@ public class TestQueryEngine extends TestCase2 {
                         })//
         );
         
-        final BindingSetPipelineOp query = sliceOp;
+        final PipelineOp query = sliceOp;
 
         /*
          * Source binding sets.
@@ -659,7 +647,7 @@ public class TestQueryEngine extends TestCase2 {
         assertEquals(nsources, source.length);
         assertEquals(nsources, sources.length);
         
-        final BindingSetPipelineOp query = delayOp; 
+        final PipelineOp query = delayOp; 
         final UUID queryId = UUID.randomUUID();
         final RunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
@@ -770,7 +758,7 @@ public class TestQueryEngine extends TestCase2 {
         assertEquals(nsources, source.length);
         assertEquals(nsources, sources.length);
         
-        final BindingSetPipelineOp query = sliceOp; 
+        final PipelineOp query = sliceOp; 
         final UUID queryId = UUID.randomUUID();
         final RunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
@@ -866,11 +854,6 @@ public class TestQueryEngine extends TestCase2 {
                 x, y }, NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
-                        new NV(Predicate.Annotations.PARTITION_ID, Integer
-                                .valueOf(-1)),//
-                        new NV(Predicate.Annotations.OPTIONAL, Boolean.FALSE),//
-                        new NV(Predicate.Annotations.CONSTRAINT, null),//
-                        new NV(Predicate.Annotations.EXPANDER, null),//
                         new NV(Predicate.Annotations.BOP_ID, predId),//
                         new NV(Predicate.Annotations.TIMESTAMP,
                                 ITx.READ_COMMITTED),//
@@ -884,7 +867,7 @@ public class TestQueryEngine extends TestCase2 {
                         })//
         );
 
-        final BindingSetPipelineOp query = new SliceOp(new BOp[] { joinOp },
+        final PipelineOp query = new SliceOp(new BOp[] { joinOp },
         // slice annotations
                 NV.asMap(new NV[] { //
                         new NV(BOp.Annotations.BOP_ID, sliceId),//
@@ -1003,11 +986,6 @@ public class TestQueryEngine extends TestCase2 {
                 .asMap(new NV[] {//
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
-                        new NV(Predicate.Annotations.PARTITION_ID, Integer
-                                .valueOf(-1)),//
-                        new NV(Predicate.Annotations.OPTIONAL, Boolean.FALSE),//
-                        new NV(Predicate.Annotations.CONSTRAINT,null),//
-                        new NV(Predicate.Annotations.EXPANDER, null),//
                         new NV(Predicate.Annotations.BOP_ID, predId),//
                         new NV(Predicate.Annotations.TIMESTAMP,
                                 ITx.READ_COMMITTED),//
@@ -1027,7 +1005,7 @@ public class TestQueryEngine extends TestCase2 {
                         })//
         );
         
-        final BindingSetPipelineOp query = new SliceOp(new BOp[] { joinOp },
+        final PipelineOp query = new SliceOp(new BOp[] { joinOp },
         // slice annotations
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, sliceId),//
@@ -1182,7 +1160,7 @@ public class TestQueryEngine extends TestCase2 {
         final int joinId2 = 4;
         final int predId2 = 5;
         
-        final BindingSetPipelineOp startOp = new StartOp(new BOp[] {},
+        final PipelineOp startOp = new StartOp(new BOp[] {},
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
@@ -1195,12 +1173,6 @@ public class TestQueryEngine extends TestCase2 {
                 .asMap(new NV[] {//
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
-                        new NV(Predicate.Annotations.PARTITION_ID,
-                                Integer.valueOf(-1)),//
-                        new NV(Predicate.Annotations.OPTIONAL,
-                                Boolean.FALSE),//
-                        new NV(Predicate.Annotations.CONSTRAINT, null),//
-                        new NV(Predicate.Annotations.EXPANDER, null),//
                         new NV(Predicate.Annotations.BOP_ID, predId1),//
                         new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
@@ -1210,29 +1182,23 @@ public class TestQueryEngine extends TestCase2 {
                 .asMap(new NV[] {//
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
-                        new NV(Predicate.Annotations.PARTITION_ID,
-                                Integer.valueOf(-1)),//
-                        new NV(Predicate.Annotations.OPTIONAL,
-                                Boolean.FALSE),//
-                        new NV(Predicate.Annotations.CONSTRAINT, null),//
-                        new NV(Predicate.Annotations.EXPANDER, null),//
                         new NV(Predicate.Annotations.BOP_ID, predId2),//
                         new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
         
-        final BindingSetPipelineOp join1Op = new PipelineJoin<E>(//
+        final PipelineOp join1Op = new PipelineJoin<E>(//
                 startOp, pred1Op,//
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, joinId1),//
                         }));
 
-        final BindingSetPipelineOp join2Op = new PipelineJoin<E>(//
+        final PipelineOp join2Op = new PipelineJoin<E>(//
                 join1Op, pred2Op,//
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, joinId2),//
                         }));
 
-        final BindingSetPipelineOp query = join2Op;
+        final PipelineOp query = join2Op;
 
         // start the query.
         final UUID queryId = UUID.randomUUID();

@@ -25,31 +25,33 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 19, 2010
  */
 
-package com.bigdata.bop.ndx;
+package com.bigdata.bop.ap;
+
+import com.bigdata.bop.ap.SampleLocalBTree;
 
 import junit.framework.TestCase2;
 
 /**
- * Test suite for {@link SampleLocalShard}.
+ * Test suite for {@link SampleLocalBTree}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestSampleLocalShard extends TestCase2 {
+public class TestSampleLocalBTree extends TestCase2 {
 
     /**
      * 
      */
-    public TestSampleLocalShard() {
+    public TestSampleLocalBTree() {
     }
 
     /**
      * @param name
      */
-    public TestSampleLocalShard(String name) {
+    public TestSampleLocalBTree(String name) {
         super(name);
     }
-
+    
     public void test_something() {
         fail("write tests");
     }

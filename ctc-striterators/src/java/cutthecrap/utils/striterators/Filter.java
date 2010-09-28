@@ -28,8 +28,7 @@ package cutthecrap.utils.striterators;
 import java.util.Iterator;
 
 /**
- * Used with Filterator by Striterator to filter returned objects. This can
- * represent either a single {@link IFilter} or a chain of {@link IFilter}s.
+ * Used with Filterator by Striterator to filter returned objects.
  */
 public abstract class Filter extends FilterBase {
 

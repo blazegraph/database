@@ -28,30 +28,30 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop;
 
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
+
+import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
+ * Interface for evaluating operations producing chunks of elements (tuples
+ * materialized from some index of a relation).
+ * 
+ * @see IAccessPath
+ * @see IChunkedOrderedIterator
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractChunkedOrderedIteratorOp<E> extends BOpBase
-        implements ChunkedOrderedIteratorOp<E> {
+abstract public class AbstractAccessPathOp<E> extends BOpBase {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends ChunkedOrderedIteratorOp.Annotations {
+    public interface Annotations extends BOp.Annotations, BufferAnnotations {
         
     }
-
-//    /**
-//     * @param args
-//     */
-//    protected AbstractChunkedOrderedIteratorOp(BOp[] args) {
-//        super(args);
-//    }
 
     /**
      * Required shallow copy constructor.
@@ -59,7 +59,7 @@ abstract public class AbstractChunkedOrderedIteratorOp<E> extends BOpBase
      * @param args
      * @param annotations
      */
-    protected AbstractChunkedOrderedIteratorOp(final BOp[] args,
+    public AbstractAccessPathOp(final BOp[] args,
             final Map<String, Object> annotations) {
 
         super(args, annotations);
@@ -71,11 +71,14 @@ abstract public class AbstractChunkedOrderedIteratorOp<E> extends BOpBase
      * 
      * @param op
      */
-    public AbstractChunkedOrderedIteratorOp(
-            final AbstractChunkedOrderedIteratorOp<E> op) {
+    public AbstractAccessPathOp(
+            final AbstractAccessPathOp<E> op) {
         super(op);
     }
 
+    /**
+     * @see BufferAnnotations#CHUNK_CAPACITY
+     */
     protected int getChunkCapacity() {
         
         return getProperty(Annotations.CHUNK_CAPACITY,
@@ -83,6 +86,9 @@ abstract public class AbstractChunkedOrderedIteratorOp<E> extends BOpBase
 
     }
 
+    /**
+     * @see BufferAnnotations#CHUNK_OF_CHUNKS_CAPACITY
+     */
     protected int getChunkOfChunksCapacity() {
 
         return getProperty(Annotations.CHUNK_OF_CHUNKS_CAPACITY,
@@ -97,16 +103,14 @@ abstract public class AbstractChunkedOrderedIteratorOp<E> extends BOpBase
 //
 //    }
 
+    /**
+     * @see BufferAnnotations#CHUNK_TIMEOUT
+     */
     protected long getChunkTimeout() {
         
         return getProperty(Annotations.CHUNK_TIMEOUT,
                 Annotations.DEFAULT_CHUNK_TIMEOUT);
         
     }
-
-    /**
-     * The {@link TimeUnit}s in which the {@link #chunkTimeout} is measured.
-     */
-    protected static transient final TimeUnit chunkTimeoutUnit = TimeUnit.MILLISECONDS;
 
 }

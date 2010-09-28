@@ -35,12 +35,14 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.apache.log4j.Logger;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
@@ -84,7 +86,7 @@ public class Rule2BOpUtility {
      * 
      * @return
      */
-    public static BindingSetPipelineOp convert(final IStep step, 
+    public static PipelineOp convert(final IStep step, 
             final int startId, final QueryEngine queryEngine) {
         
         if (step instanceof IRule)
@@ -101,12 +103,12 @@ public class Rule2BOpUtility {
      * 
      * @return
      */
-    public static BindingSetPipelineOp convert(final IRule rule, 
+    public static PipelineOp convert(final IRule rule, 
             final int startId, final QueryEngine queryEngine) {
 
         int bopId = startId;
         
-        final BindingSetPipelineOp startOp = new StartOp(new BOp[] {},
+        final PipelineOp startOp = new StartOp(new BOp[] {},
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, bopId++),//
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
@@ -167,7 +169,7 @@ public class Rule2BOpUtility {
             }
         }
         
-        BindingSetPipelineOp left = startOp;
+        PipelineOp left = startOp;
         
         for (int i = 0; i < order.length; i++) {
             
@@ -205,7 +207,7 @@ public class Rule2BOpUtility {
                 }
             }
             
-            final BindingSetPipelineOp joinOp = new PipelineJoin(//
+            final PipelineOp joinOp = new PipelineJoin(//
                     left, pred,//
                     NV.asMap(new NV[] {//
                             new NV(BOp.Annotations.BOP_ID, joinId),//
@@ -275,7 +277,7 @@ public class Rule2BOpUtility {
      * 
      * FIXME What is the pattern for UNION?
      */
-    public static BindingSetPipelineOp convert(final Program program) {
+    public static PipelineOp convert(final Program program) {
 
         throw new UnsupportedOperationException();
 

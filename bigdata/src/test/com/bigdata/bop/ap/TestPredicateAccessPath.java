@@ -40,6 +40,7 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate.Annotations;
+import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.MockRunningQuery;
 import com.bigdata.journal.BufferMode;
@@ -303,7 +304,7 @@ public class TestPredicateAccessPath extends TestCase2 {
      * 
      * @todo layering in {@link IElementFilter}s.
      * 
-     * @todo layering in a {@link DistinctElementFilter} filter.
+     * @todo layering in a {@link DistinctFilter} filter.
      */
     public void test_filter() {
 

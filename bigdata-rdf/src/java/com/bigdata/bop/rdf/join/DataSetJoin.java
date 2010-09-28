@@ -34,7 +34,7 @@ import java.util.concurrent.FutureTask;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
@@ -67,14 +67,14 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DataSetJoin extends BindingSetPipelineOp {
+public class DataSetJoin extends PipelineOp {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends BindingSetPipelineOp.Annotations {
+    public interface Annotations extends PipelineOp.Annotations {
 
         /**
          * The variable to be bound.
