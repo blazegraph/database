@@ -21,10 +21,8 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.bop.ap;
+package com.bigdata.bop.rdf;
 
-
-import com.bigdata.bop.ap.filter.TestDistinctFilter;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -61,23 +59,13 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("access path operators");
+        final TestSuite suite = new TestSuite("RDF operators");
 
-        // test basic API for a predicate.
-        suite.addTestSuite(TestPredicate.class);
-        
-        // test reading on an access path using a predicate.
-        suite.addTestSuite(TestPredicateAccessPath.class);
-        
-        /*
-         * Sampling an access path.
-         */
-        
-        // test sampling from an AbstractBTree.
-        suite.addTestSuite(TestSampleLocalBTree.class);
+        // Specialized RDF filters
+        suite.addTest(com.bigdata.bop.rdf.filter.TestAll.suite());
 
-        // test sampling from an FusedView.
-        suite.addTestSuite(TestSampleLocalBTree.class);
+        // Specialized RDF join operators
+        suite.addTest(com.bigdata.bop.rdf.join.TestAll.suite());
 
         return suite;
         

@@ -33,7 +33,7 @@ import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.rdf.rules.TMUtility;
@@ -53,7 +53,7 @@ import com.bigdata.util.concurrent.Haltable;
  * merged. Outputs from the UNION operator flow to the parent operator and will
  * be mapped across shards or nodes as appropriate for the parent. UNION runs on
  * the query controller. In order to avoid routing intermediate results through
- * the controller, the {@link BindingSetPipelineOp.Annotations#SINK_REF} of each
+ * the controller, the {@link PipelineOp.Annotations#SINK_REF} of each
  * child operand should be overridden to specify the parent of the UNION
  * operator.
  * <p>
@@ -65,7 +65,7 @@ import com.bigdata.util.concurrent.Haltable;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Union extends BindingSetPipelineOp {
+public class Union extends PipelineOp {
 
     /**
      * 
@@ -77,7 +77,7 @@ public class Union extends BindingSetPipelineOp {
      *            Two or more operators whose union is desired.
      * @param annotations
      */
-    public Union(final BindingSetPipelineOp[] args,
+    public Union(final PipelineOp[] args,
             final Map<String, Object> annotations) {
 
         super(args, annotations);

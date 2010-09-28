@@ -43,7 +43,7 @@ import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
@@ -391,7 +391,7 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
     public void test_query_startRun() throws Exception {
 
         final int startId = 1;
-        final BindingSetPipelineOp query = new StartOp(new BOp[] {}, NV
+        final PipelineOp query = new StartOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(Predicate.Annotations.BOP_ID, startId),//
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
@@ -458,7 +458,7 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
         final int joinId = 2;
         final int predId = 3;
         final int sliceId = 4;
-        final BindingSetPipelineOp query = 
+        final PipelineOp query = 
             new SliceOp(new BOp[]{new PipelineJoin<E>(
         // left
                 new StartOp(new BOp[] {}, NV.asMap(new NV[] {//
@@ -474,12 +474,6 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
                                         new String[] { namespace }),//
                                 new NV(Predicate.Annotations.KEY_ORDER,
                                         R.primaryKeyOrder),//
-                                new NV(Predicate.Annotations.PARTITION_ID,
-                                        Integer.valueOf(-1)),//
-                                new NV(Predicate.Annotations.OPTIONAL,
-                                        Boolean.FALSE),//
-                                new NV(Predicate.Annotations.CONSTRAINT, null),//
-                                new NV(Predicate.Annotations.EXPANDER, null),//
                                 new NV(Predicate.Annotations.BOP_ID, predId),//
                                 new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                         })),
@@ -642,7 +636,7 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
         final int predId2 = 5;
         final int sliceId = 6;
         
-        final BindingSetPipelineOp startOp = new StartOp(new BOp[] {},
+        final PipelineOp startOp = new StartOp(new BOp[] {},
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
@@ -654,12 +648,6 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
                 .asMap(new NV[] {//
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
-                        new NV(Predicate.Annotations.PARTITION_ID,
-                                Integer.valueOf(-1)),//
-                        new NV(Predicate.Annotations.OPTIONAL,
-                                Boolean.FALSE),//
-                        new NV(Predicate.Annotations.CONSTRAINT, null),//
-                        new NV(Predicate.Annotations.EXPANDER, null),//
                         new NV(Predicate.Annotations.BOP_ID, predId1),//
                         new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
@@ -669,17 +657,11 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
                 .asMap(new NV[] {//
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
-                        new NV(Predicate.Annotations.PARTITION_ID,
-                                Integer.valueOf(-1)),//
-                        new NV(Predicate.Annotations.OPTIONAL,
-                                Boolean.FALSE),//
-                        new NV(Predicate.Annotations.CONSTRAINT, null),//
-                        new NV(Predicate.Annotations.EXPANDER, null),//
                         new NV(Predicate.Annotations.BOP_ID, predId2),//
                         new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
         
-        final BindingSetPipelineOp join1Op = new PipelineJoin<E>(//
+        final PipelineOp join1Op = new PipelineJoin<E>(//
                 startOp, pred1Op,//
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, joinId1),//
@@ -688,7 +670,7 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
                                 BOpEvaluationContext.SHARDED),//
                         }));
 
-        final BindingSetPipelineOp join2Op = new PipelineJoin<E>(//
+        final PipelineOp join2Op = new PipelineJoin<E>(//
                 join1Op, pred2Op,//
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, joinId2),//
@@ -697,7 +679,7 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
                                 BOpEvaluationContext.SHARDED),//
                         }));
 
-        final BindingSetPipelineOp query = new SliceOp(new BOp[] { join2Op },
+        final PipelineOp query = new SliceOp(new BOp[] { join2Op },
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, sliceId),//
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,

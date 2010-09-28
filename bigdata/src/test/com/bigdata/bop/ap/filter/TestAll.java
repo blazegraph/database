@@ -21,12 +21,15 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.bop.rdf;
+package com.bigdata.bop.ap.filter;
 
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+
+import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.eval.DefaultEvaluationPlan2;
 
 /**
  * Aggregates test suites into increasing dependency order.
@@ -59,12 +62,21 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("RDF operators");
+        final TestSuite suite = new TestSuite("access path filters");
 
-        suite.addTest(com.bigdata.bop.rdf.join.TestAll.suite());
+        // test filter operator.
+        suite.addTestSuite(TestFilter.class);
 
-        return suite;
+        // test resolver operator.
+        suite.addTestSuite(TestResolver.class);
+
+        // test distinct operator.
+        suite.addTestSuite(TestDistinctFilter.class);
+
+        // @todo operators and test suites for the remaining striterator patterns.
         
+        return suite;
+
     }
-    
+
 }

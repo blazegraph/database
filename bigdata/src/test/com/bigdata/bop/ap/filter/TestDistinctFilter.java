@@ -22,27 +22,36 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Sep 8, 2010
+ * Created on Aug 19, 2010
  */
 
-package com.bigdata.bop;
+package com.bigdata.bop.ap.filter;
+
+import junit.framework.TestCase2;
 
 /**
- * An interface for {@link PipelineOp}s which are mapped across
- * shards.
- * 
- * @param <E>
- *            The generic type of the elements in the relation on which the
- *            predicate will read or write.
+ * Unit tests for {@link DistinctFilter}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IShardwisePipelineOp<E> {
+public class TestDistinctFilter extends TestCase2 {
 
     /**
-     * The predicate which reads or writes on the shard.
+     * 
      */
-    IPredicate<E> getPredicate();
+    public TestDistinctFilter() {
+    }
+
+    /**
+     * @param name
+     */
+    public TestDistinctFilter(String name) {
+        super(name);
+    }
+
+    public void test_something() {
+        fail("write tests");
+    }
     
 }

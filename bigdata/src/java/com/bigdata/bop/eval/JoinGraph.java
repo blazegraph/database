@@ -35,7 +35,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
@@ -84,14 +84,14 @@ import com.bigdata.relation.rule.Rule;
  *       binding sets from left hand side (the buffers) and run those samples
  *       against the right hand side (the local shard).
  */
-public class JoinGraph extends BindingSetPipelineOp {
+public class JoinGraph extends PipelineOp {
 
     private static final long serialVersionUID = 1L;
 
     /**
      * Known annotations.
      */
-    public interface Annotations extends BindingSetPipelineOp.Annotations {
+    public interface Annotations extends PipelineOp.Annotations {
         /**
          * The default sample size (100 is a good value).
          */

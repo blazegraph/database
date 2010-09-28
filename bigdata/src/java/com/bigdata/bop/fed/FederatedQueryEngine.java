@@ -41,7 +41,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
@@ -365,7 +365,7 @@ public class FederatedQueryEngine extends QueryEngine {
                  * @todo RMI is too expensive. Apply a memoizer pattern to avoid
                  * race conditions.
                  */
-                final BindingSetPipelineOp query = msg.getQueryController()
+                final PipelineOp query = msg.getQueryController()
                         .getQuery(msg.getQueryId());
 
                 q = newRunningQuery(FederatedQueryEngine.this, queryId,
@@ -465,7 +465,7 @@ public class FederatedQueryEngine extends QueryEngine {
     protected FederatedRunningQuery newRunningQuery(
             final QueryEngine queryEngine, final UUID queryId,
             final boolean controller, final IQueryClient clientProxy,
-            final BindingSetPipelineOp query) {
+            final PipelineOp query) {
 
         return new FederatedRunningQuery(this, queryId, controller,
                 clientProxy, query);

@@ -59,13 +59,7 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("index sampling operators");
-
-        // test sampling from an AbstractBTree.
-        suite.addTestSuite(TestSampleLocalBTree.class);
-
-        // test sampling from an FusedView.
-        suite.addTestSuite(TestSampleLocalBTree.class);
+        final TestSuite suite = new TestSuite("index operators");
 
         return suite;
         

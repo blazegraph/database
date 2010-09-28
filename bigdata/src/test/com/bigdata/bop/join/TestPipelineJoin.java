@@ -181,12 +181,6 @@ public class TestPipelineJoin extends TestCase2 {
                         .asMap(new NV[] {//
                                 new NV(Predicate.Annotations.RELATION_NAME,
                                         new String[] { namespace }),//
-                                new NV(Predicate.Annotations.PARTITION_ID,
-                                        Integer.valueOf(-1)),//
-                                new NV(Predicate.Annotations.OPTIONAL,
-                                        Boolean.FALSE),//
-                                new NV(Predicate.Annotations.CONSTRAINT, null),//
-                                new NV(Predicate.Annotations.EXPANDER, null),//
                                 new NV(Predicate.Annotations.BOP_ID, predId),//
                                 new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                         })),
@@ -277,16 +271,6 @@ public class TestPipelineJoin extends TestCase2 {
                                         new NV(
                                                 Predicate.Annotations.RELATION_NAME,
                                                 new String[] { namespace }),//
-                                        new NV(
-                                                Predicate.Annotations.PARTITION_ID,
-                                                Integer.valueOf(-1)),//
-                                        new NV(Predicate.Annotations.OPTIONAL,
-                                                Boolean.FALSE),//
-                                        new NV(
-                                                Predicate.Annotations.CONSTRAINT,
-                                                null),//
-                                        new NV(Predicate.Annotations.EXPANDER,
-                                                null),//
                                         new NV(Predicate.Annotations.BOP_ID,
                                                 predId),//
                                         new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
@@ -381,16 +365,6 @@ public class TestPipelineJoin extends TestCase2 {
                                         new NV(
                                                 Predicate.Annotations.RELATION_NAME,
                                                 new String[] { namespace }),//
-                                        new NV(
-                                                Predicate.Annotations.PARTITION_ID,
-                                                Integer.valueOf(-1)),//
-                                        new NV(Predicate.Annotations.OPTIONAL,
-                                                Boolean.FALSE),//
-                                        new NV(
-                                                Predicate.Annotations.CONSTRAINT,
-                                                null),//
-                                        new NV(Predicate.Annotations.EXPANDER,
-                                                null),//
                                         new NV(Predicate.Annotations.BOP_ID,
                                                 predId),//
                                         new NV(Predicate.Annotations.TIMESTAMP,
@@ -494,12 +468,6 @@ public class TestPipelineJoin extends TestCase2 {
                         .asMap(new NV[] {//
                                 new NV(Predicate.Annotations.RELATION_NAME,
                                         new String[] { namespace }),//
-                                new NV(Predicate.Annotations.PARTITION_ID,
-                                        Integer.valueOf(-1)),//
-                                new NV(Predicate.Annotations.OPTIONAL,
-                                        Boolean.FALSE),//
-                                new NV(Predicate.Annotations.CONSTRAINT, null),//
-                                new NV(Predicate.Annotations.EXPANDER, null),//
                                 new NV(Predicate.Annotations.BOP_ID, predId),//
                                 new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                         })),
@@ -609,12 +577,6 @@ public class TestPipelineJoin extends TestCase2 {
                         .asMap(new NV[] {//
                                 new NV(Predicate.Annotations.RELATION_NAME,
                                         new String[] { namespace }),//
-                                new NV(Predicate.Annotations.PARTITION_ID,
-                                        Integer.valueOf(-1)),//
-                                new NV(Predicate.Annotations.OPTIONAL,
-                                        Boolean.FALSE),//
-                                new NV(Predicate.Annotations.CONSTRAINT, null),//
-                                new NV(Predicate.Annotations.EXPANDER, null),//
                                 new NV(Predicate.Annotations.BOP_ID, predId),//
                                 new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                         })),

@@ -34,7 +34,7 @@ import java.util.UUID;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
@@ -221,7 +221,7 @@ public class TestThickChunkMessage extends TestCase2 {
             return null;
         }
 
-        public BindingSetPipelineOp getQuery(UUID queryId)
+        public PipelineOp getQuery(UUID queryId)
                 throws RemoteException {
             return null;
         }

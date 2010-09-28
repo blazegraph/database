@@ -32,6 +32,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.btree.ITuple;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -427,6 +428,12 @@ public class SPOPredicate extends Predicate<ISPO> {
     /**
      * Constrain the predicate by layering on another constraint (the existing
      * constraint, if any, is combined with the new constraint).
+     * 
+     * @deprecated This is being replaced by two classes of filters. One which
+     *             is always evaluated local to the index and one which is
+     *             evaluated in the JVM in which the access path is evaluated
+     *             once the {@link ITuple}s have been resolved to elements of
+     *             the relation.
      */
     public SPOPredicate setConstraint(final IElementFilter<ISPO> newConstraint) {
 

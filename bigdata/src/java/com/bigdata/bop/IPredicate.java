@@ -30,8 +30,13 @@ package com.bigdata.bop;
 
 import java.io.Serializable;
 
+import com.bigdata.bop.ap.filter.BOpFilterBase;
+import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
@@ -88,8 +93,45 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
 
         /**
          * Constraints on the elements read from the relation.
+         * 
+         * @deprecated This is being replaced by two classes of filters. One
+         *             which is always evaluated local to the index and one
+         *             which is evaluated in the JVM in which the access path is
+         *             evaluated once the {@link ITuple}s have been resolved to
+         *             elements of the relation.
          */
         String CONSTRAINT = "constraint";
+
+        /**
+         * An optional {@link BOpFilterBase} that will be evaluated local to the
+         * to the index. When the index is remote, the filter will be sent to
+         * the node on which the index resides and evaluated there. This makes
+         * it possible to efficiently filter out tuples which are not of
+         * interest for a given access path.
+         * <p>
+         * Note: The filter MUST NOT change the type of data visited by the
+         * iterator - it must remain an {@link ITupleIterator}. An attempt to
+         * change the type of the visited objects will result in a runtime
+         * exception.
+         * <p>
+         * You can chain {@link BOpFilterBase} filters by nesting them inside of
+         * one another.
+         * 
+         * @see #ACCESS_PATH_FILTER
+         * 
+         * @see IRangeQuery#rangeIterator(byte[], byte[], int, int,
+         *      IFilterConstructor)
+         */
+        String INDEX_LOCAL_FILTER = "indexLocalFilter";
+
+        /**
+         * An optional {@link BOpFilterBase} to be applied to the elements of
+         * the relation as they are materialized from the index. Unlike
+         * {@link #INDEX_LOCAL_FILTER}, this an {@link #ACCESS_PATH_FILTER} is never
+         * sent to a remote index for evaluation. This makes it possible to
+         * impose {@link DistinctFilter} across a {@link #REMOTE_ACCESS_PATH}.
+         */
+        String ACCESS_PATH_FILTER = "accessPathFilter";
 
         /**
          * Expander pattern.
@@ -144,7 +186,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * 
          * @see #DEFAULT_FULLY_BUFFERED_READ_THRESHOLD
          */
-        String FULLY_BUFFERED_READ_THRESHOLD = PipelineOp.class.getName()
+        String FULLY_BUFFERED_READ_THRESHOLD = IPredicate.class.getName()
                 + ".fullyBufferedReadThreshold";
 
         /**
@@ -168,7 +210,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * 
          * @see #DEFAULT_FLAGS
          */
-        String FLAGS = PipelineOp.class.getName() + ".flags";
+        String FLAGS = IPredicate.class.getName() + ".flags";
 
         /**
          * The default flags will visit the keys and values of the non-deleted
@@ -278,13 +320,17 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      *       which is the only method declared by {@link ISolutionExpander}.
      */
     public ISolutionExpander<E> getSolutionExpander();
-    
+
     /**
      * An optional constraint on the visitable elements.
      * 
      * @see Annotations#CONSTRAINT
      * 
-     * @todo rename as get(Element)Filter().
+     * @deprecated This is being replaced by two classes of filters. One which
+     *             is always evaluated local to the index and one which is
+     *             evaluated in the JVM in which the access path is evaluated
+     *             once the {@link ITuple}s have been resolved to elements of
+     *             the relation.
      */
     public IElementFilter<E> getConstraint();
 

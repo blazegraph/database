@@ -52,7 +52,7 @@ import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
 
 import com.bigdata.BigdataStatics;
-import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
@@ -1662,7 +1662,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         final QueryEngine queryEngine = tripleSource.getSail().getQueryEngine();
         
         final int startId = 1;
-        final BindingSetPipelineOp query = 
+        final PipelineOp query = 
             Rule2BOpUtility.convert(step, startId, queryEngine);
         
         if (log.isInfoEnabled()) {

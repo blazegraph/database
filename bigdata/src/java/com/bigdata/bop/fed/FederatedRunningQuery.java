@@ -38,7 +38,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IShardwisePipelineOp;
@@ -260,7 +260,7 @@ public class FederatedRunningQuery extends RunningQuery {
      */
     public FederatedRunningQuery(final FederatedQueryEngine queryEngine,
             final UUID queryId, final boolean controller,
-            final IQueryClient clientProxy, final BindingSetPipelineOp query) {
+            final IQueryClient clientProxy, final PipelineOp query) {
 
         super(queryEngine, queryId, /*begin, */controller, clientProxy, query);
 

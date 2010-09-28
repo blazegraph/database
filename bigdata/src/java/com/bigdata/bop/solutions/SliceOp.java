@@ -36,7 +36,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.RunningQuery;
@@ -74,7 +74,7 @@ import com.bigdata.service.IBigdataFederation;
  *       Otherwise we could cancel all operator evaluation for the query,
  *       including operators which are ancestors of the {@link SliceOp}.
  */
-public class SliceOp extends BindingSetPipelineOp {
+public class SliceOp extends PipelineOp {
 
     private final static transient Logger log = Logger.getLogger(SliceOp.class);
     
@@ -83,7 +83,7 @@ public class SliceOp extends BindingSetPipelineOp {
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends BindingSetPipelineOp.Annotations {
+    public interface Annotations extends PipelineOp.Annotations {
 
         /**
          * The first solution to be returned to the caller (origin ZERO).

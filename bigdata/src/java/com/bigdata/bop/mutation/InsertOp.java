@@ -33,7 +33,7 @@ import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IShardwisePipelineOp;
@@ -60,7 +60,7 @@ import com.bigdata.striterator.IKeyOrder;
  * @param <E>
  *            The generic type of the elements written onto the index.
  */
-public class InsertOp<E> extends BindingSetPipelineOp implements
+public class InsertOp<E> extends PipelineOp implements
         IShardwisePipelineOp<E> {
 
     /**
@@ -68,7 +68,7 @@ public class InsertOp<E> extends BindingSetPipelineOp implements
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends BindingSetPipelineOp.Annotations {
+    public interface Annotations extends PipelineOp.Annotations {
 
         /**
          * An {@link IPredicate}.  The {@link IPredicate#asBound(IBindingSet)}

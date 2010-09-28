@@ -36,7 +36,7 @@ import junit.framework.TestCase2;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.BindingSetPipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
@@ -80,7 +80,7 @@ public class TestPipelineUtility extends TestCase2 {
         
         final String namespace = "ns";
         
-        final BindingSetPipelineOp startOp = new StartOp(new BOp[] {},
+        final PipelineOp startOp = new StartOp(new BOp[] {},
                 NV.asMap(new NV[] {//
                         new NV(Predicate.Annotations.BOP_ID, startId),//
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
@@ -92,12 +92,6 @@ public class TestPipelineUtility extends TestCase2 {
                 .asMap(new NV[] {//
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
-                        new NV(Predicate.Annotations.PARTITION_ID,
-                                Integer.valueOf(-1)),//
-                        new NV(Predicate.Annotations.OPTIONAL,
-                                Boolean.FALSE),//
-                        new NV(Predicate.Annotations.CONSTRAINT, null),//
-                        new NV(Predicate.Annotations.EXPANDER, null),//
                         new NV(Predicate.Annotations.BOP_ID, predId1),//
                 }));
         
@@ -106,28 +100,22 @@ public class TestPipelineUtility extends TestCase2 {
                 .asMap(new NV[] {//
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
-                        new NV(Predicate.Annotations.PARTITION_ID,
-                                Integer.valueOf(-1)),//
-                        new NV(Predicate.Annotations.OPTIONAL,
-                                Boolean.FALSE),//
-                        new NV(Predicate.Annotations.CONSTRAINT, null),//
-                        new NV(Predicate.Annotations.EXPANDER, null),//
                         new NV(Predicate.Annotations.BOP_ID, predId2),//
                 }));
         
         @SuppressWarnings("unchecked")
-        final BindingSetPipelineOp join1Op = new PipelineJoin(startOp, pred1Op,
+        final PipelineOp join1Op = new PipelineJoin(startOp, pred1Op,
                 NV.asMap(new NV[] { new NV(Predicate.Annotations.BOP_ID,
                         joinId1),//
                         }));
 
         @SuppressWarnings("unchecked")
-        final BindingSetPipelineOp join2Op = new PipelineJoin(join1Op, pred2Op,
+        final PipelineOp join2Op = new PipelineJoin(join1Op, pred2Op,
                 NV.asMap(new NV[] { new NV(Predicate.Annotations.BOP_ID,
                         joinId2),//
                         }));
         
-        final BindingSetPipelineOp queryPlan = join2Op;
+        final PipelineOp queryPlan = join2Op;
 
         final Map<Integer,BOp> queryIndex = BOpUtility.getIndex(queryPlan);
 

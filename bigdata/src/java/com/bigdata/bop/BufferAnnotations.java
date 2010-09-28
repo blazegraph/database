@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop;
 
+import java.util.concurrent.TimeUnit;
+
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 
@@ -80,5 +82,10 @@ public interface BufferAnnotations {
      * @todo this is probably much larger than we want. Try 10ms.
      */
     int DEFAULT_CHUNK_TIMEOUT = 20;
+
+    /**
+     * The {@link TimeUnit}s in which the {@link #CHUNK_TIMEOUT} is measured.
+     */
+    TimeUnit chunkTimeoutUnit = TimeUnit.MILLISECONDS;
 
 }
