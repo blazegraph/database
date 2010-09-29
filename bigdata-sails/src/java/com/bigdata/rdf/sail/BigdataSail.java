@@ -133,7 +133,6 @@ import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InferredSPOFilter;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOAccessPath;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -148,6 +147,7 @@ import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.vocab.NoVocabulary;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -2972,7 +2972,7 @@ public class BigdataSail extends SailBase implements Sail {
 
         /**
          * Note: The <i>includeInferred</i> argument is applied in two ways.
-         * First, inferences are stripped out of the {@link SPOAccessPath}.
+         * First, inferences are stripped out of the {@link AccessPath}.
          * Second, query time expansion of
          * <code>foo rdf:type rdfs:Resource</code>, owl:sameAs, etc.
          * <p>

@@ -40,8 +40,6 @@ import com.bigdata.btree.Tuple;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.filter.TupleFilter.TupleFilterator;
 
-import cutthecrap.utils.striterators.IFilterTest;
-
 /**
  * <p>
  * Filter supporting {@link ITupleIterator}s.
@@ -101,34 +99,6 @@ abstract public class BOpTupleFilter<E> extends BOpFilterBase {
         super(args, annotations);
     }
 
-//    /**
-//     * Convenience method wraps the {@link IFilterTest} as a
-//     * {@link BOpTupleFilter}.
-//     * 
-//     * @param test
-//     *            The test (optional).
-//     * 
-//     * @return The filter wrapping the test -or- <code>null</code> if the
-//     *         argument is <code>null</code>.
-//     */
-//    @SuppressWarnings("unchecked")
-//    public static BOpFilterBase newInstance(final IFilterTest test) {
-//        
-//        if (test == null) {
-//            // No test. No filter.
-//            return null;
-//        }
-//        
-//        return new BOpTupleFilter(new BOp[0]/*filters*/,null/*annotations*/) {
-//            private static final long serialVersionUID = 1L;
-//            @Override
-//            protected boolean isValid(ITuple obj) {
-//                return test.isValid(obj);
-//            }
-//        };
-//        
-//    }
-    
     @Override
     final protected Iterator filterOnce(Iterator src, final Object context) {
 

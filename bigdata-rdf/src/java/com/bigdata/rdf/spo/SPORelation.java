@@ -87,6 +87,7 @@ import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.IRelation;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -1221,9 +1222,9 @@ public class SPORelation extends AbstractRelation<ISPO> {
         final ILocalBTreeView ndx = (ILocalBTreeView) indexManager
                 .getIndex(name, timestamp);
 
-        return new SPOAccessPath(indexManager, timestamp, predicate,
-                keyOrder, ndx, flags, getChunkOfChunksCapacity(),
-                getChunkCapacity(), getFullyBufferedReadThreshold()).init();
+        return newAccessPath(this/* relation */, indexManager, timestamp,
+                predicate, keyOrder, ndx, flags, getChunkOfChunksCapacity(),
+                getChunkCapacity(), getFullyBufferedReadThreshold());
 
     }
     
@@ -1291,12 +1292,25 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         final int fullyBufferedReadThreshold = container.getFullyBufferedReadThreshold();
         
-        return new SPOAccessPath(this, predicate, keyOrder, ndx, flags,
-                chunkOfChunksCapacity, chunkCapacity,
-                fullyBufferedReadThreshold).init();
-        
+        return newAccessPath(this, getIndexManager(), getTimestamp(),
+                predicate, keyOrder, ndx, flags, chunkOfChunksCapacity,
+                chunkCapacity, fullyBufferedReadThreshold);
+
     }
-    
+
+    @Override
+    public SPOAccessPath newAccessPath(final IRelation<ISPO> relation,
+            final IIndexManager indexManager, final long timestamp,
+            final IPredicate<ISPO> predicate, final IKeyOrder<ISPO> keyOrder,
+            final IIndex ndx, final int flags, final int chunkOfChunksCapacity,
+            final int chunkCapacity, final int fullyBufferedReadThreshold) {
+
+        return new SPOAccessPath(this/* relation */, indexManager, timestamp,
+                predicate, keyOrder, ndx, flags, chunkOfChunksCapacity,
+                chunkCapacity, fullyBufferedReadThreshold).init();
+
+    }
+
 //    public long getElementCount(boolean exact) {
 //
 //        final IIndex ndx = getIndex(SPOKeyOrder.SPO);

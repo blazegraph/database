@@ -42,8 +42,8 @@ import java.util.List;
  */
 public class Striterator implements IStriterator {
 	volatile List<IFilter> filters = null; // Note: NOT serializable.
-    private transient Iterator realSource;
-	private transient Iterator m_src = null;
+    private volatile Iterator realSource;
+	private volatile Iterator m_src = null;
 
     /**
      * Deserialization constructor.

@@ -46,42 +46,10 @@ import com.bigdata.striterator.IKeyOrder;
  */
 public class SPOAccessPath extends AccessPath<ISPO> {
 
-//    private SPOTupleSerializer          tupleSer;
-
-//    /** Relation (resolved lazily if not specified to the ctor). */
-//    private SPORelation                 relation;
-
     /**
-     * Variant when the {@link SPORelation} has already been materialized.
-     * <p>
-     * Note: Filters should be specified when the {@link IAccessPath} is
-     * constructed so that they will be evaluated on the data service rather
-     * than materializing the elements and then filtering them. This can be
-     * accomplished by adding the filter as a constraint on the predicate when
-     * specifying the access path.
      * 
-     * @param predicate
-     * @param keyOrder
-     * @param ndx
-     * @param flags
-     */
-    public SPOAccessPath(final SPORelation relation,
-            final IPredicate<ISPO> predicate, final IKeyOrder<ISPO> keyOrder,
-            final IIndex ndx, final int flags, final int chunkOfChunksCapacity,
-            final int chunkCapacity, final int fullyBufferedReadThreshold) {
-
-        super(relation, relation.getIndexManager(), relation.getTimestamp(),
-                predicate, keyOrder, ndx, flags, chunkOfChunksCapacity,
-                chunkCapacity, fullyBufferedReadThreshold);
-
-    }
-
-    /**
-     * Variant does not require the {@link SPORelation} to have been
-     * materialized. This is useful when you want an {@link IAccessPath} for a
-     * specific index partition.
-     * 
-     * @param indexManager
+     * @param relation (optional).
+     * @param indexManager (required) 
      * @param timestamp
      * @param predicate
      * @param keyOrder
@@ -91,48 +59,43 @@ public class SPOAccessPath extends AccessPath<ISPO> {
      * @param chunkCapacity
      * @param fullyBufferedReadThreshold
      */
-    public SPOAccessPath(final IIndexManager indexManager,
-            final long timestamp, final IPredicate<ISPO> predicate,
-            final IKeyOrder<ISPO> keyOrder, final IIndex ndx, final int flags,
-            final int chunkOfChunksCapacity, final int chunkCapacity,
-            final int fullyBufferedReadThreshold) {
+    public SPOAccessPath(final SPORelation relation,
+            final IIndexManager indexManager, final long timestamp,
+            final IPredicate<ISPO> predicate, final IKeyOrder<ISPO> keyOrder,
+            final IIndex ndx, final int flags, final int chunkOfChunksCapacity,
+            final int chunkCapacity, final int fullyBufferedReadThreshold) {
 
-        super(null/* relation */, indexManager, timestamp, predicate, keyOrder,
-                ndx, flags, chunkOfChunksCapacity, chunkCapacity,
-                fullyBufferedReadThreshold);
-
-    }
-
-    /**
-     * Return the constant bound on the {@link #getPredicate() predicate} for
-     * this access path at the specified index -or- {@link #NULL} iff the
-     * predicate is not bound at that position.
-     * 
-     * @param index
-     *            The index.
-     * 
-     * @return Either the bound value -or- {@link #NULL} iff the index is
-     *         unbound for the predicate for this access path.
-     */
-    @SuppressWarnings("unchecked")
-    public IV get(final int index) {
-
-        final IVariableOrConstant<IV> t = predicate.get(index);
-
-        return t == null || t.isVar() ? null : t.get();
+        super(relation, indexManager, timestamp, 
+//                relation.getIndexManager(), relation.getTimestamp(),
+                predicate, keyOrder, ndx, flags, chunkOfChunksCapacity,
+                chunkCapacity, fullyBufferedReadThreshold);
 
     }
 
-//    protected SPOTupleSerializer getTupleSerializer() {
+//    /**
+//     * Variant does not require the {@link SPORelation} to have been
+//     * materialized. This is useful when you want an {@link IAccessPath} for a
+//     * specific index partition.
+//     * 
+//     * @param indexManager
+//     * @param timestamp
+//     * @param predicate
+//     * @param keyOrder
+//     * @param ndx
+//     * @param flags
+//     * @param chunkOfChunksCapacity
+//     * @param chunkCapacity
+//     * @param fullyBufferedReadThreshold
+//     */
+//    public SPOAccessPath(final IIndexManager indexManager,
+//            final long timestamp, final IPredicate<ISPO> predicate,
+//            final IKeyOrder<ISPO> keyOrder, final IIndex ndx, final int flags,
+//            final int chunkOfChunksCapacity, final int chunkCapacity,
+//            final int fullyBufferedReadThreshold) {
 //
-//        if (tupleSer == null) {
-//
-//            tupleSer = (SPOTupleSerializer) ndx.getIndexMetadata()
-//                    .getTupleSerializer();
-//
-//        }
-//
-//        return tupleSer;
+//        super(null/* relation */, indexManager, timestamp, predicate, keyOrder,
+//                ndx, flags, chunkOfChunksCapacity, chunkCapacity,
+//                fullyBufferedReadThreshold);
 //
 //    }
 
@@ -143,34 +106,11 @@ public class SPOAccessPath extends AccessPath<ISPO> {
      */
     public SPOAccessPath init() {
 
-//        final IKeyBuilder keyBuilder = getTupleSerializer().getKeyBuilder();
-//
-//        setFromKey(((SPOKeyOrder) keyOrder).getFromKey(keyBuilder, predicate));
-//
-//        setToKey(((SPOKeyOrder) keyOrder).getToKey(keyBuilder, predicate));
-
         super.init();
 
         return this;
 
     }
-
-//    /**
-//     * Resolved lazily if not specified to the ctor.
-//     */
-//    synchronized
-//    public SPORelation getRelation() {
-//
-//        if (relation == null) {
-//
-//            relation = (SPORelation) indexManager.getResourceLocator().locate(
-//                    predicate.getOnlyRelationName(), timestamp);
-//
-//        }
-//
-//        return relation;
-//
-//    }
 
     /**
      * Strengthened return type.
@@ -181,6 +121,31 @@ public class SPOAccessPath extends AccessPath<ISPO> {
     public SPORelation getRelation() {
 
         return (SPORelation) super.getRelation();
+
+    }
+
+    /**
+     * Strengthened return type.
+     * <p>
+     * {@inheritDoc}
+     */
+    @Override
+    public SPOPredicate getPredicate() {
+
+        return (SPOPredicate) super.getPredicate();
+
+    }
+
+    /**
+     * Strengthened return type.
+     * <p>
+     * {@inheritDoc}
+     */
+    @Override
+    @SuppressWarnings("unchecked")
+    public IV get(final int index) {
+
+        return (IV) super.get(index);
 
     }
 
@@ -197,18 +162,6 @@ public class SPOAccessPath extends AccessPath<ISPO> {
     public long removeAll() {
 
         return getRelation().getContainer().removeStatements(iterator());
-
-    }
-
-    /**
-     * Strengthened return type.
-     * <p>
-     * {@inheritDoc}
-     */
-    @Override
-    public SPOPredicate getPredicate() {
-
-        return (SPOPredicate) super.getPredicate();
 
     }
 

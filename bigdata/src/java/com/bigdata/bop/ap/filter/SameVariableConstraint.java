@@ -19,6 +19,8 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.relation.accesspath.IAccessPath;
 
+import cutthecrap.utils.striterators.IFilterTest;
+
 /**
  * Filter imposes the "same variable" constraint on the elements visited by an
  * {@link IAccessPath}. The filter is required IFF a {@link IVariable} appears
@@ -39,7 +41,7 @@ import com.bigdata.relation.accesspath.IAccessPath;
  *            The generic type of the elements that will be tested by the
  *            filter.
  */
-public class SameVariableConstraint<E> implements Externalizable {
+public class SameVariableConstraint<E> implements IFilterTest, Externalizable {
 
     /**
      * The predicate template.
@@ -110,7 +112,14 @@ public class SameVariableConstraint<E> implements Externalizable {
 //        return true;
 //    }
 
-    public boolean accept(final E e) {
+    @SuppressWarnings("unchecked")
+    public boolean isValid(final Object obj) {
+
+        return accept((E) obj);
+
+    }
+    
+    private boolean accept(final E e) {
 
         int i = 0;
         while (i < indices.length) {

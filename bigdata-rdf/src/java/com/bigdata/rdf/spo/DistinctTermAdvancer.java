@@ -35,10 +35,11 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.relation.accesspath.AccessPath;
 
 /**
  * Advances the source {@link ITupleCursor} through the distinct term
- * identifiers for some {@link SPOAccessPath}. Each time a new
+ * identifiers for some {@link AccessPath}. Each time a new
  * {@link ITuple} is visited, the term identifier for the first position in
  * that tuple is decoded and its successor is formed. The source
  * {@link ITupleCursor} is then advanced to the key having that term

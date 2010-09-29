@@ -1714,6 +1714,13 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
                 new BigdataBindingSetResolverator(database, it2).start(database
                         .getExecutorService()));
+
+        try {
+            // Wait for the Future (checks for errors).
+            runningQuery.get();
+        } catch (Exception ex) {
+            throw new QueryEvaluationException(ex);
+        }
         
 //        final boolean backchain = //
 //        tripleSource.getDatabase().getAxioms().isRdfSchema()
