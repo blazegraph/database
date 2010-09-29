@@ -1842,6 +1842,7 @@ ${postInstallMessage}</echo>
 
         <!-- Test suites to run when -DtestName is not set -->
 
+        <test name="cutthecrap.utils.striterator.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.cache.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.io.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.net.TestAll" todir="${test.results.dir}" unless="testName" />
