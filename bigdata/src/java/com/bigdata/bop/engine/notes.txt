@@ -508,45 +508,64 @@ Some problems:
 
 Here is what I have not done yet:
 
-Write unit tests to sanity check these changes.
+- Striterator unit tests.
 
-done. Replace (I)FilterConstructor with IFilter.  FilterConstructor
-implemented clone.  I am not sure that I can recall why.  Presumably
-because a cloned would have a distinct filter chain.  We can not
-easily override clone() on FilterBase because of all the derived
-versions.  We could have a deep copy constructor pattern, which is
-what I did for the BOpBase class and then use that for clone.
+- Bop-erator tests.
 
-Write unit tests at the IPredicate/AccessPath level to use stackable
-filters (for the LOCAL and REMOTE access paths).  Write unit tests for
-correct range counts with and without local/remote filters.  Write
-unit tests for caching of those range counts.
+- MGC: All of the Filterators need to use deferred prefetch.  Prefetch
+  during the constructor causes problems when we are stacking filters
+  using FilterBase.  (This is also true for the ITuple filters).
 
-- The stacking of the BOpFilters may be counter intuitive or just
-  wrong.
-
-- TestPredicateAccessPath#test_localFilter() does not report the
-  correct tuples.  This is weirdness with reuse of the same backing
-  Tuple object.  See TupleFilter and BOpFilter.  The filter that is
-  being applied in the unit test does not protect against the tuple
-  reuse. It would be best to automatically wrap such asserts.  E.g.,
-  BOpTupleFilter.  It would also be good to catch runtime type
-  problems with this.  E.g., if the source iterator is ITupleFilter
-  then it is an error to wrap with BOpFilter.  You must use
-  BOpTupleFilter instead.
+- BT: Write unit tests at the IPredicate/AccessPath level to use
+  stackable filters (for the LOCAL and REMOTE access paths).  Write
+  unit tests for correct range counts with and without local/remote
+  filters.  Write unit tests for caching of those range counts.
 
 - Write BOp versions for TupleResolver, ...
 
-- All of the Filterators need to use deferred prefetch.  Prefetch
-  during the constructor causes problems when we are stacking filters
-  using FilterBase.
+- done. IPredicate#getConstraint() must go (issues remain with
+  BackchainAccessPath).
 
-IPredicate#getConstraint() must go.  This will require touching the
-backchainer classes.  The (SPO|Magic)Predicate contructors should also
-be touched up since they will otherwise DROP the local and remote
-filters.
+- The (SPO|Magic)Predicate contructors must be touched up.  
 
-Reconcile IElementFilter and implementations.
+  - They assume an IElementFilter (IFilterTest). However, the filters
+    are now specified with IFilter. 
+
+  - Those constructor will DROP the local and remote filters unless
+    the logic is modified.
+
+  - When used remotely, IElementFilter must do ITuple.getObject() and
+    MUST be wrapped using ElementFilter to be "Tuple" aware (problem
+    with Tuple reference reuse inside the ITupleIterators).
+
+  - Reconcile IElementFilter and implementations.  IElementFilter was
+    transparently wrapped by AccessPath to resolve the ITuple to the
+    element before applying the filter.  If IElementFilter is used in
+    contexts other than the index then all implementations must be
+    modified to conditionally resolve the element while filtering.
+
+  - IPredicates created from a Relation MUST use the timestamp of that
+    relation NOT READ_COMMITTED.  Remove the default timestamp
+    annotation.  Make this required where it is used so we can track
+    all of this down.
+
+MikeP:
+
+  - BackchainAccessPath.  Are the index local or access path filters
+    ever used here?  If they are then this code needs to be modified.
+
+  - The timestamp on which the backchain access path will read MUST be
+    passed through to the IPredicate constructors.
+
+  - Leave C as an anonymous variable when it will not be used, not
+    null.
+
+  - Replace NamedGraph and DefaultGraph access paths per the decision
+    tree and cost model.
+
+  - Set the TIMESTAMP on the predicate.
+
+  - Additional SPOPredicate and Predicate constructor cleanup.
 
 Reconcile the com.bigdata.striterators package.  Can we get rid of it?
 Incrementally?

@@ -9,15 +9,18 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.QueryEvaluationException;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURIImpl;
 import com.bigdata.rdf.rules.RuleContextEnum;
+import com.bigdata.rdf.spo.SPOStarJoin.Annotations;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.vocab.NoVocabulary;
@@ -121,11 +124,16 @@ public class TestSPOStarJoin extends AbstractTripleStoreTestCase {
                     new Constant<IV>(store.getIV(RDF.TYPE)),
                     new Constant<IV>(frameClass.getIV())
                     );
-            
-            final SPOStarJoin starJoin = new SPOStarJoin(
-                    store.getSPORelation().getNamespace(),
-                    Var.var("frameClass")
-                    );
+
+            final SPOStarJoin starJoin = new SPOStarJoin(new BOp[] {
+                    Var.var("frameClass"), Var.var(), Var.var(), null /* c */},
+                    NV.asMap(new NV[] { new NV(
+                            SPOStarJoin.Annotations.RELATION_NAME, new String[]{store
+                                    .getSPORelation().getNamespace()}) }));
+//            final SPOStarJoin starJoin = new SPOStarJoin(
+//                    store.getSPORelation().getNamespace(),
+//                    Var.var("frameClass")
+//                    );
             
             starJoin.addStarConstraint(new SPOStarJoin.SPOStarConstraint(
                     new Constant(ontologyClass.getIV()),
@@ -268,11 +276,17 @@ public class TestSPOStarJoin extends AbstractTripleStoreTestCase {
                     new Constant<IV>(store.getIV(RDF.TYPE)),
                     new Constant<IV>(store.getIV(RDFS.RESOURCE))
                     );
-            
-            final SPOStarJoin starJoin = new SPOStarJoin(
-                    store.getSPORelation().getNamespace(),
-                    Var.var("frameProperty")
-                    );
+
+            final SPOStarJoin starJoin = new SPOStarJoin(new BOp[] {
+                    Var.var("frameProperty"), Var.var(), Var.var(), null /* c */},
+                    NV.asMap(new NV[] { new NV(
+                            SPOStarJoin.Annotations.RELATION_NAME, new String[]{store
+                                    .getSPORelation().getNamespace()}) }));
+
+//            final SPOStarJoin starJoin = new SPOStarJoin(
+//                    store.getSPORelation().getNamespace(),
+//                    Var.var("frameProperty")
+//                    );
             
             starJoin.addStarConstraint(new SPOStarJoin.SPOStarConstraint(
                     new Constant(ontologyProperty.getIV()),

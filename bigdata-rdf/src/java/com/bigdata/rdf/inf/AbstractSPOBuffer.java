@@ -186,7 +186,7 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
         
         assert stmt != null;
 
-        if (filter != null && filter.accept(stmt)) {
+        if (filter != null && filter.isValid(stmt)) {
             
             /*
              * Note: Do not store statements (or justifications) matched by the

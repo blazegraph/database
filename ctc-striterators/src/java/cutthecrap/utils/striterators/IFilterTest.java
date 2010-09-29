@@ -1,7 +1,6 @@
-/*
-Striterator - transformation and mapping patterns over java Iterators
+/**
 
-Copyright (C) SYSTAP, LLC 2010.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -22,23 +21,29 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
+/*
+ * Created on Sep 29, 2010
+ */
 
 package cutthecrap.utils.striterators;
 
-/******************************************************************************
- * Derived from Filter, and excludes a single object from the iteration.
+import java.io.Serializable;
+
+/**
+ * Interface for a method which filters objects visited by a {@link Filterator}.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class ExclusionFilter extends Filter {
-  private Object m_exclude;
-  
-  public ExclusionFilter(Object exclude) {
-  	m_exclude = exclude;
-  }
-  
-	/***********************************************************************
-	 * Just make sure that the current object is not the one to be excluded.
-	 **/
-  public boolean isValid(Object obj) {
-  	return obj != m_exclude;
-  }
+public interface IFilterTest extends Serializable {
+
+    /**
+     * True iff the argument is matched by the filter.
+     * 
+     * @param obj
+     *            Something visited by the iterator.
+     * 
+     * @return true iff that object is accepted by the filter.
+     */
+    public boolean isValid(Object e);
+
 }

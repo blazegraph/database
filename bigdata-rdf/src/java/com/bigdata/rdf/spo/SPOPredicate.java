@@ -31,11 +31,9 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.ap.Predicate;
-import com.bigdata.btree.ITuple;
-import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.ISolutionExpander;
 
 /**
@@ -68,6 +66,13 @@ public class SPOPredicate extends Predicate<ISPO> {
 //    }
 
     /**
+     * Variable argument version of the shallow copy constructor.
+     */
+    public SPOPredicate(final BOp[] values, final NV... annotations) {
+        super(values, annotations);
+    }
+
+    /**
      * Required shallow copy constructor.
      */
     public SPOPredicate(final BOp[] values, final Map<String, Object> annotations) {
@@ -93,10 +98,15 @@ public class SPOPredicate extends Predicate<ISPO> {
      */
     public SPOPredicate(final String relationName,
             final IVariableOrConstant<IV> s,
-            final IVariableOrConstant<IV> p, final IVariableOrConstant<IV> o) {
+            final IVariableOrConstant<IV> p,
+            final IVariableOrConstant<IV> o) {
 
-        this(new String[] { relationName }, -1/* partitionId */, s, p, o,
-                null/* c */, false/* optional */, null/* constraint */, null/* expander */);
+//        this(new String[] { relationName }, -1/* partitionId */, s, p, o,
+//                null/* c */, false/* optional */, null/* constraint */, null/* expander */);
+        super(
+                new IVariableOrConstant[] { s, p, o }, //
+                new NV(Annotations.RELATION_NAME, new String[] { relationName }) //
+        );
 
     }
 
@@ -113,10 +123,15 @@ public class SPOPredicate extends Predicate<ISPO> {
     public SPOPredicate(final String relationName,
             final IVariableOrConstant<IV> s,
             final IVariableOrConstant<IV> p,
-            final IVariableOrConstant<IV> o, final IVariableOrConstant<IV> c) {
+            final IVariableOrConstant<IV> o,
+            final IVariableOrConstant<IV> c) {
 
-        this(new String[] { relationName }, -1/* partitionId */, s, p, o, c,
-                false/* optional */, null/* constraint */, null/* expander */);
+//        this(new String[] { relationName }, -1/* partitionId */, s, p, o, c,
+//                false/* optional */, null/* constraint */, null/* expander */);
+        super((c == null ? new IVariableOrConstant[] { s, p, o }
+                : new IVariableOrConstant[] { s, p, o, c }), //
+                new NV(Annotations.RELATION_NAME, relationName) //
+        );
 
     }
 
@@ -132,10 +147,13 @@ public class SPOPredicate extends Predicate<ISPO> {
      */
     public SPOPredicate(final String[] relationName,
             final IVariableOrConstant<IV> s,
-            final IVariableOrConstant<IV> p, final IVariableOrConstant<IV> o) {
+            final IVariableOrConstant<IV> p,
+            final IVariableOrConstant<IV> o) {
 
-        this(relationName, -1/* partitionId */, s, p, o,
-                null/* c */, false/* optional */, null/* constraint */, null/* expander */);
+//        this(relationName, -1/* partitionId */, s, p, o,
+//                null/* c */, false/* optional */, null/* constraint */, null/* expander */);
+        super(new IVariableOrConstant[] { s, p, o }, //
+                new NV(Annotations.RELATION_NAME, relationName));
 
     }
 
@@ -152,10 +170,14 @@ public class SPOPredicate extends Predicate<ISPO> {
     public SPOPredicate(final String relationName,
             final IVariableOrConstant<IV> s,
             final IVariableOrConstant<IV> p,
-            final IVariableOrConstant<IV> o, final boolean optional) {
+            final IVariableOrConstant<IV> o,
+            final boolean optional) {
 
-        this(new String[] { relationName }, -1/* partitionId */, s, p, o,
-                null/* c */, optional, null/* constraint */, null/* expander */);
+//        this(new String[] { relationName }, -1/* partitionId */, s, p, o,
+//                null/* c */, optional, null/* constraint */, null/* expander */);
+        super(new IVariableOrConstant[] { s, p, o }, //
+                new NV(Annotations.RELATION_NAME, new String[]{relationName}), //
+                new NV(Annotations.OPTIONAL, optional));
 
     }
 
@@ -176,9 +198,12 @@ public class SPOPredicate extends Predicate<ISPO> {
             final IVariableOrConstant<IV> o,
             final ISolutionExpander<ISPO> expander) {
 
-        this(new String[] { relationName }, -1/* partitionId */, s, p, o,
-                null/* c */, false/* optional */, null/* constraint */,
-                expander);
+//        this(new String[] { relationName }, -1/* partitionId */, s, p, o,
+//                null/* c */, false/* optional */, null/* constraint */,
+//                expander);
+        super(new IVariableOrConstant[] { s, p, o }, //
+                new NV(Annotations.RELATION_NAME, new String[]{relationName}), //
+                new NV(Annotations.EXPANDER, expander));
 
     }
 
@@ -200,86 +225,96 @@ public class SPOPredicate extends Predicate<ISPO> {
             final IVariableOrConstant<IV> o, final boolean optional,
             final ISolutionExpander<ISPO> expander) {
 
-        this(new String[] { relationName }, -1/* partitionId */, s, p, o,
-                null/* c */, optional, null/* constraint */, expander);
-        
-    }
+//        this(new String[] { relationName }, -1/* partitionId */, s, p, o,
+//                null/* c */, optional, null/* constraint */, expander);
+        super(new IVariableOrConstant[] { s, p, o }, //
+                new NV(Annotations.RELATION_NAME, new String[]{relationName}), //
+                new NV(Annotations.OPTIONAL, optional), //
+                new NV(Annotations.EXPANDER, expander));
     
-    /**
-     * Fully specified ctor.
-     * 
-     * @param relationName
-     * @param partitionId
-     * @param s
-     * @param p
-     * @param o
-     * @param c MAY be <code>null</code>.
-     * @param optional
-     * @param constraint
-     *            MAY be <code>null</code>.
-     * @param expander
-     *            MAY be <code>null</code>.
-     */
-    public SPOPredicate(String[] relationName, //
-            final int partitionId, //
-            final IVariableOrConstant<IV> s,//
-            final IVariableOrConstant<IV> p,//
-            final IVariableOrConstant<IV> o,//
-            final IVariableOrConstant<IV> c,//
-            final boolean optional, //
-            final IElementFilter<ISPO> constraint,//
-            final ISolutionExpander<ISPO> expander//
-            ) {
-        
-        super(
-                (c == null ? new IVariableOrConstant[] { s, p, o }
-                : new IVariableOrConstant[] { s, p, o, c }), 
-                
-//                new IVariableOrConstant[] { s, p, o, c },
-                
-        relationName[0], partitionId, optional, constraint, expander, ITx.READ_COMMITTED);
-
-//        if (relationName == null)
-//            throw new IllegalArgumentException();
-//       
-//        for (int i = 0; i < relationName.length; i++) {
-//            
-//            if (relationName[i] == null)
-//                throw new IllegalArgumentException();
-//            
-//        }
-//        
-//        if (relationName.length == 0)
-//            throw new IllegalArgumentException();
-//        
-//        if (partitionId < -1)
-//            throw new IllegalArgumentException();
-//        
-//        if (s == null)
-//            throw new IllegalArgumentException();
-//        
-//        if (p == null)
-//            throw new IllegalArgumentException();
-//        
-//        if (o == null)
-//            throw new IllegalArgumentException();
-//        
-//        this.relationName = relationName;
-//        
-//        this.partitionId = partitionId;
-//        
-//        this.s = s;
-//        this.p = p;
-//        this.o = o;
-//        this.c = c; // MAY be null.
-//
-//        this.optional = optional;
-//        
-//        this.constraint = constraint; /// MAY be null.
-//        
-//        this.expander = expander;// MAY be null.
-        
     }
+
+//    /**
+//     * Fully specified ctor.
+//     * 
+//     * @param relationName
+//     * @param partitionId
+//     * @param s
+//     * @param p
+//     * @param o
+//     * @param c
+//     *            MAY be <code>null</code>.
+//     * @param optional
+//     * @param constraint
+//     *            MAY be <code>null</code>.
+//     * @param expander
+//     *            MAY be <code>null</code>.
+//     * @param timestamp
+//     *            The timestamp or transaction identifier against which the
+//     *            predicate will read or write.
+//     */
+//    public SPOPredicate(//
+//            final String[] relationName, //
+//            final int partitionId, //
+//            final IVariableOrConstant<IV> s,//
+//            final IVariableOrConstant<IV> p,//
+//            final IVariableOrConstant<IV> o,//
+//            final IVariableOrConstant<IV> c,//
+//            final boolean optional, //
+//            final IElementFilter<ISPO> constraint,//
+//            final ISolutionExpander<ISPO> expander//
+////            final long timestamp
+//            ) {
+//        
+//        super((c == null ? new IVariableOrConstant[] { s, p, o }
+//                : new IVariableOrConstant[] { s, p, o, c }), //
+//                new NV(Annotations.RELATION_NAME, relationName), //
+//                new NV(Annotations.PARTITION_ID, partitionId), //
+//                new NV(Annotations.OPTIONAL, optional), //
+//                new NV(Annotations.CONSTRAINT, constraint), //
+//                new NV(Annotations.EXPANDER, expander));
+//
+////        if (relationName == null)
+////            throw new IllegalArgumentException();
+////       
+////        for (int i = 0; i < relationName.length; i++) {
+////            
+////            if (relationName[i] == null)
+////                throw new IllegalArgumentException();
+////            
+////        }
+////        
+////        if (relationName.length == 0)
+////            throw new IllegalArgumentException();
+////        
+////        if (partitionId < -1)
+////            throw new IllegalArgumentException();
+////        
+////        if (s == null)
+////            throw new IllegalArgumentException();
+////        
+////        if (p == null)
+////            throw new IllegalArgumentException();
+////        
+////        if (o == null)
+////            throw new IllegalArgumentException();
+////        
+////        this.relationName = relationName;
+////        
+////        this.partitionId = partitionId;
+////        
+////        this.s = s;
+////        this.p = p;
+////        this.o = o;
+////        this.c = c; // MAY be null.
+////
+////        this.optional = optional;
+////        
+////        this.constraint = constraint; /// MAY be null.
+////        
+////        this.expander = expander;// MAY be null.
+//        
+//    }
 
 //    /**
 //     * Copy constructor overrides the relation name(s).
@@ -416,89 +451,95 @@ public class SPOPredicate extends Predicate<ISPO> {
         
     }
 
-    /**
-     * Constrain the predicate by layering on another constraint (the existing
-     * constraint, if any, is combined with the new constraint).
-     * 
-     * @deprecated This is being replaced by two classes of filters. One which
-     *             is always evaluated local to the index and one which is
-     *             evaluated in the JVM in which the access path is evaluated
-     *             once the {@link ITuple}s have been resolved to elements of
-     *             the relation.
-     */
-    public SPOPredicate setConstraint(final IElementFilter<ISPO> newConstraint) {
+//    /**
+//     * Constrain the predicate by layering on another constraint (the existing
+//     * constraint, if any, is combined with the new constraint).
+//     * 
+//     * @deprecated This is being replaced by two classes of filters. One which
+//     *             is always evaluated local to the index and one which is
+//     *             evaluated in the JVM in which the access path is evaluated
+//     *             once the {@link ITuple}s have been resolved to elements of
+//     *             the relation.
+//     */
+//    public SPOPredicate setConstraint(final IElementFilter<ISPO> newConstraint) {
+//
+//        if (newConstraint == null)
+//            throw new IllegalArgumentException();
+//
+//        final SPOPredicate tmp = this.clone();
+//
+//        final IElementFilter<ISPO> wrappedConstraint = getConstraint() == null ? newConstraint
+//                : new WrappedSPOFilter(newConstraint, getConstraint());
+//
+//        tmp.setProperty(Annotations.CONSTRAINT, wrappedConstraint);
+//
+//        return tmp;
+//        
+////        return new SPOPredicate(//
+////                relationName, //
+////                partitionId, //
+////                s,//
+////                p,//
+////                o,//
+////                c, // 
+////                optional, //
+////                tmp,// override.
+////                expander//
+////        );
+//
+//    }
 
-        if (newConstraint == null)
-            throw new IllegalArgumentException();
-
-        final SPOPredicate tmp = this.clone();
-
-        final IElementFilter<ISPO> wrappedConstraint = getConstraint() == null ? newConstraint
-                : new WrappedSPOFilter(newConstraint, getConstraint());
-
-        tmp.setProperty(Annotations.CONSTRAINT, wrappedConstraint);
-
-        return tmp;
-        
-//        return new SPOPredicate(//
-//                relationName, //
-//                partitionId, //
-//                s,//
-//                p,//
-//                o,//
-//                c, // 
-//                optional, //
-//                tmp,// override.
-//                expander//
-//        );
-
-    }
-
-    /**
-     * Wraps two {@link IElementFilter}s as a single logical filter.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private static class WrappedSPOFilter<E extends ISPO> extends SPOFilter<E> {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = 3946650536738814437L;
-        
-        private final IElementFilter<ISPO> a;
-        private final IElementFilter<ISPO> b;
-        
-        public WrappedSPOFilter(final IElementFilter<ISPO> a,
-                final IElementFilter<ISPO> b) {
-
-            this.a = a;
-            this.b = b;
-            
-        }
-
-        public boolean accept(final E o) {
-            
-            if (!canAccept(o)) {
-                
-                return true;
-                
-            }
-            
-            final ISPO e = (ISPO) o;
-            
-            if (a.canAccept(e) && a.accept(e) && b.canAccept(e) && b.accept(e)) {
-
-                return true;
-                
-            }
-
-            return false;
-
-        }
-        
-    }
+//    /**
+//     * Wraps two {@link IElementFilter}s as a single logical filter.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    private static class WrappedSPOFilter<E extends ISPO> extends SPOFilter<E> {
+//
+//        /**
+//         * 
+//         */
+//        private static final long serialVersionUID = 3946650536738814437L;
+//        
+//        private final IElementFilter<ISPO> a;
+//        private final IElementFilter<ISPO> b;
+//        
+//        public WrappedSPOFilter(final IElementFilter<ISPO> a,
+//                final IElementFilter<ISPO> b) {
+//
+//            this.a = a;
+//            this.b = b;
+//            
+//        }
+//
+//        public boolean isValid(final Object o) {
+//            
+//            if (!canAccept(o)) {
+//                
+//                return true;
+//                
+//            }
+//
+//            return accept((E) o);
+//            
+//        }
+//        
+//        private boolean accept(final E e) {
+//                
+////            final ISPO e = (ISPO) o;
+//            
+//            if (a.canAccept(e) && a.isValid(e) && b.canAccept(e) && b.isValid(e)) {
+//
+//                return true;
+//                
+//            }
+//
+//            return false;
+//
+//        }
+//        
+//    }
     
 //    public final IVariableOrConstant<IV> get(final int index) {
 //        switch (index) {

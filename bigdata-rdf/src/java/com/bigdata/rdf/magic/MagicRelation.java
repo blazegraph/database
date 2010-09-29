@@ -18,6 +18,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.btree.BloomFilterFactory;
 import com.bigdata.btree.IIndex;
@@ -339,9 +340,12 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
             
         }
 
-        return getAccessPath(keyOrder, new MagicPredicate(getNamespace(),
-                terms));
-        
+        final MagicPredicate pred = new MagicPredicate(terms, NV
+                .asMap(new NV[] { new NV(IPredicate.Annotations.RELATION_NAME,
+                        new String[]{getNamespace()}) }));
+
+        return getAccessPath(keyOrder, pred);
+
     }
 
     private void checkPredicate(final IPredicate<IMagicTuple> predicate) {

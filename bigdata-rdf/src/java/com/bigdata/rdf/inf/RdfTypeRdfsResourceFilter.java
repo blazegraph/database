@@ -4,8 +4,10 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
+
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOFilter;
@@ -17,7 +19,8 @@ import com.bigdata.rdf.vocab.Vocabulary;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RdfTypeRdfsResourceFilter<E extends ISPO> extends SPOFilter<E> implements Externalizable {
+public class RdfTypeRdfsResourceFilter<E extends ISPO> extends SPOFilter<E>
+        implements Externalizable {
 
     /**
      * 
@@ -46,7 +49,7 @@ public class RdfTypeRdfsResourceFilter<E extends ISPO> extends SPOFilter<E> impl
         
     }
 
-    public boolean accept(final E o) {
+    public boolean isValid(final Object o) {
         
         if (!canAccept(o)) {
             
@@ -55,6 +58,12 @@ public class RdfTypeRdfsResourceFilter<E extends ISPO> extends SPOFilter<E> impl
         }
         
         final ISPO spo = (ISPO) o;
+        
+        return accept(spo);
+        
+    }
+
+    private boolean accept(final ISPO spo) {
         
         if (spo.p().equals(rdfType) && spo.o().equals(rdfsResource)) {
             

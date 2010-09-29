@@ -98,7 +98,7 @@ abstract public class BOpFilter extends BOpFilterBase {
         private static final long serialVersionUID = 1L;
 
         @Override
-        protected boolean isValid(Object obj) {
+        public boolean isValid(Object obj) {
             return BOpFilter.this.isValid(obj);
         }
 

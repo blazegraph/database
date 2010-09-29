@@ -78,13 +78,19 @@ public final class InGraphBinarySearchFilter<E extends ISPO> extends SPOFilter<E
         
     }
 
-    public boolean accept(final ISPO o) {
+    public boolean isValid(Object o) {
         
         if (!canAccept(o)) {
             
             return true;
             
         }
+        
+        return accept((ISPO) o);
+        
+    }
+
+    private boolean accept(final ISPO o) {
         
         final ISPO spo = (ISPO) o;
         

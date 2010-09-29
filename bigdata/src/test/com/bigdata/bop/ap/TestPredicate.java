@@ -38,6 +38,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 
 /**
@@ -77,9 +78,10 @@ public class TestPredicate extends TestCase2 {
 
             final Var<Long> u = Var.var("u");
 
-            final IPredicate<?> p1 = new Predicate(
-                    new IVariableOrConstant[] { u, c1, c2 }, relation);
-            
+            final IPredicate<?> p1 = new Predicate(new IVariableOrConstant[] {
+                    u, c1, c2 }, new NV(Predicate.Annotations.RELATION_NAME,
+                    new String[] { relation }));
+
             if (log.isInfoEnabled())
                 log.info(p1.toString());
 
@@ -103,7 +105,9 @@ public class TestPredicate extends TestCase2 {
             final Var<Long> v = Var.var("v");
 
             final IPredicate<?> p1 = new Predicate(
-                    new IVariableOrConstant[] { u, c1, v }, relation);
+                    new IVariableOrConstant[] { u, c1, v }, 
+                    new NV(Predicate.Annotations.RELATION_NAME,
+                            new String[] { relation }));
 
             if (log.isInfoEnabled())
                 log.info(p1.toString());
@@ -131,10 +135,12 @@ public class TestPredicate extends TestCase2 {
         final Var<Long> u = Var.var("u");
 
         final IPredicate<?> p1 = new Predicate(new IVariableOrConstant[] { u, c1, c2 },
-                relation);
+                new NV(Predicate.Annotations.RELATION_NAME,
+                        new String[] { relation }));
 
         final IPredicate<?> p2 = new Predicate(new IVariableOrConstant[] { u, c3, c4 },
-                relation);
+                new NV(Predicate.Annotations.RELATION_NAME,
+                        new String[] { relation }));
 
         if (log.isInfoEnabled()) {
 
@@ -157,9 +163,10 @@ public class TestPredicate extends TestCase2 {
 
         final Var<Long> u = Var.var("u");
 
-        final IPredicate<?> p1 = new Predicate(new IVariableOrConstant[] { u, c1, c2 },
-                relation);
-        
+        final IPredicate<?> p1 = new Predicate(new IVariableOrConstant[] { u,
+                c1, c2 }, new NV(Predicate.Annotations.RELATION_NAME,
+                new String[] { relation }));
+
         assertEquals("arity", 3, p1.arity());
 
         // verify variables versus constants.
@@ -246,9 +253,10 @@ public class TestPredicate extends TestCase2 {
 
         final Var<Long> u = Var.var("u");
 
-        final IPredicate<?> p1 = new Predicate(new IVariableOrConstant[] { u, c1, c2 },
-                relation);
-        
+        final IPredicate<?> p1 = new Predicate(new IVariableOrConstant[] { u,
+                c1, c2 }, new NV(Predicate.Annotations.RELATION_NAME,
+                new String[] { relation }));
+
         assertEquals("arity", 3, p1.arity());
 
         // verify variables versus constants.

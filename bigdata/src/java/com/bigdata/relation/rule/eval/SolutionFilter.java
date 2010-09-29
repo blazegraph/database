@@ -26,13 +26,24 @@ public class SolutionFilter<E> implements IElementFilter<ISolution<E>> {
         this.delegate = delegate;
         
     }
-    
-    public boolean accept(final ISolution<E> solution) {
 
-        final E e = solution.get();
+    public boolean isValid(final Object o) {
         
-        return delegate.accept( e );
+        return delegate.isValid(o);
+        
     }
+
+    /*
+     * Note: The old implementation is below. Based on it, the canAccept()
+     * method was not (and still is not) being invoked for SolutionFilter.
+     */
+    
+//    public boolean accept(final ISolution<E> solution) {
+//
+//        final E e = solution.get();
+//        
+//        return delegate.accept( e );
+//    }
     
     public boolean canAccept(final Object o) {
 

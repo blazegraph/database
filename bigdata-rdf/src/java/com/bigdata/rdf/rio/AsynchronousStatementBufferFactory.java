@@ -2823,7 +2823,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 					private static final long serialVersionUID = 1L;
 
 					@Override
-					protected boolean isValid(final Object obj) {
+					public boolean isValid(final Object obj) {
 						/*
 						 * Assigns the IV as a side effect iff the RDF Value can
 						 * be inlined according to the governing lexicon
@@ -2856,7 +2856,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                      * the reverse index.
                      */
                     @Override
-                    protected boolean isValid(Object obj) {
+                    public boolean isValid(Object obj) {
 
                         return !(obj instanceof BNode);
 

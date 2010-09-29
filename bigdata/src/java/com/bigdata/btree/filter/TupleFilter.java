@@ -56,16 +56,19 @@ abstract public class TupleFilter<E> extends FilterBase implements ITupleFilter<
     private static final long serialVersionUID = 1L;
 
     protected static transient final Logger log = Logger.getLogger(TupleFilter.class);
-    
-//    /**
-//     * Optional state specified by the ctor.
-//     */
-//    protected Object state;
-   
+  
     public TupleFilter() {
 
+        this(null/* state */);
+        
     }
 
+    public TupleFilter(final Object state) {
+                
+        super(state);
+        
+    }
+    
     @SuppressWarnings("unchecked")
     @Override
     public ITupleIterator<E> filterOnce(final Iterator src,Object context) {
@@ -73,21 +76,14 @@ abstract public class TupleFilter<E> extends FilterBase implements ITupleFilter<
         return new TupleFilter.TupleFilterator((ITupleIterator) src, context, this);
 
     }
-/*
-    public Iterator filterOnce(Iterator src, Object context) {
 
-        return new TupleFilter.Filterator((ITupleIterator) src);
-
-    }
-*/
-	abstract protected boolean isValid(ITuple<E> tuple);
+    abstract protected boolean isValid(ITuple<E> tuple);
 
     /**
      * Implementation class knows how to avoid side-effects from the reuse of
      * the same {@link Tuple} instance by the base {@link ITupleIterator} impls.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      * @param <E>
      */
     static public class TupleFilterator<E> implements ITupleIterator<E> {

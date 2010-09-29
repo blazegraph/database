@@ -39,6 +39,7 @@ import org.deri.iris.terms.TermFactory;
 
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
@@ -148,7 +149,10 @@ public class TestMagicStore extends AbstractInferenceEngineTestCase {
             terms[1] = Var.var("b");
             terms[2] = Var.var("c");
             IPredicate<IMagicTuple> predicate = 
-                new MagicPredicate(relation.getNamespace(), terms);
+//                new MagicPredicate(relation.getNamespace(), terms);
+            new MagicPredicate(terms, NV.asMap(new NV[] { new NV(
+                    IPredicate.Annotations.RELATION_NAME, new String[]{relation
+                            .getNamespace()}) }));
             IAccessPath<IMagicTuple> accessPath = 
                 relation.getAccessPath(predicate);
             String fqn = relation.getFQN(accessPath.getKeyOrder());
@@ -216,7 +220,10 @@ public class TestMagicStore extends AbstractInferenceEngineTestCase {
             terms[3] = Var.var("d");
             
             IPredicate<IMagicTuple> predicate = 
-                new MagicPredicate(relation.getNamespace(), terms);
+//                new MagicPredicate(relation.getNamespace(), terms);
+            new MagicPredicate(terms, NV.asMap(new NV[] { new NV(
+                    IPredicate.Annotations.RELATION_NAME,
+                    new String[] { relation.getNamespace() }) }));
             IAccessPath<IMagicTuple> accessPath = 
                 relation.getAccessPath(predicate);
             String fqn = relation.getFQN(accessPath.getKeyOrder());

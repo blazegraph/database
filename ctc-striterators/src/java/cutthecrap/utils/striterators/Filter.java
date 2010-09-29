@@ -30,7 +30,7 @@ import java.util.Iterator;
 /**
  * Used with Filterator by Striterator to filter returned objects.
  */
-public abstract class Filter extends FilterBase {
+public abstract class Filter extends FilterBase implements IFilterTest {
 
 	/**
      * 
@@ -48,5 +48,5 @@ public abstract class Filter extends FilterBase {
 
     // -------------------------------------------------------------
 
-    protected abstract boolean isValid(Object obj);
+    public abstract boolean isValid(Object obj);
 }

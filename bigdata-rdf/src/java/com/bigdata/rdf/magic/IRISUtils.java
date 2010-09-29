@@ -53,6 +53,7 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.constraint.EQ;
 import com.bigdata.bop.constraint.EQConstant;
@@ -594,11 +595,10 @@ type (triple vs. NOT_EQUAL for example).
                 
             }
             
-            return new MagicPredicate(
-                relation.getNamespace(),
-                terms
-                );
-            
+            return new MagicPredicate(terms, NV.asMap(new NV[] { new NV(
+                    IPredicate.Annotations.RELATION_NAME, new String[]{relation
+                            .getNamespace()}) }));
+
         }
         
     }

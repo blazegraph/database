@@ -211,7 +211,7 @@ public class BOpUtility {
                     private static final long serialVersionUID = 1L;
 
                     @Override
-                    protected boolean isValid(Object arg0) {
+                    public boolean isValid(Object arg0) {
                         return arg0 instanceof BOp;
                     }
                 });
@@ -314,7 +314,7 @@ public class BOpUtility {
                     private static final long serialVersionUID = 1L;
 
                     @Override
-                    protected boolean isValid(Object arg0) {
+                    public boolean isValid(Object arg0) {
                         return arg0 instanceof IVariable<?>;
                     }
                 });
@@ -338,7 +338,7 @@ public class BOpUtility {
                     private static final long serialVersionUID = 1L;
 
                     @Override
-                    protected boolean isValid(final Object arg0) {
+                    public boolean isValid(final Object arg0) {
                         return arg0 instanceof IVariable<?>;
                     }
                 });

@@ -48,7 +48,7 @@ public class UniquenessFilter extends Filter {
 	/***********************************************************************
 	 * Just make sure that the current object has not already been returned
 	 **/
-  protected boolean isValid(Object obj) {
+  public boolean isValid(Object obj) {
       return m_members.add(obj);
 //  	if (m_members.contains(obj)) {
 //  		return false;

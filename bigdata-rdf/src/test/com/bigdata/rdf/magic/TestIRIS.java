@@ -41,8 +41,11 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.TupleExpr;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.ClosureStats;
@@ -233,13 +236,14 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
                     null, // head
                     new SPOPredicate[] {
                         new SPOPredicate(
-                            new String[] {
+                                new BOp[]{new Constant<IV>(U.getIV()),
+                            Var.var("p"),
+                            Var.var("o")
+                                },
+                            new NV(IPredicate.Annotations.RELATION_NAME, new String[] {
                                 store.getSPORelation().getNamespace(),
                                 tempStore.getSPORelation().getNamespace()
-                            },
-                            new Constant<IV>(U.getIV()),
-                            Var.var("p"),
-                            Var.var("o"))
+                            })),
                     },
                     QueryOptions.NONE,
                     null // constraints

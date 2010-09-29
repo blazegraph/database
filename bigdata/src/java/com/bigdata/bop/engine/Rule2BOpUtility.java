@@ -69,8 +69,6 @@ import com.bigdata.relation.rule.eval.IRangeCountFactory;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME Implement Rule2BOpUtility.
  */
 public class Rule2BOpUtility {
 

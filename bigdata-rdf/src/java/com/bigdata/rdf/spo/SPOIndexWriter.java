@@ -249,7 +249,7 @@ public class SPOIndexWriter implements Callable<Long> {
                         + spo.toString());
             
             // skip statements that match the filter.
-            if (filter != null && filter.accept(spo))
+            if (filter != null && filter.isValid(spo))
                 continue;
 
             // skip duplicate records.

@@ -274,7 +274,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
 
             private static final long serialVersionUID = 1L;
 
-            protected boolean isValid(Object arg0) {
+            public boolean isValid(Object arg0) {
 
                 final SPO o = (SPO) arg0;
 

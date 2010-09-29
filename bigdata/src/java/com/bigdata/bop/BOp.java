@@ -175,12 +175,15 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
      * @see Annotations#MUTATION
      */
     boolean isMutation();
-    
+
     /**
      * The timestamp or transaction identifier on which the operator will read
      * or write.
      * 
      * @see Annotations#TIMESTAMP
+     * 
+     * @throws IllegalStateException
+     *             if {@link Annotations#TIMESTAMP} was not specified.
      */
     long getTimestamp();
     
@@ -238,7 +241,7 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
 
         /**
          * The timestamp (or transaction identifier) used by this operator if it
-         * reads or writes on the database.
+         * reads or writes on the database (no default).
          * 
          * @see #MUTATION
          */

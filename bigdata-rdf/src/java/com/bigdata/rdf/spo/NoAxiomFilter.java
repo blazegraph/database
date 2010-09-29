@@ -31,7 +31,6 @@ import java.io.IOException;
 import java.io.ObjectStreamException;
 
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
  * A filter that matches explicit or inferred statements but not those whose
@@ -59,13 +58,19 @@ public class NoAxiomFilter<E extends ISPO> extends SPOFilter<E> {
         
     }
     
-    public boolean accept(final ISPO o) {
+    public boolean isValid(Object o) {
         
         if (!canAccept(o)) {
             
             return true;
             
         }
+        
+        return accept((ISPO) o);
+        
+    }
+
+    private boolean accept(final ISPO o) {
         
         final ISPO spo = (ISPO) o;
         

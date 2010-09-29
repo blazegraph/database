@@ -38,7 +38,7 @@ import java.util.NoSuchElementException;
  * } );
  * </pre>
  *
- * <p>The Filterator provide the protocol support to utulise Filter objects.</p>
+ * <p>The Filterator provide the protocol support to utilize Filter objects.</p>
  */
 
 public class Filterator implements Iterator {

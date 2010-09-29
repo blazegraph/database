@@ -28,12 +28,7 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.ap.Predicate;
-import com.bigdata.journal.ITx;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.ISolutionExpander;
 
 /**
  * A predicate that is a triple with one or more variables. While the general
@@ -69,60 +64,62 @@ public class MagicPredicate extends Predicate<IMagicTuple> {
         super(op);
     }
 
-    /**
-     * Partly specified ctor. No constraint is specified. No expander is 
-     * specified.
-     * 
-     * @param relationName
-     * @param predicateName
-     * @param terms
-     */
-    public MagicPredicate(String relationName, IVariableOrConstant<IV>... terms) {
+//    /**
+//     * Partly specified ctor. No constraint is specified. No expander is
+//     * specified.
+//     * 
+//     * @param relationName
+//     * @param predicateName
+//     * @param terms
+//     */
+//    public MagicPredicate(String relationName, IVariableOrConstant<IV>... terms) {
+//
+////        this(new String[] { relationName }, -1/* partitionId */,
+////                null/* constraint */, null/* expander */, terms);
+//        super(terms, relationName, -1/* partitionId */, false/* optional */,
+//                null/* constraint */, null/* expander */, ITx.READ_COMMITTED);
+//
+//    }
 
-        this(new String[] { relationName }, -1/* partitionId */,
-                null/* constraint */, null/* expander */, terms);
+//    /**
+//     * Partly specified ctor. No constraint is specified.
+//     * 
+//     * @param relationName
+//     * @param expander
+//     *            MAY be <code>null</code>.
+//     * @param predicateName
+//     * @param terms
+//     */
+//    public MagicPredicate(String relationName, ISolutionExpander expander,
+//            IVariableOrConstant<IV>... terms) {
+//
+//        this(new String[] { relationName }, -1/* partitionId */,
+//                null/* constraint */, expander, terms);
+//
+//    }
 
-    }
-
-    /**
-     * Partly specified ctor. No constraint is specified.
-     * 
-     * @param relationName
-     * @param expander
-     *            MAY be <code>null</code>.
-     * @param predicateName
-     * @param terms
-     */
-    public MagicPredicate(String relationName, ISolutionExpander expander, 
-            IVariableOrConstant<IV>... terms) {
-
-        this(new String[] { relationName }, -1/* partitionId */,
-                null/* constraint */, expander,
-                terms);
-
-    }
-
-    /**
-     * Fully specified ctor.
-     * 
-     * @param relationName
-     * @param partitionId
-     * @param constraint
-     *            MAY be <code>null</code>.
-     * @param expander
-     *            MAY be <code>null</code>.
-     * @param predicateName
-     * @param terms
-     */
-    public MagicPredicate(String[] relationName, //
-            final int partitionId, //
-            IElementFilter constraint,//
-            ISolutionExpander expander,//
-            IVariableOrConstant<IV>... terms//
-            ) {
-        
-        super(terms, relationName[0], partitionId, false, constraint, expander, ITx.READ_COMMITTED);
-        
-    }
+//    /**
+//     * Fully specified ctor.
+//     * 
+//     * @param relationName
+//     * @param partitionId
+//     * @param constraint
+//     *            MAY be <code>null</code>.
+//     * @param expander
+//     *            MAY be <code>null</code>.
+//     * @param predicateName
+//     * @param terms
+//     */
+//    public MagicPredicate(String[] relationName, //
+//            final int partitionId, //
+//            IElementFilter constraint,//
+//            ISolutionExpander expander,//
+//            IVariableOrConstant<IV>... terms//
+//    ) {
+//
+//        super(terms, relationName[0], partitionId, false, constraint, expander,
+//                ITx.READ_COMMITTED);
+//
+//    }
 
 }

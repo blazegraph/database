@@ -39,6 +39,8 @@ import com.bigdata.service.IDataService;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
+import cutthecrap.utils.striterators.IFilter;
+
 /**
  * An abstraction for efficient reads on an {@link IRelation} using the index
  * selected by an {@link IPredicate} constraint. Like their {@link #iterator()},
@@ -71,14 +73,20 @@ public interface IAccessPath<R> extends Iterable<R> {
      * empty (there may be "deleted" index entries within the key range).
      */
     public boolean isEmpty();
-    
+
     /**
      * Return the maximum #of elements spanned by the {@link IPredicate}.
+     * <p>
+     * Note: When there is an {@link IFilter} on the {@link IPredicate} the
+     * exact range count MUST apply that {@link IFilter}, which means that it
+     * will be required to traverse the index counting tuples which pass the
+     * {@link IFilter}. However, {@link IFilter}s are ignored for the fast
+     * range count.
      * 
      * @param exact
-     *            When <code>true</code>, the result will be an exact count
-     *            and may require a key-range scan. When <code>false</code>,
-     *            the result will be an upper bound IFF delete markers are
+     *            When <code>true</code>, the result will be an exact count and
+     *            may require a key-range scan. When <code>false</code>, the
+     *            result will be an upper bound IFF delete markers are
      *            provisioned for the backing index (delete markers are required
      *            for transactions and for scale-out indices).
      * 

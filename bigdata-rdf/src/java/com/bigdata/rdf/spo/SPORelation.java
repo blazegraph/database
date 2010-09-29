@@ -49,7 +49,9 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.ap.Predicate;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BloomFilterFactory;
 import com.bigdata.btree.DefaultTupleSerializer;
@@ -85,6 +87,7 @@ import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.IRelation;
+import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.eval.ISolution;
@@ -987,14 +990,17 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         }
 
-        return getAccessPath(new SPOPredicate(new String[] { getNamespace() },
-                -1, // partitionId
-                S, P, O, C,
-                false, // optional
-                filter,//
-                null // expander
-                ));
-        
+        Predicate<ISPO> pred = new SPOPredicate(new BOp[] { S, P, O, C },
+                new NV(IPredicate.Annotations.RELATION_NAME,
+                        new String[] { getNamespace() }));
+
+        if (filter != null) {
+            // Layer on an optional filter.
+            pred = pred.addIndexLocalFilter(ElementFilter.newInstance(filter));
+        }
+
+        return getAccessPath(pred);
+
     }
 
     /**
@@ -2171,21 +2177,32 @@ public class SPORelation extends AbstractRelation<ISPO> {
     /**
      * Dumps the specified index.
      */
-    @SuppressWarnings("unchecked")
+//    @SuppressWarnings("unchecked")
     public StringBuilder dump(final IKeyOrder<ISPO> keyOrder) {
 
         final StringBuilder sb = new StringBuilder();
 
         final IPredicate<ISPO> pred = new SPOPredicate(
-                new String[] { getNamespace() }, -1, // partitionId
-                Var.var("s"),//
-                Var.var("p"),//
-                Var.var("o"),//
-                keyArity == 3 ? null : Var.var("c"),//
-                false, // optional
-                null, // filter,
-                null // expander
-        );
+                new BOp[]{//
+                      Var.var("s"),//
+                      Var.var("p"),//
+                      Var.var("o"),//
+                        keyArity == 3 ? null : Var.var("c"),//
+                },//
+                NV.asMap(new NV[] {//
+                        new NV(IPredicate.Annotations.RELATION_NAME,
+                                new String[] { getNamespace() }),//
+                        }));
+//        final IPredicate<ISPO> pred = new SPOPredicate(
+//                new String[] { getNamespace() }, -1, // partitionId
+//                Var.var("s"),//
+//                Var.var("p"),//
+//                Var.var("o"),//
+//                keyArity == 3 ? null : Var.var("c"),//
+//                false, // optional
+//                null, // filter,
+//                null // expander
+//        );
 
         final IChunkedOrderedIterator<ISPO> itr = getAccessPath(keyOrder, pred)
                 .iterator();
