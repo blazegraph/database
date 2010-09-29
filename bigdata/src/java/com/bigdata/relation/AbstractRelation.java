@@ -44,6 +44,8 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.service.DataService;
@@ -232,6 +234,35 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
 
     }
 
+    /**
+     * Core impl.
+     * 
+     * @param relation
+     * @param indexManager
+     * @param timestamp
+     * @param predicate
+     * @param keyOrder
+     * @param ndx
+     * @param flags
+     * @param chunkOfChunksCapacity
+     * @param chunkCapacity
+     * @param fullyBufferedReadThreshold
+     * @return
+     * 
+     * @todo Raise into interface?
+     */
+    public IAccessPath<E> newAccessPath(final IRelation<E> relation,
+            final IIndexManager indexManager, final long timestamp,
+            final IPredicate<E> predicate, final IKeyOrder<E> keyOrder,
+            final IIndex ndx, final int flags, final int chunkOfChunksCapacity,
+            final int chunkCapacity, final int fullyBufferedReadThreshold) {
+
+        return new AccessPath<E>(this/* relation */, indexManager, timestamp,
+                predicate, keyOrder, ndx, flags, chunkOfChunksCapacity,
+                chunkCapacity, fullyBufferedReadThreshold).init();
+
+    }
+    
     public IAccessPath<E> getAccessPath(final IPredicate<E> predicate) {
 
         // find the best key order.
@@ -243,10 +274,10 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
         // default flags.
         final int flags = IRangeQuery.DEFAULT;
 
-        return new AccessPath<E>(this/* relation */, getIndexManager(),
+        return newAccessPath(this/*relation*/, getIndexManager(),
                 getTimestamp(), predicate, keyOrder, ndx, flags,
                 getChunkOfChunksCapacity(), getChunkCapacity(),
-                getFullyBufferedReadThreshold()).init();
+                getFullyBufferedReadThreshold());
 
     }
 

@@ -305,8 +305,7 @@ public class SPO implements ISPO {
      * statement identifier are not specified. This may be used as a convenience
      * to extract the {s, p, o, c} from an {@link IPredicate} or from an
      * {@link IAccessPath} when the predicate is not known to be an
-     * {@link SPOPredicate} or the {@link IAccessPath} is not known to be an
-     * {@link SPOAccessPath}.
+     * {@link SPOPredicate}.
      * 
      * @param predicate
      *            The predicate.

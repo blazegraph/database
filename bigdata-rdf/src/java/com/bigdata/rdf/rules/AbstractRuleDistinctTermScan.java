@@ -35,7 +35,6 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.spo.SPOAccessPath;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.spo.SPORelation;
@@ -51,9 +50,8 @@ import com.bigdata.striterator.IChunkedIterator;
 
 /**
  * Base class for rules having a single predicate that is none bound in the tail
- * and a single variable in the head. These rules can be evaluated using
- * {@link SPOAccessPath#distinctTermScan()} rather than a full index scan. For
- * example:
+ * and a single variable in the head. These rules can be evaluated using a
+ * distinctTermScan rather than a full index scan. For example:
  * 
  * <pre>
  *  rdf1:   (?u ?a ?y) -&gt; (?a rdf:type rdf:Property)
@@ -62,7 +60,8 @@ import com.bigdata.striterator.IChunkedIterator;
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: AbstractRuleDistinctTermScan.java 3448 2010-08-18 20:55:58Z
+ *          thompsonbry $
  */
 abstract public class AbstractRuleDistinctTermScan extends Rule {
     

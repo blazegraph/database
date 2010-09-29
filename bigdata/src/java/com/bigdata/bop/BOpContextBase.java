@@ -353,11 +353,10 @@ public class BOpContextBase {
         }
 
         // Obtain the access path for that relation and index.
-        final IAccessPath<E> accessPath = new AccessPath<E>(
-                relation, indexManager, timestamp,
-                predicate, keyOrder, ndx, flags,
-                chunkOfChunksCapacity, chunkCapacity,
-                fullyBufferedReadThreshold).init();
+        final IAccessPath<E> accessPath = ((AbstractRelation<E>) relation)
+                .newAccessPath(relation, indexManager, timestamp, predicate,
+                        keyOrder, ndx, flags, chunkOfChunksCapacity,
+                        chunkCapacity, fullyBufferedReadThreshold);
 
         // optionally wrap with an expander pattern.
         return expander(predicate, accessPath);

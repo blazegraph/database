@@ -37,18 +37,18 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.bop.BOp;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.NV;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.ap.filter.SameVariableConstraint;
-import com.bigdata.bop.ap.filter.SameVariableConstraintFilter;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IBloomFilter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.Tuple;
+import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.TimestampUtility;
@@ -393,13 +393,14 @@ public class AccessPath<R> implements IAccessPath<R> {
                 if (indexLocalFilter != null)
                     tmp.addFilter(indexLocalFilter);
                 
-                tmp.addFilter(new SameVariableConstraintFilter(
-                                new BOp[] {},
-                                NV.asMap(new NV[] { new NV(
-                                                SameVariableConstraintFilter.Annotations.FILTER,
-                                                sameVarConstraint) })));
+                tmp.addFilter(new TupleFilter(){
+                    private static final long serialVersionUID = 1L;
+                    @Override
+                    protected boolean isValid(ITuple tuple) {
+                        return sameVarConstraint.isValid(tuple.getObject());
+                    }});
 
-                this.indexLocalFilter = indexLocalFilter;
+                this.indexLocalFilter = tmp;
                 
             } else {
                 
@@ -410,7 +411,7 @@ public class AccessPath<R> implements IAccessPath<R> {
         }
 
         // optional filter to be evaluated by the AccessPath.
-        this.accessPathFilter = predicate.getAccessPathFilter();;
+        this.accessPathFilter = predicate.getAccessPathFilter();
 
         // true iff there is a filter (either local or remote).
         this.hasFilter = (indexLocalFilter != null || accessPathFilter != null);
@@ -436,12 +437,12 @@ public class AccessPath<R> implements IAccessPath<R> {
                 + ", fromKey="
                 + (fromKey == null ? "n/a" : BytesUtil.toString(fromKey))
                 + ", toKey="
-                + (toKey == null ? "n/a" : BytesUtil.toString(toKey)
-                        + ", indexLocalFilter="
-                        + (indexLocalFilter == null ? "n/a" : indexLocalFilter)
-                        + ", accessPathFilter="
-                        + (accessPathFilter == null ? "n/a" : accessPathFilter)
-                        + "}");
+                + (toKey == null ? "n/a" : BytesUtil.toString(toKey))
+                + ", indexLocalFilter="
+                + (indexLocalFilter == null ? "n/a" : indexLocalFilter)
+                + ", accessPathFilter="
+                + (accessPathFilter == null ? "n/a" : accessPathFilter)
+                + "}";
 
     }
     
@@ -1281,6 +1282,25 @@ public class AccessPath<R> implements IAccessPath<R> {
         }
 
         return n;
+
+    }
+
+    /**
+     * Return the constant bound on the {@link #getPredicate() predicate} for
+     * this access path at the specified index -or- {@link #NULL} iff the
+     * predicate is not bound at that position.
+     * 
+     * @param index
+     *            The index.
+     * 
+     * @return Either the bound value -or- {@link #NULL} iff the index is
+     *         unbound for the predicate for this access path.
+     */
+    public Object get(final int index) {
+
+        final IVariableOrConstant<?> t = predicate.get(index);
+
+        return t == null || t.isVar() ? null : t.get();
 
     }
 
