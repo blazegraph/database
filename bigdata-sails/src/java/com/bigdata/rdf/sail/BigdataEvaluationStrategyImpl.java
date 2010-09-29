@@ -1509,7 +1509,18 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             !tripleSource.includeInferred ? ExplicitSPOFilter.INSTANCE
                 : null;
 
-        return new SPOPredicate(new BOp[] { s, p, o, c }, new NV(
+        // Decide on the correct arity for the predicate.
+        final BOp[] vars;
+        if (!database.isQuads() && !database.isStatementIdentifiers()) {
+            vars = new BOp[] { s, p, o };
+        } else if (c == null) {
+            vars = new BOp[] { s, p, o, com.bigdata.bop.Var.var() };
+        } else {
+            vars = new BOp[] { s, p, o, c };
+        }
+        
+        return new SPOPredicate(vars, //
+                new NV(
                 IPredicate.Annotations.RELATION_NAME, new String[] { database
                         .getSPORelation().getNamespace() }),//
                 // @todo move to the join.
