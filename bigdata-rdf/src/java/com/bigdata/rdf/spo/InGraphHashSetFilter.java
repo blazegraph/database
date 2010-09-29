@@ -9,6 +9,7 @@ import com.bigdata.bop.constraint.INHashMap;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.relation.rule.eval.ISolution;
 
 /**
  * "IN" filter for the context position based on a native long hash set
@@ -72,7 +73,9 @@ public final class InGraphHashSetFilter<E extends ISPO> extends SPOFilter<E> {
             
         }
         
-        return accept((ISPO) o);
+        final ISolution solution = (ISolution) o;
+        
+        return accept((ISPO) solution.get());
         
     }
 

@@ -11,6 +11,7 @@ import org.openrdf.model.URI;
 import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.relation.rule.eval.ISolution;
 
 /**
  * "IN" filter for the context position based on a sorted long[] of the
@@ -86,7 +87,9 @@ public final class InGraphBinarySearchFilter<E extends ISPO> extends SPOFilter<E
             
         }
         
-        return accept((ISPO) o);
+        final ISolution solution = (ISolution) o;
+        
+        return accept((ISPO) solution.get());
         
     }
 
