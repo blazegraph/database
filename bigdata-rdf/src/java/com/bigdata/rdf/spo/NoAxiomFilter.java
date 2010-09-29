@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.io.ObjectStreamException;
 
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.relation.rule.eval.ISolution;
 
 /**
  * A filter that matches explicit or inferred statements but not those whose
@@ -66,7 +67,9 @@ public class NoAxiomFilter<E extends ISPO> extends SPOFilter<E> {
             
         }
         
-        return accept((ISPO) o);
+        final ISolution solution = (ISolution) o;
+        
+        return accept((ISPO) solution.get());
         
     }
 

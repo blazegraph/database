@@ -12,6 +12,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOFilter;
 import com.bigdata.rdf.vocab.Vocabulary;
+import com.bigdata.relation.rule.eval.ISolution;
 
 /**
  * Filter matches <code>(x rdf:type rdfs:Resource).
@@ -57,9 +58,9 @@ public class RdfTypeRdfsResourceFilter<E extends ISPO> extends SPOFilter<E>
             
         }
         
-        final ISPO spo = (ISPO) o;
+        final ISolution solution = (ISolution) o;
         
-        return accept(spo);
+        return accept((ISPO) solution.get());
         
     }
 

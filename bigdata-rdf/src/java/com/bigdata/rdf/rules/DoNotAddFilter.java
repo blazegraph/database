@@ -34,6 +34,7 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOFilter;
 import com.bigdata.rdf.vocab.Vocabulary;
+import com.bigdata.relation.rule.eval.ISolution;
 
 /**
  * Filter keeps matched triple patterns generated OUT of the database.
@@ -121,14 +122,16 @@ public class DoNotAddFilter<E extends ISPO> extends SPOFilter<E> {
     }
     
     public boolean isValid(Object o) {
-    
+
         if (!canAccept(o)) {
             
             return true;
             
         }
         
-        return accept((ISPO) o);
+        final ISolution solution = (ISolution) o;
+        
+        return accept((ISPO) solution.get());
         
     }
 

@@ -33,6 +33,7 @@ import java.io.Serializable;
 
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.rule.eval.ISolution;
 
 /**
  * Filter matches only {@link StatementEnum#Inferred} statements.
@@ -69,7 +70,9 @@ public class InferredSPOFilter<E extends ISPO> extends SPOFilter<ISPO> {
             
         }
         
-        return accept((ISPO) o);
+        final ISolution solution = (ISolution) o;
+        
+        return accept((ISPO) solution.get());
         
     }
 
