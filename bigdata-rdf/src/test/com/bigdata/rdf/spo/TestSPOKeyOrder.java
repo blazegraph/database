@@ -29,9 +29,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.spo;
 
 import java.util.Iterator;
+
 import junit.framework.TestCase2;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -184,8 +188,9 @@ public class TestSPOKeyOrder extends TestCase2 {
 
         final IV P = tid(1);
 
-        final SPOPredicate pred = new SPOPredicate("testRelation",
-                Var.var("s"), new Constant<IV>(P), Var.var("o"), Var.var("c"));
+        final SPOPredicate pred = new SPOPredicate(new BOp[]{
+                Var.var("s"), new Constant<IV>(P), Var.var("o"), Var.var("c")},
+                new NV(IPredicate.Annotations.RELATION_NAME,new String[]{"testRelation"}));
 
         final KeyBuilder keyBuilder = new KeyBuilder();
 
@@ -224,8 +229,10 @@ public class TestSPOKeyOrder extends TestCase2 {
 
         final IV P = tid(1);
 
-        final SPOPredicate pred = new SPOPredicate("testRelation",
-                Var.var("s"), new Constant<IV>(P), Var.var("o"), Var.var("c"));
+        final SPOPredicate pred = new SPOPredicate(new BOp[] { Var.var("s"),
+                new Constant<IV>(P), Var.var("o") }, new NV(
+                IPredicate.Annotations.RELATION_NAME,
+                new String[] { "testRelation" }));// , Var.var("c"));
 
         final KeyBuilder keyBuilder = new KeyBuilder();
 

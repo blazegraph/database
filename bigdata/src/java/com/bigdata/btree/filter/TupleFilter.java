@@ -59,13 +59,13 @@ abstract public class TupleFilter<E> extends FilterBase implements ITupleFilter<
   
     public TupleFilter() {
 
-        this(null/* state */);
-        
-    }
-
-    public TupleFilter(final Object state) {
-                
-        super(state);
+//        this(null/* state */);
+//        
+//    }
+//
+//    public TupleFilter(final Object state) {
+//                
+//        super(state);
         
     }
     
