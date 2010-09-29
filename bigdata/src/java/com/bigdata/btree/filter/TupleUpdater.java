@@ -25,12 +25,6 @@ abstract public class TupleUpdater<E> extends TupleFilter<E> {
 
     }
 
-    public TupleUpdater(Object state) {
-
-        super(state);
-
-    }
-
     @SuppressWarnings("unchecked")
     @Override
     public ITupleIterator<E> filterOnce(Iterator src, Object context) {

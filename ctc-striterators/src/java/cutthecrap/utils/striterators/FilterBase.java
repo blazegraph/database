@@ -57,25 +57,7 @@ public abstract class FilterBase implements IFilter, Cloneable {
      */
     /*private*/ volatile Map<String, Object> annotations;
 
-    /**
-     * State from the constructor (optional).
-     * <p>
-     * Note: Striterators should not have a side-effect on state object since
-     * that can have unexpected consequences if the {@link IFilter} is reused.
-     */
-    final protected Object m_state;
-
     public FilterBase() {
-        m_state = null;
-    }
-    
-    /**
-     * 
-     * @param state
-     *            State (optional).
-     */
-    public FilterBase(final Object state) {
-        m_state = state;
     }
     
     /**
@@ -202,8 +184,7 @@ public abstract class FilterBase implements IFilter, Cloneable {
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append(super.toString());
-        sb.append("{state=" + m_state);
-        sb.append(",annotations=" + annotations);
+        sb.append("{annotations=" + annotations);
         sb.append(",filterChain=" + filterChain);
         sb.append("}");
         return sb.toString();

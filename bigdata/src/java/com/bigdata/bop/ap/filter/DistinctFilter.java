@@ -94,13 +94,6 @@ public class DistinctFilter extends BOpFilterBase {
         private final LinkedHashSet members;
 
         public DistinctFilterImpl() {
-            this(null);
-        }
-
-        @SuppressWarnings("unchecked")
-        public DistinctFilterImpl(final Object state) {
-
-            super(state);
 
             members = new LinkedHashSet(getInitialCapacity(), getLoadFactor());
 

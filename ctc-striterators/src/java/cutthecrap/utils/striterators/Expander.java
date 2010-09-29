@@ -39,10 +39,6 @@ public abstract class Expander extends FilterBase {
 
 	public Expander()	{	}
 
-	public Expander(Object state) {
-		super(state);
-	}
-	
 	//-------------------------------------------------------------
 
     @Override

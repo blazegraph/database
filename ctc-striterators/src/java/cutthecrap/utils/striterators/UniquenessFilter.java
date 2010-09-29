@@ -43,7 +43,6 @@ public class UniquenessFilter extends Filter {
     private final LinkedHashSet<Object> m_members = new LinkedHashSet<Object>();
 	
   public UniquenessFilter() {
-  	super(null);
   }
   
 	/***********************************************************************

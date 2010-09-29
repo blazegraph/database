@@ -39,10 +39,6 @@ public abstract class Filter extends FilterBase {
     
 	public Filter()	{}
 
-	public Filter(Object state) {
-		super(state);
-	}
-
 	//-------------------------------------------------------------
 
 	@Override
