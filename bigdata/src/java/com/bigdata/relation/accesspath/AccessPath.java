@@ -40,8 +40,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.ap.filter.BOpFilterBase;
-import com.bigdata.bop.ap.filter.BOpTupleFilter;
 import com.bigdata.bop.ap.filter.SameVariableConstraint;
 import com.bigdata.bop.ap.filter.SameVariableConstraintFilter;
 import com.bigdata.btree.BytesUtil;
@@ -65,7 +63,9 @@ import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
+import cutthecrap.utils.striterators.FilterBase;
 import cutthecrap.utils.striterators.IFilter;
+import cutthecrap.utils.striterators.NOPFilter;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
@@ -205,13 +205,13 @@ public class AccessPath<R> implements IAccessPath<R> {
      * is added regardless of whether the {@link IPredicate} specified a filter
      * or not.
      */
-    final protected BOpFilterBase indexLocalFilter;
+    final protected IFilter indexLocalFilter;
 
     /**
      * The filter derived from optional
      * {@link IPredicate.Annotations#ACCESS_PATH_FILTER}.
      */
-    final protected BOpFilterBase accessPathFilter;
+    final protected IFilter accessPathFilter;
     
     /**
      * Used to detect failure to call {@link #init()}.
@@ -373,8 +373,7 @@ public class AccessPath<R> implements IAccessPath<R> {
              * reuse of tuples within tuple iterators. That is why it is being
              * cast to a BOpTupleIterator.
              */
-            final BOpTupleFilter indexLocalFilter = (BOpTupleFilter<?>) predicate
-                    .getProperty(IPredicate.Annotations.INDEX_LOCAL_FILTER);
+            final IFilter indexLocalFilter = predicate.getIndexLocalFilter();
 
             /*
              * Optional constraint enforces the "same variable" constraint. The
@@ -389,13 +388,19 @@ public class AccessPath<R> implements IAccessPath<R> {
                 /*
                  * Stack filters.
                  */
-                this.indexLocalFilter = new SameVariableConstraintFilter(
-                        (indexLocalFilter == null ? new BOp[0]
-                                : new BOp[] { indexLocalFilter }),
-                                NV.asMap(new NV[] { new NV(
-                                        SameVariableConstraintFilter.Annotations.FILTER,
-                                        sameVarConstraint) }));
+                final FilterBase tmp = new NOPFilter();
 
+                if (indexLocalFilter != null)
+                    tmp.addFilter(indexLocalFilter);
+                
+                tmp.addFilter(new SameVariableConstraintFilter(
+                                new BOp[] {},
+                                NV.asMap(new NV[] { new NV(
+                                                SameVariableConstraintFilter.Annotations.FILTER,
+                                                sameVarConstraint) })));
+
+                this.indexLocalFilter = indexLocalFilter;
+                
             } else {
                 
                 this.indexLocalFilter = indexLocalFilter;
@@ -405,8 +410,7 @@ public class AccessPath<R> implements IAccessPath<R> {
         }
 
         // optional filter to be evaluated by the AccessPath.
-        this.accessPathFilter = (BOpFilterBase) predicate
-                .getProperty(IPredicate.Annotations.ACCESS_PATH_FILTER);
+        this.accessPathFilter = predicate.getAccessPathFilter();;
 
         // true iff there is a filter (either local or remote).
         this.hasFilter = (indexLocalFilter != null || accessPathFilter != null);
