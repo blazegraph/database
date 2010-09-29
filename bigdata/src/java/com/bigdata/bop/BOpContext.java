@@ -298,9 +298,13 @@ public class BOpContext<E> extends BOpContextBase {
 
                 final IVariable<?> var = (IVariable<?>) t;
 
-                final Constant<?> newval = new Constant(e.get(i));
+                final Object val = e.get(i);
+                
+                if (val != null) {
 
-                bindingSet.set(var, newval);
+                    bindingSet.set(var, new Constant(val));
+
+                }
 
             }
 
