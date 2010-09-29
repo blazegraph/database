@@ -235,9 +235,11 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
     }
 
     /**
-     * Core impl.
+     * Core implementation. This makes it possible to substitute a different
+     * {@link IAccessPath} implementation.
      * 
      * @param relation
+     *            (optional).
      * @param indexManager
      * @param timestamp
      * @param predicate
