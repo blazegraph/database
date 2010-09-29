@@ -66,13 +66,16 @@ final public class Constant<E> extends BOpBase implements IConstant<E> {
      * @param op
      */
     public Constant(final Constant<E> op) {
+
         super(op);
+        
         this.value = op.value;
+        
     }
     
     public Constant(final E value) {
         
-        super(new BOp[] {}, null/* annotations */);
+        super(NOARGS, NOANNS);
         
         if (value == null)
             throw new IllegalArgumentException();

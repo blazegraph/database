@@ -71,6 +71,20 @@ public class BOpBase implements BOp {
     private static final long serialVersionUID = 1L;
 
     /**
+     * An empty array.
+     */
+    static protected final transient BOp[] NOARGS = new BOp[] {};
+
+    /**
+     * An empty immutable annotations map.
+     * 
+     * @todo This is for things like {@link Constant} and {@link Var} which are
+     *       never annotated. However, i'm not sure if this is a good idea or
+     *       not. A "copy on write" map might be better.
+     */
+    static protected final transient Map<String,Object> NOANNS = Collections.emptyMap();
+    
+    /**
      * The argument values - <strong>direct access to this field is
      * discouraged</strong> - the field is protected to support
      * <em>mutation</em> APIs and should not be relied on for other purposes.
@@ -288,6 +302,10 @@ public class BOpBase implements BOp {
 
     /** deep copy the arguments. */
     static protected BOp[] deepCopy(final BOp[] a) {
+        if (a == NOARGS) {
+            // fast path for zero arity operators.
+            return a;
+        }
         final BOp[] t = new BOp[a.length];
         for (int i = 0; i < a.length; i++) {
             t[i] = a[i] == null ? null : a[i].clone();
@@ -311,7 +329,11 @@ public class BOpBase implements BOp {
      *       containing an ontology or some conditional assertions with a query
      *       plan.
      */
-    static protected Map<String,Object> deepCopy(final Map<String,Object> a) {
+    static protected Map<String, Object> deepCopy(final Map<String, Object> a) {
+        if (a == NOANNS) {
+            // Fast past for immutable, empty annotations.
+            return a;
+        }
         // allocate map.
         final Map<String, Object> t = new LinkedHashMap<String, Object>(a
                 .size());
