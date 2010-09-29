@@ -39,10 +39,6 @@ public abstract class Resolver extends FilterBase {
 	
 	public Resolver()	{}
 
-	public Resolver(Object state) {
-		super(state);
-	}
-	
 	//-------------------------------------------------------------
 
 	@Override

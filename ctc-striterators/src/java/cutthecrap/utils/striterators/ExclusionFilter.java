@@ -29,14 +29,16 @@ package cutthecrap.utils.striterators;
  * Derived from Filter, and excludes a single object from the iteration.
  */
 public class ExclusionFilter extends Filter {
-  public ExclusionFilter(Object state) {
-  	super(state);
+  private Object m_exclude;
+  
+  public ExclusionFilter(Object exclude) {
+  	m_exclude = exclude;
   }
   
 	/***********************************************************************
 	 * Just make sure that the current object is not the one to be excluded.
 	 **/
   protected boolean isValid(Object obj) {
-  	return obj != m_state;
+  	return obj != m_exclude;
   }
 }

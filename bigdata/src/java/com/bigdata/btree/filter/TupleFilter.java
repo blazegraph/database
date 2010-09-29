@@ -64,17 +64,8 @@ abstract public class TupleFilter<E> extends FilterBase implements ITupleFilter<
    
     public TupleFilter() {
 
-        this(null/* state */);
-        
     }
 
-    public TupleFilter(final Object state) {
-                
-//        this.state = state;
-        super(state);
-        
-    }
-    
     @SuppressWarnings("unchecked")
     @Override
     public ITupleIterator<E> filterOnce(final Iterator src,Object context) {
