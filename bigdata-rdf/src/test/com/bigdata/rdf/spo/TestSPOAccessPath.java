@@ -29,7 +29,10 @@ package com.bigdata.rdf.spo;
 
 import org.openrdf.model.Statement;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
@@ -321,12 +324,14 @@ public class TestSPOAccessPath extends AbstractTripleStoreTestCase {
             {
 
                 final SPOPredicate predicate = new SPOPredicate(//
-                        store.getSPORelation().getNamespace(),//
-                        Var.var("g"), // s
-                        new Constant<IV>(p1.getIV()), // p
-                        new Constant<IV>(o1.getIV()), // o
-                        Var.var("h") // c
-                );
+                        new BOp[] { Var.var("g"), // s
+                                new Constant<IV>(p1.getIV()), // p
+                                new Constant<IV>(o1.getIV()), // o
+                                Var.var("h") // c
+                        }, new NV(IPredicate.Annotations.RELATION_NAME,
+                                new String[] { store.getSPORelation()
+                                        .getNamespace() //
+                                }));
 
                 final IAccessPath<ISPO> accessPath = store.getSPORelation()
                         .getAccessPath(predicate);
@@ -344,12 +349,13 @@ public class TestSPOAccessPath extends AbstractTripleStoreTestCase {
             // shared 'g' variable (?g, p1, o1, ?g)
             {
                 final SPOPredicate predicate = new SPOPredicate(//
-                        store.getSPORelation().getNamespace(),//
-                        Var.var("g"), // s
-                        new Constant<IV>(p1.getIV()), // p
-                        new Constant<IV>(o1.getIV()), // o
-                        Var.var("g") // c
-                );
+                        new BOp[] { Var.var("g"), // s
+                                new Constant<IV>(p1.getIV()), // p
+                                new Constant<IV>(o1.getIV()), // o
+                                Var.var("g") // c
+                        }, new NV(IPredicate.Annotations.RELATION_NAME,
+                                new String[] { store.getSPORelation()
+                                        .getNamespace() }));
 
                 final IAccessPath<ISPO> accessPath = store.getSPORelation()
                         .getAccessPath(predicate);

@@ -95,6 +95,9 @@ public class SPOPredicate extends Predicate<ISPO> {
      * @param s
      * @param p
      * @param o
+     * 
+     * @deprecated Only used by the unit tests.  They should use the shallow
+     * copy constructor form.
      */
     public SPOPredicate(final String relationName,
             final IVariableOrConstant<IV> s,
@@ -128,8 +131,7 @@ public class SPOPredicate extends Predicate<ISPO> {
 
 //        this(new String[] { relationName }, -1/* partitionId */, s, p, o, c,
 //                false/* optional */, null/* constraint */, null/* expander */);
-        super((c == null ? new IVariableOrConstant[] { s, p, o }
-                : new IVariableOrConstant[] { s, p, o, c }), //
+        super(new IVariableOrConstant[] { s, p, o, c }, //
                 new NV(Annotations.RELATION_NAME, relationName) //
         );
 
