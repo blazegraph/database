@@ -551,6 +551,8 @@ abstract public class AbstractTripleStore extends
          * Boolean option (default <code>true</code>) enables support for a
          * full text index that may be used to lookup literals by tokens found
          * in the text of those literals.
+         * 
+         * @see #TEXT_INDEXER_CLASS
          */
         String TEXT_INDEX = AbstractTripleStore.class.getName() + ".textIndex";
 

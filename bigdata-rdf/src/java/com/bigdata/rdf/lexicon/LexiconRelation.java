@@ -703,7 +703,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
      * A factory returning the softly held singleton for the
      * {@link FullTextIndex}.
      * 
-     * @see Options#TEXT_INDEX
+     * @see AbstractTripleStore.Options#TEXT_INDEX
      * 
      * @todo replace with the use of the {@link IResourceLocator} since it
      *       already imposes a canonicalizing mapping within for the index name
