@@ -90,7 +90,7 @@ class UnsynchronizedSolutionBuffer<E extends IBindingSet> extends
             final ISolution solution = joinNexus.newSolution(rule,
                     bindingSet);
 
-            if (solutionFilter == null || solutionFilter.accept(solution)) {
+            if (solutionFilter == null || solutionFilter.isValid(solution)) {
 
                 a[naccepted++] = solution;
 

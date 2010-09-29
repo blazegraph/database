@@ -28,6 +28,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.Set;
 
 import com.bigdata.bop.BOp;
@@ -38,8 +39,6 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.IStarJoin;
 
 /**
@@ -55,27 +54,31 @@ public class SPOStarJoin extends SPOPredicate
      */
     private static final long serialVersionUID = 981603459301801862L;
 
+    public interface Annotations extends SPOPredicate.Annotations {
+        
+    }
+    
     /**
      * The star constraints for this star join.
      * 
      * @todo {@link IStarConstraint} should probably be a {@link BOp} and this
      *       should probably be an annotation.
      */
-    protected final Collection<IStarConstraint<ISPO>> starConstraints;
+    private final Collection<IStarConstraint<ISPO>> starConstraints = new LinkedList<IStarConstraint<ISPO>>();
+    
+    /**
+     * Required shallow copy constructor.
+     */
+    public SPOStarJoin(final BOp[] values, final Map<String, Object> annotations) {
+        super(values, annotations);
+    }
 
-//    /**
-//     * Required shallow copy constructor.
-//     */
-//    public SPOStarJoin(final BOp[] values, final Map<String, Object> annotations) {
-//        super(values, annotations);
-//    }
-//
-//    /**
-//     * Required deep copy constructor.
-//     */
-//    public SPOStarJoin(final SPOStarJoin op) {
-//        super(op);
-//    }
+    /**
+     * Required deep copy constructor.
+     */
+    public SPOStarJoin(final SPOStarJoin op) {
+        super(op);
+    }
 
     /**
      * Construct an SPO star join from a normal SPO predicate.  The star join
@@ -88,70 +91,74 @@ public class SPOStarJoin extends SPOPredicate
      *          the normal SPO predicate from which to pull the S
      */
     public SPOStarJoin(final SPOPredicate pred) {
-        
-        this(new String[] { pred.getOnlyRelationName() }, pred.getPartitionId(), 
-                pred.s(), // s 
-                (IVariableOrConstant<IV>) Var.var(), // p 
-                (IVariableOrConstant<IV>) Var.var(), // o
-                pred.c(), // c
-                pred.isOptional(), pred.getConstraint(), 
-                pred.getSolutionExpander());
-        
-    }
-    
-    /**
-     * Create an SPO star join over the given relation for the given subject.
-     *  
-     * @param relationName
-     *          the name of the SPO relation to use
-     * @param s
-     *          the subject of this star join
-     */
-    public SPOStarJoin(final String relationName,
-            final IVariableOrConstant<IV> s) {
 
-        this(new String[] { relationName }, -1/* partitionId */, 
-                s, 
-                (IVariableOrConstant<IV>) Var.var(), // p 
-                (IVariableOrConstant<IV>) Var.var(), // o
-                null, // c 
-                false/* optional */, null/* constraint */, null/* expander */);
+        super(new BOp[] { pred.s(), Var.var(), Var.var(), pred.c() },
+                deepCopy(pred.annotations()));
+        
+//        this(new String[] { pred.getOnlyRelationName() }, pred.getPartitionId(), 
+//                pred.s(), // s 
+//                (IVariableOrConstant<IV>) Var.var(), // p 
+//                (IVariableOrConstant<IV>) Var.var(), // o
+//                pred.c(), // c
+//                pred.isOptional(), pred.getConstraint(), 
+//                pred.getSolutionExpander());
 
     }
     
-    /**
-     * Fully specified ctor.
-     * 
-     * @param relationName
-     * @param partitionId
-     * @param s
-     * @param p
-     * @param o
-     * @param c 
-     *            MAY be <code>null</code>.
-     * @param optional
-     * @param constraint
-     *            MAY be <code>null</code>.
-     * @param expander
-     *            MAY be <code>null</code>.
-     */
-    public SPOStarJoin(final String[] relationName, //
-            final int partitionId, //
-            final IVariableOrConstant<IV> s,//
-            final IVariableOrConstant<IV> p,//
-            final IVariableOrConstant<IV> o,//
-            final IVariableOrConstant<IV> c,//
-            final boolean optional, //
-            final IElementFilter<ISPO> constraint,//
-            final ISolutionExpander<ISPO> expander//
-            ) {
-        
-        super(relationName, partitionId, s, p, o, c, optional, constraint, 
-                expander);
+//    /**
+//     * Create an SPO star join over the given relation for the given subject.
+//     *  
+//     * @param relationName
+//     *          the name of the SPO relation to use
+//     * @param s
+//     *          the subject of this star join
+//     */
+//    public SPOStarJoin(final String relationName,
+//            final IVariableOrConstant<IV> s) {
+//
+//        super(new BOp[] { s, Var.var(), Var.var(), null /* c */}, NV
+//                .asMap(new NV[] { new NV(Annotations.RELATION_NAME,
+//                        relationName) }));
+////        this(new String[] { relationName }, -1/* partitionId */, 
+////                s, 
+////                (IVariableOrConstant<IV>) Var.var(), // p 
+////                (IVariableOrConstant<IV>) Var.var(), // o
+////                null, // c 
+////                false/* optional */, null/* constraint */, null/* expander */);
+//
+//    }
     
-        this.starConstraints = new LinkedList<IStarConstraint<ISPO>>();
-        
-    }
+//    /**
+//     * Fully specified ctor.
+//     * 
+//     * @param relationName
+//     * @param partitionId
+//     * @param s
+//     * @param p
+//     * @param o
+//     * @param c 
+//     *            MAY be <code>null</code>.
+//     * @param optional
+//     * @param constraint
+//     *            MAY be <code>null</code>.
+//     * @param expander
+//     *            MAY be <code>null</code>.
+//     */
+//    public SPOStarJoin(final String[] relationName, //
+//            final int partitionId, //
+//            final IVariableOrConstant<IV> s,//
+//            final IVariableOrConstant<IV> p,//
+//            final IVariableOrConstant<IV> o,//
+//            final IVariableOrConstant<IV> c,//
+//            final boolean optional, //
+//            final IElementFilter<ISPO> constraint,//
+//            final ISolutionExpander<ISPO> expander//
+//            ) {
+//        
+//        super(relationName, partitionId, s, p, o, c, optional, constraint, 
+//                expander);
+//    
+//    }
     
     /**
      * Add an SPO star constraint to this star join.

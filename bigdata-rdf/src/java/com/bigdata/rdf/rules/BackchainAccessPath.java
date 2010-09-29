@@ -43,7 +43,6 @@ import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -51,6 +50,9 @@ import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
+
+import cutthecrap.utils.striterators.IFilter;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * A read-only {@link IAccessPath} that backchains certain inferences.
@@ -311,21 +313,36 @@ public class BackchainAccessPath implements IAccessPath<ISPO> {
             owlSameAsItr = null;
             
         }
-        
+
         /*
          * Wrap it up as a chunked iterator.
          * 
          * Note: If we are not adding any entailments then we just use the
          * source iterator directly.
          * 
-         * @todo why is the filter being passed in here? Can the backchaining
+         * FIXME Why is the filter being passed in here? Can the backchaining
          * iterators produce entailments that would violate the filter? If so,
          * then shouldn't the filter be applied by the backchainers themselves
-         * so that they do not overgenerate? (This comment also applies for the
-         * type resource backchainer, below).
+         * so that they do not overgenerate? Is this because those filters might
+         * cause a problem when reading on the other tails used by the sameAs
+         * expansion? (This comment also applies for the type resource
+         * backchainer, below).
          */
 
-        final IElementFilter<ISPO> filter = predicate.getConstraint();
+        if(predicate.getIndexLocalFilter()!=null)
+            throw new UnsupportedOperationException("indexLocalFilter in expander: "+this);
+        if(predicate.getAccessPathFilter()!=null)
+            throw new UnsupportedOperationException("accessPathFilter in expander: "+this);
+        final IElementFilter<ISPO> filter = null;
+//        final IElementFilter<ISPO> filter = predicate.getConstraint();
+//        final IFilter indexLocalFilter = predicate.getIndexLocalFilter();
+//        final IFilter accessPathFilter = predicate.getAccessPathFilter();
+//        
+//        final Striterator tmp = new Striterator(owlSameAsItr);
+//        if(indexLocalFilter!=null)
+//            tmp.addFilter(indexLocalFilter);
+//        if(accessPathFilter!=null)
+//            tmp.addFilter(accessPathFilter);
         
         IChunkedOrderedIterator<ISPO> itr = (owlSameAsItr == null//
                 ? accessPath.iterator(limit, capacity) //

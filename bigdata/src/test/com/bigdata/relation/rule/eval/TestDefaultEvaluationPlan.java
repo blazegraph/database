@@ -41,12 +41,14 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.btree.keys.ISortKeyBuilder;
 import com.bigdata.config.IValidator;
 import com.bigdata.io.IStreamSerializer;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
@@ -105,6 +107,7 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
     public void test_lubmQuery8() {
 
         final String relation = "spo";
+        final long timestamp = ITx.READ_COMMITTED;
         
         final Constant<?> rdfType = new Constant<String>("rdfType");
         final Constant<?> Department = new Constant<String>("Department");
@@ -117,31 +120,41 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
         final IPredicate<?> pred0 = new Predicate(//
                 new IVariableOrConstant[] {//
                 Var.var("y"), rdfType, Department },//
-                relation//
+                new NV(Predicate.Annotations.RELATION_NAME,
+                        new String[] { relation }),//
+                new NV(Predicate.Annotations.TIMESTAMP,timestamp)//
                 );
 
         final IPredicate<?> pred1 = new Predicate(//
                 new IVariableOrConstant[] {//
                 Var.var("x"), rdfType, Student },//
-                relation//
+                new NV(Predicate.Annotations.RELATION_NAME,
+                        new String[] { relation }),//
+                new NV(Predicate.Annotations.TIMESTAMP,timestamp)//
                 );
         
         final IPredicate<?> pred2 = new Predicate( //
                 new IVariableOrConstant[] {//
                 Var.var("x"), memberOf, Var.var("y") },//
-                relation//
+                new NV(Predicate.Annotations.RELATION_NAME,
+                        new String[] { relation }),//
+                new NV(Predicate.Annotations.TIMESTAMP,timestamp)//
                 );
         
         final IPredicate<?> pred3 = new Predicate(//
                 new IVariableOrConstant[] {//
                 Var.var("y"), subOrganizationOf, University0 },//
-                relation//
+                new NV(Predicate.Annotations.RELATION_NAME,
+                        new String[] { relation }),//
+                new NV(Predicate.Annotations.TIMESTAMP,timestamp)//
                 );
         
         final IPredicate<?> pred4 = new Predicate(//
                 new IVariableOrConstant[] {//
                 Var.var("x"), emailAddress, Var.var("z") },
-                relation//
+                new NV(Predicate.Annotations.RELATION_NAME,
+                        new String[] { relation }),//
+                new NV(Predicate.Annotations.TIMESTAMP,timestamp)//
                 );
         
         final IRule rule = new Rule(getName(), null/* head */,

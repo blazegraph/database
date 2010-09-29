@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.ap;
 
+import java.util.Iterator;
 import java.util.Map;
 
 import cern.colt.Arrays;
@@ -42,11 +43,13 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
-import com.bigdata.btree.ITuple;
-import com.bigdata.journal.ITx;
+import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.striterator.IKeyOrder;
+
+import cutthecrap.utils.striterators.FilterBase;
+import cutthecrap.utils.striterators.IFilter;
 
 /**
  * A generic implementation of an immutable {@link IPredicate}.
@@ -81,20 +84,31 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
     }
 
     /**
-     * Simplified ctor.
-     * 
-     * @param values
-     *            The values (order is important!).
-     * @param relationName
-     *            Identifies the relation to be queried.
+     * Variable argument version of the shallow constructor.
+     * @param vars
+     * @param annotations
      */
-    public Predicate(final IVariableOrConstant<?>[] values,
-            final String relationName) {
-
-        this(values, relationName, -1/* partitionId */, false/* optional */,
-                null/* constraint */, null/* expander */, ITx.READ_COMMITTED);
-
+    public Predicate(final BOp[] vars, final NV... annotations) {
+        
+        super(vars, NV.asMap(annotations));
+        
     }
+    
+//    /**
+//     * Simplified ctor.
+//     * 
+//     * @param values
+//     *            The values (order is important!).
+//     * @param relationName
+//     *            Identifies the relation to be queried.
+//     */
+//    public Predicate(final IVariableOrConstant<?>[] values,
+//            final String relationName) {
+//
+//        this(values, relationName, -1/* partitionId */, false/* optional */,
+//                null/* constraint */, null/* expander */, ITx.READ_COMMITTED);
+//
+//    }
 
     /**
      * 
@@ -121,7 +135,8 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
                 new NV(Annotations.RELATION_NAME,new String[]{relationName}),//
                 new NV(Annotations.PARTITION_ID,partitionId),//
                 new NV(Annotations.OPTIONAL,optional),//
-                new NV(Annotations.CONSTRAINT,constraint),//
+                new NV(Annotations.INDEX_LOCAL_FILTER,
+                    ElementFilter.newInstance(constraint)),//
                 new NV(Annotations.EXPANDER,expander),//
                 new NV(Annotations.TIMESTAMP, timestamp)
         }));
@@ -204,21 +219,33 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
         
     }
 
-    /**
-     * 
-     * @deprecated This is being replaced by two classes of filters. One which
-     *             is always evaluated local to the index and one which is
-     *             evaluated in the JVM in which the access path is evaluated
-     *             once the {@link ITuple}s have been resolved to elements of
-     *             the relation.
-     */
-    @SuppressWarnings("unchecked")
-    final public IElementFilter<E> getConstraint() {
+//    /**
+//     * 
+//     * @deprecated This is being replaced by two classes of filters. One which
+//     *             is always evaluated local to the index and one which is
+//     *             evaluated in the JVM in which the access path is evaluated
+//     *             once the {@link ITuple}s have been resolved to elements of
+//     *             the relation.
+//     */
+//    @SuppressWarnings("unchecked")
+//    final public IElementFilter<E> getConstraint() {
+//
+//        return (IElementFilter<E>) getProperty(Annotations.CONSTRAINT);
+//
+//    }
 
-        return (IElementFilter<E>) getProperty(Annotations.CONSTRAINT);
+    final public IFilter getIndexLocalFilter() {
+
+        return (IFilter) getProperty(Annotations.INDEX_LOCAL_FILTER);
 
     }
 
+    final public IFilter getAccessPathFilter() {
+
+        return (IFilter) getProperty(Annotations.ACCESS_PATH_FILTER);
+
+    }
+    
     @SuppressWarnings("unchecked")
     final public ISolutionExpander<E> getSolutionExpander() {
         
@@ -359,6 +386,96 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
         tmp.setProperty(Annotations.BOP_ID, bopId);
 
         return tmp;
+
+    }
+
+    public Predicate<E> setTimestamp(final long timestamp) {
+
+        final Predicate<E> tmp = this.clone();
+
+        tmp.setProperty(Annotations.TIMESTAMP, timestamp);
+
+        return tmp;
+
+    }
+
+    /**
+     * Add an {@link Annotations#INDEX_LOCAL_FILTER}. When there is a filter for
+     * the named property, the filters are combined. Otherwise the filter is
+     * set.
+     * 
+     * @param filter
+     *            The filter.
+     *            
+     * @return The new predicate to which that filter was added.
+     */
+    public Predicate<E> addIndexLocalFilter(final IFilter filter) {
+
+        final Predicate<E> tmp = this.clone();
+
+        tmp.addFilter(Annotations.INDEX_LOCAL_FILTER, filter);
+
+        return tmp;
+
+    }
+
+    /**
+     * Add an {@link Annotations#INDEX_LOCAL_FILTER}. When there is a filter for
+     * the named property, the filters are combined. Otherwise the filter is
+     * set.
+     * 
+     * @param filter
+     *            The filter.
+     *            
+     * @return The new predicate to which that filter was added.
+     */
+    public Predicate<E> addAccessPathFilter(final IFilter filter) {
+
+        final Predicate<E> tmp = this.clone();
+
+        tmp.addFilter(Annotations.ACCESS_PATH_FILTER, filter);
+
+        return tmp;
+
+    }
+
+    /**
+     * Private method used to add a filter. When there is a filter for the named
+     * property, the filters are combined. Otherwise the filter is set. DO NOT
+     * use this outside of the copy-on-write helper methods.
+     * 
+     * @param name
+     *            The property name.
+     * @param filter
+     *            The filter.
+     */
+    private void addFilter(final String name, final IFilter filter) {
+        
+        if (filter == null)
+            throw new IllegalArgumentException();
+
+        final IFilter current = (IFilter) getProperty(name);
+
+        if (current == null) {
+            
+            /*
+             * Set the filter.
+             */
+            setProperty(Annotations.INDEX_LOCAL_FILTER, filter);
+            
+        } else {
+
+            /*
+             * Wrap the filter.
+             */
+            setProperty(Annotations.INDEX_LOCAL_FILTER, new FilterBase() {
+
+                @Override
+                protected Iterator filterOnce(Iterator src, Object context) {
+                    return src;
+                }
+            }.addFilter(current).addFilter(filter));
+        }
 
     }
 

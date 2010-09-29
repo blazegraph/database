@@ -33,8 +33,6 @@ import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOFilter;
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
 
 /**
@@ -122,13 +120,19 @@ public class DoNotAddFilter<E extends ISPO> extends SPOFilter<E> {
 
     }
     
-    public boolean accept(final ISPO o) {
-        
+    public boolean isValid(Object o) {
+    
         if (!canAccept(o)) {
             
             return true;
             
         }
+        
+        return accept((ISPO) o);
+        
+    }
+
+    private boolean accept(final ISPO o) {
         
         final ISPO spo = (ISPO) o;
         

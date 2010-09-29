@@ -58,12 +58,15 @@ import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.rio.rdfxml.RDFXMLParser;
 
 import com.bigdata.bop.ArrayBindingSet;
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
+import com.bigdata.bop.ap.filter.BOpTupleFilter;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
@@ -129,6 +132,7 @@ import com.bigdata.relation.IDatabase;
 import com.bigdata.relation.IMutableDatabase;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationSchema;
+import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -2472,23 +2476,35 @@ abstract public class AbstractTripleStore extends
      *            evaluated close to the data.
      * @return
      */
-    @SuppressWarnings("unchecked")
+//    @SuppressWarnings("unchecked")
     final public IAccessPath<ISPO> getAccessPath(
             final IKeyOrder<ISPO> keyOrder, final IElementFilter<ISPO> filter) {
 
         final SPORelation r = getSPORelation();
-        
-        final SPOPredicate p = new SPOPredicate(//
-                new String[] { r.getNamespace() },//
-                -1, // partitionId
-                Var.var("s"),//
-                Var.var("p"),//
-                Var.var("o"),//
-                quads ? Var.var("c") : null,//
-                false, // optional
-                filter,//
-                null // expander
-        );
+        final SPOPredicate p = new SPOPredicate(
+                new BOp[]{//
+                      Var.var("s"),//
+                      Var.var("p"),//
+                      Var.var("o"),//
+                      quads ? Var.var("c") : null,//
+                },//
+                NV.asMap(new NV[] {//
+                        new NV(IPredicate.Annotations.RELATION_NAME,
+                                new String[] { r.getNamespace() }),//
+                        new NV(IPredicate.Annotations.INDEX_LOCAL_FILTER,
+                               ElementFilter.newInstance(filter)),//
+                        }));
+//        final SPOPredicate p = new SPOPredicate(//
+//                new String[] { r.getNamespace() },//
+//                -1, // partitionId
+//                Var.var("s"),//
+//                Var.var("p"),//
+//                Var.var("o"),//
+//                quads ? Var.var("c") : null,//
+//                false, // optional
+//                filter,//
+//                null // expander
+//        );
 
         return r.getAccessPath(keyOrder, p);
 

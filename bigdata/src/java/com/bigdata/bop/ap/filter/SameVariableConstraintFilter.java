@@ -94,7 +94,7 @@ public class SameVariableConstraintFilter extends BOpFilterBase {
         }
 
         @Override
-        protected boolean isValid(Object obj) {
+        public boolean isValid(Object obj) {
 
             return filter.accept(obj);
 

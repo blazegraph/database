@@ -52,7 +52,7 @@ import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
 
 import com.bigdata.BigdataStatics;
-import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
@@ -60,6 +60,8 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.constraint.EQ;
 import com.bigdata.bop.constraint.EQConstant;
@@ -95,6 +97,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BigdataBindingSetResolverator;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -1490,28 +1493,43 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 }
             }
         }
-        
+
         /*
          * This applies a filter to the access path to remove any inferred
          * triples when [includeInferred] is false.
          * 
-         * @todo In order to rotate additional constraints onto an access path
-         * we would need to either change IPredicate and AbstractAccessPath to
-         * process an IConstraint[] or write a delegation pattern that let's us
-         * wrap one filter inside of another.
+         * @todo We can now stack filters so are we missing out here by not
+         * layering in other filters as well? [In order to rotate additional
+         * constraints onto an access path we would need to either change
+         * IPredicate and AbstractAccessPath to process an IConstraint[] or
+         * write a delegation pattern that let's us wrap one filter inside of
+         * another.]
          */
         final IElementFilter<ISPO> filter = 
             !tripleSource.includeInferred ? ExplicitSPOFilter.INSTANCE
                 : null;
-        
-        return new SPOPredicate(
-                new String[] { database.getSPORelation().getNamespace() },
-                -1, // partitionId
-                s, p, o, c,
-                optional, // optional
-                filter, // filter on elements visited by the access path.
-                expander // free text search expander or named graphs expander
-                );
+
+        return new SPOPredicate(new BOp[] { s, p, o, c }, new NV(
+                IPredicate.Annotations.RELATION_NAME, new String[] { database
+                        .getSPORelation().getNamespace() }),//
+                // @todo move to the join.
+                new NV(IPredicate.Annotations.OPTIONAL, optional),
+                // filter on elements visited by the access path.
+                new NV(IPredicate.Annotations.INDEX_LOCAL_FILTER, ElementFilter
+                        .newInstance(filter)),
+                // free text search expander or named graphs expander
+                new NV(IPredicate.Annotations.EXPANDER, expander),
+                // timestamp
+                new NV(IPredicate.Annotations.TIMESTAMP, database
+                        .getSPORelation().getTimestamp()));
+//        return new SPOPredicate(
+//                new String[] { database.getSPORelation().getNamespace() },
+//                -1, // partitionId
+//                s, p, o, c,
+//                optional, // optional
+//                filter, // filter on elements visited by the access path.
+//                expander // free text search expander or named graphs expander
+//                );
         
     }
 
@@ -1931,7 +1949,8 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         for (IPredicate pred : tails) {
             IVariableOrConstant s = pred.get(0);
             if (s.isVar() && /*pred.getSolutionExpander() == null &&*/ 
-                    pred.getConstraint() == null) {
+                    pred.getIndexLocalFilter() == null&&
+                    pred.getAccessPathFilter() == null) {
                 IVariable v = (IVariable) s;
                 Collection<IPredicate> preds = subjects.get(v);
                 if (preds == null) {

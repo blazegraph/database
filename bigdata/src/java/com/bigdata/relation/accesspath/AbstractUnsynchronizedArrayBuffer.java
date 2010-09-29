@@ -139,7 +139,7 @@ public abstract class AbstractUnsynchronizedArrayBuffer<E> implements IBuffer<E>
 
         if (filter != null && filter.canAccept(e)) {
 
-            return filter.accept(e);
+            return filter.isValid(e);
 
         }
 

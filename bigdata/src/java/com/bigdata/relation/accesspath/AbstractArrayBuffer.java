@@ -119,7 +119,7 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
 
         if (filter != null) {
 
-            if(!filter.accept(e)) {
+            if(!filter.isValid(e)) {
                 
                 // rejected by the filter.
                 

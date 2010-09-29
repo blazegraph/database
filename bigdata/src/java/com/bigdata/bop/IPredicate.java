@@ -41,6 +41,7 @@ import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
+import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IRule;
@@ -95,32 +96,35 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          */
         String OPTIONAL = "optional";
 
-        /**
-         * Constraints on the elements read from the relation.
-         * 
-         * @deprecated This is being replaced by two classes of filters. One
-         *             which is always evaluated local to the index and one
-         *             which is evaluated in the JVM in which the access path is
-         *             evaluated once the {@link ITuple}s have been resolved to
-         *             elements of the relation.
-         */
-        String CONSTRAINT = "constraint";
+//        /**
+//         * Constraints on the elements read from the relation.
+//         * 
+//         * @deprecated This is being replaced by two classes of filters. One
+//         *             which is always evaluated local to the index and one
+//         *             which is evaluated in the JVM in which the access path is
+//         *             evaluated once the {@link ITuple}s have been resolved to
+//         *             elements of the relation.
+//         *             <p>
+//         *             This was historically an {@link IElementFilter}, which is
+//         *             an {@link IFilterTest}. {@link #INDEX_LOCAL_FILTER} is an
+//         *             {@link IFilter}. You can wrap the {@link IFilterTest} as
+//         *             an {@link IFilter} using {@link ElementFilter}.
+//         */
+//        String CONSTRAINT = "constraint";
 
         /**
-         * An optional {@link BOpFilterBase} that will be evaluated local to the
-         * to the index. When the index is remote, the filter will be sent to
-         * the node on which the index resides and evaluated there. This makes
-         * it possible to efficiently filter out tuples which are not of
-         * interest for a given access path.
+         * An optional {@link IFilter} that will be evaluated local to the to
+         * the index. When the index is remote, the filter will be sent to the
+         * node on which the index resides and evaluated there. This makes it
+         * possible to efficiently filter out tuples which are not of interest
+         * for a given access path.
          * <p>
          * Note: The filter MUST NOT change the type of data visited by the
          * iterator - it must remain an {@link ITupleIterator}. An attempt to
          * change the type of the visited objects will result in a runtime
-         * exception.
-         * <p>
-         * Note: This filter must be "aware" of the reuse of tuples within tuple
-         * iterators. See {@link BOpTupleFilter} and {@link TupleFilter} for
-         * starting points.
+         * exception. This filter must be "aware" of the reuse of tuples within
+         * tuple iterators. See {@link BOpTupleFilter}, {@link TupleFilter} and
+         * {@link ElementFilter} for starting points.
          * <p>
          * You can chain {@link BOpFilterBase} filters by nesting them inside of
          * one another. You can chain {@link FilterBase} filters together as
@@ -337,19 +341,35 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      */
     public ISolutionExpander<E> getSolutionExpander();
 
-    /**
-     * An optional constraint on the visitable elements.
-     * 
-     * @see Annotations#CONSTRAINT
-     * 
-     * @deprecated This is being replaced by two classes of filters. One which
-     *             is always evaluated local to the index and one which is
-     *             evaluated in the JVM in which the access path is evaluated
-     *             once the {@link ITuple}s have been resolved to elements of
-     *             the relation.
-     */
-    public IElementFilter<E> getConstraint();
+//    /**
+//     * An optional constraint on the visitable elements.
+//     * 
+//     * @see Annotations#CONSTRAINT
+//     * 
+//     * @deprecated This is being replaced by two classes of filters. One which
+//     *             is always evaluated local to the index and one which is
+//     *             evaluated in the JVM in which the access path is evaluated
+//     *             once the {@link ITuple}s have been resolved to elements of
+//     *             the relation.
+//     */
+//    public IElementFilter<E> getConstraint();
 
+    /**
+     * Return the optional filter to be evaluated local to the index.
+     * 
+     * @see Annotations#INDEX_LOCAL_FILTER
+     */
+    public IFilter getIndexLocalFilter();
+
+    /**
+     * Return the optional filter to be evaluated once tuples have been
+     * converted into relation elements by the access path (local to the
+     * caller).
+     * 
+     * @see Annotations#ACCESS_PATH_FILTER
+     */
+    public IFilter getAccessPathFilter();
+    
     /**
      * Return the {@link IKeyOrder} assigned to this {@link IPredicate} by the
      * query optimizer.

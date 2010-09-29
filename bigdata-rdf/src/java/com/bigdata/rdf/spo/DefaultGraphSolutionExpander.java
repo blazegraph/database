@@ -36,11 +36,14 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
+
 import com.bigdata.BigdataStatics;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.ap.Predicate;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
@@ -50,6 +53,7 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -341,8 +345,8 @@ public class DefaultGraphSolutionExpander implements ISolutionExpander<ISPO> {
              * the one specified by [c].
              */
 
-            final SPOPredicate p = accessPath.getPredicate().setConstraint(
-                    filter);
+            final Predicate<ISPO> p = accessPath.getPredicate().addIndexLocalFilter(
+                    ElementFilter.newInstance(filter));
 
             /*
              * Wrap with access path that leaves [c] unbound but strips off the

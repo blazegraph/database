@@ -5,9 +5,12 @@ import org.openrdf.model.URI;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -15,6 +18,7 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
+import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.rule.Rule;
 
 /**
@@ -40,16 +44,16 @@ public class MatchRule extends Rule<SPO> {
                 //
                 new SPOPredicate(relationName, var("s"), var("p"), lit),
                 //
-                new SPOPredicate(new String[] { relationName },
-                                -1, // partitionId
-                                var("s"), //
+                new SPOPredicate(
+                        new BOp[] { var("s"), //
                                 vocab.getConstant(RDF.TYPE),//
-                                var("t"), //
-                                null, // context
-                                false, //optional
-                                ExplicitSPOFilter.INSTANCE,// filter
-                                null // expander
-                                ),
+                                var("t") }, //
+                        new NV(IPredicate.Annotations.RELATION_NAME,
+                                new String[] { relationName }),
+                        new NV(
+                                IPredicate.Annotations.INDEX_LOCAL_FILTER,
+                                ElementFilter
+                                        .newInstance(ExplicitSPOFilter.INSTANCE))),
                 //
                 new SPOPredicate(relationName, var("t"), vocab
                                 .getConstant(RDFS.SUBCLASSOF), cls) //

@@ -124,7 +124,16 @@ public class AccessPath<R> implements IAccessPath<R> {
     protected final int chunkCapacity;
     protected final int fullyBufferedReadThreshold;
 
+    /**
+     * <code>true</code> iff the {@link IPredicate}is fully bound.
+     */
     private final boolean isFullyBoundForKey;
+
+    /**
+     * <code>true</code> iff there is a filter for the access path (either local
+     * or remote).
+     */
+    private final boolean hasFilter;
     
     /**
      * <code>true</code> iff all elements in the predicate which are required
@@ -399,6 +408,9 @@ public class AccessPath<R> implements IAccessPath<R> {
         this.accessPathFilter = (BOpFilterBase) predicate
                 .getProperty(IPredicate.Annotations.ACCESS_PATH_FILTER);
 
+        // true iff there is a filter (either local or remote).
+        this.hasFilter = (indexLocalFilter != null || accessPathFilter != null);
+
         final IKeyBuilder keyBuilder = ndx.getIndexMetadata()
                 .getTupleSerializer().getKeyBuilder();
 
@@ -407,41 +419,6 @@ public class AccessPath<R> implements IAccessPath<R> {
         toKey = keyOrder.getToKey(keyBuilder, predicate);
         
     }
-
-//    /**
-//     * Align the predicate's {@link IElementFilter} constraint with
-//     * {@link ITupleFilter} so that the {@link IElementFilter} can be evaluated
-//     * close to the data by an {@link ITupleIterator}.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     * @param <R>
-//     *            The generic type of the elements presented to the filter.
-//     */
-//    public static class ElementFilter<R> extends TupleFilter<R> {
-//        
-//        private static final long serialVersionUID = 1L;
-//
-//        private final IElementFilter<R> constraint;
-//        
-//        public ElementFilter(final IElementFilter<R> constraint) {
-//            
-//            if (constraint == null)
-//                throw new IllegalArgumentException();
-//            
-//            this.constraint = constraint;
-//            
-//        }
-//        
-//        public boolean isValid(final ITuple<R> tuple) {
-//            
-//            final R obj = (R) tuple.getObject();
-//        
-//            return constraint.accept( obj );
-//            
-//        }
-//
-//    }
 
     public String toString() {
 
@@ -1148,19 +1125,12 @@ public class AccessPath<R> implements IAccessPath<R> {
 
     }
 
-    /**
-     * Note: When there is a {@link IPredicate#getConstraint()} on the
-     * {@link IPredicate} the exact range count will apply that constraint as a
-     * filter during traversal. However, the constraint is ignored for the fast
-     * range count.
-     */
     final public long rangeCount(final boolean exact) {
 
         assertInitialized();
 
         long n = 0L;
 
-        final boolean hasFilter = (indexLocalFilter != null || accessPathFilter != null);
         if (exact) {
 
             /*

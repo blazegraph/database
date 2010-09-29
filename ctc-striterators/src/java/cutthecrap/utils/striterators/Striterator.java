@@ -137,9 +137,9 @@ public class Striterator implements IStriterator {
 	
 	/** check each object against cls.isInstance(object) **/
 	public IStriterator addTypeFilter(final Class cls) {
-		addFilter(new Filter() {
-  		protected boolean isValid(Object obj) {
-  			boolean ret = cls.isInstance(obj);
+        addFilter(new Filter() {
+        public boolean isValid(Object obj) {
+            boolean ret = cls.isInstance(obj);
 
   			return ret;
   		}
@@ -150,10 +150,10 @@ public class Striterator implements IStriterator {
 
 	/** check each object against cls.isInstance(object) **/
 	public IStriterator addInstanceOfFilter(final Class cls) {
-		addFilter(new Filter() {
-  		protected boolean isValid(Object obj) {
-  			return obj == null ? false : obj.getClass() == obj;
-  		}
+        addFilter(new Filter() {
+        public boolean isValid(Object obj) {
+            return obj == null ? false : obj.getClass() == obj;
+        }
   	} );
   	
   	return this;

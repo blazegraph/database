@@ -222,7 +222,7 @@ public class MagicIndexWriter implements Callable<Long> {
                         + magicTuple.toString());
             
             // skip statements that match the filter.
-            if (filter != null && filter.accept(magicTuple))
+            if (filter != null && filter.isValid(magicTuple))
                 continue;
 
             // skip duplicate records.

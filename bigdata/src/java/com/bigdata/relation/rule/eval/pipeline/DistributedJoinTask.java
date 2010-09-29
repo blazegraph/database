@@ -1128,7 +1128,7 @@ public class DistributedJoinTask extends JoinTask {
 			return new Striterator(cache.values().iterator()).addFilter(new Filter(){
 				private static final long serialVersionUID = 1L;
 				@Override
-				protected boolean isValid(final Object e) {
+				public boolean isValid(final Object e) {
 					/*
 					 * Filter out any tasks which are not done or which had an
 					 * error.

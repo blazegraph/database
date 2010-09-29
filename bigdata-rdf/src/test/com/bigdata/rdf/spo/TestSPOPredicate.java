@@ -34,6 +34,7 @@ import junit.framework.TestCase2;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.rdf.internal.IV;
@@ -165,7 +166,8 @@ public class TestSPOPredicate extends TestCase2 {
         final SPOPredicate p1 = new SPOPredicate(relation, u, rdfType, rdfsClass);
 
         final Predicate p2 = new Predicate(new IVariableOrConstant[] { u,
-                rdfType, rdfsClass }, relation);
+                rdfType, rdfsClass }, new NV(
+                Predicate.Annotations.RELATION_NAME, new String[] { relation }));
 
         log.info(p1.toString());
 
@@ -191,13 +193,15 @@ public class TestSPOPredicate extends TestCase2 {
                 rdfsResource);
 
         final Predicate<?> p1b = new Predicate(new IVariableOrConstant[] { u,
-                rdfsSubClassOf, rdfsResource }, relation);
+                rdfsSubClassOf, rdfsResource }, new NV(Predicate.Annotations.RELATION_NAME,
+                        new String[] { relation }));
 
         final SPOPredicate p2 = new SPOPredicate(relation, u, rdfType,
                 rdfsClass);
 
         final Predicate<?> p2b = new Predicate(new IVariableOrConstant[] { u,
-                rdfType, rdfsClass }, relation);
+                rdfType, rdfsClass }, new NV(Predicate.Annotations.RELATION_NAME,
+                        new String[] { relation }));
 
         // p1 and p1b compare as equal.
         assertTrue(p1.equals(p1));

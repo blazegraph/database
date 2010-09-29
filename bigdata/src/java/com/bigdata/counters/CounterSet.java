@@ -361,7 +361,7 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                protected boolean isValid(Object val) {
+                public boolean isValid(Object val) {
 
                     final ICounter counter = (ICounter) val;
 

@@ -172,9 +172,10 @@ public class TestPredicateAccessPath extends TestCase2 {
     public void test_nothingBound() {
 
         // nothing bound.
-        final IAccessPath<E> accessPath = rel
-                .getAccessPath(new Predicate<E>(new IVariableOrConstant[] {
-                        Var.var("name"), Var.var("value") }, namespace));
+        final IAccessPath<E> accessPath = rel.getAccessPath(new Predicate<E>(
+                new BOp[] { Var.var("name"), Var.var("value") }, new NV(
+                        IPredicate.Annotations.RELATION_NAME,
+                        new String[] { namespace })));
 
         // verify the range count.
         assertEquals(5, accessPath.rangeCount(true/* exact */));
@@ -215,7 +216,9 @@ public class TestPredicateAccessPath extends TestCase2 {
 
         final IAccessPath<E> accessPath = rel.getAccessPath(new Predicate<E>(
                 new IVariableOrConstant[] { new Constant<String>("Mary"),
-                        Var.var("value") }, namespace));
+                        Var.var("value") }, new NV(
+                        Predicate.Annotations.RELATION_NAME,
+                        new String[] { namespace })));
 
         // verify the range count.
         assertEquals(2, accessPath.rangeCount(true/* exact */));

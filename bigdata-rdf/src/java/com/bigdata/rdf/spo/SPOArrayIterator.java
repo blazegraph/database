@@ -227,7 +227,7 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<ISPO> {
 
             final ISPO spo = (SPO) itr.next().getObject();
             
-            if (filter != null && !filter.accept(spo)) {
+            if (filter != null && !filter.isValid(spo)) {
 
                 continue;
                 

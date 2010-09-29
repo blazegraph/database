@@ -287,7 +287,7 @@ public class BOpBase implements BOp {
     }
 
     /** deep copy the arguments. */
-    static private BOp[] deepCopy(final BOp[] a) {
+    static protected BOp[] deepCopy(final BOp[] a) {
         final BOp[] t = new BOp[a.length];
         for (int i = 0; i < a.length; i++) {
             t[i] = a[i] == null ? null : a[i].clone();
@@ -311,7 +311,7 @@ public class BOpBase implements BOp {
      *       containing an ontology or some conditional assertions with a query
      *       plan.
      */
-    static private Map<String,Object> deepCopy(final Map<String,Object> a) {
+    static protected Map<String,Object> deepCopy(final Map<String,Object> a) {
         // allocate map.
         final Map<String, Object> t = new LinkedHashMap<String, Object>(a
                 .size());

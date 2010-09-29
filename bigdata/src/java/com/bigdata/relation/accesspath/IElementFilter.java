@@ -30,30 +30,25 @@ package com.bigdata.relation.accesspath;
 
 import java.io.Serializable;
 
-import cutthecrap.utils.striterators.IFilter;
+import cutthecrap.utils.striterators.IFilterTest;
 
 /**
  * Filter for accepting or rejecting visited elements.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo Can we replace this with an interface declared by CTC with isValid() or
- *       just the CTC {@link IFilter} so we allow non-filtering striterators to
- *       be applied as well?
  */
-public interface IElementFilter<E> extends // BOp,
-        Serializable {
+public interface IElementFilter<E> extends IFilterTest, Serializable {
 
-    /**
-     * True iff the argument is matched by the filter.
-     * 
-     * @param e
-     *            An element.
-     * 
-     * @return true iff the element is accepted by the filter.
-     */
-    public boolean accept(E e);
+//    /**
+//     * True iff the argument is matched by the filter.
+//     * 
+//     * @param e
+//     *            An element.
+//     * 
+//     * @return true iff the element is accepted by the filter.
+//     */
+//    public boolean isValid(E e);
 
     /**
      * Return true iff this this filter can be used on the specified object
@@ -61,7 +56,7 @@ public interface IElementFilter<E> extends // BOp,
      * <p>
      * Note: This was added to make it possible filter out cases where the
      * runtime type system was throwing a {@link ClassCastException} in the
-     * {@link #accept(Object)} implementation.
+     * {@link #isValid(Object)} implementation.
      * 
      * @param o
      *            An object of some type.
