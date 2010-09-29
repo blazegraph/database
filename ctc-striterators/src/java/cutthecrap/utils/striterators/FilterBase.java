@@ -108,8 +108,10 @@ public abstract class FilterBase implements IFilter, Cloneable {
     }
 
     final public Iterator filter(Iterator src, final Object context) {
-    	// makes most sense to consider the filterchain as preprocessing the
-    	// src prior to application of this filter.
+        // wrap src with _this_ filter.
+        src = filterOnce(src, context);
+////    	 makes most sense to consider the filterchain as preprocessing the
+////    	 src prior to application of this filter.
         if (filterChain != null) {
             // wrap source with each additional filter from the filter chain.
             for (IFilter filter : filterChain) {
@@ -117,8 +119,6 @@ public abstract class FilterBase implements IFilter, Cloneable {
             }
         }
         
-        // wrap src with _this_ filter.
-        src = filterOnce(src, context);
         return src;
     }
 
