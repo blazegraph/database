@@ -82,8 +82,14 @@ abstract public class TupleFilter<E> extends FilterBase implements ITupleFilter<
         return new TupleFilter.TupleFilterator((ITupleIterator) src, context, this);
 
     }
+/*
+    public Iterator filterOnce(Iterator src, Object context) {
 
-    abstract protected boolean isValid(ITuple<E> tuple);
+        return new TupleFilter.Filterator((ITupleIterator) src);
+
+    }
+*/
+	abstract protected boolean isValid(ITuple<E> tuple);
 
     /**
      * Implementation class knows how to avoid side-effects from the reuse of

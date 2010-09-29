@@ -80,9 +80,6 @@ abstract public class BOpFilterBase extends BOpBase implements IFilter {
 
     final public Iterator filter(Iterator src, final Object context) {
 
-        // wrap src with _this_ filter.
-        src = filterOnce(src, context);
-        
         // wrap source with each additional filter from the filter chain.
         for (BOp arg : args()) {
         
@@ -90,6 +87,9 @@ abstract public class BOpFilterBase extends BOpBase implements IFilter {
             
         }
 
+        // wrap src with _this_ filter.
+        src = filterOnce(src, context);
+        
         return src;
         
     }

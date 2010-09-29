@@ -89,4 +89,8 @@ public class E implements IElement, Serializable {
         return true;
     }
     
+    public int hashCode() {
+    	return name.hashCode() + value.hashCode();
+    }
+    
 }
