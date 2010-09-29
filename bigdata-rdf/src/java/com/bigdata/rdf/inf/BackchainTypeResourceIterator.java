@@ -30,9 +30,9 @@ package com.bigdata.rdf.inf;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
-
 import org.apache.log4j.Logger;
-
+import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.ITermIVFilter;
 import com.bigdata.rdf.model.StatementEnum;
@@ -49,7 +49,6 @@ import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.striterator.IKeyOrder;
-
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.FilterBase;
 import cutthecrap.utils.striterators.Resolver;
@@ -155,10 +154,14 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
         if (accessPath == null)
             throw new IllegalArgumentException();
         
-        final SPO spo = new SPO(accessPath.getPredicate());
+//        final SPO spo = new SPO(accessPath.getPredicate());
+        final IPredicate<ISPO> pred = accessPath.getPredicate();
+        final IV s = getTerm(pred, 0);
+        final IV p = getTerm(pred, 1);
+        final IV o = getTerm(pred, 2);
 
-        if (((spo.o == null || spo.o.equals(rdfsResource)) && 
-             (spo.p == null || spo.p.equals(rdfType))) == false) {
+        if (((o == null || o.equals(rdfsResource)) && 
+             (p == null || p.equals(rdfType))) == false) {
             
             /*
              * Backchain will not generate any statements.
@@ -189,7 +192,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
          */
         final PushbackIterator<IV> posItr;
 
-        if (spo.s == null) {
+        if (s == null) {
 
             /*
              * Backchain will generate one statement for each distinct subject
@@ -290,6 +293,14 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
         
         return new BackchainTypeResourceIterator(_src, src, resourceIds,
                 posItr, rdfType, rdfsResource);
+        
+    }
+    
+    private static IV getTerm(final IPredicate<ISPO> pred, final int pos) {
+        
+        final IVariableOrConstant<IV> term = pred.get(pos);
+        
+        return term == null || term.isVar() ? null : term.get();
         
     }
     
