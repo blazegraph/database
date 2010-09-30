@@ -70,9 +70,7 @@ public class InferredSPOFilter<E extends ISPO> extends SPOFilter<ISPO> {
             
         }
         
-        final ISolution solution = (ISolution) o;
-        
-        return accept((ISPO) solution.get());
+        return accept((ISPO) o);
         
     }
 

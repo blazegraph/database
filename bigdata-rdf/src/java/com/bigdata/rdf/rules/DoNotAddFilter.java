@@ -132,9 +132,7 @@ public class DoNotAddFilter<E extends ISPO> extends SPOFilter<E> {
             
         }
         
-        final ISolution solution = (ISolution) o;
-        
-        return accept((ISPO) solution.get());
+        return accept((ISPO) o);
         
     }
 

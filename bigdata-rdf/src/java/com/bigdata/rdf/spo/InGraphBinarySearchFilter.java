@@ -87,9 +87,7 @@ public final class InGraphBinarySearchFilter<E extends ISPO> extends SPOFilter<E
             
         }
         
-        final ISolution solution = (ISolution) o;
-        
-        return accept((ISPO) solution.get());
+        return accept((ISPO) o);
         
     }
 
