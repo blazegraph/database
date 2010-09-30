@@ -125,6 +125,13 @@ public class FederatedQueryEngine extends QueryEngine {
         return resourceService;
         
     }
+    
+    @Override
+    final public boolean isScaleOut() {
+        
+        return true;
+        
+    }
 
     /**
      * Overridden to strengthen the return type.

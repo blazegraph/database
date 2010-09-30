@@ -46,6 +46,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
+import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
@@ -241,6 +242,39 @@ public class PipelineJoin<E> extends PipelineOp implements
         }
         
     }
+
+    /**
+     * Shallow copy vararg constructor.
+     * 
+     * @param args
+     * @param annotations
+     */
+    public PipelineJoin(final BOp[] args, NV[] annotations) {
+
+        this(args, NV.asMap(annotations));
+        
+    }
+
+    /**
+     * Shallow copy constructor.
+     * 
+     * @param args
+     * @param annotations
+     */
+    public PipelineJoin(final BOp[] args, final Map<String, Object> annotations) {
+
+        super(args, annotations);
+
+        if (arity() != 2)
+            throw new IllegalArgumentException();
+
+        if (left() == null)
+            throw new IllegalArgumentException();
+
+        if (right() == null)
+            throw new IllegalArgumentException();
+
+    }
     
     /**
      * @param left
@@ -254,13 +288,7 @@ public class PipelineJoin<E> extends PipelineOp implements
     public PipelineJoin(final PipelineOp left,
             final IPredicate<?> right, final Map<String, Object> annotations) {
 
-        super(new BOp[] { left, right }, annotations);
-
-        if (left == null)
-            throw new IllegalArgumentException();
-
-        if (right == null)
-            throw new IllegalArgumentException();
+        this(new BOp[] { left, right }, annotations);
 
     }
 

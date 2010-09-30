@@ -308,7 +308,7 @@ public class RuleState implements IRuleState {
      * @return
      *            The array of required variables for each tail index.
      */
-    protected IVariable[][] computeRequiredVarsForEachTail(final IRule rule,
+    static public IVariable[][] computeRequiredVarsForEachTail(final IRule rule,
             final int[] order) {
 
         if (order == null)

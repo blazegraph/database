@@ -113,6 +113,7 @@ import org.openrdf.sail.SailConnectionListener;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
@@ -920,10 +921,9 @@ public class BigdataSail extends SailBase implements Sail {
 
         namespaces = 
             Collections.synchronizedMap(new LinkedHashMap<String, String>());
-        
-        queryEngine = new QueryEngine(database.getIndexManager());
-        
-        queryEngine.init();
+
+        queryEngine = QueryEngineFactory.newQueryController(database
+                .getIndexManager());
         
     }
     
