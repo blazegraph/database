@@ -29,8 +29,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.spo;
 
 import java.util.HashMap;
+
 import junit.framework.TestCase2;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
@@ -76,63 +78,109 @@ public class TestSPOPredicate extends TestCase2 {
     final static Constant<IV> rdfsClass = new Constant<IV>(
             new TermId(VTE.URI, 4L));
     
-    public void test_ctor() {
+    final static Constant<IV> someGraph = new Constant<IV>(
+            new TermId(VTE.URI, 6L));
+    
+	public void test_ctor_triples_oneVar() {
 
-        {
+		final Var<IV> u = Var.var("u");
 
-            final Var<IV> u = Var.var("u");
+		final SPOPredicate p1 = new SPOPredicate(new BOp[] { u, rdfsSubClassOf,
+				rdfsResource }, new NV(IPredicate.Annotations.RELATION_NAME,
+				new String[] { relation }));
 
-            final SPOPredicate p1 = new SPOPredicate(relation,u, rdfsSubClassOf,
- rdfsResource);
+		if (log.isInfoEnabled())
+			log.info(p1.toString());
 
-            if (log.isInfoEnabled())
-                log.info(p1.toString());
+		assertEquals("arity", 3, p1.arity());
 
-            assertEquals("arity", 3, p1.arity());
+		assertEquals("variableCount", 1, p1.getVariableCount(SPOKeyOrder.SPO));
 
-            assertEquals("variableCount", 1, p1
-                    .getVariableCount(SPOKeyOrder.SPO));
+		assertEquals(u, p1.get(0));
 
-            assertEquals("variableCount", 2, p1
-                    .getVariableCount(SPOKeyOrder.SPOC));
+		assertEquals(rdfsSubClassOf, p1.get(1));
 
-            assertEquals(u, p1.get(0));
+		assertEquals(rdfsResource, p1.get(2));
 
-            assertEquals(rdfsSubClassOf,p1.get(1));
-            
-            assertEquals(rdfsResource,p1.get(2));
-            
-        }
+	}
 
-        {
+	public void test_ctor_triples_twoVars() {
 
-            final Var<IV> u = Var.var("u");
+		final Var<IV> u = Var.var("u");
 
-            final Var<IV> v = Var.var("v");
+		final Var<IV> v = Var.var("v");
 
-            final SPOPredicate p1 = new SPOPredicate(relation, u,
-                    rdfsSubClassOf, v);
+		final SPOPredicate p1 = new SPOPredicate(new BOp[] { u, rdfsSubClassOf,
+				v }, new NV(IPredicate.Annotations.RELATION_NAME,
+				new String[] { relation }));
 
-            if (log.isInfoEnabled())
-                log.info(p1.toString());
+		if (log.isInfoEnabled())
+			log.info(p1.toString());
 
-            assertEquals("arity", 3, p1.arity());
+		assertEquals("arity", 3, p1.arity());
 
-            assertEquals("variableCount", 2, p1
-                    .getVariableCount(SPOKeyOrder.SPO));
+		assertEquals("variableCount", 2, p1.getVariableCount(SPOKeyOrder.SPO));
 
-            assertEquals("variableCount", 3, p1
-                    .getVariableCount(SPOKeyOrder.SPOC));
+		assertEquals(u, p1.get(0));
 
-            assertEquals(u, p1.get(0));
+		assertEquals(rdfsSubClassOf, p1.get(1));
 
-            assertEquals(rdfsSubClassOf, p1.get(1));
+		assertEquals(v, p1.get(2));
 
-            assertEquals(v, p1.get(2));
-            
-        }
+	}
 
-    }
+	public void test_ctor_quads_oneVar() {
+
+		final Var<IV> u = Var.var("u");
+
+		final SPOPredicate p1 = new SPOPredicate(new BOp[] { u, rdfsSubClassOf,
+				rdfsResource, someGraph },
+				new NV(IPredicate.Annotations.RELATION_NAME,
+						new String[] { relation }));
+
+		if (log.isInfoEnabled())
+			log.info(p1.toString());
+
+		assertEquals("arity", 4, p1.arity());
+
+		assertEquals("variableCount", 1, p1.getVariableCount(SPOKeyOrder.SPOC));
+
+		assertEquals(u, p1.get(0));
+
+		assertEquals(rdfsSubClassOf, p1.get(1));
+
+		assertEquals(rdfsResource, p1.get(2));
+
+		assertEquals(someGraph, p1.get(3));
+
+	}
+
+	public void test_ctor_quads_twoVars() {
+
+		final Var<IV> u = Var.var("u");
+
+		final Var<IV> v = Var.var("v");
+
+		final SPOPredicate p1 = new SPOPredicate(new BOp[] { u, rdfsSubClassOf,
+				rdfsResource, v }, new NV(IPredicate.Annotations.RELATION_NAME,
+				new String[] { relation }));
+
+		if (log.isInfoEnabled())
+			log.info(p1.toString());
+
+		assertEquals("arity", 4, p1.arity());
+
+		assertEquals("variableCount", 2, p1.getVariableCount(SPOKeyOrder.SPOC));
+
+		assertEquals(u, p1.get(0));
+
+		assertEquals(rdfsSubClassOf, p1.get(1));
+
+		assertEquals(rdfsResource, p1.get(2));
+
+		assertEquals(v, p1.get(3));
+
+	}
     
     /**
      * Verify equality testing with same impl.
