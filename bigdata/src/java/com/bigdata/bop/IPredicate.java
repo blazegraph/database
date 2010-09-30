@@ -30,6 +30,7 @@ package com.bigdata.bop;
 
 import java.io.Serializable;
 
+import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.filter.BOpFilterBase;
 import com.bigdata.bop.ap.filter.BOpTupleFilter;
 import com.bigdata.bop.ap.filter.DistinctFilter;
@@ -469,8 +470,28 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
     public IConstant<?> get(E e, int index);
 
     /**
-     * A copy of this {@link IPredicate} in which zero or more variables have
-     * been bound to constants using the given {@link IBindingSet}.
+     * Return a new instance in which all occurrences of the given variable have
+     * been replaced by the specified constant.
+     * 
+     * @param var
+     *            The variable.
+     * @param val
+     *            The constant.
+     * 
+     * @return A new instance of the predicate in which all occurrences of the
+     *         variable have been replaced by the constant.
+     * 
+     * @throws IllegalArgumentException
+     *             if either argument is <code>null</code>.
+     */
+    public Predicate<E> asBound(final IVariable<?> var, final IConstant<?> val);
+
+    /**
+     * Return a new instance in which all occurrences of the variable appearing
+     * in the binding set have been replaced by their bound values.
+     * 
+     * @param bindingSet
+     *            The binding set.
      */
     public IPredicate<E> asBound(IBindingSet bindingSet);
 

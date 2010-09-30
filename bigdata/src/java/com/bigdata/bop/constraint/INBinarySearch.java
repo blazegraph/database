@@ -63,10 +63,6 @@ import com.bigdata.bop.NV;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo unit tests.
- * 
- * @todo variant based on a {@link ConcurrentHashMap}.
  */
 public class INBinarySearch<T> extends INConstraint<T> {
 
