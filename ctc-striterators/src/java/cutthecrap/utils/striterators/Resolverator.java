@@ -50,7 +50,10 @@ public class Resolverator implements Iterator {
   }
   
   public Object next() {
-  	return m_resolver.resolve(m_iter.next());
+	  if (hasNext())
+		  return m_resolver.resolve(m_iter.next());
+	  else
+		  throw new NoSuchElementException("Resolverator");
   }
   
   public void remove() {

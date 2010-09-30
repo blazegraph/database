@@ -40,26 +40,35 @@ public class Mergerator implements Iterator {
 	
 	private Object m_valA = null;
 	private Object m_valB = null;
+	private boolean m_init = false;
 	
   public Mergerator(Iterator setA, Iterator setB, Object context, Comparator comparator) {
     m_context = context;
     m_setA = setA;
     m_setB = setB;
 
-    m_comparator = comparator;
-    
-    if (m_setA.hasNext()) {
-    	m_valA = m_setA.next();
-    }
-    
-    if (m_setB.hasNext()) {
-    	m_valB = m_setB.next();
-    }
+    m_comparator = comparator;   
+  }
+  
+  private void init() {
+	  if (!m_init) {
+		    if (m_setA.hasNext()) {
+		    	m_valA = m_setA.next();
+		    }
+		    
+		    if (m_setB.hasNext()) {
+		    	m_valB = m_setB.next();
+		    }
+		    
+		    m_init = true;
+	  }
   }
 
   //-------------------------------------------------------------
 
   public boolean hasNext() {
+	  init();
+	  
   	return m_valA != null || m_valB != null;
   }
 

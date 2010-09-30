@@ -66,7 +66,7 @@ public class Appenderator implements Iterator {
   		return m_current.next();
   	}
 
-  	throw new NoSuchElementException("FilterIterator");
+  	throw new NoSuchElementException("Appenderator");
   }
 
   //-------------------------------------------------------------
