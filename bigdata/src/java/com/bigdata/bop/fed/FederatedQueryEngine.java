@@ -214,8 +214,13 @@ public class FederatedQueryEngine extends QueryEngine {
         
         this.resourceService = resourceService;
 
-        // the proxy for this query engine when used as a query controller.
-        this.clientProxy = (IQueryClient) ((JiniFederation<?>)fed).getProxy(this, false/*enableDGC*/);
+        if(fed instanceof JiniFederation<?>) {
+            // the proxy for this query engine when used as a query controller.
+        	this.clientProxy = (IQueryClient) ((JiniFederation<?>)fed).getProxy(this, false/*enableDGC*/);
+        } else {
+        	// E.g., an EmbeddedFederation in the test suite. 
+        	this.clientProxy = this;
+        }
 
     }
 
