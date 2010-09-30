@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package cutthecrap.utils.striterators;
 
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 /**
  * Supports standard iteration over an object Array, allowing this to
@@ -47,7 +48,10 @@ public class ArrayIterator implements Iterator {
 
 	/** @return current index from array **/
 	public Object next() {
-		return m_src[m_index++];
+		if (m_index < m_src.length)
+			return m_src[m_index++];
+		else
+			throw new NoSuchElementException("ArrayIterator");
 	}
 
 	/** void .. does nothing **/

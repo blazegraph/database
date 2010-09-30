@@ -47,21 +47,29 @@ public class Contractorator implements Iterator {
 	protected final Object   m_ctx;
 	private final Contractor m_contractor;
 	private Object m_next;
+	private boolean m_init = false;
 
 	public Contractorator(Iterator src, final Object ctx, Contractor contractor) {
 		m_src = src;
 		m_ctx = ctx;
 		m_contractor = contractor;
-
-		m_next = m_contractor.contract(m_src);
+	}
+	
+	private void init() {
+		if (!m_init) {
+			m_next = m_contractor.contract(m_src);
+			m_init = true;
+		}
 	}
 
 	public boolean hasNext() {
+		init();
+		
 		return m_next != null;
 	}
 
 	public Object next() {
-		if (m_next == null) {
+		if (!hasNext()) {
 			throw new NoSuchElementException();
 		}
 
