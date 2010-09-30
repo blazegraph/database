@@ -93,7 +93,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
         super(vars, NV.asMap(annotations));
         
     }
-
+    
     /**
      * Disallows <code>null</code> in any position.
      * @param args
@@ -491,6 +491,28 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
     }
 
+    /**
+     * Strips off the named annotations.
+     * 
+     * @param names
+     *            The annotations to be removed.
+     *            
+     * @return A new predicate in which the specified annotations do not appear.
+     */
+    public Predicate<E> clearAnnotations(final String[] names) {
+
+        final Predicate<E> tmp = this.clone();
+
+        for(String name : names) {
+            
+            tmp.clearProperty(name);
+            
+        }
+
+        return tmp;
+        
+    }
+    
     public String toString() {
         
         return toString(null/* bindingSet */);

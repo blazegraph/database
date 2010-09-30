@@ -27,10 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.fed;
 
-import java.io.File;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.Properties;
@@ -40,7 +37,6 @@ import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
@@ -49,6 +45,7 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.E;
 import com.bigdata.bop.ap.Predicate;
@@ -66,21 +63,15 @@ import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SortOp;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
-import com.bigdata.rdf.spo.DistinctSPOIterator;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.service.AbstractEmbeddedFederationTestCase;
 import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.EmbeddedFederation;
-import com.bigdata.service.ManagedResourceService;
-import com.bigdata.service.ResourceService;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.Dechunkerator;
-import com.bigdata.util.config.NicUtil;
 
 /**
  * Unit tests for {@link FederatedQueryEngine} running against an
@@ -132,11 +123,11 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
     // The separator key between the index partitions.
     private byte[] separatorKey;
 
-    /** The local persistence store for the {@link #queryEngine}. */
-    private Journal queryEngineStore;
-    
-    /** The local {@link ResourceService} for the {@link #queryEngine}. */
-    private ManagedResourceService queryEngineResourceService;
+//    /** The local persistence store for the {@link #queryEngine}. */
+//    private Journal queryEngineStore;
+//    
+//    /** The local {@link ResourceService} for the {@link #queryEngine}. */
+//    private ManagedResourceService queryEngineResourceService;
     
     /** The query controller. */
     private FederatedQueryEngine queryEngine;
@@ -163,41 +154,42 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         
 //        final IBigdataFederation<?> fed = client.connect();
 
-        // create index manager for the query controller.
-        {
-            final Properties p = new Properties();
-            p.setProperty(Journal.Options.BUFFER_MODE, BufferMode.Transient
-                    .toString());
-            queryEngineStore = new Journal(p);
-        }
-        
-        // create resource service for the query controller.
-        {
-            queryEngineResourceService = new ManagedResourceService(
-                    new InetSocketAddress(InetAddress
-                            .getByName(NicUtil.getIpAddress("default.nic",
-                                    "default", true/* loopbackOk */)), 0/* port */
-                    ), 0/* requestServicePoolSize */) {
-
-                @Override
-                protected File getResource(UUID uuid) throws Exception {
-                    // Will not serve up files.
-                    return null;
-                }
-            };
-        }
-
-        {
-
-            // create the query controller.
-            queryEngine = new FederatedQueryEngine(UUID.randomUUID(), fed,
-                    queryEngineStore, queryEngineResourceService);
-
-            queryEngine.init();
-
-            System.err.println("controller: " + queryEngine);
-
-        }
+//        // create index manager for the query controller.
+//        {
+//            final Properties p = new Properties();
+//            p.setProperty(Journal.Options.BUFFER_MODE, BufferMode.Transient
+//                    .toString());
+//            queryEngineStore = new Journal(p);
+//        }
+//        
+//        // create resource service for the query controller.
+//        {
+//            queryEngineResourceService = new ManagedResourceService(
+//                    new InetSocketAddress(InetAddress
+//                            .getByName(NicUtil.getIpAddress("default.nic",
+//                                    "default", true/* loopbackOk */)), 0/* port */
+//                    ), 0/* requestServicePoolSize */) {
+//
+//                @Override
+//                protected File getResource(UUID uuid) throws Exception {
+//                    // Will not serve up files.
+//                    return null;
+//                }
+//            };
+//        }
+//
+//        {
+//
+//            // create the query controller.
+//            queryEngine = new FederatedQueryEngine(UUID.randomUUID(), fed,
+//                    queryEngineStore, queryEngineResourceService);
+//
+//            queryEngine.init();
+//
+//            System.err.println("controller: " + queryEngine);
+//
+//        }
+        queryEngine = QueryEngineFactory.newFederatedQueryController(fed);
         
 //        dataService0 = fed.getDataService(dataServices[0]); 
 //        dataService1 = fed.getDataService(dataServices[1]); 
@@ -251,14 +243,14 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
         // clear reference.
         separatorKey = null;
         
-        if (queryEngineResourceService != null) {
-            queryEngineResourceService.shutdownNow();
-            queryEngineResourceService = null;
-        }
-        if (queryEngineStore != null) {
-            queryEngineStore.destroy();
-            queryEngineStore = null;
-        }
+//        if (queryEngineResourceService != null) {
+//            queryEngineResourceService.shutdownNow();
+//            queryEngineResourceService = null;
+//        }
+//        if (queryEngineStore != null) {
+//            queryEngineStore.destroy();
+//            queryEngineStore = null;
+//        }
         if (queryEngine != null) {
             queryEngine.shutdownNow();
             queryEngine = null;

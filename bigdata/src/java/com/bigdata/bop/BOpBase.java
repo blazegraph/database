@@ -411,15 +411,27 @@ public class BOpBase implements BOp {
      *            The name.
      * @param value
      *            The value.
-     * 
-     * @return The old value.
-     * 
-     * @todo thread safety and visibility for concurrent access to and
-     *       modifications of the annotations map.
      */
     protected void setProperty(final String name, final Object value) {
         
         annotations.put(name,value);
+        
+    }
+    
+    /**
+     * Clear an annotation.
+     * <p>
+     * Note: This protected to facilitate copy-on-write patterns. It is not
+     * public to prevent arbitrary changes to operators outside of methods which
+     * clone the operator and return the modified version. This is part of the
+     * effectively immutable contract for {@link BOp}s.
+     * 
+     * @param name
+     *            The name.
+     */
+    protected void clearProperty(final String name) {
+        
+        annotations.remove(name);
         
     }
     

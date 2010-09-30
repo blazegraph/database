@@ -269,6 +269,16 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         return localIndexManager;
         
     }
+    
+    /**
+     * Return <code>true</code> iff running against an
+     * {@link IBigdataFederation}.
+     */
+    public boolean isScaleOut() {
+
+        return false;
+
+    }
 
     /**
      * The currently executing queries.
