@@ -123,9 +123,6 @@ public class DoNotAddFilter<E extends ISPO> extends SPOFilter<E> {
     
     public boolean isValid(Object o) {
 
-        System.err.println(o);
-        System.err.println(o.getClass());
-        
         if (!canAccept(o)) {
             
             return true;
