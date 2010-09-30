@@ -230,7 +230,7 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
                     .getAxioms(), true/* forwardChainRdfTypeRdfsResource */);
             
             applyRule(store, r, filter/*, false /*justified*/,
-                    -1/* solutionCount */, 0/* mutationCount*/);
+                    0/* solutionCount */, 0/* mutationCount*/);
 
             /*
              * validate the state of the primary store - there is no entailment

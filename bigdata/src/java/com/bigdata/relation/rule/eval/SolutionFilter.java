@@ -27,17 +27,15 @@ public class SolutionFilter<E> implements IElementFilter<ISolution<E>> {
         
     }
 
-    public boolean isValid(final Object o) {
+    @SuppressWarnings("unchecked")
+	public boolean isValid(final Object o) {
         
-        return delegate.isValid(o);
+		final E e = ((ISolution<E>) o).get();
+
+		return delegate.isValid(e);
         
     }
 
-    /*
-     * Note: The old implementation is below. Based on it, the canAccept()
-     * method was not (and still is not) being invoked for SolutionFilter.
-     */
-    
 //    public boolean accept(final ISolution<E> solution) {
 //
 //        final E e = solution.get();
