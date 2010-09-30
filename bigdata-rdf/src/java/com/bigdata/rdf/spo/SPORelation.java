@@ -991,7 +991,9 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         }
 
-        Predicate<ISPO> pred = new SPOPredicate(new BOp[] { S, P, O, C },
+        Predicate<ISPO> pred = new SPOPredicate(
+				keyArity == 4 ? new BOp[] { S,
+								P, O, C } : new BOp[] { S, P, O },
                 new NV(IPredicate.Annotations.RELATION_NAME,
                         new String[] { getNamespace() }));
 
@@ -2197,12 +2199,16 @@ public class SPORelation extends AbstractRelation<ISPO> {
         final StringBuilder sb = new StringBuilder();
 
         final IPredicate<ISPO> pred = new SPOPredicate(
-                new BOp[]{//
+                keyArity==4?new BOp[]{//
                       Var.var("s"),//
                       Var.var("p"),//
                       Var.var("o"),//
-                        keyArity == 3 ? null : Var.var("c"),//
-                },//
+                      Var.var("c"),//
+                }:new BOp[] {
+                      Var.var("s"),//
+                      Var.var("p"),//
+                      Var.var("o"),//
+                      },//
                 NV.asMap(new NV[] {//
                         new NV(IPredicate.Annotations.RELATION_NAME,
                                 new String[] { getNamespace() }),//

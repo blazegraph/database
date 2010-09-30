@@ -126,7 +126,7 @@ public class BOpBase implements BOp {
      * @throws IllegalArgumentException
      *             if the arguments are not valid for the operator.
      */
-    protected void checkArgs(final Object[] args) {
+    protected void checkArgs(final BOp[] args) {
 
     }
 
