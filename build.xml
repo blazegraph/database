@@ -1124,6 +1124,9 @@ ${postInstallMessage}</echo>
       <copy toDir="${build.dir}/bigdata-sails/src">
         <fileset dir="${bigdata.dir}/bigdata-sails/src" />
       </copy>
+      <copy toDir="${build.dir}/ctc-striterators/src">
+        <fileset dir="${bigdata.dir}/ctc-striterators/src" />
+      </copy>
       <copy toDir="${build.dir}/lgpl-utils/src">
         <fileset dir="${bigdata.dir}/lgpl-utils/src" />
       </copy>
@@ -1194,6 +1197,7 @@ ${postInstallMessage}</echo>
           <include name="bigdata-jini/src/**" />
           <include name="bigdata-rdf/src/**" />
           <include name="bigdata-sails/src/**" />
+          <include name="ctc-striterators/src/**" />
           <include name="lgpl-utils/src/**" />
           <include name="bigdata/lib/**" />
           <include name="bigdata-jini/lib/**" />

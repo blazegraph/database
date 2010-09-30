@@ -271,6 +271,16 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     }
     
     /**
+     * The RMI proxy for this {@link QueryEngine} when used as a query controller.
+     * The default implementation returns <i>this</i>.
+     */
+    public IQueryClient getProxy() {
+
+    	return this;
+    	
+    }
+    
+    /**
      * Return <code>true</code> iff running against an
      * {@link IBigdataFederation}.
      */
@@ -655,7 +665,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
             throw new IllegalArgumentException();
 
         final RunningQuery runningQuery = newRunningQuery(this, queryId,
-                true/* controller */, this/* clientProxy */, query);
+                true/* controller */, getProxy()/*queryController*/, query);
 
         final long timeout = query.getProperty(BOp.Annotations.TIMEOUT,
                 BOp.Annotations.DEFAULT_TIMEOUT);

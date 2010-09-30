@@ -48,6 +48,7 @@ import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.MockRunningQuery;
 import com.bigdata.btree.ITuple;
+import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -164,6 +165,12 @@ public class TestPredicateAccessPath extends TestCase2 {
 
     }
 
+    public void test_keyOrderSerializable() {
+    	
+    	SerializerUtil.serialize(R.primaryKeyOrder);
+    	
+    }
+    
     /**
      * Using a predicate with nothing bound, verify that we get the
      * right range count on the relation and that we read the correct elements
