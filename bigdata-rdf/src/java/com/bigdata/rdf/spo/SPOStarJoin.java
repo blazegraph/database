@@ -92,8 +92,9 @@ public class SPOStarJoin extends SPOPredicate
      */
     public SPOStarJoin(final SPOPredicate pred) {
 
-        super(new BOp[] { pred.s(), Var.var(), Var.var(), pred.c() },
-                deepCopy(pred.annotations()));
+		super(pred.arity() == 3 ? new BOp[] { pred.s(), Var.var(), Var.var() }
+				: new BOp[] { pred.s(), Var.var(), Var.var(), pred.c() },
+				deepCopy(pred.annotations()));
         
 //        this(new String[] { pred.getOnlyRelationName() }, pred.getPartitionId(), 
 //                pred.s(), // s 

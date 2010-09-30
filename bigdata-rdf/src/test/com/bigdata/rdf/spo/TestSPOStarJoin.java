@@ -117,16 +117,16 @@ public class TestSPOStarJoin extends AbstractTripleStoreTestCase {
             store.commit();
             
             System.err.println(store.dumpStore());
-            
-            final SPOPredicate pred = new SPOPredicate(
-                    store.getSPORelation().getNamespace(),
-                    Var.var("frameClass"),
-                    new Constant<IV>(store.getIV(RDF.TYPE)),
-                    new Constant<IV>(frameClass.getIV())
-                    );
+
+			final SPOPredicate pred = new SPOPredicate(new BOp[] {
+					Var.var("frameClass"),
+					new Constant<IV>(store.getIV(RDF.TYPE)),
+					new Constant<IV>(frameClass.getIV()) }, new NV(
+					IPredicate.Annotations.RELATION_NAME, new String[] { store
+							.getSPORelation().getNamespace(), }));
 
             final SPOStarJoin starJoin = new SPOStarJoin(new BOp[] {
-                    Var.var("frameClass"), Var.var(), Var.var() },
+                    Var.var("frameClass"), Var.var(), Var.var()},//, null /* c */},
                     NV.asMap(new NV[] { new NV(
                             SPOStarJoin.Annotations.RELATION_NAME, new String[]{store
                                     .getSPORelation().getNamespace()}) }));
@@ -271,14 +271,14 @@ public class TestSPOStarJoin extends AbstractTripleStoreTestCase {
             System.err.println(store.dumpStore());
             
             final SPOPredicate pred = new SPOPredicate(
-                    store.getSPORelation().getNamespace(),
-                    Var.var("frameProperty"),
+            		new BOp[]{Var.var("frameProperty"),
                     new Constant<IV>(store.getIV(RDF.TYPE)),
-                    new Constant<IV>(store.getIV(RDFS.RESOURCE))
+                    new Constant<IV>(store.getIV(RDFS.RESOURCE))},
+                    new NV(IPredicate.Annotations.RELATION_NAME,new String[]{store.getSPORelation().getNamespace()})
                     );
 
             final SPOStarJoin starJoin = new SPOStarJoin(new BOp[] {
-                    Var.var("frameProperty"), Var.var(), Var.var() },
+                    Var.var("frameProperty"), Var.var(), Var.var()},//, null /* c */},
                     NV.asMap(new NV[] { new NV(
                             SPOStarJoin.Annotations.RELATION_NAME, new String[]{store
                                     .getSPORelation().getNamespace()}) }));

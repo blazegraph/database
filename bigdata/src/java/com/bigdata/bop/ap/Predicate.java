@@ -93,6 +93,18 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
         super(vars, NV.asMap(annotations));
         
     }
+
+    /**
+     * Disallows <code>null</code> in any position.
+     * @param args
+     */
+    @Override
+	protected void checkArgs(BOp[] args) {
+		for (BOp a : args) {
+			if (a == null)
+				throw new IllegalArgumentException();
+		}
+	}
     
 //    /**
 //     * Simplified ctor.

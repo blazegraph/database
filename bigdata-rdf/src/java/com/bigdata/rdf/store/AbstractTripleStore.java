@@ -2484,12 +2484,17 @@ abstract public class AbstractTripleStore extends
 
         final SPORelation r = getSPORelation();
         final SPOPredicate p = new SPOPredicate(
+        		quads?
                 new BOp[]{//
                       Var.var("s"),//
                       Var.var("p"),//
                       Var.var("o"),//
-                      quads ? Var.var("c") : null,//
-                },//
+                      Var.var("c")//
+                }: new BOp[]{
+                      Var.var("s"),//
+                      Var.var("p"),//
+                      Var.var("o"),//
+                      },//
                 NV.asMap(new NV[] {//
                         new NV(IPredicate.Annotations.RELATION_NAME,
                                 new String[] { r.getNamespace() }),//
