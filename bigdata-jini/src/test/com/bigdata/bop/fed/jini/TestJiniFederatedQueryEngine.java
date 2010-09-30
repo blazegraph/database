@@ -217,8 +217,8 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
         
         super.setUp();
 
-//        dataService0 = fed.getDataService(dataServices[0]); 
-//        dataService1 = fed.getDataService(dataServices[1]); 
+        dataService0 = fed.getDataService(dataServices[0]); 
+        dataService1 = fed.getDataService(dataServices[1]); 
 //        {
 //
 //        	// @todo need to wait for the dataService to be running.

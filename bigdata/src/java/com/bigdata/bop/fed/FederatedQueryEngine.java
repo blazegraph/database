@@ -41,8 +41,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryDecl;
@@ -55,6 +55,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.ResourceService;
+import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -91,6 +92,11 @@ public class FederatedQueryEngine extends QueryEngine {
     private final ManagedResourceService resourceService;
 
     /**
+     * The proxy for this query engine when used as a query controller.
+     */
+    private final IQueryClient clientProxy;
+    
+    /**
      * A queue of {@link IChunkMessage}s which needs to have their data
      * materialized so an operator can consume those data on this node.
      */
@@ -124,6 +130,18 @@ public class FederatedQueryEngine extends QueryEngine {
     
         return resourceService;
         
+    }
+    
+    /**
+     * Overridden to return an RMI proxy for this {@link FederatedQueryEngine}.
+     * <p>
+     * {@inheritDoc}
+     */
+    @Override
+    public IQueryClient getProxy() {
+    	
+    	return clientProxy;
+    	
     }
     
     @Override
@@ -195,6 +213,9 @@ public class FederatedQueryEngine extends QueryEngine {
         this.serviceUUID = thisService;
         
         this.resourceService = resourceService;
+
+        // the proxy for this query engine when used as a query controller.
+        this.clientProxy = (IQueryClient) ((JiniFederation<?>)fed).getProxy(this, false/*enableDGC*/);
 
     }
 
@@ -475,7 +496,7 @@ public class FederatedQueryEngine extends QueryEngine {
             final PipelineOp query) {
 
         return new FederatedRunningQuery(this, queryId, controller,
-                clientProxy, query);
+                this.clientProxy, query);
 
     }
 

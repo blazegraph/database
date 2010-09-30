@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.ap;
 
+import java.io.Serializable;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -64,9 +65,11 @@ public class R extends AbstractRelation<E> {
     /**
      * Metadata about the index orders for this relation.
      */
-    private static class KeyOrder extends AbstractKeyOrder<E> {
+    public static class KeyOrder extends AbstractKeyOrder<E> implements Serializable {
 
-        public Comparator<E> getComparator() {
+		private static final long serialVersionUID = 1L;
+
+		public Comparator<E> getComparator() {
             return new EComparator();
         }
 
