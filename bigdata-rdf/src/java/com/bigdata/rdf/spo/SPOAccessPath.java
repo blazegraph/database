@@ -181,6 +181,9 @@ public class SPOAccessPath extends AccessPath<ISPO> {
      *            The context term identifier.
      * 
      * @return The constrained {@link IAccessPath}.
+     * 
+     * @deprecated with {@link DefaultGraphSolutionExpander} and
+     *             {@link NamedGraphSolutionExpander}.
      */
     public SPOAccessPath bindContext(final IV c) {
 
@@ -205,8 +208,10 @@ public class SPOAccessPath extends AccessPath<ISPO> {
      *            is to be set
      * 
      * @return The constrained {@link IAccessPath}.
+     * 
+     * @deprecated with {@link #bindContext(IV)}
      */
-    public SPOAccessPath bindPosition(final int position, final IV v) {
+    private SPOAccessPath bindPosition(final int position, final IV v) {
 
         if (v == null) {
 

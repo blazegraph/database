@@ -82,7 +82,7 @@ public class DataSetJoin extends PipelineOp {
         String VAR = DataSetJoin.class.getName() + ".var";
 
         /**
-         * The {@link IV}s to be bound. This is logically a set and SHOULD NOT
+         * The {@link IV}[]s to be bound. This is logically a set and SHOULD NOT
          * include duplicates. The elements in this array SHOULD be ordered for
          * improved efficiency.
          */

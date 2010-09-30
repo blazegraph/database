@@ -6,12 +6,11 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.Arrays;
 import java.util.HashSet;
+
 import org.openrdf.model.URI;
 
-import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.relation.rule.eval.ISolution;
 
 /**
  * "IN" filter for the context position based on a sorted long[] of the
@@ -24,8 +23,6 @@ import com.bigdata.relation.rule.eval.ISolution;
  * @version $Id$
  * 
  * @see InGraphHashSetFilter
- * 
- * @todo reconcile with {@link INBinarySearch}
  */
 public final class InGraphBinarySearchFilter<E extends ISPO> extends SPOFilter<E>
         implements Externalizable {

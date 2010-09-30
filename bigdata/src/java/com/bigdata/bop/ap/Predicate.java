@@ -34,6 +34,7 @@ import java.util.Map;
 import cern.colt.Arrays;
 
 import com.bigdata.bop.AbstractAccessPathOp;
+import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
@@ -43,6 +44,8 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.ISolutionExpander;
@@ -305,6 +308,13 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
         return getProperty(Annotations.REMOTE_ACCESS_PATH,
                 Annotations.DEFAULT_REMOTE_ACCESS_PATH);
     }
+   
+    public Predicate<E> asBound(final IVariable<?> var, final IConstant<?> val) {
+
+        return asBound(new ArrayBindingSet(new IVariable[] { var },
+                new IConstant[] { val }));
+        
+    }
     
     public Predicate<E> asBound(final IBindingSet bindingSet) {
 
@@ -323,13 +333,13 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
             final IVariableOrConstant<?> t = (IVariableOrConstant<?>) get(i);
 
-            if (t == null) {
-                /*
-                 * Note: t != null handles the case where the [c] position of an
-                 * SPO is allowed to be null.
-                 */
-                continue;
-            }
+//            if (t == null) {
+//                /*
+//                 * Note: t != null handles the case where the [c] position of an
+//                 * SPO is allowed to be null.
+//                 */
+//                continue;
+//            }
 
             if (t.isConstant())
                 continue;

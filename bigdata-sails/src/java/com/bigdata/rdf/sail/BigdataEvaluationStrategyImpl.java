@@ -1360,6 +1360,9 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             return null;
         }
         
+        // The annotations for the predicate.
+        final List<NV> anns = new LinkedList<NV>();
+        
         final IVariableOrConstant<IV> c;
         if (!database.isQuads()) {
             /*
@@ -1390,46 +1393,28 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         } else {
             /*
              * Quad store mode.
-             * 
-             * FIXME Scale-out joins depend on knowledge of the best access path
-             * and the index partitions (aka shards) which it will traverse.
-             * Review all of the new expanders and make sure that they do not
-             * violate this principle. Expanders tend to lazily determine the
-             * access path, and I believe that RDFJoinNexus#getTailAccessPath()
-             * may even refuse to operate with expanders. If this is the case,
-             * then the choice of the access path needs to be completely coded
-             * into the predicate as a combination of binding or clearing the
-             * context variable and setting an appropriate constraint (filter).
              */
-            if (BigdataStatics.debug) {
-                if (dataset == null) {
-                    System.err.println("No dataset.");
-                } else {
-                    final int defaultGraphSize = dataset.getDefaultGraphs()
-                            .size();
-                    final int namedGraphSize = dataset.getNamedGraphs().size();
-                    if (defaultGraphSize > 10 || namedGraphSize > 10) {
-                        System.err.println("large dataset: defaultGraphs="
-                                + defaultGraphSize + ", namedGraphs="
-                                + namedGraphSize);
-                    } else {
-                        System.err.println(dataset.toString());
-                    }
-                }
-                System.err.println(stmtPattern.toString());
-            }
             if (expander != null) {
                 /*
-                 * @todo can this happen? If it does then we need to look at how
-                 * to layer the expanders.
+                 * This code path occurs when we are doing a free text search
+                 * for this access path using the FreeTestSearchExpander. There
+                 * is no need to do any named or default graph expansion work on
+                 * a free text search access path.
                  */
-                // throw new AssertionError("expander already set");
-                // we are doing a free text search, no need to do any named or
-                // default graph expansion work
                 c = null;
             } else {
+                // the graph variable iff specified by the query.
                 final Var cvar = stmtPattern.getContextVar();
+                // quads mode.
+                anns.add(new NV(Rule2BOpUtility.Annotations.QUADS, true));
+                // attach the Scope.
+                anns.add(new NV(Rule2BOpUtility.Annotations.SCOPE, stmtPattern
+                        .getScope()));
+                // set iff the graph variable was specified by the query.
+                if (cvar != null)
+                    anns.add(new NV(Rule2BOpUtility.Annotations.CVAR, cvar));
                 if (dataset == null) {
+                    // attach the appropriate expander : @todo drop expanders. 
                     if (cvar == null) {
                         /*
                          * There is no dataset and there is no graph variable,
@@ -1456,6 +1441,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                         c = generateVariableOrConstant(cvar);
                     }
                 } else { // dataset != null
+                    // attach the DataSet.
+                    anns.add(new NV(Rule2BOpUtility.Annotations.DATASET,
+                            dataset));
+                    // attach the appropriate expander : @todo drop expanders. 
                     switch (stmtPattern.getScope()) {
                     case DEFAULT_CONTEXTS: {
                         /*
@@ -1518,21 +1507,28 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         } else {
             vars = new BOp[] { s, p, o, c };
         }
+
+        anns.add(new NV(IPredicate.Annotations.RELATION_NAME,
+                new String[] { database.getSPORelation().getNamespace() }));//
         
-        return new SPOPredicate(vars, //
-                new NV(
-                IPredicate.Annotations.RELATION_NAME, new String[] { database
-                        .getSPORelation().getNamespace() }),//
-                // @todo move to the join.
-                new NV(IPredicate.Annotations.OPTIONAL, optional),
-                // filter on elements visited by the access path.
-                new NV(IPredicate.Annotations.INDEX_LOCAL_FILTER, ElementFilter
-                        .newInstance(filter)),
-                // free text search expander or named graphs expander
-                new NV(IPredicate.Annotations.EXPANDER, expander),
-                // timestamp
-                new NV(IPredicate.Annotations.TIMESTAMP, database
-                        .getSPORelation().getTimestamp()));
+        // is the join associated with this predicate optional? @todo move to the join.
+        if (optional)
+            anns.add(new NV(IPredicate.Annotations.OPTIONAL, optional));
+        
+        // filter on elements visited by the access path.
+        if (filter != null)
+            anns.add(new NV(IPredicate.Annotations.INDEX_LOCAL_FILTER,
+                    ElementFilter.newInstance(filter)));
+
+        // free text search expander or named graphs expander
+        if (expander != null)
+            anns.add(new NV(IPredicate.Annotations.EXPANDER, expander));
+
+        // timestamp
+        anns.add(new NV(IPredicate.Annotations.TIMESTAMP, database
+                .getSPORelation().getTimestamp()));
+        
+        return new SPOPredicate(vars, anns.toArray(new NV[anns.size()]));
 //        return new SPOPredicate(
 //                new String[] { database.getSPORelation().getNamespace() },
 //                -1, // partitionId
@@ -1692,7 +1688,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         
         final int startId = 1;
         final PipelineOp query = 
-            Rule2BOpUtility.convert(step, startId, queryEngine);
+            Rule2BOpUtility.convert(step, startId, database, queryEngine);
         
         if (log.isInfoEnabled()) {
             log.info(query);
