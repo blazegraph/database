@@ -79,6 +79,7 @@ import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.rule.EmptyAccessPathExpander;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
@@ -107,7 +108,7 @@ public class Rule2BOpUtility {
      * <p>
      * Note: When enabled, the {@link NamedGraphSolutionExpander} and
      * {@link DefaultGraphSolutionExpander} must be stripped from the
-     * {@link IPredicate.Annotations#EXPANDER}. In the long term, we will simply
+     * {@link IPredicate.Annotations#ACCESS_PATH_EXPANDER}. In the long term, we will simply
      * no longer generate them in {@link BigdataEvaluationStrategyImpl}.
      * <p>
      * Note: If you want to test just the named graph stuff, then the default
@@ -349,12 +350,11 @@ public class Rule2BOpUtility {
                     final IVariable<?> v = (IVariable<?>) arg;
                     /*
                      * We do a remove because we don't ever need to run these
-                     * constraints again during subsequent joins once they
-                     * have been run once at the initial appearance of the
-                     * variable.
+                     * constraints again during subsequent joins once they have
+                     * been run once at the initial appearance of the variable.
                      * 
-                     * FIXME revisit this when we dynamically re-order running
-                     *          joins
+                     * @todo revisit this when we dynamically re-order running
+                     * joins
                      */ 
                     if (constraintsByVar.containsKey(v))
                         constraints.addAll(constraintsByVar.remove(v));
@@ -406,7 +406,7 @@ public class Rule2BOpUtility {
                      * the long term it will simply not be generated.)
                      */
                     pred = pred
-                            .clearAnnotations(new String[] { IPredicate.Annotations.EXPANDER });
+                            .clearAnnotations(new String[] { IPredicate.Annotations.ACCESS_PATH_EXPANDER });
 
                     switch (scope) {
                     case NAMED_CONTEXTS:
@@ -532,21 +532,16 @@ public class Rule2BOpUtility {
             /*
              * The data set is empty (no graphs). Return a join backed by an
              * empty access path.
-             * 
-             * Note: Since the join could be optional or part of an optional
-             * join group, we can not just drop it. Instead we need to return a
-             * join against an empty access path. Since the join could also
-             * "select" for some subset of variables, it seems that we really
-             * need to modify PipelineJoin to recognize an annotation indicating
-             * an empty access path. It can then substitute the empty access
-             * path when processing the source binding sets. There should be
-             * unit tests for this.
-             * 
-             * FIXME Return PipelineJoin with an EMPTY ACCESS PATH.
              */
-            
-            throw new UnsupportedOperationException();
-            
+
+            // force an empty access path for this predicate.
+            pred = (Predicate) pred.setUnboundProperty(
+                    IPredicate.Annotations.ACCESS_PATH_EXPANDER,
+                    EmptyAccessPathExpander.INSTANCE);
+
+            return new PipelineJoin(new BOp[] { left, pred }, anns
+                    .toArray(new NV[anns.size()]));
+
         } else if (summary.nknown == 1) {
 
             /*

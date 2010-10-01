@@ -189,7 +189,7 @@ public class SPOPredicate extends Predicate<ISPO> {
 //                expander);
         super(new IVariableOrConstant[] { s, p, o }, //
                 new NV(Annotations.RELATION_NAME, new String[]{relationName}), //
-                new NV(Annotations.EXPANDER, expander));
+                new NV(Annotations.ACCESS_PATH_EXPANDER, expander));
 
     }
 
@@ -216,7 +216,7 @@ public class SPOPredicate extends Predicate<ISPO> {
         super(new IVariableOrConstant[] { s, p, o }, //
                 new NV(Annotations.RELATION_NAME, new String[]{relationName}), //
                 new NV(Annotations.OPTIONAL, optional), //
-                new NV(Annotations.EXPANDER, expander));
+                new NV(Annotations.ACCESS_PATH_EXPANDER, expander));
     
     }
 

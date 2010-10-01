@@ -44,7 +44,6 @@ import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.eval.IEvaluationPlan;
@@ -76,6 +75,9 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * 
          * FIXME Change this to be a scalar value. It is currently an array for
          * backwards compatibility.
+         * 
+         * @see https://sourceforge.net/apps/trac/bigdata/ticket/180 (Migrate
+         *      the RDFS inference and truth maintenance logic to BOPs)
          */
         String RELATION_NAME = "relationName";
 
@@ -155,9 +157,22 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
         String ACCESS_PATH_FILTER = "accessPathFilter";
 
         /**
-         * Expander pattern.
+         * Access path expander pattern. This allows you to wrap or replace the
+         * {@link IAccessPath}.
+         * <p>
+         * Note: You MUST be extremely careful when using this feature in
+         * scale-out. Access path expanders in scale-out are logically
+         * consistent with used with a {@link #REMOTE_ACCESS_PATH}, but remote
+         * access paths often lack the performance of a local access path.
+         * <p>
+         * In order for the expander to be consistent with a local access path
+         * it MUST NOT rewrite the predicate in such a manner as to read on data
+         * onto found on the shard onto which the predicate was mapped during
+         * query evaluation.
+         * 
+         * @see ISolutionExpander
          */
-        String EXPANDER = "expander";
+        String ACCESS_PATH_EXPANDER = "accessPathExpander";
 
         /**
          * The partition identifier -or- <code>-1</code> if the predicate does
@@ -335,7 +350,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      * 
      * @return The {@link ISolutionExpander}.
      * 
-     * @see Annotations#EXPANDER
+     * @see Annotations#ACCESS_PATH_EXPANDER
      * 
      * @todo replace with {@link ISolutionExpander#getAccessPath(IAccessPath)},
      *       which is the only method declared by {@link ISolutionExpander}.
