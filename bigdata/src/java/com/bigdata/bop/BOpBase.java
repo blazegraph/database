@@ -453,15 +453,32 @@ public class BOpBase implements BOp {
                 sb.append(',');
             sb.append(t.getClass().getSimpleName());
         }
-        sb.append(")[");
-        final Integer id = (Integer) annotations.get(Annotations.BOP_ID);
-        if (id != null)
-            sb.append("Annotations.BOP_ID=" + id);
-        sb.append("]");
+        sb.append(")");
+        annotationsToString(sb);
         return sb.toString();
 
     }
 
+    protected void annotationsToString(final StringBuilder sb) {
+        final Map<String,Object> annotations = annotations();
+        if (!annotations.isEmpty()) {
+            sb.append("[");
+            boolean first = true;
+            for (Map.Entry<String, Object> e : annotations.entrySet()) {
+                if (!first)
+                    sb.append(", ");
+                if (e.getValue() != null && e.getValue().getClass().isArray()) {
+                    sb.append(e.getKey() + "="
+                            + Arrays.toString((Object[]) e.getValue()));
+                } else {
+                    sb.append(e.getKey() + "=" + e.getValue());
+                }
+                first = false;
+            }
+            sb.append("]");
+        }
+    }
+    
     final public BOpEvaluationContext getEvaluationContext() {
 
         return getProperty(Annotations.EVALUATION_CONTEXT,

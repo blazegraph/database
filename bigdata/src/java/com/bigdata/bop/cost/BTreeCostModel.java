@@ -26,9 +26,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.bop.cost;
 
+import java.text.NumberFormat;
+
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.journal.IIndexManager;
+import com.bigdata.btree.BTreeUtilizationReport;
+import com.bigdata.btree.IBTreeStatistics;
+import com.bigdata.btree.IBTreeUtilizationReport;
 import com.bigdata.journal.Journal;
 
 /**
@@ -52,43 +56,71 @@ import com.bigdata.journal.Journal;
  */
 public class BTreeCostModel {
 
+    private final DiskCostModel diskCostModel;
+
+    /**
+     * 
+     * @param diskCostModel
+     *            The cost model for the disk on which the {@link Journal}
+     *            backing the {@link BTree} is located.
+     */
+    public BTreeCostModel(final DiskCostModel diskCostModel) {
+        
+        if (diskCostModel == null)
+            throw new IllegalArgumentException();
+        
+        this.diskCostModel = diskCostModel;
+        
+    }
+
+    /**
+     * Compute the height of the B+Tree from its entry count and branching
+     * factor (this can also be used to find the minimum height at which there
+     * could exist a given range count).
+     */
+    static public int estimateHeight(final int entryCount,
+            final int branchingFactor) {
+
+        if (entryCount < branchingFactor)
+            return 0;
+
+        final double logm = Math.log(branchingFactor);
+
+        final double logn = Math.log(entryCount);
+        
+        final double h = (logm / logn) - 1;
+
+        return (int) Math.ceil(h);
+
+    }
+    
     /**
      * Return the estimated cost of a range scan of the index.
      * 
-     * @param diskCostModel
-     *            The cost model for the disk.
      * @param rangeCount
      *            The range count for the scan.
-     * @param btree
-     *            The index.
+     * @param m
+     *            The B+Tree branching factor.
+     * @param h
+     *            The B+Tree height.
+     * @param leafUtilization
+     *            The leaf utilization percentage [0:100].
      * 
      * @return The estimated cost (milliseconds).
-     * 
-     * @todo how to get the right view onto the BTree without locking? or raise
-     *       the cost model into the {@link IIndexManager}?
      */
-    public double rangeScan(final DiskCostModel diskCostModel,
-            final int rangeCount, final BTree btree) {
+    public double rangeScan(final long rangeCount, final int m, final int h,
+            final int leafUtilization) {
 
         if (rangeCount == 0)
             return 0d;
 
-        // double height = (Math.log(branchingFactor) / Math.log(entryCount)) -
-        // 1;
-
-        final int m = btree.getBranchingFactor();
-
-        final int entryCount = btree.getEntryCount();
-
-        final int height = btree.getHeight();
-
         // average seek time to a leaf.
-        final double averageSeekTime = Math.max(0, (height - 1))
+        final double averageSeekTime = Math.max(0, (h - 1))
                 * diskCostModel.seekTime;
 
         // the percentage of the leaves which are full.
         // final double leafFillRate = .70d;
-        final double leafFillRate = ((double) btree.getUtilization()[1]) / 100;
+        final double leafFillRate = ((double) leafUtilization) / 100;
 
         /*
          * The expected #of leaves to visit for that range scan.
@@ -96,7 +128,7 @@ public class BTreeCostModel {
          * Note: There is an edge condition when the root leaf is empty
          * (fillRate is zero).
          */
-        final double expectedLeafCount = Math.ceil((rangeCount / m)
+        final double expectedLeafCount = Math.ceil((((double) rangeCount) / m)
                 * Math.min(1, (1 / leafFillRate)));
 
         /*
@@ -107,6 +139,142 @@ public class BTreeCostModel {
         final double estimatedCost = averageSeekTime * expectedLeafCount;
 
         return estimatedCost;
+
+    }
+
+    /**
+     * Prints out some tables based on different disk cost models, branching
+     * factors, and range scans. To validate this, you can do a scatter plot of
+     * the rangeCount and cost columns and observe the log linear curve of the
+     * B+Tree.
+     * 
+     * @param args
+     *            ignored.
+     * 
+     * @see <a
+     *      href="src/resources/architectures/query-cost-model.xls">query-cost-model.xls</a>
+     */
+    public static void main(String[] args) {
+
+        final DiskCostModel[] diskCostModels = new DiskCostModel[] { DiskCostModel.DEFAULT };
+
+        final int[] branchingFactors = new int[] { 32, 64, 128, 256, 512, 1024 };
+
+        final int[] heights = new int[] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+        
+        final int[] rangeCounts = new int[] { 1, 10, 100, 1000, 2000, 5000, 10000, 2000, 50000, 100000 };
+
+        final int leafUtilization = 65; // average percent "full" per leaf.
+        
+        System.out.println("seekTime\txferRate\tleafUtil\tm\theight\trangeCount\tcost(ms)");
+        
+        final NumberFormat millisFormat = NumberFormat.getIntegerInstance();
+        millisFormat.setGroupingUsed(true);
+
+        final NumberFormat percentFormat = NumberFormat.getPercentInstance();
+        percentFormat.setMinimumFractionDigits(0);
+
+        final StringBuilder sb = new StringBuilder();
+
+        for (DiskCostModel diskCostModel : diskCostModels) {
+
+            final BTreeCostModel btreeCostModel = new BTreeCostModel(
+                    diskCostModel);
+
+            for (int m : branchingFactors) {
+
+                for (int h : heights) {
+
+                    for (int rangeCount : rangeCounts) {
+
+                        final int estimatedHeight = estimateHeight(rangeCount,
+                                m);
+
+                        if (estimatedHeight > h) {
+                            /*
+                             * Skip range counts which are too large for the
+                             * current B+Tree height.
+                             */
+                            break;
+                        }
+                        
+                        final double cost = btreeCostModel.rangeScan(
+                                rangeCount, m, h, leafUtilization);
+
+                        sb.setLength(0); // reset.
+                        sb.append(millisFormat.format(diskCostModel.seekTime));
+                        sb.append('\t');
+                        sb.append(millisFormat
+                                .format(diskCostModel.transferRate));
+                        sb.append('\t');
+                        sb.append(percentFormat.format(leafUtilization / 100d));
+                        sb.append('\t');
+                        sb.append(m);
+                        sb.append('\t');
+                        sb.append(h);
+                        sb.append('\t');
+                        sb.append(rangeCount);
+                        sb.append('\t');
+                        sb.append(millisFormat.format(cost));
+                        System.out.println(sb);
+
+                    }
+
+                }
+
+            }
+            
+        }
+
+    }
+
+    private static class MockBTreeStatistics implements IBTreeStatistics {
+
+        private final int m;
+
+        private final int entryCount;
+
+        private final int height;
+
+        private final int leafCount;
+
+        private final int nodeCount;
+
+        private final IBTreeUtilizationReport utilReport;
+
+        public MockBTreeStatistics(final int m, final int entryCount,
+                final int height, final int leafCount, final int nodeCount) {
+            this.m = m;
+            this.entryCount = entryCount;
+            this.height = height;
+            this.leafCount = leafCount;
+            this.nodeCount = nodeCount;
+            this.utilReport = new BTreeUtilizationReport(this);
+        }
+
+        public int getBranchingFactor() {
+            return m;
+        }
+
+        public int getEntryCount() {
+            return entryCount;
+        }
+
+        public int getHeight() {
+            return height;
+        }
+
+        public int getLeafCount() {
+            return leafCount;
+        }
+
+        public int getNodeCount() {
+            return nodeCount;
+        }
+
+        public IBTreeUtilizationReport getUtilization() {
+            return utilReport;
+        }
 
     }
 
