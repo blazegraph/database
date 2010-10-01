@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.engine;
 
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -47,17 +48,24 @@ import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.HashBindingSet;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.TermId;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sail.BigdataEvaluationStrategyImpl;
@@ -68,6 +76,7 @@ import com.bigdata.rdf.spo.InGraphHashSetFilter;
 import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IProgram;
@@ -76,6 +85,7 @@ import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlan2;
 import com.bigdata.relation.rule.eval.IRangeCountFactory;
 import com.bigdata.relation.rule.eval.RuleState;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Utility class converts {@link IRule}s to {@link BOp}s.
@@ -168,14 +178,21 @@ public class Rule2BOpUtility {
          * The estimated cost of a SCAN + FILTER approach to a default graph or
          * named graph query.
          */
-        String COST_SCAN = Rule2BOpUtility.class.getName() + ".costScan";
+        String COST_SCAN = Rule2BOpUtility.class.getName() + ".cost.scan";
 
         /**
          * The estimated cost of a SUBQUERY approach to a default graph or named
          * graph query.
          */
         String COST_SUBQUERY = Rule2BOpUtility.class.getName()
-                + ".costSubquery";
+                + ".cost.subquery";
+
+        /**
+         * The #of samples used when estimating the cost of a SUBQUERY approach
+         * to a default graph or named graph query.
+         */
+        String COST_SUBQUERY_SAMPLE_COUNT = Rule2BOpUtility.class.getName()
+                + ".cost.subquerySampleCount";
 
         /**
          * The #of known graphs in the {@link Dataset} for a default graph or
@@ -254,7 +271,14 @@ public class Rule2BOpUtility {
         // evaluation plan order.
         final int[] order = plan.getOrder();
         
-        // variables to be retained for each join.
+        // the #of variables in each tail of the rule.
+        final int[] nvars = new int[rule.getTailCount()];
+
+        // the index assigned to each tail of the rule.
+        final IKeyOrder[] keyOrder = computeKeyOrderForEachTail(rule, context,
+                order, nvars);
+
+        // the variables to be retained for each join.
         final IVariable[][] selectVars = RuleState
                 .computeRequiredVarsForEachTail(rule, order);
         
@@ -304,6 +328,9 @@ public class Rule2BOpUtility {
             // assign a bop id to the predicate
             Predicate<?> pred = (Predicate<?>) rule.getTail(order[i]).setBOpId(
                     bopId++);
+            
+            // decorate the predicate with the assigned index.
+            pred = pred.setKeyOrder(keyOrder[order[i]]);
 
             /*
              * Collect all the constraints for this predicate based on which
@@ -361,6 +388,9 @@ public class Rule2BOpUtility {
             final boolean quads = pred.getProperty(Annotations.QUADS,
                     Annotations.DEFAULT_QUADS);
 
+            // pull of the Sesame dataset before we strip the annotations.
+            final Dataset dataset = (Dataset) pred.getProperty(Annotations.DATASET);
+
             // strip off annotations that we do not want to propagate.
             pred = pred.clearAnnotations(ANNS_TO_CLEAR_FROM_PREDICATE);
 
@@ -380,12 +410,12 @@ public class Rule2BOpUtility {
 
                     switch (scope) {
                     case NAMED_CONTEXTS:
-                        left = namedGraphJoin(queryEngine, left, anns, pred,
-                                cvar);
+                        left = namedGraphJoin(queryEngine, context, left, anns,
+                                pred, dataset, cvar);
                         break;
                     case DEFAULT_CONTEXTS:
-                        left = defaultGraphJoin(queryEngine, left, anns, pred,
-                                cvar);
+                        left = defaultGraphJoin(queryEngine, context, left,
+                                anns, pred, dataset, cvar);
                         break;
                     default:
                         throw new AssertionError();
@@ -468,10 +498,9 @@ public class Rule2BOpUtility {
      * @return
      */
     private static PipelineOp namedGraphJoin(final QueryEngine queryEngine,
-            final PipelineOp left, final List<NV> anns, Predicate pred,
+            final BOpContextBase context, final PipelineOp left,
+            final List<NV> anns, Predicate pred, final Dataset dataset,
             final org.openrdf.query.algebra.Var cvar) {
-
-        final Dataset dataset = (Dataset) pred.getProperty(Annotations.DATASET);
 
         final boolean scaleOut = queryEngine.isScaleOut();
         if (scaleOut) {
@@ -482,8 +511,7 @@ public class Rule2BOpUtility {
                     BOpEvaluationContext.ANY));
         }
 
-        final DataSetSummary summary = new DataSetSummary(dataset
-                .getNamedGraphs());
+        final DataSetSummary summary = new DataSetSummary(dataset.getNamedGraphs());
 
         anns.add(new NV(Annotations.NKNOWN, summary.nknown));
 
@@ -544,18 +572,41 @@ public class Rule2BOpUtility {
         } else {
 
             /*
-             * Estimate cost of SCAN with C unbound)
+             * Estimate cost of SCAN with C unbound.
              */
-            final double scanCost = getScanCost(pred);
+            final double scanCost = queryEngine.estimateCost(context, pred);
 
             anns.add(new NV(Annotations.COST_SCAN, scanCost));
 
             /*
-             * Estimate cost of SUBQUERY with C bound.
+             * Estimate cost of SUBQUERY with C bound (sampling).
+             * 
+             * @todo This should randomly sample in case there is bias in the
+             * order in which the URIs are presented here. However, the only
+             * thing which would be likely to create a strong bias is if someone
+             * sorted them on the IVs or if the URIs were in the same ordering
+             * in which their IVs were assigned AND the data were somehow
+             * correlated with that order. I rate the latter as pretty unlikely
+             * and the former is not true, so this sampling approach should be
+             * pretty good.
+             * 
+             * @todo parameter for the #of samples to take.
              */
-            final double subqueryCost = getSubqueryCost(pred);
+            double subqueryCost = 0d;
+            final int limit = 100;
+            int nsamples = 0;
+            for (URI uri : summary.graphs) {
+                if (nsamples == limit)
+                    break;
+                final IV graph = ((BigdataURI) uri).getIV();
+                subqueryCost += queryEngine.estimateCost(context, pred.asBound(
+                        (IVariable) pred.get(3), new Constant(graph)));
+                nsamples++;
+            }
+            subqueryCost /= nsamples;
 
             anns.add(new NV(Annotations.COST_SUBQUERY, subqueryCost));
+            anns.add(new NV(Annotations.COST_SUBQUERY_SAMPLE_COUNT, nsamples));
 
             if (scanCost < subqueryCost * summary.nknown) {
 
@@ -628,34 +679,6 @@ public class Rule2BOpUtility {
     }
 
     /**
-     * 
-     * @param pred
-     * @return
-     * 
-     * FIXME Cost models have been implemented, but are not yet hooked in.
-     */
-    static double getScanCost(Predicate pred) {
-        /*
-         * @todo Scan is more expensive on the Journal so this is set to ONE (1)
-         * and subquery is set to ZERO (0). This will get replaced by the actual
-         * computed costs shortly.
-         */
-        return 1d;
-    }
-
-    /**
-     * 
-     * @param pred
-     * @return
-     * 
-     *         FIXME Cost models have been implemented, but are not yet hooked
-     *         in.
-     */
-    static double getSubqueryCost(Predicate pred) {
-        return 0d;
-    }
-
-    /**
      * Generate a default graph join (quads mode).
      * 
      * @param queryEngine
@@ -669,7 +692,8 @@ public class Rule2BOpUtility {
      *       remote access paths with other remote access paths.
      */
     private static PipelineOp defaultGraphJoin(final QueryEngine queryEngine,
-            final PipelineOp left, final List<NV> anns, final Predicate pred,
+            final BOpContextBase context, final PipelineOp left,
+            final List<NV> anns, final Predicate pred, final Dataset dataset,
             final org.openrdf.query.algebra.Var cvar) {
 
         // @todo decision of local vs remote ap.
@@ -877,5 +901,107 @@ public class Rule2BOpUtility {
         }
         
     } // DataSetSummary
+
+    /**
+     * Return an array indicating the {@link IKeyOrder} that will be used when
+     * reading on each of the tail predicates. The array is formed using a
+     * private {@link IBindingSet} and propagating fake bindings to each
+     * predicate in turn using the given evaluation order.
+     * 
+     * @param order
+     *            The evaluation order.
+     * @param nvars
+     *            The #of unbound variables for each tail predicate is assigned
+     *            by side-effect.
+     * 
+     * @return An array of the {@link IKeyOrder}s for each tail predicate. The
+     *         array is correlated with the predicates index in the tail of the
+     *         rule NOT its evaluation order.
+     */
+    @SuppressWarnings("unchecked")
+    static private IKeyOrder[] computeKeyOrderForEachTail(final IRule rule,
+            final BOpContextBase context, final int[] order, final int[] nvars) {
+
+        if (order == null)
+            throw new IllegalArgumentException();
+
+        if (order.length != rule.getTailCount())
+            throw new IllegalArgumentException();
+
+        final int tailCount = rule.getTailCount();
+
+        final IKeyOrder[] a = new IKeyOrder[tailCount];
+        
+        final IBindingSet bindingSet = new HashBindingSet();
+        
+        for (int orderIndex = 0; orderIndex < tailCount; orderIndex++) {
+
+            final int tailIndex = order[orderIndex];
+
+            final IPredicate pred = rule.getTail(tailIndex);
+
+            final IRelation rel = context.getRelation(pred);
+            
+            final IPredicate asBound = pred.asBound(bindingSet);
+            
+            final IKeyOrder keyOrder = context.getAccessPath(
+                    rel, asBound).getKeyOrder();
+
+            if (log.isDebugEnabled())
+                log.debug("keyOrder=" + keyOrder + ", orderIndex=" + orderIndex
+                        + ", tailIndex=" + orderIndex + ", pred=" + pred
+                        + ", bindingSet=" + bindingSet + ", rule=" + rule);
+
+            // save results.
+            a[tailIndex] = keyOrder;
+            nvars[tailIndex] = keyOrder == null ? asBound.getVariableCount()
+                    : asBound.getVariableCount((IKeyOrder) keyOrder);
+
+            final int arity = pred.arity();
+
+            for (int j = 0; j < arity; j++) {
+
+                final IVariableOrConstant<?> t = pred.get(j);
+
+                if (t.isVar()) {
+
+                    final Var<?> var = (Var<?>) t;
+
+                    if (log.isDebugEnabled()) {
+
+                        log.debug("Propagating binding: pred=" + pred
+                                        + ", var=" + var + ", bindingSet="
+                                        + bindingSet);
+                        
+                    }
+                    
+                    bindingSet.set(var, fakeTermId);
+
+                }
+
+            }
+
+        }
+
+        if (log.isDebugEnabled()) {
+
+            log.debug("keyOrder[]=" + Arrays.toString(a) + ", nvars="
+                    + Arrays.toString(nvars) + ", rule=" + rule);
+
+        }
+
+        return a;
+
+    }
+
+    /**
+     * A fake value that is propagated when we compute the {@link IKeyOrder} for
+     * a series of joins based on an assigned join evaluation order.
+     * 
+     * @todo This has to be of the appropriate data type or we run into class
+     * cast exceptions. 
+     */
+    final private static transient IConstant<IV> fakeTermId = new Constant<IV>(
+            new TermId(VTE.URI, -1L));
 
 }

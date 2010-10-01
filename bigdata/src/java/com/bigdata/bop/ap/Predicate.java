@@ -31,8 +31,6 @@ package com.bigdata.bop.ap;
 import java.util.Iterator;
 import java.util.Map;
 
-import cern.colt.Arrays;
-
 import com.bigdata.bop.AbstractAccessPathOp;
 import com.bigdata.bop.ArrayBindingSet;
 import com.bigdata.bop.BOp;
@@ -44,8 +42,6 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.ISolutionExpander;
@@ -553,28 +549,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
         }
 
         sb.append(")");
-
-        final Map<String,Object> annotations = annotations();
-        if (!annotations.isEmpty()) {
-            sb.append("[");
-            boolean first = true;
-            for (Map.Entry<String, Object> e : annotations.entrySet()) {
-                if (!first)
-                    sb.append(", ");
-                // @todo remove relation name hack when making relation name a scalar.
-                if (Annotations.RELATION_NAME.equals(e.getKey())
-                        && e.getValue() != null
-                        && e.getValue().getClass().isArray()) {
-                    sb.append(e.getKey() + "="
-                            + Arrays.toString((String[]) e.getValue()));
-                } else {
-                    sb.append(e.getKey() + "=" + e.getValue());
-                }
-                first = false;
-            }
-            sb.append("]");
-        }
-        
+        annotationsToString(sb);
         return sb.toString();
 
     }

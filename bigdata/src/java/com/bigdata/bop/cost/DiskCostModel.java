@@ -47,16 +47,24 @@ public class DiskCostModel {
      */
     final public double seekTime;
 
+    /**
+     * The average disk transfer rate (megabytes per second).
+     */
     final public double transferRate;
 
     /**
      * 
      * @param seekTime
+     *            The average disk seek time (milliseconds).
      * @param transferRate
+     *            The average disk transfer rate (megabytes per second).
      */
     public DiskCostModel(double seekTime, double transferRate) {
+
         this.seekTime = seekTime;
+
         this.transferRate = transferRate;
+
     }
 
 }

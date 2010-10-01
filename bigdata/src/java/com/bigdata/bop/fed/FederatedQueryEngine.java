@@ -215,11 +215,27 @@ public class FederatedQueryEngine extends QueryEngine {
         this.resourceService = resourceService;
 
         if(fed instanceof JiniFederation<?>) {
-            // the proxy for this query engine when used as a query controller.
-        	this.clientProxy = (IQueryClient) ((JiniFederation<?>)fed).getProxy(this, false/*enableDGC*/);
+
+            /*
+             * The proxy for this query engine when used as a query controller.
+             * 
+             * 
+             * Should the data services expose their query engine in this
+             * manner?
+             * 
+             * @todo We need to unexport the proxy as well when the service is
+             * shutdown. This should follow the same pattern as DataService ->
+             * DataServer. E.g., a QueryEngineServer class.
+             */
+
+            this.clientProxy = (IQueryClient) ((JiniFederation<?>) fed)
+                    .getProxy(this, false/* enableDGC */);
+
         } else {
-        	// E.g., an EmbeddedFederation in the test suite. 
+        
+            // E.g., an EmbeddedFederation in the test suite. 
         	this.clientProxy = this;
+        	
         }
 
     }

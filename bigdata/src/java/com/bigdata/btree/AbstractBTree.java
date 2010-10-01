@@ -138,7 +138,7 @@ import cutthecrap.utils.striterators.IFilter;
  * @see KeyBuilder
  */
 abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
-        ILinearList {
+        ILinearList, IBTreeStatistics {
 
     /**
      * The index is already closed.
@@ -787,8 +787,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         // the % utilization in [0:1] for the whole tree (nodes + leaves).
         counterSet.addCounter("% utilization", new Instrument<Double>(){
             protected void sample() {
-                final int[] tmp = getUtilization();
-                setValue(tmp[2] / 100d);
+                setValue(getUtilization().getTotalUtilization() / 100d);
             }
         });
         
@@ -1617,10 +1616,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         return true;
             
     }
-     
-    /**
-     * The branching factor for the btree.
+    
+    /*
+     * IBTreeStatistics
      */
+    
     final public int getBranchingFactor() {
 
         return branchingFactor;
@@ -1636,33 +1636,14 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      */
     final int minChildren;
 
-    /**
-     * The height of the btree. The height is the #of levels minus one. A btree
-     * with only a root leaf has <code>height := 0</code>. A btree with a
-     * root node and one level of leaves under it has <code>height := 1</code>.
-     * Note that all leaves of a btree are at the same height (this is what is
-     * means for the btree to be "balanced"). Also note that the height only
-     * changes when we split or join the root node (a btree maintains balance by
-     * growing and shrinking in levels from the top rather than the leaves).
-     */
     abstract public int getHeight();
 
-    /**
-     * The #of non-leaf nodes in the {@link AbstractBTree}. This is zero (0)
-     * for a new btree.
-     */
     abstract public int getNodeCount();
 
-    /**
-     * The #of leaf nodes in the {@link AbstractBTree}. This is one (1) for a
-     * new btree.
-     */
     abstract public int getLeafCount();
 
     /**
-     * The #of entries (aka values) in the {@link AbstractBTree}. This is zero
-     * (0) for a new B+Tree. Note that this value is tracked explicitly so it
-     * requires no IOs.
+     * {@inheritDoc}
      * 
      * @todo this could be re-defined as the exact entry count if we tracked the
      *       #of deleted index entries and subtracted that from the total #of
@@ -1675,6 +1656,21 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      *       or add a method returning the #of deleted entries, etc.
      */
     abstract public int getEntryCount();
+
+    /**
+     * Return a statistics snapshot of the B+Tree.
+     */
+    public IBTreeStatistics getStatistics() {
+    
+        return new BTreeStatistics(this);
+        
+    }
+    
+    public IBTreeUtilizationReport getUtilization() {
+
+        return new BTreeUtilizationReport(this);
+
+    }
 
     /**
      * The object responsible for (de-)serializing the nodes and leaves of the
@@ -3197,47 +3193,6 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 //    abstract public ILeafCursor newLeafCursor(ILeafCursor leafCursor);
     
     /**
-     * Computes and returns the utilization of the tree. The utilization figures
-     * do not factor in the space requirements of nodes and leaves.
-     * 
-     * @return An array whose elements are:
-     *         <ul>
-     *         <li>0 - the leaf utilization percentage [0:100]. The leaf
-     *         utilization is computed as the #of values stored in the tree
-     *         divided by the #of values that could be stored in the #of
-     *         allocated leaves.</li>
-     *         <li>1 - the node utilization percentage [0:100]. The node
-     *         utilization is computed as the #of non-root nodes divided by the
-     *         #of non-root nodes that could be addressed by the tree.</li>
-     *         <li>2 - the total utilization percentage [0:100]. This is the
-     *         average of the leaf utilization and the node utilization.</li>
-     *         </ul>
-     */
-    public int[] getUtilization() {
-
-        final int nnodes = getNodeCount();
-
-        final int nleaves = getLeafCount();
-
-        final int nentries = getEntryCount();
-
-        final int numNonRootNodes = nnodes + nleaves - 1;
-
-        final int branchingFactor = getBranchingFactor();
-
-        final int nodeUtilization = nnodes == 0 ? 100 : (100 * numNonRootNodes)
-                / (nnodes * branchingFactor);
-
-        final int leafUtilization = (100 * nentries)
-                / (nleaves * branchingFactor);
-
-        final int utilization = (nodeUtilization + leafUtilization) / 2;
-
-        return new int[] { nodeUtilization, leafUtilization, utilization };
-
-    }
-
-    /**
      * Recursive dump of the tree.
      * 
      * @param out
@@ -3256,7 +3211,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         // True iff we will write out the node structure.
         final boolean info = level.toInt() <= Level.INFO.toInt();
 
-        final int[] utils = getUtilization();
+        final IBTreeUtilizationReport utils = getUtilization();
 
         if (info) {
 
@@ -3273,8 +3228,9 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             out.println("height=" + height + ", branchingFactor="
                     + branchingFactor + ", #nodes=" + nnodes + ", #leaves="
                     + nleaves + ", #entries=" + nentries + ", nodeUtil="
-                    + utils[0] + "%, leafUtil=" + utils[1] + "%, utilization="
-                    + utils[2] + "%");
+                    + utils.getNodeUtilization() + "%, leafUtil="
+                    + utils.getLeafUtilization() + "%, utilization="
+                    + utils.getTotalUtilization() + "%");
         }
 
         if (root != null) {

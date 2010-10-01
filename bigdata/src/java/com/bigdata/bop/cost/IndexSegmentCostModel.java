@@ -37,15 +37,27 @@ import com.bigdata.btree.IndexSegment;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo
  */
 public class IndexSegmentCostModel {
+
+    private final DiskCostModel diskCostModel;
 
     /**
      * 
      * @param diskCostModel
      *            The disk cost model.
+     */
+    public IndexSegmentCostModel(final DiskCostModel diskCostModel) {
+        
+        if (diskCostModel == null)
+            throw new IllegalArgumentException();
+        
+        this.diskCostModel = diskCostModel;
+        
+    }
+    
+    /**
+     * 
      * @param rangeCount
      *            The range count for the index scan.
      * @param branchingFactor
@@ -58,8 +70,7 @@ public class IndexSegmentCostModel {
      * 
      * @return The estimated time for the range scan (milliseconds).
      */
-    public double rangeScan(final DiskCostModel diskCostModel,
-            final int rangeCount, final int branchingFactor,
+    public double rangeScan(final int rangeCount, final int branchingFactor,
             final int averageBytesPerLeaf, final int xferBufferSize) {
 
         if (rangeCount == 0)
