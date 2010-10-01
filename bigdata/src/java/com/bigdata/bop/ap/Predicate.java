@@ -479,19 +479,20 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
             /*
              * Set the filter.
              */
-            _setProperty(Annotations.INDEX_LOCAL_FILTER, filter);
+            _setProperty(name, filter);
             
         } else {
 
             /*
              * Wrap the filter.
              */
-            _setProperty(Annotations.INDEX_LOCAL_FILTER, new FilterBase() {
+            _setProperty(name, new FilterBase() {
 
                 @Override
                 protected Iterator filterOnce(Iterator src, Object context) {
                     return src;
                 }
+                
             }.addFilter(current).addFilter(filter));
         }
 
