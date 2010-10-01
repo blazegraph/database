@@ -1522,7 +1522,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
         // free text search expander or named graphs expander
         if (expander != null)
-            anns.add(new NV(IPredicate.Annotations.EXPANDER, expander));
+            anns.add(new NV(IPredicate.Annotations.ACCESS_PATH_EXPANDER, expander));
 
         // timestamp
         anns.add(new NV(IPredicate.Annotations.TIMESTAMP, database

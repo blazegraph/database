@@ -412,7 +412,7 @@ public class BOpBase implements BOp {
      * @param value
      *            The value.
      */
-    protected void setProperty(final String name, final Object value) {
+    protected void _setProperty(final String name, final Object value) {
         
         annotations.put(name,value);
         
@@ -429,10 +429,55 @@ public class BOpBase implements BOp {
      * @param name
      *            The name.
      */
-    protected void clearProperty(final String name) {
+    protected void _clearProperty(final String name) {
         
         annotations.remove(name);
         
+    }
+
+    /**
+     * Unconditionally sets the property.
+     * 
+     * @param name
+     *            The name.
+     * @param value
+     *            The value.
+     *            
+     * @return A copy of this {@link BOp} on which the property has been set.
+     */
+    public BOpBase setProperty(final String name, final Object value) {
+
+        final BOpBase tmp = this.clone();
+
+        tmp._setProperty(name, value);
+
+        return tmp;
+
+    }
+
+    /**
+     * Conditionally sets the property.
+     * 
+     * @param name
+     *            The name.
+     * @param value
+     *            The value.
+     * 
+     * @return A copy of this {@link BOp} on which the property has been set.
+     * 
+     * @throws IllegalStateException
+     *             if the property is already set.
+     */
+    public BOpBase setUnboundProperty(final String name, final Object value) {
+
+        final BOpBase tmp = this.clone();
+
+        if (tmp.annotations.put(name, value) != null)
+            throw new IllegalStateException("Already set: name=" + name
+                    + ", value=" + value);
+
+        return tmp;
+
     }
     
     public int getId() {

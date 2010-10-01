@@ -148,7 +148,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
                 new NV(Annotations.OPTIONAL,optional),//
                 new NV(Annotations.INDEX_LOCAL_FILTER,
                     ElementFilter.newInstance(constraint)),//
-                new NV(Annotations.EXPANDER,expander),//
+                new NV(Annotations.ACCESS_PATH_EXPANDER,expander),//
                 new NV(Annotations.TIMESTAMP, timestamp)
         }));
         
@@ -197,7 +197,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 //      throw new UnsupportedOperationException();
       final Predicate<E> tmp = this.clone();
 
-      tmp.setProperty(Annotations.RELATION_NAME, relationName);
+      tmp._setProperty(Annotations.RELATION_NAME, relationName);
 
       return tmp;
       
@@ -260,7 +260,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
     @SuppressWarnings("unchecked")
     final public ISolutionExpander<E> getSolutionExpander() {
         
-        return (ISolutionExpander<E>) getProperty(Annotations.EXPANDER);
+        return (ISolutionExpander<E>) getProperty(Annotations.ACCESS_PATH_EXPANDER);
         
     }
 
@@ -374,7 +374,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
         final Predicate<E> tmp = this.clone();
 
-        tmp.setProperty(Annotations.KEY_ORDER, keyOrder);
+        tmp._setProperty(Annotations.KEY_ORDER, keyOrder);
 
         return tmp;
 
@@ -391,7 +391,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
         final Predicate<E> tmp = this.clone();
 
-        tmp.setProperty(Annotations.PARTITION_ID, partitionId);
+        tmp._setProperty(Annotations.PARTITION_ID, partitionId);
 
         return tmp;
 
@@ -401,7 +401,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
         final Predicate<E> tmp = this.clone();
 
-        tmp.setProperty(Annotations.BOP_ID, bopId);
+        tmp._setProperty(Annotations.BOP_ID, bopId);
 
         return tmp;
 
@@ -411,7 +411,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
         final Predicate<E> tmp = this.clone();
 
-        tmp.setProperty(Annotations.TIMESTAMP, timestamp);
+        tmp._setProperty(Annotations.TIMESTAMP, timestamp);
 
         return tmp;
 
@@ -479,14 +479,14 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
             /*
              * Set the filter.
              */
-            setProperty(Annotations.INDEX_LOCAL_FILTER, filter);
+            _setProperty(Annotations.INDEX_LOCAL_FILTER, filter);
             
         } else {
 
             /*
              * Wrap the filter.
              */
-            setProperty(Annotations.INDEX_LOCAL_FILTER, new FilterBase() {
+            _setProperty(Annotations.INDEX_LOCAL_FILTER, new FilterBase() {
 
                 @Override
                 protected Iterator filterOnce(Iterator src, Object context) {
@@ -511,7 +511,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
         for(String name : names) {
             
-            tmp.clearProperty(name);
+            tmp._clearProperty(name);
             
         }
 
