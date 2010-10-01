@@ -30,13 +30,16 @@ package com.bigdata.bop.rdf.filter;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpBase;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.ap.filter.BOpResolver;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 
 /**
  * Strips the context information from an {@link SPO}. This is used in default
- * graph access paths.
+ * graph access paths. It operators on {@link ISPO}s so it must be applied using
+ * {@link IPredicate.Annotations#ACCESS_PATH_FILTER}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -47,6 +50,12 @@ public class StripContextFilter extends BOpResolver {
      * 
      */
     private static final long serialVersionUID = 1L;
+
+    /** 
+     * A global instance.
+     */
+    public static final transient StripContextFilter INSTANCE = new StripContextFilter(
+            BOpBase.NOARGS, BOpBase.NOANNS);
 
     /**
      * @param op

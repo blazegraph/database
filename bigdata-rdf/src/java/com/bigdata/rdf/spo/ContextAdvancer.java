@@ -22,62 +22,42 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 4, 2008
+ * Created on Oct 1, 2010
  */
 
 package com.bigdata.rdf.spo;
 
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.filter.Advancer;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.striterator.IKeyOrder;
 
 /**
- * This was cloned from the {@link DistinctTermAdvancer}. It supports an
- * efficient scan of the distinct term identifiers that appear in the first
- * position(s) of the keys for the statement index corresponding to the
- * specified {@link IKeyOrder}. For example, using {@link SPOKeyOrder#POS} will
- * give you the term identifiers for the distinct predicates actually in use
- * within statements in the {@link SPORelation}.
+ * Advancer for a quads index whose last key component is the "context position
+ * (such as SPOC or SOPC). The advancer will skip to first possible key for the
+ * next distinct triple for each quad which it visits. This is a cheap way to
+ * impose a "DISTINCT" filter using an index scan and works well for both local
+ * and scale-out indices.
  * <p>
- * Note: This class only offers additional functionality over the
- * {@link DistinctTermAdvancer} for a quad store. For example, consider a triple
- * store with 2-bound on the {@link SPOKeyOrder#SPO} index. Since you are only
- * going to visit the distinct Object values, the advancer will not "advance"
- * over anything and you might as well use a normal {@link IAccessPath} or
- * rangeIterator.
- * 
- * @see DistinctTermAdvancer
+ * You have to use {@link IRangeQuery#CURSOR} to request an {@link ITupleCursor}
+ * when using an {@link Advancer} pattern.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: DistinctMultiTermAdvancer.java 2886 2010-05-19 19:16:49Z
- *          mroycsi $
- * 
- * @todo Unit tests?
+ * @version $Id$
  */
-public class DistinctMultiTermAdvancer extends Advancer<SPO> {
+public class ContextAdvancer extends Advancer<SPO> {
 
-//    private static final long    serialVersionUID = 2500001864793869957L;
-
-    /**
-     * New version for this class, which  
-     */
-    private static final long serialVersionUID = -7326621294779476500L;
-    
-    private final int arity;
-    private final int boundEntries;
+    private static final long serialVersionUID = 1L;
 
     private transient IKeyBuilder keyBuilder;
 
-    public DistinctMultiTermAdvancer(final int arity, final int boundEntries) {
-
-        this.arity = arity;
-        this.boundEntries = boundEntries;
+    public ContextAdvancer() {
+        
     }
 
     @Override
@@ -96,22 +76,29 @@ public class DistinctMultiTermAdvancer extends Advancer<SPO> {
 
         }
 
+        // extract the key.
         final byte[] key = tuple.getKey();
         
-        final IV[] ivs = IVUtility.decode(key, boundEntries+1);
+        // decode the first three components of the key.
+        final IV[] terms = IVUtility.decode(key, 3/*nterms*/);
         
+        // reset the buffer.
         keyBuilder.reset();
+
+        // encode the first three components of the key.
+        IVUtility.encode(keyBuilder,terms[0]);
+        IVUtility.encode(keyBuilder,terms[1]);
+        IVUtility.encode(keyBuilder,terms[2]);
         
-        for (int i = 0; i < ivs.length; i++) {
-            ivs[i].encode(keyBuilder);
-        }
-        
+        // obtain the key.
         final byte[] fromKey = keyBuilder.getKey();
         
+        // obtain the successor of the key.
         final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
 
+        // seek to that successor.
         src.seek(toKey);
-
+        
     }
 
 }

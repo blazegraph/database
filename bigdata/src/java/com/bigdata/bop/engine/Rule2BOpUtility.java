@@ -61,8 +61,10 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.bset.StartOp;
 import com.bigdata.bop.join.PipelineJoin;
+import com.bigdata.bop.rdf.filter.StripContextFilter;
 import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.bop.solutions.SliceOp;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
@@ -70,6 +72,7 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sail.BigdataEvaluationStrategyImpl;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.spo.ContextAdvancer;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InGraphHashSetFilter;
@@ -245,6 +248,9 @@ public class Rule2BOpUtility {
     public static PipelineOp convert(final IRule rule, final int startId,
             final AbstractTripleStore db, final QueryEngine queryEngine) {
 
+        // true iff the database is in quads mode.
+        final boolean isQuadsQuery = db.isQuads();
+        
         int bopId = startId;
 
         final PipelineOp startOp = new StartOp(new BOp[] {},
@@ -502,6 +508,15 @@ public class Rule2BOpUtility {
             final List<NV> anns, Predicate pred, final Dataset dataset,
             final org.openrdf.query.algebra.Var cvar) {
 
+        /*
+         * @todo raise this into the caller and do one per rule rather than once
+         * per access path.
+         */
+        final DataSetSummary summary = new DataSetSummary(dataset
+                .getNamedGraphs());
+
+        anns.add(new NV(Annotations.NKNOWN, summary.nknown));
+
         final boolean scaleOut = queryEngine.isScaleOut();
         if (scaleOut) {
             anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
@@ -510,10 +525,6 @@ public class Rule2BOpUtility {
             anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                     BOpEvaluationContext.ANY));
         }
-
-        final DataSetSummary summary = new DataSetSummary(dataset.getNamedGraphs());
-
-        anns.add(new NV(Annotations.NKNOWN, summary.nknown));
 
         // true iff C is bound to a constant.
         final boolean isCBound = cvar.getValue() != null;
@@ -688,23 +699,231 @@ public class Rule2BOpUtility {
      */
     private static PipelineOp defaultGraphJoin(final QueryEngine queryEngine,
             final BOpContextBase context, final PipelineOp left,
-            final List<NV> anns, final Predicate pred, final Dataset dataset,
+            final List<NV> anns, Predicate pred, final Dataset dataset,
             final org.openrdf.query.algebra.Var cvar) {
 
-        // @todo decision of local vs remote ap.
-        final boolean scaleOut = queryEngine.isScaleOut();
-        if (scaleOut) {
-            anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
-                    BOpEvaluationContext.SHARDED));
-        } else {
-            anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
-                    BOpEvaluationContext.ANY));
-        }
-
         /*
-         * FIXME implement the default graph decision tree. 
+         * @todo raise this into the caller and do one per rule rather than once
+         * per access path.
          */
+        final DataSetSummary summary = new DataSetSummary(dataset
+                .getDefaultGraphs());
+
+        // true iff C is bound to a constant.
+        final boolean isCBound = cvar.getValue() != null;
+        
+        final boolean scaleOut = queryEngine.isScaleOut();
+
+        if (summary.nknown == 0) {
+
+            /*
+             * The data set is empty (no graphs). Return a join backed by an
+             * empty access path.
+             */
+
+            // force an empty access path for this predicate.
+            pred = (Predicate) pred.setUnboundProperty(
+                    IPredicate.Annotations.ACCESS_PATH_EXPANDER,
+                    EmptyAccessPathExpander.INSTANCE);
+
+            return new PipelineJoin(new BOp[] { left, pred }, anns
+                    .toArray(new NV[anns.size()]));
+
+        } else if (summary.nknown == 1) {
+
+            /*
+             * The dataset contains exactly one graph. Bind C. Add a filter to
+             * strip off the context position.
+             */
+
+            // bind C.
+            pred = pred.asBound((IVariable) pred.get(3), new Constant(
+                    summary.firstContext));
+
+            pred = pred.addAccessPathFilter(StripContextFilter.INSTANCE);
+            
+            return new PipelineJoin(new BOp[] { left, pred }, anns
+                    .toArray(new NV[anns.size()]));
+
+        } else if (pred.getKeyOrder().getIndexName().endsWith("C")) {
+
+            /*
+             * C is not bound. An advancer is imposed on the AP to skip to the
+             * next possible triple after each match. Impose filter on AP to
+             * strip off the context position. Distinct filter is not required
+             * since the advancer pattern used will not report duplicates.
+             */
+            
+            // Set the CURSOR flag.
+            pred = (Predicate) pred.setProperty(IPredicate.Annotations.FLAGS,
+                    pred.getProperty(IPredicate.Annotations.FLAGS,
+                            IPredicate.Annotations.DEFAULT_FLAGS)
+                            | IRangeQuery.CURSOR);
+
+            // Set Advancer (runs at the index).
+            pred = pred.addIndexLocalFilter(new ContextAdvancer());
+            
+            // Filter to strip off the context position.
+            pred = pred.addAccessPathFilter(StripContextFilter.INSTANCE);
+
+            if(scaleOut) {
+
+                /*
+                 * When true, an ISimpleSplitHandler guarantees that no triple
+                 * on that index spans more than one shard.
+                 * 
+                 * @todo Implement the split handler and detect when it is being
+                 * used.
+                 */
+                final boolean shardTripleConstraint = false;
+
+                if (shardTripleConstraint) {
+
+                    // JOIN is SHARDED.
+                    pred = (Predicate) pred.setProperty(
+                            BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.SHARDED);
+
+                    // AP is LOCAL.
+                    pred = (Predicate) pred.setProperty(
+                            IPredicate.Annotations.REMOTE_ACCESS_PATH, false);
+
+                } else {
+
+                    // JOIN is ANY.
+                    pred = (Predicate) pred.setProperty(
+                            BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.ANY);
+
+                    // AP is REMOTE.
+                    pred = (Predicate) pred.setProperty(
+                            IPredicate.Annotations.REMOTE_ACCESS_PATH, true);
+
+                }
+
+            }
+            return new PipelineJoin(new BOp[] { left, pred }, anns
+                    .toArray(new NV[anns.size()]));
+            
+        }
+        // FIXME Finish the default graph decision tree.
         throw new UnsupportedOperationException();
+//        } else if (dataset == null) {
+//
+//            /*
+//             * The dataset is all graphs. C is left unbound and the unmodified
+//             * access path is used.
+//             */
+//
+//            return new PipelineJoin(new BOp[] { left, pred }, anns
+//                    .toArray(new NV[anns.size()]));
+//
+//        } else {
+//
+//            /*
+//             * Estimate cost of SCAN with C unbound.
+//             */
+//            final double scanCost = queryEngine.estimateCost(context, pred);
+//
+//            anns.add(new NV(Annotations.COST_SCAN, scanCost));
+//
+//            /*
+//             * Estimate cost of SUBQUERY with C bound (sampling).
+//             * 
+//             * @todo This should randomly sample in case there is bias in the
+//             * order in which the URIs are presented here. However, the only
+//             * thing which would be likely to create a strong bias is if someone
+//             * sorted them on the IVs or if the URIs were in the same ordering
+//             * in which their IVs were assigned AND the data were somehow
+//             * correlated with that order. I rate the latter as pretty unlikely
+//             * and the former is not true, so this sampling approach should be
+//             * pretty good.
+//             * 
+//             * @todo parameter for the #of samples to take.
+//             */
+//            double subqueryCost = 0d;
+//            final int limit = 100;
+//            int nsamples = 0;
+//            for (URI uri : summary.graphs) {
+//                if (nsamples == limit)
+//                    break;
+//                final IV graph = ((BigdataURI) uri).getIV();
+//                subqueryCost += queryEngine.estimateCost(context, pred.asBound(
+//                        (IVariable) pred.get(3), new Constant(graph)));
+//                nsamples++;
+//            }
+//            subqueryCost /= nsamples;
+//
+//            anns.add(new NV(Annotations.COST_SUBQUERY, subqueryCost));
+//            anns.add(new NV(Annotations.COST_SUBQUERY_SAMPLE_COUNT, nsamples));
+//
+//            if (scanCost < subqueryCost * summary.nknown) {
+//
+//                /*
+//                 * Scan and filter. C is left unbound. We do a range scan on the
+//                 * index and filter using an IN constraint.
+//                 */
+//
+//                // IN filter for the named graphs.
+//                final IElementFilter<ISPO> test = new InGraphHashSetFilter<ISPO>(
+//                        summary.nknown, summary.graphs);
+//
+//                // layer filter onto the predicate.
+//                pred = pred
+//                        .addIndexLocalFilter(ElementFilter.newInstance(test));
+//                
+//                return new PipelineJoin(new BOp[] { left, pred }, anns
+//                        .toArray(new NV[anns.size()]));
+//
+//            } else {
+//
+//                /*
+//                 * Parallel Subquery.
+//                 */
+//
+//                /*
+//                 * Setup the data set join.
+//                 * 
+//                 * @todo When the #of named graphs is large we need to do
+//                 * something special to avoid sending huge graph sets around
+//                 * with the query. For example, we should create named data sets
+//                 * and join against them rather than having an in-memory
+//                 * DataSetJoin.
+//                 * 
+//                 * @todo The historical approach performed parallel subquery
+//                 * using an expander pattern rather than a data set join. The
+//                 * data set join should have very much the same effect, but it
+//                 * may need to emit multiple chunks to have good parallelism.
+//                 */
+//
+//                // The variable to be bound.
+//                final IVariable var = (IVariable) pred.get(3);
+//                
+//                // The data set join.
+//                final DataSetJoin dataSetJoin = new DataSetJoin(
+//                        new BOp[] { var }, NV.asMap(new NV[] {
+//                                new NV(DataSetJoin.Annotations.VAR, var),
+//                                new NV(DataSetJoin.Annotations.GRAPHS, summary
+//                                        .getGraphs()) }));
+//
+//                if (scaleOut) {
+//                    anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+//                            BOpEvaluationContext.SHARDED));
+//                    anns.add(new NV(Predicate.Annotations.REMOTE_ACCESS_PATH,
+//                            false));
+//                } else {
+//                    anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+//                            BOpEvaluationContext.ANY));
+//                    anns.add(new NV(Predicate.Annotations.REMOTE_ACCESS_PATH,
+//                            false));
+//                }
+//
+//                return new PipelineJoin(new BOp[] { left, pred }, anns
+//                        .toArray(new NV[anns.size()]));
+//
+//            }
+//
+//        }
 
     }
 

@@ -92,6 +92,9 @@ public class TestAll extends TestCase {
         // test suite for distinct term scan
         suite.addTestSuite(TestDistinctTermScan.class);
 
+        // test suite for the ContextAdvancer.
+        suite.addTestSuite(TestContextAdvancer.class);
+
         // test suite for rdf1.
         suite.addTestSuite(TestRuleRdf01.class);
 
