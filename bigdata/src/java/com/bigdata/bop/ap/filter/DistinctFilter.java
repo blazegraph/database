@@ -21,6 +21,10 @@ import cutthecrap.utils.striterators.Filterator;
  * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
  *          thompsonbry $
  * 
+ * @todo Extract a common interface or metadata for all DISTINCT element filters
+ *       (in memory hash map, persistence capable hash map, distributed hash
+ *       map).
+ * 
  * @todo Reconcile with {@link IChunkConverter},
  *       {@link com.bigdata.striterator.DistinctFilter} (handles solutions) and
  *       {@link MergeFilter} (handles comparables),
@@ -38,6 +42,13 @@ public class DistinctFilter extends BOpFilterBase {
 
     }
 
+    /**
+     * A instance using the default configuration for the in memory hash map.
+     */
+    public static DistinctFilter newInstance() {
+        return new DistinctFilter(NOARGS, NOANNS);
+    }
+    
     /**
      * Required deep copy constructor.
      */

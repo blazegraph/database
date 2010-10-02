@@ -52,10 +52,11 @@ public class StripContextFilter extends BOpResolver {
     private static final long serialVersionUID = 1L;
 
     /** 
-     * A global instance.
+     * A default instance.
      */
-    public static final transient StripContextFilter INSTANCE = new StripContextFilter(
-            BOpBase.NOARGS, BOpBase.NOANNS);
+    public static StripContextFilter newInstance() {
+        return new StripContextFilter(BOpBase.NOARGS, BOpBase.NOANNS);
+    }
 
     /**
      * @param op
