@@ -408,7 +408,10 @@ public class BOpUtility {
             if (!distinct.add(t) && !(t instanceof IVariableOrConstant<?>)) {
                 /*
                  * BOp appears more than once. This is only allowed for
-                 * constants and variables.
+                 * constants and variables to reduce the likelihood of operator
+                 * trees which describe loops. This will not detect operator
+                 * trees whose sinks target a descendant, which is another way
+                 * to create a loop.
                  */
                 throw new DuplicateBOpException(t.toString());
             }

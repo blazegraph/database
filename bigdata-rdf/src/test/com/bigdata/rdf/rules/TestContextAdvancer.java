@@ -180,7 +180,8 @@ public class TestContextAdvancer extends TestCase2 {
 
                 pred = pred.addIndexLocalFilter(new ContextAdvancer());
 
-                pred = pred.addAccessPathFilter(StripContextFilter.INSTANCE);
+                pred = pred.addAccessPathFilter(StripContextFilter
+                        .newInstance());
 
                 final IAccessPath<ISPO> ap = context.getAccessPath(db
                         .getSPORelation(), pred);

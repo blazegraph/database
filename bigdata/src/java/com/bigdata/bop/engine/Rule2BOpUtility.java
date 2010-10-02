@@ -59,7 +59,9 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
+import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.bset.StartOp;
+import com.bigdata.bop.fed.FederatedQueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.rdf.filter.StripContextFilter;
 import com.bigdata.bop.rdf.join.DataSetJoin;
@@ -89,6 +91,7 @@ import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlan2;
 import com.bigdata.relation.rule.eval.IRangeCountFactory;
 import com.bigdata.relation.rule.eval.RuleState;
+import com.bigdata.service.ResourceService;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -119,6 +122,14 @@ public class Rule2BOpUtility {
      * {@link DefaultGraphSolutionExpander}.
      */
     private static boolean enableDecisionTree = false;
+
+    /**
+     * The #of samples to take when comparing the cost of a SCAN with an IN
+     * filter to subquery for each graph in the data set.
+     * 
+     * @todo Add query hint to override this default.
+     */
+    private static final int SAMPLE_LIMIT = 100;
     
     /**
      * Annotations used by the {@link BigdataEvaluationStrategyImpl} to
@@ -248,8 +259,8 @@ public class Rule2BOpUtility {
     public static PipelineOp convert(final IRule rule, final int startId,
             final AbstractTripleStore db, final QueryEngine queryEngine) {
 
-        // true iff the database is in quads mode.
-        final boolean isQuadsQuery = db.isQuads();
+//        // true iff the database is in quads mode.
+//        final boolean isQuadsQuery = db.isQuads();
         
         int bopId = startId;
 
@@ -508,15 +519,6 @@ public class Rule2BOpUtility {
             final List<NV> anns, Predicate pred, final Dataset dataset,
             final org.openrdf.query.algebra.Var cvar) {
 
-        /*
-         * @todo raise this into the caller and do one per rule rather than once
-         * per access path.
-         */
-        final DataSetSummary summary = new DataSetSummary(dataset
-                .getNamedGraphs());
-
-        anns.add(new NV(Annotations.NKNOWN, summary.nknown));
-
         final boolean scaleOut = queryEngine.isScaleOut();
         if (scaleOut) {
             anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
@@ -528,44 +530,8 @@ public class Rule2BOpUtility {
 
         // true iff C is bound to a constant.
         final boolean isCBound = cvar.getValue() != null;
-        
-        if (isCBound) {
 
-            /*
-             * C is already bound.  The unmodified access path is used. 
-             */
-
-            return new PipelineJoin(new BOp[] { left, pred }, anns
-                    .toArray(new NV[anns.size()]));
-
-        } else if (summary.nknown == 0) {
-
-            /*
-             * The data set is empty (no graphs). Return a join backed by an
-             * empty access path.
-             */
-
-            // force an empty access path for this predicate.
-            pred = (Predicate) pred.setUnboundProperty(
-                    IPredicate.Annotations.ACCESS_PATH_EXPANDER,
-                    EmptyAccessPathExpander.INSTANCE);
-
-            return new PipelineJoin(new BOp[] { left, pred }, anns
-                    .toArray(new NV[anns.size()]));
-
-        } else if (summary.nknown == 1) {
-
-            /*
-             * The dataset contains exactly one graph. Bind C.
-             */
-            
-            pred = pred.asBound((IVariable) pred.get(3), new Constant(
-                    summary.firstContext));
-            
-            return new PipelineJoin(new BOp[] { left, pred }, anns
-                    .toArray(new NV[anns.size()]));
-
-        } else if (dataset == null) {
+        if (dataset == null) {
 
             /*
              * The dataset is all graphs. C is left unbound and the unmodified
@@ -575,144 +541,27 @@ public class Rule2BOpUtility {
             return new PipelineJoin(new BOp[] { left, pred }, anns
                     .toArray(new NV[anns.size()]));
 
-        } else {
-
-            /*
-             * Estimate cost of SCAN with C unbound.
-             */
-            final double scanCost = queryEngine.estimateCost(context, pred);
-
-            anns.add(new NV(Annotations.COST_SCAN, scanCost));
-
-            /*
-             * Estimate cost of SUBQUERY with C bound (sampling).
-             * 
-             * @todo This should randomly sample in case there is bias in the
-             * order in which the URIs are presented here. However, the only
-             * thing which would be likely to create a strong bias is if someone
-             * sorted them on the IVs or if the URIs were in the same ordering
-             * in which their IVs were assigned AND the data were somehow
-             * correlated with that order. I rate the latter as pretty unlikely
-             * and the former is not true, so this sampling approach should be
-             * pretty good.
-             * 
-             * @todo parameter for the #of samples to take.
-             */
-            double subqueryCost = 0d;
-            final int limit = 100;
-            int nsamples = 0;
-            for (URI uri : summary.graphs) {
-                if (nsamples == limit)
-                    break;
-                final IV graph = ((BigdataURI) uri).getIV();
-                subqueryCost += queryEngine.estimateCost(context, pred.asBound(
-                        (IVariable) pred.get(3), new Constant(graph)));
-                nsamples++;
-            }
-            subqueryCost /= nsamples;
-
-            anns.add(new NV(Annotations.COST_SUBQUERY, subqueryCost));
-            anns.add(new NV(Annotations.COST_SUBQUERY_SAMPLE_COUNT, nsamples));
-
-            if (scanCost < subqueryCost * summary.nknown) {
-
-                /*
-                 * Scan and filter. C is left unbound. We do a range scan on the
-                 * index and filter using an IN constraint.
-                 */
-
-                // IN filter for the named graphs.
-                final IElementFilter<ISPO> test = new InGraphHashSetFilter<ISPO>(
-                        summary.nknown, summary.graphs);
-
-                // layer filter onto the predicate.
-                pred = pred
-                        .addIndexLocalFilter(ElementFilter.newInstance(test));
-                
-                return new PipelineJoin(new BOp[] { left, pred }, anns
-                        .toArray(new NV[anns.size()]));
-
-            } else {
-
-                /*
-                 * Parallel Subquery.
-                 */
-
-                /*
-                 * Setup the data set join.
-                 * 
-                 * @todo When the #of named graphs is large we need to do
-                 * something special to avoid sending huge graph sets around
-                 * with the query. For example, we should create named data sets
-                 * and join against them rather than having an in-memory
-                 * DataSetJoin.
-                 * 
-                 * @todo The historical approach performed parallel subquery
-                 * using an expander pattern rather than a data set join. The
-                 * data set join should have very much the same effect, but it
-                 * may need to emit multiple chunks to have good parallelism.
-                 */
-
-                // The variable to be bound.
-                final IVariable var = (IVariable) pred.get(3);
-                
-                // The data set join.
-                final DataSetJoin dataSetJoin = new DataSetJoin(
-                        new BOp[] { var }, NV.asMap(new NV[] {
-                                new NV(DataSetJoin.Annotations.VAR, var),
-                                new NV(DataSetJoin.Annotations.GRAPHS, summary
-                                        .getGraphs()) }));
-
-                if (scaleOut) {
-                    anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.SHARDED));
-                    anns.add(new NV(Predicate.Annotations.REMOTE_ACCESS_PATH,
-                            false));
-                } else {
-                    anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.ANY));
-                    anns.add(new NV(Predicate.Annotations.REMOTE_ACCESS_PATH,
-                            false));
-                }
-
-                return new PipelineJoin(new BOp[] { left, pred }, anns
-                        .toArray(new NV[anns.size()]));
-
-            }
-
         }
 
-    }
+        if (isCBound) {
 
-    /**
-     * Generate a default graph join (quads mode).
-     * 
-     * @param queryEngine
-     * @param left
-     * @param anns
-     * @param pred
-     * @return
-     * 
-     * @todo The default graph remote access path query estimates do not take
-     *       RMI costs into account. This is Ok since we are only comparing
-     *       remote access paths with other remote access paths.
-     */
-    private static PipelineOp defaultGraphJoin(final QueryEngine queryEngine,
-            final BOpContextBase context, final PipelineOp left,
-            final List<NV> anns, Predicate pred, final Dataset dataset,
-            final org.openrdf.query.algebra.Var cvar) {
+            /*
+             * C is already bound.  The unmodified access path is used. 
+             */
 
+            return new PipelineJoin(new BOp[] { left, pred }, anns
+                    .toArray(new NV[anns.size()]));
+
+        }
+        
         /*
          * @todo raise this into the caller and do one per rule rather than once
          * per access path.
          */
         final DataSetSummary summary = new DataSetSummary(dataset
-                .getDefaultGraphs());
+                .getNamedGraphs());
 
-        // true iff C is bound to a constant.
-        final boolean isCBound = cvar.getValue() != null;
-        
-        final boolean scaleOut = queryEngine.isScaleOut();
+        anns.add(new NV(Annotations.NKNOWN, summary.nknown));
 
         if (summary.nknown == 0) {
 
@@ -729,7 +578,141 @@ public class Rule2BOpUtility {
             return new PipelineJoin(new BOp[] { left, pred }, anns
                     .toArray(new NV[anns.size()]));
 
-        } else if (summary.nknown == 1) {
+        }
+
+        if (summary.nknown == 1) {
+
+            /*
+             * The dataset contains exactly one graph. Bind C.
+             */
+
+            pred = pred.asBound((IVariable) pred.get(3), new Constant(
+                    summary.firstContext));
+
+            return new PipelineJoin(new BOp[] { left, pred }, anns
+                    .toArray(new NV[anns.size()]));
+
+        }
+
+        /*
+         * Estimate cost of SCAN with C unbound.
+         */
+        final double scanCost = queryEngine.estimateCost(context, pred);
+        anns.add(new NV(Annotations.COST_SCAN, scanCost));
+
+        // Estimate cost of SUBQUERY with C bound (sampling).
+        final double subqueryCost = summary.estimateSubqueryCost(queryEngine,
+                context, SAMPLE_LIMIT, pred, anns);
+
+        if (scanCost < subqueryCost) {
+
+            /*
+             * Scan and filter. C is left unbound. We do a range scan on the
+             * index and filter using an IN constraint.
+             */
+
+            // IN filter for the named graphs.
+            final IElementFilter<ISPO> test = new InGraphHashSetFilter<ISPO>(
+                    summary.nknown, summary.graphs);
+
+            // layer filter onto the predicate.
+            pred = pred.addIndexLocalFilter(ElementFilter.newInstance(test));
+
+            return new PipelineJoin(new BOp[] { left, pred }, anns
+                    .toArray(new NV[anns.size()]));
+
+        } else {
+
+            /*
+             * Parallel Subquery.
+             */
+
+            /*
+             * Setup the data set join.
+             * 
+             * @todo When the #of named graphs is large we need to do something
+             * special to avoid sending huge graph sets around with the query.
+             * For example, we should create named data sets and join against
+             * them rather than having an in-memory DataSetJoin.
+             * 
+             * @todo The historical approach performed parallel subquery using
+             * an expander pattern rather than a data set join. The data set
+             * join should have very much the same effect, but it may need to
+             * emit multiple chunks to have good parallelism.
+             */
+
+            // The variable to be bound.
+            final IVariable var = (IVariable) pred.get(3);
+
+            // The data set join.
+            final DataSetJoin dataSetJoin = new DataSetJoin(new BOp[] { var },
+                    NV.asMap(new NV[] {
+                            new NV(DataSetJoin.Annotations.VAR, var),
+                            new NV(DataSetJoin.Annotations.GRAPHS, summary
+                                    .getGraphs()) }));
+
+            if (scaleOut) {
+                anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.SHARDED));
+                anns
+                        .add(new NV(Predicate.Annotations.REMOTE_ACCESS_PATH,
+                                false));
+            } else {
+                anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.ANY));
+                anns
+                        .add(new NV(Predicate.Annotations.REMOTE_ACCESS_PATH,
+                                false));
+            }
+
+            return new PipelineJoin(new BOp[] { left, pred }, anns
+                    .toArray(new NV[anns.size()]));
+
+        }
+
+    }
+
+    /**
+     * Generate a default graph join (quads mode).
+     * 
+     * @param queryEngine
+     * @param left
+     * @param anns
+     * @param pred
+     * @return
+     */
+    private static PipelineOp defaultGraphJoin(final QueryEngine queryEngine,
+            final BOpContextBase context, final PipelineOp left,
+            final List<NV> anns, Predicate pred, final Dataset dataset,
+            final org.openrdf.query.algebra.Var cvar) {
+
+        /*
+         * @todo raise this into the caller and do one per rule rather than once
+         * per access path.
+         */
+        final DataSetSummary summary = dataset == null ? null
+                : new DataSetSummary(dataset.getDefaultGraphs());
+
+        final boolean scaleOut = queryEngine.isScaleOut();
+
+        if (dataset != null && summary.nknown == 0) {
+
+            /*
+             * The data set is empty (no graphs). Return a join backed by an
+             * empty access path.
+             */
+
+            // force an empty access path for this predicate.
+            pred = (Predicate) pred.setUnboundProperty(
+                    IPredicate.Annotations.ACCESS_PATH_EXPANDER,
+                    EmptyAccessPathExpander.INSTANCE);
+
+            return new PipelineJoin(new BOp[] { left, pred }, anns
+                    .toArray(new NV[anns.size()]));
+
+        }
+        
+        if (dataset != null && summary.nknown == 1) {
 
             /*
              * The dataset contains exactly one graph. Bind C. Add a filter to
@@ -740,12 +723,14 @@ public class Rule2BOpUtility {
             pred = pred.asBound((IVariable) pred.get(3), new Constant(
                     summary.firstContext));
 
-            pred = pred.addAccessPathFilter(StripContextFilter.INSTANCE);
+            pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
             
             return new PipelineJoin(new BOp[] { left, pred }, anns
                     .toArray(new NV[anns.size()]));
 
-        } else if (pred.getKeyOrder().getIndexName().endsWith("C")) {
+        }
+        
+        if (pred.getKeyOrder().getIndexName().endsWith("C")) {
 
             /*
              * C is not bound. An advancer is imposed on the AP to skip to the
@@ -764,7 +749,7 @@ public class Rule2BOpUtility {
             pred = pred.addIndexLocalFilter(new ContextAdvancer());
             
             // Filter to strip off the context position.
-            pred = pred.addAccessPathFilter(StripContextFilter.INSTANCE);
+            pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
 
             if(scaleOut) {
 
@@ -802,128 +787,114 @@ public class Rule2BOpUtility {
                 }
 
             }
+
             return new PipelineJoin(new BOp[] { left, pred }, anns
                     .toArray(new NV[anns.size()]));
-            
+
         }
-        // FIXME Finish the default graph decision tree.
-        throw new UnsupportedOperationException();
-//        } else if (dataset == null) {
-//
+
+        // Estimate cost of SCAN with C unbound.
+        final double scanCost = queryEngine.estimateCost(context, pred);
+        anns.add(new NV(Annotations.COST_SCAN, scanCost));
+
+        /*
+         * Estimate cost of SUBQUERY with C bound (sampling). A large value is
+         * used if the dataset is null since the default graph query will run
+         * against all contexts and we are better off doing a SCAN.
+         */
+        final double subqueryCost = dataset == null ? Double.MAX_VALUE
+                : summary.estimateSubqueryCost(queryEngine, context,
+                        SAMPLE_LIMIT, pred, anns);
+
+        if (scanCost < subqueryCost) {
+
+            /*
+             * SCAN AND FILTER. C is not bound. Unless all graphs are used,
+             * layer IN filter on the AP to select for the desired graphs. Layer
+             * a filter on the AP to strip off the context position. Layer a
+             * DISTINCT filter on top of that.
+             */
+
+            if (dataset != null) {
+                
+                // IN filter for the named graphs.
+                final IElementFilter<ISPO> test = new InGraphHashSetFilter<ISPO>(
+                        summary.nknown, summary.graphs);
+
+                // layer filter onto the predicate.
+                pred = pred
+                        .addIndexLocalFilter(ElementFilter.newInstance(test));
+
+            }
+
+            // Filter to strip off the context position.
+            pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
+
+            // Filter for distinct SPOs.
+            pred = pred.addAccessPathFilter(DistinctFilter.newInstance());
+
+            return new PipelineJoin(new BOp[] { left, pred }, anns
+                    .toArray(new NV[anns.size()]));
+
+        } else {
+
+            /*
+             * PARALLEL SUBQUERY. Bind each value of C in turn, issuing parallel
+             * subqueries against the asBound access paths using an expander
+             * pattern and layer on a filter to strip off the context position.
+             * The asBound access paths write on a shared buffer. That shared
+             * buffer is read from by the expander.
+             * 
+             * Scale-out: JOIN is ANY or HASHED. AP is REMOTE.
+             * 
+             * FIXME This needs to be implemented based on an expander pattern
+             * which we can capture from DefaultGraphExpander.
+             */
+
+            throw new UnsupportedOperationException();
+            
 //            /*
-//             * The dataset is all graphs. C is left unbound and the unmodified
-//             * access path is used.
+//             * Setup the data set join.
+//             * 
+//             * @todo When the #of named graphs is large we need to do something
+//             * special to avoid sending huge graph sets around with the query.
+//             * For example, we should create named data sets and join against
+//             * them rather than having an in-memory DataSetJoin.
+//             * 
+//             * @todo The historical approach performed parallel subquery using
+//             * an expander pattern rather than a data set join. The data set
+//             * join should have very much the same effect, but it may need to
+//             * emit multiple chunks to have good parallelism.
 //             */
+//
+//            // The variable to be bound.
+//            final IVariable var = (IVariable) pred.get(3);
+//
+//            // The data set join.
+//            final DataSetJoin dataSetJoin = new DataSetJoin(new BOp[] { var },
+//                    NV.asMap(new NV[] {
+//                            new NV(DataSetJoin.Annotations.VAR, var),
+//                            new NV(DataSetJoin.Annotations.GRAPHS, summary
+//                                    .getGraphs()) }));
+//
+//            if (scaleOut) {
+//                anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+//                        BOpEvaluationContext.SHARDED));
+//                anns
+//                        .add(new NV(Predicate.Annotations.REMOTE_ACCESS_PATH,
+//                                false));
+//            } else {
+//                anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+//                        BOpEvaluationContext.ANY));
+//                anns
+//                        .add(new NV(Predicate.Annotations.REMOTE_ACCESS_PATH,
+//                                false));
+//            }
 //
 //            return new PipelineJoin(new BOp[] { left, pred }, anns
 //                    .toArray(new NV[anns.size()]));
-//
-//        } else {
-//
-//            /*
-//             * Estimate cost of SCAN with C unbound.
-//             */
-//            final double scanCost = queryEngine.estimateCost(context, pred);
-//
-//            anns.add(new NV(Annotations.COST_SCAN, scanCost));
-//
-//            /*
-//             * Estimate cost of SUBQUERY with C bound (sampling).
-//             * 
-//             * @todo This should randomly sample in case there is bias in the
-//             * order in which the URIs are presented here. However, the only
-//             * thing which would be likely to create a strong bias is if someone
-//             * sorted them on the IVs or if the URIs were in the same ordering
-//             * in which their IVs were assigned AND the data were somehow
-//             * correlated with that order. I rate the latter as pretty unlikely
-//             * and the former is not true, so this sampling approach should be
-//             * pretty good.
-//             * 
-//             * @todo parameter for the #of samples to take.
-//             */
-//            double subqueryCost = 0d;
-//            final int limit = 100;
-//            int nsamples = 0;
-//            for (URI uri : summary.graphs) {
-//                if (nsamples == limit)
-//                    break;
-//                final IV graph = ((BigdataURI) uri).getIV();
-//                subqueryCost += queryEngine.estimateCost(context, pred.asBound(
-//                        (IVariable) pred.get(3), new Constant(graph)));
-//                nsamples++;
-//            }
-//            subqueryCost /= nsamples;
-//
-//            anns.add(new NV(Annotations.COST_SUBQUERY, subqueryCost));
-//            anns.add(new NV(Annotations.COST_SUBQUERY_SAMPLE_COUNT, nsamples));
-//
-//            if (scanCost < subqueryCost * summary.nknown) {
-//
-//                /*
-//                 * Scan and filter. C is left unbound. We do a range scan on the
-//                 * index and filter using an IN constraint.
-//                 */
-//
-//                // IN filter for the named graphs.
-//                final IElementFilter<ISPO> test = new InGraphHashSetFilter<ISPO>(
-//                        summary.nknown, summary.graphs);
-//
-//                // layer filter onto the predicate.
-//                pred = pred
-//                        .addIndexLocalFilter(ElementFilter.newInstance(test));
-//                
-//                return new PipelineJoin(new BOp[] { left, pred }, anns
-//                        .toArray(new NV[anns.size()]));
-//
-//            } else {
-//
-//                /*
-//                 * Parallel Subquery.
-//                 */
-//
-//                /*
-//                 * Setup the data set join.
-//                 * 
-//                 * @todo When the #of named graphs is large we need to do
-//                 * something special to avoid sending huge graph sets around
-//                 * with the query. For example, we should create named data sets
-//                 * and join against them rather than having an in-memory
-//                 * DataSetJoin.
-//                 * 
-//                 * @todo The historical approach performed parallel subquery
-//                 * using an expander pattern rather than a data set join. The
-//                 * data set join should have very much the same effect, but it
-//                 * may need to emit multiple chunks to have good parallelism.
-//                 */
-//
-//                // The variable to be bound.
-//                final IVariable var = (IVariable) pred.get(3);
-//                
-//                // The data set join.
-//                final DataSetJoin dataSetJoin = new DataSetJoin(
-//                        new BOp[] { var }, NV.asMap(new NV[] {
-//                                new NV(DataSetJoin.Annotations.VAR, var),
-//                                new NV(DataSetJoin.Annotations.GRAPHS, summary
-//                                        .getGraphs()) }));
-//
-//                if (scaleOut) {
-//                    anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
-//                            BOpEvaluationContext.SHARDED));
-//                    anns.add(new NV(Predicate.Annotations.REMOTE_ACCESS_PATH,
-//                            false));
-//                } else {
-//                    anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
-//                            BOpEvaluationContext.ANY));
-//                    anns.add(new NV(Predicate.Annotations.REMOTE_ACCESS_PATH,
-//                            false));
-//                }
-//
-//                return new PipelineJoin(new BOp[] { left, pred }, anns
-//                        .toArray(new NV[anns.size()]));
-//
-//            }
-//
-//        }
+
+        }
 
     }
 
@@ -1113,7 +1084,61 @@ public class Rule2BOpUtility {
             return a;
             
         }
-        
+
+        /**
+         * Estimate cost of SUBQUERY with C bound (sampling).
+         * 
+         * @param queryEngine
+         * @param context
+         * @param limit
+         *            The maximum #of samples to take.
+         * @param pred
+         *            The predicate.
+         * @param anns
+         *            A list of annotations to which the cost estimate data will
+         *            be added.
+         * 
+         * @return The estimated cost. This is adjusted based on the sample size
+         *         and the #of graphs against which the query was issued and
+         *         represents the total expected cost of the subqueries against
+         *         all of the graphs in the {@link Dataset}.
+         * 
+         * @todo Subquery will be less efficient than a scan when the access
+         *       path is remote since there will be remote requests. This model
+         *       does not capture that additional overhead. We need to measure
+         *       the overhead using appropriate data sets and queries and then
+         *       build it into the model. The overhead itself could be changed
+         *       dramatically by optimizations in the
+         *       {@link FederatedQueryEngine} and the {@link ResourceService}.
+         * 
+         * @todo This should randomly sample in case there is bias in the order
+         *       in which the URIs are presented here. However, the only thing
+         *       which would be likely to create a strong bias is if someone
+         *       sorted them on the IVs or if the URIs were in the same ordering
+         *       in which their IVs were assigned AND the data were somehow
+         *       correlated with that order. I rate the latter as pretty
+         *       unlikely and the former is not true, so this sampling approach
+         *       should be pretty good.
+         */
+        public double estimateSubqueryCost(QueryEngine queryEngine,
+                BOpContextBase context, int limit, Predicate pred, List<NV> anns) {
+            double subqueryCost = 0d;
+            int nsamples = 0;
+            for (URI uri : graphs) {
+                if (nsamples == limit)
+                    break;
+                final IV graph = ((BigdataURI) uri).getIV();
+                subqueryCost += queryEngine.estimateCost(context, pred.asBound(
+                        (IVariable) pred.get(3), new Constant(graph)));
+                nsamples++;
+            }
+            subqueryCost = (subqueryCost * nknown) / nsamples;
+
+            anns.add(new NV(Annotations.COST_SUBQUERY, subqueryCost));
+            anns.add(new NV(Annotations.COST_SUBQUERY_SAMPLE_COUNT, nsamples));
+            return subqueryCost;
+        }
+
     } // DataSetSummary
 
     /**
