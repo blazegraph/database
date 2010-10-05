@@ -543,63 +543,70 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
     }
 
-    public boolean equals(final Object other) {
-        
-        if (this == other)
-            return true;
-
-        if(!(other instanceof IPredicate<?>))
-            return false;
-        
-        final IPredicate<?> o = (IPredicate<?>)other;
-        
-        final int arity = arity();
-        
-        if(arity != o.arity()) return false;
-
-        for (int i = 0; i < arity; i++) {
-
-            final IVariableOrConstant<?> x = get(i);
-
-            final IVariableOrConstant<?> y = o.get(i);
-            
-            if (x != y && !(x.equals(y))) {
-                
-                return false;
-            
-            }
-            
-        }
-        
-        return true;
-        
-    }
-    
-    public int hashCode() {
-        
-        int h = hash;
-
-        if (h == 0) {
-
-            final int n = arity();
-
-            for (int i = 0; i < n; i++) {
-        
-                h = 31 * h + get(i).hashCode();
-                
-            }
-            
-            hash = h;
-            
-        }
-        
-        return h;
-
-    }
-
-    /**
-     * Caches the hash code.
+    /*
+     * Intentionally removed. See BOpBase.
+     * 
+     * hashCode() and equals() for Predicate were once used to cache access
+     * paths, but that code was history long before we developed the bop model.
      */
-    private int hash = 0;
+    
+//    public boolean equals(final Object other) {
+//        
+//        if (this == other)
+//            return true;
+//
+//        if(!(other instanceof IPredicate<?>))
+//            return false;
+//        
+//        final IPredicate<?> o = (IPredicate<?>)other;
+//        
+//        final int arity = arity();
+//        
+//        if(arity != o.arity()) return false;
+//
+//        for (int i = 0; i < arity; i++) {
+//
+//            final IVariableOrConstant<?> x = get(i);
+//
+//            final IVariableOrConstant<?> y = o.get(i);
+//            
+//            if (x != y && !(x.equals(y))) {
+//                
+//                return false;
+//            
+//            }
+//            
+//        }
+//        
+//        return true;
+//        
+//    }
+//    
+//    public int hashCode() {
+//        
+//        int h = hash;
+//
+//        if (h == 0) {
+//
+//            final int n = arity();
+//
+//            for (int i = 0; i < n; i++) {
+//        
+//                h = 31 * h + get(i).hashCode();
+//                
+//            }
+//            
+//            hash = h;
+//            
+//        }
+//        
+//        return h;
+//
+//    }
+//
+//    /**
+//     * Caches the hash code.
+//     */
+//    private int hash = 0;
 
 }

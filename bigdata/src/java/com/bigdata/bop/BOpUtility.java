@@ -413,7 +413,7 @@ public class BOpUtility {
                  * trees whose sinks target a descendant, which is another way
                  * to create a loop.
                  */
-                throw new DuplicateBOpException("id=" + t.getId() + ", root="
+                throw new DuplicateBOpException("dup=" + t + ", root="
                         + toString(op));
             }
         }
