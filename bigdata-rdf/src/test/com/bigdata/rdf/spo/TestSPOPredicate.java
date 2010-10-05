@@ -182,130 +182,130 @@ public class TestSPOPredicate extends TestCase2 {
 
 	}
     
-    /**
-     * Verify equality testing with same impl.
-     */
-    public void test_equalsSameImpl() {
-
-        final Var<IV> u = Var.var("u");
-
-        final SPOPredicate p1 = new SPOPredicate(relation,u, rdfsSubClassOf, rdfsResource);
-
-        final SPOPredicate p2 = new SPOPredicate(relation,u, rdfType, rdfsClass);
-
-        log.info(p1.toString());
-
-        log.info(p2.toString());
-
-        assertTrue(p1.equals(new SPOPredicate(relation, u, rdfsSubClassOf, rdfsResource)));
-
-        assertTrue(p2.equals(new SPOPredicate(relation, u, rdfType, rdfsClass)));
-        
-        assertFalse(p1.equals(p2));
-
-        assertFalse(p2.equals(p1));
-        
-    }
-    
-    public void test_equalsDifferentImpl() {
-        
-        final Var<IV> u = Var.var("u");
-
-        final SPOPredicate p1 = new SPOPredicate(relation, u, rdfType, rdfsClass);
-
-        final Predicate p2 = new Predicate(new IVariableOrConstant[] { u,
-                rdfType, rdfsClass }, new NV(
-                Predicate.Annotations.RELATION_NAME, new String[] { relation }));
-
-        log.info(p1.toString());
-
-        log.info(p2.toString());
-
-        assertTrue(p1.equals(p2));
-
-        assertTrue(p2.equals(p1));
-
-    }
-
-    /**
-     * Note: {@link HashMap} support will breaks unless the {@link IPredicate}
-     * class defines <code>equals(Object o)</code>. If it just defines
-     * <code>equals(IPredicate)</code> then {@link Object#equals(Object)} will
-     * be invoked instead!
-     */
-    public void test_hashMapSameImpl() {
-
-        final Var<IV> u = Var.var("u");
-
-        final SPOPredicate p1 = new SPOPredicate(relation, u, rdfsSubClassOf,
-                rdfsResource);
-
-        final Predicate<?> p1b = new Predicate(new IVariableOrConstant[] { u,
-                rdfsSubClassOf, rdfsResource }, new NV(Predicate.Annotations.RELATION_NAME,
-                        new String[] { relation }));
-
-        final SPOPredicate p2 = new SPOPredicate(relation, u, rdfType,
-                rdfsClass);
-
-        final Predicate<?> p2b = new Predicate(new IVariableOrConstant[] { u,
-                rdfType, rdfsClass }, new NV(Predicate.Annotations.RELATION_NAME,
-                        new String[] { relation }));
-
-        // p1 and p1b compare as equal.
-        assertTrue(p1.equals(p1));
-        assertTrue(p1.equals(p1b));
-        assertTrue(p1b.equals(p1));
-        assertTrue(p1b.equals(p1b));
-        
-        // {p1,p1b} not equal {p2,p2b}
-        assertFalse(p1.equals(p2));
-        assertFalse(p1.equals(p2b));
-        assertFalse(p1b.equals(p2));
-        assertFalse(p1b.equals(p2b));
-
-        // {p1,p1b} have the same hash code.
-        assertEquals(p1.hashCode(), p1b.hashCode());
-
-        // {p2,p2b} have the same hash code.
-        assertEquals(p2.hashCode(), p2b.hashCode());
-        
-        final HashMap<IPredicate,String> map = new HashMap<IPredicate,String>();
-        
-        assertFalse(map.containsKey(p1));
-        assertFalse(map.containsKey(p2));
-        assertFalse(map.containsKey(p1b));
-        assertFalse(map.containsKey(p2b));
-        
-        assertEquals(0,map.size());
-        assertNull(map.put(p1,"p1"));
-        assertEquals(1,map.size());
-        assertEquals("p1",map.put(p1,"p1"));
-        assertEquals(1,map.size());
-
-        assertTrue(p1.equals(p1b));
-        assertTrue(p1b.equals(p1));
-        assertTrue(p1.hashCode()==p1b.hashCode());
-        assertEquals("p1",map.put(p1b,"p1"));
-        assertEquals(1,map.size());
-        
-        assertTrue(map.containsKey(p1));
-        assertTrue(map.containsKey(p1b));
-        assertFalse(map.containsKey(p2));
-        assertFalse(map.containsKey(p2b));
-
-        assertEquals("p1",map.get(p1));
-        assertEquals("p1",map.get(p1b));
-        
-        map.put(p2,"p2");
-        
-        assertTrue(map.containsKey(p1));
-        assertTrue(map.containsKey(p1b));
-        assertTrue(map.containsKey(p2));
-        assertTrue(map.containsKey(p2b));
-        
-        assertEquals("p2",map.get(p2));
-        assertEquals("p2",map.get(p2b));
-        
-    }
+//    /**
+//     * Verify equality testing with same impl.
+//     */
+//    public void test_equalsSameImpl() {
+//
+//        final Var<IV> u = Var.var("u");
+//
+//        final SPOPredicate p1 = new SPOPredicate(relation,u, rdfsSubClassOf, rdfsResource);
+//
+//        final SPOPredicate p2 = new SPOPredicate(relation,u, rdfType, rdfsClass);
+//
+//        log.info(p1.toString());
+//
+//        log.info(p2.toString());
+//
+//        assertTrue(p1.equals(new SPOPredicate(relation, u, rdfsSubClassOf, rdfsResource)));
+//
+//        assertTrue(p2.equals(new SPOPredicate(relation, u, rdfType, rdfsClass)));
+//        
+//        assertFalse(p1.equals(p2));
+//
+//        assertFalse(p2.equals(p1));
+//        
+//    }
+//    
+//    public void test_equalsDifferentImpl() {
+//        
+//        final Var<IV> u = Var.var("u");
+//
+//        final SPOPredicate p1 = new SPOPredicate(relation, u, rdfType, rdfsClass);
+//
+//        final Predicate p2 = new Predicate(new IVariableOrConstant[] { u,
+//                rdfType, rdfsClass }, new NV(
+//                Predicate.Annotations.RELATION_NAME, new String[] { relation }));
+//
+//        log.info(p1.toString());
+//
+//        log.info(p2.toString());
+//
+//        assertTrue(p1.equals(p2));
+//
+//        assertTrue(p2.equals(p1));
+//
+//    }
+//
+//    /**
+//     * Note: {@link HashMap} support will breaks unless the {@link IPredicate}
+//     * class defines <code>equals(Object o)</code>. If it just defines
+//     * <code>equals(IPredicate)</code> then {@link Object#equals(Object)} will
+//     * be invoked instead!
+//     */
+//    public void test_hashMapSameImpl() {
+//
+//        final Var<IV> u = Var.var("u");
+//
+//        final SPOPredicate p1 = new SPOPredicate(relation, u, rdfsSubClassOf,
+//                rdfsResource);
+//
+//        final Predicate<?> p1b = new Predicate(new IVariableOrConstant[] { u,
+//                rdfsSubClassOf, rdfsResource }, new NV(Predicate.Annotations.RELATION_NAME,
+//                        new String[] { relation }));
+//
+//        final SPOPredicate p2 = new SPOPredicate(relation, u, rdfType,
+//                rdfsClass);
+//
+//        final Predicate<?> p2b = new Predicate(new IVariableOrConstant[] { u,
+//                rdfType, rdfsClass }, new NV(Predicate.Annotations.RELATION_NAME,
+//                        new String[] { relation }));
+//
+//        // p1 and p1b compare as equal.
+//        assertTrue(p1.equals(p1));
+//        assertTrue(p1.equals(p1b));
+//        assertTrue(p1b.equals(p1));
+//        assertTrue(p1b.equals(p1b));
+//        
+//        // {p1,p1b} not equal {p2,p2b}
+//        assertFalse(p1.equals(p2));
+//        assertFalse(p1.equals(p2b));
+//        assertFalse(p1b.equals(p2));
+//        assertFalse(p1b.equals(p2b));
+//
+//        // {p1,p1b} have the same hash code.
+//        assertEquals(p1.hashCode(), p1b.hashCode());
+//
+//        // {p2,p2b} have the same hash code.
+//        assertEquals(p2.hashCode(), p2b.hashCode());
+//        
+//        final HashMap<IPredicate,String> map = new HashMap<IPredicate,String>();
+//        
+//        assertFalse(map.containsKey(p1));
+//        assertFalse(map.containsKey(p2));
+//        assertFalse(map.containsKey(p1b));
+//        assertFalse(map.containsKey(p2b));
+//        
+//        assertEquals(0,map.size());
+//        assertNull(map.put(p1,"p1"));
+//        assertEquals(1,map.size());
+//        assertEquals("p1",map.put(p1,"p1"));
+//        assertEquals(1,map.size());
+//
+//        assertTrue(p1.equals(p1b));
+//        assertTrue(p1b.equals(p1));
+//        assertTrue(p1.hashCode()==p1b.hashCode());
+//        assertEquals("p1",map.put(p1b,"p1"));
+//        assertEquals(1,map.size());
+//        
+//        assertTrue(map.containsKey(p1));
+//        assertTrue(map.containsKey(p1b));
+//        assertFalse(map.containsKey(p2));
+//        assertFalse(map.containsKey(p2b));
+//
+//        assertEquals("p1",map.get(p1));
+//        assertEquals("p1",map.get(p1b));
+//        
+//        map.put(p2,"p2");
+//        
+//        assertTrue(map.containsKey(p1));
+//        assertTrue(map.containsKey(p1b));
+//        assertTrue(map.containsKey(p2));
+//        assertTrue(map.containsKey(p2b));
+//        
+//        assertEquals("p2",map.get(p2));
+//        assertEquals("p2",map.get(p2b));
+//        
+//    }
     
 }
