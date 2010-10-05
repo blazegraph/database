@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.ap;
 
-import java.util.Iterator;
 import java.util.Map;
 
 import com.bigdata.bop.AbstractAccessPathOp;
@@ -44,11 +43,11 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.ISolutionExpander;
+import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.striterator.IKeyOrder;
 
-import cutthecrap.utils.striterators.FilterBase;
 import cutthecrap.utils.striterators.IFilter;
+import cutthecrap.utils.striterators.NOPFilter;
 
 /**
  * A generic implementation of an immutable {@link IPredicate}.
@@ -140,7 +139,7 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
     public Predicate(final IVariableOrConstant<?>[] values,
             final String relationName, final int partitionId,
             final boolean optional, final IElementFilter<E> constraint,
-            final ISolutionExpander<E> expander, final long timestamp) {
+            final IAccessPathExpander<E> expander, final long timestamp) {
 
         this(values, NV.asMap(new NV[] {//
                 new NV(Annotations.RELATION_NAME,new String[]{relationName}),//
@@ -258,9 +257,9 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
     }
     
     @SuppressWarnings("unchecked")
-    final public ISolutionExpander<E> getSolutionExpander() {
+    final public IAccessPathExpander<E> getAccessPathExpander() {
         
-        return (ISolutionExpander<E>) getProperty(Annotations.ACCESS_PATH_EXPANDER);
+        return (IAccessPathExpander<E>) getProperty(Annotations.ACCESS_PATH_EXPANDER);
         
     }
 
@@ -325,17 +324,11 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
         final int arity = arity();
         
+//        boolean modified = false;
+        
         for (int i = 0; i < arity; i++) {
 
             final IVariableOrConstant<?> t = (IVariableOrConstant<?>) get(i);
-
-//            if (t == null) {
-//                /*
-//                 * Note: t != null handles the case where the [c] position of an
-//                 * SPO is allowed to be null.
-//                 */
-//                continue;
-//            }
 
             if (t.isConstant())
                 continue;
@@ -350,6 +343,8 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
             }
 
             tmp.set(i, val.clone());
+            
+//            modified = true;
 
         }
         
@@ -363,22 +358,22 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
 
     }
 
-    @SuppressWarnings("unchecked")
-    public IKeyOrder<E> getKeyOrder() {
-
-        return (IKeyOrder<E>) getProperty(Annotations.KEY_ORDER);
-
-    }
-
-    public Predicate<E> setKeyOrder(final IKeyOrder<E> keyOrder) {
-
-        final Predicate<E> tmp = this.clone();
-
-        tmp._setProperty(Annotations.KEY_ORDER, keyOrder);
-
-        return tmp;
-
-    }
+//    @SuppressWarnings("unchecked")
+//    public IKeyOrder<E> getKeyOrder() {
+//
+//        return (IKeyOrder<E>) getProperty(Annotations.KEY_ORDER);
+//
+//    }
+//
+//    public Predicate<E> setKeyOrder(final IKeyOrder<E> keyOrder) {
+//
+//        final Predicate<E> tmp = this.clone();
+//
+//        tmp._setProperty(Annotations.KEY_ORDER, keyOrder);
+//
+//        return tmp;
+//
+//    }
     
     @SuppressWarnings("unchecked")
     public Predicate<E> clone() {
@@ -486,37 +481,22 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
             /*
              * Wrap the filter.
              */
-            _setProperty(name, new FilterBase() {
-
-                @Override
-                protected Iterator filterOnce(Iterator src, Object context) {
-                    return src;
-                }
-                
-            }.addFilter(current).addFilter(filter));
+            _setProperty(name, new NOPFilter().addFilter(current)
+                    .addFilter(filter));
         }
 
     }
-
+    
     /**
-     * Strips off the named annotations.
-     * 
-     * @param names
-     *            The annotations to be removed.
-     *            
-     * @return A new predicate in which the specified annotations do not appear.
+     * Strengthened return type.
+     * <p>
+     * {@inheritDoc}
      */
+    @SuppressWarnings("unchecked")
+    @Override
     public Predicate<E> clearAnnotations(final String[] names) {
-
-        final Predicate<E> tmp = this.clone();
-
-        for(String name : names) {
-            
-            tmp._clearProperty(name);
-            
-        }
-
-        return tmp;
+        
+        return (Predicate<E>) super.clearAnnotations(names);
         
     }
     
@@ -533,7 +513,15 @@ public class Predicate<E> extends AbstractAccessPathOp<E> implements
         final StringBuilder sb = new StringBuilder();
 
         sb.append(getClass().getName());
+
+        final Integer bopId = (Integer) getProperty(Annotations.BOP_ID);
         
+        if (bopId != null) {
+        
+            sb.append("[" + bopId + "]");
+            
+        }
+
         sb.append("(");
 
         for (int i = 0; i < arity; i++) {

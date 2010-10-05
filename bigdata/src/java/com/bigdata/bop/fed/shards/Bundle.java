@@ -22,6 +22,8 @@ class Bundle<F> implements Comparable<Bundle<F>> {
     /** The asBound predicate. */
     final IPredicate<F> asBound;
 
+    final IKeyOrder<F> keyOrder;
+    
     /** The fromKey generated from that asBound predicate. */
     final byte[] fromKey;
 
@@ -35,6 +37,8 @@ class Bundle<F> implements Comparable<Bundle<F>> {
 
         this.asBound = pred.asBound(bindingSet);
 
+        this.keyOrder = keyOrder;
+        
         this.fromKey = keyOrder.getFromKey(keyBuilder, asBound);
 
         this.toKey = keyOrder.getToKey(keyBuilder, asBound);
@@ -98,6 +102,7 @@ class Bundle<F> implements Comparable<Bundle<F>> {
         StringBuilder sb = new StringBuilder(super.toString());
         sb.append("{bindingSet="+bindingSet);
         sb.append(",asBound="+asBound);
+        sb.append(",keyOrder="+keyOrder);
         sb.append(",fromKey="+BytesUtil.toString(fromKey));
         sb.append(",toKey="+BytesUtil.toString(toKey));
         sb.append("}");

@@ -28,9 +28,9 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.TripleStoreUtility;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.TempTripleStore;
+import com.bigdata.rdf.store.TripleStoreUtility;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.rule.Program;
@@ -104,7 +104,8 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
      */
     public Properties getProperties(
             final Class<? extends BaseClosure> closureClass,
-            final boolean nestedSubquery) {
+            final boolean nestedSubqueryIsIgnored
+            ) {
 
         final Properties properties = getProperties();
 
@@ -113,10 +114,10 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
                         com.bigdata.rdf.store.AbstractTripleStore.Options.CLOSURE_CLASS,
                         closureClass.getName());
 
-        properties
-                .setProperty(
-                        com.bigdata.rdf.store.AbstractTripleStore.Options.NESTED_SUBQUERY,
-                        "" + nestedSubquery);
+//        properties
+//                .setProperty(
+//                        com.bigdata.rdf.store.AbstractTripleStore.Options.NESTED_SUBQUERY,
+//                        "" + nestedSubquery);
 
         return properties;
         
@@ -126,24 +127,24 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
      * small.rdf
      */
     
-    public void test_fixedPoint_Small_Full_NestedSubqueryJoins()
-            throws Exception {
-
-        final Properties properties = getProperties(FullClosure.class, true/* nestedSubquery */);
-
-        final AbstractTripleStore store = getStore(properties);
-
-        try {
-
-            doFixedPointTest(new String[] { "small.rdf" }, store);
-
-        } finally {
-
-            store.__tearDownUnitTest();
-
-        }
-
-    }
+//    public void test_fixedPoint_Small_Full_NestedSubqueryJoins()
+//            throws Exception {
+//
+//        final Properties properties = getProperties(FullClosure.class, true/* nestedSubquery */);
+//
+//        final AbstractTripleStore store = getStore(properties);
+//
+//        try {
+//
+//            doFixedPointTest(new String[] { "small.rdf" }, store);
+//
+//        } finally {
+//
+//            store.__tearDownUnitTest();
+//
+//        }
+//
+//    }
 
     public void test_fixedPoint_Small_Full_PipelineJoins() throws Exception {
 
@@ -163,24 +164,24 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
     }
 
-    public void test_fixedPoint_Small_Fast_NestedSubqueryJoins()
-            throws Exception {
-
-        final Properties properties = getProperties(FastClosure.class, true/* nestedSubquery */);
-
-        final AbstractTripleStore store = getStore(properties);
-
-        try {
-
-            doFixedPointTest(new String[] { "small.rdf" }, store);
-
-        } finally {
-
-            store.__tearDownUnitTest();
-
-        }
-
-    }
+//    public void test_fixedPoint_Small_Fast_NestedSubqueryJoins()
+//            throws Exception {
+//
+//        final Properties properties = getProperties(FastClosure.class, true/* nestedSubquery */);
+//
+//        final AbstractTripleStore store = getStore(properties);
+//
+//        try {
+//
+//            doFixedPointTest(new String[] { "small.rdf" }, store);
+//
+//        } finally {
+//
+//            store.__tearDownUnitTest();
+//
+//        }
+//
+//    }
 
     public void test_fixedPoint_Small_Fast_PipelineJoins() throws Exception {
 
@@ -204,24 +205,25 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
      * sample data.rdf
      */
     
-    public void test_fixedPoint_SampleData_Full_NestedSubqueryJoins()
-            throws Exception {
-
-        final Properties properties = getProperties(FullClosure.class, true/* nestedSubquery */);
-
-        final AbstractTripleStore store = getStore(properties);
-
-        try {
-
-            doFixedPointTest(new String[] { "sample data.rdf" }, store);
-
-        } finally {
-
-            store.__tearDownUnitTest();
-
-        }
-
-    }
+//    public void test_fixedPoint_SampleData_Full_NestedSubqueryJoins()
+//            throws Exception {
+//
+//        final Properties properties = getProperties(FullClosure.class, true/* nestedSubquery */);
+//
+//        final AbstractTripleStore store = getStore(properties);
+//
+//        try {
+//
+//            doFixedPointTest(new String[] { "sample data.rdf" }, store);
+//
+//        } finally {
+//
+//            store.__tearDownUnitTest();
+//
+//        }
+//
+//    }
+    
     public void test_fixedPoint_SampleData_Full_PipelineJoins()
             throws Exception {
 
@@ -241,24 +243,24 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
     }
 
-    public void test_fixedPoint_SampleData_Fast_NestedSubqueryJoins()
-            throws Exception {
-
-        final Properties properties = getProperties(FastClosure.class, true/* nextedSubquery */);
-
-        final AbstractTripleStore store = getStore(properties);
-
-        try {
-
-            doFixedPointTest(new String[] { "sample data.rdf" }, store);
-
-        } finally {
-
-            store.__tearDownUnitTest();
-
-        }
-
-    }
+//    public void test_fixedPoint_SampleData_Fast_NestedSubqueryJoins()
+//            throws Exception {
+//
+//        final Properties properties = getProperties(FastClosure.class, true/* nextedSubquery */);
+//
+//        final AbstractTripleStore store = getStore(properties);
+//
+//        try {
+//
+//            doFixedPointTest(new String[] { "sample data.rdf" }, store);
+//
+//        } finally {
+//
+//            store.__tearDownUnitTest();
+//
+//        }
+//
+//    }
 
     public void test_fixedPoint_SampleData_Fast_PipelineJoins()
             throws Exception {
@@ -283,24 +285,24 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
      * small owlSameAs.rdf
      */
     
-    public void test_fixedPoint_TestOwlSameAs_Full_NestedSubqueryJoins()
-            throws Exception {
-
-        final Properties properties = getProperties(FullClosure.class, true/* nestedSubquery */);
-
-        final AbstractTripleStore store = getStore(properties);
-
-        try {
-
-            doFixedPointTest(new String[] { "small owlSameAs.rdf" }, store);
-
-        } finally {
-
-            store.__tearDownUnitTest();
-
-        }
-
-    }
+//    public void test_fixedPoint_TestOwlSameAs_Full_NestedSubqueryJoins()
+//            throws Exception {
+//
+//        final Properties properties = getProperties(FullClosure.class, true/* nestedSubquery */);
+//
+//        final AbstractTripleStore store = getStore(properties);
+//
+//        try {
+//
+//            doFixedPointTest(new String[] { "small owlSameAs.rdf" }, store);
+//
+//        } finally {
+//
+//            store.__tearDownUnitTest();
+//
+//        }
+//
+//    }
 
     public void test_fixedPoint_TestOwlSameAs_Full_PipelineJoins()
             throws Exception {
@@ -321,24 +323,24 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
     }
 
-    public void test_fixedPoint_TestOwlSameAs_Fast_NestedSubqueryJoins()
-            throws Exception {
-
-        final Properties properties = getProperties(FastClosure.class, true/* nestedSubquery */);
-
-        final AbstractTripleStore store = getStore(properties);
-
-        try {
-
-            doFixedPointTest(new String[] { "small owlSameAs.rdf" }, store);
-
-        } finally {
-
-            store.__tearDownUnitTest();
-
-        }
-
-    }
+//    public void test_fixedPoint_TestOwlSameAs_Fast_NestedSubqueryJoins()
+//            throws Exception {
+//
+//        final Properties properties = getProperties(FastClosure.class, true/* nestedSubquery */);
+//
+//        final AbstractTripleStore store = getStore(properties);
+//
+//        try {
+//
+//            doFixedPointTest(new String[] { "small owlSameAs.rdf" }, store);
+//
+//        } finally {
+//
+//            store.__tearDownUnitTest();
+//
+//        }
+//
+//    }
 
     public void test_fixedPoint_TestOwlSameAs_Fast_Pipeline() throws Exception {
 
@@ -365,32 +367,32 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
      * and have never identified any problems.
      */
 
-    public void test_fixedPoint_LUBM_U1_As_Full_NestedSubquery()
-            throws Exception {
-
-        final String[] resources = readFiles(new File(
-                "bigdata-rdf/src/resources/data/lehigh/U1"),
-                new FilenameFilter() {
-                    public boolean accept(File dir, String name) {
-                        return name.endsWith(".owl");
-                    }
-                });
-
-        final Properties properties = getProperties(FullClosure.class, true/* nestedSubquery */);
-
-        final AbstractTripleStore store = getStore(properties);
-
-        try {
-
-            doFixedPointTest(resources, store);
-
-        } finally {
-
-            store.__tearDownUnitTest();
-
-        }
-
-    }
+//    public void test_fixedPoint_LUBM_U1_As_Full_NestedSubquery()
+//            throws Exception {
+//
+//        final String[] resources = readFiles(new File(
+//                "bigdata-rdf/src/resources/data/lehigh/U1"),
+//                new FilenameFilter() {
+//                    public boolean accept(File dir, String name) {
+//                        return name.endsWith(".owl");
+//                    }
+//                });
+//
+//        final Properties properties = getProperties(FullClosure.class, true/* nestedSubquery */);
+//
+//        final AbstractTripleStore store = getStore(properties);
+//
+//        try {
+//
+//            doFixedPointTest(resources, store);
+//
+//        } finally {
+//
+//            store.__tearDownUnitTest();
+//
+//        }
+//
+//    }
 
     public void test_fixedPoint_LUBM_U1_As_Full_PipelineJoins()
             throws Exception {
@@ -419,30 +421,30 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
     }
 
-    public void test_fixedPoint_LUBM_U1_As_Fast_NestedSubquery() throws Exception {
-
-        final String[] resources = readFiles(new File("bigdata-rdf/src/resources/data/lehigh/U1"),
-                new FilenameFilter() {
-                    public boolean accept(File dir, String name) {
-                        return name.endsWith(".owl");
-                    }
-                });
-
-        final Properties properties = getProperties(FastClosure.class, true/* nestedSubquery */);
-
-        final AbstractTripleStore store = getStore(properties);
-
-        try {
-
-            doFixedPointTest(resources, store);
-
-        } finally {
-
-            store.__tearDownUnitTest();
-
-        }
-
-    }
+//    public void test_fixedPoint_LUBM_U1_As_Fast_NestedSubquery() throws Exception {
+//
+//        final String[] resources = readFiles(new File("bigdata-rdf/src/resources/data/lehigh/U1"),
+//                new FilenameFilter() {
+//                    public boolean accept(File dir, String name) {
+//                        return name.endsWith(".owl");
+//                    }
+//                });
+//
+//        final Properties properties = getProperties(FastClosure.class, true/* nestedSubquery */);
+//
+//        final AbstractTripleStore store = getStore(properties);
+//
+//        try {
+//
+//            doFixedPointTest(resources, store);
+//
+//        } finally {
+//
+//            store.__tearDownUnitTest();
+//
+//        }
+//
+//    }
 
     public void test_fixedPoint_LUBM_U1_As_Fast_PipelineJoins() throws Exception {
 

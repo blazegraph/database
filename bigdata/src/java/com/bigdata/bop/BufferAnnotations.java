@@ -55,7 +55,7 @@ public interface BufferAnnotations {
     int DEFAULT_CHUNK_OF_CHUNKS_CAPACITY = 100;
 
     /**
-     * Sets the capacity of the {@link IBuffer}s used to accumulate a chunk of
+     * Sets the capacity of the {@link IBuffer}[]s used to accumulate a chunk of
      * {@link IBindingSet}s (default {@value #CHUNK_CAPACITY}). Partial chunks
      * may be automatically combined into full chunks.
      * 

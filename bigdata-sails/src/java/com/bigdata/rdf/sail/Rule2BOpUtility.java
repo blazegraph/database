@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Sep 5, 2010
  */
 
-package com.bigdata.bop.engine;
+package com.bigdata.rdf.sail;
 
 import java.io.Serializable;
 import java.util.Arrays;
@@ -37,9 +37,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.URI;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
@@ -61,27 +61,23 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.bset.StartOp;
-import com.bigdata.bop.fed.FederatedQueryEngine;
+import com.bigdata.bop.cost.ScanCostReport;
+import com.bigdata.bop.cost.SubqueryCostReport;
+import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.rdf.filter.StripContextFilter;
 import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.bop.solutions.SliceOp;
-import com.bigdata.btree.IRangeQuery;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.TermId;
 import com.bigdata.rdf.internal.VTE;
-import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.sail.BigdataEvaluationStrategyImpl;
-import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.spo.ContextAdvancer;
 import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InGraphHashSetFilter;
 import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.IRelation;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.EmptyAccessPathExpander;
@@ -91,8 +87,8 @@ import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlan2;
 import com.bigdata.relation.rule.eval.IRangeCountFactory;
 import com.bigdata.relation.rule.eval.RuleState;
-import com.bigdata.service.ResourceService;
 import com.bigdata.striterator.IKeyOrder;
+
 
 /**
  * Utility class converts {@link IRule}s to {@link BOp}s.
@@ -114,8 +110,9 @@ public class Rule2BOpUtility {
      * <p>
      * Note: When enabled, the {@link NamedGraphSolutionExpander} and
      * {@link DefaultGraphSolutionExpander} must be stripped from the
-     * {@link IPredicate.Annotations#ACCESS_PATH_EXPANDER}. In the long term, we will simply
-     * no longer generate them in {@link BigdataEvaluationStrategyImpl}.
+     * {@link IPredicate.Annotations#ACCESS_PATH_EXPANDER}. In the long term, we
+     * will simply no longer generate them in
+     * {@link BigdataEvaluationStrategyImpl}.
      * <p>
      * Note: If you want to test just the named graph stuff, then the default
      * graph processing could be handed off to the
@@ -173,21 +170,20 @@ public class Rule2BOpUtility {
          */
         String SCOPE = Rule2BOpUtility.class.getName() + ".scope";
 
-        /**
-         * The graph variable specified in the query (quads mode only). This is
-         * <p>
-         * Note: This is not used for SIDs mode because we use the standard
-         * triple store access paths.
-         * 
-         * @see org.openrdf.query.algebra.Var
-         * 
-         * @todo can we just use pred.get(3)?
-         */
-        String CVAR = Rule2BOpUtility.class.getName() + ".cvar";
-
         /*
-         * Cost estimates.
+         * Query planner and cost estimates.
          */
+
+        /**
+         * The original index assigned to the access path by the static query
+         * optimizer.
+         * <p>
+         * Note: The actual index will be chosen at runtime based on the asBound
+         * predicate. In scale-out, the binding sets are send to the node having
+         * the shard on which the asBound predicate would read.
+         */
+        String ORIGINAL_INDEX = Rule2BOpUtility.class.getName()
+                + ".originalIndex";
 
         /**
          * The estimated cost of a SCAN + FILTER approach to a default graph or
@@ -196,18 +192,11 @@ public class Rule2BOpUtility {
         String COST_SCAN = Rule2BOpUtility.class.getName() + ".cost.scan";
 
         /**
-         * The estimated cost of a SUBQUERY approach to a default graph or named
-         * graph query.
+         * A {@link SubqueryCostReport} on the estimated cost of a SUBQUERY
+         * approach to a default graph or named graph query.
          */
         String COST_SUBQUERY = Rule2BOpUtility.class.getName()
                 + ".cost.subquery";
-
-        /**
-         * The #of samples used when estimating the cost of a SUBQUERY approach
-         * to a default graph or named graph query.
-         */
-        String COST_SUBQUERY_SAMPLE_COUNT = Rule2BOpUtility.class.getName()
-                + ".cost.subquerySampleCount";
 
         /**
          * The #of known graphs in the {@link Dataset} for a default graph or
@@ -217,17 +206,16 @@ public class Rule2BOpUtility {
 
     }
 
-    /**
-     * A list of annotations to be cleared from {@link Predicate} when they are
-     * copied into a query plan.
-     */
-    private static final String[] ANNS_TO_CLEAR_FROM_PREDICATE = new String[] {
-            Annotations.QUADS,//
-            Annotations.DATASET,//
-            Annotations.SCOPE,//
-            Annotations.CVAR,//
-            IPredicate.Annotations.OPTIONAL //
-    };
+//    /**
+//     * A list of annotations to be cleared from {@link Predicate} when they are
+//     * copied into a query plan.
+//     */
+//    private static final String[] ANNS_TO_CLEAR_FROM_PREDICATE = new String[] {
+//            Annotations.QUADS,//
+//            Annotations.DATASET,//
+//            Annotations.SCOPE,//
+//            IPredicate.Annotations.OPTIONAL //
+//    };
     
     /**
      * Convert an {@link IStep} into an operator tree. This should handle
@@ -239,13 +227,14 @@ public class Rule2BOpUtility {
      * 
      * @return
      */
-    public static PipelineOp convert(final IStep step, final int startId,
-            final AbstractTripleStore db, final QueryEngine queryEngine) {
+    public static PipelineOp convert(final IStep step,
+            final AtomicInteger idFactory, final AbstractTripleStore db,
+            final QueryEngine queryEngine) {
 
-        if (step instanceof IRule)
-            return convert((IRule) step, startId, db, queryEngine);
+        if (step instanceof IRule<?>)
+            return convert((IRule<?>) step, idFactory, db, queryEngine);
         
-        return convert((IProgram) step, startId, db, queryEngine);
+        return convert((IProgram) step, idFactory, db, queryEngine);
 
     }
 
@@ -256,20 +245,20 @@ public class Rule2BOpUtility {
      * 
      * @return
      */
-    public static PipelineOp convert(final IRule rule, final int startId,
-            final AbstractTripleStore db, final QueryEngine queryEngine) {
+    public static PipelineOp convert(final IRule<?> rule,
+            final AtomicInteger idFactory, final AbstractTripleStore db,
+            final QueryEngine queryEngine) {
 
 //        // true iff the database is in quads mode.
 //        final boolean isQuadsQuery = db.isQuads();
         
-        int bopId = startId;
-
         final PipelineOp startOp = new StartOp(new BOp[] {},
                 NV.asMap(new NV[] {//
-                        new NV(Predicate.Annotations.BOP_ID, bopId++),//
+                        new NV(Predicate.Annotations.BOP_ID, idFactory
+                                .incrementAndGet()),//
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
-                        }));
+                }));
         
         /*
          * First put the tails in the correct order based on the logic in
@@ -297,7 +286,7 @@ public class Rule2BOpUtility {
                 order, nvars);
 
         // the variables to be retained for each join.
-        final IVariable[][] selectVars = RuleState
+        final IVariable<?>[][] selectVars = RuleState
                 .computeRequiredVarsForEachTail(rule, order);
         
         /*
@@ -341,14 +330,15 @@ public class Rule2BOpUtility {
         
         for (int i = 0; i < order.length; i++) {
             
-            final int joinId = bopId++;
+            final int joinId = idFactory.incrementAndGet();
             
             // assign a bop id to the predicate
             Predicate<?> pred = (Predicate<?>) rule.getTail(order[i]).setBOpId(
-                    bopId++);
-            
+                    idFactory.incrementAndGet());
+
             // decorate the predicate with the assigned index.
-            pred = pred.setKeyOrder(keyOrder[order[i]]);
+//            pred = pred.setKeyOrder(keyOrder[order[i]]);
+            pred.setProperty(Annotations.ORIGINAL_INDEX, keyOrder[order[i]]);
 
             /*
              * Collect all the constraints for this predicate based on which
@@ -394,22 +384,23 @@ public class Rule2BOpUtility {
                 anns.add(new NV(PipelineJoin.Annotations.CONSTRAINTS,
                         constraints
                                 .toArray(new IConstraint[constraints.size()])));
-            
-            final Scope scope = (Scope) pred.getProperty(Annotations.SCOPE);
 
-            // @todo can we just use pred.get(3)?
-            final org.openrdf.query.algebra.Var cvar = (org.openrdf.query.algebra.Var) pred
-                    .getProperty(Annotations.CVAR);
+            /*
+             * Pull off annotations before we clear them from the predicate.
+             */
+            final Scope scope = (Scope) pred.getProperty(Annotations.SCOPE);
 
             // true iff this is a quads access path.
             final boolean quads = pred.getProperty(Annotations.QUADS,
                     Annotations.DEFAULT_QUADS);
 
             // pull of the Sesame dataset before we strip the annotations.
-            final Dataset dataset = (Dataset) pred.getProperty(Annotations.DATASET);
+            final Dataset dataset = (Dataset) pred
+                    .getProperty(Annotations.DATASET);
 
             // strip off annotations that we do not want to propagate.
-            pred = pred.clearAnnotations(ANNS_TO_CLEAR_FROM_PREDICATE);
+            pred = pred.clearAnnotations(new String[] { Annotations.SCOPE,
+                    Annotations.QUADS, Annotations.DATASET });
 
             if (quads) {
 
@@ -427,12 +418,12 @@ public class Rule2BOpUtility {
 
                     switch (scope) {
                     case NAMED_CONTEXTS:
-                        left = namedGraphJoin(queryEngine, context, left, anns,
-                                pred, dataset, cvar);
+                        left = namedGraphJoin(queryEngine, context, idFactory,
+                                left, anns, pred, dataset);
                         break;
                     case DEFAULT_CONTEXTS:
-                        left = defaultGraphJoin(queryEngine, context, left,
-                                anns, pred, dataset, cvar);
+                        left = defaultGraphJoin(queryEngine, context, idFactory,
+                                left, anns, pred, dataset);
                         break;
                     default:
                         throw new AssertionError();
@@ -470,8 +461,11 @@ public class Rule2BOpUtility {
 
         }
         
-        // just for now while i'm debugging
-        System.err.println(toString(left));
+        if (log.isDebugEnabled()) {
+            // just for now while i'm debugging
+            System.err.println("rule=" + rule + "\nquery="
+                    + BOpUtility.toString(left));
+        }
         
         return left;
         
@@ -488,7 +482,7 @@ public class Rule2BOpUtility {
      * @return The join operator.
      */
     private static PipelineOp triplesModeJoin(final QueryEngine queryEngine,
-            final PipelineOp left, final List<NV> anns, final Predicate pred) {
+            final PipelineOp left, final List<NV> anns, final Predicate<?> pred) {
 
         final boolean scaleOut = queryEngine.isScaleOut();
         if (scaleOut) {
@@ -513,11 +507,20 @@ public class Rule2BOpUtility {
      * @param pred
      * @param cvar
      * @return
+     * 
+     * @todo If the context position is shared by some other variable which we
+     *       know to be bound based on the selected join order, then we need to
+     *       treat the context variable as during this analysis.
+     * 
+     * @todo Since we do not know the specific asBound values, but only that
+     *       they will be bound, we should defer the SCAN versus SUBQUERY
+     *       decision until we actually evaluate that access path. This is
+     *       basically a special case of runtime query optimization.
      */
     private static PipelineOp namedGraphJoin(final QueryEngine queryEngine,
-            final BOpContextBase context, final PipelineOp left,
-            final List<NV> anns, Predicate pred, final Dataset dataset,
-            final org.openrdf.query.algebra.Var cvar) {
+            final BOpContextBase context, final AtomicInteger idFactory,
+            final PipelineOp left, final List<NV> anns, Predicate<?> pred,
+            final Dataset dataset) {
 
         final boolean scaleOut = queryEngine.isScaleOut();
         if (scaleOut) {
@@ -527,9 +530,6 @@ public class Rule2BOpUtility {
             anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                     BOpEvaluationContext.ANY));
         }
-
-        // true iff C is bound to a constant.
-        final boolean isCBound = cvar.getValue() != null;
 
         if (dataset == null) {
 
@@ -543,7 +543,7 @@ public class Rule2BOpUtility {
 
         }
 
-        if (isCBound) {
+        if (pred.get(3/* c */).isConstant()) {
 
             /*
              * C is already bound.  The unmodified access path is used. 
@@ -553,10 +553,12 @@ public class Rule2BOpUtility {
                     .toArray(new NV[anns.size()]));
 
         }
-        
+
         /*
          * @todo raise this into the caller and do one per rule rather than once
-         * per access path.
+         * per access path. While a query can mix default and named graph access
+         * paths, there is only one named graph collection and one default graph
+         * collection within the scope of that query.
          */
         final DataSetSummary summary = new DataSetSummary(dataset
                 .getNamedGraphs());
@@ -571,7 +573,7 @@ public class Rule2BOpUtility {
              */
 
             // force an empty access path for this predicate.
-            pred = (Predicate) pred.setUnboundProperty(
+            pred = (Predicate<?>) pred.setUnboundProperty(
                     IPredicate.Annotations.ACCESS_PATH_EXPANDER,
                     EmptyAccessPathExpander.INSTANCE);
 
@@ -586,8 +588,8 @@ public class Rule2BOpUtility {
              * The dataset contains exactly one graph. Bind C.
              */
 
-            pred = pred.asBound((IVariable) pred.get(3), new Constant(
-                    summary.firstContext));
+            pred = pred.asBound((IVariable<?>) pred.get(3),
+                    new Constant<IV<?, ?>>(summary.firstContext));
 
             return new PipelineJoin(new BOp[] { left, pred }, anns
                     .toArray(new NV[anns.size()]));
@@ -596,15 +598,23 @@ public class Rule2BOpUtility {
 
         /*
          * Estimate cost of SCAN with C unbound.
+         * 
+         * @todo must pass estimateCost() to the underlying access path plus
+         * layer on any cost for the optional expander.
          */
-        final double scanCost = queryEngine.estimateCost(context, pred);
-        anns.add(new NV(Annotations.COST_SCAN, scanCost));
+        final IRelation r = context.getRelation(pred);
+        final ScanCostReport scanCostReport = ((AccessPath) context
+                .getAccessPath(r, pred)).estimateCost();
+
+        anns.add(new NV(Annotations.COST_SCAN, scanCostReport));
 
         // Estimate cost of SUBQUERY with C bound (sampling).
-        final double subqueryCost = summary.estimateSubqueryCost(queryEngine,
-                context, SAMPLE_LIMIT, pred, anns);
+        final SubqueryCostReport subqueryCostReport = summary
+                .estimateSubqueryCost(context, SAMPLE_LIMIT, pred);
 
-        if (scanCost < subqueryCost) {
+        anns.add(new NV(Annotations.COST_SUBQUERY, subqueryCostReport));
+
+        if (scanCostReport.cost < subqueryCostReport.subqueryCost) {
 
             /*
              * Scan and filter. C is left unbound. We do a range scan on the
@@ -642,14 +652,17 @@ public class Rule2BOpUtility {
              */
 
             // The variable to be bound.
-            final IVariable var = (IVariable) pred.get(3);
+            final IVariable<?> var = (IVariable<?>) pred.get(3);
 
             // The data set join.
-            final DataSetJoin dataSetJoin = new DataSetJoin(new BOp[] { var },
-                    NV.asMap(new NV[] {
-                            new NV(DataSetJoin.Annotations.VAR, var),
-                            new NV(DataSetJoin.Annotations.GRAPHS, summary
-                                    .getGraphs()) }));
+            final DataSetJoin dataSetJoin = new DataSetJoin(new BOp[] { left },
+                    NV.asMap(new NV[] {//
+                                    new NV(DataSetJoin.Annotations.VAR, var),//
+                                    new NV(DataSetJoin.Annotations.BOP_ID,
+                                            idFactory.incrementAndGet()),//
+                                    new NV(DataSetJoin.Annotations.GRAPHS,
+                                            summary.getGraphs()) //
+                            }));
 
             if (scaleOut) {
                 anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
@@ -665,7 +678,7 @@ public class Rule2BOpUtility {
                                 false));
             }
 
-            return new PipelineJoin(new BOp[] { left, pred }, anns
+            return new PipelineJoin(new BOp[] { dataSetJoin, pred }, anns
                     .toArray(new NV[anns.size()]));
 
         }
@@ -680,15 +693,22 @@ public class Rule2BOpUtility {
      * @param anns
      * @param pred
      * @return
+     * 
+     * @todo Since we do not know the specific asBound values, but only that
+     *       they will be bound, we should defer the SCAN versus SUBQUERY
+     *       decision until we actually evaluate that access path. This is
+     *       basically a special case of runtime query optimization.
      */
     private static PipelineOp defaultGraphJoin(final QueryEngine queryEngine,
-            final BOpContextBase context, final PipelineOp left,
-            final List<NV> anns, Predicate pred, final Dataset dataset,
-            final org.openrdf.query.algebra.Var cvar) {
+            final BOpContextBase context, final AtomicInteger idFactory,
+            final PipelineOp left, final List<NV> anns, Predicate<?> pred,
+            final Dataset dataset) {
 
         /*
          * @todo raise this into the caller and do one per rule rather than once
-         * per access path.
+         * per access path. While a query can mix default and named graph access
+         * paths, there is only one named graph collection and one default graph
+         * collection within the scope of that query.
          */
         final DataSetSummary summary = dataset == null ? null
                 : new DataSetSummary(dataset.getDefaultGraphs());
@@ -703,7 +723,7 @@ public class Rule2BOpUtility {
              */
 
             // force an empty access path for this predicate.
-            pred = (Predicate) pred.setUnboundProperty(
+            pred = (Predicate<?>) pred.setUnboundProperty(
                     IPredicate.Annotations.ACCESS_PATH_EXPANDER,
                     EmptyAccessPathExpander.INSTANCE);
 
@@ -719,94 +739,106 @@ public class Rule2BOpUtility {
              * strip off the context position.
              */
 
-            // bind C.
-            pred = pred.asBound((IVariable) pred.get(3), new Constant(
-                    summary.firstContext));
+            // Bind C.
+            pred = pred.asBound((IVariable<?>) pred.get(3),
+                    new Constant<IV<?, ?>>(summary.firstContext));
 
+            // Strip of the context position.
             pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
             
             return new PipelineJoin(new BOp[] { left, pred }, anns
                     .toArray(new NV[anns.size()]));
 
         }
-        
-        if (pred.getKeyOrder().getIndexName().endsWith("C")) {
-
-            /*
-             * C is not bound. An advancer is imposed on the AP to skip to the
-             * next possible triple after each match. Impose filter on AP to
-             * strip off the context position. Distinct filter is not required
-             * since the advancer pattern used will not report duplicates.
-             */
-            
-            // Set the CURSOR flag.
-            pred = (Predicate) pred.setProperty(IPredicate.Annotations.FLAGS,
-                    pred.getProperty(IPredicate.Annotations.FLAGS,
-                            IPredicate.Annotations.DEFAULT_FLAGS)
-                            | IRangeQuery.CURSOR);
-
-            // Set Advancer (runs at the index).
-            pred = pred.addIndexLocalFilter(new ContextAdvancer());
-            
-            // Filter to strip off the context position.
-            pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
-
-            if(scaleOut) {
-
-                /*
-                 * When true, an ISimpleSplitHandler guarantees that no triple
-                 * on that index spans more than one shard.
-                 * 
-                 * @todo Implement the split handler and detect when it is being
-                 * used.
-                 */
-                final boolean shardTripleConstraint = false;
-
-                if (shardTripleConstraint) {
-
-                    // JOIN is SHARDED.
-                    pred = (Predicate) pred.setProperty(
-                            BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.SHARDED);
-
-                    // AP is LOCAL.
-                    pred = (Predicate) pred.setProperty(
-                            IPredicate.Annotations.REMOTE_ACCESS_PATH, false);
-
-                } else {
-
-                    // JOIN is ANY.
-                    pred = (Predicate) pred.setProperty(
-                            BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.ANY);
-
-                    // AP is REMOTE.
-                    pred = (Predicate) pred.setProperty(
-                            IPredicate.Annotations.REMOTE_ACCESS_PATH, true);
-
-                }
-
-            }
-
-            return new PipelineJoin(new BOp[] { left, pred }, anns
-                    .toArray(new NV[anns.size()]));
-
-        }
-
-        // Estimate cost of SCAN with C unbound.
-        final double scanCost = queryEngine.estimateCost(context, pred);
-        anns.add(new NV(Annotations.COST_SCAN, scanCost));
 
         /*
-         * Estimate cost of SUBQUERY with C bound (sampling). A large value is
-         * used if the dataset is null since the default graph query will run
-         * against all contexts and we are better off doing a SCAN.
+         * @todo This optimization can only be applied at runtime. It can not be
+         * decided statically because the actual index used may change as
+         * variable bindings propagate [it could be decided statically if we
+         * examined the predicate as it would be evaluated by propagating fake
+         * variable bindings except when some joins are optional in which case
+         * the actual index can not be known until runtime.]
          */
-        final double subqueryCost = dataset == null ? Double.MAX_VALUE
-                : summary.estimateSubqueryCost(queryEngine, context,
-                        SAMPLE_LIMIT, pred, anns);
+//        if (pred.getKeyOrder().getIndexName().endsWith("C")) {
+//
+//            /*
+//             * C is not bound. An advancer is imposed on the AP to skip to the
+//             * next possible triple after each match. Impose filter on AP to
+//             * strip off the context position. Distinct filter is not required
+//             * since the advancer pattern used will not report duplicates.
+//             */
+//            
+//            // Set the CURSOR flag.
+//            pred = (Predicate<?>) pred.setProperty(IPredicate.Annotations.FLAGS,
+//                    pred.getProperty(IPredicate.Annotations.FLAGS,
+//                            IPredicate.Annotations.DEFAULT_FLAGS)
+//                            | IRangeQuery.CURSOR);
+//
+//            // Set Advancer (runs at the index).
+//            pred = pred.addIndexLocalFilter(new ContextAdvancer());
+//            
+//            // Filter to strip off the context position.
+//            pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
+//
+//            if(scaleOut) {
+//
+//                /*
+//                 * When true, an ISimpleSplitHandler guarantees that no triple
+//                 * on that index spans more than one shard.
+//                 * 
+//                 * @todo Implement the split handler and detect when it is being
+//                 * used. The implementation can use ContextAdvancer to skip to
+//                 * the end of the "triple" identified by the default split code.
+//                 */
+//                final boolean shardTripleConstraint = false;
+//
+//                if (shardTripleConstraint) {
+//
+//                    // JOIN is SHARDED.
+//                    pred = (Predicate<?>) pred.setProperty(
+//                            BOp.Annotations.EVALUATION_CONTEXT,
+//                            BOpEvaluationContext.SHARDED);
+//
+//                    // AP is LOCAL.
+//                    pred = (Predicate<?>) pred.setProperty(
+//                            IPredicate.Annotations.REMOTE_ACCESS_PATH, false);
+//
+//                } else {
+//
+//                    // JOIN is ANY.
+//                    pred = (Predicate<?>) pred.setProperty(
+//                            BOp.Annotations.EVALUATION_CONTEXT,
+//                            BOpEvaluationContext.ANY);
+//
+//                    // AP is REMOTE.
+//                    pred = (Predicate<?>) pred.setProperty(
+//                            IPredicate.Annotations.REMOTE_ACCESS_PATH, true);
+//
+//                }
+//
+//            }
+//
+//            return new PipelineJoin(new BOp[] { left, pred }, anns
+//                    .toArray(new NV[anns.size()]));
+//
+//        }
 
-        if (scanCost < subqueryCost) {
+        // Estimate cost of SCAN with C unbound.
+        final IRelation r = context.getRelation(pred);
+        final ScanCostReport scanCostReport = ((AccessPath) context
+                .getAccessPath(r, pred)).estimateCost();
+        anns.add(new NV(Annotations.COST_SCAN, scanCostReport));
+
+        /*
+         * Estimate cost of SUBQUERY with C bound (sampling).
+         */
+        final SubqueryCostReport subqueryCostReport = dataset == null ? null
+                : summary.estimateSubqueryCost(context, SAMPLE_LIMIT, pred);
+
+        anns.add(new NV(Annotations.COST_SUBQUERY, subqueryCostReport));
+
+        if (subqueryCostReport == null
+                || scanCostReport.cost < subqueryCostReport.subqueryCost) {
 
             /*
              * SCAN AND FILTER. C is not bound. Unless all graphs are used,
@@ -846,103 +878,48 @@ public class Rule2BOpUtility {
              * buffer is read from by the expander.
              * 
              * Scale-out: JOIN is ANY or HASHED. AP is REMOTE.
-             * 
-             * FIXME This needs to be implemented based on an expander pattern
-             * which we can capture from DefaultGraphExpander.
              */
 
-            throw new UnsupportedOperationException();
+            final long estimatedRangeCount = subqueryCostReport.rangeCount;
+
+            final Set<IV> graphs = summary.getGraphs();
             
-//            /*
-//             * Setup the data set join.
-//             * 
-//             * @todo When the #of named graphs is large we need to do something
-//             * special to avoid sending huge graph sets around with the query.
-//             * For example, we should create named data sets and join against
-//             * them rather than having an in-memory DataSetJoin.
-//             * 
-//             * @todo The historical approach performed parallel subquery using
-//             * an expander pattern rather than a data set join. The data set
-//             * join should have very much the same effect, but it may need to
-//             * emit multiple chunks to have good parallelism.
-//             */
-//
-//            // The variable to be bound.
-//            final IVariable var = (IVariable) pred.get(3);
-//
-//            // The data set join.
-//            final DataSetJoin dataSetJoin = new DataSetJoin(new BOp[] { var },
-//                    NV.asMap(new NV[] {
-//                            new NV(DataSetJoin.Annotations.VAR, var),
-//                            new NV(DataSetJoin.Annotations.GRAPHS, summary
-//                                    .getGraphs()) }));
-//
-//            if (scaleOut) {
-//                anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
-//                        BOpEvaluationContext.SHARDED));
-//                anns
-//                        .add(new NV(Predicate.Annotations.REMOTE_ACCESS_PATH,
-//                                false));
-//            } else {
-//                anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
-//                        BOpEvaluationContext.ANY));
-//                anns
-//                        .add(new NV(Predicate.Annotations.REMOTE_ACCESS_PATH,
-//                                false));
-//            }
-//
-//            return new PipelineJoin(new BOp[] { left, pred }, anns
-//                    .toArray(new NV[anns.size()]));
+            // @todo default with query hint to override and relate to ClientIndexView limit in scale-out.
+            final int maxParallel = 10;
+            
+            // Set subquery expander.
+            pred = (Predicate<?>) pred.setUnboundProperty(
+                    IPredicate.Annotations.ACCESS_PATH_EXPANDER,
+                    new DGExpander(maxParallel, graphs, estimatedRangeCount));
 
-        }
 
-    }
+            // Filter to strip off the context position.
+            pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
 
-    /**
-     * Pretty print (aspects of) a bop.
-     * 
-     * @param bop
-     *            The bop.
-     *            
-     * @return The formatted representation.
-     */
-    private static String toString(final BOp bop) {
-        
-        StringBuilder sb = new StringBuilder();
-        
-        toString(bop, sb, 0);
-        
-        // chop off the last \n
-        sb.setLength(sb.length() - 1);
-
-        return sb.toString();
-
-    }
-
-    private static void toString(final BOp bop, final StringBuilder sb,
-            final int indent) {
-
-        for (int i = 0; i < indent; i++) {
-            sb.append(' ');
-        }
-        sb.append(bop).append('\n');
-
-        if (bop != null) {
-            final List<BOp> args = bop.args();
-            for (BOp arg : args) {
-                toString(arg, sb, indent + 4);
+            // Filter for distinct SPOs.
+            pred = pred.addAccessPathFilter(DistinctFilter.newInstance());
+            
+            if (scaleOut) {
+                anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.ANY));
+                anns
+                        .add(new NV(Predicate.Annotations.REMOTE_ACCESS_PATH,
+                                true));
+            } else {
+                anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.ANY));
+                anns
+                        .add(new NV(Predicate.Annotations.REMOTE_ACCESS_PATH,
+                                false));
             }
-            final IConstraint[] constraints = (IConstraint[]) bop
-                    .getProperty(PipelineJoin.Annotations.CONSTRAINTS);
-            if (constraints != null) {
-                for (IConstraint c : constraints) {
-                    toString(c, sb, indent + 4);
-                }
-            }
+            
+            return new PipelineJoin(new BOp[] { left, pred }, anns
+                    .toArray(new NV[anns.size()]));
+            
         }
 
     }
-    
+
     /**
      * Convert a program into an operator tree.
      * 
@@ -952,194 +929,13 @@ public class Rule2BOpUtility {
      * 
      * FIXME What is the pattern for UNION?
      */
-    public static PipelineOp convert(final IProgram rule, final int startId,
-            final AbstractTripleStore db, final QueryEngine queryEngine) {
+    public static PipelineOp convert(final IProgram rule,
+            final AtomicInteger idFactory, final AbstractTripleStore db,
+            final QueryEngine queryEngine) {
 
         throw new UnsupportedOperationException();
 
     }
-
-    /**
-     * Helper class summarizes the named graphs for a quads mode query.
-     * 
-     * @todo This could be used for either named or default graphs. All it does
-     *       not report the #of URIs known to the database.
-     * 
-     * @todo This summary could be computed once for a given query for its named
-     *       graphs and once for its default graph. We do not need to do this
-     *       for each predicate in the query.
-     */
-    private static class DataSetSummary {
-
-        /**
-         * The set of graphs. The {@link URI}s MUST have been resolved against
-         * the appropriate {@link LexiconRelation} such that their term
-         * identifiers (when the exist) are known. If any term identifier is
-         * {@link IRawTripleStore#NULL}, then the corresponding graph does not
-         * exist and no access path will be queried for that graph. However, a
-         * non- {@link IRawTripleStore#NULL} term identifier may also identify a
-         * graph which does not exist, in which case an access path will be
-         * created for that {@link URI}s but will not visit any data.
-         */
-        public final Iterable<? extends URI> graphs;
-
-        /**
-         * The #of graphs in {@link #graphs} whose term identifier is known.
-         * While this is not proof that there is data in the quad store for a
-         * graph having the corresponding {@link URI}, it does allow the
-         * possibility that a graph could exist for that {@link URI}.
-         */
-        public final int nknown;
-//        * <p>
-//        * If {@link #nknown} is ZERO (0), then the access path is empty.
-//        * <p>
-//        * If {@link #nknown} is ONE (1), then the caller's {@link IAccessPath}
-//        * should be used and filtered to remove the context information. If
-//        * {@link #graphs} is <code>null</code>, which implies that ALL graphs
-//        * in the quad store will be used as the default graph, then
-//        * {@link #nknown} will be {@link Integer#MAX_VALUE}.
-
-        /**
-         * The term identifier for the first graph and
-         * {@link IRawTripleStore#NULL} if no graphs were specified having a
-         * term identifier.
-         */
-        public final IV firstContext;
-
-        /**
-         * 
-         * @param graphs
-         *            The set of named graphs in the SPARQL DATASET (optional).
-         *            A runtime exception will be thrown during evaluation of
-         *            the if the {@link URI}s are not {@link BigdataURI}s. If
-         *            <code>graphs := null</code>, then the set of named graphs
-         *            is understood to be ALL graphs in the quad store.
-         */
-        public DataSetSummary(final Iterable<? extends URI> graphs) {
-
-            this.graphs = graphs;
-
-            IV firstContext = null;
-
-            if (graphs == null) {
-
-                nknown = Integer.MAX_VALUE;
-
-            } else {
-
-                final Iterator<? extends URI> itr = graphs.iterator();
-
-                int nknown = 0;
-
-                while (itr.hasNext()) {
-
-                    final BigdataURI uri = (BigdataURI) itr.next();
-
-                    if (uri.getIV() != null) {
-
-                        if (++nknown == 1) {
-
-                            firstContext = uri.getIV();
-
-                        }
-
-                    }
-
-                } // while
-
-                this.nknown = nknown;
-
-            }
-
-            this.firstContext = firstContext;
-
-        }
-
-        /**
-         * Return a dense array of the {@link IV}s for the graphs known to the
-         * database.
-         */
-        public IV[] getGraphs() {
-            
-            final IV[] a = new IV[nknown];
-            
-            final Iterator<? extends URI> itr = graphs.iterator();
-
-            int nknown = 0;
-
-            while (itr.hasNext()) {
-
-                final BigdataURI uri = (BigdataURI) itr.next();
-
-                final IV id = uri.getIV();
-
-                if (id != null) {
-
-                    a[nknown++] = id;
-
-                }
-
-            } // while
-            
-            return a;
-            
-        }
-
-        /**
-         * Estimate cost of SUBQUERY with C bound (sampling).
-         * 
-         * @param queryEngine
-         * @param context
-         * @param limit
-         *            The maximum #of samples to take.
-         * @param pred
-         *            The predicate.
-         * @param anns
-         *            A list of annotations to which the cost estimate data will
-         *            be added.
-         * 
-         * @return The estimated cost. This is adjusted based on the sample size
-         *         and the #of graphs against which the query was issued and
-         *         represents the total expected cost of the subqueries against
-         *         all of the graphs in the {@link Dataset}.
-         * 
-         * @todo Subquery will be less efficient than a scan when the access
-         *       path is remote since there will be remote requests. This model
-         *       does not capture that additional overhead. We need to measure
-         *       the overhead using appropriate data sets and queries and then
-         *       build it into the model. The overhead itself could be changed
-         *       dramatically by optimizations in the
-         *       {@link FederatedQueryEngine} and the {@link ResourceService}.
-         * 
-         * @todo This should randomly sample in case there is bias in the order
-         *       in which the URIs are presented here. However, the only thing
-         *       which would be likely to create a strong bias is if someone
-         *       sorted them on the IVs or if the URIs were in the same ordering
-         *       in which their IVs were assigned AND the data were somehow
-         *       correlated with that order. I rate the latter as pretty
-         *       unlikely and the former is not true, so this sampling approach
-         *       should be pretty good.
-         */
-        public double estimateSubqueryCost(QueryEngine queryEngine,
-                BOpContextBase context, int limit, Predicate pred, List<NV> anns) {
-            double subqueryCost = 0d;
-            int nsamples = 0;
-            for (URI uri : graphs) {
-                if (nsamples == limit)
-                    break;
-                final IV graph = ((BigdataURI) uri).getIV();
-                subqueryCost += queryEngine.estimateCost(context, pred.asBound(
-                        (IVariable) pred.get(3), new Constant(graph)));
-                nsamples++;
-            }
-            subqueryCost = (subqueryCost * nknown) / nsamples;
-
-            anns.add(new NV(Annotations.COST_SUBQUERY, subqueryCost));
-            anns.add(new NV(Annotations.COST_SUBQUERY_SAMPLE_COUNT, nsamples));
-            return subqueryCost;
-        }
-
-    } // DataSetSummary
 
     /**
      * Return an array indicating the {@link IKeyOrder} that will be used when

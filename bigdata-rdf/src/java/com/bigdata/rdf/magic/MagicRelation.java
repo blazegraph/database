@@ -21,15 +21,10 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.btree.BloomFilterFactory;
-import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
-import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.spo.SPOKeyOrder;
-import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.accesspath.AccessPath;
@@ -289,37 +284,37 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
         
     }
 
-    public IAccessPath<IMagicTuple> getAccessPath(
-            final IPredicate<IMagicTuple> predicate) {
+//    public IAccessPath<IMagicTuple> getAccessPath(
+//            final IPredicate<IMagicTuple> predicate) {
+//
+//        if (predicate == null)
+//            throw new IllegalArgumentException();
+//        
+//        checkPredicate(predicate);
+//        
+//        return _getAccessPath(predicate);
+//        
+//    }
 
-        if (predicate == null)
-            throw new IllegalArgumentException();
-        
-        checkPredicate(predicate);
-        
-        return _getAccessPath(predicate);
-        
-    }
-
-    /**
-     * Isolates the logic for selecting the {@link SPOKeyOrder} from the
-     * {@link SPOPredicate} and then delegates to
-     * {@link #getAccessPath(IKeyOrder, IPredicate)}.
-     */
-    final private IAccessPath<IMagicTuple> _getAccessPath(
-            final IPredicate<IMagicTuple> predicate) {
-
-        final MagicKeyOrder keyOrder = getKeyOrder(predicate);
-
-        final IAccessPath<IMagicTuple> accessPath = getAccessPath(keyOrder,
-                predicate);
-
-        if (log.isDebugEnabled())
-            log.debug(accessPath.toString());
-
-        return accessPath;
-
-    }
+//    /**
+//     * Isolates the logic for selecting the {@link SPOKeyOrder} from the
+//     * {@link SPOPredicate} and then delegates to
+//     * {@link #getAccessPath(IKeyOrder, IPredicate)}.
+//     */
+//    final private IAccessPath<IMagicTuple> _getAccessPath(
+//            final IPredicate<IMagicTuple> predicate) {
+//
+//        final MagicKeyOrder keyOrder = getKeyOrder(predicate);
+//
+//        final IAccessPath<IMagicTuple> accessPath = getAccessPath(keyOrder,
+//                predicate);
+//
+//        if (log.isDebugEnabled())
+//            log.debug(accessPath.toString());
+//
+//        return accessPath;
+//
+//    }
 
     public IKeyOrder<IMagicTuple> getPrimaryKeyOrder() {
         
@@ -398,77 +393,82 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
         
     }
     
-    /**
-     * Core impl.
-     * <p>
-     * Note: This method is NOT cached. See {@link #getAccessPath(IPredicate)}.
-     * 
-     * @param keyOrder
-     *            The natural order of the selected index (this identifies the
-     *            index).
-     * @param predicate
-     *            The predicate specifying the query constraint on the access
-     *            path.
-     * 
-     * @return The access path.
-     * 
-     * FIXME This does not touch the cache. Track down the callers. I imagine
-     * that these are mostly SPO access path scans, but they could also be scans
-     * on the POS or OSP indices. What we really want is a method with the
-     * signature <code>getAccessPath(keyOrder,filter)</code>, where the
-     * filter is optional. This method should cache by the keyOrder, which
-     * implies that we want to either verify or layer on the filter if we will
-     * be reusing the cached access path with different filter values.
-     * <p>
-     * The application SHOULD NOT specify both the predicate and the keyOrder
-     * since they are less likely to make the right choice, but it is reasonable
-     * to specify the keyOrder for bulk copy, dump, and some other modestly low
-     * level things and when only a single access path is used, then of course
-     * we need to specify that access path (several things use a temporary
-     * triple store with only the SPO access path).
-     */
-    public IAccessPath<IMagicTuple> getAccessPath(final IKeyOrder<IMagicTuple> keyOrder,
-            final IPredicate<IMagicTuple> predicate) {
+//    /**
+//     * Core impl.
+//     * <p>
+//     * Note: This method is NOT cached. See {@link #getAccessPath(IPredicate)}.
+//     * 
+//     * @param keyOrder
+//     *            The natural order of the selected index (this identifies the
+//     *            index).
+//     * @param predicate
+//     *            The predicate specifying the query constraint on the access
+//     *            path.
+//     * 
+//     * @return The access path.
+//     */
+//    public IAccessPath<IMagicTuple> getAccessPath(final IKeyOrder<IMagicTuple> keyOrder,
+//            final IPredicate<IMagicTuple> predicate) {
+//
+//        if (keyOrder == null)
+//            throw new IllegalArgumentException();
+//        
+//        if (predicate == null)
+//            throw new IllegalArgumentException();
+//        
+//        checkPredicate(predicate);
+//        
+//        final IIndex ndx = getIndex(keyOrder);
+//
+//        if (ndx == null) {
+//        
+//            throw new IllegalArgumentException("no index? relation="
+//                    + getNamespace() + ", timestamp=" + getTimestamp()
+//                    + ", keyOrder=" + keyOrder + ", pred=" + predicate
+//                    + ", indexManager=" + getIndexManager());
+//            
+//        }
+//        
+//        final int flags = IRangeQuery.KEYS
+//                | IRangeQuery.VALS
+//                | (TimestampUtility.isReadOnly(getTimestamp()) ? IRangeQuery.READONLY
+//                        : 0);
+//        
+//        final AbstractTripleStore container = getContainer();
+//        
+//        final int chunkOfChunksCapacity = container.getChunkOfChunksCapacity();
+//
+//        final int chunkCapacity = container.getChunkCapacity();
+//
+//        final int fullyBufferedReadThreshold = container.getFullyBufferedReadThreshold();
+//        
+//        return newAccessPath(this, getIndexManager(),
+//                getTimestamp(), predicate, keyOrder, ndx, flags,
+//                chunkOfChunksCapacity, chunkCapacity,
+//                fullyBufferedReadThreshold);
+//
+//    }
 
-        if (keyOrder == null)
-            throw new IllegalArgumentException();
-        
-        if (predicate == null)
-            throw new IllegalArgumentException();
-        
-        checkPredicate(predicate);
-        
-        final IIndex ndx = getIndex(keyOrder);
+    @Override
+    public IAccessPath<IMagicTuple> newAccessPath(
+//            final IRelation<IMagicTuple> relation,
+            final IIndexManager localIndexManager, //final long timestamp,
+            final IPredicate<IMagicTuple> predicate,
+            final IKeyOrder<IMagicTuple> keyOrder
+//            , final IIndex ndx,
+//            final int flags, final int chunkOfChunksCapacity,
+//            final int chunkCapacity, final int fullyBufferedReadThreshold
+            ) {
 
-        if (ndx == null) {
-        
-            throw new IllegalArgumentException("no index? relation="
-                    + getNamespace() + ", timestamp=" + getTimestamp()
-                    + ", keyOrder=" + keyOrder + ", pred=" + predicate
-                    + ", indexManager=" + getIndexManager());
-            
-        }
-        
-        final int flags = IRangeQuery.KEYS
-                | IRangeQuery.VALS
-                | (TimestampUtility.isReadOnly(getTimestamp()) ? IRangeQuery.READONLY
-                        : 0);
-        
-        final AbstractTripleStore container = getContainer();
-        
-        final int chunkOfChunksCapacity = container.getChunkOfChunksCapacity();
-
-        final int chunkCapacity = container.getChunkCapacity();
-
-        final int fullyBufferedReadThreshold = container.getFullyBufferedReadThreshold();
-        
-        return new AccessPath<IMagicTuple>(this, getIndexManager(),
-                getTimestamp(), predicate, keyOrder, ndx, flags,
-                chunkOfChunksCapacity, chunkCapacity,
-                fullyBufferedReadThreshold).init();
+        return new AccessPath<IMagicTuple>(this/* relation */, localIndexManager,
+                /*timestamp,*/ predicate, keyOrder
+//                , ndx, flags,
+//                chunkOfChunksCapacity, chunkCapacity,
+//                fullyBufferedReadThreshold
+                ).init();
 
     }
-    
+
     /**
      * Strengthened return type.
      */

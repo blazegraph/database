@@ -11,7 +11,6 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.solutions.SortOp;
-import com.bigdata.btree.IIndex;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TimestampUtility;
@@ -25,6 +24,9 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
+ * A stream of {@link IBindingSet} are mapped across the shards which will have
+ * the data for the {@link IPredicate#asBound(IBindingSet)} {@link IPredicate}.
+ * <p>
  * Unsynchronized (non-thread safe) buffer maps the {@link IBindingSet}s across
  * the index partition(s) associated with an {@link IPredicate} and
  * {@link IKeyOrder}. For each source chunk, "as bound" versions of the target
@@ -72,11 +74,11 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
      */
     protected final IPredicate<F> pred;
 
-    /**
-     * Identifies the index for the access path required by the {@link #pred
-     * predicate}.
-     */
-    protected final IKeyOrder<F> keyOrder;
+//    /**
+//     * Identifies the index for the access path required by the {@link #pred
+//     * predicate}.
+//     */
+//    protected final IKeyOrder<F> keyOrder;
 
     /**
      * The timestamp associated with the operation on the target access path. If
@@ -86,30 +88,35 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
      */
     protected final long timestamp;
     
-    /**
-     * The name of the scale-out index associated with the {@link #pred
-     * predicate}, including both the relation name and the {@link IKeyOrder}
-     * components of the index name.
-     */
-    protected final String namespace;
+//    /**
+//     * The name of the scale-out index associated with the {@link #pred
+//     * predicate}, including both the relation name and the {@link IKeyOrder}
+//     * components of the index name.
+//     */
+//    protected final String namespace;
+//
+//    /**
+//     * The associated {@link IMetadataIndex}.
+//     * 
+//     * @todo might be moved into the {@link IShardMapper} constructors for
+//     *       efficiency so only materialized when necessary. Alternatively, we
+//     *       might get the {@link IKeyBuilder} from the index metadata template
+//     *       on the {@link IMetadataIndex} and thus avoid lookup of the
+//     *       {@link IRelation}.
+//     */
+//    protected final IMetadataIndex mdi;
+//    
+//    /**
+//     * The {@link IKeyBuilder} for the index associated with the access path
+//     * required by the predicate. 
+//     */
+//    protected final IKeyBuilder keyBuilder;
 
     /**
-     * The associated {@link IMetadataIndex}.
-     * 
-     * @todo might be moved into the {@link IShardMapper} constructors for
-     *       efficiency so only materialized when necessary. Alternatively, we
-     *       might get the {@link IKeyBuilder} from the index metadata template
-     *       on the {@link IMetadataIndex} and thus avoid lookup of the
-     *       {@link IRelation}.
+     * A scale-out view of the target relation.
      */
-    protected final IMetadataIndex mdi;
+    protected final IRelation<F> relation;
     
-    /**
-     * The {@link IKeyBuilder} for the index associated with the access path
-     * required by the predicate. 
-     */
-    protected final IKeyBuilder keyBuilder;
-
     /**
      * The implementation class for the algorithm which will be used to map the
      * {@link IBindingSet}s over the shards.
@@ -126,8 +133,6 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
      *            the target operator must read or write. For example, when the
      *            target operator is a JOIN, this is the {@link IPredicate}
      *            associated with the right hand operator of the join.
-     * @param keyOrder
-     *            Identifies the access path for the target predicate.
      * @param timestamp
      *            The timestamp associated with the operation on the target
      *            access path. If the binding sets will be used to read on the
@@ -137,10 +142,12 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
      * @param capacity
      *            The capacity of this buffer.
      */
+//    * @param keyOrder
+//    *            Identifies the access path for the target predicate.
     public MapBindingSetsOverShardsBuffer(
             final IBigdataFederation<?> fed,//
             final IPredicate<F> pred, //
-            final IKeyOrder<F> keyOrder,//
+//            final IKeyOrder<F> keyOrder,//
             final long timestamp,//
             final int capacity) {
 
@@ -152,54 +159,66 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
         if (pred == null)
             throw new IllegalArgumentException();
 
-        if (keyOrder == null)
-            throw new IllegalArgumentException();
+//        /*
+//         * This class was reworked to target the index which is
+//         * selected dynamically rather than based on a static given IKeyOrder.
+//         * Just use relation.getKeyOrder(predicate) for each asBound predicate
+//         * and then obtain the IKeyBuilder from the scale-out view of the
+//         * associated index.
+//         */
+//        if (keyOrder == null)
+//            throw new IllegalArgumentException();
 
         this.fed = (AbstractScaleOutFederation<?>) fed;
         
         this.pred = pred;
 
-        this.namespace = pred.getOnlyRelationName() + "."
-                + keyOrder.getIndexName();
-
-        this.keyOrder = keyOrder;
+//        this.namespace = pred.getOnlyRelationName() + "."
+//                + keyOrder.getIndexName();
+//
+//        this.keyOrder = keyOrder;
 
         this.timestamp = timestamp;
 
-        /*
-         * Note: we can use the read view of the relation to get the IKeyBuilder
-         * even if we will be writing on the relation since the IKeyBuilder
-         * semantics can not be readily changed once an index has been created.
-         */
+//        /*
+//         * Note: we can use the read view of the relation to get the IKeyBuilder
+//         * even if we will be writing on the relation since the IKeyBuilder
+//         * semantics can not be readily changed once an index has been created.
+//         */
         {
 
-            @SuppressWarnings("unchecked")
-            final IRelation<F> relation = (IRelation<F>) fed
-                    .getResourceLocator().locate(pred.getOnlyRelationName(),
-                            timestamp);
+            final String namespace = pred.getOnlyRelationName();
+            
+//            @SuppressWarnings("unchecked")
+            this.relation = (IRelation<F>) fed.getResourceLocator().locate(
+                    namespace, timestamp);
 
-            final IIndex index = relation.getIndex(keyOrder);
-
-            this.keyBuilder = index.getIndexMetadata().getKeyBuilder();
+            if (relation == null)
+                throw new RuntimeException("Not found: relation=" + namespace
+                        + "@" + TimestampUtility.toString(timestamp));
+            
+//            final IIndex index = relation.getIndex(keyOrder);
+//
+//            this.keyBuilder = index.getIndexMetadata().getKeyBuilder();
             
         }
-
-        /*
-         * Resolve a scale-out view of the metadata index for the target
-         * predicate.
-         */
-        {
-
-            mdi = fed.getMetadataIndex(namespace, timestamp);
-
-            if (mdi == null) {
-
-                throw new NoSuchIndexException("name=" + namespace
-                        + ", timestamp=" + TimestampUtility.toString(timestamp));
-
-            }
-            
-        }
+//
+//        /*
+//         * Resolve a scale-out view of the metadata index for the target
+//         * predicate.
+//         */
+//        {
+//
+//            mdi = fed.getMetadataIndex(namespace, timestamp);
+//
+//            if (mdi == null) {
+//
+//                throw new NoSuchIndexException("name=" + namespace
+//                        + ", timestamp=" + TimestampUtility.toString(timestamp));
+//
+//            }
+//            
+//        }
 
         /*
          * @todo Conditionally choose the best algorithm. I am not sure if we
@@ -216,8 +235,21 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
         final boolean predicateWillBeFullyBound = false;
         if (predicateWillBeFullyBound) {
 
-            // uses ISplitter, but requires keys based on fully bound predicate.
-            algorithm = new Algorithm_FullyBoundPredicate<E, F>(this);
+            /*
+             * Uses ISplitter, but requires keys based on fully bound predicate.
+             * 
+             * Note: This can not be used when there are optional joins other
+             * other conditionals which could result in the predicate not being
+             * fully bound for some evaluation paths.
+             */
+            
+            /*
+             * The key order which will be used for that relation for a fully
+             * bound predicate.
+             */
+            final IKeyOrder<F> keyOrder = null;
+            
+            algorithm = new Algorithm_FullyBoundPredicate<E, F>(this, keyOrder);
             
         } else {
 
@@ -225,6 +257,26 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
             algorithm = new Algorithm_NestedLocatorScan<E, F>(this);
 
         }
+
+    }
+
+    /**
+     * Resolve a scale-out view of the metadata index for the target predicate.
+     */
+    protected IMetadataIndex getMetadataIndex(final IKeyOrder<F> keyOrder) {
+
+        final String namespace = relation.getFQN(keyOrder);
+
+        final IMetadataIndex mdi = fed.getMetadataIndex(namespace, timestamp);
+
+        if (mdi == null) {
+
+            throw new NoSuchIndexException("name=" + namespace + ", timestamp="
+                    + TimestampUtility.toString(timestamp));
+
+        }
+        
+        return mdi;
 
     }
 
@@ -246,6 +298,11 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
          */
         for (int i = 0; i < chunk.length; i++) {
 
+            final IKeyOrder<F> keyOrder = relation.getKeyOrder(pred);
+
+            final IKeyBuilder keyBuilder = relation.getIndex(keyOrder)
+                    .getIndexMetadata().getKeyBuilder();
+            
             bundles[i] = new Bundle<F>(keyBuilder, pred, keyOrder, chunk[i]);
             
         }
@@ -266,11 +323,14 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
     /**
      * Locator scan for the index partitions for that predicate as bound.
      */
-    protected Iterator<PartitionLocator> locatorScan(final byte[] fromKey,
+    protected Iterator<PartitionLocator> locatorScan(
+            final IKeyOrder<F> keyOrder, final byte[] fromKey,
             final byte[] toKey) {
 
+        final String name = relation.getFQN(keyOrder);
+
         return fed
-                .locatorScan(namespace, timestamp, fromKey, toKey, false/* reverse */);
+                .locatorScan(name, timestamp, fromKey, toKey, false/* reverse */);
 
     }
 

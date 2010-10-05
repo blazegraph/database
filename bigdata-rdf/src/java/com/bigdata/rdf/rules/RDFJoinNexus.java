@@ -67,7 +67,7 @@ import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.ISolutionExpander;
+import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.eval.AbstractJoinNexus;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer;
@@ -82,6 +82,7 @@ import com.bigdata.relation.rule.eval.RuleStats;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * {@link IProgram} execution support for the RDF DB.
@@ -335,53 +336,61 @@ public class RDFJoinNexus extends AbstractJoinNexus implements IJoinNexus {
     public IAccessPath getTailAccessPath(final IRelation relation,
             final IPredicate predicate) {
 
-        if (predicate.getPartitionId() != -1) {
-
-            /*
-             * Note: This handles a read against a local index partition. For
-             * scale-out, the [indexManager] will be the data service's local
-             * index manager.
-             * 
-             * Note: Expanders ARE NOT applied in this code path. Expanders
-             * require a total view of the relation, which is not available
-             * during scale-out pipeline joins. Likewise, the [backchain]
-             * property will be ignored since it is handled by an expander.
-             * 
-             * @todo If getAccessPathForIndexPartition() is raised into the
-             * IRelation interface, then we can get rid of the cast to the
-             * SPORelation implementation.
-             */
-
-            return ((SPORelation) relation).getAccessPathForIndexPartition(
-                    indexManager, predicate);
-
-        }
-
-//        // Find the best access path for the predicate for that relation.
-        IAccessPath accessPath = relation.getAccessPath(predicate);
-//
 //        if (predicate.getPartitionId() != -1) {
 //
 //            /*
-//             * Note: The expander can not run against a shard since it assumes
-//             * access to the full key range of the index. Expanders are
-//             * convenient and work well for stand alone indices, but they should
-//             * be replaced by rule rewrites for scale-out.
+//             * Note: This handles a read against a local index partition. For
+//             * scale-out, the [indexManager] will be the data service's local
+//             * index manager.
+//             * 
+//             * Note: Expanders ARE NOT applied in this code path. Expanders
+//             * require a total view of the relation, which is not available
+//             * during scale-out pipeline joins. Likewise, the [backchain]
+//             * property will be ignored since it is handled by an expander.
+//             * 
+//             * @todo If getAccessPathForIndexPartition() is raised into the
+//             * IRelation interface, then we can get rid of the cast to the
+//             * SPORelation implementation.
 //             */
 //
-//            return accessPath;
+////            return ((SPORelation) relation).getAccessPathForIndexPartition(
+////                    indexManager, predicate);
+//            return relation.getAccessPath(indexManager, relation
+//                    .getKeyOrder(predicate), predicate);
+//
+//        }
+//
+//        // Find the best access path for the predicate for that relation.
+//        IAccessPath accessPath = relation.getAccessPath(predicate);
+////
+////        if (predicate.getPartitionId() != -1) {
+////
+////            /*
+////             * Note: The expander can not run against a shard since it assumes
+////             * access to the full key range of the index. Expanders are
+////             * convenient and work well for stand alone indices, but they should
+////             * be replaced by rule rewrites for scale-out.
+////             */
+////
+////            return accessPath;
+////            
+////        }
+//        
+        final IKeyOrder keyOrder = relation.getKeyOrder(predicate);
+
+        IAccessPath accessPath = relation.getAccessPath(
+                indexManager/* localIndexManager */, keyOrder, predicate);
+
+        final IAccessPathExpander expander = predicate.getAccessPathExpander();
+//        
+//        if (expander != null) {
+//            
+//            // allow the predicate to wrap the access path
+//            accessPath = expander.getAccessPath(accessPath);
 //            
 //        }
-        
-        final ISolutionExpander expander = predicate.getSolutionExpander();
-        
-        if (expander != null) {
-            
-            // allow the predicate to wrap the access path : @todo caching on AP?
-            accessPath = expander.getAccessPath(accessPath);
-            
-        }
-        
+
+        // @todo raise into SPORelation#getAccessPath/3?
         if(backchain && relation instanceof SPORelation) {
 
             if (expander == null || expander.backchain()) {

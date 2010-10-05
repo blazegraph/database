@@ -26,7 +26,7 @@ import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.ISolutionExpander;
+import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.QueryOptions;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.eval.ActionEnum;
@@ -57,7 +57,7 @@ public class OwlSameAsPropertiesExpandingIterator implements
 
     private IChunkedOrderedIterator<ISolution> solutions;
 
-    private ISolutionExpander<ISPO> sameAsSelfExpander;
+    private IAccessPathExpander<ISPO> sameAsSelfExpander;
 
     public OwlSameAsPropertiesExpandingIterator(IV s, IV p, IV o,
             AbstractTripleStore db, final IV sameAs,
@@ -347,7 +347,7 @@ public class OwlSameAsPropertiesExpandingIterator implements
         return false;
     }
 
-    private class SameAsSelfExpander implements ISolutionExpander<ISPO> {
+    private class SameAsSelfExpander implements IAccessPathExpander<ISPO> {
         public boolean backchain() {
             return false;
         }

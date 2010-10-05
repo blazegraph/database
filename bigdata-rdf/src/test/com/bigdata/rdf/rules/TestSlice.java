@@ -56,12 +56,11 @@ import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.ISolution;
-import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Test for {@link ISlice} handling in native {@link IRule} execution. Slice for
- * joins is handled by {@link NestedSubqueryWithJoinThreadsTask}. Slice for an
+ * joins is handled by the query plan and its evaluation. Slice for an
  * {@link IAccessPath} scan is handled using the appropriate iterator and is not
  * tested by this class.
  * 

@@ -9,7 +9,6 @@ import java.util.concurrent.ExecutorService;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.TemporaryStore;
@@ -78,15 +77,6 @@ public class RelationFusedView<E> implements IRelation<E> {
         
     }
     
-    public IAccessPath<E> getAccessPath(final IPredicate<E> predicate) {
-
-        return new AccessPathFusedView<E>(//
-                (AccessPath<E>)relation1.getAccessPath(predicate),//
-                (AccessPath<E>)relation2.getAccessPath(predicate)//
-        );
-        
-    }
-
 //    /**
 //     * Note: You can not compute the exact element count for a fused view since
 //     * there may be duplicate elements in the two source {@link IRelation}s
@@ -223,13 +213,40 @@ public class RelationFusedView<E> implements IRelation<E> {
         throw new UnsupportedOperationException();
     }
 
-    public IKeyOrder<E> getKeyOrder(IPredicate<E> p) {
-        throw new UnsupportedOperationException();
+    public IKeyOrder<E> getKeyOrder(IPredicate<E> predicate) {
+        // @todo I am not sure that we really need to cross check this.
+        final IKeyOrder<E> keyOrder1 = relation1.getKeyOrder(predicate);
+        final IKeyOrder<E> keyOrder2 = relation2.getKeyOrder(predicate);
+        if (keyOrder1 == null || keyOrder2 == null)
+            throw new UnsupportedOperationException();
+        if(!keyOrder1.equals(keyOrder2))
+            throw new UnsupportedOperationException();
+        return keyOrder1;
     }
 
-    public IAccessPath<E> getAccessPathForIndexPartition(
-            IIndexManager indexManager, IPredicate<E> predicate) {
-        throw new UnsupportedOperationException();        
+    public IAccessPath<E> getAccessPath(final IPredicate<E> predicate) {
+
+        return new AccessPathFusedView<E>(//
+                (AccessPath<E>)relation1.getAccessPath(predicate),//
+                (AccessPath<E>)relation2.getAccessPath(predicate)//
+        );
+        
     }
+
+    public IAccessPath<E> getAccessPath(IKeyOrder<E> keyOrderIsIgnored,
+            IPredicate<E> predicate) {
+        return getAccessPath(predicate);
+//        return getAccessPath(null/*localIndexManager*/,keyOrder,predicate);
+    }
+
+    public IAccessPath<E> getAccessPath(IIndexManager localIndexManagerIsIgnored,
+            IKeyOrder<E> keyOrderisIgnored, IPredicate<E> predicate) {
+        return getAccessPath(predicate);
+    }
+
+//    public IAccessPath<E> getAccessPathForIndexPartition(
+//            IIndexManager indexManager, IPredicate<E> predicate) {
+//        throw new UnsupportedOperationException();        
+//    }
 
 }

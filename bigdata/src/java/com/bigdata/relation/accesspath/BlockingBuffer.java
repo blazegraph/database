@@ -50,7 +50,6 @@ import com.bigdata.rdf.store.BigdataSolutionResolverator;
 import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
 import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
 import com.bigdata.striterator.ICloseableIterator;
 import com.bigdata.util.InnerCause;
 
@@ -1170,7 +1169,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * they reach the desired limit, thereby avoiding issuing interrupts. Those
      * processes include {@link IAccessPath} scans where the #of elements to be
      * visited exceeds the fully materialized chunk threshold and {@link IRule}
-     * evaluation, e.g., by {@link NestedSubqueryWithJoinThreadsTask}.
+     * evaluation.
      * 
      * @return The iterator (this is a singleton).
      * 

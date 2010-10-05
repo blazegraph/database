@@ -37,7 +37,7 @@ public class StressTestCentos extends AbstractTripleStoreTestCase {
 //        properties.setProperty(AbstractTripleStore.Options.QUADS, "true");
         properties.setProperty(AbstractTripleStore.Options.BLOOM_FILTER, "false");
         properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS, NoVocabulary.class.getName());
-        properties.setProperty(AbstractTripleStore.Options.NESTED_SUBQUERY, "false");
+//        properties.setProperty(AbstractTripleStore.Options.NESTED_SUBQUERY, "false");
 
         return properties;
         

@@ -989,8 +989,8 @@ public class TestQueryEngine extends TestCase2 {
                         new NV(Predicate.Annotations.BOP_ID, predId),//
                         new NV(Predicate.Annotations.TIMESTAMP,
                                 ITx.READ_COMMITTED),//
-                        new NV(Predicate.Annotations.KEY_ORDER,
-                                R.primaryKeyOrder),//
+//                        new NV(Predicate.Annotations.KEY_ORDER,
+//                                R.primaryKeyOrder),//
                 }));
 
         final PipelineJoin<E> joinOp = new PipelineJoin<E>(startOp/* left */,
@@ -1119,30 +1119,6 @@ public class TestQueryEngine extends TestCase2 {
             assertEquals(1L, stats.chunksOut.get());
         }
 
-    }
-
-    /**
-     * @todo Test the ability run a query reading on an access path using a
-     *       element filter (other than DISTINCT).
-     */
-    public void test_query_join1_filter() {
-        
-        fail("write test");
-
-    }
-
-    /**
-     * FIXME Test the ability run a query reading on an access path using a
-     * DISTINCT filter (this is just stacking a striterator on the access path).
-     * 
-     * @see DistinctSPOIterator, which should stack as a striterator. It might
-     *      be best to break it up into something to strip off the context
-     *      position and a distincterator.
-     */
-    public void test_query_join1_distinctAccessPath() {
-        
-        fail("write test");
-        
     }
 
     /**

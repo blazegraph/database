@@ -66,7 +66,6 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.ap.filter.BOpTupleFilter;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
@@ -123,6 +122,7 @@ import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.spo.SPOTupleSerializer;
 import com.bigdata.rdf.spo.StatementWriter;
+import com.bigdata.rdf.spo.XXXCShardSplitHandler;
 import com.bigdata.rdf.vocab.BaseVocabulary;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.rdf.vocab.RDFSVocabulary;
@@ -301,6 +301,11 @@ abstract public class AbstractTripleStore extends
     final private Class<? extends BaseClosure> closureClass;
     
     /**
+     * @see Options#CONSTRAIN_XXXC_SHARDS
+     */
+    final private boolean constrainXXXCShards;
+    
+    /**
      * Return an instance of the class that is used to compute the closure of
      * the database.
      */
@@ -370,6 +375,15 @@ abstract public class AbstractTripleStore extends
         
     }
 
+    /**
+     * @see Options#CONSTRAIN_XXXC_SHARDS
+     */
+    final public boolean isConstrainXXXCShards() {
+        
+        return constrainXXXCShards;
+        
+    }
+    
     /**
      * The {@link BigdataValueFactoryImpl} for namespace of the
      * {@link LexiconRelation} associated with this {@link AbstractTripleStore}.
@@ -900,6 +914,33 @@ abstract public class AbstractTripleStore extends
         String DEFAULT_EXTENSION_FACTORY_CLASS = DefaultExtensionFactory.class
                 .getName();
 
+        /*
+         * Options for shard split behavior.
+         */
+
+        /**
+         * Boolean option determines whether or not an
+         * {@link XXXCShardSplitHandler} is applied (scale-out only, default
+         * {@value #DEFAULT_CONSTRAIN_XXXC_SHARDS}).
+         * <p>
+         * When <code>true</code>, shards whose {@link SPOKeyOrder} name ends
+         * with "C" are constrained such that all quads for the same triple will
+         * be co-located on the same shard. This constraint allows certain
+         * optimizations for default graph handling.
+         * <p>
+         * This constraint may be used if you do not expect to have more than
+         * ~200MB worth of distinct graphs within which the same triple may be
+         * asserted. This is a soft constraint as larger shards are permitted,
+         * but performance will degrade if this constraint forces some shards to
+         * be many times larger than their nominal capacity.
+         * 
+         * @see XXXCShardSplitHandler
+         */
+        String CONSTRAIN_XXXC_SHARDS = AbstractTripleStore.class.getName()
+                + ".constrainXXXCShards";
+        
+        String DEFAULT_CONSTRAIN_XXXC_SHARDS = "true";
+        
     }
 
     protected Class determineAxiomClass() {
@@ -1120,6 +1161,10 @@ abstract public class AbstractTripleStore extends
             closureClass = cls;
             
         }
+        
+        this.constrainXXXCShards = Boolean.valueOf(getProperty(
+                Options.CONSTRAIN_XXXC_SHARDS,
+                Options.DEFAULT_CONSTRAIN_XXXC_SHARDS)); 
         
         // setup namespace mapping for serialization utility methods.
         addNamespace(RDF.NAMESPACE, "rdf");
@@ -2498,6 +2543,8 @@ abstract public class AbstractTripleStore extends
                 NV.asMap(new NV[] {//
                         new NV(IPredicate.Annotations.RELATION_NAME,
                                 new String[] { r.getNamespace() }),//
+//                        new NV(IPredicate.Annotations.KEY_ORDER,
+//                                keyOrder),//
                         new NV(IPredicate.Annotations.INDEX_LOCAL_FILTER,
                                ElementFilter.newInstance(filter)),//
                         }));
@@ -3827,10 +3874,11 @@ abstract public class AbstractTripleStore extends
                 && !getAccessPath(null, getVocabulary().get(OWL.SAMEAS), null)
                         .isEmpty();
 
-        final IRuleTaskFactory defaultRuleTaskFactory = isNestedSubquery() //
-                ? DefaultRuleTaskFactory.SUBQUERY//
-                : DefaultRuleTaskFactory.PIPELINE//
-                ;
+        final IRuleTaskFactory defaultRuleTaskFactory = DefaultRuleTaskFactory.PIPELINE;
+//        = isNestedSubquery() //
+//                ? DefaultRuleTaskFactory.SUBQUERY//
+//                : DefaultRuleTaskFactory.PIPELINE//
+//                ;
 
         // Note: returns a Properties wrapping the resource's properties.
         final Properties tmp = getProperties();

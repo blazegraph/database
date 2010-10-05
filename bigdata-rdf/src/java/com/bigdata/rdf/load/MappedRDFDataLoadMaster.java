@@ -1034,8 +1034,8 @@ V extends Serializable//
         // log.info(Options.QUERY_TIME_EXPANDER + "="
         // + p.getProperty(Options.QUERY_TIME_EXPANDER));
 
-        log.info(Options.NESTED_SUBQUERY + "="
-                + p.getProperty(Options.NESTED_SUBQUERY));
+//        log.info(Options.NESTED_SUBQUERY + "="
+//                + p.getProperty(Options.NESTED_SUBQUERY));
 
 //        log.info(IndexMetadata.Options.BTREE_READ_RETENTION_QUEUE_CAPACITY + "=" + p.getProperty(IndexMetadata.Options.BTREE_READ_RETENTION_QUEUE_CAPACITY));
 

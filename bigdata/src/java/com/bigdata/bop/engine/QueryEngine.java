@@ -46,8 +46,8 @@ import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
-import com.bigdata.bop.cost.BTreeCostModel;
 import com.bigdata.bop.cost.DiskCostModel;
+import com.bigdata.bop.cost.ScanCostReport;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IBTreeStatistics;
@@ -443,6 +443,10 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
                         // pool).
                         log.warn("Dropping chunk: queryId=" + queryId);
                         continue;
+                    } catch (Throwable ex) {
+                        // halt that query.
+                        q.halt(ex);
+                        continue;
                     }
                 } catch (InterruptedException e) {
                     /*
@@ -457,9 +461,9 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 //                            ,e
                             );
                     return;
-                } catch (Throwable ex) {
+                } catch (Throwable t) {
                     // log and continue
-                    log.error(ex, ex);
+                    log.error(t, t);
                     continue;
                 }
             }
@@ -700,6 +704,14 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
         }
 
+        // Note: ChunkTask verifies this.
+//        /*
+//         * Verify that all bops from the identified bop to the root have an
+//         * assigned bop. This is required in order for us to be able to target
+//         * messages to those operators.
+//         */
+//        BOpUtility.verifyPipline(msg.getBOpId(), query);
+        
         assertRunning();
 
         putRunningQuery(queryId, runningQuery);
@@ -781,80 +793,6 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
      */
     public void cancelQuery(UUID queryId, Throwable cause) {
         // NOP
-    }
-
-    /*
-     * Cost models.
-     */
-
-    /**
-     * The cost model associated with the disk on which the indices are stored.
-     * For a {@link Journal}, this is just the cost model of the backing disk.
-     * For the federation, this should be an average cost model.
-     * 
-     * @todo This is not parameterized. A simple cost model is always assumed.
-     *       The correct cost model is necessary in order to get the tradeoff
-     *       point right for SCAN+FILTER versus SUBQUERY on SSD or RAID arrays
-     *       with lots of spindles versus normal disk.
-     * 
-     * @todo In a shared disk deployment, we might introduce one cost model for
-     *       local SSD used to cache journals, one for local non-SSD disks used
-     *       to cache index segments, and one for remote storage used to
-     *       materialize historical journals and index segments for query.
-     * 
-     * @todo In a federation, this should be reported out as metadata for the
-     *       federation. Perhaps as a Jini attribute.
-     */
-    private static final DiskCostModel diskCostModel = DiskCostModel.DEFAULT;
-
-    /**
-     * Return an estimate of the cost of a scan on the predicate.
-     * 
-     * @param pred
-     *            The predicate.
-     * 
-     * @return The estimated cost of a scan on that predicate.
-     * 
-     * @todo This tunnels through to the {@link AbstractBTree} class and is thus
-     *       specific to standalone and also may run into trouble once we
-     *       support unisolated access paths for reads or mutation since it may
-     *       encounter an {@link UnisolatedReadWriteIndex} instead of an
-     *       {@link AbstractBTree}.
-     */
-    public <E> double estimateCost(final BOpContextBase context,
-            final Predicate<E> pred) {
-     
-        final IRelation<E> r = context.getRelation(pred);
-        
-        final IAccessPath<E> ap = context.getAccessPath(r, pred);
-        
-        final long rangeCount = ap.rangeCount(false/* exact */);
-
-        /*
-         * Drill through to the actual index object on the local index manager
-         * (standalone only). This avoids the UnisolatedReadWriteIndex class
-         * used to protect the index from concurrent modifications.
-         */
-        final String name = pred.getOnlyRelationName() + "."
-                + pred.getKeyOrder();
-        
-        final long timestamp = (Long) pred
-                .getRequiredProperty(BOp.Annotations.TIMESTAMP);
-        
-        final AbstractBTree index = (AbstractBTree) getIndexManager().getIndex(
-                name, timestamp);
-
-        if (index == null)
-            throw new NoSuchIndexException(name + ", timestamp="
-                    + TimestampUtility.toString(timestamp));
-
-        final IBTreeStatistics stats = index.getStatistics();
-
-        final double cost = new BTreeCostModel(diskCostModel).rangeScan(
-                rangeCount, stats.getBranchingFactor(), stats.getHeight(),
-                stats.getUtilization().getLeafUtilization());
-
-        return cost;
     }
 
 }

@@ -105,10 +105,10 @@ public class TestRule extends AbstractRuleTestCase {
             final IBindingSet bindings = new HashBindingSet();
             
             assertFalse(r.getTail(0).isFullyBound(SPOKeyOrder.SPO));
-            assertFalse(r.getTail(0).isFullyBound(SPOKeyOrder.SPOC));
+//            assertFalse(r.getTail(0).isFullyBound(SPOKeyOrder.SPOC));
             
             assertEquals(1, r.getTail(0).getVariableCount(SPOKeyOrder.SPO));
-            assertEquals(2, r.getTail(0).getVariableCount(SPOKeyOrder.SPOC));
+//            assertEquals(2, r.getTail(0).getVariableCount(SPOKeyOrder.SPOC));
             
             assertFalse(r.isFullyBound(0, bindings));
             

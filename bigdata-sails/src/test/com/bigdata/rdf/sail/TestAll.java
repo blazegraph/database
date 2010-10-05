@@ -96,8 +96,8 @@ public class TestAll extends TestCase {
 //        suite.addTest(TestBigdataSailWithQuads.suite());
         
         // quad store test suite w/ pipeline joins.
-        suite.addTest(TestBigdataSailWithQuadsAndPipelineJoins.suite());
-        suite.addTest(TestBigdataSailWithQuadsAndPipelineJoinsWithoutInlining.suite());
+        suite.addTest(TestBigdataSailWithQuads.suite());
+        suite.addTest(TestBigdataSailWithQuadsWithoutInlining.suite());
         
         return suite;
 

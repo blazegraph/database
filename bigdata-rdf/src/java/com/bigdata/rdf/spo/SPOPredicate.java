@@ -32,7 +32,7 @@ import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.relation.rule.ISolutionExpander;
+import com.bigdata.relation.rule.IAccessPathExpander;
 
 /**
  * A predicate that is a triple with one or more variables. While the general
@@ -182,7 +182,7 @@ public class SPOPredicate extends Predicate<ISPO> {
             final IVariableOrConstant<IV> s,
             final IVariableOrConstant<IV> p,
             final IVariableOrConstant<IV> o,
-            final ISolutionExpander<ISPO> expander) {
+            final IAccessPathExpander<ISPO> expander) {
 
 //        this(new String[] { relationName }, -1/* partitionId */, s, p, o,
 //                null/* c */, false/* optional */, null/* constraint */,
@@ -209,7 +209,7 @@ public class SPOPredicate extends Predicate<ISPO> {
             final IVariableOrConstant<IV> s,
             final IVariableOrConstant<IV> p,
             final IVariableOrConstant<IV> o, final boolean optional,
-            final ISolutionExpander<ISPO> expander) {
+            final IAccessPathExpander<ISPO> expander) {
 
 //        this(new String[] { relationName }, -1/* partitionId */, s, p, o,
 //                null/* c */, optional, null/* constraint */, expander);

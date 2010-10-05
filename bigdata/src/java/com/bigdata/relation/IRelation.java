@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
@@ -43,9 +44,11 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.spo.SPORelation;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.locator.ILocatableResource;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -164,14 +167,16 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
      * 
      * @todo What about "best" versus "perfect"? Perfect is more a concept from
      *       RDF with covering indices. For other schemas we will often just
-     *       have "best".  If you only have one index then it is always "best".
+     *       have "best". If you only have one index then it is always "best".
+     *       However, in order to use the "best" access path we must impose the
+     *       constraint on the {@link IAccessPath} that it filter out any
+     *       elements visited during the scan which do not satisfy the places
+     *       where bound variables or constants appear in the predicate.
      *       <p>
-     *       Note that one of the main uses for this is query optimization.
-     *       However, runtime query optimization can just work through the
-     *       possible indices and join orders and get to a "best" query plan
-     *       given the actual indices and foreign keys.
+     *       Range count estimates will report all rows to be scanned. Exact
+     *       range counts will perform the scan, applying any filters.
      */
-    IKeyOrder<E> getKeyOrder(IPredicate<E> p);
+    IKeyOrder<E> getKeyOrder(IPredicate<E> predicate);
 
     /**
      * Return the best {@link IAccessPath} for a relation given a predicate with
@@ -205,38 +210,115 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
      *            The constraint on the elements to be visited.
      * 
      * @return The best {@link IAccessPath} for that {@link IPredicate}.
+     * 
+     * @see #getAccessPath(IKeyOrder, IPredicate)
      */
     IAccessPath<E> getAccessPath(IPredicate<E> predicate);
 
     /**
-     * This handles a request for an access path that is restricted to a
-     * specific index partition. This access path is used with the scale-out
-     * JOIN strategy, which distributes join tasks onto each index partition
-     * from which it needs to read. Those tasks constrain the predicate to only
-     * read from the index partition which is being serviced by that join task.
-     * <p>
-     * Note: Expanders ARE NOT applied in this code path. Expanders require a
-     * total view of the relation, which is not available during scale-out
-     * pipeline joins.
+     * Return the {@link IAccessPath} for an {@link IRelation} using the
+     * specified {@link IKeyOrder}.
      * 
-     * @param indexManager
-     *            This MUST be the data service local index manager so that the
-     *            returned access path will read against the local shard.
+     * @param keyOrder
+     *            Identifies which index to use (required).
      * @param predicate
-     *            The predicate. {@link IPredicate#getPartitionId()} MUST return
-     *            a valid index partition identifier.
+     *            The predicate (required).
+     *            
+     * @return The {@link IAccessPath}.
      * 
-     * @throws IllegalArgumentException
-     *             if either argument is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             unless the {@link IIndexManager} is a <em>local</em> index
-     *             manager providing direct access to the specified shard.
-     * @throws IllegalArgumentException
-     *             unless the predicate identifies a specific shard using
-     *             {@link IPredicate#getPartitionId()}.
+     * @see #getAccessPath(IIndexManager, IKeyOrder, IPredicate) 
      */
-    IAccessPath<E> getAccessPathForIndexPartition(IIndexManager indexManager,
-            IPredicate<E> predicate);
+    IAccessPath<E> getAccessPath(IKeyOrder<E> keyOrder,IPredicate<E> predicate);
+
+    /**
+     * Return the {@link IAccessPath} for an {@link IRelation} using the
+     * specified {@link IIndexManager} and {@link IKeyOrder} (core impl).
+     * <p>
+     * <h2>Predicate annotations</h2>
+     * Together, this method and {@link AccessPath} is responsible for
+     * interpreting the following {@link IPredicate}
+     * {@link IPredicate#Annotations}:
+     * <ul>
+     * <li>{@link IPredicate.Annotations#ACCESS_PATH_EXPANDER}</li>
+     * <li></li>
+     * </ul>
+     * <h2>Access paths and a Standalone Database</h2>
+     * There is only one {@link IIndexManager} when running against a standalone
+     * database. That {@link IIndexManager} is available from
+     * {@link IRelation#getIndexManager()}.
+     * <h2>
+     * Access Paths and Scale-Out Operators</h2>
+     * <p>
+     * Scale-out {@link BOp operators} which are
+     * {@link BOpEvaluationContext#SHARDED} or
+     * {@link BOpEvaluationContext#HASHED} require access to the local index
+     * manager on the data service and signal this using:
+     * <ul>
+     * <li>The {@link BOpEvaluationContext#SHARDED} or
+     * {@link BOpEvaluationContext#HASHED} (on a join); and</li>
+     * <li>The {@link IPredicate.Annotations#PARTITION_ID} (for a shard-wise
+     * access path).</li>
+     * </ul>
+     * In order to service a request for a local access path in scale-out, the
+     * caller MUST specify the <i>localIndexManager</i>.
+     * <p>
+     * Scale-out {@link BOp operators} MAY use remote access paths and signal
+     * this using:
+     * <ul>
+     * <li>The {@link BOpEvaluationContext#ANY} (on a join); and</li>
+     * <li>Setting {@link IPredicate.Annotations#REMOTE_ACCESS_PATH} to
+     * <code>true</code>.</li>
+     * </ul>
+     * When a remote access path is required, the <i>localIndexManager</i> is
+     * ignored and {@link IRelation#getIndexManager()} is used to obtain the
+     * {@link IBigdataFederation} from which the {@link IRelation} definition
+     * was materialized.
+     * 
+     * @param localIndexManager
+     *            The local index manager (optional).
+     * @param keyOrder
+     *            Identifies which index to use (required).
+     * @param predicate
+     *            The predicate (required).
+     * 
+     * @return The {@link IAccessPath}.
+     */
+    IAccessPath<E> getAccessPath(IIndexManager localIndexManager,
+            IKeyOrder<E> keyOrder, IPredicate<E> predicate);
+
+//    /**
+//     * This handles a request for an access path that is restricted to a
+//     * specific index partition. This access path is used with the scale-out
+//     * JOIN strategy, which distributes join tasks onto each index partition
+//     * from which it needs to read. Those tasks constrain the predicate to only
+//     * read from the index partition which is being serviced by that join task.
+//     * <p>
+//     * Note: Expanders ARE NOT applied in this code path. Expanders require a
+//     * total view of the relation, which is not available during scale-out
+//     * pipeline joins.
+//     * 
+//     * @param indexManager
+//     *            This MUST be the data service local index manager so that the
+//     *            returned access path will read against the local shard.
+//     * @param predicate
+//     *            The predicate. {@link IPredicate#getPartitionId()} MUST return
+//     *            a valid index partition identifier.
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if either argument is <code>null</code>.
+//     * @throws IllegalArgumentException
+//     *             unless the {@link IIndexManager} is a <em>local</em> index
+//     *             manager providing direct access to the specified shard.
+//     * @throws IllegalArgumentException
+//     *             unless the predicate identifies a specific shard using
+//     *             {@link IPredicate#getPartitionId()}.
+//     *             
+//     * @deprecated {@link AccessPath} is handling this directly based on the
+//     *             {@link IPredicate.Annotations#PARTITION_ID}.
+//     */
+//    IAccessPath<E> getAccessPathForIndexPartition(IIndexManager indexManager,
+//            IPredicate<E> predicate);
+    
     /**
      * The fully qualified name of the index.
      * 
@@ -248,8 +330,8 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
     String getFQN(IKeyOrder<? extends E> keyOrder);
 
     /**
-     * Return the index for the {@link IKeyOrder} the timestamp for this view of
-     * the relation.
+     * Return the index for associated with the specified {@link IKeyOrder} this
+     * view of the relation.
      * 
      * @param keyOrder
      *            The natural index order.

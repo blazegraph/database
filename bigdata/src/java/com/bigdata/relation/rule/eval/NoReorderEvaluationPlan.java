@@ -27,7 +27,7 @@ package com.bigdata.relation.rule.eval;
 
 import com.bigdata.bop.IPredicate;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.ISolutionExpander;
+import com.bigdata.relation.rule.IAccessPathExpander;
 
 /**
  * Useful for testing - will not reorder the join predicates.
@@ -95,7 +95,7 @@ public class NoReorderEvaluationPlan implements IEvaluationPlan {
 
             final IPredicate predicate = rule.getTail(tailIndex);
             
-            final ISolutionExpander expander = predicate.getSolutionExpander();
+            final IAccessPathExpander expander = predicate.getAccessPathExpander();
 
             if (expander != null && expander.runFirst()) {
 

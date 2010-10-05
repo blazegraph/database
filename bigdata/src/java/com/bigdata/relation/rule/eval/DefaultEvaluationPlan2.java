@@ -36,7 +36,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.journal.ITx;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.ISolutionExpander;
+import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.IStarJoin;
 
 /**
@@ -223,7 +223,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
         
         int startIndex = 0;
         for (int i = 0; i < tailCount; i++) {
-            ISolutionExpander expander = rule.getTail(i).getSolutionExpander();
+            IAccessPathExpander expander = rule.getTail(i).getAccessPathExpander();
             if (expander != null && expander.runFirst()) {
                 if (DEBUG) log.debug("found a run first, tail " + i);
                 order[startIndex++] = i;
@@ -438,7 +438,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
 
             final IPredicate predicate = rule.getTail(tailIndex);
             
-            final ISolutionExpander expander = predicate.getSolutionExpander();
+            final IAccessPathExpander expander = predicate.getAccessPathExpander();
 
             if (expander != null && expander.runFirst()) {
 

@@ -86,7 +86,13 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
      */
     public ChunkedWrappedIterator(final Iterator<E> src) {
 
-        this(src, DEFAULT_CHUNK_SIZE, null/*elementClass*/);
+        this(src, DEFAULT_CHUNK_SIZE);
+
+    }
+
+    public ChunkedWrappedIterator(final Iterator<E> src, final int chunkSize) {
+
+        this(src, chunkSize, null/* elementClass */);
 
     }
 

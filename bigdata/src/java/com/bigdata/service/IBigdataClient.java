@@ -38,7 +38,6 @@ import com.bigdata.journal.ITx;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
-import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
 import com.bigdata.relation.rule.eval.ProgramTask;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.ndx.ClientIndexView;
@@ -284,9 +283,6 @@ public interface IBigdataClient<T> {
          * Instead, this application request generates at most this many tasks
          * at a time and new tasks will not be created for that request until
          * the previous set of tasks for the request have completed.
-         * 
-         * @todo use for {@link NestedSubqueryWithJoinThreadsTask} for parallel
-         *       subqueries?
          * 
          * @todo use for {@link ProgramTask} for parallel rule evaluation?
          */

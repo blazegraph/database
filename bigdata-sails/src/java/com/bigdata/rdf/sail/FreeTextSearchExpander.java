@@ -24,7 +24,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.rule.ISolutionExpander;
+import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.search.Hiterator;
 import com.bigdata.search.IHit;
 import com.bigdata.striterator.ChunkedConvertingIterator;
@@ -43,7 +43,7 @@ import com.bigdata.striterator.IKeyOrder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
+public class FreeTextSearchExpander implements IAccessPathExpander<ISPO> {
     
     protected static final Logger log = Logger.getLogger(FreeTextSearchExpander.class);
     

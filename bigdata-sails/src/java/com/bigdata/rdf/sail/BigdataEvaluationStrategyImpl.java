@@ -16,6 +16,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
@@ -71,7 +72,6 @@ import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.constraint.OR;
 import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.engine.Rule2BOpUtility;
 import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.solutions.ISortOrder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
@@ -106,14 +106,13 @@ import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.ISolutionExpander;
+import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.QueryOptions;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.eval.IRuleTaskFactory;
 import com.bigdata.relation.rule.eval.ISolution;
-import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
 import com.bigdata.relation.rule.eval.RuleStats;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.search.IHit;
@@ -152,8 +151,8 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * <dt>OFFSET and LIMIT</dt>
  * <dd>
  * <p>
- * {@link IQueryOptions#getSlice()}, which is effected as a conditional in
- * {@link NestedSubqueryWithJoinThreadsTask} based on the
+ * {@link IQueryOptions#getSlice()}, which was effected as a conditional in
+ * the old "Nested Subquery With Join Threads Task" based on the
  * {@link RuleStats#solutionCount}. Query {@link ISolution}s are counted as
  * they are generated, but they are only entered into the {@link ISolution}
  * {@link IBuffer} when the solutionCount is GE the OFFSET and LT the LIMIT.
@@ -826,7 +825,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                     return null;
                 }
             }
-            if (tail.getSolutionExpander() instanceof FreeTextSearchExpander) {
+            if (tail.getAccessPathExpander() instanceof FreeTextSearchExpander) {
                 searches.put(tail, sp);
             }
             tails.add(tail);
@@ -883,8 +882,8 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 boolean needsFilter = true;
                 // check the other tails one by one
                 for (IPredicate<ISPO> tail : tails) {
-                    ISolutionExpander<ISPO> expander = 
-                        tail.getSolutionExpander();
+                    IAccessPathExpander<ISPO> expander = 
+                        tail.getAccessPathExpander();
                     // only concerned with non-optional tails that are not
                     // themselves magic searches
                     if (expander instanceof FreeTextSearchExpander
@@ -915,7 +914,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                         log.debug("needs filter: " + searchVar);
                     }
                     FreeTextSearchExpander expander = (FreeTextSearchExpander) 
-                            search.getSolutionExpander();
+                            search.getAccessPathExpander();
                     expander.addNamedGraphsFilter(graphs);
                 }
             }
@@ -959,7 +958,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         
         if (log.isDebugEnabled()) {
             for (IPredicate<ISPO> tail : tails) {
-                ISolutionExpander<ISPO> expander = tail.getSolutionExpander();
+                IAccessPathExpander<ISPO> expander = tail.getAccessPathExpander();
                 if (expander != null) {
                     IAccessPath<ISPO> accessPath = database.getSPORelation()
                             .getAccessPath(tail);
@@ -1315,7 +1314,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             final boolean optional) throws QueryEvaluationException {
         
         // create a solution expander for free text search if necessary
-        ISolutionExpander<ISPO> expander = null;
+        IAccessPathExpander<ISPO> expander = null;
         final Value predValue = stmtPattern.getPredicateVar().getValue();
         if (log.isDebugEnabled()) {
             log.debug(predValue);
@@ -1410,9 +1409,6 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 // attach the Scope.
                 anns.add(new NV(Rule2BOpUtility.Annotations.SCOPE, stmtPattern
                         .getScope()));
-                // set iff the graph variable was specified by the query.
-                if (cvar != null)
-                    anns.add(new NV(Rule2BOpUtility.Annotations.CVAR, cvar));
                 if (dataset == null) {
                     // attach the appropriate expander : @todo drop expanders. 
                     if (cvar == null) {
@@ -1685,11 +1681,16 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             throws Exception {
         
         final QueryEngine queryEngine = tripleSource.getSail().getQueryEngine();
-        
+
+        /*
+         * Note: The ids are assigned using incrementAndGet() so ONE (1) is the
+         * first id that will be assigned when we pass in ZERO (0) as the
+         * initial state of the AtomicInteger.
+         */
         final int startId = 1;
-        final PipelineOp query = 
-            Rule2BOpUtility.convert(step, startId, database, queryEngine);
-        
+        final PipelineOp query = Rule2BOpUtility.convert(step,
+                new AtomicInteger(0), database, queryEngine);
+
         if (log.isInfoEnabled()) {
             log.info(query);
         }

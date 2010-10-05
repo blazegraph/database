@@ -61,7 +61,6 @@ import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.Dechunkerator;
-import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Unit tests for {@link MapBindingSetsOverShardsBuffer}.
@@ -373,7 +372,7 @@ public class TestMapBindingSetsOverShards extends
         try {
             
             final MockMapBindingSetsOverShardsBuffer<E> fixture = new MockMapBindingSetsOverShardsBuffer<E>(
-                    fed, pred, rel.getPrimaryKeyOrder(), tx, 100/* capacity */);
+                    fed, pred, /*rel.getPrimaryKeyOrder(),*/ tx, 100/* capacity */);
 
             // write the binding sets on the fixture.
             for (IBindingSet bindingSet : data) {
@@ -521,7 +520,7 @@ public class TestMapBindingSetsOverShards extends
         try {
             
             final MockMapBindingSetsOverShardsBuffer<E> fixture = new MockMapBindingSetsOverShardsBuffer<E>(
-                    fed, pred, rel.getPrimaryKeyOrder(), tx, 100/* capacity */);
+                    fed, pred, /*rel.getPrimaryKeyOrder(),*/ tx, 100/* capacity */);
 
             // write the binding sets on the fixture.
             for (IBindingSet bindingSet : data) {
@@ -634,7 +633,7 @@ public class TestMapBindingSetsOverShards extends
         try {
             
             final MockMapBindingSetsOverShardsBuffer<E> fixture = new MockMapBindingSetsOverShardsBuffer<E>(
-                    fed, pred, rel.getPrimaryKeyOrder(), tx, 100/* capacity */);
+                    fed, pred, /*rel.getPrimaryKeyOrder(),*/ tx, 100/* capacity */);
 
             // write the binding sets on the fixture.
             for (IBindingSet bindingSet : data) {
@@ -744,17 +743,16 @@ public class TestMapBindingSetsOverShards extends
         /**
          * @param fed
          * @param pred
-         * @param keyOrder
          * @param timestamp
          * @param capacity
          *            The capacity of this buffer
          */
         public MockMapBindingSetsOverShardsBuffer(
                 final IBigdataFederation<?> fed, final IPredicate<F> pred,
-                final IKeyOrder<F> keyOrder, final long timestamp,
+                final long timestamp,
                 final int capacity) {
 
-            super(fed, pred, keyOrder, timestamp, capacity);
+            super(fed, pred, /*keyOrder, */ timestamp, capacity);
 
             /*
              * Output capacity of each sink is the input capacity for the

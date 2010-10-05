@@ -30,7 +30,8 @@ package com.bigdata.bop.rdf.join;
 import junit.framework.TestCase2;
 
 /**
- * Test {@link DataSetJoin}
+ * Test {@link DataSetJoin}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */

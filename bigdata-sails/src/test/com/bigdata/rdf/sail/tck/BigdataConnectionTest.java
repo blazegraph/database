@@ -29,38 +29,19 @@ package com.bigdata.rdf.sail.tck;
 
 import java.io.File;
 import java.io.IOException;
-import java.sql.Date;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.List;
 import java.util.Properties;
-import java.util.TimeZone;
-import javax.xml.datatype.DatatypeFactory;
-import javax.xml.datatype.XMLGregorianCalendar;
-
-import junit.framework.Test;
-import junit.framework.TestSuite;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.URI;
-import org.openrdf.model.vocabulary.RDF;
-import org.openrdf.query.BindingSet;
-import org.openrdf.query.QueryLanguage;
-import org.openrdf.query.TupleQuery;
-import org.openrdf.query.TupleQueryResult;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnectionTest;
 
 import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSail.Options;
-import com.bigdata.rdf.sail.tck.BigdataStoreTest.LTSWithNestedSubquery;
 import com.bigdata.rdf.store.LocalTripleStore;
-import com.bigdata.relation.AbstractResource;
 
 public class BigdataConnectionTest extends RepositoryConnectionTest {
 
@@ -71,28 +52,28 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
 		super(name);
 	}
 
-    /**
-     * Return a test suite using the {@link LocalTripleStore} and nested
-     * subquery joins.
-     */
-    public static class LTSWithNestedSubquery extends BigdataConnectionTest {
-
-        public LTSWithNestedSubquery(String name) {
-            super(name);
-        }
-
-        @Override
-        protected Properties getProperties() {
-            
-            final Properties p = new Properties(super.getProperties());
-            
-            p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,"true");
-            
-            return p;
-            
-        }
-
-    }
+//    /**
+//     * Return a test suite using the {@link LocalTripleStore} and nested
+//     * subquery joins.
+//     */
+//    public static class LTSWithNestedSubquery extends BigdataConnectionTest {
+//
+//        public LTSWithNestedSubquery(String name) {
+//            super(name);
+//        }
+//
+//        @Override
+//        protected Properties getProperties() {
+//            
+//            final Properties p = new Properties(super.getProperties());
+//            
+//            p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,"true");
+//            
+//            return p;
+//            
+//        }
+//
+//    }
     
     /**
      * Return a test suite using the {@link LocalTripleStore} and pipeline
@@ -111,7 +92,7 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
             
             final Properties p = new Properties(super.getProperties());
             
-            p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,"false");
+//            p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,"false");
             
             return p;
             

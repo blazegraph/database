@@ -98,12 +98,6 @@ import com.bigdata.striterator.Dechunkerator;
  *          thompsonbry $
  * 
  * @todo reuse the stress tests from {@link TestQueryEngine}.
- * 
- *       FIXME It is difficult to verify from within a unit test that a remote
- *       access path was used. Access paths are obtained by the join operator
- *       when they execute. Since that is either another thread and callable or
- *       another node, service, thread and callable it is difficult to verify
- *       that the access path was either remote or local.
  */
 public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase {
 
@@ -546,8 +540,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV(Predicate.Annotations.BOP_ID, predId),//
                         new NV(Predicate.Annotations.TIMESTAMP,
                                 ITx.READ_COMMITTED),//
-                        new NV(Predicate.Annotations.KEY_ORDER,
-                                R.primaryKeyOrder),//
+//                        new NV(Predicate.Annotations.KEY_ORDER,
+//                                R.primaryKeyOrder),//
                 }));
 
         final PipelineJoin<E> joinOp = new PipelineJoin<E>(startOp/* left */,
@@ -714,8 +708,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                         new NV(Predicate.Annotations.BOP_ID, predId),//
                         new NV(Predicate.Annotations.TIMESTAMP,
                                 ITx.READ_COMMITTED),//
-                        new NV(Predicate.Annotations.KEY_ORDER,
-                                R.primaryKeyOrder),//
+//                        new NV(Predicate.Annotations.KEY_ORDER,
+//                                R.primaryKeyOrder),//
                 }));
 
         final PipelineJoin<E> joinOp = new PipelineJoin<E>(startOp/* left */,
@@ -864,8 +858,8 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                 .asMap(new NV[] {//
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
-                        new NV(Predicate.Annotations.KEY_ORDER,
-                                R.primaryKeyOrder),//
+//                        new NV(Predicate.Annotations.KEY_ORDER,
+//                                R.primaryKeyOrder),//
                         new NV(Predicate.Annotations.BOP_ID, predId),//
                         new NV(Predicate.Annotations.TIMESTAMP,
                                 ITx.READ_COMMITTED),//
@@ -991,33 +985,6 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
     }
 
     /**
-     * @todo Test the ability run a query reading on an access path using a
-     *       element filter (other than DISTINCT).
-     */
-    public void test_query_join1_filter() {
-        
-        fail("write test");
-
-    }
-
-    /**
-     * FIXME Test the ability run a query reading on an access path using a
-     * DISTINCT filter on that access path. For scale-out, this means using an
-     * RMI access path, stacking a distinct filter on the access path, and
-     * marking the join evaluation context as ANY since we do not push the
-     * binding sets to the shards when using RMI access paths.
-     * 
-     * @see DistinctSPOIterator, which should stack as a striterator. It might
-     *      be best to break it up into something to strip off the context
-     *      position and a distincterator.
-     */
-    public void test_query_join1_distinctAccessPath() {
-        
-        fail("write test");
-        
-    }
-
-    /**
      * Test the ability run a query requiring two joins.
      * 
      * @todo Verify join constraints (e.g., x == y or x != y).
@@ -1047,7 +1014,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                                 new String[] { namespace }),//
                         new NV(Predicate.Annotations.BOP_ID, predId1),//
                         new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
-                        new NV(Predicate.Annotations.KEY_ORDER,R.primaryKeyOrder),//
+//                        new NV(Predicate.Annotations.KEY_ORDER,R.primaryKeyOrder),//
                 }));
         
         final Predicate<?> pred2Op = new Predicate<E>(new IVariableOrConstant[] {
@@ -1057,7 +1024,7 @@ public class TestFederatedQueryEngine extends AbstractEmbeddedFederationTestCase
                                 new String[] { namespace }),//
                         new NV(Predicate.Annotations.BOP_ID, predId2),//
                         new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
-                        new NV(Predicate.Annotations.KEY_ORDER,R.primaryKeyOrder),//
+//                        new NV(Predicate.Annotations.KEY_ORDER,R.primaryKeyOrder),//
                 }));
         
         final PipelineOp join1Op = new PipelineJoin<E>(//

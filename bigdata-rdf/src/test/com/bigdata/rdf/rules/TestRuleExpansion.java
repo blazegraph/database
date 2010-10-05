@@ -55,7 +55,7 @@ import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.ISolutionExpander;
+import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
@@ -192,7 +192,7 @@ public class TestRuleExpansion extends AbstractInferenceEngineTestCase {
             
             {
                 
-                ISolutionExpander<ISPO> expander = new ISolutionExpander<ISPO>() {
+                IAccessPathExpander<ISPO> expander = new IAccessPathExpander<ISPO>() {
                     public boolean backchain() {
                         return false;
                     }

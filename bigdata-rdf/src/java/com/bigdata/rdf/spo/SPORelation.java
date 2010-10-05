@@ -56,7 +56,6 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BloomFilterFactory;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
@@ -86,14 +85,11 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.relation.AbstractRelation;
-import com.bigdata.relation.IRelation;
-import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.InsertSolutionBuffer;
-import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.EmptyChunkedIterator;
@@ -116,11 +112,6 @@ import cutthecrap.utils.striterators.Striterator;
  * quads. The statement type (inferred, axiom, or explicit) and the optional
  * statement identifier are stored under the key. All state for a statement is
  * replicated in each of the statement indices.
- * 
- *  * @todo integration with package providing magic set rewrites of rules in order
- *       to test whether or not a statement is still provable when it is
- *       retracted during TM. this will reduce the cost of loading data, since
- *       much of that is writing the justifications index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -696,6 +687,20 @@ public class SPORelation extends AbstractRelation<ISPO> {
         metadata.setTupleSerializer(new SPOTupleSerializer(keyOrder,
                 leafKeySer, leafValSer));
 
+        if ((getIndexManager() instanceof IBigdataFederation<?>)
+                && ((IBigdataFederation<?>) getIndexManager()).isScaleOut()
+                && keyOrder.getKeyArity() == 4
+                && getContainer().isConstrainXXXCShards()
+                && keyOrder.getIndexName().endsWith("C")) {
+
+            /*
+             * Apply a constraint to an xxxC index such that all quads for the
+             * same triple are in the same shard.
+             */
+            metadata.setSplitHandler(new XXXCShardSplitHandler());
+
+        }
+
         if (bloomFilter && keyOrder.equals(SPOKeyOrder.SPO)) {
             
             /*
@@ -1006,310 +1011,330 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     }
 
+//    /**
+//     * Return the {@link IAccessPath} that is most efficient for the specified
+//     * predicate based on an analysis of the bound and unbound positions in the
+//     * predicate.
+//     * <p>
+//     * Note: When statement identifiers are enabled, the only way to bind the
+//     * context position is to already have an {@link SPO} on hand. There is no
+//     * index which can be used to look up an {@link SPO} by its context and the
+//     * context is always a blank node.
+//     * <p>
+//     * Note: This method is a hot spot, especially when the maximum parallelism
+//     * for subqueries is large. A variety of caching techniques are being
+//     * evaluated to address this.
+//     * 
+//     * @param pred
+//     *            The predicate.
+//     * 
+//     * @return The best access path for that predicate.
+//     */
+//    public IAccessPath<ISPO> getAccessPath(final IPredicate<ISPO> predicate) {
+//
+//        /*
+//         * Note: Query is faster w/o cache on all LUBM queries.
+//         * 
+//         * @todo Optimization could reuse a caller's SPOAccessPath instance,
+//         * setting only the changed data on the fromKey/toKey.  That could
+//         * be done with setS(long), setO(long), setP(long) methods.  The
+//         * filter could be modified in the same manner.  That could cut down
+//         * on allocation costs, formatting the from/to keys, etc.
+//         */
+//
+////        if (predicate.getPartitionId() != -1) {
+////
+////            /*
+////             * Note: This handles a read against a local index partition.
+////             * 
+////             * Note: This does not work here because it has the federation's
+////             * index manager rather than the data service's index manager. That
+////             * is because we always resolve relations against the federation
+////             * since their metadata is stored in the global row store. Maybe
+////             * this could be changed if we developed the concept of a
+////             * "relation shard" accessed the metadata via a catalog and which
+////             * was aware that only one index shard could be resolved locally.
+////             */
+////
+////            return getAccessPathForIndexPartition(predicate);
+////
+////        }
+//
+//        return _getAccessPath(predicate);
+//              
+//    }
+
+//    /**
+//     * Isolates the logic for selecting the {@link SPOKeyOrder} from the
+//     * {@link SPOPredicate} and then delegates to
+//     * {@link #getAccessPath(IKeyOrder, IPredicate)}.
+//     */
+//    final private SPOAccessPath _getAccessPath(final IPredicate<ISPO> predicate) {
+//
+//        final SPOKeyOrder keyOrder = getKeyOrder(predicate);
+//        
+//        final SPOAccessPath accessPath = getAccessPath(keyOrder, predicate);
+//
+//        if (log.isDebugEnabled())
+//            log.debug(accessPath.toString());
+//
+//        //            System.err.println("new access path: pred="+predicate);
+//
+//        return accessPath;
+//
+//    }
+
     /**
-     * Return the {@link IAccessPath} that is most efficient for the specified
-     * predicate based on an analysis of the bound and unbound positions in the
-     * predicate.
+     * Implementation chooses a quads or triples index as appropriate.
      * <p>
-     * Note: When statement identifiers are enabled, the only way to bind the
-     * context position is to already have an {@link SPO} on hand. There is no
-     * index which can be used to look up an {@link SPO} by its context and the
-     * context is always a blank node.
-     * <p>
-     * Note: This method is a hot spot, especially when the maximum parallelism
-     * for subqueries is large. A variety of caching techniques are being
-     * evaluated to address this.
+     * {@inheritDoc}
      * 
-     * @param pred
-     *            The predicate.
-     * 
-     * @return The best access path for that predicate.
+     * @todo This should recognize when only the primary index is available and
+     *       then use it for all access paths.
      */
-    public IAccessPath<ISPO> getAccessPath(final IPredicate<ISPO> predicate) {
-
-        /*
-         * Note: Query is faster w/o cache on all LUBM queries.
-         * 
-         * @todo Optimization could reuse a caller's SPOAccessPath instance,
-         * setting only the changed data on the fromKey/toKey.  That could
-         * be done with setS(long), setO(long), setP(long) methods.  The
-         * filter could be modified in the same manner.  That could cut down
-         * on allocation costs, formatting the from/to keys, etc.
-         */
-
-//        if (predicate.getPartitionId() != -1) {
-//
-//            /*
-//             * Note: This handles a read against a local index partition.
-//             * 
-//             * Note: This does not work here because it has the federation's
-//             * index manager rather than the data service's index manager. That
-//             * is because we always resolve relations against the federation
-//             * since their metadata is stored in the global row store. Maybe
-//             * this could be changed if we developed the concept of a
-//             * "relation shard" accessed the metadata via a catalog and which
-//             * was aware that only one index shard could be resolved locally.
-//             */
-//
-//            return getAccessPathForIndexPartition(predicate);
-//
-//        }
-
-        return _getAccessPath(predicate);
-              
-    }
-
-    /**
-     * Isolates the logic for selecting the {@link SPOKeyOrder} from the
-     * {@link SPOPredicate} and then delegates to
-     * {@link #getAccessPath(IKeyOrder, IPredicate)}.
-     */
-    final private SPOAccessPath _getAccessPath(final IPredicate<ISPO> predicate) {
-
-        final SPOKeyOrder keyOrder = getKeyOrder(predicate);
-        
-        final SPOAccessPath accessPath = getAccessPath(keyOrder, predicate);
-
-        if (log.isDebugEnabled())
-            log.debug(accessPath.toString());
-
-        //            System.err.println("new access path: pred="+predicate);
-
-        return accessPath;
-
-    }
-    
     public SPOKeyOrder getKeyOrder(final IPredicate<ISPO> predicate) {
-        
-        return SPOKeyOrder.getKeyOrder(predicate, keyArity);
 
+        return SPOKeyOrder.getKeyOrder(predicate, keyArity);
+        
     }
 
-    /**
-     * This handles a request for an access path that is restricted to a
-     * specific index partition.
-     * <p>
-     * Note: This path is used with the scale-out JOIN strategy, which
-     * distributes join tasks onto each index partition from which it needs to
-     * read. Those tasks constrain the predicate to only read from the index
-     * partition which is being serviced by that join task.
-     * <p>
-     * Note: Since the relation may materialize the index views for its various
-     * access paths, and since we are restricted to a single index partition and
-     * (presumably) an index manager that only sees the index partitions local
-     * to a specific data service, we create an access path view for an index
-     * partition without forcing the relation to be materialized.
-     * <p>
-     * Note: Expanders ARE NOT applied in this code path. Expanders require a
-     * total view of the relation, which is not available during scale-out
-     * pipeline joins.
-     * 
-     * @param indexManager
-     *            This MUST be the data service local index manager so that the
-     *            returned access path will read against the local shard.
-     * @param predicate
-     *            The predicate. {@link IPredicate#getPartitionId()} MUST return
-     *            a valid index partition identifier.
-     * 
-     * @throws IllegalArgumentException
-     *             if either argument is <code>null</code>.
-     * @throws IllegalArgumentException
-     *             unless the {@link IIndexManager} is a <em>local</em> index
-     *             manager providing direct access to the specified shard.
-     * @throws IllegalArgumentException
-     *             unless the predicate identifies a specific shard using
-     *             {@link IPredicate#getPartitionId()}.
-     * 
-     * @todo Raise this method into the {@link IRelation} interface?
-     */
+//    /**
+//     * This handles a request for an access path that is restricted to a
+//     * specific index partition.
+//     * <p>
+//     * Note: This path is used with the scale-out JOIN strategy, which
+//     * distributes join tasks onto each index partition from which it needs to
+//     * read. Those tasks constrain the predicate to only read from the index
+//     * partition which is being serviced by that join task.
+//     * <p>
+//     * Note: Since the relation may materialize the index views for its various
+//     * access paths, and since we are restricted to a single index partition and
+//     * (presumably) an index manager that only sees the index partitions local
+//     * to a specific data service, we create an access path view for an index
+//     * partition without forcing the relation to be materialized.
+//     * <p>
+//     * Note: Expanders ARE NOT applied in this code path. Expanders require a
+//     * total view of the relation, which is not available during scale-out
+//     * pipeline joins.
+//     * 
+//     * @param indexManager
+//     *            This MUST be the data service local index manager so that the
+//     *            returned access path will read against the local shard.
+//     * @param predicate
+//     *            The predicate. {@link IPredicate#getPartitionId()} MUST return
+//     *            a valid index partition identifier.
+//     * 
+//     * @throws IllegalArgumentException
+//     *             if either argument is <code>null</code>.
+//     * @throws IllegalArgumentException
+//     *             unless the {@link IIndexManager} is a <em>local</em> index
+//     *             manager providing direct access to the specified shard.
+//     * @throws IllegalArgumentException
+//     *             unless the predicate identifies a specific shard using
+//     *             {@link IPredicate#getPartitionId()}.
+//     * 
+//     * @deprecated {@link AccessPath} is handling this directly based on the
+//     *             {@link IPredicate.Annotations#PARTITION_ID}.
+//     */
+//    @Override
+//    public IAccessPath<ISPO> getAccessPathForIndexPartition(
+//            final IIndexManager indexManager, //
+//            final IPredicate<ISPO> predicate//
+//            ) {
+//
+//        return getAccessPath(indexManager,getKeyOrder(predicate),predicate);
+//        
+////        /*
+////         * Note: getIndexManager() _always_ returns the federation's index
+////         * manager because that is how we materialize an ILocatableResource when
+////         * we locate it. However, the federation's index manager can not be used
+////         * here because it addresses the scale-out indices. Instead, the caller
+////         * must pass in the IIndexManager which has access to the local index
+////         * objects so we can directly read on the shard.
+////         */
+//////        final IIndexManager indexManager = getIndexManager();
+////
+////        if (indexManager == null)
+////            throw new IllegalArgumentException();
+////
+////        if (indexManager instanceof IBigdataFederation<?>) {
+////
+////            /*
+////             * This will happen if you fail to re-create the JoinNexus within
+////             * the target execution environment.
+////             * 
+////             * This is disallowed because the predicate specifies an index
+////             * partition and expects to have access to the local index objects
+////             * for that index partition. However, the index partition is only
+////             * available when running inside of the ConcurrencyManager and when
+////             * using the IndexManager exposed by the ConcurrencyManager to its
+////             * tasks.
+////             */
+////
+////            throw new IllegalArgumentException(
+////                    "Expecting a local index manager, not: "
+////                            + indexManager.getClass().toString());
+////
+////        }
+////        
+////        if (predicate == null)
+////            throw new IllegalArgumentException();
+////
+////        final int partitionId = predicate.getPartitionId();
+////
+////        if (partitionId == -1) // must be a valid partition identifier.
+////            throw new IllegalArgumentException();
+////
+////        /*
+////         * @todo This condition should probably be an error since the expander
+////         * will be ignored.
+////         */
+//////        if (predicate.getSolutionExpander() != null)
+//////            throw new IllegalArgumentException();
+////
+////        if (predicate.getRelationCount() != 1) {
+////
+////            /*
+////             * This is disallowed. The predicate must be reading on a single
+////             * local index partition, not a view comprised of more than one
+////             * index partition.
+////             * 
+////             * @todo In fact, we could allow a view here as long as all parts of
+////             * the view are local. That could be relevant when the other view
+////             * component was a shard of a focusStore for parallel decomposition
+////             * of RDFS closure, etc. The best way to handle such views when the
+////             * components are not local is to use a UNION of the JOIN. When both
+////             * parts are local we can do better using a UNION of the
+////             * IAccessPath.
+////             */
+////            
+////            throw new IllegalStateException();
+////            
+////        }
+////        
+////        final String namespace = getNamespace();//predicate.getOnlyRelationName();
+////
+////        /*
+////         * Find the best access path for that predicate.
+////         */
+////        final SPOKeyOrder keyOrder = getKeyOrder(predicate);
+////
+////        // The name of the desired index partition.
+////        final String name = DataService.getIndexPartitionName(namespace + "."
+////                + keyOrder.getIndexName(), predicate.getPartitionId());
+////
+////        /*
+////         * Note: whether or not we need both keys and values depends on the
+////         * specific index/predicate.
+////         * 
+////         * Note: If the timestamp is a historical read, then the iterator will
+////         * be read only regardless of whether we specify that flag here or not.
+////         */
+//////      * Note: We can specify READ_ONLY here since the tail predicates are not
+//////      * mutable for rule execution.
+////        final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;// | IRangeQuery.READONLY;
+////
+////        final long timestamp = getTimestamp();//getReadTimestamp();
+////        
+////        // MUST be a local index view.
+////        final ILocalBTreeView ndx = (ILocalBTreeView) indexManager
+////                .getIndex(name, timestamp);
+////
+////        return newAccessPath(this/* relation */, indexManager, timestamp,
+////                predicate, keyOrder, ndx, flags, getChunkOfChunksCapacity(),
+////                getChunkCapacity(), getFullyBufferedReadThreshold());
+//
+//    }
+
+//    /**
+//     * Core impl.
+//     * 
+//     * @param keyOrder
+//     *            The natural order of the selected index (this identifies the
+//     *            index).
+//     * @param predicate
+//     *            The predicate specifying the query constraint on the access
+//     *            path.
+//     * 
+//     * @return The access path.
+//     */
+//    public SPOAccessPath getAccessPath(final IIndexManager localIndexManager,
+//            final IKeyOrder<ISPO> keyOrder, final IPredicate<ISPO> predicate) {
+//
+//        if (keyOrder == null)
+//            throw new IllegalArgumentException();
+//        
+//        if (predicate == null)
+//            throw new IllegalArgumentException();
+//        
+//        final IIndex ndx = getIndex(keyOrder);
+//
+//        if (ndx == null) {
+//        
+//            throw new IllegalArgumentException("no index? relation="
+//                    + getNamespace() + ", timestamp=" + getTimestamp()
+//                    + ", keyOrder=" + keyOrder + ", pred=" + predicate
+//                    + ", indexManager=" + getIndexManager());
+//            
+//        }
+//
+//        /*
+//         * Note: The PARALLEL flag here is an indication that the iterator may
+//         * run in parallel across the index partitions. This only effects
+//         * scale-out and only for simple triple patterns since the pipeline join
+//         * does something different (it runs inside the index partition using
+//         * the local index, not the client's view of a distributed index).
+//         * 
+//         * @todo Introducing the PARALLEL flag here will break semantics when
+//         * the rule is supposed to be "stable" (repeatable order) or when the
+//         * access path is supposed to be fully ordered. What we really need to
+//         * do is take the "stable" flag from the rule and transfer it onto the
+//         * predicates in that rule so we can enforce stable execution for
+//         * scale-out. Of course, that would kill any parallelism for scale-out
+//         * :-) This shows up as an issue when using SLICEs since the rule that
+//         * we execute has to have stable results for someone to page through
+//         * those results using LIMIT/OFFSET.
+//         */
+//        final int flags = IRangeQuery.KEYS
+//                | IRangeQuery.VALS
+//                | (TimestampUtility.isReadOnly(getTimestamp()) ? IRangeQuery.READONLY
+//                        : 0)
+//                | IRangeQuery.PARALLEL
+//                ;
+//        
+//        final AbstractTripleStore container = getContainer();
+//        
+//        final int chunkOfChunksCapacity = container.getChunkOfChunksCapacity();
+//
+//        final int chunkCapacity = container.getChunkCapacity();
+//
+//        final int fullyBufferedReadThreshold = container.getFullyBufferedReadThreshold();
+//        
+//        return newAccessPath(this, getIndexManager(), getTimestamp(),
+//                predicate, keyOrder, ndx, flags, chunkOfChunksCapacity,
+//                chunkCapacity, fullyBufferedReadThreshold);
+//
+//    }
+
     @Override
-    public IAccessPath<ISPO> getAccessPathForIndexPartition(
-            final IIndexManager indexManager, //
-            final IPredicate<ISPO> predicate//
+    public SPOAccessPath newAccessPath(
+//            final IRelation<ISPO> relation,
+            final IIndexManager localIndexManager, 
+//            final long timestamp,
+            final IPredicate<ISPO> predicate, 
+            final IKeyOrder<ISPO> keyOrder 
+//            final IIndex ndx, 
+//            final int flags, 
+//            final int chunkOfChunksCapacity,
+//            final int chunkCapacity, 
+//            final int fullyBufferedReadThreshold
             ) {
 
-        /*
-         * Note: getIndexManager() _always_ returns the federation's index
-         * manager because that is how we materialize an ILocatableResource when
-         * we locate it. However, the federation's index manager can not be used
-         * here because it addresses the scale-out indices. Instead, the caller
-         * must pass in the IIndexManager which has access to the local index
-         * objects so we can directly read on the shard.
-         */
-//        final IIndexManager indexManager = getIndexManager();
-
-        if (indexManager == null)
-            throw new IllegalArgumentException();
-
-        if (indexManager instanceof IBigdataFederation<?>) {
-
-            /*
-             * This will happen if you fail to re-create the JoinNexus within
-             * the target execution environment.
-             * 
-             * This is disallowed because the predicate specifies an index
-             * partition and expects to have access to the local index objects
-             * for that index partition. However, the index partition is only
-             * available when running inside of the ConcurrencyManager and when
-             * using the IndexManager exposed by the ConcurrencyManager to its
-             * tasks.
-             */
-
-            throw new IllegalArgumentException(
-                    "Expecting a local index manager, not: "
-                            + indexManager.getClass().toString());
-
-        }
-        
-        if (predicate == null)
-            throw new IllegalArgumentException();
-
-        final int partitionId = predicate.getPartitionId();
-
-        if (partitionId == -1) // must be a valid partition identifier.
-            throw new IllegalArgumentException();
-
-        /*
-         * @todo This condition should probably be an error since the expander
-         * will be ignored.
-         */
-//        if (predicate.getSolutionExpander() != null)
-//            throw new IllegalArgumentException();
-
-        if (predicate.getRelationCount() != 1) {
-
-            /*
-             * This is disallowed. The predicate must be reading on a single
-             * local index partition, not a view comprised of more than one
-             * index partition.
-             * 
-             * @todo In fact, we could allow a view here as long as all parts of
-             * the view are local. That could be relevant when the other view
-             * component was a shard of a focusStore for parallel decomposition
-             * of RDFS closure, etc. The best way to handle such views when the
-             * components are not local is to use a UNION of the JOIN. When both
-             * parts are local we can do better using a UNION of the
-             * IAccessPath.
-             */
-            
-            throw new IllegalStateException();
-            
-        }
-        
-        final String namespace = getNamespace();//predicate.getOnlyRelationName();
-
-        /*
-         * Find the best access path for that predicate.
-         */
-        final SPOKeyOrder keyOrder = getKeyOrder(predicate);
-
-        // The name of the desired index partition.
-        final String name = DataService.getIndexPartitionName(namespace + "."
-                + keyOrder.getIndexName(), predicate.getPartitionId());
-
-        /*
-         * Note: whether or not we need both keys and values depends on the
-         * specific index/predicate.
-         * 
-         * Note: If the timestamp is a historical read, then the iterator will
-         * be read only regardless of whether we specify that flag here or not.
-         */
-//      * Note: We can specify READ_ONLY here since the tail predicates are not
-//      * mutable for rule execution.
-        final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;// | IRangeQuery.READONLY;
-
-        final long timestamp = getTimestamp();//getReadTimestamp();
-        
-        // MUST be a local index view.
-        final ILocalBTreeView ndx = (ILocalBTreeView) indexManager
-                .getIndex(name, timestamp);
-
-        return newAccessPath(this/* relation */, indexManager, timestamp,
-                predicate, keyOrder, ndx, flags, getChunkOfChunksCapacity(),
-                getChunkCapacity(), getFullyBufferedReadThreshold());
-
-    }
-    
-    /**
-     * Core impl.
-     * 
-     * @param keyOrder
-     *            The natural order of the selected index (this identifies the
-     *            index).
-     * @param predicate
-     *            The predicate specifying the query constraint on the access
-     *            path.
-     * 
-     * @return The access path.
-     */
-    public SPOAccessPath getAccessPath(final IKeyOrder<ISPO> keyOrder,
-            final IPredicate<ISPO> predicate) {
-
-        if (keyOrder == null)
-            throw new IllegalArgumentException();
-        
-        if (predicate == null)
-            throw new IllegalArgumentException();
-        
-        final IIndex ndx = getIndex(keyOrder);
-
-        if (ndx == null) {
-        
-            throw new IllegalArgumentException("no index? relation="
-                    + getNamespace() + ", timestamp=" + getTimestamp()
-                    + ", keyOrder=" + keyOrder + ", pred=" + predicate
-                    + ", indexManager=" + getIndexManager());
-            
-        }
-
-        /*
-         * Note: The PARALLEL flag here is an indication that the iterator may
-         * run in parallel across the index partitions. This only effects
-         * scale-out and only for simple triple patterns since the pipeline join
-         * does something different (it runs inside the index partition using
-         * the local index, not the client's view of a distributed index).
-         * 
-         * @todo Introducing the PARALLEL flag here will break semantics when
-         * the rule is supposed to be "stable" (repeatable order) or when the
-         * access path is supposed to be fully ordered. What we really need to
-         * do is take the "stable" flag from the rule and transfer it onto the
-         * predicates in that rule so we can enforce stable execution for
-         * scale-out. Of course, that would kill any parallelism for scale-out
-         * :-) This shows up as an issue when using SLICEs since the rule that
-         * we execute has to have stable results for someone to page through
-         * those results using LIMIT/OFFSET.
-         */
-        final int flags = IRangeQuery.KEYS
-                | IRangeQuery.VALS
-                | (TimestampUtility.isReadOnly(getTimestamp()) ? IRangeQuery.READONLY
-                        : 0)
-                | IRangeQuery.PARALLEL
-                ;
-        
-        final AbstractTripleStore container = getContainer();
-        
-        final int chunkOfChunksCapacity = container.getChunkOfChunksCapacity();
-
-        final int chunkCapacity = container.getChunkCapacity();
-
-        final int fullyBufferedReadThreshold = container.getFullyBufferedReadThreshold();
-        
-        return newAccessPath(this, getIndexManager(), getTimestamp(),
-                predicate, keyOrder, ndx, flags, chunkOfChunksCapacity,
-                chunkCapacity, fullyBufferedReadThreshold);
-
-    }
-
-    @Override
-    public SPOAccessPath newAccessPath(final IRelation<ISPO> relation,
-            final IIndexManager indexManager, final long timestamp,
-            final IPredicate<ISPO> predicate, final IKeyOrder<ISPO> keyOrder,
-            final IIndex ndx, final int flags, final int chunkOfChunksCapacity,
-            final int chunkCapacity, final int fullyBufferedReadThreshold) {
-
-        return new SPOAccessPath(this/* relation */, indexManager, timestamp,
-                predicate, keyOrder, ndx, flags, chunkOfChunksCapacity,
-                chunkCapacity, fullyBufferedReadThreshold).init();
+        return new SPOAccessPath(this/*relation*/, localIndexManager, //timestamp,
+                predicate, keyOrder
+//                , ndx, flags, chunkOfChunksCapacity,
+//                chunkCapacity, fullyBufferedReadThreshold
+                ).init();
 
     }
 
@@ -2212,6 +2237,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
                 NV.asMap(new NV[] {//
                         new NV(IPredicate.Annotations.RELATION_NAME,
                                 new String[] { getNamespace() }),//
+//                        new NV(IPredicate.Annotations.KEY_ORDER,
+//                                keyOrder),//
                         }));
 //        final IPredicate<ISPO> pred = new SPOPredicate(
 //                new String[] { getNamespace() }, -1, // partitionId
@@ -2224,8 +2251,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
 //                null // expander
 //        );
 
-        final IChunkedOrderedIterator<ISPO> itr = getAccessPath(keyOrder, pred)
-                .iterator();
+        final IChunkedOrderedIterator<ISPO> itr = getAccessPath(
+                keyOrder, pred).iterator();
 
         try {
 

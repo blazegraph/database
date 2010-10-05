@@ -88,6 +88,8 @@ public class TestAll extends TestCase {
          * their key-range.
          */
         suite.addTestSuite(TestSegSplitter.class);
+        suite.addTestSuite(TestSparseRowStoreSplitHandler.class);
+        suite.addTestSuite(TestFixedLengthPrefixShardSplits.class);
         
         /*
          * Test management of local resources.
