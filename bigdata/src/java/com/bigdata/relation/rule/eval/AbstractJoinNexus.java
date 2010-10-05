@@ -54,7 +54,6 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.mdi.PartitionLocator;
-import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
@@ -351,56 +350,59 @@ abstract public class AbstractJoinNexus implements IJoinNexus {
 
     }
 
-    /**
-     * @deprecated by {@link #getTailAccessPath(IRelation, IPredicate)}
-     * 
-     * @see #getTailAccessPath(IRelation, IPredicate).
-     */
-    public IAccessPath getTailAccessPath(final IPredicate predicate) {
-     
-        // Resolve the relation name to the IRelation object.
-        final IRelation relation = getTailRelationView(predicate);
-
-        return getTailAccessPath(relation, predicate);
-
-    }
+//    /**
+//     * @deprecated by {@link #getTailAccessPath(IRelation, IPredicate)}
+//     * 
+//     * @see #getTailAccessPath(IRelation, IPredicate).
+//     */
+//    public IAccessPath getTailAccessPath(final IPredicate predicate) {
+//     
+//        // Resolve the relation name to the IRelation object.
+//        final IRelation relation = getTailRelationView(predicate);
+//
+//        return getTailAccessPath(relation, predicate);
+//
+//    }
 
     public IAccessPath getTailAccessPath(final IRelation relation,
             final IPredicate predicate) {
 
-        if (predicate.getPartitionId() != -1) {
-
-            /*
-             * Note: This handles a read against a local index partition. For
-             * scale-out, the [indexManager] will be the data service's local
-             * index manager.
-             * 
-             * Note: Expanders ARE NOT applied in this code path. Expanders
-             * require a total view of the relation, which is not available
-             * during scale-out pipeline joins. Likewise, the [backchain]
-             * property will be ignored since it is handled by an expander.
-             */
-
-            return ((AbstractRelation<?>) relation)
-                    .getAccessPathForIndexPartition(indexManager, predicate);
-
-        }
-
-        // Find the best access path for the predicate for that relation.
-        final IAccessPath<?> accessPath = relation.getAccessPath(predicate);
+        return relation.getAccessPath(indexManager/* localIndexManager */,
+                relation.getKeyOrder(predicate), predicate); 
         
-        // Note: No expander's for bops, at least not right now.
-//        final ISolutionExpander expander = predicate.getSolutionExpander();
-//        
-//        if (expander != null) {
-//            
-//            // allow the predicate to wrap the access path
-//            accessPath = expander.getAccessPath(accessPath);
-//            
+//        if (predicate.getPartitionId() != -1) {
+//
+//            /*
+//             * Note: This handles a read against a local index partition. For
+//             * scale-out, the [indexManager] will be the data service's local
+//             * index manager.
+//             * 
+//             * Note: Expanders ARE NOT applied in this code path. Expanders
+//             * require a total view of the relation, which is not available
+//             * during scale-out pipeline joins. Likewise, the [backchain]
+//             * property will be ignored since it is handled by an expander.
+//             */
+//
+//            return ((AbstractRelation<?>) relation)
+//                    .getAccessPathForIndexPartition(indexManager, predicate);
+//
 //        }
-        
-        // return that access path.
-        return accessPath;
+//
+//        // Find the best access path for the predicate for that relation.
+//        final IAccessPath<?> accessPath = relation.getAccessPath(predicate);
+//        
+//        // Note: No expander's for bops, at least not right now.
+////        final ISolutionExpander expander = predicate.getSolutionExpander();
+////        
+////        if (expander != null) {
+////            
+////            // allow the predicate to wrap the access path
+////            accessPath = expander.getAccessPath(accessPath);
+////            
+////        }
+//        
+//        // return that access path.
+//        return accessPath;
     }
 
     public Iterator<PartitionLocator> locatorScan(

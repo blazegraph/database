@@ -48,13 +48,16 @@ public interface ILocalBTreeView extends IIndex {
 
     /**
      * An array containing the ordered sources in the view. Changes to the array
-     * DO NOT affect the view. If the view is a {@link BTree} then the array
-     * will contain a single element which is that {@link BTree}.
+     * DO NOT affect the view. If the view is an {@link AbstractBTree} then the
+     * array will contain a single element which is that {@link AbstractBTree}.
      */
     public AbstractBTree[] getSources();
-    
+
     /**
      * The {@link BTree} that is absorbing writes for the view.
+     * 
+     * @throws UnsupportedOperationException
+     *             if the index is not mutable.
      */
     public BTree getMutableBTree();
 

@@ -131,40 +131,40 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
         
     }
     
-    /**
-     * Return a test suite using the {@link LocalTripleStore} and nested
-     * subquery joins.
-     */
-    public static TestSuite suiteLTSWithNestedSubquery() throws Exception {
-        
-        return ManifestTest.suite(new Factory() {
-
-            public SPARQLQueryTest createSPARQLQueryTest(String testURI,
-                    String name, String queryFileURL, String resultFileURL,
-                    Dataset dataSet, boolean laxCardinality) {
-
-                return new BigdataSparqlTest(testURI, name, queryFileURL,
-                        resultFileURL, dataSet, laxCardinality) {
-
-                    protected Properties getProperties() {
-
-                        final Properties p = new Properties(super
-                                .getProperties());
-
-                        p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,
-                                "true");
-
-                        return p;
-
-                    }
-
-                };
-
-            }
-            
-        });
-        
-    }
+//    /**
+//     * Return a test suite using the {@link LocalTripleStore} and nested
+//     * subquery joins.
+//     */
+//    public static TestSuite suiteLTSWithNestedSubquery() throws Exception {
+//        
+//        return ManifestTest.suite(new Factory() {
+//
+//            public SPARQLQueryTest createSPARQLQueryTest(String testURI,
+//                    String name, String queryFileURL, String resultFileURL,
+//                    Dataset dataSet, boolean laxCardinality) {
+//
+//                return new BigdataSparqlTest(testURI, name, queryFileURL,
+//                        resultFileURL, dataSet, laxCardinality) {
+//
+//                    protected Properties getProperties() {
+//
+//                        final Properties p = new Properties(super
+//                                .getProperties());
+//
+//                        p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,
+//                                "true");
+//
+//                        return p;
+//
+//                    }
+//
+//                };
+//
+//            }
+//            
+//        });
+//        
+//    }
 
     /**
      * Return a test suite using the {@link LocalTripleStore} and pipeline joins. 
@@ -185,8 +185,8 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
                         final Properties p = new Properties(super
                                 .getProperties());
 
-                        p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,
-                                "false");
+//                        p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,
+//                                "false");
 
                         return p;
 

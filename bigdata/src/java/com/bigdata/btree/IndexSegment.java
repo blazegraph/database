@@ -52,7 +52,7 @@ import com.bigdata.service.EventType;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IndexSegment extends AbstractBTree {
+public class IndexSegment extends AbstractBTree {//implements ILocalBTreeView {
 
     /**
      * Type safe reference to the backing store.
@@ -1401,6 +1401,18 @@ public class IndexSegment extends AbstractBTree {
             
         }
         
+    }
+
+    public BTree getMutableBTree() {
+        throw new UnsupportedOperationException();
+    }
+
+    public int getSourceCount() {
+        return 1;
+    }
+
+    public AbstractBTree[] getSources() {
+        return new AbstractBTree[]{this};
     }
 
 }

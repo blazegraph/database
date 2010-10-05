@@ -38,10 +38,10 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IShardwisePipelineOp;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryPeer;
@@ -60,7 +60,6 @@ import com.bigdata.relation.rule.eval.pipeline.DistributedJoinTask;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ResourceService;
-import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Extends {@link RunningQuery} to provide additional state and logic required
@@ -442,9 +441,6 @@ public class FederatedRunningQuery extends RunningQuery {
              * The sink must read or write on a shard so we map the binding sets
              * across the access path for the sink.
              * 
-             * Note: IKeyOrder tells us which index will be used and should be
-             * set on the predicate by the join optimizer.
-             * 
              * @todo Set the capacity of the the "map" buffer to the size of the
              * data contained in the sink (in fact, we should just process the
              * sink data in place using an expanded IChunkAccessor interface).
@@ -459,13 +455,12 @@ public class FederatedRunningQuery extends RunningQuery {
              */
             @SuppressWarnings("unchecked")
             final IPredicate<E> pred = ((IShardwisePipelineOp) targetOp).getPredicate();
-            final IKeyOrder<E> keyOrder = pred.getKeyOrder();
             final long timestamp = pred.getTimestamp(); 
             final int capacity = 1000;// @todo
             final int chunkOfChunksCapacity = 10;// @todo small queue
             final int chunkSize = 100;// @todo modest chunks.
             final MapBindingSetsOverShardsBuffer<IBindingSet, E> mapper = new MapBindingSetsOverShardsBuffer<IBindingSet, E>(
-                    getFederation(), pred, keyOrder, timestamp, capacity) {
+                    getFederation(), pred, timestamp, capacity) {
                 @Override
                 protected IBuffer<IBindingSet[]> newBuffer(final PartitionLocator locator) {
                     return new BlockingBuffer<IBindingSet[]>(

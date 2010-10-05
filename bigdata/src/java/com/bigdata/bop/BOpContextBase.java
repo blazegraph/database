@@ -30,25 +30,15 @@ package com.bigdata.bop;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
-import com.bigdata.btree.IRangeQuery;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.TimestampUtility;
-import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.IRelation;
-import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.eval.IJoinNexus;
-import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Base class for the bigdata operation evaluation context (NOT serializable).
@@ -58,11 +48,16 @@ import com.bigdata.striterator.IKeyOrder;
  */
 public class BOpContextBase {
 
-    static private final transient Logger log = Logger.getLogger(BOpContextBase.class);
+//    static private final transient Logger log = Logger.getLogger(BOpContextBase.class);
 
-//    private final QueryEngine queryEngine;
-    
+    /**
+     * The federation iff running in scale-out.
+     */
     private final IBigdataFederation<?> fed;
+
+    /**
+     * The <strong>local</strong> index manager.
+     */
     private final IIndexManager indexManager;
 
     /**
@@ -104,8 +99,11 @@ public class BOpContextBase {
 
     /**
      * Core constructor.
+     * 
      * @param fed
+     *            The federation iff running in scale-out.
      * @param indexManager
+     *            The <strong>local</strong> index manager.
      */
     public BOpContextBase(final IBigdataFederation<?> fed,
             final IIndexManager indexManager) {
@@ -232,7 +230,7 @@ public class BOpContextBase {
      *       conversion is done. It has much of the same logic (this also
      *       handles remote access paths now).
      * 
-     * @todo Support mutable relation views.
+     * @todo Support mutable relation views (no - just fix truth maintenance).
      */
 //    @SuppressWarnings("unchecked")
     public <E> IAccessPath<E> getAccessPath(final IRelation<E> relation,
@@ -244,147 +242,149 @@ public class BOpContextBase {
         if (predicate == null)
             throw new IllegalArgumentException();
 
-        /*
-         * FIXME This should be as assigned by the query planner so the query is
-         * fully declarative.
-         */
-        final IKeyOrder<E> keyOrder;
-        {
-            final IKeyOrder<E> tmp = predicate.getKeyOrder();
-            if (tmp != null) {
-                // use the specified index.
-                keyOrder = tmp;
-            } else {
-                // ask the relation for the best index.
-                keyOrder = relation.getKeyOrder(predicate);
-            }
-        }
+        return relation.getAccessPath(indexManager/* localIndexManager */,
+                relation.getKeyOrder(predicate), predicate);
 
-        if (keyOrder == null)
-            throw new RuntimeException("No access path: " + predicate);
-
-        final int partitionId = predicate.getPartitionId();
-
-        final long timestamp = (Long) predicate
-                .getRequiredProperty(BOp.Annotations.TIMESTAMP);
-        
-        final int flags = predicate.getProperty(
-                IPredicate.Annotations.FLAGS,
-                IPredicate.Annotations.DEFAULT_FLAGS)
-                | (TimestampUtility.isReadOnly(timestamp) ? IRangeQuery.READONLY
-                        : 0);
-        
-        final int chunkOfChunksCapacity = predicate.getProperty(
-                BufferAnnotations.CHUNK_OF_CHUNKS_CAPACITY,
-                BufferAnnotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY);
-
-        final int chunkCapacity = predicate.getProperty(
-                BufferAnnotations.CHUNK_CAPACITY,
-                BufferAnnotations.DEFAULT_CHUNK_CAPACITY);
-
-        final int fullyBufferedReadThreshold = predicate.getProperty(
-                IPredicate.Annotations.FULLY_BUFFERED_READ_THRESHOLD,
-                IPredicate.Annotations.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD);
-        
-        if (partitionId != -1) {
-
-            /*
-             * Note: This handles a read against a local index partition. For
-             * scale-out, the [indexManager] will be the data service's local
-             * index manager.
-             * 
-             * Note: Expanders ARE NOT applied in this code path. Expanders
-             * require a total view of the relation, which is not available
-             * during scale-out pipeline joins. Likewise, the [backchain]
-             * property will be ignored since it is handled by an expander.
-             * 
-             * @todo Replace this with IRelation#getAccessPathForIndexPartition()
-             */
-//            return ((AbstractRelation<?>) relation)
-//                    .getAccessPathForIndexPartition(indexManager,
-//                            (IPredicate) predicate);
-
-            /*
-             * @todo This is an error since expanders are currently ignored on
-             * shard-wise access paths. While it is possible to enable expanders
-             * for shard-wise access paths.
-             */
-            if (predicate.getSolutionExpander() != null)
-                throw new IllegalArgumentException();
-            
-            final String namespace = relation.getNamespace();//predicate.getOnlyRelationName();
-
-            // The name of the desired index partition.
-            final String name = DataService.getIndexPartitionName(namespace
-                    + "." + keyOrder.getIndexName(), partitionId);
-
-            // MUST be a local index view.
-            final ILocalBTreeView ndx = (ILocalBTreeView) indexManager
-                    .getIndex(name, timestamp);
-
-            return new AccessPath<E>(relation, indexManager, timestamp,
-                    predicate, keyOrder, ndx, flags, chunkOfChunksCapacity,
-                    chunkCapacity, fullyBufferedReadThreshold).init();
-
-        }
-
-//          accessPath = relation.getAccessPath((IPredicate) predicate);
-
-        // Decide on a local or remote view of the index.
-        final IIndexManager indexManager;
-        if (predicate.isRemoteAccessPath()) {
-            // use federation in scale-out for a remote access path.
-            indexManager = fed != null ? fed : this.indexManager;
-        } else {
-            indexManager = this.indexManager;
-        }
-
-        // Obtain the index.
-        final String fqn = AbstractRelation.getFQN(relation, keyOrder);
-        final IIndex ndx = AbstractRelation.getIndex(indexManager, fqn, timestamp);
-
-        if (ndx == null) {
-
-            throw new IllegalArgumentException("no index? relation="
-                    + relation.getNamespace() + ", timestamp=" + timestamp
-                    + ", keyOrder=" + keyOrder + ", pred=" + predicate
-                    + ", indexManager=" + getIndexManager());
-
-        }
-
-        // Obtain the access path for that relation and index.
-        final IAccessPath<E> accessPath = ((AbstractRelation<E>) relation)
-                .newAccessPath(relation, indexManager, timestamp, predicate,
-                        keyOrder, ndx, flags, chunkOfChunksCapacity,
-                        chunkCapacity, fullyBufferedReadThreshold);
-
-        // optionally wrap with an expander pattern.
-        return expander(predicate, accessPath);
+//        /*
+//         * Note: ALWAYS use the "perfect" index.
+//         */
+//        final IKeyOrder<E> keyOrder = relation.getKeyOrder(predicate);
+////        {
+////            final IKeyOrder<E> tmp = predicate.getKeyOrder();
+////            if (tmp != null) {
+////                // use the specified index.
+////                keyOrder = tmp;
+////            } else {
+////                // ask the relation for the best index.
+////                keyOrder = relation.getKeyOrder(predicate);
+////            }
+////        }
+////
+////        if (keyOrder == null)
+////            throw new RuntimeException("No access path: " + predicate);
+//
+//        final int partitionId = predicate.getPartitionId();
+//
+//        final long timestamp = (Long) predicate
+//                .getRequiredProperty(BOp.Annotations.TIMESTAMP);
+//        
+//        final int flags = predicate.getProperty(
+//                IPredicate.Annotations.FLAGS,
+//                IPredicate.Annotations.DEFAULT_FLAGS)
+//                | (TimestampUtility.isReadOnly(timestamp) ? IRangeQuery.READONLY
+//                        : 0);
+//        
+//        final int chunkOfChunksCapacity = predicate.getProperty(
+//                BufferAnnotations.CHUNK_OF_CHUNKS_CAPACITY,
+//                BufferAnnotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY);
+//
+//        final int chunkCapacity = predicate.getProperty(
+//                BufferAnnotations.CHUNK_CAPACITY,
+//                BufferAnnotations.DEFAULT_CHUNK_CAPACITY);
+//
+//        final int fullyBufferedReadThreshold = predicate.getProperty(
+//                IPredicate.Annotations.FULLY_BUFFERED_READ_THRESHOLD,
+//                IPredicate.Annotations.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD);
+//        
+//        if (partitionId != -1) {
+//
+//            /*
+//             * Note: This handles a read against a local index partition. For
+//             * scale-out, the [indexManager] will be the data service's local
+//             * index manager.
+//             * 
+//             * Note: Expanders ARE NOT applied in this code path. Expanders
+//             * require a total view of the relation, which is not available
+//             * during scale-out pipeline joins. Likewise, the [backchain]
+//             * property will be ignored since it is handled by an expander.
+//             * 
+//             * @todo Replace this with IRelation#getAccessPathForIndexPartition()
+//             */
+////            return ((AbstractRelation<?>) relation)
+////                    .getAccessPathForIndexPartition(indexManager,
+////                            (IPredicate) predicate);
+//
+//            /*
+//             * @todo This is an error since expanders are currently ignored on
+//             * shard-wise access paths. While it is possible to enable expanders
+//             * for shard-wise access paths.
+//             */
+//            if (predicate.getSolutionExpander() != null)
+//                throw new IllegalArgumentException();
+//            
+//            final String namespace = relation.getNamespace();//predicate.getOnlyRelationName();
+//
+//            // The name of the desired index partition.
+//            final String name = DataService.getIndexPartitionName(namespace
+//                    + "." + keyOrder.getIndexName(), partitionId);
+//
+//            // MUST be a local index view.
+//            final ILocalBTreeView ndx = (ILocalBTreeView) indexManager
+//                    .getIndex(name, timestamp);
+//
+//            return new AccessPath<E>(relation, indexManager, timestamp,
+//                    predicate, keyOrder, ndx, flags, chunkOfChunksCapacity,
+//                    chunkCapacity, fullyBufferedReadThreshold).init();
+//
+//        }
+//
+////          accessPath = relation.getAccessPath((IPredicate) predicate);
+//
+//        // Decide on a local or remote view of the index.
+//        final IIndexManager indexManager;
+//        if (predicate.isRemoteAccessPath()) {
+//            // use federation in scale-out for a remote access path.
+//            indexManager = fed != null ? fed : this.indexManager;
+//        } else {
+//            indexManager = this.indexManager;
+//        }
+//
+//        // Obtain the index.
+//        final String fqn = AbstractRelation.getFQN(relation, keyOrder);
+//        final IIndex ndx = AbstractRelation.getIndex(indexManager, fqn, timestamp);
+//
+//        if (ndx == null) {
+//
+//            throw new IllegalArgumentException("no index? relation="
+//                    + relation.getNamespace() + ", timestamp=" + timestamp
+//                    + ", keyOrder=" + keyOrder + ", pred=" + predicate
+//                    + ", indexManager=" + getIndexManager());
+//
+//        }
+//
+//        // Obtain the access path for that relation and index.
+//        final IAccessPath<E> accessPath = ((AbstractRelation<E>) relation)
+//                .newAccessPath(relation, indexManager, timestamp, predicate,
+//                        keyOrder, ndx, flags, chunkOfChunksCapacity,
+//                        chunkCapacity, fullyBufferedReadThreshold);
+//
+//        // optionally wrap with an expander pattern.
+//        return expander(predicate, accessPath);
 
     }
 
-    /**
-     * Optionally wrap with an expander pattern.
-     * 
-     * @param predicate
-     * @param accessPath
-     * @return
-     * @param <E>
-     */
-    private <E> IAccessPath<E> expander(final IPredicate<E> predicate,
-            final IAccessPath<E> accessPath) {
-
-        final ISolutionExpander<E> expander = predicate.getSolutionExpander();
-
-        if (expander != null) {
-
-            // allow the predicate to wrap the access path
-            return expander.getAccessPath(accessPath);
-
-        }
-
-        return accessPath;
-        
-    }
+//    /**
+//     * Optionally wrap with an expander pattern.
+//     * 
+//     * @param predicate
+//     * @param accessPath
+//     * @return
+//     * @param <E>
+//     */
+//    private <E> IAccessPath<E> expander(final IPredicate<E> predicate,
+//            final IAccessPath<E> accessPath) {
+//
+//        final ISolutionExpander<E> expander = predicate.getSolutionExpander();
+//
+//        if (expander != null) {
+//
+//            // allow the predicate to wrap the access path
+//            return expander.getAccessPath(accessPath);
+//
+//        }
+//
+//        return accessPath;
+//        
+//    }
 
 }

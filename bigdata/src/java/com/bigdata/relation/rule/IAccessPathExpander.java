@@ -39,11 +39,8 @@ import com.bigdata.relation.accesspath.IAccessPath;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo Rename as IAccessPathExpander since that is what it does and rename the
- *       {@link IPredicate#getSolutionExpander()} method as well.
  */
-public interface ISolutionExpander<E> extends Serializable {
+public interface IAccessPathExpander<E> extends Serializable {
 
     /**
      * Return the {@link IAccessPath} that will be used to evaluate the

@@ -333,8 +333,8 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
             System.err.println(Options.FILE + "="
                     + p.getProperty(Options.FILE));
 
-            System.err.println(Options.NESTED_SUBQUERY + "="
-                    + p.getProperty(Options.NESTED_SUBQUERY));
+//            System.err.println(Options.NESTED_SUBQUERY + "="
+//                    + p.getProperty(Options.NESTED_SUBQUERY));
 
             System.err.println(Options.CHUNK_CAPACITY + "="
                     + p.getProperty(Options.CHUNK_CAPACITY));
@@ -2522,16 +2522,16 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
              */
             });
             
-            /*
-             * Do condition for each database model in which we use nested joins
-             * and in which we use pipeline joins. Note that the choice here
-             * applies to be closure (if closure is performed) and to query.
-             */
-            conditions = apply(conditions, new NV[][] {
-                    new NV[] { new NV(Options.NESTED_SUBQUERY, "true") },
-                    new NV[] { new NV(Options.NESTED_SUBQUERY, "false") },
-            //
-            });
+//            /*
+//             * Do condition for each database model in which we use nested joins
+//             * and in which we use pipeline joins. Note that the choice here
+//             * applies to be closure (if closure is performed) and to query.
+//             */
+//            conditions = apply(conditions, new NV[][] {
+//                    new NV[] { new NV(Options.NESTED_SUBQUERY, "true") },
+//                    new NV[] { new NV(Options.NESTED_SUBQUERY, "false") },
+//            //
+//            });
             
             final Experiment exp = new Experiment(className, defaultProperties,
                     conditions);

@@ -29,10 +29,10 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
-import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -53,22 +53,26 @@ public class SPOAccessPath extends AccessPath<ISPO> {
      * @param timestamp
      * @param predicate
      * @param keyOrder
-     * @param ndx
-     * @param flags
-     * @param chunkOfChunksCapacity
-     * @param chunkCapacity
-     * @param fullyBufferedReadThreshold
      */
-    public SPOAccessPath(final SPORelation relation,
-            final IIndexManager indexManager, final long timestamp,
-            final IPredicate<ISPO> predicate, final IKeyOrder<ISPO> keyOrder,
-            final IIndex ndx, final int flags, final int chunkOfChunksCapacity,
-            final int chunkCapacity, final int fullyBufferedReadThreshold) {
+//    * @param ndx
+//    * @param flags
+//    * @param chunkOfChunksCapacity
+//    * @param chunkCapacity
+//    * @param fullyBufferedReadThreshold
+    public SPOAccessPath(final IRelation<ISPO> relation,
+            final IIndexManager localIndexManager, 
+//            final long timestamp,
+            final IPredicate<ISPO> predicate, final IKeyOrder<ISPO> keyOrder
+//            ,
+//            final IIndex ndx, final int flags, final int chunkOfChunksCapacity,
+//            final int chunkCapacity, final int fullyBufferedReadThreshold
+            ) {
 
-        super(relation, indexManager, timestamp, 
+        super(relation, localIndexManager, //timestamp, 
 //                relation.getIndexManager(), relation.getTimestamp(),
-                predicate, keyOrder, ndx, flags, chunkOfChunksCapacity,
-                chunkCapacity, fullyBufferedReadThreshold);
+                predicate, keyOrder);
+//        , ndx, flags, chunkOfChunksCapacity,
+//                chunkCapacity, fullyBufferedReadThreshold);
 
     }
 

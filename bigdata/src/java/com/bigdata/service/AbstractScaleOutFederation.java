@@ -50,6 +50,8 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.NoSuchIndexException;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.resources.StoreManager;
@@ -232,10 +234,10 @@ public abstract class AbstractScaleOutFederation<T> extends AbstractFederation<T
         return getMetadataIndexCache().getIndex(name, timestamp);
          
     }
-    
+
     /**
-     * Returns an iterator that will visit the {@link PartitionLocator}s for
-     * the specified scale-out index key range.
+     * Returns an iterator that will visit the {@link PartitionLocator}s for the
+     * specified scale-out index key range.
      * <p>
      * The method fetches a chunk of locators at a time from the metadata index.
      * Unless the #of index partitions spanned is very large, this will be an
@@ -249,8 +251,8 @@ public abstract class AbstractScaleOutFederation<T> extends AbstractFederation<T
      * make the set of mapped index partitions inconsistent in the sense that it
      * might double count some parts of the key range or that it might skip some
      * parts of the key range. In order to avoid this problem the caller MUST
-     * use <em>read-consistent</em> semantics. If the {@link ClientIndexView}
-     * is not already isolated by a transaction, then the caller MUST create a
+     * use <em>read-consistent</em> semantics. If the {@link ClientIndexView} is
+     * not already isolated by a transaction, then the caller MUST create a
      * read-only transaction use the global last commit time of the federation.
      * 
      * @param name
@@ -266,16 +268,25 @@ public abstract class AbstractScaleOutFederation<T> extends AbstractFederation<T
      *            The first scale-out index key that will NOT be visited
      *            (exclusive). When <code>null</code> there is no upper bound.
      * @param reverseScan
-     *            <code>true</code> if you need to visit the index partitions
-     *            in reverse key order (this is done when the partitioned
-     *            iterator is scanning backwards).
+     *            <code>true</code> if you need to visit the index partitions in
+     *            reverse key order (this is done when the partitioned iterator
+     *            is scanning backwards).
      * 
      * @return The iterator.
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>name</o> is null.
+     * @throws NoSuchIndexException
+     *             if there is no such scale-out index at the specified
+     *             <i>timestamp</i>
      */
     @SuppressWarnings("unchecked")
     public Iterator<PartitionLocator> locatorScan(final String name,
             final long timestamp, final byte[] fromKey, final byte[] toKey,
             final boolean reverseScan) {
+
+        if (name == null)
+            throw new IllegalArgumentException();
         
         if (log.isInfoEnabled())
             log.info("Querying metadata index: name=" + name + ", timestamp="
@@ -284,6 +295,10 @@ public abstract class AbstractScaleOutFederation<T> extends AbstractFederation<T
                     + BytesUtil.toString(toKey));
         
         final IMetadataIndex mdi = getMetadataIndex(name, timestamp);
+
+        if (mdi == null)
+            throw new NoSuchIndexException("name=" + name + "@"
+                    + TimestampUtility.toString(timestamp));
         
         final ITupleIterator<PartitionLocator> itr;
 

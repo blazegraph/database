@@ -32,7 +32,7 @@ import com.bigdata.relation.rule.Rule;
  *       limit the binding patterns across the rule.  (In fact, variables can be
  *       "named" by their index into the binding set for most purposes.)
  */
-final public class Var<E> extends BOpBase implements IVariable<E>,
+final public class Var<E> extends ImmutableBOp implements IVariable<E>,
         Comparable<IVariable<E>> {
 
     private static final long serialVersionUID = -7100443208125002485L;

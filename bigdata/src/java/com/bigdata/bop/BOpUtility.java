@@ -413,7 +413,8 @@ public class BOpUtility {
                  * trees whose sinks target a descendant, which is another way
                  * to create a loop.
                  */
-                throw new DuplicateBOpException(t.toString());
+                throw new DuplicateBOpException("id=" + t.getId() + ", root="
+                        + toString(op));
             }
         }
         // wrap to ensure immutable and thread-safe.
@@ -527,5 +528,94 @@ public class BOpUtility {
         }
 
     } // toArray()
+
+    /**
+     * Pretty print a bop.
+     * 
+     * @param bop
+     *            The bop.
+     * 
+     * @return The formatted representation.
+     */
+    public static String toString(final BOp bop) {
+
+        final StringBuilder sb = new StringBuilder();
+
+        toString(bop, sb, 0);
+
+        // chop off the last \n
+        sb.setLength(sb.length() - 1);
+
+        return sb.toString();
+
+    }
+
+    private static void toString(final BOp bop, final StringBuilder sb,
+            final int indent) {
+
+        sb.append(indent(indent)).append(
+                bop == null ? "<null>" : bop.toString()).append('\n');
+
+        if (bop == null)
+            return;
+        
+        for (BOp arg : bop.args()) {
+
+            if (arg.arity() > 0) {
+             
+                toString(arg, sb, indent+1);
+                
+            }
+
+        }
+
+    }
+
+    /**
+     * Returns a string that may be used to indent a dump of the nodes in
+     * the tree.
+     * 
+     * @param height
+     *            The height.
+     *            
+     * @return A string suitable for indent at that height.
+     */
+    private static String indent(final int height) {
+
+        if( height == -1 ) {
+        
+            // The height is not defined.
+            
+            return "";
+            
+        }
+        
+        return ws.substring(0, height * 4);
+
+    }
+
+    private static final transient String ws = "                                                                                                                                                                                                                  ";
+
+//    /**
+//     * Verify that all bops from the identified <i>startId</i> to the root are
+//     * {@link PipelineOp}s and have an assigned {@link BOp.Annotations#BOP_ID}.
+//     * This is required in order for us to be able to target messages to those
+//     * operators.
+//     * 
+//     * @param startId
+//     *            The {@link BOp.Annotations#BOP_ID} at which the query will
+//     *            start. This is typically the left-most descendant.
+//     * @param root
+//     *            The root of the operator tree.
+//     * 
+//     * @throws RuntimeException
+//     *             if the operator tree does not meet any of the criteria for
+//     *             pipeline evaluation.
+//     */
+//    public static void verifyPipline(final int startId, final BOp root) {
+//
+//        throw new UnsupportedOperationException();
+//
+//    }
 
 }

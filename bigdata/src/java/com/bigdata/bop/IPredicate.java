@@ -45,7 +45,7 @@ import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.ISolutionExpander;
+import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.eval.IEvaluationPlan;
 import com.bigdata.relation.rule.eval.pipeline.JoinMasterTask;
 import com.bigdata.striterator.IKeyOrder;
@@ -81,15 +81,15 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          */
         String RELATION_NAME = "relationName";
 
-        /**
-         * The {@link IKeyOrder} which will be used to read on the relation.
-         * <p>
-         * Note: This is generally assigned by the query optimizer. The query
-         * optimizer considers the possible indices for each {@link IPredicate}
-         * in a query and the possible join orders and then specifies the order
-         * of the joins and the index to use for each join.
-         */
-        String KEY_ORDER = "keyOrder";
+//        /**
+//         * The {@link IKeyOrder} which will be used to read on the relation.
+//         * <p>
+//         * Note: This is generally assigned by the query optimizer. The query
+//         * optimizer considers the possible indices for each {@link IPredicate}
+//         * in a query and the possible join orders and then specifies the order
+//         * of the joins and the index to use for each join.
+//         */
+//        String KEY_ORDER = "keyOrder";
 
         /**
          * <code>true</code> iff the predicate is optional (the right operand of
@@ -160,17 +160,28 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
          * Access path expander pattern. This allows you to wrap or replace the
          * {@link IAccessPath}.
          * <p>
-         * Note: You MUST be extremely careful when using this feature in
-         * scale-out. Access path expanders in scale-out are logically
-         * consistent with used with a {@link #REMOTE_ACCESS_PATH}, but remote
-         * access paths often lack the performance of a local access path.
+         * Note: Access path expanders in scale-out are logically consistent
+         * when used with a {@link #REMOTE_ACCESS_PATH}. However, remote access
+         * paths often lack the performance of a local access path. In order for
+         * the expander to be consistent with a local access path it MUST NOT
+         * rewrite the predicate in such a manner as to read on data onto found
+         * on the shard onto which the predicate was mapped during query
+         * evaluation.
          * <p>
-         * In order for the expander to be consistent with a local access path
-         * it MUST NOT rewrite the predicate in such a manner as to read on data
-         * onto found on the shard onto which the predicate was mapped during
-         * query evaluation.
+         * In general, scale-out query depends on binding sets being mapped onto
+         * the shards against which they will read or write. When an expander
+         * changes the bindings on an {@link IPredicate}, it typically changes
+         * the access path which will be used. This is only supported when the
+         * access path is {@link #REMOTE_ACCESS_PATH}.
+         * <p>
+         * Note: If an expander generates nested {@link IAccessPath}s then it
+         * typically must strip off both the {@link #ACCESS_PATH_EXPANDER} and
+         * the {@link #ACCESS_PATH_EXPANDER} from the {@link IPredicate} before
+         * generating the inner {@link IAccessPath} and then layer the
+         * {@link #ACCESS_PATH_FILTER} back onto the expanded visitation
+         * pattern.
          * 
-         * @see ISolutionExpander
+         * @see IAccessPathExpander
          */
         String ACCESS_PATH_EXPANDER = "accessPathExpander";
 
@@ -335,7 +346,7 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      * enforced using {@link IConstraint}s on the {@link IRule}.
      * <p>
      * More control over the behavior of optionals may be gained through the use
-     * of an {@link ISolutionExpander} pattern.
+     * of an {@link IAccessPathExpander} pattern.
      * 
      * @return <code>true</code> iff this predicate is optional when evaluating
      *         a JOIN.
@@ -348,14 +359,14 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      * Returns the object that may be used to selectively override the
      * evaluation of the predicate.
      * 
-     * @return The {@link ISolutionExpander}.
+     * @return The {@link IAccessPathExpander}.
      * 
      * @see Annotations#ACCESS_PATH_EXPANDER
      * 
-     * @todo replace with {@link ISolutionExpander#getAccessPath(IAccessPath)},
-     *       which is the only method declared by {@link ISolutionExpander}.
+     * @todo Replace with {@link IAccessPathExpander#getAccessPath(IAccessPath)}
+     *       , which is the only method declared by {@link IAccessPathExpander}?
      */
-    public ISolutionExpander<E> getSolutionExpander();
+    public IAccessPathExpander<E> getAccessPathExpander();
 
 //    /**
 //     * An optional constraint on the visitable elements.
@@ -386,30 +397,30 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
      */
     public IFilter getAccessPathFilter();
     
-    /**
-     * Return the {@link IKeyOrder} assigned to this {@link IPredicate} by the
-     * query optimizer.
-     * 
-     * @return The assigned {@link IKeyOrder} or <code>null</code> if the query
-     *         optimizer has not assigned the {@link IKeyOrder} yet.
-     * 
-     * @see Annotations#KEY_ORDER
-     */
-    public IKeyOrder<E> getKeyOrder();
-    
-    /**
-     * Set the {@link IKeyOrder} annotation on the {@link IPredicate}, returning
-     * a new {@link IPredicate} in which the annotation takes on the given
-     * binding.
-     * 
-     * @param keyOrder
-     *            The {@link IKeyOrder}.
-     * 
-     * @return The new {@link IPredicate}.
-     * 
-     * @see Annotations#KEY_ORDER
-     */
-    public IPredicate<E> setKeyOrder(final IKeyOrder<E> keyOrder);
+//    /**
+//     * Return the {@link IKeyOrder} assigned to this {@link IPredicate} by the
+//     * query optimizer.
+//     * 
+//     * @return The assigned {@link IKeyOrder} or <code>null</code> if the query
+//     *         optimizer has not assigned the {@link IKeyOrder} yet.
+//     * 
+//     * @see Annotations#KEY_ORDER
+//     */
+//    public IKeyOrder<E> getKeyOrder();
+//    
+//    /**
+//     * Set the {@link IKeyOrder} annotation on the {@link IPredicate}, returning
+//     * a new {@link IPredicate} in which the annotation takes on the given
+//     * binding.
+//     * 
+//     * @param keyOrder
+//     *            The {@link IKeyOrder}.
+//     * 
+//     * @return The new {@link IPredicate}.
+//     * 
+//     * @see Annotations#KEY_ORDER
+//     */
+//    public IPredicate<E> setKeyOrder(final IKeyOrder<E> keyOrder);
     
     /**
      * Figure out if all positions in the predicate which are required to form
@@ -487,6 +498,9 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
     /**
      * Return a new instance in which all occurrences of the given variable have
      * been replaced by the specified constant.
+     * <p>
+     * Note: The optimal {@link IKeyOrder} often changes when binding a variable
+     * on a predicate.
      * 
      * @param var
      *            The variable.
@@ -504,6 +518,9 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
     /**
      * Return a new instance in which all occurrences of the variable appearing
      * in the binding set have been replaced by their bound values.
+     * <p>
+     * Note: The optimal {@link IKeyOrder} often changes when binding a variable
+     * on a predicate.
      * 
      * @param bindingSet
      *            The binding set.

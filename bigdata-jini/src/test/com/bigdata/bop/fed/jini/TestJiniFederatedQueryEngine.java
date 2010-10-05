@@ -467,8 +467,8 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
                         .asMap(new NV[] {//
                                 new NV(Predicate.Annotations.RELATION_NAME,
                                         new String[] { namespace }),//
-                                new NV(Predicate.Annotations.KEY_ORDER,
-                                        R.primaryKeyOrder),//
+//                                new NV(Predicate.Annotations.KEY_ORDER,
+//                                        R.primaryKeyOrder),//
                                 new NV(Predicate.Annotations.BOP_ID, predId),//
                                 new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                         })),

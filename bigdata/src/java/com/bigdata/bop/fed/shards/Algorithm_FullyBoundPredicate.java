@@ -10,6 +10,7 @@ import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.service.Split;
 import com.bigdata.service.ndx.AbstractSplitter;
 import com.bigdata.service.ndx.ISplitter;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * When the asBound predicates are known to be fully bound, then the
@@ -23,14 +24,26 @@ class Algorithm_FullyBoundPredicate<E extends IBindingSet, F> implements
 
     private final MapBindingSetsOverShardsBuffer<E, F> op;
 
+    private final IKeyOrder keyOrder;
+    
     private final ISplitter splitter;
 
+    /**
+     * 
+     * @param op
+     * @param keyOrder
+     *            The key order which will be used for the predicate when it is
+     *            fully bound.
+     */
     public Algorithm_FullyBoundPredicate(
-            final MapBindingSetsOverShardsBuffer<E, F> op) {
+            final MapBindingSetsOverShardsBuffer<E, F> op,
+            final IKeyOrder<F> keyOrder) {
 
         this.op = op;
 
-        this.splitter = new Splitter(op.mdi);
+        this.keyOrder = keyOrder;
+        
+        this.splitter = new Splitter(op.getMetadataIndex(keyOrder));
 
     }
 
@@ -79,7 +92,7 @@ class Algorithm_FullyBoundPredicate<E extends IBindingSet, F> implements
                 slice[j] = bset;
 
                 if (log.isTraceEnabled())
-                    log.trace("Mapping: keyOrder=" + op.keyOrder + ", bset="
+                    log.trace("Mapping: keyOrder=" + keyOrder + ", bset="
                             + bset + " onto partitionId="
                             + split.pmd.getPartitionId());
 

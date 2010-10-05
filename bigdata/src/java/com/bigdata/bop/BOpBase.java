@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.bigdata.bop.constraint.EQ;
+import com.bigdata.btree.Tuple;
 
 /**
  * Abstract base class for {@link BOp}s.
@@ -411,10 +412,12 @@ public class BOpBase implements BOp {
      *            The name.
      * @param value
      *            The value.
+     * 
+     * @return The old value.
      */
-    protected void _setProperty(final String name, final Object value) {
+    protected Object _setProperty(final String name, final Object value) {
         
-        annotations.put(name,value);
+        return annotations.put(name,value);
         
     }
     
@@ -472,7 +475,7 @@ public class BOpBase implements BOp {
 
         final BOpBase tmp = this.clone();
 
-        if (tmp.annotations.put(name, value) != null)
+        if (tmp._setProperty(name, value) != null)
             throw new IllegalStateException("Already set: name=" + name
                     + ", value=" + value);
 
@@ -480,6 +483,49 @@ public class BOpBase implements BOp {
 
     }
     
+    /**
+     * Clear the named annotation.
+     * 
+     * @param name
+     *            The annotation.
+     * @return A copy of this {@link BOp} in which the named annotation has been
+     *         removed.
+     */
+    public BOpBase clearProperty(final String name) {
+
+        if (name == null)
+            throw new IllegalArgumentException();
+        
+        final BOpBase tmp = this.clone();
+
+        tmp._clearProperty(name);
+        
+        return tmp;
+
+    }
+    
+    /**
+     * Strips off the named annotations.
+     * 
+     * @param names
+     *            The annotations to be removed.
+     *            
+     * @return A copy of this {@link BOp} in which the specified annotations do not appear.
+     */
+    public BOp clearAnnotations(final String[] names) {
+
+        final BOpBase tmp = this.clone();
+
+        for(String name : names) {
+            
+            tmp._clearProperty(name);
+            
+        }
+
+        return tmp;
+        
+    }
+
     public int getId() {
         
         return (Integer) getRequiredProperty(Annotations.BOP_ID);
@@ -489,14 +535,23 @@ public class BOpBase implements BOp {
     public String toString() {
         
         final StringBuilder sb = new StringBuilder();
-//        sb.append(getClass().getName());
-        sb.append(super.toString());
+        sb.append(getClass().getName());
+//        sb.append(super.toString());
+        final Integer bopId = (Integer) getProperty(Annotations.BOP_ID);
+        if (bopId != null) {
+            sb.append("[" + bopId + "]");
+        }
         sb.append("(");
-        for (int i = 0; i < args.length; i++) {
-            final BOp t = args[i];
-            if (i > 0)
+        int nwritten = 0;
+        for (BOp t : args) {
+            if (nwritten > 0)
                 sb.append(',');
             sb.append(t.getClass().getSimpleName());
+            final Integer tid = (Integer) t.getProperty(Annotations.BOP_ID);
+            if (tid != null) {
+                sb.append("[" + tid + "]");
+            }
+            nwritten++;
         }
         sb.append(")");
         annotationsToString(sb);
@@ -510,11 +565,16 @@ public class BOpBase implements BOp {
             sb.append("[");
             boolean first = true;
             for (Map.Entry<String, Object> e : annotations.entrySet()) {
-                if (!first)
+                if (first)
+                    sb.append(" ");
+                else
                     sb.append(", ");
                 if (e.getValue() != null && e.getValue().getClass().isArray()) {
                     sb.append(e.getKey() + "="
                             + Arrays.toString((Object[]) e.getValue()));
+                } else if (e.getKey() == IPredicate.Annotations.FLAGS) {
+                    sb.append(e.getKey() + "="
+                            + Tuple.flagString((Integer) e.getValue()));
                 } else {
                     sb.append(e.getKey() + "=" + e.getValue());
                 }

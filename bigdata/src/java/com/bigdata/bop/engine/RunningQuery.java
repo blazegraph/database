@@ -49,9 +49,9 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.NoSuchBOpException;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
@@ -836,27 +836,27 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
          *             <code>true</code>.
          */
         public ChunkTask(final IChunkMessage<IBindingSet> msg) {
+
+            if (msg == null)
+                throw new IllegalArgumentException();
+            
             if (!msg.isMaterialized())
                 throw new IllegalStateException();
+            
             this.msg = msg;
+            
             bopId = msg.getBOpId();
+            
             partitionId = msg.getPartitionId();
+            
             bop = bopIndex.get(bopId);
-            if (bop == null) {
+            
+            if (bop == null)
                 throw new NoSuchBOpException(bopId);
-            }
-            if (!(bop instanceof PipelineOp)) {
-                /*
-                 * @todo evaluation of element[] pipelines needs to use pretty
-                 * much the same code, but it needs to be typed for E[] rather
-                 * than IBindingSet[].
-                 * 
-                 * @todo evaluation of Monet style BATs would also operate under
-                 * different assumptions, closer to those of an element[].
-                 */
+            
+            if (!(bop instanceof PipelineOp))
                 throw new UnsupportedOperationException(bop.getClass()
                         .getName());
-            }
 
             // self
             final PipelineOp op = ((PipelineOp) bop);
@@ -864,9 +864,13 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
             // parent (null if this is the root of the operator tree).
             final BOp p = BOpUtility.getParent(query, op);
 
-            // sink (null unless parent is defined)
+            /*
+             * The sink is the parent. The parent MUST have an id so we can
+             * target it with a message. (The sink will be null iff there is no
+             * parent for this operator.)
+             */
             sinkId = p == null ? null : (Integer) p
-                    .getProperty(PipelineOp.Annotations.BOP_ID);
+                    .getRequiredProperty(PipelineOp.Annotations.BOP_ID);
 
             // altSink (null when not specified).
             altSinkId = (Integer) op
@@ -918,7 +922,8 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
                     sink, altSink);
 
             // FutureTask for operator execution (not running yet).
-            ft = op.eval(context);
+            if ((ft = op.eval(context)) == null)
+                throw new RuntimeException("No future: " + op);
 
         }
 
@@ -938,6 +943,10 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
                 ft.run(); // run
                 ft.get(); // verify success
                 if (sink != null && sink != queryBuffer && !sink.isEmpty()) {
+                    if (sinkId == null)
+                        throw new RuntimeException("sinkId not defined: bopId="
+                                + bopId + ", query="
+                                + BOpUtility.toString(query));
                     /*
                      * Handle sink output, sending appropriate chunk message(s).
                      * 
@@ -947,6 +956,11 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
                 }
                 if (altSink != null && altSink != queryBuffer
                         && !altSink.isEmpty()) {
+                    if (altSinkId == null)
+                        throw new RuntimeException(
+                                "altSinkId not defined: bopId=" + bopId
+                                        + ", query="
+                                        + BOpUtility.toString(query));
                     /*
                      * Handle alt sink output, sending appropriate chunk
                      * message(s).

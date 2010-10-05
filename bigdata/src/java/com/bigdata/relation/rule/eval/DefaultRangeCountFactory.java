@@ -31,6 +31,7 @@ package com.bigdata.relation.rule.eval;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.IPredicate;
+import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 
 /**
@@ -82,7 +83,10 @@ public class DefaultRangeCountFactory implements IRangeCountFactory {
      */
     public long rangeCount(final IPredicate predicate) {
 
-        final IAccessPath accessPath = joinNexus.getTailAccessPath(predicate);
+        final IRelation relation = joinNexus.getTailRelationView(predicate);
+
+        final IAccessPath accessPath = joinNexus.getTailAccessPath(relation,
+                predicate);
 
         final long rangeCount = accessPath.rangeCount(false/* exact */);
 

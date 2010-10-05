@@ -99,7 +99,6 @@ import com.bigdata.rdf.spo.SPOComparator;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.AbstractRelation;
-import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
@@ -796,32 +795,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
     }
 
     /**
-     * @todo Not implemented yet. This could be used for high-level query, but
-     *       there are no rules written so far that join against the
-     *       {@link LexiconRelation}.
-     * 
-     * @throws UnsupportedOperationException
-     */
-    public IAccessPath<BigdataValue> getAccessPath(
-            IPredicate<BigdataValue> predicate) {
-
-        throw new UnsupportedOperationException();
-        
-    }
-
-    /**
      * Note : this method is part of the mutation api. it is primarily (at this
      * point, only) invoked by the rule execution layer and, at present, no
      * rules can entail terms into the lexicon.
      * 
      * @throws UnsupportedOperationException
      */
-//    public BigdataValue newElement(IPredicate<BigdataValue> predicate,
-//            IBindingSet bindingSet) {
-//
-//        throw new UnsupportedOperationException();
-//
-//    }
     public BigdataValue newElement(List<BOp> a, IBindingSet bindingSet) {
         throw new UnsupportedOperationException();
     }

@@ -16,7 +16,6 @@ import com.bigdata.relation.rule.eval.pipeline.JoinMasterTask;
 import com.bigdata.relation.rule.eval.pipeline.JoinTask;
 import com.bigdata.relation.rule.eval.pipeline.LocalJoinMasterTask;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.ndx.ClientIndexView;
 
 /**
  * Default factory for tasks to execute {@link IRule}s.
@@ -33,17 +32,17 @@ public class DefaultRuleTaskFactory implements IRuleTaskFactory, Externalizable 
      */
     private static final long serialVersionUID = -6751546625682021618L;
 
-    /**
-     * Nested subquery join strategy.
-     * <p>
-     * Note: When used on a scale-out index, this results in the use of
-     * {@link ClientIndexView}s and a LOT of RMI. The {@link #PIPELINE}
-     * strategy was developed to improve join performance for scale-out.
-     * 
-     * @see NestedSubqueryWithJoinThreadsTask
-     */
-    public static transient final IRuleTaskFactory SUBQUERY = new DefaultRuleTaskFactory(
-            true/* subquery */);
+//    /**
+//     * Nested subquery join strategy.
+//     * <p>
+//     * Note: When used on a scale-out index, this results in the use of
+//     * {@link ClientIndexView}s and a LOT of RMI. The {@link #PIPELINE}
+//     * strategy was developed to improve join performance for scale-out.
+//     * 
+//     * @see NestedSubqueryWithJoinThreadsTask
+//     */
+//    public static transient final IRuleTaskFactory SUBQUERY = new DefaultRuleTaskFactory(
+//            true/* subquery */);
 
     /**
      * Pipeline join strategy.
@@ -85,15 +84,15 @@ public class DefaultRuleTaskFactory implements IRuleTaskFactory, Externalizable 
 
         final IIndexManager indexManager = joinNexus.getIndexManager();
         
-        if(subquery) {
-
-            if (log.isDebugEnabled())
-                log.debug("local nested subquery joins: indexManager="
-                        + indexManager.getClass() + ", rule=" + rule);
-
-            return new NestedSubqueryWithJoinThreadsTask(rule, joinNexus, buffer);
-
-        }
+//        if(subquery) {
+//
+//            if (log.isDebugEnabled())
+//                log.debug("local nested subquery joins: indexManager="
+//                        + indexManager.getClass() + ", rule=" + rule);
+//
+//            return new NestedSubqueryWithJoinThreadsTask(rule, joinNexus, buffer);
+//
+//        }
 
         /*
          * pipeline join.

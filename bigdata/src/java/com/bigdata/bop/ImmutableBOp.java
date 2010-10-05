@@ -22,46 +22,55 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Oct 1, 2010
+ * Created on Oct 5, 2010
  */
 
-package com.bigdata.relation.rule;
+package com.bigdata.bop;
 
-import com.bigdata.relation.accesspath.EmptyAccessPath;
-import com.bigdata.relation.accesspath.IAccessPath;
+import java.util.Map;
 
 /**
- * An "expander" which replaces the access path with an {@link EmptyAccessPath}.
+ * Base class for immutable operators such as {@link Var} and {@link Constant}.
+ * These operators do not deep copy their data and do not permit decoration with
+ * annotations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EmptyAccessPathExpander<E> implements IAccessPathExpander<E> {
+abstract public class ImmutableBOp extends BOpBase {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
-    public static transient final EmptyAccessPathExpander INSTANCE = new EmptyAccessPathExpander();
-
-    public IAccessPath<E> getAccessPath(IAccessPath<E> accessPath) {
-
-        return new EmptyAccessPath<E>(accessPath.getPredicate(), accessPath
-                .getKeyOrder());
-        
+    /**
+     * @param op
+     */
+    public ImmutableBOp(BOpBase op) {
+        super(op);
     }
 
-    public boolean runFirst() {
-
-        return false;
-        
+    /**
+     * @param args
+     * @param annotations
+     */
+    public ImmutableBOp(BOp[] args, Map<String, Object> annotations) {
+        super(args, annotations);
     }
+    
+    /*
+     * Overrides for the copy-on-write mutation API. 
+     */
 
-    public boolean backchain() {
-        
-        return false;
-        
+    @Override
+    protected Object _setProperty(String name,Object value) {
+        throw new UnsupportedOperationException();
+    }
+    
+    @Override
+    protected void _clearProperty(String name) {
+        throw new UnsupportedOperationException();
     }
 
 }

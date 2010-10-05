@@ -23,7 +23,7 @@ import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.ISolutionExpander;
+import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.service.AbstractDistributedFederation;
@@ -294,17 +294,17 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
      * 
      * @throws Exception
      * 
-     * FIXME If a predicate defines an {@link ISolutionExpander} then we DO
+     * FIXME If a predicate defines an {@link IAccessPathExpander} then we DO
      * NOT map the predicate. Instead, we use
      * {@link IJoinNexus#getTailAccessPath(IPredicate)} and evaluate the
-     * {@link IAccessPath} with the layered {@link ISolutionExpander} in
-     * process. If the {@link ISolutionExpander} touches the index, it will
+     * {@link IAccessPath} with the layered {@link IAccessPathExpander} in
+     * process. If the {@link IAccessPathExpander} touches the index, it will
      * be using an {@link IClientIndex}. While the {@link IClientIndex} is
      * not nearly as efficient as using a local index partition, it will
      * provide a view of the total key-range partitioned index.
      * <p>
      * do this for each join dimension for which an
-     * {@link ISolutionExpander} is defined, including not only the first N
+     * {@link IAccessPathExpander} is defined, including not only the first N
      * join dimensions (handles free text search) but also an intermediate
      * join dimension (requires that all source join tasks target a join
      * task having a view of the scale-out index rather than mapping the

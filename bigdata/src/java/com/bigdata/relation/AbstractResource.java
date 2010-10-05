@@ -59,14 +59,10 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.relation.locator.ILocatableResource;
-import com.bigdata.relation.rule.eval.DefaultRuleTaskFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.ISolution;
-import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
 import com.bigdata.relation.rule.eval.ProgramTask;
-import com.bigdata.relation.rule.eval.pipeline.JoinMasterTask;
-import com.bigdata.relation.rule.eval.pipeline.JoinTask;
 import com.bigdata.service.IBigdataFederation;
 
 /**
@@ -97,7 +93,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
     private final int fullyBufferedReadThreshold;
     private final boolean forceSerialExecution;
     private final int maxParallelSubqueries;
-    private final boolean nestedSubquery;
+//    private final boolean nestedSubquery;
 
     /**
      * The capacity of the buffers accumulating chunks from concurrent producers.
@@ -186,22 +182,22 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
         
     }
 
-    /**
-     * When <code>true</code> the {@link NestedSubqueryWithJoinThreadsTask} is
-     * applied. Otherwise the {@link JoinMasterTask} is applied.
-     * 
-     * @see Options#NESTED_SUBQUERY
-     * 
-     * @deprecated by {@link BOp} annotations and the pipeline join, which
-     *             always does better than the older nested subquery evaluation
-     *             logic.
-     */
-    public boolean isNestedSubquery() {
-
-//        return false;
-        return nestedSubquery;
-        
-    }
+//    /**
+//     * When <code>true</code> the {@link NestedSubqueryWithJoinThreadsTask} is
+//     * applied. Otherwise the {@link JoinMasterTask} is applied.
+//     * 
+//     * @see Options#NESTED_SUBQUERY
+//     * 
+//     * @deprecated by {@link BOp} annotations and the pipeline join, which
+//     *             always does better than the older nested subquery evaluation
+//     *             logic.
+//     */
+//    public boolean isNestedSubquery() {
+//
+////        return false;
+//        return nestedSubquery;
+//        
+//    }
     
     /**
      * Options for locatable resources.
@@ -372,14 +368,6 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          * {@link ExecutorService} entirely and ONE (1) to submit a single task
          * at a time to the {@link ExecutorService}.
          * 
-         * @todo review default before release as well as interpretation. The
-         *       {@link NestedSubqueryWithJoinThreadsTask} behaves as stated,
-         *       but may be refactored to allow this parallelism per join
-         *       dimension. The {@link JoinMasterTask} interprets this as a
-         *       per-join dimension parallelism (the parallelism limit is
-         *       currently imposed by a per {@link JoinTask}
-         *       {@link ExecutorService}, which must be explicitly enabled in
-         *       the code).
          * @deprecated by {@link BOp} annotations.
          */
         String MAX_PARALLEL_SUBQUERIES = ProgramTask.class.getName()
@@ -390,29 +378,29 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          */
         String DEFAULT_MAX_PARALLEL_SUBQUERIES = "5";
 
-        /**
-         * Boolean option controls the JOIN evaluation strategy. When
-         * <code>true</code>, {@link NestedSubqueryWithJoinThreadsTask} is used
-         * to compute joins. When <code>false</code>, {@link JoinMasterTask} is
-         * used instead (aka pipeline joins).
-         * <p>
-         * Note: The default depends on the deployment mode. Nested subquery
-         * joins are somewhat faster for local data (temporary stores, journals,
-         * and a federation that does not support scale-out). However, pipeline
-         * joins are MUCH faster for scale-out so they are used by default
-         * whenever {@link IBigdataFederation#isScaleOut()} reports
-         * <code>true</code>.
-         * <p>
-         * Note: Cold query performance for complex high volume queries appears
-         * to be better for the pipeline join, so it may make sense to use the
-         * pipeline join even for local data.
-         * 
-         * @deprecated The {@link NestedSubqueryWithJoinThreadsTask} is much
-         *             slower than the pipeline join algorithm, even for a
-         *             single machine.
-         */
-        String NESTED_SUBQUERY = DefaultRuleTaskFactory.class.getName()
-                + ".nestedSubquery";
+//        /**
+//         * Boolean option controls the JOIN evaluation strategy. When
+//         * <code>true</code>, {@link NestedSubqueryWithJoinThreadsTask} is used
+//         * to compute joins. When <code>false</code>, {@link JoinMasterTask} is
+//         * used instead (aka pipeline joins).
+//         * <p>
+//         * Note: The default depends on the deployment mode. Nested subquery
+//         * joins are somewhat faster for local data (temporary stores, journals,
+//         * and a federation that does not support scale-out). However, pipeline
+//         * joins are MUCH faster for scale-out so they are used by default
+//         * whenever {@link IBigdataFederation#isScaleOut()} reports
+//         * <code>true</code>.
+//         * <p>
+//         * Note: Cold query performance for complex high volume queries appears
+//         * to be better for the pipeline join, so it may make sense to use the
+//         * pipeline join even for local data.
+//         * 
+//         * @deprecated The {@link NestedSubqueryWithJoinThreadsTask} is much
+//         *             slower than the pipeline join algorithm, even for a
+//         *             single machine.
+//         */
+//        String NESTED_SUBQUERY = DefaultRuleTaskFactory.class.getName()
+//                + ".nestedSubquery";
         
 //        /** 
 //         * @todo option to specify the class that will serve as the
@@ -490,8 +478,8 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
 //        final boolean pipelineIsBetter = (indexManager instanceof IBigdataFederation && ((IBigdataFederation) indexManager)
 //                .isScaleOut());
 //        
-        nestedSubquery = Boolean.parseBoolean(getProperty(
-                Options.NESTED_SUBQUERY, "false"));
+//        nestedSubquery = Boolean.parseBoolean(getProperty(
+//                Options.NESTED_SUBQUERY, "false"));
 //        Boolean
 //                        .toString(!pipelineIsBetter)));
 

@@ -34,7 +34,6 @@ import junit.framework.TestCase2;
 import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
@@ -150,20 +149,22 @@ public class TestContextAdvancer extends TestCase2 {
             Predicate<ISPO> pred = new SPOPredicate(new BOp[] { Var.var("s"),
                     Var.var("p"), Var.var("o"), Var.var("c") }, NV
                     .asMap(new NV[] {//
-                            new NV(Predicate.Annotations.KEY_ORDER,
-                                    SPOKeyOrder.SPOC), //
+//                            new NV(Predicate.Annotations.KEY_ORDER,
+//                                    SPOKeyOrder.SPOC), //
                             new NV(Predicate.Annotations.TIMESTAMP,
                                     ITx.UNISOLATED),//
                     }));
 
-            final BOpContextBase context = new BOpContextBase(null/* fed */,
-                    store/* indexManager */);
+//            final BOpContextBase context = new BOpContextBase(null/* fed */,
+//                    store/* indexManager */);
 
             // First verify assumptions without the advancer.
             {
 
-                final IAccessPath<ISPO> ap = context.getAccessPath(db
-                        .getSPORelation(), pred);
+                final IAccessPath<ISPO> ap = db.getSPORelation().getAccessPath(
+                        SPOKeyOrder.SPOC, pred);
+//                final IAccessPath<ISPO> ap = db.getSPORelation().getAccessPath(
+//                        SPOKeyOrder.SPOC, pred);
 
                 assertEquals(SPOKeyOrder.SPOC, ap.getKeyOrder());
                 
@@ -183,8 +184,12 @@ public class TestContextAdvancer extends TestCase2 {
                 pred = pred.addAccessPathFilter(StripContextFilter
                         .newInstance());
 
-                final IAccessPath<ISPO> ap = context.getAccessPath(db
-                        .getSPORelation(), pred);
+                final IAccessPath<ISPO> ap = db.getSPORelation().getAccessPath(
+                        SPOKeyOrder.SPOC, pred);
+//                final IAccessPath<ISPO> ap = context.getAccessPath(db
+//                        .getSPORelation(), pred);
+
+                assertEquals(SPOKeyOrder.SPOC, ap.getKeyOrder());
 
                 assertEquals(4, ap.rangeCount(true/* exact */));
 

@@ -29,7 +29,7 @@ package com.bigdata.bop;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-final public class Constant<E> extends BOpBase implements IConstant<E> {
+final public class Constant<E> extends ImmutableBOp implements IConstant<E> {
 
     /**
      * 
@@ -84,6 +84,15 @@ final public class Constant<E> extends BOpBase implements IConstant<E> {
         
     }
     
+    /**
+     * Clone is overridden to reduce heap churn.
+     */
+    final public Constant<E> clone() {
+
+        return this;
+        
+    }
+
     public String toString() {
         
         return value.toString();
@@ -150,5 +159,5 @@ final public class Constant<E> extends BOpBase implements IConstant<E> {
         throw new UnsupportedOperationException();
         
     }
-    
+
 }

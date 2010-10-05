@@ -49,6 +49,7 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.RuleContextEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
+import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IRule;
@@ -222,13 +223,29 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 
                 final IBindingSet bindingSet = joinNexus.newBindingSet(rule);
 
-                // (u rdfs:subClassOf x)
-                assertEquals(SPOKeyOrder.POS, joinNexus.getTailAccessPath(
-                        rule.getTail(0).asBound(bindingSet)).getKeyOrder());
+                {
+                    final IPredicate asBound = rule.getTail(0).asBound(
+                            bindingSet);
 
-                // (v rdfs:subClassOf u)
-                assertEquals(SPOKeyOrder.POS, joinNexus.getTailAccessPath(
-                        rule.getTail(1).asBound(bindingSet)).getKeyOrder());
+                    final IRelation relation = joinNexus
+                            .getTailRelationView(asBound);
+
+                    // (u rdfs:subClassOf x)
+                    assertEquals(SPOKeyOrder.POS, joinNexus.getTailAccessPath(
+                            relation, asBound).getKeyOrder());
+                }
+
+                {
+                    final IPredicate asBound = rule.getTail(1).asBound(
+                            bindingSet);
+
+                    final IRelation relation = joinNexus
+                            .getTailRelationView(asBound);
+
+                    // (v rdfs:subClassOf u)
+                    assertEquals(SPOKeyOrder.POS, joinNexus.getTailAccessPath(
+                            relation, asBound).getKeyOrder());
+                }
 
             }
 
@@ -250,10 +267,13 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 
                 final IBindingSet bindingSet = joinNexus.newBindingSet(rule);
 
+                final IPredicate asBound = rule.getTail(0).asBound(bindingSet);
+                
+                final IRelation relation = joinNexus.getTailRelationView(asBound);
+
                 // (x y z)
-                assertEquals(SPOKeyOrder.SPO,
-                        joinNexus.getTailAccessPath(
-                                rule.getTail(0).asBound(bindingSet)).getKeyOrder());
+                assertEquals(SPOKeyOrder.SPO, joinNexus.getTailAccessPath(
+                        relation, asBound).getKeyOrder());
 
             }
 
@@ -280,16 +300,25 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 
                 final IBindingSet bindingSet = joinNexus.newBindingSet(rule);
 
-                // (1L y z)
-                assertEquals(SPOKeyOrder.SPO,
-                        joinNexus.getTailAccessPath(
-                                rule.getTail(0).asBound(bindingSet)).getKeyOrder());
+                {
+                    final IPredicate asBound = rule.getTail(0).asBound(
+                            bindingSet);
+                    final IRelation relation = joinNexus
+                            .getTailRelationView(asBound);
+                    // (1L y z)
+                    assertEquals(SPOKeyOrder.SPO, joinNexus.getTailAccessPath(
+                            relation, asBound).getKeyOrder());
 
-                // (x y 1L)
-                assertEquals(SPOKeyOrder.OSP,
-                        joinNexus.getTailAccessPath(
-                                rule.getTail(1).asBound(bindingSet)).getKeyOrder());
-
+                }
+                {
+                    final IPredicate asBound = rule.getTail(1).asBound(
+                            bindingSet);
+                    final IRelation relation = joinNexus
+                            .getTailRelationView(asBound);
+                    // (x y 1L)
+                    assertEquals(SPOKeyOrder.OSP, joinNexus.getTailAccessPath(
+                            relation, asBound).getKeyOrder());
+                }
 
             }
 
@@ -376,9 +405,13 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 
                 for (int i = 0; i < rule.getTailCount(); i++) {
 
+                    final IPredicate pred = rule.getTail(i).asBound(bindingSet);
+
+                    final IRelation relation = joinNexus
+                            .getTailRelationView(pred);
+
                     final IAccessPath accessPath = joinNexus
-                            .getTailAccessPath(rule.getTail(i).asBound(
-                                    bindingSet));
+                            .getTailAccessPath(relation, pred);
 
                     assertEquals(0, accessPath.rangeCount(true/* exact */));
 

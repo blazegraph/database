@@ -36,6 +36,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.cost.BTreeCostModel;
+import com.bigdata.bop.cost.DiskCostModel;
+import com.bigdata.bop.cost.ScanCostReport;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
@@ -294,7 +297,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
      * @throws IllegalArgumentException
      *             if the index is <code>null</code>.
      */
-    public UnisolatedReadWriteIndex(IIndex ndx) {
+    public UnisolatedReadWriteIndex(final BTree ndx) {
         
         this(ndx, DEFAULT_CAPACITY);
         
@@ -330,7 +333,7 @@ public class UnisolatedReadWriteIndex implements IIndex {
      *       the computed solutions onto the relations. It is likely that a
      *       read-write lock will do well for this situation.
      */
-    public UnisolatedReadWriteIndex(final IIndex ndx, final int capacity) {
+    public UnisolatedReadWriteIndex(final BTree ndx, final int capacity) {
 
         if (ndx == null)
             throw new IllegalArgumentException();
@@ -808,6 +811,31 @@ public class UnisolatedReadWriteIndex implements IIndex {
             
         }
         
+    }
+
+    /**
+     * Estimate the cost of a range scan.
+     * 
+     * @param diskCostModel
+     *            The disk cost model.
+     * @param rangeCount
+     *            The #of tuples to be visited.
+     *            
+     * @return The estimated cost.
+     */
+    public ScanCostReport estimateCost(final DiskCostModel diskCostModel,
+            final long rangeCount) {
+
+        // BTree is its own statistics view.
+        final IBTreeStatistics stats = (BTree) ndx;
+
+        // Estimate cost based on random seek per node/leaf.
+        final double cost = new BTreeCostModel(diskCostModel).rangeScan(
+                rangeCount, stats.getBranchingFactor(), stats.getHeight(),
+                stats.getUtilization().getLeafUtilization());
+
+        return new ScanCostReport(rangeCount, cost);
+
     }
 
 }

@@ -57,7 +57,7 @@ import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.ISolutionExpander;
+import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.ICloseableIterator;
@@ -112,7 +112,7 @@ import com.bigdata.util.concurrent.MappedTaskExecutor;
  *       possible contexts (or all on that shard) so we only run the access path
  *       once rather than once per context.
  */
-public class DefaultGraphSolutionExpander implements ISolutionExpander<ISPO> {
+public class DefaultGraphSolutionExpander implements IAccessPathExpander<ISPO> {
 
     protected static transient Logger log = Logger
             .getLogger(DefaultGraphSolutionExpander.class);

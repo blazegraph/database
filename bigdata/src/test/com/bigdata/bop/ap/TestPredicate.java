@@ -218,14 +218,13 @@ public class TestPredicate extends TestCase2 {
                 final IConstant<?> c = bindingSet.get((IVariable<?>) p1.get(i));
                 if (c != null) {
                     /*
-                     * The variable should have been bound to a copy of that
-                     * constant.
+                     * The variable should have been bound to that constant.
                      */
                     assertTrue("i=" + i, p2.get(i).isConstant());
                     // equals (same data)
                     assertEquals("i=" + i, c, p2.get(i));
-                    // but not the same ref (deep copy).
-                    assertTrue("i=" + i, c != p2.get(i));
+                    // same ref (no deep copy for constants).
+                    assertTrue("i=" + i, c == p2.get(i));
                 } else {
                     // p2 should still be a variable.
                     assertTrue("i=" + i, p2.get(i).isVar());
@@ -234,14 +233,14 @@ public class TestPredicate extends TestCase2 {
                 }
             } else {
                 /*
-                 * Since not a variable in p1, the asBound variable is a (deep
-                 * copy of a) constant.
+                 * Since not a variable in p1, the asBound variable is a
+                 * constant (no deep copy for constants).
                  */
                 assertTrue("i=" + i, p2.get(i).isConstant());
                 // copy as equals.
                 assertEquals("i=" + i, p1.get(i), p2.get(i));
-                // but not the same references (deep copy).
-                assertTrue("i=" + i, p1.get(i) != p2.get(i));
+                // the same references (no deep copy for constants).
+                assertTrue("i=" + i, p1.get(i) == p2.get(i));
             }
         }
     }

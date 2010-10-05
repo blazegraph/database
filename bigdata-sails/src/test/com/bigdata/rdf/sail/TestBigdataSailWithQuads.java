@@ -32,16 +32,15 @@ import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 import junit.framework.TestSuite;
 
-import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.tck.BigdataConnectionTest;
 import com.bigdata.rdf.sail.tck.BigdataSparqlTest;
 import com.bigdata.rdf.sail.tck.BigdataStoreTest;
-import com.bigdata.relation.AbstractResource;
 
 /**
  * Test suite for the {@link BigdataSail} with quads enabled. The provenance
- * mode is disabled. Inference is disabled.
+ * mode is disabled. Inference is disabled. This version of the test suite uses
+ * the pipeline join algorithm.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -66,7 +65,7 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
          * Use a proxy test suite and specify the delegate.
          */
 
-        final ProxyTestSuite suite = new ProxyTestSuite(delegate, "SAIL with Quads (nested subquery joins)");
+        final ProxyTestSuite suite = new ProxyTestSuite(delegate, "SAIL with Quads (pipeline joins)");
 
         // test pruning of variables not required for downstream processing.
         suite.addTestSuite(TestPruneBindingSets.class);
@@ -101,13 +100,18 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
 
             final TestSuite tckSuite = new TestSuite("Sesame 2.x TCK");
 
-            tckSuite.addTestSuite(BigdataStoreTest.LTSWithNestedSubquery.class);
+            tckSuite.addTestSuite(BigdataStoreTest.LTSWithPipelineJoins.class);
 
-            tckSuite.addTestSuite(BigdataConnectionTest.LTSWithNestedSubquery.class);
+            tckSuite.addTestSuite(BigdataConnectionTest.LTSWithPipelineJoins.class);
 
             try {
 
-                tckSuite.addTest(BigdataSparqlTest.suiteLTSWithNestedSubquery());
+                /*
+                 * suite() will call suiteLTSWithPipelineJoins() and then
+                 * filter out the dataset tests, which we don't need right now
+                 */
+//                tckSuite.addTest(BigdataSparqlTest.suiteLTSWithPipelineJoins());
+                tckSuite.addTest(BigdataSparqlTest.suite());
 
             } catch (Exception ex) {
 
@@ -141,17 +145,17 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
         properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
 */
         properties.setProperty(Options.QUADS_MODE, "true");
-
+        
         properties.setProperty(Options.TRUTH_MAINTENANCE, "false");
 
-        properties.setProperty(AbstractResource.Options.NESTED_SUBQUERY, "true");
+//        properties.setProperty(AbstractResource.Options.NESTED_SUBQUERY, "false");
 
         return properties;
         
     }
     
     @Override
-    protected BigdataSail reopenSail(final BigdataSail sail) {
+    protected BigdataSail reopenSail(BigdataSail sail) {
 
         final Properties properties = sail.database.getProperties();
 

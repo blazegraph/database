@@ -138,7 +138,7 @@ import cutthecrap.utils.striterators.IFilter;
  * @see KeyBuilder
  */
 abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
-        ILinearList, IBTreeStatistics {
+        ILinearList, IBTreeStatistics, ILocalBTreeView {
 
     /**
      * The index is already closed.

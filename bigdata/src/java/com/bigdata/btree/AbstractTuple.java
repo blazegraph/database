@@ -689,7 +689,25 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
             sb.append("REVERSE");
             
         }
-        
+
+        if ((flags & IRangeQuery.FIXED_LENGTH_SUCCESSOR) != 0) {
+            
+            if (onCount++ > 0)
+                sb.append(",");
+            
+            sb.append("FIXED_LENGTH_SUCCESSOR");
+            
+        }
+
+        if ((flags & IRangeQuery.PARALLEL) != 0) {
+            
+            if (onCount++ > 0)
+                sb.append(",");
+            
+            sb.append("PARALLEL");
+            
+        }
+
         sb.append("]");
         
         return sb.toString();

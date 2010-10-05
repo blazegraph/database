@@ -53,7 +53,7 @@ import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.rule.ISolutionExpander;
+import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.ICloseableIterator;
@@ -71,7 +71,7 @@ import com.bigdata.util.concurrent.MappedTaskExecutor;
  *          FIXME See notes on the {@link DefaultGraphSolutionExpander}
  *          concerning scale-out joins.
  */
-public class NamedGraphSolutionExpander implements ISolutionExpander<ISPO> {
+public class NamedGraphSolutionExpander implements IAccessPathExpander<ISPO> {
 
     private static final long serialVersionUID = 2399492655063411719L;
 

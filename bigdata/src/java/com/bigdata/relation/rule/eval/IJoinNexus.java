@@ -436,20 +436,20 @@ public interface IJoinNexus {
      */
     IRelation getTailRelationView(IPredicate pred);
 
-    /**
-     * Obtain an access path reading from the view for the relation associated
-     * with the specified predicate (from the tail of some rule).
-     * 
-     * @param pred
-     *            The predicate.
-     * 
-     * @return The access path.
-     * 
-     * @deprecated by {@link #getTailAccessPath(IRelation, IPredicate)} which
-     *             factors out obtaining the {@link IRelation} view into the
-     *             caller, which turns out to be a significant cost savings.
-     */
-    IAccessPath getTailAccessPath(IPredicate pred);
+//    /**
+//     * Obtain an access path reading from the view for the relation associated
+//     * with the specified predicate (from the tail of some rule).
+//     * 
+//     * @param pred
+//     *            The predicate.
+//     * 
+//     * @return The access path.
+//     * 
+//     * @deprecated by {@link #getTailAccessPath(IRelation, IPredicate)} which
+//     *             factors out obtaining the {@link IRelation} view into the
+//     *             caller, which turns out to be a significant cost savings.
+//     */
+//    IAccessPath getTailAccessPath(IPredicate pred);
 
     /**
      * Obtain an access path reading from relation for the specified predicate

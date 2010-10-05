@@ -30,6 +30,7 @@ package com.bigdata.rdf.rules;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -46,7 +47,6 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.eval.ActionEnum;
@@ -94,7 +94,7 @@ public class TestOptionals extends AbstractInferenceEngineTestCase {
      
         final Properties p = new Properties(getProperties());
 
-        p.setProperty(AbstractRelation.Options.NESTED_SUBQUERY, "false");
+//        p.setProperty(AbstractRelation.Options.NESTED_SUBQUERY, "false");
         
         doOptionalsTest(p);
         

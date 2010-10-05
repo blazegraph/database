@@ -94,6 +94,9 @@ public class TestAll extends TestCase {
 
         // star joins
         suite.addTestSuite(TestSPOStarJoin.class);
+
+        // test for shard split handler for the xxxC indices.
+        suite.addTestSuite(TestXXXCShardSplitHandler.class);
         
         return suite;
         

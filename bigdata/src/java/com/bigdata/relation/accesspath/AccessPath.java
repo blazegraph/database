@@ -33,29 +33,51 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.ap.filter.SameVariableConstraint;
+import com.bigdata.bop.cost.BTreeCostModel;
+import com.bigdata.bop.cost.DiskCostModel;
+import com.bigdata.bop.cost.IndexSegmentCostModel;
+import com.bigdata.bop.cost.ScanCostReport;
+import com.bigdata.btree.AbstractBTree;
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.IBTreeStatistics;
 import com.bigdata.btree.IBloomFilter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.Tuple;
+import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.btree.filter.TupleFilter;
+import com.bigdata.btree.isolation.IsolatedFusedView;
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.proc.ISimpleIndexProcedure;
+import com.bigdata.btree.view.FusedView;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.Journal;
+import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.LocalPartitionMetadata;
+import com.bigdata.rawstore.Bytes;
+import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IRelation;
-import com.bigdata.service.IDataService;
+import com.bigdata.service.AbstractClient;
+import com.bigdata.service.DataService;
+import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.ndx.IClientIndex;
+import com.bigdata.service.ndx.IScaleOutClientIndex;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.EmptyChunkedIterator;
@@ -81,18 +103,19 @@ import cutthecrap.utils.striterators.Striterator;
  * @param R
  *            The generic type of the elements of the {@link IRelation}.
  * 
- * @todo This needs to be more generalized so that you can use a index that is
- *       best without being optimal by specifying a low-level filter to be
- *       applied to the index. That requires a means to dynamically filter out
- *       the elements we do not want from the key-range scan - the filtering
- *       should of course be done at the {@link IDataService}.
+ * @todo Add support for non-perfect access paths. This class should layer on an
+ *       index local {@link IFilter} which rejects tuples which do not satisfy
+ *       the {@link IPredicate}'s bindings. This will give the effect of a SCAN
+ *       with an implied filter. The javadoc on
+ *       {@link IRelation#getKeyOrder(IPredicate)} should also be updated to
+ *       reflect the allowance for non-perfect access paths.
  */
 public class AccessPath<R> implements IAccessPath<R> {
 
     static final protected Logger log = Logger.getLogger(IAccessPath.class);
     
     /** Relation (resolved lazily if not specified to the ctor). */
-    private final AtomicReference<IRelation<R>> relation;
+    private final IRelation<R> relation;
 
     /** Access to the index, resource locator, executor service, etc. */
     protected final IIndexManager indexManager;
@@ -264,41 +287,44 @@ public class AccessPath<R> implements IAccessPath<R> {
      * @param keyOrder
      *            The order in which the elements would be visited for this
      *            access path.
-     * @param ndx
-     *            The index on which the access path is reading.
-     * @param flags
-     *            The default {@link IRangeQuery} flags.
-     * @param chunkOfChunksCapacity
-     *            The #of chunks that can be held by an {@link IBuffer} that is
-     *            the target or one or more producers. This is generally a small
-     *            number on the order of the #of parallel producers that might
-     *            be writing on the {@link IBuffer} since the capacity of the
-     *            {@link UnsynchronizedArrayBuffer}s is already quite large (10k
-     *            or better elements, defining a single "chunk" from a single
-     *            producer).
-     * @param chunkCapacity
-     *            The maximum size for a single chunk (generally 10k or better).
-     * @param fullyBufferedReadThreshold
-     *            If the estimated remaining rangeCount for an
-     *            {@link #iterator(long, long, int)} is LTE this threshold then
-     *            we will do a fully buffered (synchronous) read. Otherwise we
-     *            will do an asynchronous read.
      */
+//  * @param ndx
+//  *            The index on which the access path is reading.
+//  * @param flags
+//  *            The default {@link IRangeQuery} flags.
+//  * @param chunkOfChunksCapacity
+//  *            The #of chunks that can be held by an {@link IBuffer} that is
+//  *            the target or one or more producers. This is generally a small
+//  *            number on the order of the #of parallel producers that might
+//  *            be writing on the {@link IBuffer} since the capacity of the
+//  *            {@link UnsynchronizedArrayBuffer}s is already quite large (10k
+//  *            or better elements, defining a single "chunk" from a single
+//  *            producer).
+//  * @param chunkCapacity
+//  *            The maximum size for a single chunk (generally 10k or better).
+//  * @param fullyBufferedReadThreshold
+//  *            If the estimated remaining rangeCount for an
+//  *            {@link #iterator(long, long, int)} is LTE this threshold then
+//  *            we will do a fully buffered (synchronous) read. Otherwise we
+//  *            will do an asynchronous read.
     public AccessPath(//
             final IRelation<R> relation,//
-            final IIndexManager indexManager,  //
-            final long timestamp,//
+            final IIndexManager localIndexManager,  //
+//            final long timestamp,// 
             final IPredicate<R> predicate,//
-            final IKeyOrder<R> keyOrder,  //
-            final IIndex ndx,//
-            final int flags, //
-            final int chunkOfChunksCapacity,
-            final int chunkCapacity,
-            final int fullyBufferedReadThreshold
+            final IKeyOrder<R> keyOrder  //
+//            final IIndex ndx,//
+//            final int flags, //
+//            final int chunkOfChunksCapacity,
+//            final int chunkCapacity,
+//            final int fullyBufferedReadThreshold
             ) {
 
-        if (indexManager == null)
+        if (relation == null)
             throw new IllegalArgumentException();
+        
+//        if (indexManager == null)
+//            throw new IllegalArgumentException();
         
         if (predicate == null)
             throw new IllegalArgumentException();
@@ -306,53 +332,135 @@ public class AccessPath<R> implements IAccessPath<R> {
         if (keyOrder == null)
             throw new IllegalArgumentException();
 
-        if (ndx == null)
-            throw new IllegalArgumentException();
+//        if (ndx == null)
+//            throw new IllegalArgumentException();
 
-        final int partitionId = predicate.getPartitionId();
-        
-        if (partitionId != -1) {
-            
-            /*
-             * An index partition constraint was specified, so verify that we
-             * were given a local index object and that the index object is for
-             * the correct index partition.
-             */
-            
-            pmd = ndx.getIndexMetadata().getPartitionMetadata();
+        this.relation = relation;
 
-            if (pmd == null)
-                throw new IllegalArgumentException("Not an index partition");
-        
-            if (pmd.getPartitionId() != partitionId) {
-                
-                throw new IllegalArgumentException("Expecting partitionId="
-                        + partitionId + ", but have " + pmd.getPartitionId());
-                
-            }
-            
+        final boolean remoteAccessPath = predicate.getProperty(
+                IPredicate.Annotations.REMOTE_ACCESS_PATH,
+                IPredicate.Annotations.DEFAULT_REMOTE_ACCESS_PATH);
+
+        /*
+         * Chose the right index manger. If relation.getIndexManager() is not
+         * federation, then always use that index manager. Otherwise, if AP is
+         * REMOTE use the relation's index manager. Otherwise, the
+         * localIndexManager MUST NOT be null and we will use it.
+         */
+        if (!(relation.getIndexManager() instanceof IBigdataFederation<?>)) {
+            this.indexManager = relation.getIndexManager();
+        } else if (remoteAccessPath) {
+            this.indexManager = relation.getIndexManager();
         } else {
-            
-            // The predicate is not constrained to an index partition.
-            
-            pmd = null;
-            
+            if (localIndexManager == null) {
+                throw new RuntimeException("Local index manager not given but"
+                        + "access path specifies local index.");
+            }
+            this.indexManager = localIndexManager;
         }
-
-        // Note: the caller's [relation] MAY be null.
-        this.relation = new AtomicReference<IRelation<R>>(relation);
+//        this.indexManager = indexManager;
         
-        this.indexManager = indexManager;
-        
-        this.timestamp = timestamp;
+        this.timestamp = relation.getTimestamp();
         
         this.predicate = predicate;
 
         this.keyOrder = keyOrder;
 
+        final int partitionId = predicate.getPartitionId();
+        
+        final IIndex ndx;
+        if (partitionId != -1) {
+            
+            if (remoteAccessPath) {
+                /*
+                 * A request for a specific shard is not compatible with a
+                 * request for a remote access path.
+                 */
+                throw new RuntimeException("Annotations are not compatible: "
+                        + IPredicate.Annotations.REMOTE_ACCESS_PATH + "="
+                        + remoteAccessPath + ", but "
+                        + IPredicate.Annotations.PARTITION_ID + "="
+                        + partitionId);
+            }
+            
+            final String namespace = relation.getNamespace();
+
+            // The name of the desired index partition.
+            final String name = DataService.getIndexPartitionName(namespace
+                    + "." + keyOrder.getIndexName(), partitionId);
+
+            // MUST be a local index view.
+            ndx = (ILocalBTreeView) indexManager.getIndex(name, timestamp);
+
+            if (ndx == null) {
+
+                throw new RuntimeException("No such index: relation="
+                        + relation.getNamespace() + ", timestamp=" + timestamp
+                        + ", keyOrder=" + keyOrder + ", pred=" + predicate
+                        + ", indexManager=" + indexManager);
+
+            }
+
+            /*
+             * An index partition constraint was specified, so verify that we
+             * were given a local index object and that the index object is for
+             * the correct index partition.
+             */
+
+            pmd = ndx.getIndexMetadata().getPartitionMetadata();
+
+            if (pmd == null)
+                throw new RuntimeException("Not an index partition");
+
+            if (pmd.getPartitionId() != partitionId) {
+
+                throw new RuntimeException("Expecting partitionId="
+                        + partitionId + ", but have " + pmd.getPartitionId());
+
+            }
+
+        } else {
+
+            // The predicate is not constrained to an index partition.
+            pmd = null;
+
+            // Obtain the index.
+            final String fqn = AbstractRelation.getFQN(relation, keyOrder);
+
+            ndx = AbstractRelation.getIndex(indexManager, fqn, timestamp);
+
+            if (ndx == null) {
+
+                throw new RuntimeException("No such index: relation="
+                        + relation.getNamespace() + ", timestamp=" + timestamp
+                        + ", keyOrder=" + keyOrder + ", pred=" + predicate
+                        + ", indexManager=" + indexManager);
+
+            }
+
+        }
+
         this.ndx = ndx;
 
-        this.flags = flags;
+        final int flags = predicate.getProperty(
+                IPredicate.Annotations.FLAGS,
+                IPredicate.Annotations.DEFAULT_FLAGS);
+        
+        final int chunkOfChunksCapacity = predicate.getProperty(
+                BufferAnnotations.CHUNK_OF_CHUNKS_CAPACITY,
+                BufferAnnotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY);
+
+        final int chunkCapacity = predicate.getProperty(
+                BufferAnnotations.CHUNK_CAPACITY,
+                BufferAnnotations.DEFAULT_CHUNK_CAPACITY);
+
+        final int fullyBufferedReadThreshold = predicate.getProperty(
+                IPredicate.Annotations.FULLY_BUFFERED_READ_THRESHOLD,
+                IPredicate.Annotations.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD);
+
+        this.flags = flags
+                | (TimestampUtility.isReadOnly(timestamp) ? IRangeQuery.READONLY
+                        : 0);
 
         this.chunkOfChunksCapacity = chunkOfChunksCapacity;
 
@@ -372,6 +480,11 @@ public class AccessPath<R> implements IAccessPath<R> {
              * Note: This MUST be an implementation which is "aware" of the
              * reuse of tuples within tuple iterators. That is why it is being
              * cast to a BOpTupleIterator.
+             * 
+             * @todo if not a perfect index then impose additional filter first
+             * to skip over tuples which do not satisfy the concrete asBound
+             * predicate. This allows us to use the "best" index, not just a
+             * "perfect" index.
              */
             final IFilter indexLocalFilter = predicate.getIndexLocalFilter();
 
@@ -409,7 +522,7 @@ public class AccessPath<R> implements IAccessPath<R> {
             }
             
         }
-
+        
         // optional filter to be evaluated by the AccessPath.
         this.accessPathFilter = predicate.getAccessPathFilter();
 
@@ -442,6 +555,7 @@ public class AccessPath<R> implements IAccessPath<R> {
                 + (indexLocalFilter == null ? "n/a" : indexLocalFilter)
                 + ", accessPathFilter="
                 + (accessPathFilter == null ? "n/a" : accessPathFilter)
+                + ", indexManager="+indexManager
                 + "}";
 
     }
@@ -492,22 +606,22 @@ public class AccessPath<R> implements IAccessPath<R> {
     /**
      * Resolved lazily if not specified to the ctor.
      */
-    @SuppressWarnings("unchecked")
+//    @SuppressWarnings("unchecked")
     public IRelation<R> getRelation() {
-
-        IRelation<R> tmp = relation.get();
-        
-        if (tmp == null) {
-
-            tmp = (IRelation<R>) indexManager.getResourceLocator().locate(
-                    predicate.getOnlyRelationName(), timestamp);
-
-            relation.compareAndSet(null/*expect*/, tmp/*update*/);
-            
-        }
-
-        return relation.get();
-
+        return relation;
+//
+//        IRelation<R> tmp = relation.get();
+//        
+//        if (tmp == null) {
+//
+//            tmp = (IRelation<R>) indexManager.getResourceLocator().locate(
+//                    predicate.getOnlyRelationName(), timestamp);
+//
+//            relation.compareAndSet(null/*expect*/, tmp/*update*/);
+//            
+//        }
+//
+//        return relation.get();
     }
 
     public IIndexManager getIndexManager() {
@@ -1303,5 +1417,310 @@ public class AccessPath<R> implements IAccessPath<R> {
         return t == null || t.isVar() ? null : t.get();
 
     }
+
+    /**
+     * Return an estimate of the cost of a scan on the predicate.
+     * 
+     * @param pred
+     *            The predicate.
+     * 
+     * @return The estimated cost of a scan on that predicate.
+     * 
+     * @todo This tunnels through to the {@link AbstractBTree} class and is thus
+     *       specific to standalone and also may run into trouble once we
+     *       support unisolated access paths for reads or mutation since it may
+     *       encounter an {@link UnisolatedReadWriteIndex} instead of an
+     *       {@link AbstractBTree}.
+     */
+    public ScanCostReport estimateCost() {
+
+        if(ndx instanceof UnisolatedReadWriteIndex) {
+        
+            return ((UnisolatedReadWriteIndex) ndx).estimateCost(diskCostModel,
+                    rangeCount);
+            
+        }
+        
+        if (ndx instanceof BTree) {
+
+            /*
+             * Fast path for a local BTree.
+             */
+            
+            // fast range count (may be cached by the access path).
+            final long rangeCount = rangeCount(false/*exact*/);
+
+            return estimateCost(diskCostModel, (BTree) ndx, rangeCount);
+
+        }
+
+        if (ndx instanceof ILocalBTreeView) {
+
+            /*
+             * A local view. This path is for both transactions and local
+             * shards.
+             */
+            
+            // fast range count (may be cached by the access path).
+            final long rangeCount = rangeCount(false/* exact */);
+            
+            return estimateCost((ILocalBTreeView) ndx, rangeCount, fromKey,
+                    toKey);
+
+        }
+
+        if (ndx instanceof IScaleOutClientIndex) {
+            
+            /*
+             * A scale-out index is being addressed.
+             */
+            return estimateCost((IScaleOutClientIndex) ndx);
+
+        }
+
+        throw new UnsupportedOperationException("index=" + ndx);
+        
+    }
+
+    /**
+     * Return the estimated cost of an index scan on a local {@link BTree}.
+     * 
+     * @param btree
+     *            The {@link BTree}.
+     *            
+     * @return The estimated cost of the scan.
+     */
+    private ScanCostReport estimateCost(final DiskCostModel diskCostModel,
+            final BTree btree, final long rangeCount) {
+
+        // BTree is its own statistics view.
+        final IBTreeStatistics stats = (BTree) btree;
+        
+        // Estimate cost based on random seek per node/leaf.
+        final double cost = new BTreeCostModel(diskCostModel).rangeScan(
+                rangeCount, stats.getBranchingFactor(), stats.getHeight(),
+                stats.getUtilization().getLeafUtilization());
+
+        return new ScanCostReport(rangeCount, cost);
+
+    }
+
+    /**
+     * Return the estimated cost of a key-range scan for a local B+Tree view.
+     * This handles both {@link IsolatedFusedView} (transactions) and
+     * {@link FusedView} (shards).
+     * 
+     * @param view
+     *            The view.
+     * 
+     * @return The estimated cost.
+     */
+    static private ScanCostReport estimateCost(final ILocalBTreeView view,
+            final long rangeCount, final byte[] fromKey, final byte[] toKey) {
+        
+        double cost = 0d;
+
+        final AbstractBTree[] sources = view.getSources();
+
+        for (AbstractBTree source : sources) {
+
+            final IBTreeStatistics stats = source.getStatistics();
+
+            // fast range count on that source.
+            final long sourceRangeCount = source.rangeCount(fromKey, toKey);
+
+            if (source instanceof IndexSegment) {
+
+                // Cost for an index segment based on multi-block IO.
+                final IndexSegment seg = (IndexSegment) source;
+
+                final long extentLeaves = seg.getStore().getCheckpoint().extentLeaves;
+
+                final int leafCount = stats.getLeafCount();
+
+                final int bytesPerLeaf = (int) Math
+                        .ceil(((double) extentLeaves) / leafCount);
+
+                cost += new IndexSegmentCostModel(diskCostModel).rangeScan(
+                        (int) sourceRangeCount, stats.getBranchingFactor(),
+                        bytesPerLeaf, DirectBufferPool.INSTANCE
+                                .getPoolCapacity());
+
+            } else {
+
+                // Cost for a B+Tree based on random seek per node/leaf.
+                cost += new BTreeCostModel(diskCostModel).rangeScan(
+                        sourceRangeCount, stats.getBranchingFactor(), stats
+                                .getHeight(), stats.getUtilization()
+                                .getLeafUtilization());
+
+            }
+
+        }
+
+        // @todo pass details per source back in the cost report.
+        return new ScanCostReport(rangeCount, cost);
+
+
+    }
+
+    /**
+     * Return the estimated cost of a key-range scan on a remote view of a
+     * scale-out index.
+     * 
+     * @param ndx
+     *            The scale-out index.
+     * 
+     * @return
+     * 
+     * @todo Remote scans can be parallelized. If flags includes PARALLEL then
+     *       the cost can be as little as the cost of scanning one shard.
+     *       However, the {@link IClientIndex} has a configuration value which
+     *       specifies the maximum parallelism of any given operation (this is
+     *       self-reported if we cast to the implementation class). Further,
+     *       even if we assume that the shards are evenly distributed over the
+     *       nodes, when the #of shards is significantly larger than the #of
+     *       nodes then the scan can interfere with itself. Finally, this should
+     *       include an estimate of the RMI overhead.
+     */
+    private ScanCostReport estimateCost(final IScaleOutClientIndex ndx) {
+        
+        final String name = ndx.getIndexMetadata().getName();
+
+        final AbstractClient<?> client = ndx.getFederation().getClient();
+        
+        // maximum parallelization by the client.
+        final int maxParallel = client.getMaxParallelTasksPerRequest();
+
+        // the metadata index for that scale-out index.
+        final IMetadataIndex mdi = ndx.getFederation().getMetadataIndex(name,
+                timestamp);
+
+        if (mdi == null)
+            throw new NoSuchIndexException("name=" + name + "@"
+                    + TimestampUtility.toString(timestamp));
+
+        // #of index partitions to be scanned.
+        final long partitionCount = mdi.rangeCount(fromKey, toKey);
+
+        if (partitionCount == 0) {
+         
+            /*
+             * SWAG in case zero partition count is reported (I am not sure that
+             * this code path is possible).
+             */
+            return new ScanCostReport(rangeCount, partitionCount, 100/* millis */);
+   
+        }
+
+        // fast range count (may be cached by the access path).
+        final long rangeCount = rangeCount(false/* exact */);
+
+        if (partitionCount == 1) {
+
+            /*
+             * Delegate the operation to the remote shard.
+             */
+
+            return (ScanCostReport) ndx.submit(fromKey,
+                    new EstimateShardScanCost(rangeCount, fromKey, toKey));
+
+        }
+
+        /*
+         * Assume a statistical model. Each partition is comprised of 1 journal
+         * with 50k tuples plus two index segments of 100M each.
+         */
+
+        // one journal per shard.
+        final int njournals = 1;
+        // two segments per shard.
+        final int nsegments = 2;
+
+        final long rangeCountOnJournal = rangeCount
+                / (partitionCount * (njournals + nsegments));
+
+        final double costPerJournal = new BTreeCostModel(diskCostModel)
+                .rangeScan(rangeCountOnJournal, //
+                        mdi.getIndexMetadata().getBranchingFactor(), //
+                        5,// height (SWAG)
+                        70// leafUtilization (percent, SWAG).
+                );
+
+        final double costPerSegment = diskCostModel.seekTime + Bytes.megabyte
+                * 100;
+
+        final double costPerShard = costPerJournal + 2 * costPerSegment;
+
+        final double cost = costPerShard * partitionCount;
+
+        return new ScanCostReport(rangeCount, partitionCount, cost);
+
+    }
+
+    /**
+     * Procedure to estimate the cost of an index range scan on a remote shard.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    private static final class EstimateShardScanCost implements
+            ISimpleIndexProcedure {
+
+        private static final long serialVersionUID = 1L;
+
+        private final long rangeCount;
+
+        private final byte[] fromKey;
+
+        private final byte[] toKey;
+
+        public EstimateShardScanCost(final long rangeCount,
+                final byte[] fromKey, final byte[] toKey) {
+            this.rangeCount = rangeCount;
+            this.fromKey = fromKey;
+            this.toKey = toKey;
+        }
+
+        public Object apply(final IIndex ndx) {
+            
+            final ScanCostReport scanCostReport = AccessPath.estimateCost(
+                    ((ILocalBTreeView) ndx), rangeCount, fromKey, toKey);
+            
+            return scanCostReport;
+            
+        }
+
+        public boolean isReadOnly() {
+            return true;
+        }
+    }
+
+    /*
+     * Cost models.
+     */
+
+    /**
+     * The cost model associated with the disk on which the indices are stored.
+     * For a {@link Journal}, this is just the cost model of the backing disk.
+     * For the federation, this should be an average cost model.
+     * 
+     * @todo This is not parameterized. A simple cost model is always assumed.
+     *       The correct cost model is necessary in order to get the tradeoff
+     *       point right for SCAN+FILTER versus SUBQUERY on SSD or RAID arrays
+     *       with lots of spindles versus normal disk.
+     * 
+     * @todo In a shared disk deployment, we might introduce one cost model for
+     *       local SSD used to cache journals, one for local non-SSD disks used
+     *       to cache index segments, and one for remote storage used to
+     *       materialize historical journals and index segments for query.
+     * 
+     * @todo In a federation, this should be reported out as metadata for the
+     *       federation. Perhaps as a Jini attribute. Or we could self-publish
+     *       this using a System property whose value was either the name of the
+     *       desired cost model enum or a representation of the cost model which
+     *       we could then parse.
+     */
+    private static final DiskCostModel diskCostModel = DiskCostModel.DEFAULT;
 
 }

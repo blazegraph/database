@@ -66,7 +66,6 @@ import org.apache.lucene.util.Version;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISimpleSplitHandler;
@@ -82,7 +81,6 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.relation.AbstractRelation;
-import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -1345,10 +1343,10 @@ public class FullTextIndex extends AbstractRelation {
         throw new UnsupportedOperationException();
     }
 
-    @SuppressWarnings("unchecked")
-    public IAccessPath getAccessPath(IPredicate predicate) {
-        throw new UnsupportedOperationException();
-    }
+//    @SuppressWarnings("unchecked")
+//    public IAccessPath getAccessPath(IPredicate predicate) {
+//        throw new UnsupportedOperationException();
+//    }
 
     public Set<String> getIndexNames() {
         throw new UnsupportedOperationException();

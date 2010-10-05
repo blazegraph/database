@@ -48,6 +48,9 @@ public class NOPFilter extends FilterBase {
     public NOPFilter() {
     }
 
+    /**
+     * Returns <i>src</i>.
+     */
     @Override
     protected Iterator filterOnce(Iterator src, Object context) {
         return src;

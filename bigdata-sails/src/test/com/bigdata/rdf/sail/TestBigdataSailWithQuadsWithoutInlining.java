@@ -47,27 +47,27 @@ import com.bigdata.relation.AbstractResource;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestBigdataSailWithQuadsAndPipelineJoins extends AbstractBigdataSailTestCase {
+public class TestBigdataSailWithQuadsWithoutInlining extends AbstractBigdataSailTestCase {
 
     /**
      * 
      */
-    public TestBigdataSailWithQuadsAndPipelineJoins() {
+    public TestBigdataSailWithQuadsWithoutInlining() {
     }
 
-    public TestBigdataSailWithQuadsAndPipelineJoins(String name) {
+    public TestBigdataSailWithQuadsWithoutInlining(String name) {
         super(name);
     }
     
     public static Test suite() {
         
-        final TestBigdataSailWithQuadsAndPipelineJoins delegate = new TestBigdataSailWithQuadsAndPipelineJoins(); // !!!! THIS CLASS !!!!
+        final TestBigdataSailWithQuadsWithoutInlining delegate = new TestBigdataSailWithQuadsWithoutInlining(); // !!!! THIS CLASS !!!!
 
         /*
          * Use a proxy test suite and specify the delegate.
          */
 
-        final ProxyTestSuite suite = new ProxyTestSuite(delegate, "SAIL with Quads (pipeline joins)");
+        final ProxyTestSuite suite = new ProxyTestSuite(delegate, "SAIL with Quads (pipeline joins, no inlining)");
 
         // test pruning of variables not required for downstream processing.
         suite.addTestSuite(TestPruneBindingSets.class);
@@ -150,7 +150,9 @@ public class TestBigdataSailWithQuadsAndPipelineJoins extends AbstractBigdataSai
         
         properties.setProperty(Options.TRUTH_MAINTENANCE, "false");
 
-        properties.setProperty(AbstractResource.Options.NESTED_SUBQUERY, "false");
+//        properties.setProperty(AbstractResource.Options.NESTED_SUBQUERY, "false");
+
+        properties.setProperty(Options.INLINE_LITERALS, "false");
 
         return properties;
         

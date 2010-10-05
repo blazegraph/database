@@ -1240,7 +1240,7 @@ public class TestNamedGraphs extends QuadsTestCase {
             final URI UT = new URIImpl("http://www.bigdata.com/UT");
             final URI c1 = new URIImpl("http://www.bigdata.com/context1");
             final URI c2 = new URIImpl("http://www.bigdata.com/context2");
-            final URI c3 = new URIImpl("http://www.bigdata.com/context3");
+//            final URI c3 = new URIImpl("http://www.bigdata.com/context3");
             final URI c4 = new URIImpl("http://www.bigdata.com/context3");
 
             /*
@@ -1257,9 +1257,13 @@ public class TestNamedGraphs extends QuadsTestCase {
                 cxn.add(paul, loves, sam, c4);
                 cxn.add(sam, livesIn, UT, c4);
                 cxn.commit();
+
+                if(log.isInfoEnabled()) {
+                    log.info("\n"+sail.getDatabase().dumpStore().toString());
+                }
             }
 
-            {
+            if(true){
 
                 /*
                  * One graph in the defaultGraphs set, but the specified graph
@@ -1267,7 +1271,7 @@ public class TestNamedGraphs extends QuadsTestCase {
                  */
 
                 final String query = "SELECT  ?x ?y ?z \n" + //
-                        "FROM    <" + c3 + ">\n" + //
+                        "FROM    <" + c4/*c3*/ + ">\n" + //
                         "WHERE   { ?x <" + loves + "> ?y .\n" + //
                         "          ?y <" + loves + "> ?z .\n" + //
                         "}";
@@ -1285,7 +1289,7 @@ public class TestNamedGraphs extends QuadsTestCase {
 
             }
 
-            {
+            if(true){
 
                 /*
                  * The data set is not specified. The query will run against the
@@ -1332,15 +1336,20 @@ public class TestNamedGraphs extends QuadsTestCase {
 
             }
 
-            {
+            if(true){
 
                 /*
                  * Two graphs (c1,c2) are used. There should be one solution.
+                 * 
                  * There is a second solution if c4 is considered, but it should
                  * not be since it is not in the default graph.
+                 * 
+                 * If you are getting an extra (john,mark,paul) solution then
+                 * the default graph access path is not enforcing "DISTINCT SPO"
+                 * semantics.
                  */
 
-                final String query = "SELECT  ?x ?y ?z \n" + //
+                final String query = "SELECT ?x ?y ?z \n" + //
                         "FROM    <" + c1 + ">\n" + //
                         "FROM    <" + c2 + ">\n" + //
                         "WHERE   { ?x <" + loves + "> ?y .\n" + //

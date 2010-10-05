@@ -312,10 +312,10 @@ public class TestDefaultResourceLocator extends TestCase2 {
             return 0;
         }
 
-        public IAccessPath getAccessPath(IPredicate predicate) {
-            // TODO Auto-generated method stub
-            return null;
-        }
+//        public IAccessPath getAccessPath(IPredicate predicate) {
+//            // TODO Auto-generated method stub
+//            return null;
+//        }
 
         public long getElementCount(boolean exact) {
             // TODO Auto-generated method stub

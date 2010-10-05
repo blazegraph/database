@@ -38,7 +38,7 @@ class Algorithm_NestedLocatorScan<E extends IBindingSet, F> implements
              * bound.
              */
             final Iterator<PartitionLocator> itr = op.locatorScan(
-                    bundle.fromKey, bundle.toKey);
+                    bundle.keyOrder, bundle.fromKey, bundle.toKey);
 
             while (itr.hasNext()) {
 
