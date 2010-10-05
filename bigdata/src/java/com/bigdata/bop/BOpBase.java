@@ -603,4 +603,95 @@ public class BOpBase implements BOp {
 
     }
 
+    /*
+     * Note: I've played around with a few hash functions and senses of
+     * equality. Predicate (before the bops were introduced) used to have a
+     * hashCode() and equals() which was used to cache access paths, but that is
+     * long gone. The problem with specifying a hashCode() and equals() method
+     * for BOp/BOpBase/Predicate is that we wind up with duplicate bop
+     * exceptions being reported by BOpUtility#getIndex(BOp).
+     */
+    
+//    /**
+//     * <code>true</code> if all arguments and annotations are the same.
+//     */
+//    public boolean equals(final Object other) {
+//
+//        if (this == other)
+//            return true;
+//
+//        if (!(other instanceof BOp))
+//            return false;
+//
+//        final BOp o = (BOp) other;
+//
+//        final int arity = arity();
+//
+//        if (arity != o.arity())
+//            return false;
+//
+//        for (int i = 0; i < arity; i++) {
+//
+//            final BOp x = get(i);
+//
+//            final BOp y = o.get(i);
+//
+//            /*
+//             *    X      Y
+//             * same   same : continue (includes null == null);
+//             * null  other : return false;
+//             * !null other : if(!x.equals(y)) return false.
+//             */
+//            if (x != y || x == null || !(x.equals(y))) { 
+////                    && (//
+////                    (x != null && !(x.equals(y))) || //
+////                    (y != null && !(y.equals(x))))//
+////            ) {
+//
+//                return false;
+//
+//            }
+//
+//        }
+//
+//        return annotations.equals(o.annotations());
+//
+//    }
+//
+//    /**
+//     * The hash code is based on the hash of the operands plus the optional
+//     * {@link BOp.Annotations#BOP_ID}.  It is cached.
+//     */
+//    public int hashCode() {
+//
+//        int h = hash;
+//
+//        if (h == 0) {
+//
+//            final int n = arity();
+//
+//            for (int i = 0; i < n; i++) {
+//
+//                h = 31 * h + get(i).hashCode();
+//
+//            }
+//
+//            Integer id = (Integer) getProperty(Annotations.BOP_ID);
+//
+//            if (id != null)
+//                h = 31 * h + id.intValue();
+//
+//            hash = h;
+//
+//        }
+//
+//        return h;
+//
+//    }
+//
+//    /**
+//     * Caches the hash code.
+//     */
+//    private int hash = 0;
+
 }

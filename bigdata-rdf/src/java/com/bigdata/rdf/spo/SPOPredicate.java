@@ -79,9 +79,6 @@ public class SPOPredicate extends Predicate<ISPO> {
      * @param s
      * @param p
      * @param o
-     * 
-     * @deprecated Only used by the unit tests.  They should use the shallow
-     * copy constructor form.
      */
     public SPOPredicate(final String relationName,
             final IVariableOrConstant<IV> s,
