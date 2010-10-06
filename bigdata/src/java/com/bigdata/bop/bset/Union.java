@@ -28,17 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.bset;
 
 import java.util.Map;
-import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
-import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.join.PipelineJoin;
-import com.bigdata.rdf.rules.TMUtility;
-import com.bigdata.relation.RelationFusedView;
-import com.bigdata.util.concurrent.Haltable;
+import com.bigdata.bop.PipelineOp;
 
 /**
  * UNION(ops)[maxParallel(default all)]
@@ -49,18 +43,29 @@ import com.bigdata.util.concurrent.Haltable;
  * and may be executed independently. By default, the subqueries are run with
  * unlimited parallelism.
  * <p>
- * UNION is useful when independent queries are evaluated and their outputs are
- * merged. Outputs from the UNION operator flow to the parent operator and will
- * be mapped across shards or nodes as appropriate for the parent. UNION runs on
- * the query controller. In order to avoid routing intermediate results through
- * the controller, the {@link PipelineOp.Annotations#SINK_REF} of each
- * child operand should be overridden to specify the parent of the UNION
- * operator.
+ * Note: UNION runs on the query controller. The
+ * {@link PipelineOp.Annotations#SINK_REF} of each child operand should be
+ * overridden to specify the parent of the UNION operator, thereby routing
+ * around the UNION operator itself. If you fail to do this, then the
+ * intermediate results of the subqueries will be routed through the UNION
+ * operator on the query controller.
  * <p>
- * UNION can not be used when the intermediate results must be routed into the
- * subqueries.  However, a {@link Tee} pattern may help in such cases.  For
- * example, a {@link Tee} may be used to create a union of pipeline joins for
- * two access paths during truth maintenance.
+ * UNION can not be used when intermediate results from other computations must
+ * be routed into subqueries. However, a {@link Tee} pattern may help in such
+ * cases. For example, a {@link Tee} may be used to create a union of pipeline
+ * joins for two access paths during truth maintenance.
+ * <p>
+ * For example:
+ * 
+ * <pre>
+ * UNION([a,b,c],{})
+ * </pre>
+ * 
+ * Will run the subqueries <i>a</i>, <i>b</i>, and <i>c</i> in parallel. Each
+ * subquery will be initialized with a single empty {@link IBindingSet}. The
+ * output of those subqueries will be routed to the UNION operator (their
+ * parent) unless the subqueries explicitly override this behavior using
+ * {@link PipelineOp.Annotations#SINK_REF}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

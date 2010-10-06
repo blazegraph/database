@@ -393,6 +393,12 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
 
     }
 
+    protected void execute(final Runnable r) {
+        
+        localIndexManager.getExecutorService().execute(r);
+        
+    }
+    
     /**
      * Runnable submits chunks available for evaluation against running queries.
      * 
@@ -438,7 +444,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
                         if (log.isDebugEnabled())
                             log.debug("Running chunk: " + chunk);
                         // execute task.
-                        localIndexManager.getExecutorService().execute(ft);
+                        execute(ft);
                     } catch (RejectedExecutionException ex) {
                         // shutdown of the pool (should be an unbounded
                         // pool).
