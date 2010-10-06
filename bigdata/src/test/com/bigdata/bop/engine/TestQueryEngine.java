@@ -906,7 +906,7 @@ public class TestQueryEngine extends TestCase2 {
         {
             // validate the stats map.
             assertNotNull(statsMap);
-            assertEquals(3, statsMap.size());
+            assertEquals("statsMap.size()", 3, statsMap.size());
             if (log.isInfoEnabled())
                 log.info(statsMap.toString());
         }

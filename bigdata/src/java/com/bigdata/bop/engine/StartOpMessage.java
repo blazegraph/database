@@ -33,7 +33,7 @@ public class StartOpMessage implements Serializable {
     final public int partitionId;
 
     /** The node on which the operator will execute. */
-    final public UUID serviceId;
+    final public UUID runningOnServiceId;
 
     /**
      * The #of {@link IChunkMessage} accepted as the input for the operator.
@@ -45,7 +45,8 @@ public class StartOpMessage implements Serializable {
     final public int nmessages;
 
     public StartOpMessage(final UUID queryId, final int opId,
-            final int partitionId, final UUID serviceId, final int nmessages) {
+            final int partitionId, final UUID runningOnServiceId,
+            final int nmessages) {
 
         if (queryId == null)
             throw new IllegalArgumentException();
@@ -59,7 +60,7 @@ public class StartOpMessage implements Serializable {
     
         this.partitionId = partitionId;
         
-        this.serviceId = serviceId;
+        this.runningOnServiceId = runningOnServiceId;
         
         this.nmessages = nmessages;
     
@@ -67,7 +68,7 @@ public class StartOpMessage implements Serializable {
 
     public String toString() {
         return getClass().getName() + "{queryId=" + queryId + ",bopId=" + bopId
-                + ",partitionId=" + partitionId + ",serviceId=" + serviceId
+                + ",partitionId=" + partitionId + ",serviceId=" + runningOnServiceId
                 + ",nchunks=" + nmessages + "}";
     }
 

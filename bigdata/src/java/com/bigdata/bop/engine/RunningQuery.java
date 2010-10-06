@@ -204,7 +204,7 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
     public void setDeadline(final long deadline) {
 
         if (!controller)
-            throw new UnsupportedOperationException();
+            throw new UnsupportedOperationException(ERR_NOT_CONTROLLER);
 
         if (deadline <= 0)
             throw new IllegalArgumentException();
@@ -291,8 +291,10 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
     /**
      * Return the current statistics for the query and <code>null</code> unless
-     * this is the query controller. For {@link PipelineOp} operator
-     * which is evaluated there will be a single entry in this map.
+     * this is the query controller. There will be a single entry in the map for
+     * each distinct {@link PipelineOp}. The map entries are inserted when we
+     * first begin to run an instance of that operator on some
+     * {@link IChunkMessage}.
      */
     public Map<Integer/* bopId */, BOpStats> getStats() {
 
@@ -511,7 +513,9 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
         try {
 
             // verify still running.
-            future.halted();
+            if (future.isDone()) {
+                throw new RuntimeException("Query is done", future.getCause());
+            }
 
             // add chunk to be consumed.
             chunksIn.add(msg);
@@ -535,7 +539,7 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
     void startQuery(final IChunkMessage<IBindingSet> msg) {
 
         if (!controller)
-            throw new UnsupportedOperationException();
+            throw new UnsupportedOperationException(ERR_NOT_CONTROLLER);
 
         if (msg == null)
             throw new IllegalArgumentException();
@@ -576,7 +580,7 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
     public void startOp(final StartOpMessage msg) {
 
         if (!controller)
-            throw new UnsupportedOperationException();
+            throw new UnsupportedOperationException(ERR_NOT_CONTROLLER);
 
         if (msg == null)
             throw new IllegalArgumentException();
@@ -618,7 +622,7 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
     public void haltOp(final HaltOpMessage msg) {
 
         if (!controller)
-            throw new UnsupportedOperationException();
+            throw new UnsupportedOperationException(ERR_NOT_CONTROLLER);
 
         if (msg == null)
             throw new IllegalArgumentException();
@@ -1083,7 +1087,7 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
     public IAsynchronousIterator<IBindingSet[]> iterator() {
 
         if (!controller)
-            throw new UnsupportedOperationException();
+            throw new UnsupportedOperationException(ERR_NOT_CONTROLLER);
 
         if (queryIterator == null)
             throw new UnsupportedOperationException();
