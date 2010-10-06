@@ -65,6 +65,11 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
     final static public Logger log = Logger.getLogger(BaseVocabulary.class);
 
     /**
+     * The serialVersionUID as reported by the trunk on Oct 6, 2010.
+     */
+    private static final long serialVersionUID = 1560142397515291331L;
+
+    /**
      * The database that is the authority for the defined terms and term
      * identifiers. This will be <code>null</code> when the de-serialization
      * ctor is used.
