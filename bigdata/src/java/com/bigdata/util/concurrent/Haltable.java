@@ -69,11 +69,11 @@ public class Haltable<V> implements Future<V> {
     private final transient static Logger log = Logger
             .getLogger(Haltable.class);
 
-    /**
-     * Exception used to indicate a {@link #cancel(boolean) cancelled}
-     * computation.
-     */
-    private static Throwable CANCELLED = new InterruptedException("CANCELLED");
+//    /**
+//     * Exception used to indicate a {@link #cancel(boolean) cancelled}
+//     * computation.
+//     */
+//    private static final Throwable CANCELLED = new InterruptedException("CANCELLED");
 
     /**
      * Lock guarding the {@link #halted} condition and the various non-volatile,
@@ -87,26 +87,32 @@ public class Haltable<V> implements Future<V> {
     final private Condition halted = lock.newCondition();
 
     /**
-     * The result of the computation.
+     * The result of the computation. This is guarded by the {@link #lock} .
      */
     private V result = null;
 
     /**
      * The first cause as set by {@link #halt(Throwable)}.
      */
-    private Throwable firstCause = null;
+    private volatile Throwable firstCause = null;
 
     /**
      * Flag is set <code>true</code> if the process was halted by a
      * {@link Throwable} not included in the set of normal termination causes.
      */
-    private boolean error = false;
+    private volatile boolean error = false;
 
     /**
      * Set to <code>true</code> iff the process should halt.
      */
     private volatile boolean halt = false;
 
+    /**
+     * Set to <code>true</code> iff the process was {@link #cancel(boolean)
+     * cancelled}.
+     */
+    private volatile boolean cancelled = false;
+    
     /**
      * Halt (normal termination).
      */
@@ -173,34 +179,56 @@ public class Haltable<V> implements Future<V> {
     }
 
     /**
-     * Return unless processing has been halted.
-     * <p>
-     * This method may be used to detect asynchronous termination of the
-     * process. It will throw out the wrapper first cause if the process is
-     * halted. The method should be invoked from within the execution of the
-     * process itself so that it may notice asynchronous termination.
+     * Return unless processing has been halted. The method should be invoked
+     * from within the execution of the process itself so that it may notice
+     * asynchronous termination. It will throw out the wrapper first cause if
+     * the process is halted. The method is <code>protected</code> since the
+     * semantics are those of testing for unexpected termination of the process
+     * from within the process. External processes should use {@link #isDone()}.
      * 
      * @throws RuntimeException
      *             wrapping the {@link #firstCause} iff processing has been
      *             halted.
      */
-    final public void halted() {
+    final protected void halted() {
 
         if (halt) {
-            if (firstCause == null)
+            if (firstCause == null) {
+                /*
+                 * Note: this is an error since there is an expectation by the
+                 * process when it invokes halted() that the process is still
+                 * running (since it invoked halted() it must be running). Since
+                 * it is running,
+                 */
                 throw new RuntimeException();
+                
+            }
             throw new RuntimeException(firstCause);
         }
 
     }
 
     final public boolean cancel(final boolean mayInterruptIfRunning) {
+        lock.lock();
+        try {
+            
+            final Throwable t = new InterruptedException();
 
-        halt(CANCELLED);
+            halt(t);
 
-        // return true if this was the firstCause.
-        return (firstCause == CANCELLED);
+            if (firstCause == t) {
+                // iff this was the firstCause.
+                cancelled = true;
+                return true;
+            }
 
+            return false;
+            
+        } finally {
+            
+            lock.unlock();
+            
+        }
     }
 
     final public V get() throws InterruptedException, ExecutionException {
@@ -209,8 +237,11 @@ public class Haltable<V> implements Future<V> {
             while (!halt) {
                 halted.await();
             }
-            if (firstCause == CANCELLED)
-                throw new CancellationException();
+            if(cancelled) {
+                final CancellationException t = new CancellationException();
+                t.initCause(firstCause);
+                throw t;
+            }
             if (error)
                 throw new ExecutionException(firstCause);
             return result;
@@ -260,13 +291,25 @@ public class Haltable<V> implements Future<V> {
      */
     final public boolean isError() {
 
-        return halt && error;
+        // Note: lock required for atomic visibility for [halt AND error].
+        lock.lock();
+        try {
+            return halt && error;
+        } finally {
+            lock.unlock();
+        }
 
     }
 
     public boolean isCancelled() {
 
-        return halt && firstCause == CANCELLED;
+        // Note: lock required for atomic visibility for [halt AND cancelled].
+        lock.lock();
+        try {
+            return halt && cancelled;
+        } finally {
+            lock.unlock();
+        }
 
     }
 
@@ -333,8 +376,8 @@ public class Haltable<V> implements Future<V> {
      *         termination.
      */
     protected boolean isNormalTerminationCause(final Throwable cause) {
-        if (CANCELLED == cause)
-            return true;
+//        if (InnerCause.isInnerCause(cause, CancelledException.class))
+//            return true;
         if (InnerCause.isInnerCause(cause, InterruptedException.class))
             return true;
         if (InnerCause.isInnerCause(cause, CancellationException.class))

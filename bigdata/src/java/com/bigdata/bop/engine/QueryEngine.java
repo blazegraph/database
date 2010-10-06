@@ -32,6 +32,8 @@ import java.util.Comparator;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -51,6 +53,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * A class managing execution of concurrent queries against a local
@@ -343,7 +346,12 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         
         if (engineFuture.compareAndSet(null/* expect */, ft)) {
         
-            localIndexManager.getExecutorService().execute(ft);
+            engineService.set(Executors
+                    .newSingleThreadExecutor(new DaemonThreadFactory(
+                            QueryEngine.class + ".engineService")));
+
+            engineService.get().execute(ft);
+//            localIndexManager.getExecutorService().execute(ft);
             
         } else {
             
@@ -354,10 +362,15 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     }
 
     /**
-     * The {@link Future} for the query engine.
+     * The service on which we run the query engine.  This is started by {@link #init()}.
+     */
+    private final AtomicReference<ExecutorService> engineService = new AtomicReference<ExecutorService>();
+
+    /**
+     * The {@link Future} for the query engine.  This is set by {@link #init()}.
      */
     private final AtomicReference<FutureTask<Void>> engineFuture = new AtomicReference<FutureTask<Void>>();
-
+    
     /**
      * Volatile flag is set for normal termination.  When set, no new queries
      * will be accepted but existing queries will run to completion.
@@ -524,8 +537,19 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         
         // stop the query engine.
         final Future<?> f = engineFuture.get();
-        if (f != null)
+        if (f != null) {
             f.cancel(true/* mayInterruptIfRunning */);
+        }
+
+        // stop the service on which we ran the query engine.
+        final ExecutorService s = engineService.get();
+        if (s != null) {
+            s.shutdownNow();
+        }
+        
+        // clear references.
+        engineFuture.set(null);
+        engineService.set(null);
         
     }
 
@@ -549,12 +573,22 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
         if (f != null)
             f.cancel(true/* mayInterruptIfRunning */);
 
+        // stop the service on which we ran the query engine.
+        final ExecutorService s = engineService.get();
+        if (s != null) {
+            s.shutdownNow();
+        }
+        
         // halt any running queries.
         for(RunningQuery q : runningQueries.values()) {
             
             q.cancel(true/*mayInterruptIfRunning*/);
             
         }
+
+        // clear references.
+        engineFuture.set(null);
+        engineService.set(null);
 
     }
 

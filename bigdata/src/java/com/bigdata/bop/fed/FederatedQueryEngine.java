@@ -33,6 +33,8 @@ import java.rmi.RemoteException;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -57,6 +59,7 @@ import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.ResourceService;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * An {@link IBigdataFederation} aware {@link QueryEngine}.
@@ -95,13 +98,20 @@ public class FederatedQueryEngine extends QueryEngine {
      * The proxy for this query engine when used as a query controller.
      */
     private final IQueryClient clientProxy;
-    
+
     /**
      * A queue of {@link IChunkMessage}s which needs to have their data
      * materialized so an operator can consume those data on this node.
+     * This queue is drained by the {@link MaterializeChunksTask}.
      */
     final private BlockingQueue<IChunkMessage<?>> chunkMaterializationQueue = new LinkedBlockingQueue<IChunkMessage<?>>();
 
+    /**
+     * The service on which we run {@link MaterializeChunksTask}. This is
+     * started by {@link #init()}.
+     */
+    private final AtomicReference<ExecutorService> materializeChunksService = new AtomicReference<ExecutorService>();
+    
     /**
      * The {@link Future} for the task draining the {@link #chunkMaterializationQueue}.
      */
@@ -270,8 +280,14 @@ public class FederatedQueryEngine extends QueryEngine {
                 new MaterializeChunksTask(), (Void) null);
         
         if (materializeChunksFuture.compareAndSet(null/* expect */, ft)) {
-        
-            getIndexManager().getExecutorService().execute(ft);
+
+            materializeChunksService.set(Executors
+                    .newSingleThreadExecutor(new DaemonThreadFactory(
+                            FederatedQueryEngine.class
+                                    + ".materializeChunksService")));
+
+//            getIndexManager().getExecutorService().execute(ft);
+            materializeChunksService.get().execute(ft);
             
         } else {
             
@@ -288,11 +304,22 @@ public class FederatedQueryEngine extends QueryEngine {
      */
     @Override
     protected void didShutdown() {
-        
+
         // stop materializing chunks.
         final Future<?> f = materializeChunksFuture.get();
-        if (f != null)
+        if (f != null) {
             f.cancel(true/* mayInterruptIfRunning */);
+        }
+
+        // stop the service on which we ran the MaterializeChunksTask.
+        final ExecutorService s = materializeChunksService.get();
+        if (s != null) {
+            s.shutdownNow();
+        }
+
+        // Clear the references.
+        materializeChunksFuture.set(null);
+        materializeChunksService.set(null);
 
     }
     
@@ -516,8 +543,8 @@ public class FederatedQueryEngine extends QueryEngine {
             final boolean controller, final IQueryClient clientProxy,
             final PipelineOp query) {
 
-        return new FederatedRunningQuery(this, queryId, controller,
-                this.clientProxy, query);
+        return new FederatedRunningQuery(this/*queryEngine*/, queryId, controller,
+                clientProxy, query);
 
     }
 
