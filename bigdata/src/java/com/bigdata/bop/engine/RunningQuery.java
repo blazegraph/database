@@ -873,8 +873,7 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
              * target it with a message. (The sink will be null iff there is no
              * parent for this operator.)
              */
-            sinkId = p == null ? null : (Integer) p
-                    .getRequiredProperty(PipelineOp.Annotations.BOP_ID);
+            sinkId = getEffectiveDefaultSink(bop, p);
 
             // altSink (null when not specified).
             altSinkId = (Integer) op
@@ -889,12 +888,12 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
                                 + bop);
             }
 
-            if (sinkId != null && altSinkId != null
-                    && sinkId.intValue() == altSinkId.intValue()) {
-                throw new RuntimeException(
-                        "The primary and alternative sink may not be the same operator: "
-                                + bop);
-            }
+//            if (sinkId != null && altSinkId != null
+//                    && sinkId.intValue() == altSinkId.intValue()) {
+//                throw new RuntimeException(
+//                        "The primary and alternative sink may not be the same operator: "
+//                                + bop);
+//            }
 
             /*
              * Setup the BOpStats object. For some operators, e.g., SliceOp,
@@ -931,6 +930,38 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
         }
 
+        /**
+         * Return the effective default sink.
+         * 
+         * @param bop
+         *            The operator.
+         * @param p
+         *            The parent of that operator, if any.
+         */
+        private Integer getEffectiveDefaultSink(final BOp bop, final BOp p) {
+
+            if (bop == null)
+                throw new IllegalArgumentException();
+
+            Integer sink;
+
+            // Explictly specified sink?
+            sink = (Integer) bop.getProperty(PipelineOp.Annotations.SINK_REF);
+
+            if (sink == null) {
+                if (p == null) {
+                    // No parent, so no sink.
+                    return null;
+                }
+                // The parent is the sink.
+                sink = (Integer) p
+                        .getRequiredProperty(PipelineOp.Annotations.BOP_ID);
+            }
+
+            return sink;
+
+        }
+        
         /**
          * Evaluate the {@link IChunkMessage}.
          */
