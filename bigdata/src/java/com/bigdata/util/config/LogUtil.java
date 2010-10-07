@@ -25,9 +25,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.util.config;
 
-import java.util.Set;
-import java.util.HashSet;
-
 import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
 import org.apache.log4j.xml.DOMConfigurator;
@@ -66,11 +63,11 @@ public class LogUtil {
                 System.out.println
                 ("       set system property "
                          +"'-Dlog4j.configuration="
-                         +"bigdata/src/resources/logging/log4j.properties"
+                         +"file:bigdata/src/resources/logging/log4j.properties"
                          +"\n       and/or \n"
                          +"      set system property "
                          +"'-Dlog4j.primary.configuration="
-                         +"<installDir>/"
+                         +"file:<installDir>/"
                          +"bigdata/src/resources/logging/log4j.properties'");
             }
         }
