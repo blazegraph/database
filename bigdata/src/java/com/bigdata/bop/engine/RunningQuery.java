@@ -166,7 +166,7 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
      * 
      * @see RunState
      */
-    private final ReentrantLock lock;
+    private final ReentrantLock lock = new ReentrantLock();
 
     /**
      * The run state of this query and <code>null</code> unless this is the
@@ -357,10 +357,6 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
         this.query = query;
 
-        this.lock = new ReentrantLock();
-
-        this.runState = controller ? new RunState(this) : null;
-
         this.bopIndex = BOpUtility.getIndex(query);
 
         /*
@@ -368,6 +364,8 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
          */
         if (controller) {
             
+            runState = new RunState(this);
+
             statsMap = new ConcurrentHashMap<Integer, BOpStats>();
             
             for (Map.Entry<Integer, BOp> e : bopIndex.entrySet()) {
@@ -409,19 +407,12 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
         } else {
 
-            statsMap = null;
-            
-            // Note: only exists on the query controller.
-            queryBuffer = null;
-            queryIterator = null;
+            runState = null; // Note: only on the query controller.
+            statsMap = null; // Note: only on the query controller.
+            queryBuffer = null; // Note: only on the query controller.
+            queryIterator = null; // Note: only when queryBuffer is defined.
             
         }
-
-        // System.err
-        // .println("new RunningQuery:: queryId=" + queryId
-        // + ", isController=" + controller + ", queryController="
-        // + clientProxy + ", queryEngine="
-        // + queryEngine.getServiceUUID());
 
     }
 
