@@ -376,7 +376,6 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
             statsMap = null;
         }
 
-        // runStateLock = controller ? new ReentrantLock() : null;
         lock = new ReentrantLock();
 
         runState = controller ? new RunState(this) : null;
