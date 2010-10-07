@@ -51,7 +51,7 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 
 /**
- * Test suite for {@link CopyBindingSetOp}.
+ * Test suite for {@link CopyOp}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -139,7 +139,7 @@ public class TestCopyBindingSets extends TestCase2 {
 
         final int bopId = 1;
 
-        final CopyBindingSetOp query = new CopyBindingSetOp(new BOp[] {}, NV
+        final CopyOp query = new CopyOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                 new NV(BOp.Annotations.BOP_ID, bopId),//
                 }));
@@ -178,9 +178,9 @@ public class TestCopyBindingSets extends TestCase2 {
     }
     
     /**
-     * {@link Tee} is just a specialized {@link CopyBindingSetOp} which requires
+     * {@link Tee} is just a specialized {@link CopyOp} which requires
      * that the alternate sink is also specified.  Write a unit test of those
-     * semantics for {@link CopyBindingSetOp}.
+     * semantics for {@link CopyOp}.
      */
     public void test_copyToSinkAndAltSink() {
 
@@ -202,10 +202,10 @@ public class TestCopyBindingSets extends TestCase2 {
 
         final int bopId = 1;
 
-        final CopyBindingSetOp query = new CopyBindingSetOp(new BOp[] {}, NV
+        final CopyOp query = new CopyOp(new BOp[] {}, NV
                 .asMap(new NV[] {//
                         new NV(BOp.Annotations.BOP_ID, bopId),//
-                        new NV(CopyBindingSetOp.Annotations.CONSTRAINTS,
+                        new NV(CopyOp.Annotations.CONSTRAINTS,
                                 new IConstraint[] {
                                 new EQConstant(x, new Constant<String>("Mary"))
                         }),//

@@ -359,8 +359,22 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
         bopIndex = BOpUtility.getIndex(query);
 
-        statsMap = controller ? new ConcurrentHashMap<Integer, BOpStats>()
-                : null;
+        /*
+         * Setup the BOpStats object for each pipeline operator in the query.
+         */
+        if (controller) {
+            statsMap = new ConcurrentHashMap<Integer, BOpStats>();
+            for (Map.Entry<Integer, BOp> e : bopIndex.entrySet()) {
+                final int bopId = e.getKey();
+                final BOp tmp = e.getValue();
+                if ((tmp instanceof PipelineOp)) {
+                    final PipelineOp bop = (PipelineOp) tmp;
+                    statsMap.put(bopId, bop.newStats());
+                }
+            }
+        } else {
+            statsMap = null;
+        }
 
         // runStateLock = controller ? new ReentrantLock() : null;
         lock = new ReentrantLock();
@@ -738,20 +752,59 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
             final IChunkMessage<IBindingSet> chunk) {
 
         // create runnable to evaluate a chunk for an operator and partition.
-        final Runnable r = new ChunkTask(chunk);
+        final ChunkTask chunkTask = new ChunkTask(chunk);
 
         // wrap runnable.
-        final FutureTask<Void> f2 = new FutureTask(r, null/* result */);
+        final FutureTask<Void> f2 = new FutureTask(chunkTask, null/* result */);
 
+        final BSBundle bundle = new BSBundle(chunk.getBOpId(), chunk
+                .getPartitionId());
+        
         // add to list of active futures for this query.
-        operatorFutures.put(new BSBundle(chunk.getBOpId(), chunk
-                .getPartitionId()), f2);
+        if (operatorFutures.put(bundle, f2) != null) {
+            /*
+             * FIXME This indicates that we have more than one future for the
+             * same (bopId,shardId). When this is true we are losing track of
+             * with the consequence that we can not properly cancel them.
+             * Instead of losing track like this, we should be targeting the
+             * running operator instance with the new chunk. This needs to be
+             * done atomically.
+             */
+//            throw new AssertionError();
+        }
 
         // return : caller will execute.
         return f2;
 
     }
 
+    /*
+     * @todo Possible class to give us more information about a running operator
+     * so we can attach a new chunk to the source for a running instance. An
+     * alternative is to attach the same sinks to each instance of the operator,
+     * but then we get into trouble with the operator implementations which will
+     * close their sinks when they get to the bottom of their processing loop.
+     */
+//    private static class RunningFutureContext {
+//
+//        private final Future<Void> f;
+//        private final BOpContext<IBindingSet> context;
+//        private final ChunkTask chunkTask;
+//
+//        public RunningFutureContext(final Future<Void> f,
+//                final BOpContext<IBindingSet> context, final ChunkTask chunkTask) {
+//            this.f = f;
+//            this.context = context;
+//            this.chunkTask = chunkTask;
+//        }
+//        
+//        public void addMessage(final IChunkMessage<IBindingSet> msg) {
+//            context.getSource();
+//            throw new UnsupportedOperationException();
+//        }
+//        
+//    }
+    
     /**
      * Runnable evaluates an operator for some chunk of inputs. In scale-out,
      * the operator may be evaluated against some partition of a scale-out
@@ -905,19 +958,30 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
              * Note: RunState#haltOp() avoids adding a BOpStats object to itself
              * since that would cause double counting when the same object is
              * used for each invocation of the operator.
+             * 
+             * @todo If we always pass in a shared stats object then we will
+             * have live reporting on all instances of the task evaluating each
+             * operator in the query but there could be more contention for the
+             * counters. However, if we chain the operators together then we are
+             * likely to run one task instance per operator, at least in
+             * standalone.  Try it w/ always shared and see if there is a hot
+             * spot?
              */
             final BOpStats stats;
             if (((PipelineOp) bop).isSharedState()) {
-                final BOpStats foo = op.newStats();
-                final BOpStats bar = statsMap.putIfAbsent(bopId, foo);
-                stats = (bar == null ? foo : bar);
+//                final BOpStats foo = op.newStats();
+//                final BOpStats bar = statsMap.putIfAbsent(bopId, foo);
+//                stats = (bar == null ? foo : bar);
+                stats = statsMap.get(bopId);
             } else {
                 stats = op.newStats();
             }
+            assert stats != null;
 
             sink = (p == null ? queryBuffer : op.newBuffer(stats));
 
-            altSink = altSinkId == null ? null : op.newBuffer(stats);
+            altSink = altSinkId == null ? null
+                    : altSinkId.equals(sinkId) ? sink : op.newBuffer(stats);
 
             // context : @todo pass in IChunkMessage or IChunkAccessor
             context = new BOpContext<IBindingSet>(RunningQuery.this,
@@ -945,7 +1009,7 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
             Integer sink;
 
-            // Explictly specified sink?
+            // Explicitly specified sink?
             sink = (Integer) bop.getProperty(PipelineOp.Annotations.SINK_REF);
 
             if (sink == null) {
@@ -955,7 +1019,7 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
                 }
                 // The parent is the sink.
                 sink = (Integer) p
-                        .getRequiredProperty(PipelineOp.Annotations.BOP_ID);
+                        .getRequiredProperty(BOp.Annotations.BOP_ID);
             }
 
             return sink;

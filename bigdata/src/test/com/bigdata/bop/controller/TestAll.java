@@ -21,13 +21,14 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.bop.eval;
+package com.bigdata.bop.controller;
 
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
+import com.bigdata.bop.controller.JoinGraph;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlan2;
 
@@ -68,7 +69,16 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("query optimization/evaluation");
+        final TestSuite suite = new TestSuite("controller operators");
+
+        // test UNION
+        suite.addTestSuite(TestUnion.class);
+
+        // test STEPS
+//        suite.addTestSuite(TestUnion.class);
+
+        // @todo test STAR (transitive closure).
+//        suite.addTestSuite(TestStar.class);
 
         suite.addTestSuite(TestJoinGraph.class);
 

@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -35,9 +36,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.BOp.Annotations;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.AbstractNode;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.relation.accesspath.IBlockingBuffer;
 
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.Filter;
@@ -52,7 +57,7 @@ import cutthecrap.utils.striterators.Striterator;
  */
 public class BOpUtility {
 
-//    private static final Logger log = Logger.getLogger(BOpUtility.class);
+    private static final Logger log = Logger.getLogger(BOpUtility.class);
     
     /**
      * Pre-order recursive visitation of the operator tree (arguments only, no
@@ -468,9 +473,51 @@ public class BOpUtility {
 
     }
 
+    /**
+     * Return the left-deep child of the operator, halting at a leaf or earlier
+     * if a control operator is found.
+     * 
+     * @param op
+     *            The operator.
+     * 
+     * @return The child where pipeline evaluation should begin.
+     * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     * 
+     * @todo This does not protect against loops in the operator tree.
+     * 
+     * @todo unit tests.
+     */
+    static public BOp getPipelineStart(BOp op) {
+
+        if (op == null)
+            throw new IllegalArgumentException();
+
+        while (true) {
+            if (op.getProperty(BOp.Annotations.CONTROLLER,
+                    BOp.Annotations.DEFAULT_CONTROLLER)) {
+                // Halt at a control operator.
+                return op;
+            }
+            if(op.arity()==0) {
+                // No children.
+                return op;
+            }
+            final BOp left = op.get(0);
+            if (left == null) {
+                // Halt at a leaf.
+                return op;
+            }
+            // Descend through the left child.
+            op = left;
+        }
+
+    }
 
     /**
-     * Combine chunks drawn from an iterator into a single chunk.
+     * Combine chunks drawn from an iterator into a single chunk. This is useful
+     * when materializing intermediate results for an all-at-once operator.
      * 
      * @param itr
      *            The iterator
@@ -511,20 +558,34 @@ public class BOpUtility {
         }
 
         if (nchunks == 0) {
+
             return new IBindingSet[0];
+            
         } else if (nchunks == 1) {
+            
             return list.get(0);
+            
         } else {
+            
             int n = 0;
+            
             final IBindingSet[] a = new IBindingSet[nelements];
+            
             final Iterator<IBindingSet[]> itr2 = list.iterator();
+            
             while (itr2.hasNext()) {
+            
                 final IBindingSet[] t = itr2.next();
+                
                 System.arraycopy(t/* src */, 0/* srcPos */, a/* dest */,
                         n/* destPos */, t.length/* length */);
+                
                 n += t.length;
+            
             }
+
             return a;
+
         }
 
     } // toArray()
@@ -617,5 +678,161 @@ public class BOpUtility {
 //        throw new UnsupportedOperationException();
 //
 //    }
+
+    /**
+     * Check constraints.
+     * 
+     * @param constraints
+     * @param bindingSet
+     * 
+     * @return <code>true</code> iff the constraints are satisfied.
+     */
+    static public boolean isConsistent(final IConstraint[] constraints,
+            final IBindingSet bindingSet) {
+
+        for (int i = 0; i < constraints.length; i++) {
+
+            final IConstraint constraint = constraints[i];
+
+            if (!constraint.accept(bindingSet)) {
+
+                if (log.isDebugEnabled()) {
+
+                    log.debug("Rejected by "
+                            + constraint.getClass().getSimpleName() + " : "
+                            + bindingSet);
+
+                }
+
+                return false;
+
+            }
+
+            if (log.isTraceEnabled()) {
+
+                log.debug("Accepted by "
+                        + constraint.getClass().getSimpleName() + " : "
+                        + bindingSet);
+
+            }
+
+        }
+
+        return true;
+
+    }
+    
+    /**
+     * Copy binding sets from the source to the sink(s).
+     * 
+     * @param source
+     *            The source.
+     * @param sink
+     *            The sink (required).
+     * @param sink2
+     *            Another sink (optional).
+     * @param constraints
+     *            Binding sets which fail these constraints will NOT be copied
+     *            (optional).
+     * @param stats
+     *            The {@link BOpStats#chunksIn} and {@link BOpStats#unitsIn}
+     *            will be updated during the copy (optional).
+     */
+    static public void copy(
+            final IAsynchronousIterator<IBindingSet[]> source,
+            final IBlockingBuffer<IBindingSet[]> sink,
+            final IBlockingBuffer<IBindingSet[]> sink2,
+            final IConstraint[] constraints, final BOpStats stats) {
+
+        while (source.hasNext()) {
+
+            final IBindingSet[] chunk = source.next();
+
+            if (stats != null) {
+
+                stats.chunksIn.increment();
+
+                stats.unitsIn.add(chunk.length);
+
+            }
+
+            // apply optional constraints.
+            final IBindingSet[] tmp = applyConstraints(chunk,constraints);
+            
+//            System.err.println("Copying: "+Arrays.toString(tmp));
+            
+            // copy accepted binding sets to the default sink.
+            sink.add(tmp);
+            
+            if (sink2 != null) {
+                // copy accepted binding sets to the alt sink.
+                sink2.add(tmp);
+            }
+            
+        }
+        
+    }
+
+    /**
+     * Return a dense array containing only those {@link IBindingSet}s which
+     * satisfy the constraints.
+     * 
+     * @param chunk
+     *            A chunk of binding sets.
+     * @param constraints
+     *            The constraints (optional).
+     *            
+     * @return The dense chunk of binding sets.
+     */
+    static private IBindingSet[] applyConstraints(final IBindingSet[] chunk,
+            final IConstraint[] constraints) {
+
+        if (constraints == null) {
+
+            /*
+             * No constraints, copy all binding sets.
+             */
+
+            return chunk;
+
+        }
+
+        /*
+         * Copy binding sets which satisfy the constraint(s).
+         */
+
+        IBindingSet[] t = new IBindingSet[chunk.length];
+
+        int j = 0;
+
+        for (int i = 0; i < chunk.length; i++) {
+
+            final IBindingSet bindingSet = chunk[i];
+
+            if (BOpUtility.isConsistent(constraints, bindingSet)) {
+
+                t[j++] = bindingSet;
+
+            }
+
+        }
+
+        if (j != chunk.length) {
+
+            // allocate exact size array.
+            final IBindingSet[] tmp = (IBindingSet[]) java.lang.reflect.Array
+                    .newInstance(chunk[0].getClass(), j);
+
+            // make a dense copy.
+            System.arraycopy(t/* src */, 0/* srcPos */, tmp/* dst */,
+                    0/* dstPos */, j/* len */);
+
+            t = tmp;
+
+        }
+
+        return t;
+
+    }
 
 }

@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 16, 2010
  */
 
-package com.bigdata.bop.eval;
+package com.bigdata.bop.controller;
 
 import java.io.Serializable;
 import java.util.LinkedList;

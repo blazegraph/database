@@ -28,8 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.engine;
 
 import java.rmi.RemoteException;
+import java.text.DateFormat;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -88,29 +90,6 @@ class RunState {
      * Message if a query deadline has been exceeded.
      */
     static private final transient String ERR_DEADLINE = "Query deadline is expired.";
-
-    /**
-     * {@link RunningQuery#handleOutputChunk(BOp, int, IBlockingBuffer)} drops
-     * {@link IChunkMessage}s onto {@link RunningQuery#chunksIn} and drops the
-     * {@link RunningQuery} on {@link QueryEngine#runningQueries} as soon as
-     * output {@link IChunkMessage}s are generated. A {@link IChunkMessage} MAY
-     * be taken for evaluation as soon as it is published. This means that the
-     * operator which will consume that {@link IChunkMessage} can begin to
-     * execute <em>before</em> {@link RunningQuery#haltOp(HaltOpMessage)} is
-     * invoked to indicate the end of the operator which produced that
-     * {@link IChunkMessage}.
-     * <p>
-     * This is all fine. However, due to the potential overlap in these
-     * schedules {@link RunState#totalAvailableCount} can become transiently
-     * negative. This flag disables asserts which would otherwise fail on legal
-     * transient negatives.
-     */
-    static private final boolean availableMessageCountMayBeNegative = true;
-    
-    /**
-     * Flag may be used to turn on stderr output.
-     */
-    static private final boolean debug = true;
     
     /**
      * The query.
@@ -129,7 +108,13 @@ class RunState {
     private final UUID queryId;
 
     /**
-     * The query deadline.
+     * The timestamp when the {@link RunState} was created (millseconds since
+     * the epoch).
+     */
+    private final long begin;
+    
+    /**
+     * The query deadline (milliseconds since the epoch).
      * 
      * @see BOp.Annotations#TIMEOUT
      * @see RunningQuery#getDeadline()
@@ -165,6 +150,18 @@ class RunState {
      * The #of {@link IChunkMessage} for the query which a running task has made
      * available but which have not yet been accepted for processing by another
      * task.
+     * <p>
+     * Note: {@link RunningQuery#handleOutputChunk(BOp, int, IBlockingBuffer)}
+     * drops {@link IChunkMessage}s onto {@link RunningQuery#chunksIn} and drops
+     * the {@link RunningQuery} on {@link QueryEngine#runningQueries} as soon as
+     * output {@link IChunkMessage}s are generated. A {@link IChunkMessage} MAY
+     * be taken for evaluation as soon as it is published. This means that the
+     * operator which will consume that {@link IChunkMessage} can begin to
+     * execute <em>before</em> {@link RunningQuery#haltOp(HaltOpMessage)} is
+     * invoked to indicate the end of the operator which produced that
+     * {@link IChunkMessage}. Due to the potential overlap in these schedules
+     * {@link RunState#totalAvailableCount} may be <em>transiently negative</em>
+     * . This is the expected behavior.
      */
     private final AtomicLong totalAvailableCount = new AtomicLong();
 
@@ -301,6 +298,8 @@ class RunState {
 
         this.bopIndex = bopIndex;
 
+        this.begin = System.currentTimeMillis();
+        
     }
 
     /**
@@ -349,7 +348,8 @@ class RunState {
             } catch (RemoteException ex) {
                 throw new AssertionError(ex);
             }
-            TableLog.tableLog.info("\n\nqueryId=" + queryId + "\n");
+//            TableLog.tableLog.info("\n\nqueryId=" + queryId + "\n");
+            
             TableLog.tableLog.info(getTableHeader());
             TableLog.tableLog.info(getTableRow("startQ", serviceId, msg
                     .getBOpId(), -1/* shardId */, 1/* fanIn */,
@@ -601,33 +601,14 @@ class RunState {
      */
     private void messagesConsumed(final int bopId, final int nmessages) {
 
-        final long available = totalAvailableCount.addAndGet(-nmessages);
+        totalAvailableCount.addAndGet(-nmessages);
 
-        assert availableMessageCountMayBeNegative || available >= 0 : "available="
-                + available
-                + " :: runState="
-                + this
-                + ", nmessages="
-                + nmessages;
+        AtomicLong n = availableMap.get(bopId);
 
-        {
+        if (n == null)
+            availableMap.put(bopId, n = new AtomicLong());
 
-            AtomicLong n = availableMap.get(bopId);
-
-            if (n == null)
-                availableMap.put(bopId, n = new AtomicLong());
-
-            final long tmp = n.addAndGet(-nmessages);
-
-            assert availableMessageCountMayBeNegative || tmp >= 0 : "available="
-                    + tmp
-                    + " for bopId="
-                    + bopId
-                    + " :: runState="
-                    + this
-                    + ", nmessages=" + nmessages;
-
-        }
+        n.addAndGet(-nmessages);
 
     }
 
@@ -644,26 +625,14 @@ class RunState {
      */
     private void messagesProduced(final int targetId, final int nmessages) {
 
-        final long available = totalAvailableCount.addAndGet(nmessages);
-
-        assert availableMessageCountMayBeNegative || available >= 0 : "available="
-                + available
-                + " :: runState="
-                + this
-                + ", targetId="
-                + targetId
-                + ", nmessages=" + nmessages;
+        totalAvailableCount.addAndGet(nmessages);
 
         AtomicLong n = availableMap.get(targetId);
 
         if (n == null)
             availableMap.put(targetId, n = new AtomicLong());
 
-        final long tmp = n.addAndGet(nmessages);
-
-        assert availableMessageCountMayBeNegative || tmp >= 0 : "available="
-                + tmp + " for bopId=" + targetId + " :: runState=" + this
-                + ", targetId=" + targetId + ", nmessages=" + nmessages;
+        n.addAndGet(nmessages);
 
     }
 
@@ -703,7 +672,10 @@ class RunState {
 
         Arrays.sort(bopIds);
 
-        sb.append("step");
+        sb.append("queryId");
+        sb.append("\tbegin");
+        sb.append("\telapsed");
+        sb.append("\tstep");
         sb.append("\tlabel");
         sb.append("\tbopId");
         sb.append("\tserviceId");
@@ -766,6 +738,17 @@ class RunState {
 
         final StringBuilder sb = new StringBuilder();
 
+        final DateFormat dateFormat = DateFormat.getDateTimeInstance(
+                DateFormat.FULL, DateFormat.FULL);
+        
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        sb.append(queryId);
+        sb.append('\t');
+        sb.append(dateFormat.format(new Date(begin)));
+        sb.append('\t');
+        sb.append(elapsed);
+        sb.append('\t');
         sb.append(Long.toString(nsteps.get()));
         sb.append('\t');
         sb.append(label);

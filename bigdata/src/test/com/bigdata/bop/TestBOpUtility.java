@@ -635,8 +635,31 @@ public class TestBOpUtility extends TestCase2 {
 
     }
 
-//    public void test_verifyPipeline() {
-//        
-//    }
-    
+    /**
+     * Unit test for locating the left-deep child at which pipeline evaluation
+     * should begin.
+     */
+    public void test_getPipelineStart() {
+
+        final int aid = 0;
+        final int bid = 1;
+        final int cid = 2;
+
+        final BOp a = new BOpBase(new BOp[] {}, NV.asMap(new NV[] { new NV(
+                BOp.Annotations.BOP_ID, aid) }));
+
+        final BOp b = new BOpBase(new BOp[] {}, NV.asMap(new NV[] { new NV(
+                BOp.Annotations.BOP_ID, bid) }));
+
+        final BOp c = new BOpBase(new BOp[] { a, b }, NV
+                .asMap(new NV[] { new NV(BOp.Annotations.BOP_ID, cid) }));
+
+        assertEquals(a, BOpUtility.getPipelineStart(a));
+
+        assertEquals(b, BOpUtility.getPipelineStart(b));
+
+        assertEquals(a, BOpUtility.getPipelineStart(c));
+
+    }
+
 }

@@ -116,6 +116,8 @@ public class BOpContext<E> extends BOpContextBase {
 
     /**
      * Where to write the output of the operator.
+     * 
+     * @see PipelineOp.Annotations#SINK_REF
      */
     public final IBlockingBuffer<E[]> getSink() {
         return sink;
@@ -125,6 +127,8 @@ public class BOpContext<E> extends BOpContextBase {
      * Optional alternative sink for the output of the operator. This is used by
      * things like SPARQL optional joins to route failed joins outside of the
      * join group.
+     * 
+     * @see PipelineOp.Annotations#ALT_SINK_REF
      */
     public final IBlockingBuffer<E[]> getSink2() {
         return sink2;
@@ -180,18 +184,6 @@ public class BOpContext<E> extends BOpContextBase {
      *       When doing that, modify to automatically track the {@link BOpStats}
      *       as the <i>source</i> is consumed.
      */
-//    * @throws IllegalArgumentException
-//    *             if the <i>indexManager</i> is <code>null</code>
-//    * @throws IllegalArgumentException
-//    *             if the <i>indexManager</i> is is not a <em>local</em> index
-//    *             manager.
-//    * @throws IllegalArgumentException
-//    *             if the <i>readTimestamp</i> is {@link ITx#UNISOLATED}
-//    *             (queries may not read on the unisolated indices).
-//    * @throws IllegalArgumentException
-//    *             if the <i>writeTimestamp</i> is neither
-//    *             {@link ITx#UNISOLATED} nor a read-write transaction
-//    *             identifier.
     public BOpContext(final IRunningQuery runningQuery,final int partitionId,
             final BOpStats stats, final IAsynchronousIterator<E[]> source,
             final IBlockingBuffer<E[]> sink, final IBlockingBuffer<E[]> sink2) {
@@ -199,31 +191,12 @@ public class BOpContext<E> extends BOpContextBase {
         super(runningQuery.getFederation(), runningQuery.getIndexManager());
         
         this.runningQuery = runningQuery;
-//        if (indexManager == null)
-//            throw new IllegalArgumentException();
-//        if (indexManager instanceof IBigdataFederation<?>) {
-//            /*
-//             * This is disallowed because predicates always read on local index
-//             * objects, even in scale-out.
-//             */
-//            throw new IllegalArgumentException(
-//                    "Expecting a local index manager, not: "
-//                            + indexManager.getClass().toString());
-//        }
-//        if (readTimestamp == ITx.UNISOLATED)
-//            throw new IllegalArgumentException();
-//        if (TimestampUtility.isReadOnly(writeTimestamp))
-//            throw new IllegalArgumentException();
         if (stats == null)
             throw new IllegalArgumentException();
         if (source == null)
             throw new IllegalArgumentException();
         if (sink == null)
             throw new IllegalArgumentException();
-//        this.fed = fed; // may be null
-//        this.indexManager = indexManager;
-//        this.readTimestamp = readTimestamp;
-//        this.writeTimestamp = writeTimestamp;
         this.partitionId = partitionId;
         this.stats = stats;
         this.source = source;
@@ -266,7 +239,7 @@ public class BOpContext<E> extends BOpContextBase {
         if (constraints != null) {
 
             // verify constraint.
-            return isConsistent(constraints, bindings);
+            return BOpUtility.isConsistent(constraints, bindings);
         
         }
         
@@ -336,49 +309,6 @@ public class BOpContext<E> extends BOpContextBase {
             bindingSet.set(var, newval);
 
         }
-
-    }
-
-    /**
-     * Check constraints.
-     * 
-     * @param constraints
-     * @param bindingSet
-     * 
-     * @return <code>true</code> iff the constraints are satisfied.
-     */
-    public boolean isConsistent(final IConstraint[] constraints,
-            final IBindingSet bindingSet) {
-
-        for (int i = 0; i < constraints.length; i++) {
-
-            final IConstraint constraint = constraints[i];
-
-            if (!constraint.accept(bindingSet)) {
-
-                if (log.isDebugEnabled()) {
-
-                    log.debug("Rejected by "
-                            + constraint.getClass().getSimpleName() + " : "
-                            + bindingSet);
-
-                }
-
-                return false;
-
-            }
-
-            if (log.isTraceEnabled()) {
-
-                log.debug("Accepted by "
-                        + constraint.getClass().getSimpleName() + " : "
-                        + bindingSet);
-
-            }
-
-        }
-
-        return true;
 
     }
 
@@ -454,5 +384,41 @@ public class BOpContext<E> extends BOpContextBase {
 //                false/* reverse */);
 //
 //    }
+
+    /**
+     * Copy data from the source to the sink. The sink will be flushed and
+     * closed. The source will be closed.
+     */
+    public void copySourceToSink() {
+
+        // source.
+        final IAsynchronousIterator<IBindingSet[]> source = (IAsynchronousIterator) getSource();
+
+        // default sink
+        final IBlockingBuffer<IBindingSet[]> sink = (IBlockingBuffer) getSink();
+
+        final BOpStats stats = getStats();
+
+        try {
+
+            // copy binding sets from the source.
+            BOpUtility.copy(source, sink, null/* sink2 */,
+                    null/* constraints */, stats);
+
+            // flush the sink.
+            sink.flush();
+
+        } finally {
+
+            sink.close();
+
+            if (sink2 != null)
+                sink2.close();
+
+            source.close();
+
+        }
+
+    }
 
 }

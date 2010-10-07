@@ -33,24 +33,29 @@ import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IChunkAccessor;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 
 /**
- * This operator copies its source to its sink. Specializations exist which are
+ * This operator copies its source to its sink(s). Specializations exist which are
  * used to feed the the initial set of intermediate results into a pipeline (
  * {@link StartOp}) and which are used to replicate intermediate results to more
  * than one sink ({@link Tee}).
  * 
+ * @see Annotations#SINK_REF
+ * @see Annotations#ALT_SINK_REF
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class CopyBindingSetOp extends PipelineOp {
+public class CopyOp extends PipelineOp {
 
     /**
      * 
@@ -63,8 +68,14 @@ public class CopyBindingSetOp extends PipelineOp {
          * An optional {@link IConstraint}[] which places restrictions on the
          * legal patterns in the variable bindings.
          */
-        String CONSTRAINTS = CopyBindingSetOp.class.getName() + ".constraints";
+        String CONSTRAINTS = CopyOp.class.getName() + ".constraints";
 
+        /**
+         * An optional {@link IBindingSet}[] to be used <strong>instead</strong>
+         * of the default source.
+         */
+        String BINDING_SETS = CopyOp.class.getName() + ".bindingSets";
+        
     }
 
     /**
@@ -72,7 +83,7 @@ public class CopyBindingSetOp extends PipelineOp {
      * 
      * @param op
      */
-    public CopyBindingSetOp(CopyBindingSetOp op) {
+    public CopyOp(CopyOp op) {
         super(op);
     }
 
@@ -82,7 +93,7 @@ public class CopyBindingSetOp extends PipelineOp {
      * @param args
      * @param annotations
      */
-    public CopyBindingSetOp(BOp[] args, Map<String, Object> annotations) {
+    public CopyOp(BOp[] args, Map<String, Object> annotations) {
         super(args, annotations);
     }
 
@@ -92,6 +103,15 @@ public class CopyBindingSetOp extends PipelineOp {
     public IConstraint[] constraints() {
 
         return getProperty(Annotations.CONSTRAINTS, null/* defaultValue */);
+
+    }
+
+    /**
+     * @see Annotations#BINDING_SETS
+     */
+    public IBindingSet[] bindingSets() {
+
+        return getProperty(Annotations.BINDING_SETS, null/* defaultValue */);
 
     }
 
@@ -109,98 +129,73 @@ public class CopyBindingSetOp extends PipelineOp {
      */
     static private class CopyTask implements Callable<Void> {
 
+        private final CopyOp op;
+
         private final BOpContext<IBindingSet> context;
 
-        /**
-         * The constraint (if any) specified for the join operator.
-         */
-        final private IConstraint[] constraints;
-
-        CopyTask(final CopyBindingSetOp op,
+        CopyTask(final CopyOp op,
                 final BOpContext<IBindingSet> context) {
 
+            this.op = op;
+            
             this.context = context;
-
-            this.constraints = op.constraints();
 
         }
 
         public Void call() throws Exception {
+
+            // source.
             final IAsynchronousIterator<IBindingSet[]> source = context
                     .getSource();
+
+            // default sink
             final IBlockingBuffer<IBindingSet[]> sink = context.getSink();
+            
+            // optional altSink.
             final IBlockingBuffer<IBindingSet[]> sink2 = context.getSink2();
+            
+            final BOpStats stats = context.getStats();
+
+            final IConstraint[] constraints = op.constraints();
+
             try {
-                final BOpStats stats = context.getStats();
-                while (source.hasNext()) {
-                    final IBindingSet[] chunk = source.next();
-                    stats.chunksIn.increment();
-                    stats.unitsIn.add(chunk.length);
-                    final IBindingSet[] tmp = applyConstraints(chunk);
-                    sink.add(tmp);
-                    if (sink2 != null)
-                        sink2.add(tmp);
+
+                final IBindingSet[] bindingSets = op.bindingSets();
+
+                if (bindingSets != null) {
+
+                    // copy optional additional binding sets.
+                    BOpUtility.copy(
+                            new ThickAsynchronousIterator<IBindingSet[]>(
+                                    new IBindingSet[][] { bindingSets }), sink,
+                            sink2, constraints, stats);
+
+                } else {
+
+                    // copy binding sets from the source.
+                    BOpUtility.copy(source, sink, sink2, constraints, stats);
+
                 }
+                
+                // flush the sink.
                 sink.flush();
-                if (sink2 != null)
+                if (sink2 != null) // and the optional altSink.
                     sink2.flush();
+
+                // Done.
                 return null;
+                
             } finally {
+                
                 sink.close();
+                
                 if (sink2 != null)
                     sink2.close();
+                
                 source.close();
-            }
-        }
-
-        private IBindingSet[] applyConstraints(final IBindingSet[] chunk) {
-            
-            if (constraints == null) {
-
-                /*
-                 * No constraints, copy all binding sets.
-                 */
-                
-                return chunk;
-                
-            }
-            
-            /*
-             * Copy binding sets which satisfy the constraint(s).
-             */
-            
-            IBindingSet[] t = new IBindingSet[chunk.length];
-            
-            int j = 0;
-            
-            for (int i = 0; i < chunk.length; i++) {
-            
-                final IBindingSet bindingSet = chunk[i];
-                
-                if (context.isConsistent(constraints, bindingSet)) {
-                
-                    t[j++] = bindingSet;
-                    
-                }
                 
             }
 
-            if (j != chunk.length) {
-
-                // allocate exact size array.
-                final IBindingSet[] tmp = (IBindingSet[]) java.lang.reflect.Array
-                        .newInstance(chunk[0].getClass(), j);
-
-                // make a dense copy.
-                System.arraycopy(t/* src */, 0/* srcPos */, tmp/* dst */,
-                        0/* dstPos */, j/* len */);
-
-                t = tmp;
-
-            }
-
-            return t;
-            
         }
 
     } // class CopyTask

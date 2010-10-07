@@ -182,15 +182,15 @@ public class Haltable<V> implements Future<V> {
      * Return unless processing has been halted. The method should be invoked
      * from within the execution of the process itself so that it may notice
      * asynchronous termination. It will throw out the wrapper first cause if
-     * the process is halted. The method is <code>protected</code> since the
-     * semantics are those of testing for unexpected termination of the process
-     * from within the process. External processes should use {@link #isDone()}.
+     * the process is halted. External processes waiting on the {@link Future}
+     * interface should use {@link #isDone()} which does not have the semantics
+     * of asserting that the process should still be running.
      * 
      * @throws RuntimeException
      *             wrapping the {@link #firstCause} iff processing has been
      *             halted.
      */
-    final protected void halted() {
+    final public void halted() {
 
         if (halt) {
             if (firstCause == null) {
