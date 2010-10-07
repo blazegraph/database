@@ -147,10 +147,10 @@ public class NV implements Serializable, Comparable<NV> {
      * 
      * @param a
      *            The array.
-     *            
+     * 
      * @return The map.
      */
-    static public Map<String, Object> asMap(final NV[] a) {
+    static public Map<String, Object> asMap(final NV... a) {
 
         final Map<String, Object> tmp = new LinkedHashMap<String, Object>(
                 a.length);
@@ -162,7 +162,7 @@ public class NV implements Serializable, Comparable<NV> {
         }
 
         return tmp;
-        
+
     }
 
 }

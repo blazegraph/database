@@ -22,38 +22,38 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Sep 2, 2010
+ * Created on Aug 18, 2010
  */
 
-package com.bigdata.bop.bset;
+package com.bigdata.bop.controller;
 
-import com.bigdata.bop.bset.Union;
+import com.bigdata.bop.controller.JoinGraph;
 
 import junit.framework.TestCase2;
 
 /**
- * Test suite for {@link Union}.
+ * Unit tests for runtime query optimization using {@link JoinGraph}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestUnionBindingSets extends TestCase2 {
+public class TestJoinGraph extends TestCase2 {
 
     /**
      * 
      */
-    public TestUnionBindingSets() {
+    public TestJoinGraph() {
     }
 
     /**
      * @param name
      */
-    public TestUnionBindingSets(String name) {
+    public TestJoinGraph(String name) {
         super(name);
     }
 
-    public void test_unionBindingSets() {
-
+    public void test_something() {
+     
         fail("write tests");
         
     }

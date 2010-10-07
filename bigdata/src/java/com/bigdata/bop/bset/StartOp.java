@@ -5,10 +5,10 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 
 /**
- * A version of {@link CopyBindingSetOp} which is always evaluated on the query
+ * A version of {@link CopyOp} which is always evaluated on the query
  * controller.
  */
-public class StartOp extends CopyBindingSetOp {
+public class StartOp extends CopyOp {
 
 	/**
 	 * 

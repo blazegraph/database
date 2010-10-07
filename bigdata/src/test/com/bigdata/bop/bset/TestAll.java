@@ -24,6 +24,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.bset;
 
 
+import com.bigdata.bop.controller.TestUnion;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -66,9 +68,6 @@ public class TestAll extends TestCase {
 
         // test conditional routing of binding sets in a pipeline.
         suite.addTestSuite(TestConditionalRoutingOp.class);
-
-        // test distinct operator for binding sets.
-        suite.addTestSuite(TestUnionBindingSets.class);
 
         return suite;
         

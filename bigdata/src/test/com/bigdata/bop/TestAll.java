@@ -102,7 +102,7 @@ public class TestAll extends TestCase {
         suite.addTest(com.bigdata.bop.engine.TestAll.suite());
 
         // high level query optimization and evaluation.
-        suite.addTest(com.bigdata.bop.eval.TestAll.suite());
+        suite.addTest(com.bigdata.bop.controller.TestAll.suite());
 
         /*
          * Note: This is tested later once we have gone through the core unit

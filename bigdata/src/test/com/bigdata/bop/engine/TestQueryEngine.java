@@ -39,6 +39,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.TestCase2;
 
@@ -1693,17 +1694,31 @@ public class TestQueryEngine extends TestCase2 {
 
         try {
 
-            // Populate a map that we will use to realize the match and
-            // selection without replacement logic.
+            /*
+             * Populate a map that we will use to realize the match and
+             * selection without replacement logic. The map uses counters to
+             * handle duplicate keys. This makes it possible to write tests in
+             * which two or more binding sets which are "equal" appear.
+             */
 
             final int nrange = expected.length;
 
-            final java.util.Map<T, T> range = new java.util.HashMap<T, T>();
+            final java.util.Map<T, AtomicInteger> range = new java.util.LinkedHashMap<T, AtomicInteger>();
 
             for (int j = 0; j < nrange; j++) {
 
-                range.put(expected[j], expected[j]);
+                AtomicInteger count = range.get(expected[j]);
 
+                if (count == null) {
+
+                    count = new AtomicInteger();
+
+                }
+
+                range.put(expected[j], count);
+
+                count.incrementAndGet();
+                
             }
 
             // Do selection without replacement for the objects visited by
@@ -1721,13 +1736,20 @@ public class TestQueryEngine extends TestCase2 {
 
                 final T actualObject = actual.next();
 
-                if (range.remove(actualObject) == null) {
+                if (log.isInfoEnabled())
+                    log.info("visting: " + actualObject);
+
+                AtomicInteger counter = range.get(actualObject);
+
+                if (counter == null || counter.get() == 0) {
 
                     fail("Object not expected" + ": index=" + j + ", object="
                             + actualObject);
 
                 }
 
+                counter.decrementAndGet();
+                
             }
 
             if (actual.hasNext()) {

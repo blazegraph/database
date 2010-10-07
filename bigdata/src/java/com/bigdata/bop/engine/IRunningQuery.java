@@ -56,6 +56,11 @@ public interface IRunningQuery {
     IIndexManager getIndexManager();
 
     /**
+     * The query engine.  This may be used to submit subqueries for evaluation.
+     */
+    QueryEngine getQueryEngine();
+    
+    /**
      * Cancel the running query (normal termination).
      * <p>
      * Note: This method provides a means for an operator to indicate that the

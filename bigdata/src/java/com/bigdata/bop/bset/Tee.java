@@ -32,6 +32,7 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.rdf.rules.TMUtility;
 import com.bigdata.relation.RelationFusedView;
@@ -87,7 +88,7 @@ import com.bigdata.relation.rule.Slice;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Tee extends CopyBindingSetOp {
+public class Tee extends CopyOp {
 
     /**
      * 

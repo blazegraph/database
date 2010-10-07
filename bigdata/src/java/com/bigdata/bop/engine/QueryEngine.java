@@ -44,12 +44,16 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
@@ -674,19 +678,61 @@ public class QueryEngine implements IQueryPeer, IQueryClient {
     }
 
     /**
-     * Evaluate a query which visits {@link IBindingSet}s, such as a join. This
-     * node will serve as the controller for the query.
+     * Return an {@link IAsynchronousIterator} that will read a single, empty
+     * {@link IBindingSet}.
+     * 
+     * @param bindingSet
+     *            the binding set.
+     */
+    private ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+            final IBindingSet bindingSet) {
+
+        return new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { new IBindingSet[] { bindingSet } });
+
+    }
+
+    /**
+     * Evaluate a query. This node will serve as the controller for the query.
+     * 
+     * @param query
+     *            The query to evaluate.
+     * 
+     * @return The {@link IRunningQuery}.
+     * 
+     * @throws IllegalStateException
+     *             if the {@link QueryEngine} has been {@link #shutdown()}.
+     * @throws Exception
+     */
+    public RunningQuery eval(final BOp op) throws Exception {
+        
+        final BOp startOp = BOpUtility.getPipelineStart(op);
+
+        final int startId = startOp.getId();
+        
+        final UUID queryId = UUID.randomUUID();
+
+        return eval(queryId, (PipelineOp) op,
+                new LocalChunkMessage<IBindingSet>(this/* queryEngine */,
+                        queryId, startId, -1 /* partitionId */,
+                        newBindingSetIterator(new HashBindingSet())));
+
+    }
+
+    /**
+     * Evaluate a query. This node will serve as the controller for the query.
+     * The {@link IBindingSet}s made available by the {@link IChunkMessage} will
+     * be pushed into the query.
      * 
      * @param queryId
      *            The unique identifier for the query.
      * @param query
      *            The query to evaluate.
-     * 
-     * @return An iterator visiting {@link IBindingSet}s which result from
-     *         evaluating the query.
      * @param msg
      *            A message providing access to the initial {@link IBindingSet
      *            binding set(s)} used to begin query evaluation.
+     * 
+     * @return The {@link IRunningQuery}.
      * 
      * @throws IllegalStateException
      *             if the {@link QueryEngine} has been {@link #shutdown()}.

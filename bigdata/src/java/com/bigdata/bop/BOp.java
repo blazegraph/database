@@ -234,6 +234,8 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
          * {@link Annotations#TIMESTAMP} associated with that operation.
          * 
          * @see #TIMESTAMP
+         * 
+         * @todo Move to {@link IPredicate}?
          */
         String MUTATION = BOp.class.getName() + ".mutation";
 
@@ -244,6 +246,8 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
          * reads or writes on the database (no default).
          * 
          * @see #MUTATION
+         * 
+         * @todo Move to {@link IPredicate}?
          */
         String TIMESTAMP = BOp.class.getName() + ".timestamp";
 
@@ -255,6 +259,18 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
 
         BOpEvaluationContext DEFAULT_EVALUATION_CONTEXT = BOpEvaluationContext.ANY;
 
+        /**
+         * A boolean annotation whose value indicates whether or not this is a
+         * control operator (default {@value #DEFAULT_CONTROLLER}). A control
+         * operator is an operator which will issue subqueries for its
+         * arguments. Thus control operators mark a boundary in pipelined
+         * evaluation. Some examples of control operators include UNION, STEPS,
+         * and STAR (aka transitive closure).
+         */
+        String CONTROLLER = BOp.class.getName()+".controller";
+        
+        boolean DEFAULT_CONTROLLER = false;
+        
         /**
          * For hash partitioned operators, this is the set of the member nodes
          * for the operator.

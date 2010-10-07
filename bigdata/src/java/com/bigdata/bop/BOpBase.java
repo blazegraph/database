@@ -610,6 +610,8 @@ public class BOpBase implements BOp {
      * long gone. The problem with specifying a hashCode() and equals() method
      * for BOp/BOpBase/Predicate is that we wind up with duplicate bop
      * exceptions being reported by BOpUtility#getIndex(BOp).
+     * 
+     * Note: Both Var and Constant override hashCode() and equals().
      */
     
 //    /**
