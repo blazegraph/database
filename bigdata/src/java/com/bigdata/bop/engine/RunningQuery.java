@@ -357,63 +357,64 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
         this.query = query;
 
-        bopIndex = BOpUtility.getIndex(query);
+        this.lock = new ReentrantLock();
+
+        this.runState = controller ? new RunState(this) : null;
+
+        this.bopIndex = BOpUtility.getIndex(query);
 
         /*
          * Setup the BOpStats object for each pipeline operator in the query.
          */
         if (controller) {
+            
             statsMap = new ConcurrentHashMap<Integer, BOpStats>();
+            
             for (Map.Entry<Integer, BOp> e : bopIndex.entrySet()) {
+            
                 final int bopId = e.getKey();
+                
                 final BOp tmp = e.getValue();
+                
                 if ((tmp instanceof PipelineOp)) {
+                    
                     final PipelineOp bop = (PipelineOp) tmp;
+                
                     statsMap.put(bopId, bop.newStats());
+                    
                 }
             }
-        } else {
-            statsMap = null;
-        }
 
-        lock = new ReentrantLock();
-
-        runState = controller ? new RunState(this) : null;
-
-        if (controller) {
-
-            final BOpStats queryStats = query.newStats();
-
-            statsMap.put((Integer) query
-                    .getRequiredProperty(BOp.Annotations.BOP_ID), queryStats);
+//            final BOpStats queryStats = query.newStats();
+//
+//            statsMap.put((Integer) query
+//                    .getRequiredProperty(BOp.Annotations.BOP_ID), queryStats);
 
             if (!query.isMutation()) {
 
+                final BOpStats queryStats = statsMap.get(query.getId());
+
                 queryBuffer = query.newBuffer(queryStats);
+
+                queryIterator = new QueryResultIterator<IBindingSet[]>(this,
+                        queryBuffer.iterator());
 
             } else {
 
                 // Note: Not used for mutation queries.
                 queryBuffer = null;
+                queryIterator = null;
 
             }
 
         } else {
 
+            statsMap = null;
+            
             // Note: only exists on the query controller.
             queryBuffer = null;
-
-        }
-
-        if (queryBuffer == null) {
-
             queryIterator = null;
-
-        } else {
-
-            queryIterator = new QueryResultIterator<IBindingSet[]>(this,
-                    queryBuffer.iterator());
-
+            
         }
 
         // System.err
