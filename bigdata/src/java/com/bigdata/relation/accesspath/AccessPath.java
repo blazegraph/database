@@ -354,7 +354,7 @@ public class AccessPath<R> implements IAccessPath<R> {
         } else {
             if (localIndexManager == null) {
                 throw new RuntimeException("Local index manager not given but"
-                        + "access path specifies local index.");
+                        + " access path specifies local index: pred="+predicate);
             }
             this.indexManager = localIndexManager;
         }
