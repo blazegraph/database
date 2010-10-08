@@ -1784,7 +1784,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
                 
                 for(Future f : futures) {
                 
-                    if(f.isDone()) {
+                    if(f.isDone()&&!f.isCancelled()) {
                         // all tasks that complete should have done so without error.
                         f.get();
                     }
