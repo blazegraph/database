@@ -670,15 +670,13 @@ public class Rule2BOpUtility {
             if (scaleOut) {
                 anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.SHARDED));
-                anns
-                        .add(new NV(Predicate.Annotations.REMOTE_ACCESS_PATH,
-                                false));
+                pred = (Predicate) pred.setProperty(
+                        Predicate.Annotations.REMOTE_ACCESS_PATH, false);
             } else {
                 anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.ANY));
-                anns
-                        .add(new NV(Predicate.Annotations.REMOTE_ACCESS_PATH,
-                                false));
+                pred = (Predicate) pred.setProperty(
+                        Predicate.Annotations.REMOTE_ACCESS_PATH, false);
             }
 
             return new PipelineJoin(new BOp[] { dataSetJoin, pred }, anns
@@ -905,15 +903,13 @@ public class Rule2BOpUtility {
             if (scaleOut) {
                 anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.ANY));
-                anns
-                        .add(new NV(Predicate.Annotations.REMOTE_ACCESS_PATH,
-                                true));
+                pred = (Predicate) pred.setProperty(
+                        Predicate.Annotations.REMOTE_ACCESS_PATH, false);
             } else {
                 anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.ANY));
-                anns
-                        .add(new NV(Predicate.Annotations.REMOTE_ACCESS_PATH,
-                                false));
+                pred = (Predicate) pred.setProperty(
+                        Predicate.Annotations.REMOTE_ACCESS_PATH, false);
             }
             
             return new PipelineJoin(new BOp[] { left, pred }, anns
