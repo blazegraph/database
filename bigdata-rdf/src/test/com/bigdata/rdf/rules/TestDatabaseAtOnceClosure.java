@@ -619,12 +619,15 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
                         String baseURI;
 
                         try {
+                        	
+                        	System.out.println("looking for "  + resource);
 
                             is = new FileInputStream(new File(resource));
                             baseURI = new File(resource).toURI().toString();
 
                         } catch (FileNotFoundException ex) {
 
+                        	System.out.println("no file, retrieving from resource");
                             is = getClass().getResourceAsStream(resource);
                             baseURI = getClass().getResource(resource).toURI()
                                     .toString();

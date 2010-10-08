@@ -1411,6 +1411,9 @@ abstract public class WriteCacheService implements IWriteCache {
             log.trace("offset: " + offset + ", length: " + data.limit()
                     + ", chk=" + chk + ", useChecksum=" + useChecksum);
         }
+        
+        if (!open)
+        	throw new IllegalStateException("WriteCacheService has been closed");
 
         if (offset < 0)
             throw new IllegalArgumentException();
@@ -1907,6 +1910,8 @@ abstract public class WriteCacheService implements IWriteCache {
              * Not open. Return [null] rather than throwing an exception per the
              * contract for this implementation.
              */
+        	log.warn("Reading from closed writeCacheService");
+        	
             return null;
 
         }
