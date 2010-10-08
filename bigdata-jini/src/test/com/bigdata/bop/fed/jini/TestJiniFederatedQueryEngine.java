@@ -467,8 +467,8 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
                         .asMap(new NV[] {//
                                 new NV(Predicate.Annotations.RELATION_NAME,
                                         new String[] { namespace }),//
-//                                new NV(Predicate.Annotations.KEY_ORDER,
-//                                        R.primaryKeyOrder),//
+                                // Note: local access path!
+                                new NV( Predicate.Annotations.REMOTE_ACCESS_PATH,false),
                                 new NV(Predicate.Annotations.BOP_ID, predId),//
                                 new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                         })),
@@ -643,6 +643,8 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
                 .asMap(new NV[] {//
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
+                        // Note: local access path!
+                        new NV( Predicate.Annotations.REMOTE_ACCESS_PATH,false),
                         new NV(Predicate.Annotations.BOP_ID, predId1),//
                         new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
@@ -652,6 +654,8 @@ public class TestJiniFederatedQueryEngine extends TestCase2 {
                 .asMap(new NV[] {//
                         new NV(Predicate.Annotations.RELATION_NAME,
                                 new String[] { namespace }),//
+                        // Note: local access path!
+                        new NV( Predicate.Annotations.REMOTE_ACCESS_PATH,false),
                         new NV(Predicate.Annotations.BOP_ID, predId2),//
                         new NV(Predicate.Annotations.TIMESTAMP, ITx.READ_COMMITTED),//
                 }));
