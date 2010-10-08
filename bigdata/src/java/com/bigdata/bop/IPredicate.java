@@ -48,6 +48,7 @@ import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.eval.IEvaluationPlan;
 import com.bigdata.relation.rule.eval.pipeline.JoinMasterTask;
+import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.striterator.IKeyOrder;
 
 import cutthecrap.utils.striterators.FilterBase;
@@ -194,36 +195,46 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
         int DEFAULT_PARTITION_ID = -1;
 
         /**
-         * Boolean option determines whether the predicate will use a local
-         * access path or a remote access path (default
+         * Boolean option determines whether the predicate will use a data
+         * service local access path (partitioned index view) or a remote access
+         * path (global index view) (default
          * {@value #DEFAULT_REMOTE_ACCESS_PATH}).
          * <p>
-         * <em>Local access paths</em> are much more efficient and should be
-         * used for most purposes. However, it is not possible to impose certain
-         * kinds of filters on a sharded or hash partitioned operations across
-         * local access paths. In particular, a DISTINCT filter can not be
-         * imposed using sharded or hash partitioned.
+         * Note: "Remote" has the semantics that the access path has a total
+         * view of the index. In scale-out this is achieved using RMI and an
+         * {@link IClientIndex}. "Local" has the semantics that the access path
+         * has a partitioned view of the index. In scale-out, this corresponds
+         * to a shard. In standalone, there is no difference between "local" and
+         * "remote" index views since the indices are not partitioned.
          * <p>
-         * When the access path is local, the parent operator must be annotated
-         * to use a {@link BOpEvaluationContext#SHARDED shard wise} or
-         * {@link BOpEvaluationContext#HASHED node-wise} mapping of the binding
-         * sets.
+         * Local access paths (in scale-out) are much more efficient and should
+         * be used for most purposes. However, it is not possible to impose
+         * certain kinds of filters on a partitioned index. For example, a
+         * DISTINCT filter requires a global index view.
          * <p>
-         * <em>Remote access paths</em> use a scale-out index view. This view
-         * makes the scale-out index appear as if it were monolithic rather than
-         * sharded or hash partitioned. The monolithic view of a scale-out index
-         * can be used to impose a DISTINCT filter since all tuples will flow
-         * back to the caller.
+         * When the access path is local (aka partitioned), the parent operator
+         * must be annotated to use a {@link BOpEvaluationContext#SHARDED shard
+         * wise} or {@link BOpEvaluationContext#HASHED node-wise} mapping of the
+         * binding sets.
          * <p>
-         * When the access path is remote, the parent operator should use
+         * Remote access paths (in scale-out) use a scale-out index view. This
+         * view makes the scale-out index appear as if it were monolithic rather
+         * than partitioned. The monolithic view of a scale-out index can be
+         * used to impose a DISTINCT filter since all tuples will flow back to
+         * the caller.
+         * <p>
+         * When the access path is remote the parent operator should use
          * {@link BOpEvaluationContext#ANY} to prevent the binding sets from
-         * being moved around when the access path is remote.
+         * being moved around when the access path is remote. Note that the
+         * {@link BOpEvaluationContext} is basically ignored for standalone
+         * since there is only one place for the operator to run - on the query
+         * controller.
          * 
          * @see BOpEvaluationContext
          */
         String REMOTE_ACCESS_PATH = "remoteAccessPath";
         
-        boolean DEFAULT_REMOTE_ACCESS_PATH = false;
+        boolean DEFAULT_REMOTE_ACCESS_PATH = true;
         
         /**
          * If the estimated rangeCount for an {@link AccessPath#iterator()} is
