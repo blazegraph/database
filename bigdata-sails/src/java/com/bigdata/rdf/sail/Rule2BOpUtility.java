@@ -78,6 +78,7 @@ import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InGraphHashSetFilter;
 import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
+import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
@@ -485,12 +486,17 @@ public class Rule2BOpUtility {
      * @return The join operator.
      */
     private static PipelineOp triplesModeJoin(final QueryEngine queryEngine,
-            final PipelineOp left, final List<NV> anns, final Predicate<?> pred) {
+            final PipelineOp left, final List<NV> anns, Predicate<?> pred) {
 
         final boolean scaleOut = queryEngine.isScaleOut();
         if (scaleOut) {
+            /*
+             * All triples queries can run shard-wise.
+             */
             anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                     BOpEvaluationContext.SHARDED));
+            pred = (Predicate) pred.setProperty(
+                    Predicate.Annotations.REMOTE_ACCESS_PATH, false);
         } else {
             anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                     BOpEvaluationContext.ANY));
@@ -527,8 +533,13 @@ public class Rule2BOpUtility {
 
         final boolean scaleOut = queryEngine.isScaleOut();
         if (scaleOut) {
+            /*
+             * All named graph patterns in scale-out are partitioned (sharded).
+             */
             anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                     BOpEvaluationContext.SHARDED));
+            pred = (Predicate) pred.setProperty(
+                    Predicate.Annotations.REMOTE_ACCESS_PATH, false);
         } else {
             anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                     BOpEvaluationContext.ANY));
@@ -667,17 +678,15 @@ public class Rule2BOpUtility {
                                             summary.getGraphs()) //
                             }));
 
-            if (scaleOut) {
-                anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
-                        BOpEvaluationContext.SHARDED));
-                pred = (Predicate) pred.setProperty(
-                        Predicate.Annotations.REMOTE_ACCESS_PATH, false);
-            } else {
-                anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
-                        BOpEvaluationContext.ANY));
-                pred = (Predicate) pred.setProperty(
-                        Predicate.Annotations.REMOTE_ACCESS_PATH, false);
-            }
+//            if (scaleOut) {
+//                anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+//                        BOpEvaluationContext.SHARDED));
+//                pred = (Predicate) pred.setProperty(
+//                        Predicate.Annotations.REMOTE_ACCESS_PATH, false);
+//            } else {
+//                anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+//                        BOpEvaluationContext.ANY));
+//            }
 
             return new PipelineJoin(new BOp[] { dataSetJoin, pred }, anns
                     .toArray(new NV[anns.size()]));
@@ -744,6 +753,14 @@ public class Rule2BOpUtility {
             pred = pred.asBound((IVariable<?>) pred.get(3),
                     new Constant<IV<?, ?>>(summary.firstContext));
 
+            if (scaleOut) {
+                // use a partitioned join.
+                anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.SHARDED));
+                pred = (Predicate) pred.setProperty(
+                        Predicate.Annotations.REMOTE_ACCESS_PATH, false);
+            }
+
             // Strip of the context position.
             pred = pred.addAccessPathFilter(StripContextFilter.newInstance());
             
@@ -786,19 +803,16 @@ public class Rule2BOpUtility {
 //                /*
 //                 * When true, an ISimpleSplitHandler guarantees that no triple
 //                 * on that index spans more than one shard.
-//                 * 
-//                 * @todo Implement the split handler and detect when it is being
-//                 * used. The implementation can use ContextAdvancer to skip to
-//                 * the end of the "triple" identified by the default split code.
 //                 */
-//                final boolean shardTripleConstraint = false;
+//                final SPORelation r = (SPORelation)context.getRelation(pred);
+//                final boolean shardTripleConstraint = r.getContainer().isConstrainXXXCShards();
 //
 //                if (shardTripleConstraint) {
 //
 //                    // JOIN is SHARDED.
-//                    pred = (Predicate<?>) pred.setProperty(
+//                    anns.add(new NV(
 //                            BOp.Annotations.EVALUATION_CONTEXT,
-//                            BOpEvaluationContext.SHARDED);
+//                            BOpEvaluationContext.SHARDED));
 //
 //                    // AP is LOCAL.
 //                    pred = (Predicate<?>) pred.setProperty(
@@ -807,9 +821,9 @@ public class Rule2BOpUtility {
 //                } else {
 //
 //                    // JOIN is ANY.
-//                    pred = (Predicate<?>) pred.setProperty(
+//                    anns.add(new NV(
 //                            BOp.Annotations.EVALUATION_CONTEXT,
-//                            BOpEvaluationContext.ANY);
+//                            BOpEvaluationContext.ANY));
 //
 //                    // AP is REMOTE.
 //                    pred = (Predicate<?>) pred.setProperty(
@@ -866,6 +880,20 @@ public class Rule2BOpUtility {
             // Filter for distinct SPOs.
             pred = pred.addAccessPathFilter(DistinctFilter.newInstance());
 
+            if (scaleOut) {
+                /*
+                 * Use the global index view so we can impose the distinct
+                 * filter.
+                 */
+                anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.ANY));
+                pred = (Predicate) pred.setProperty(
+                        Predicate.Annotations.REMOTE_ACCESS_PATH, false);
+            } else {
+                anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.ANY));
+            }
+            
             return new PipelineJoin(new BOp[] { left, pred }, anns
                     .toArray(new NV[anns.size()]));
 
@@ -901,6 +929,10 @@ public class Rule2BOpUtility {
             pred = pred.addAccessPathFilter(DistinctFilter.newInstance());
             
             if (scaleOut) {
+                /*
+                 * Use the global index view so we can impose the distinct
+                 * filter.
+                 */
                 anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.ANY));
                 pred = (Predicate) pred.setProperty(
@@ -908,8 +940,6 @@ public class Rule2BOpUtility {
             } else {
                 anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.ANY));
-                pred = (Predicate) pred.setProperty(
-                        Predicate.Annotations.REMOTE_ACCESS_PATH, false);
             }
             
             return new PipelineJoin(new BOp[] { left, pred }, anns
