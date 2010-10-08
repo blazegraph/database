@@ -226,6 +226,8 @@ abstract public class WriteCacheService implements IWriteCache {
 	 * write lock prevents {@link #acquireForWriter()} when we must either reset
 	 * the {@link #current} cache buffer or change the {@link #current}
 	 * reference. E.g., {@link #flush(boolean, long, TimeUnit)}.
+	 * <p>
+	 * Note: {@link #read(long)} is non-blocking. It does NOT use this lock!!!
 	 */
 	final private ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
@@ -957,6 +959,9 @@ abstract public class WriteCacheService implements IWriteCache {
 				return;
 			}
 
+            // Closed.
+            open = false;
+
 			// Interrupt the write task.
 			localWriteFuture.cancel(true/* mayInterruptIfRunning */);
 			final Future<?> rwf = remoteWriteFuture;
@@ -1030,9 +1035,6 @@ abstract public class WriteCacheService implements IWriteCache {
 //			final HAServer haServer = this.haServer.get();
 //			if (haServer != null)
 //				haServer.interrupt();
-
-			// Closed.
-			open = false;
 
 		} finally {
 			writeLock.unlock();
@@ -1910,8 +1912,6 @@ abstract public class WriteCacheService implements IWriteCache {
              * Not open. Return [null] rather than throwing an exception per the
              * contract for this implementation.
              */
-        	log.warn("Reading from closed writeCacheService");
-        	
             return null;
 
         }
@@ -1934,8 +1934,16 @@ abstract public class WriteCacheService implements IWriteCache {
          * Ask the cache buffer if it has the record still. It will not if the
          * cache buffer has been concurrently reset.
          */
-
-        return cache.read(off.longValue());
+        try {
+            return cache.read(off.longValue());
+        } catch (IllegalStateException ex) {
+            /*
+             * The write cache was closed. Per the API for this method, return
+             * [null] so that the caller will read through to the backing store.
+             */
+            assert !open;
+            return null;
+        }
 
     }
 
