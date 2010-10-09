@@ -47,7 +47,9 @@ public class RootBlockCommitter implements ICommitter {
 	 * to be stored in the CommitRecord.
 	 */
 	public long handleCommit(final long commitTime) {
-		final ByteBuffer rbv = journal.getRootBlockView().asReadOnlyBuffer();
+		IRootBlockView view = journal.getRootBlockView();
+		
+		final ByteBuffer rbv = view.asReadOnlyBuffer();
 		/*
 		 * FIXME There is an API issue with the RWStore which does not allow
 		 * us to pass in a read-only buffer.  Write unit tests for this on

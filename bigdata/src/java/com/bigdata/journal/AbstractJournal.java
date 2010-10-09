@@ -633,6 +633,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	private final long initialExtent;
 	private final long minimumExtension;
 
+	private RootBlockCommitter m_rootBlockCommitter;
+
 	/**
 	 * The maximum extent before a {@link #commit()} will {@link #overflow()}.
 	 * In practice, overflow tries to trigger before this point in order to
@@ -2300,7 +2302,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 				return 0L;
 			}
-
+			
+			/*
+			 * Explicitly call the RootBlockCommitter
+			 */
+			rootAddrs[PREV_ROOTBLOCK] = this.m_rootBlockCommitter.handleCommit(commitTime);
+			
 			/*
 			 * Write the commit record onto the store.
 			 * 
@@ -2767,9 +2774,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			setupName2AddrBTree(getRootAddr(ROOT_NAME2ADDR));
 			
 			/**
-			 * Register committer to write previous root block
+			 * Do not register committer to write previous root block, but
+			 * instead just create it and call explicitly when required.  This
+			 * is a workaround to allow "void" transactions.
 			 */
-			setCommitter(PREV_ROOTBLOCK, new RootBlockCommitter(this));
+			m_rootBlockCommitter = new RootBlockCommitter(this);
 			
 			/**
 			 * If the strategy is a RWStrategy, then register the delete

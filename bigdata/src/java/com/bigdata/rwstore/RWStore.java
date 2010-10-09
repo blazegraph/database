@@ -1584,7 +1584,9 @@ public class RWStore implements IStore {
 					throw new IllegalStateException("Returned MetaBits Address not valid!");
 				}
 
-				free(oldMetaBits, oldMetaBitsSize);
+				// Call immediateFree - no need to defer freeof metaBits, this
+				//	has to stop somewhere!
+				immediateFree((int) oldMetaBits, oldMetaBitsSize);
 
 				// save allocation headers
 				Iterator iter = m_commitList.iterator();
