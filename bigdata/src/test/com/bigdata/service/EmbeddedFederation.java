@@ -932,13 +932,17 @@ public class EmbeddedFederation<T> extends AbstractScaleOutFederation<T> {
 
         if (metadataService != null) {
 
-            // the file flagging this as the MDS rather than a DS.
-            final File tmp = new File(metadataService.getResourceManager()
-                    .getDataDir(), EmbeddedFederation.MDS);
+            if (!isTransient()) {
 
-            if(!tmp.delete()) {
+                // the file flagging this as the MDS rather than a DS.
+                final File tmp = new File(metadataService.getResourceManager()
+                        .getDataDir(), EmbeddedFederation.MDS);
 
-                log.warn(ERR_COULD_NOT_DELETE + tmp);
+                if (!tmp.delete()) {
+
+                    log.warn(ERR_COULD_NOT_DELETE + tmp);
+
+                }
 
             }
 

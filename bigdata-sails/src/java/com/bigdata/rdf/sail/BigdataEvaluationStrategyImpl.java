@@ -54,6 +54,7 @@ import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
@@ -74,6 +75,8 @@ import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.solutions.ISortOrder;
+import com.bigdata.bop.solutions.SliceOp;
+import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rdf.internal.DummyIV;
 import com.bigdata.rdf.internal.IV;
@@ -103,10 +106,10 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
+import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
-import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.QueryOptions;
@@ -1523,6 +1526,21 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         // timestamp
         anns.add(new NV(IPredicate.Annotations.TIMESTAMP, database
                 .getSPORelation().getTimestamp()));
+
+        /*
+         * Explicitly set the access path / iterator flags.
+         * 
+         * Note: High level query generally permits iterator level parallelism.
+         * We set the PARALLEL flag here so it can be used if a global index
+         * view is chosen for the access path.
+         * 
+         * Note: High level query for SPARQL always uses read-only access paths.
+         * If you are working with a SPARQL extension with UPDATE or INSERT INTO
+         * semantics then you will need to remote the READONLY flag for the
+         * mutable access paths.
+         */
+        anns.add(new NV(IPredicate.Annotations.FLAGS, IRangeQuery.DEFAULT
+                | IRangeQuery.PARALLEL | IRangeQuery.READONLY));
         
         return new SPOPredicate(vars, anns.toArray(new NV[anns.size()]));
 //        return new SPOPredicate(
@@ -1682,19 +1700,44 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         
         final QueryEngine queryEngine = tripleSource.getSail().getQueryEngine();
 
-        /*
-         * Note: The ids are assigned using incrementAndGet() so ONE (1) is the
-         * first id that will be assigned when we pass in ZERO (0) as the
-         * initial state of the AtomicInteger.
-         */
         final int startId = 1;
-        final PipelineOp query = Rule2BOpUtility.convert(step,
-                new AtomicInteger(0), database, queryEngine);
+        final PipelineOp query;
+        {
 
-        if (log.isInfoEnabled()) {
-            log.info(query);
+            /*
+             * Note: The ids are assigned using incrementAndGet() so ONE (1) is
+             * the first id that will be assigned when we pass in ZERO (0) as
+             * the initial state of the AtomicInteger.
+             */
+            final AtomicInteger idFactory = new AtomicInteger(0);
+
+            /*
+             * Convert the step to a bigdata operator tree.
+             */
+            PipelineOp tmp = Rule2BOpUtility.convert(step, idFactory, database,
+                    queryEngine);
+
+            if (!tmp.getEvaluationContext().equals(
+                    BOpEvaluationContext.CONTROLLER)) {
+                /*
+                 * Wrap with an operator which will be evaluated on the query
+                 * controller.
+                 */
+                tmp = new SliceOp(new BOp[] { tmp }, NV.asMap(//
+                        new NV(BOp.Annotations.BOP_ID, idFactory
+                                .incrementAndGet()), //
+                        new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER)));
+
+            }
+
+            query = tmp;
+
+            if (log.isInfoEnabled())
+                log.info(query);
+
         }
-        
+
         final UUID queryId = UUID.randomUUID();
         final RunningQuery runningQuery = queryEngine.eval(queryId, query,
                 new LocalChunkMessage<IBindingSet>(queryEngine, queryId,

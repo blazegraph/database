@@ -613,22 +613,35 @@ public class Rule2BOpUtility {
         /*
          * Estimate cost of SCAN with C unbound.
          * 
+         * Note: We need to use global index view in order to estimate the cost
+         * of the scan even though the scan will be shard-wise when we actually
+         * run the query.
+         * 
          * @todo must pass estimateCost() to the underlying access path plus
          * layer on any cost for the optional expander.
          */
         final IRelation r = context.getRelation(pred);
         final ScanCostReport scanCostReport = ((AccessPath) context
-                .getAccessPath(r, pred)).estimateCost();
+                .getAccessPath(r, (Predicate<?>) pred.setProperty(
+                        IPredicate.Annotations.REMOTE_ACCESS_PATH, true)))
+                .estimateCost();
 
         anns.add(new NV(Annotations.COST_SCAN, scanCostReport));
 
-        // Estimate cost of SUBQUERY with C bound (sampling).
+        /*
+         * Estimate cost of SUBQUERY with C bound (sampling).
+         * 
+         * Note: Again, we need to use a remote index view in order to estimate
+         * the cost of the subqueries even though we will use sharded joins when
+         * actually running the query.
+         */
         final SubqueryCostReport subqueryCostReport = summary
-                .estimateSubqueryCost(context, SAMPLE_LIMIT, pred);
+                .estimateSubqueryCost(context, SAMPLE_LIMIT, (Predicate<?>) pred.setProperty(
+                        IPredicate.Annotations.REMOTE_ACCESS_PATH, true));
 
         anns.add(new NV(Annotations.COST_SUBQUERY, subqueryCostReport));
 
-        if (scanCostReport.cost < subqueryCostReport.subqueryCost) {
+        if (scanCostReport.cost < subqueryCostReport.cost) {
 
             /*
              * Scan and filter. C is left unbound. We do a range scan on the
@@ -790,7 +803,7 @@ public class Rule2BOpUtility {
 //            pred = (Predicate<?>) pred.setProperty(IPredicate.Annotations.FLAGS,
 //                    pred.getProperty(IPredicate.Annotations.FLAGS,
 //                            IPredicate.Annotations.DEFAULT_FLAGS)
-//                            | IRangeQuery.CURSOR);
+//                            | IRangeQuery.CURSOR); // @todo also READONLY
 //
 //            // Set Advancer (runs at the index).
 //            pred = pred.addIndexLocalFilter(new ContextAdvancer());
@@ -838,22 +851,35 @@ public class Rule2BOpUtility {
 //
 //        }
 
-        // Estimate cost of SCAN with C unbound.
+        /*
+         * Estimate cost of SCAN with C unbound.
+         * 
+         * Note: We need to use the global index view in order to estimate the
+         * cost of the scan regardless of whether the query runs with
+         * partitioned or global index views when it is evaluated.
+         */
         final IRelation r = context.getRelation(pred);
         final ScanCostReport scanCostReport = ((AccessPath) context
-                .getAccessPath(r, pred)).estimateCost();
+                .getAccessPath(r, (Predicate<?>) pred.setProperty(
+                        IPredicate.Annotations.REMOTE_ACCESS_PATH, true)))
+                .estimateCost();
         anns.add(new NV(Annotations.COST_SCAN, scanCostReport));
 
         /*
          * Estimate cost of SUBQUERY with C bound (sampling).
+         * 
+         * Note: We need to use the global index view in order to estimate the
+         * cost of the scan regardless of whether the query runs with
+         * partitioned or global index views when it is evaluated.
          */
         final SubqueryCostReport subqueryCostReport = dataset == null ? null
-                : summary.estimateSubqueryCost(context, SAMPLE_LIMIT, pred);
+                : summary.estimateSubqueryCost(context, SAMPLE_LIMIT, (Predicate<?>) pred.setProperty(
+                        IPredicate.Annotations.REMOTE_ACCESS_PATH, true));
 
         anns.add(new NV(Annotations.COST_SUBQUERY, subqueryCostReport));
 
         if (subqueryCostReport == null
-                || scanCostReport.cost < subqueryCostReport.subqueryCost) {
+                || scanCostReport.cost < subqueryCostReport.cost) {
 
             /*
              * SCAN AND FILTER. C is not bound. Unless all graphs are used,
@@ -888,7 +914,7 @@ public class Rule2BOpUtility {
                 anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.ANY));
                 pred = (Predicate) pred.setProperty(
-                        Predicate.Annotations.REMOTE_ACCESS_PATH, false);
+                        Predicate.Annotations.REMOTE_ACCESS_PATH, true);
             } else {
                 anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.ANY));
@@ -936,7 +962,7 @@ public class Rule2BOpUtility {
                 anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.ANY));
                 pred = (Predicate) pred.setProperty(
-                        Predicate.Annotations.REMOTE_ACCESS_PATH, false);
+                        Predicate.Annotations.REMOTE_ACCESS_PATH, true);
             } else {
                 anns.add(new NV(Predicate.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.ANY));

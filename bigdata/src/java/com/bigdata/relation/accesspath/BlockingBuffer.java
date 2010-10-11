@@ -1873,9 +1873,17 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                          * iterator can keep looking for another element but the
                          * source is no longer writing on the buffer and nothing
                          * will show up.
+                         * 
+                         * Whether or not this is an error depends on whether or
+                         * not you are intending to chain together producers and
+                         * consumers using blocking buffers or if the output of
+                         * the producer will be collected and then passed onto
+                         * another process (perhaps on another node) once the
+                         * producer is done.
                          */
 
-                        log.error("Future not set on buffer.");
+                        if (log.isInfoEnabled())
+                            log.info("Future not set on buffer.");
 
                     } else {
 
