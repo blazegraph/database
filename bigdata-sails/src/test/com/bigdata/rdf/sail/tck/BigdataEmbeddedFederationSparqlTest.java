@@ -28,18 +28,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.tck;
 
 import java.io.File;
-import java.util.Enumeration;
 import java.util.Properties;
 
 import junit.framework.Test;
 import junit.framework.TestSuite;
-
 import net.jini.config.ConfigurationException;
 
 import org.openrdf.query.Dataset;
 import org.openrdf.query.parser.sparql.ManifestTest;
 import org.openrdf.query.parser.sparql.SPARQLQueryTest;
-import org.openrdf.query.parser.sparql.SPARQLQueryTest.Factory;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.dataset.DatasetRepository;
@@ -76,10 +73,11 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
     }
     
     /**
-     * Skip the dataset tests for now until we can figure out what is wrong
-     * with them.
+     * Skip the dataset tests for now until we can figure out what is wrong with
+     * them.
      * 
-     * @todo FIXME fix the dataset tests 
+     * FIXME Fix the dataset tests. There is some problem in how the data to be
+     * loaded into the fixture is being resolved in these tests.
      */
     public static Test suite() throws Exception {
         
@@ -91,13 +89,19 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
         
         TestSuite suite1 = suiteEmbeddedFederation();
 
-        if (!hideDatasetTests) {
-            
-            return suite1;
-            
+        // Only run the specified tests?
+        if (!testURIs.isEmpty()) {
+            final TestSuite suite = new TestSuite();
+            for (String s : testURIs) {
+                suite.addTest(getSingleTest(suite1, s));
+            }
+            return suite;
         }
         
-        return filterOutDataSetTests(suite1);
+        if(hideDatasetTests)
+            suite1 = filterOutDataSetTests(suite1);
+        
+        return suite1;
         
     }
     
