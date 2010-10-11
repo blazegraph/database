@@ -288,52 +288,21 @@ public class AccessPath<R> implements IAccessPath<R> {
      *            The order in which the elements would be visited for this
      *            access path.
      */
-//  * @param ndx
-//  *            The index on which the access path is reading.
-//  * @param flags
-//  *            The default {@link IRangeQuery} flags.
-//  * @param chunkOfChunksCapacity
-//  *            The #of chunks that can be held by an {@link IBuffer} that is
-//  *            the target or one or more producers. This is generally a small
-//  *            number on the order of the #of parallel producers that might
-//  *            be writing on the {@link IBuffer} since the capacity of the
-//  *            {@link UnsynchronizedArrayBuffer}s is already quite large (10k
-//  *            or better elements, defining a single "chunk" from a single
-//  *            producer).
-//  * @param chunkCapacity
-//  *            The maximum size for a single chunk (generally 10k or better).
-//  * @param fullyBufferedReadThreshold
-//  *            If the estimated remaining rangeCount for an
-//  *            {@link #iterator(long, long, int)} is LTE this threshold then
-//  *            we will do a fully buffered (synchronous) read. Otherwise we
-//  *            will do an asynchronous read.
     public AccessPath(//
             final IRelation<R> relation,//
             final IIndexManager localIndexManager,  //
-//            final long timestamp,// 
             final IPredicate<R> predicate,//
             final IKeyOrder<R> keyOrder  //
-//            final IIndex ndx,//
-//            final int flags, //
-//            final int chunkOfChunksCapacity,
-//            final int chunkCapacity,
-//            final int fullyBufferedReadThreshold
             ) {
 
         if (relation == null)
             throw new IllegalArgumentException();
-        
-//        if (indexManager == null)
-//            throw new IllegalArgumentException();
         
         if (predicate == null)
             throw new IllegalArgumentException();
 
         if (keyOrder == null)
             throw new IllegalArgumentException();
-
-//        if (ndx == null)
-//            throw new IllegalArgumentException();
 
         this.relation = relation;
 
@@ -358,7 +327,6 @@ public class AccessPath<R> implements IAccessPath<R> {
             }
             this.indexManager = localIndexManager;
         }
-//        this.indexManager = indexManager;
         
         this.timestamp = relation.getTimestamp();
         
@@ -389,8 +357,12 @@ public class AccessPath<R> implements IAccessPath<R> {
             final String name = DataService.getIndexPartitionName(namespace
                     + "." + keyOrder.getIndexName(), partitionId);
 
-            // MUST be a local index view.
-            ndx = (ILocalBTreeView) indexManager.getIndex(name, timestamp);
+            try {
+                // MUST be a local index view.
+                ndx = (ILocalBTreeView) indexManager.getIndex(name, timestamp);
+            } catch (Throwable t) {
+                throw new RuntimeException(predicate.toString(), t);
+            }
 
             if (ndx == null) {
 
@@ -458,9 +430,7 @@ public class AccessPath<R> implements IAccessPath<R> {
                 IPredicate.Annotations.FULLY_BUFFERED_READ_THRESHOLD,
                 IPredicate.Annotations.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD);
 
-        this.flags = flags
-                | (TimestampUtility.isReadOnly(timestamp) ? IRangeQuery.READONLY
-                        : 0);
+        this.flags = flags;
 
         this.chunkOfChunksCapacity = chunkOfChunksCapacity;
 
@@ -603,25 +573,10 @@ public class AccessPath<R> implements IAccessPath<R> {
         
     }
     
-    /**
-     * Resolved lazily if not specified to the ctor.
-     */
-//    @SuppressWarnings("unchecked")
     public IRelation<R> getRelation() {
+
         return relation;
-//
-//        IRelation<R> tmp = relation.get();
-//        
-//        if (tmp == null) {
-//
-//            tmp = (IRelation<R>) indexManager.getResourceLocator().locate(
-//                    predicate.getOnlyRelationName(), timestamp);
-//
-//            relation.compareAndSet(null/*expect*/, tmp/*update*/);
-//            
-//        }
-//
-//        return relation.get();
+        
     }
 
     public IIndexManager getIndexManager() {
@@ -637,8 +592,6 @@ public class AccessPath<R> implements IAccessPath<R> {
     }
     
     public IPredicate<R> getPredicate() {
-        
-//        assertInitialized();
         
         return predicate;
         
@@ -1425,19 +1378,13 @@ public class AccessPath<R> implements IAccessPath<R> {
      *            The predicate.
      * 
      * @return The estimated cost of a scan on that predicate.
-     * 
-     * @todo This tunnels through to the {@link AbstractBTree} class and is thus
-     *       specific to standalone and also may run into trouble once we
-     *       support unisolated access paths for reads or mutation since it may
-     *       encounter an {@link UnisolatedReadWriteIndex} instead of an
-     *       {@link AbstractBTree}.
      */
     public ScanCostReport estimateCost() {
 
         if(ndx instanceof UnisolatedReadWriteIndex) {
         
             return ((UnisolatedReadWriteIndex) ndx).estimateCost(diskCostModel,
-                    rangeCount);
+                    rangeCount(false/* exact */));
             
         }
         
@@ -1589,7 +1536,7 @@ public class AccessPath<R> implements IAccessPath<R> {
 
         final AbstractClient<?> client = ndx.getFederation().getClient();
         
-        // maximum parallelization by the client.
+        // maximum parallelization by the client : @todo not used yet.
         final int maxParallel = client.getMaxParallelTasksPerRequest();
 
         // the metadata index for that scale-out index.
@@ -1604,13 +1551,13 @@ public class AccessPath<R> implements IAccessPath<R> {
         final long partitionCount = mdi.rangeCount(fromKey, toKey);
 
         if (partitionCount == 0) {
-         
+
             /*
              * SWAG in case zero partition count is reported (I am not sure that
              * this code path is possible).
              */
-            return new ScanCostReport(rangeCount, partitionCount, 100/* millis */);
-   
+            return new ScanCostReport(0L/* rangeCount */, partitionCount, 100/* millis */);
+
         }
 
         // fast range count (may be cached by the access path).
@@ -1622,7 +1569,8 @@ public class AccessPath<R> implements IAccessPath<R> {
              * Delegate the operation to the remote shard.
              */
 
-            return (ScanCostReport) ndx.submit(fromKey,
+            return (ScanCostReport) ndx.submit(
+                    fromKey == null ? BytesUtil.EMPTY : fromKey,
                     new EstimateShardScanCost(rangeCount, fromKey, toKey));
 
         }
@@ -1652,6 +1600,7 @@ public class AccessPath<R> implements IAccessPath<R> {
 
         final double costPerShard = costPerJournal + 2 * costPerSegment;
 
+        // @todo ignores potential parallelism.
         final double cost = costPerShard * partitionCount;
 
         return new ScanCostReport(rangeCount, partitionCount, cost);

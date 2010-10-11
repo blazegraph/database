@@ -48,6 +48,7 @@ import org.openrdf.repository.sail.SailRepository;
 import org.openrdf.sail.memory.MemoryStore;
 import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.StrengthEnum;
+import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
@@ -68,7 +69,7 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
      * numeric values and these tests test for syntatic differences, i.e.
      * 01 != 1.
      */
-    private static Collection<String> cannotInlineTests = Arrays.asList(new String[] {
+    protected static Collection<String> cannotInlineTests = Arrays.asList(new String[] {
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-01",
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-03",
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-04",
@@ -89,8 +90,6 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
     private static String datasetTests = "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/dataset"; 
     
     /**
-     * Use the {@link #suiteLTSWithPipelineJoins()} test suite by default.
-     * <p>
      * Skip the dataset tests for now until we can figure out what is wrong
      * with them.
      * 
@@ -112,62 +111,34 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
             
         }
         
-        TestSuite suite2 = new TestSuite(suite1.getName());
+        return filterOutDataSetTests(suite1);
         
-        Enumeration<TestSuite> e = suite1.tests();
+    }
+    
+    static protected Test filterOutDataSetTests(TestSuite suite1) {
+        
+        final TestSuite suite2 = new TestSuite(suite1.getName());
+        
+        final Enumeration<TestSuite> e = suite1.tests();
         
         while (e.hasMoreElements()) {
             
-            TestSuite suite3 = e.nextElement();
+            final TestSuite suite3 = e.nextElement();
             
             if (suite3.getName().equals("dataset") == false) {
                 
                 suite2.addTest(suite3);
                 
             }
+            
         }
         
         return suite2;
         
     }
     
-//    /**
-//     * Return a test suite using the {@link LocalTripleStore} and nested
-//     * subquery joins.
-//     */
-//    public static TestSuite suiteLTSWithNestedSubquery() throws Exception {
-//        
-//        return ManifestTest.suite(new Factory() {
-//
-//            public SPARQLQueryTest createSPARQLQueryTest(String testURI,
-//                    String name, String queryFileURL, String resultFileURL,
-//                    Dataset dataSet, boolean laxCardinality) {
-//
-//                return new BigdataSparqlTest(testURI, name, queryFileURL,
-//                        resultFileURL, dataSet, laxCardinality) {
-//
-//                    protected Properties getProperties() {
-//
-//                        final Properties p = new Properties(super
-//                                .getProperties());
-//
-//                        p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,
-//                                "true");
-//
-//                        return p;
-//
-//                    }
-//
-//                };
-//
-//            }
-//            
-//        });
-//        
-//    }
-
     /**
-     * Return a test suite using the {@link LocalTripleStore} and pipeline joins. 
+     * Return the test suite. 
      */
     public static TestSuite suiteLTSWithPipelineJoins() throws Exception {
        
@@ -246,7 +217,7 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
         super.tearDown();
 
         if (backend != null)
-            backend.destroy();
+            tearDownBackend(backend);
 
         /*
          * Note: this field MUST be cleared to null or the backing database
@@ -269,10 +240,12 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
 
         final Properties props = new Properties();
         
-        final File journal = BigdataStoreTest.createTempFile();
-        
-        props.setProperty(BigdataSail.Options.FILE, journal.getAbsolutePath());
+//        final File journal = BigdataStoreTest.createTempFile();
+//        
+//        props.setProperty(BigdataSail.Options.FILE, journal.getAbsolutePath());
 
+        props.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
+        
         // quads mode: quads=true, sids=false, axioms=NoAxioms, vocab=NoVocabulary
         props.setProperty(Options.QUADS_MODE, "true");
 
@@ -293,8 +266,8 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
 //      Force identical unicode comparisons (assuming default COLLATOR setting).
         props.setProperty(Options.STRENGTH, StrengthEnum.Identical.toString());
         
-        // enable read/write transactions
-        props.setProperty(Options.ISOLATABLE_INDICES, "true");
+        // disable read/write transactions
+        props.setProperty(Options.ISOLATABLE_INDICES, "false");
         
         // disable truth maintenance in the SAIL
         props.setProperty(Options.TRUTH_MAINTENANCE, "false");
@@ -319,6 +292,12 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
         }
     }
 
+    protected void tearDownBackend(IIndexManager backend) {
+        
+        backend.destroy();
+        
+    }
+    
     @Override
     protected Repository createRepository() throws Exception {
         Repository repo = newRepository();

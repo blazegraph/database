@@ -284,7 +284,8 @@ public class FederatedRunningQuery extends RunningQuery {
              * by the client.
              */
             throw new RuntimeException(
-                    "The top-level of a query must be evaluated on the query controller.");
+                    "The top-level of a query must be evaluated on the query controller: query="
+                            + getQuery());
 
         }
         

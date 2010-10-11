@@ -31,7 +31,7 @@ public class SubqueryCostReport implements Serializable {
      * An estimated cost (latency in milliseconds) based on the samples and
      * adjusted for the #of graphs.
      */
-    public final double subqueryCost;
+    public final double cost;
 
     /**
      * 
@@ -44,18 +44,38 @@ public class SubqueryCostReport implements Serializable {
      * @param rangeCount
      *            An estimated range count based on the samples and adjusted
      *            for the #of graphs.
-     * @param subqueryCost
+     * @param cost
      *            An estimated cost (latency in milliseconds) based on the
      *            samples and adjusted for the #of graphs.
      */
     public SubqueryCostReport(final int ngraphs, final int limit,
-            final int nsamples, final long rangeCount,
-            final double subqueryCost) {
+            final int nsamples, final long rangeCount, final double cost) {
+
+        if (ngraphs < 0)
+            throw new IllegalArgumentException();
+        
+        if (limit < 1)
+            throw new IllegalArgumentException();
+        
+        if (nsamples < 0)
+            throw new IllegalArgumentException();
+        
+        if (rangeCount < 0)
+            throw new IllegalArgumentException();
+        
+        if (cost < 0)
+            throw new IllegalArgumentException();
+
         this.ngraphs = ngraphs;
+        
         this.limit = limit;
+        
         this.nsamples = nsamples;
+        
         this.rangeCount = rangeCount;
-        this.subqueryCost = subqueryCost;
+        
+        this.cost = cost;
+    
     }
     
     /**
@@ -67,7 +87,7 @@ public class SubqueryCostReport implements Serializable {
                 ",limit=" + limit + //
                 ",nsamples=" + nsamples + //
                 ",rangeCount=" + rangeCount + //
-                ",subqueryCost=" + subqueryCost + //
+                ",cost=" + cost + //
                 "}";
     }
     

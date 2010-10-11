@@ -26,7 +26,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
-import java.io.File;
 import java.util.Properties;
 
 import junit.framework.TestCase;
@@ -133,18 +132,11 @@ abstract public class AbstractBigdataSailTestCase extends TestCase2 {
              * Read properties from a hierarchy of sources and cache a
              * reference.
              */
-            m_properties = super.getProperties();
+            m_properties = new Properties(super.getProperties());
 
             // transient means that there is nothing to delete after the test.
-            m_properties.setProperty(Options.BUFFER_MODE,BufferMode.Transient.toString());
-            
-            // disregard the inherited properties.
-//            m_properties = new Properties();
-            
-//            m_properties = new Properties( m_properties );
-
-            m_properties.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());
 //            m_properties.setProperty(Options.BUFFER_MODE,BufferMode.Transient.toString());
+            m_properties.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());
 
             /*
              * If an explicit filename is not specified...
@@ -232,39 +224,39 @@ abstract public class AbstractBigdataSailTestCase extends TestCase2 {
 
     abstract protected BigdataSail reopenSail(BigdataSail sail);
 
-    /**
-     * Recursively removes any files and subdirectories and then removes the
-     * file (or directory) itself.
-     * 
-     * @param f
-     *            A file or directory.
-     */
-    protected void recursiveDelete(File f) {
-        
-        if(f.isDirectory()) {
-            
-            File[] children = f.listFiles();
-            
-            for(int i=0; i<children.length; i++) {
-                
-                recursiveDelete( children[i] );
-                
-            }
-            
-        }
-        
-        if (f.exists()) {
-
-            log.warn("Removing: " + f);
-
-            if (!f.delete()) {
-
-                throw new RuntimeException("Could not remove: " + f);
-
-            }
-
-        }
-
-    }
+//    /**
+//     * Recursively removes any files and subdirectories and then removes the
+//     * file (or directory) itself.
+//     * 
+//     * @param f
+//     *            A file or directory.
+//     */
+//    protected void recursiveDelete(File f) {
+//        
+//        if(f.isDirectory()) {
+//            
+//            File[] children = f.listFiles();
+//            
+//            for(int i=0; i<children.length; i++) {
+//                
+//                recursiveDelete( children[i] );
+//                
+//            }
+//            
+//        }
+//        
+//        if (f.exists()) {
+//
+//            log.warn("Removing: " + f);
+//
+//            if (!f.delete()) {
+//
+//                throw new RuntimeException("Could not remove: " + f);
+//
+//            }
+//
+//        }
+//
+//    }
     
 }

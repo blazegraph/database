@@ -37,7 +37,9 @@ import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.filter.Advancer;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.IRelation;
@@ -256,15 +258,23 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
         int DEFAULT_FULLY_BUFFERED_READ_THRESHOLD = 100;
 
         /**
-         * Flags for the iterator ({@link IRangeQuery#KEYS},
-         * {@link IRangeQuery#VALS}, {@link IRangeQuery#PARALLEL}).
+         * Specify the {@link IRangeQuery} flags for the {@link IAccessPath} (
+         * default is {@link IRangeQuery#KEYS}, {@link IRangeQuery#VALS}).
          * <p>
-         * Note: The {@link IRangeQuery#PARALLEL} flag here is an indication
-         * that the iterator may run in parallel across the index partitions.
-         * This only effects scale-out and only for simple triple patterns since
-         * the pipeline join does something different (it runs inside the index
-         * partition using the local index, not the client's view of a
-         * distributed index).
+         * Note: Most access paths are read-only so it is nearly always a good
+         * idea to set the {@link IRangeQuery#READONLY} flag.
+         * <p>
+         * Note: Access paths used to support high-level query can nearly always
+         * use {@link IRangeQuery#PARALLEL} iterator semantics, which permits
+         * the iterator to run in parallel across index partitions in scale-out.
+         * This flag only effects operations which use a global index view in
+         * scale-out ( pipeline joins do something different).
+         * <p>
+         * Note: Some expanders may require the {@link IRangeQuery#CURSOR} flag.
+         * For example, {@link Advancer} patterns use an {@link ITupleCursor}
+         * rather than an {@link ITupleIterator}. However, since the cursors are
+         * <i>slightly</i> slower, they should only be specified when their
+         * semantics are necessary.
          * 
          * @see #DEFAULT_FLAGS
          */
@@ -272,13 +282,11 @@ public interface IPredicate<E> extends BOp, Cloneable, Serializable {
 
         /**
          * The default flags will visit the keys and values of the non-deleted
-         * tuples and allows parallelism in the iterator (when supported).
-         * 
-         * @todo consider making parallelism something that the query planner
-         *       must specify explicitly.
+         * tuples.
          */
         final int DEFAULT_FLAGS = IRangeQuery.KEYS | IRangeQuery.VALS
-                | IRangeQuery.PARALLEL;
+//                | IRangeQuery.PARALLEL
+                ;
 
     }
     

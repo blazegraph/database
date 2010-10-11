@@ -34,6 +34,12 @@ public class ScanCostReport {
      */
     public ScanCostReport(final long rangeCount, final double cost) {
 
+        if (rangeCount < 0)
+            throw new IllegalArgumentException();
+
+        if (cost < 0)
+            throw new IllegalArgumentException();
+        
         this.rangeCount = rangeCount;
 
         this.shardCount = 1;

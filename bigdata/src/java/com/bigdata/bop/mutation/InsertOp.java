@@ -294,6 +294,12 @@ public class InsertOp<E> extends PipelineOp implements
          * 
          *       FIXME Allow remote writes as well if a remote access path is
          *       marked on the {@link IPredicate}.
+         *       
+         *       FIXME There is currently a problem obtaining the UNISOLATED
+         *       index in scale-out using the DelegateIndexManager.  The issue
+         *       is down in the guts of how AbstractTask exposes its views of
+         *       the indices and manifests as a problem an assert in Name2Addr
+         *       concerning the dirtyListener implementation. 
          */
         public <T> ILocalBTreeView getMutableLocalIndexView(
                 final IRelation<T> relation, final IKeyOrder<T> keyOrder,

@@ -43,7 +43,7 @@ class SimpleDataServiceProcedureTask extends AbstractDataServiceProcedureTask {
         super(ndx, ts, split, proc, resultHandler);
         
         if (key == null)
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("name="+ndx.getName()+", proc="+proc);
     
         this.key = key;
         

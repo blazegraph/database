@@ -98,6 +98,9 @@ public class TestAll extends TestCase {
         // quad store test suite w/ pipeline joins.
         suite.addTest(TestBigdataSailWithQuads.suite());
         suite.addTest(TestBigdataSailWithQuadsWithoutInlining.suite());
+
+        // quad store in scale-out.
+        suite.addTest(TestBigdataSailEmbeddedFederationWithQuads.suite());
         
         return suite;
 

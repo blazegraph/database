@@ -201,7 +201,7 @@ public class TestOptionals extends QuadsTestCase {
     public void testOptional() throws Exception {
 
         Properties properties = getProperties();
-        properties.put("com.bigdata.rdf.sail.isolatableIndices", "true");
+//        properties.put("com.bigdata.rdf.sail.isolatableIndices", "true");
         properties.put("com.bigdata.rdf.store.AbstractTripleStore.axiomsClass", "com.bigdata.rdf.axioms.NoAxioms");
         properties.put("com.bigdata.rdf.sail.truthMaintenance", "false");
         properties.put("com.bigdata.rdf.store.AbstractTripleStore.vocabularyClass", "com.bigdata.rdf.vocab.NoVocabulary");
