@@ -28,16 +28,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.tck;
 
 import info.aduna.io.IOUtil;
-import java.io.File;
+
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
+import java.util.Iterator;
 import java.util.Properties;
+
 import junit.framework.Test;
+import junit.framework.TestCase;
 import junit.framework.TestSuite;
+
 import org.openrdf.query.Dataset;
 import org.openrdf.query.parser.sparql.ManifestTest;
 import org.openrdf.query.parser.sparql.SPARQLQueryTest;
@@ -46,6 +50,7 @@ import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.dataset.DatasetRepository;
 import org.openrdf.repository.sail.SailRepository;
 import org.openrdf.sail.memory.MemoryStore;
+
 import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.journal.BufferMode;
@@ -53,8 +58,10 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSail.Options;
-import com.bigdata.rdf.store.LocalTripleStore;
-import com.bigdata.relation.AbstractResource;
+
+import cutthecrap.utils.striterators.Expander;
+import cutthecrap.utils.striterators.SingleValueIterator;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Test harness for running the SPARQL test suites.
@@ -87,13 +94,14 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/distinct/manifest#distinct-9",
     });
     
-    private static String datasetTests = "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/dataset"; 
-    
+//    private static String datasetTests = "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/dataset";
+
     /**
-     * Skip the dataset tests for now until we can figure out what is wrong
-     * with them.
+     * Skip the dataset tests for now until we can figure out what is wrong with
+     * them.
      * 
-     * @todo FIXME fix the dataset tests 
+     * FIXME Fix the dataset tests. There is some problem in how the data to be
+     * loaded into the fixture is being resolved in these tests.
      */
     public static Test suite() throws Exception {
         
@@ -105,17 +113,31 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
         
         TestSuite suite1 = suiteLTSWithPipelineJoins();
 
-        if (!hideDatasetTests) {
-            
-            return suite1;
-            
+        // Only run the specified tests?
+        if (!testURIs.isEmpty()) {
+            final TestSuite suite = new TestSuite();
+            for (String s : testURIs) {
+                suite.addTest(getSingleTest(suite1, s));
+            }
+            return suite;
         }
         
-        return filterOutDataSetTests(suite1);
+        if(hideDatasetTests)
+            suite1 = filterOutDataSetTests(suite1);
+        
+        return suite1;
         
     }
-    
-    static protected Test filterOutDataSetTests(TestSuite suite1) {
+
+    /**
+     * Hack filters out the "dataset" tests.
+     * 
+     * @param suite1
+     *            The test suite.
+     *            
+     * @return The test suite without the data set tests.
+     */
+    static protected TestSuite filterOutDataSetTests(final TestSuite suite1) {
         
         final TestSuite suite2 = new TestSuite(suite1.getName());
         
@@ -136,7 +158,74 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
         return suite2;
         
     }
+
+    /**
+     * An array of URIs for tests to be run. When null or empty the default test
+     * suite is run. When specified, only the tests matching these test URIs are
+     * run.
+     */
+    static final protected Collection<String> testURIs = Arrays.asList(new String[] {
+/*
+//      busted with EvalStrategy1
+        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#nested-opt-2",
+        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#filter-scope-1",
+        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#join-scope-1",
+        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional/manifest#dawg-optional-complex-4",
+        
+//      busted with EvalStrategy2 with LeftJoin enabled
+        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-12",
+        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#nested-opt-1",
+        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#opt-filter-1",
+        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#opt-filter-2",
+        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional/manifest#dawg-optional-complex-3",
+        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional-filter/manifest#dawg-optional-filter-001",
+        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional-filter/manifest#dawg-optional-filter-004",
+*/        
+//      Dataset crap
+        // "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/i18n/manifest#normalization-1"
+            
+        // "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/dataset/manifest#dawg-dataset-01"
+            
+//        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2//manifest#",
+//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#dawg-str-1",
+//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#dawg-str-2",
+//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#dawg-datatype-1",
+//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#sameTerm-simple",
+//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#sameTerm-eq",
+//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#sameTerm-not-eq",
+//
+//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-equals/manifest#eq-graph-1",
+//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-equals/manifest#eq-graph-2",
+            
+            /*
+             * busted with scale-out quads query.
+             */
+//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional/manifest#dawg-union-001",
+//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/graph/manifest#dawg-graph-07",
+//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/graph/manifest#dawg-graph-11",
+//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/distinct/manifest#distinct-star-1"
+    });
     
+    protected static BigdataSparqlTest getSingleTest(TestSuite suite, String testURI) throws Exception {
+        
+        BigdataSparqlTest test = null;
+//        TestSuite suite = (TestSuite) BigdataSparqlTest.suite(false);
+        Enumeration e1 = suite.tests();
+        while (e1.hasMoreElements()) {
+            suite = (TestSuite) e1.nextElement();
+            Enumeration e2 = suite.tests();
+            while (e2.hasMoreElements()) {
+                 test = (BigdataSparqlTest) e2.nextElement();
+                 if (testURI.equals(test.getTestURI())) {
+                     return test;
+                 }
+            }
+        }
+        
+        throw new RuntimeException("could not find a test with that URI");
+        
+    }
+
     /**
      * Return the test suite. 
      */
