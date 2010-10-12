@@ -133,6 +133,13 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
         return new DatasetRepository ( new BigdataSailRepository ( new BigdataSail ( newTripleStore () ) ) ) ;
     }
 
+    @Override
+    protected Repository createRepository() throws Exception {
+        Repository repo = newRepository();
+        repo.initialize();
+        return repo;
+    }
+
     private ScaleOutTripleStore newTripleStore ()
         throws Exception
     {
@@ -256,16 +263,13 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
             _properties.put ( BigdataSail.Options.TRUTH_MAINTENANCE, "false" );
             _properties.put ( BigdataSail.Options.QUERY_TIME_EXPANDER, "false" );
             
-            if (BigdataSparqlTest.cannotInlineTests.contains(testURI))
-                _properties.setProperty(Options.INLINE_LITERALS, "false");
-
 			/*
 			 * The Sesame TCK forces statement level connection auto-commit so
 			 * we set a flag to permit that here. However, auto-commit and this
 			 * flag SHOULD NOT be used outside of the test suite as they provide
 			 * an extreme performance penalty.
 			 */
-            _properties.put ( BigdataSail.Options.ALLOW_AUTO_COMMIT, "true" ) ;
+            //_properties.put ( BigdataSail.Options.ALLOW_AUTO_COMMIT, "true" ) ;
 
 			/*
 			 * Provide Unicode support for keys with locale-based string
@@ -308,7 +312,7 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
 			 * partitions will become uniformly distributed, which will
 			 * negatively impact index performance.
 			 */
-			_properties.put(BigdataSail.Options.TERMID_BITS_TO_REVERSE,"2");
+			_properties.put(BigdataSail.Options.TERMID_BITS_TO_REVERSE,"0"); // was 2.
         	        
 			/*
 			 * Option may be enabled to store blank nodes such that they are
@@ -317,6 +321,17 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
 			// new NV(BigdataSail.Options.STORE_BLANK_NODES,"true");
 
         }
+
+		/*
+		 * Turn inlining on or off depending on _this_ test. This is outside of
+		 * the if block above because _properties is cached.
+		 */
+        if (BigdataSparqlTest.cannotInlineTests.contains(testURI)) {
+            _properties.setProperty(Options.INLINE_LITERALS, "false");
+        } else {
+        	_properties.setProperty(Options.INLINE_LITERALS, "true");
+        }
+        
         return _properties ;
     }
 

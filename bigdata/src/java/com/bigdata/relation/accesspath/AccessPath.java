@@ -64,6 +64,7 @@ import com.bigdata.btree.proc.ISimpleIndexProcedure;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TimestampUtility;
@@ -328,12 +329,35 @@ public class AccessPath<R> implements IAccessPath<R> {
             this.indexManager = localIndexManager;
         }
         
-        this.timestamp = relation.getTimestamp();
-        
         this.predicate = predicate;
 
         this.keyOrder = keyOrder;
 
+        final int flags = predicate.getProperty(
+                IPredicate.Annotations.FLAGS,
+                IPredicate.Annotations.DEFAULT_FLAGS);
+        
+        this.flags = flags;
+
+		/*
+		 * Choose the timestamp of the view. If the request is for the
+		 * unisolated index but the predicate was flagged as READONLY then
+		 * automatically choose READ_COMMITTED instead.
+		 */
+		{
+
+			long timestamp = relation.getTimestamp();
+
+			timestamp = (timestamp == ITx.UNISOLATED
+					&& (flags & IRangeQuery.READONLY) != 0 ? ITx.READ_COMMITTED
+					: timestamp);
+			
+			this.timestamp = timestamp;
+			
+		}
+        
+        this.historicalRead = TimestampUtility.isReadOnly(timestamp);
+        
         final int partitionId = predicate.getPartitionId();
         
         final IIndex ndx;
@@ -414,10 +438,6 @@ public class AccessPath<R> implements IAccessPath<R> {
 
         this.ndx = ndx;
 
-        final int flags = predicate.getProperty(
-                IPredicate.Annotations.FLAGS,
-                IPredicate.Annotations.DEFAULT_FLAGS);
-        
         final int chunkOfChunksCapacity = predicate.getProperty(
                 BufferAnnotations.CHUNK_OF_CHUNKS_CAPACITY,
                 BufferAnnotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY);
@@ -430,16 +450,12 @@ public class AccessPath<R> implements IAccessPath<R> {
                 IPredicate.Annotations.FULLY_BUFFERED_READ_THRESHOLD,
                 IPredicate.Annotations.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD);
 
-        this.flags = flags;
-
         this.chunkOfChunksCapacity = chunkOfChunksCapacity;
 
         this.chunkCapacity = chunkCapacity;
 
         this.fullyBufferedReadThreshold = fullyBufferedReadThreshold;
         
-        this.historicalRead = TimestampUtility.isReadOnly(timestamp);
-
         this.isFullyBoundForKey = predicate.isFullyBound(keyOrder);
 
         {

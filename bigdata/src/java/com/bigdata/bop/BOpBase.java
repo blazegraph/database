@@ -572,7 +572,7 @@ public class BOpBase implements BOp {
                 if (e.getValue() != null && e.getValue().getClass().isArray()) {
                     sb.append(e.getKey() + "="
                             + Arrays.toString((Object[]) e.getValue()));
-                } else if (e.getKey() == IPredicate.Annotations.FLAGS) {
+                } else if (e.getKey().equals(IPredicate.Annotations.FLAGS)) {
                     sb.append(e.getKey() + "="
                             + Tuple.flagString((Integer) e.getValue()));
                 } else {

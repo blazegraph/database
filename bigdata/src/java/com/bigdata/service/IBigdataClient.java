@@ -442,12 +442,14 @@ public interface IBigdataClient<T> {
 
         String DEFAULT_COLLECT_QUEUE_STATISTICS = "true";
 
-        /**
-         * The delay between reports of performance counters to the
-         * {@link ILoadBalancerService} in milliseconds ({@value #DEFAULT_REPORT_DELAY}).
-         * 
-         * @see #DEFAULT_REPORT_DELAY
-         */
+		/**
+		 * The delay between reports of performance counters to the
+		 * {@link ILoadBalancerService} in milliseconds (
+		 * {@value #DEFAULT_REPORT_DELAY}). When ZERO (0L), performance counter
+		 * reporting will be disabled.
+		 * 
+		 * @see #DEFAULT_REPORT_DELAY
+		 */
         String REPORT_DELAY = IBigdataClient.class.getName() + ".reportDelay";
 
         /**

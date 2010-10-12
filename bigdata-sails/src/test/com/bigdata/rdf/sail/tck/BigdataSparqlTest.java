@@ -191,19 +191,6 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
 //            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-equals/manifest#eq-graph-1",
 //            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-equals/manifest#eq-graph-2",
             
-            /*
-             * busted with scale-out quads query (problem was that the
-             * subqueries did not have a top-level operator which ran on
-             * the query controller).
-             */
-//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional/manifest#dawg-union-001",
-//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/graph/manifest#dawg-graph-07",
-//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/graph/manifest#dawg-graph-11",
-//            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/distinct/manifest#distinct-star-1"
-    		
-    		/*
-    		 * Problems with JiniFederation.
-    		 */
     });
 
     /**
@@ -358,8 +345,8 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
         // no query time inference
         props.setProperty(Options.QUERY_TIME_EXPANDER, "false");
         
-        // auto-commit only there for TCK
-        props.setProperty(Options.ALLOW_AUTO_COMMIT, "true");
+//        // auto-commit only there for TCK
+//        props.setProperty(Options.ALLOW_AUTO_COMMIT, "true");
         
         // exact size only there for TCK
         props.setProperty(Options.EXACT_SIZE, "true");
