@@ -8,7 +8,8 @@ import java.io.Serializable;
 public class SubqueryCostReport implements Serializable {
 
     /**
-     * 
+	 * @todo should be either Externalizable and explicitly managed versioning
+	 *       or Serializable with a public interface for versioning.
      */
     private static final long serialVersionUID = 1L;
 

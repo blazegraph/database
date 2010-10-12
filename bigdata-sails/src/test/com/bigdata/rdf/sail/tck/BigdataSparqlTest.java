@@ -70,7 +70,7 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
      * numeric values and these tests test for syntatic differences, i.e.
      * 01 != 1.
      */
-    protected static Collection<String> cannotInlineTests = Arrays.asList(new String[] {
+    static final Collection<String> cannotInlineTests = Arrays.asList(new String[] {
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-01",
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-03",
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-04",
@@ -131,7 +131,7 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
      *            
      * @return The test suite without the data set tests.
      */
-    static protected TestSuite filterOutDataSetTests(final TestSuite suite1) {
+    static TestSuite filterOutDataSetTests(final TestSuite suite1) {
         
         final TestSuite suite2 = new TestSuite(suite1.getName());
         
@@ -158,7 +158,7 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
      * suite is run. When specified, only the tests matching these test URIs are
      * run.
      */
-    static final protected Collection<String> testURIs = Arrays.asList(new String[] {
+    static final Collection<String> testURIs = Arrays.asList(new String[] {
 /*
 //      busted with EvalStrategy1
         "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#nested-opt-2",
@@ -200,6 +200,10 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
 //            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/graph/manifest#dawg-graph-07",
 //            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/graph/manifest#dawg-graph-11",
 //            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/distinct/manifest#distinct-star-1"
+    		
+    		/*
+    		 * Problems with JiniFederation.
+    		 */
     });
 
     /**
@@ -216,16 +220,16 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
      *             if there is no test in the suite which is associated with
      *             that testURI.
      */
-    protected static BigdataSparqlTest getSingleTest(TestSuite suite,
+    static SPARQLQueryTest getSingleTest(TestSuite suite,
             final String testURI) throws RuntimeException {
     
-        BigdataSparqlTest test = null;
+        SPARQLQueryTest test = null;
         final Enumeration e1 = suite.tests();
         while (e1.hasMoreElements()) {
             suite = (TestSuite) e1.nextElement();
             final Enumeration e2 = suite.tests();
             while (e2.hasMoreElements()) {
-                 test = (BigdataSparqlTest) e2.nextElement();
+                 test = (SPARQLQueryTest) e2.nextElement();
                  if (testURI.equals(test.getTestURI())) {
                      return test;
                  }
@@ -275,9 +279,9 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
         
     }
     
-    public String getTestURI() {
-        return testURI;
-    }
+//    public String getTestURI() {
+//        return testURI;
+//    }
     
     /**
      * Overridden to destroy the backend database and its files on the disk.

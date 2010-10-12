@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.bop.cost;
 
+import java.io.Serializable;
+
 /**
  * A cost model of the disk.
  * 
@@ -38,9 +40,15 @@ package com.bigdata.bop.cost;
  *       transfer rate. However, SCSI does much better than SATA when it can
  *       reorder the writes for improved locality.
  */
-public class DiskCostModel {
+public class DiskCostModel implements Serializable {
 
-    public static final DiskCostModel DEFAULT = new DiskCostModel(10d, 41943040);
+	/**
+	 * @todo should be either Externalizable and explicitly managed versioning
+	 *       or Serializable with a public interface for versioning.
+	 */
+	private static final long serialVersionUID = 1L;
+
+	public static final DiskCostModel DEFAULT = new DiskCostModel(10d, 41943040);
 
     /**
      * The average disk seek time (milliseconds).

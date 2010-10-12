@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.bop.cost;
 
+import java.io.Serializable;
 import java.text.NumberFormat;
 
 import com.bigdata.btree.AbstractBTree;
@@ -54,9 +55,15 @@ import com.bigdata.journal.Journal;
  *       focus on one branch of the {@link BTree} could cause nothing but the
  *       root to be in the cache when probing a different branch.
  */
-public class BTreeCostModel {
+public class BTreeCostModel implements Serializable {
 
-    private final DiskCostModel diskCostModel;
+	/**
+	 * @todo should be either Externalizable and explicitly managed versioning
+	 *       or Serializable with a public interface for versioning.
+	 */
+	private static final long serialVersionUID = 1L;
+
+	private final DiskCostModel diskCostModel;
 
     /**
      * 

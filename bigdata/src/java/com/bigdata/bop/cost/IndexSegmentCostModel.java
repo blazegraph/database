@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.bop.cost;
 
+import java.io.Serializable;
+
 import com.bigdata.btree.IndexSegment;
 
 /**
@@ -38,9 +40,15 @@ import com.bigdata.btree.IndexSegment;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IndexSegmentCostModel {
+public class IndexSegmentCostModel implements Serializable {
 
-    private final DiskCostModel diskCostModel;
+	/**
+	 * @todo should be either Externalizable and explicitly managed versioning
+	 *       or Serializable with a public interface for versioning.
+	 */
+	private static final long serialVersionUID = 1L;
+
+	private final DiskCostModel diskCostModel;
 
     /**
      * 

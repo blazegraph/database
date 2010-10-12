@@ -485,9 +485,9 @@ public class Rule2BOpUtility {
 
         }
         
-        if (true||log.isDebugEnabled()) {
+        if (true||log.isInfoEnabled()) {
             // just for now while i'm debugging
-            log.info ("rule=" + rule + "\nquery="
+            log.info("rule=" + rule + ":::query="
                     + BOpUtility.toString(left));
         }
         

@@ -1,5 +1,7 @@
 package com.bigdata.bop.cost;
 
+import java.io.Serializable;
+
 
 /**
  * A report on the expected cost of an index key range scan.
@@ -8,9 +10,15 @@ package com.bigdata.bop.cost;
  *         Thompson</a>
  * @version $Id$
  */
-public class ScanCostReport {
+public class ScanCostReport implements Serializable {
 
-    /**
+	/**
+	 * @todo should be either Externalizable and explicitly managed versioning
+	 *       or Serializable with a public interface for versioning.
+	 */
+	private static final long serialVersionUID = 1L;
+
+	/**
      * The fast range count.
      */
     public final long rangeCount;
