@@ -35,11 +35,9 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
-import java.util.Iterator;
 import java.util.Properties;
 
 import junit.framework.Test;
-import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 import org.openrdf.query.Dataset;
@@ -58,10 +56,6 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSail.Options;
-
-import cutthecrap.utils.striterators.Expander;
-import cutthecrap.utils.striterators.SingleValueIterator;
-import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Test harness for running the SPARQL test suites.
@@ -198,22 +192,38 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
 //            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-equals/manifest#eq-graph-2",
             
             /*
-             * busted with scale-out quads query.
+             * busted with scale-out quads query (problem was that the
+             * subqueries did not have a top-level operator which ran on
+             * the query controller).
              */
 //            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional/manifest#dawg-union-001",
 //            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/graph/manifest#dawg-graph-07",
 //            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/graph/manifest#dawg-graph-11",
 //            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/distinct/manifest#distinct-star-1"
     });
+
+    /**
+     * Return the sole test in the suite associated with the specified testURI.
+     * 
+     * @param suite
+     *            The test suite.
+     * @param testURI
+     *            The test URI (these are defined by the DAWG).
+     *            
+     * @return An instance of this class which will run just that one test.
+     * 
+     * @throws RuntimeException
+     *             if there is no test in the suite which is associated with
+     *             that testURI.
+     */
+    protected static BigdataSparqlTest getSingleTest(TestSuite suite,
+            final String testURI) throws RuntimeException {
     
-    protected static BigdataSparqlTest getSingleTest(TestSuite suite, String testURI) throws Exception {
-        
         BigdataSparqlTest test = null;
-//        TestSuite suite = (TestSuite) BigdataSparqlTest.suite(false);
-        Enumeration e1 = suite.tests();
+        final Enumeration e1 = suite.tests();
         while (e1.hasMoreElements()) {
             suite = (TestSuite) e1.nextElement();
-            Enumeration e2 = suite.tests();
+            final Enumeration e2 = suite.tests();
             while (e2.hasMoreElements()) {
                  test = (BigdataSparqlTest) e2.nextElement();
                  if (testURI.equals(test.getTestURI())) {

@@ -54,7 +54,6 @@ import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
@@ -75,7 +74,6 @@ import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.solutions.ISortOrder;
-import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rdf.internal.DummyIV;
@@ -1711,27 +1709,9 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
              */
             final AtomicInteger idFactory = new AtomicInteger(0);
 
-            /*
-             * Convert the step to a bigdata operator tree.
-             */
-            PipelineOp tmp = Rule2BOpUtility.convert(step, idFactory, database,
+            // Convert the step to a bigdata operator tree.
+            query = Rule2BOpUtility.convert(step, idFactory, database,
                     queryEngine);
-
-            if (!tmp.getEvaluationContext().equals(
-                    BOpEvaluationContext.CONTROLLER)) {
-                /*
-                 * Wrap with an operator which will be evaluated on the query
-                 * controller.
-                 */
-                tmp = new SliceOp(new BOp[] { tmp }, NV.asMap(//
-                        new NV(BOp.Annotations.BOP_ID, idFactory
-                                .incrementAndGet()), //
-                        new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.CONTROLLER)));
-
-            }
-
-            query = tmp;
 
             if (log.isInfoEnabled())
                 log.info(query);

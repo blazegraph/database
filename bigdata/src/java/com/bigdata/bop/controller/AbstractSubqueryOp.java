@@ -263,7 +263,8 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
             } finally {
 
                 // Cancel any tasks which are still running.
-                cancelTasks();
+                for (FutureTask<RunningQuery> ft : tasks)
+                    ft.cancel(true/* mayInterruptIfRunning */);
                 
                 context.getSink().close();
                 
@@ -274,16 +275,6 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
             
         }
 
-        /**
-         * Cancel any running tasks.
-         */
-        private void cancelTasks() {
-
-            for (FutureTask<RunningQuery> ft : tasks)
-                ft.cancel(true/* mayInterruptIfRunning */);
-            
-        }
-        
         /**
          * Run a subquery.
          * 
@@ -338,11 +329,13 @@ abstract public class AbstractSubqueryOp extends PipelineOp {
                     
                 } catch (Throwable t) {
 
-                    // If a subquery fails, then cancel all of the subqueries.
-                    ControllerTask.this.cancelTasks();
-
-                    // rethrow the exception.
-                    throw new RuntimeException(t);
+                    /*
+                     * If a subquery fails, then propagate the error to the
+                     * parent and rethrow the first cause error out of the
+                     * subquery.
+                     */
+                    throw new RuntimeException(ControllerTask.this.context
+                            .getRunningQuery().halt(t));
 
                 } finally {
 

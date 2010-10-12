@@ -1217,17 +1217,6 @@ public class RunningQuery implements Future<Void>, IRunningQuery {
 
     }
 
-    /**
-     * Cancel the query (abnormal termination).
-     * 
-     * @param t
-     *            The cause.
-     *            
-     * @return The first cause.
-     * 
-     * @throws IllegalArgumentException
-     *             if the argument is <code>null</code>.
-     */
     public Throwable halt(final Throwable t) {
 
         if (t == null)

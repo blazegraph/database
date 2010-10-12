@@ -72,4 +72,17 @@ public interface IRunningQuery {
      */
     void halt();
 
+    /**
+     * Cancel the query (abnormal termination).
+     * 
+     * @param t
+     *            The cause.
+     *            
+     * @return The first cause.
+     * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     */
+    Throwable halt(final Throwable t);
+    
 }
