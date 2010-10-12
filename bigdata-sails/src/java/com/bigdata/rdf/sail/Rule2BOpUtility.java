@@ -487,7 +487,7 @@ public class Rule2BOpUtility {
         
         if (true||log.isDebugEnabled()) {
             // just for now while i'm debugging
-            System.err.println("rule=" + rule + "\nquery="
+            log.info ("rule=" + rule + "\nquery="
                     + BOpUtility.toString(left));
         }
         
