@@ -9,6 +9,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.InputStream;
+import java.net.URLEncoder;
 import java.util.Properties;
 
 import org.openrdf.model.Statement;
@@ -620,18 +621,34 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
                         try {
                         	
-                        	System.out.println("looking for "  + resource);
-
                             is = new FileInputStream(new File(resource));
                             baseURI = new File(resource).toURI().toString();
 
                         } catch (FileNotFoundException ex) {
-
-                        	System.out.println("no file, retrieving from resource");
                             is = getClass().getResourceAsStream(resource);
-                            baseURI = getClass().getResource(resource).toURI()
-                                    .toString();
+                            java.net.URL resourceUrl = 
+                                getClass().getResource(resource);
 
+                            //if the resource couldn't be found in the file system
+                            //and couldn't be found by searching from this class'
+                            //package (com.bigdata.rdf.rules) as root, then use
+                            //the class loader to try searching from the root of
+                            //the JAR itself
+                            if (resourceUrl == null) {
+                                is = getClass().getClassLoader().getResourceAsStream(resource);
+                                resourceUrl = 
+                                    getClass().getClassLoader().getResource(resource);
+                            }
+
+                            if (resourceUrl == null) {
+                                log.warn("resource not found ["+resource+"]");
+                                throw new Exception("FAILURE: resource not found ["+resource+"]");
+                            }
+
+                            // must encode before new URI()
+                            baseURI = new java.net.URI(URLEncoder.encode(
+                                    resourceUrl.toString(), "UTF-8"))
+                                    .toString();
                         }
 
                         if (is == null) {
