@@ -631,4 +631,12 @@ public abstract class SPARQLQueryTest extends TestCase {
 		int secLastSlashIdx = manifestFileURL.lastIndexOf('/', lastSlashIdx - 1);
 		return manifestFileURL.substring(secLastSlashIdx + 1, lastSlashIdx);
 	}
+
+	/**
+	 * Made visible to the test suites so we can filter for specific tests.
+	 */
+	public String getTestURI() {
+        return testURI;
+    }
+    
 }

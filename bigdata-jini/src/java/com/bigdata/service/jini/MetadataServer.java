@@ -43,6 +43,7 @@ import net.jini.lookup.entry.Name;
 
 import org.apache.log4j.MDC;
 
+import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
@@ -299,6 +300,18 @@ public class MetadataServer extends DataServer {
             
         }
 
+        /**
+         * Extends the base behavior to return an RMI compatible proxy for the
+         * {@link Future}.
+         */
+        @Override
+        public Future submit(final long tx, final String name,
+                final IIndexProcedure proc) {
+
+            return getFederation().getProxy(super.submit(tx, name, proc));
+
+        }
+        
         /**
          * Extends the base behavior to return a {@link Name} of the service
          * from the {@link Configuration}. If no name was specified in the
