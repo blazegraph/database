@@ -133,17 +133,22 @@ public abstract class SPARQLQueryTest extends TestCase {
 	protected Repository createRepository()
 		throws Exception
 	{
-		Repository repo = newRepository();
-		repo.initialize();
-		RepositoryConnection con = repo.getConnection();
-		try {
-			con.clear();
-			con.clearNamespaces();
-		}
-		finally {
-			con.close();
-		}
-		return repo;
+		/*
+		 * Note: We override this for bigdata and use a new repository instance
+		 * for each test.  See the various subclasses for examples.
+		 */
+		throw new UnsupportedOperationException();
+//		Repository repo = newRepository();
+//		repo.initialize();
+//		RepositoryConnection con = repo.getConnection();
+//		try {
+//			con.clear();
+//			con.clearNamespaces();
+//		}
+//		finally {
+//			con.close();
+//		}
+//		return repo;
 	}
 
 	protected abstract Repository newRepository()
@@ -402,7 +407,12 @@ public abstract class SPARQLQueryTest extends TestCase {
 				in.close();
 			}
 
-			con.setAutoCommit(true);
+			/*
+			 * Modified Oct 11th 2010 by BBT.  Do not enable auto-commit. Just
+			 * commit the connection.
+			 */
+//			con.setAutoCommit(true);
+			con.commit();
 		}
 		finally {
 			con.close();

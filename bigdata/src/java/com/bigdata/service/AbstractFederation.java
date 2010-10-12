@@ -1219,18 +1219,22 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
             final long delay = Long.parseLong(p.getProperty(
                     Options.REPORT_DELAY, Options.DEFAULT_REPORT_DELAY));
 
-            if (log.isInfoEnabled())
-                log.info(Options.REPORT_DELAY + "=" + delay);
+			if (log.isInfoEnabled())
+				log.info(Options.REPORT_DELAY + "=" + delay);
 
-            final TimeUnit unit = TimeUnit.MILLISECONDS;
+			if (delay > 0L) {
 
-            final long initialDelay = delay;
+				final TimeUnit unit = TimeUnit.MILLISECONDS;
 
-            addScheduledTask(new ReportTask(AbstractFederation.this),
-                    initialDelay, delay, unit);
+				final long initialDelay = delay;
 
-            if (log.isInfoEnabled())
-                log.info("Started ReportTask.");
+				addScheduledTask(new ReportTask(AbstractFederation.this),
+						initialDelay, delay, unit);
+
+				if (log.isInfoEnabled())
+					log.info("Started ReportTask.");
+
+			}
 
         }
 
@@ -1346,7 +1350,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                 /*
                  * Report the performance counters to the load balancer.
                  */
-                
+
                 reportPerformanceCounters();
                 
             } catch (Throwable t) {
