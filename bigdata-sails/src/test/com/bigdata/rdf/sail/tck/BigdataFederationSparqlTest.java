@@ -68,7 +68,15 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
     {
         super ( URI, name, query, results, dataSet, laxCardinality ) ;
     }
-   
+
+    @Override public void runTest ()
+        throws Exception
+    {
+        _logger.info ( String.format ( ">>>>> Running test: %s", testURI ) ) ;
+        super.runTest () ;
+        _logger.info ( String.format ( ">>>>> Completed test: %s", testURI ) ) ;
+    }
+
     @Override public void tearDown ()
         throws Exception
     {
@@ -140,7 +148,8 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
 
     private static final Logger _logger = Logger.getLogger ( BigdataFederationSparqlTest.class ) ;
 
-    private JiniFederation<Object> _fed = null ;
+    private static JiniFederation<Object> _fed = null ;
+    private static Properties _properties = null ;
+
     private ScaleOutTripleStore _ts = null ;
-    private Properties _properties = null ;
 }
