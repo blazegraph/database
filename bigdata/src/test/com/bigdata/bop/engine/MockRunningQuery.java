@@ -78,6 +78,11 @@ public class MockRunningQuery implements IRunningQuery {
         log.warn("Mock object does not implement halt()");
     }
 
+    public Throwable halt(Throwable t) {
+        log.warn("Mock object does not implement halt(Throwable)");
+        return t;
+    }
+
     public QueryEngine getQueryEngine() {
         throw new UnsupportedOperationException();
     }

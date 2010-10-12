@@ -78,7 +78,6 @@ import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InGraphHashSetFilter;
 import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
-import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
@@ -235,8 +234,29 @@ public class Rule2BOpUtility {
             final AtomicInteger idFactory, final AbstractTripleStore db,
             final QueryEngine queryEngine) {
 
-        if (step instanceof IRule<?>)
-            return convert((IRule<?>) step, idFactory, db, queryEngine);
+        if (step instanceof IRule<?>) {
+
+            // Convert the step to a bigdata operator tree.
+            PipelineOp tmp = convert((IRule<?>) step, idFactory, db,
+                    queryEngine);
+
+            if (!tmp.getEvaluationContext().equals(
+                    BOpEvaluationContext.CONTROLLER)) {
+                /*
+                 * Wrap with an operator which will be evaluated on the query
+                 * controller.
+                 */
+                tmp = new SliceOp(new BOp[] { tmp }, NV.asMap(//
+                        new NV(BOp.Annotations.BOP_ID, idFactory
+                                .incrementAndGet()), //
+                        new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER)));
+
+            }
+
+            return tmp;
+            
+        }
         
         return convert((IProgram) step, idFactory, db, queryEngine);
 
