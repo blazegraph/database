@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -55,7 +54,6 @@ import org.openrdf.query.algebra.helpers.QueryModelVisitorBase;
 import com.bigdata.BigdataStatics;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
-import com.bigdata.bop.HashBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
@@ -70,7 +68,6 @@ import com.bigdata.bop.constraint.INBinarySearch;
 import com.bigdata.bop.constraint.NE;
 import com.bigdata.bop.constraint.NEConstant;
 import com.bigdata.bop.constraint.OR;
-import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.solutions.ISortOrder;
@@ -103,7 +100,6 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IQueryOptions;
@@ -1718,12 +1714,14 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
         }
 
-        final UUID queryId = UUID.randomUUID();
-        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
-                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
-                        startId, -1/* partitionId */,
-                        newBindingSetIterator(new HashBindingSet())));
-        
+//        final UUID queryId = UUID.randomUUID();
+//        final RunningQuery runningQuery = queryEngine.eval(queryId, query,
+//                new LocalChunkMessage<IBindingSet>(queryEngine, queryId,
+//                        startId, -1/* partitionId */,
+//                        newBindingSetIterator(new HashBindingSet())));
+
+        final RunningQuery runningQuery = queryEngine.eval(query);
+
         final IAsynchronousIterator<IBindingSet[]> it1 = 
             runningQuery.iterator();
         
@@ -1817,20 +1815,20 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         
     }
 
-    /**
-     * Return an {@link IAsynchronousIterator} that will read a single,
-     * empty {@link IBindingSet}.
-     * 
-     * @param bindingSet
-     *            the binding set.
-     */
-    protected ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
-            final IBindingSet bindingSet) {
-
-        return new ThickAsynchronousIterator<IBindingSet[]>(
-                new IBindingSet[][] { new IBindingSet[] { bindingSet } });
-
-    }
+//    /**
+//     * Return an {@link IAsynchronousIterator} that will read a single,
+//     * empty {@link IBindingSet}.
+//     * 
+//     * @param bindingSet
+//     *            the binding set.
+//     */
+//    protected ThickAsynchronousIterator<IBindingSet[]> newBindingSetIterator(
+//            final IBindingSet bindingSet) {
+//
+//        return new ThickAsynchronousIterator<IBindingSet[]>(
+//                new IBindingSet[][] { new IBindingSet[] { bindingSet } });
+//
+//    }
 
     @SuppressWarnings("serial")
     private class UnknownOperatorException extends RuntimeException {

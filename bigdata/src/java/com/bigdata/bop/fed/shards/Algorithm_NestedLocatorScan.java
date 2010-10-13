@@ -45,9 +45,10 @@ class Algorithm_NestedLocatorScan<E extends IBindingSet, F> implements
                 final PartitionLocator locator = itr.next();
 
                 if (log.isTraceEnabled())
-                    log.trace("adding bindingSet to buffer" + ": partitionId="
-                            + locator.getPartitionId() + ", bindingSet="
-                            + bundle.bindingSet);
+					log.trace("adding bindingSet to buffer" + ": partitionId="
+							+ locator.getPartitionId() + "dataService="
+							+ locator.getDataServiceUUID() + ", bindingSet="
+							+ bundle.bindingSet);
 
                 final IBuffer<IBindingSet[]> sink = op.getBuffer(locator);
 
