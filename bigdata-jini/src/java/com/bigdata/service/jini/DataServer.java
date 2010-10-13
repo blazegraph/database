@@ -372,17 +372,27 @@ public class DataServer extends AbstractServer {
 
         }
 
+        /**
+         * Extends the base behavior to return an RMI compatible proxy for the
+         * {@link IQueryEngine}.
+         */
         @Override
         public IQueryPeer getQueryEngine() {
             
-            /*
-             * Note: DGC is not necessary since the DataService has a hard
-             * reference to the QueryEngine.
-             */
-            return getFederation()
-                    .getProxy(super.getQueryEngine(), false/* enableDGC */);
-            
+			synchronized (this) {
+				if (queryPeerProxy == null) {
+					/*
+					 * Note: DGC is not necessary since the DataService has a
+					 * hard reference to the QueryEngine.
+					 */
+					queryPeerProxy = getFederation().getProxy(
+							super.getQueryEngine(), false/* enableDGC */);
+				}
+				return queryPeerProxy;
+			}
+
         }
+        private IQueryPeer queryPeerProxy = null;
         
         /**
          * Extends the base behavior to return a {@link Name} of the service

@@ -87,6 +87,15 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/distinct/manifest#no-distinct-9",
           "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/distinct/manifest#distinct-9",
     });
+
+	/**
+	 * The following tests require Unicode configuration for identical
+	 * comparisons. This appears to work with {ASCII,IDENTICAL} or
+	 * {JDK,IDENTICAL} but not with {ICU,IDENTICAL} for some reason.
+	 */
+    static final Collection<String> unicodeStrengthIdentical = Arrays.asList(new String[] {
+    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/i18n/manifest#normalization-1"
+    });
     
 //    private static String datasetTests = "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/dataset";
 
@@ -176,9 +185,9 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
         "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional-filter/manifest#dawg-optional-filter-004",
 */        
 //      Dataset crap
-        // "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/i18n/manifest#normalization-1"
+//         "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/i18n/manifest#normalization-1",
             
-        // "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/dataset/manifest#dawg-dataset-01"
+//         "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/dataset/manifest#dawg-dataset-01",
             
 //        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2//manifest#",
 //            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-builtin/manifest#dawg-str-1",
@@ -191,6 +200,13 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
 //            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-equals/manifest#eq-graph-1",
 //            "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/expr-equals/manifest#eq-graph-2",
             
+    		/*
+    		 * Tests which fail with 2 data services.
+    		 */
+//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/basic/manifest#bgp-no-match",//Ok
+//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/basic/manifest#prefix-name-1",//OK
+//    		"http://www.w3.org/2001/sw/DataAccess/tests/data-r2/basic/manifest#spoo-1",//BOOM
+    		
     });
 
     /**
@@ -351,10 +367,10 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
         // exact size only there for TCK
         props.setProperty(Options.EXACT_SIZE, "true");
         
-        props.setProperty(Options.COLLATOR, CollatorEnum.ASCII.toString());
+//        props.setProperty(Options.COLLATOR, CollatorEnum.ASCII.toString());
         
 //      Force identical unicode comparisons (assuming default COLLATOR setting).
-        props.setProperty(Options.STRENGTH, StrengthEnum.Identical.toString());
+//        props.setProperty(Options.STRENGTH, StrengthEnum.Identical.toString());
         
         // disable read/write transactions
         props.setProperty(Options.ISOLATABLE_INDICES, "false");
@@ -372,8 +388,16 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
         if (true) {
             final Properties props = getProperties();
             
-            if (cannotInlineTests.contains(testURI))
+            if (cannotInlineTests.contains(testURI)){
+            	// The test can not be run using XSD inlining.
                 props.setProperty(Options.INLINE_LITERALS, "false");
+            }
+            
+            if(unicodeStrengthIdentical.contains(testURI)) {
+            	// Force identical Unicode comparisons.
+            	props.setProperty(Options.COLLATOR, CollatorEnum.JDK.toString());
+            	props.setProperty(Options.STRENGTH, StrengthEnum.Identical.toString());
+            }
             
             final BigdataSail sail = new BigdataSail(props);
             return new DatasetRepository(new BigdataSailRepository(sail));

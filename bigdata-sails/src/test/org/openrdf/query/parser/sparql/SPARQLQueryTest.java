@@ -62,6 +62,7 @@ import org.openrdf.sail.memory.MemoryStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.bigdata.rdf.sail.BigdataSailQuery;
+import com.bigdata.rdf.sail.BigdataSailRepository;
 
 public abstract class SPARQLQueryTest extends TestCase {
 
@@ -164,11 +165,23 @@ public abstract class SPARQLQueryTest extends TestCase {
 		}
 	}
 
+	/**
+	 * Return the connection which will be used to query the repository.
+	 * @param dataRep The repository.
+	 * @return The connection.
+	 * @throws Exception
+	 */
+    protected RepositoryConnection getQueryConnection(Repository dataRep)
+    	throws Exception
+	{
+    	return dataRep.getConnection();
+    }
+	
 	@Override
 	protected void runTest()
 		throws Exception
 	{
-		RepositoryConnection con = dataRep.getConnection();
+		RepositoryConnection con = getQueryConnection(dataRep);
 		try {
 			String queryString = readQueryString();
 			Query query = con.prepareQuery(QueryLanguage.SPARQL, queryString, queryFileURL);

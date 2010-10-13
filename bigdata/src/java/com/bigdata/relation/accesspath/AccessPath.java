@@ -390,6 +390,11 @@ public class AccessPath<R> implements IAccessPath<R> {
 
             if (ndx == null) {
 
+//            	// For debugging only - comment this out.
+//				dumpMDI((AbstractScaleOutFederation<?>) relation
+//						.getIndexManager(), relation.getNamespace(), timestamp,
+//						keyOrder);
+
                 throw new RuntimeException("No such index: relation="
                         + relation.getNamespace() + ", timestamp=" + timestamp
                         + ", keyOrder=" + keyOrder + ", pred=" + predicate
@@ -1687,5 +1692,34 @@ public class AccessPath<R> implements IAccessPath<R> {
      *       we could then parse.
      */
     private static final DiskCostModel diskCostModel = DiskCostModel.DEFAULT;
+
+//	/**
+//	 * Dumps the locators for an index of a relation.
+//	 * 
+//	 * @param fed
+//	 * @param namespace
+//	 *            The relation namespace.
+//	 * @param timestamp
+//	 *            The timestamp of the view.
+//	 * @param keyOrder
+//	 *            The index.
+//	 */
+//	private static void dumpMDI(AbstractScaleOutFederation<?> fed,
+//			final String namespace, final long timestamp,
+//			final IKeyOrder<?> keyOrder) {
+//
+//		final String name = namespace + "." + keyOrder.getIndexName();
+//
+//		final Iterator<PartitionLocator> itr = fed
+//				.locatorScan(name, timestamp, new byte[] {}/* fromKey */,
+//						null/* toKey */, false/* reverseScan */);
+//
+//		System.err.println("name=" + name + " @ "
+//				+ TimestampUtility.toString(timestamp));
+//		while (itr.hasNext()) {
+//			System.err.println(itr.next());
+//		}
+//
+//	}
 
 }

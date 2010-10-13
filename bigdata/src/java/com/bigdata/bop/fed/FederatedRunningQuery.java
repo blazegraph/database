@@ -46,6 +46,7 @@ import com.bigdata.bop.engine.IChunkMessage;
 import com.bigdata.bop.engine.IQueryClient;
 import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.bop.engine.LocalChunkMessage;
+import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.RunningQuery;
 import com.bigdata.bop.fed.shards.MapBindingSetsOverShardsBuffer;
 import com.bigdata.io.DirectBufferPool;
@@ -313,19 +314,20 @@ public class FederatedRunningQuery extends RunningQuery {
         
     }
 
-    /**
-     * Resolve the proxy for an {@link IQueryPeer}. This is special cased for
-     * both <i>this</i> service (the actual reference is returned) and the query
-     * controller (we use an alternative path to discover the query controller
-     * since it might not be registered against a lookup service if it is not a
-     * data service).
-     * 
-     * @param serviceUUID
-     *            The service identifier for the peer.
-     * 
-     * @return The proxy for the service or <code>null</code> if the service
-     *         could not be discovered.
-     */
+	/**
+	 * Resolve the proxy for an {@link IQueryPeer}. This is special cased for
+	 * both <i>this</i> service (the actual reference is returned) and the query
+	 * controller (we use an alternative path to discover the query controller
+	 * since it might not be registered against a lookup service if it is not a
+	 * data service).
+	 * 
+	 * @param serviceUUID
+	 *            The service identifier for the peer.
+	 * 
+	 * @return The proxy for the service, the actual {@link QueryEngine}
+	 *         reference if the identified service is <i>this</i> service, or
+	 *         <code>null</code> if the service could not be discovered.
+	 */
     protected IQueryPeer getQueryPeer(final UUID serviceUUID) {
 
         if (serviceUUID == null)
@@ -334,9 +336,16 @@ public class FederatedRunningQuery extends RunningQuery {
         final IQueryPeer queryPeer;
         
         if(serviceUUID.equals(getQueryEngine().getServiceUUID())) {
-        
-            // Return a hard reference to this query engine (NOT a proxy).
-            return getQueryEngine();
+
+			/*
+			 * Return a hard reference to this query engine (NOT a proxy).
+			 * 
+			 * Note: This is used to avoid RMI when the message will be consumed
+			 * by the service which produced that message. This is a deliberate
+			 * performance optimization which is supported by all of the data
+			 * structures involved.
+			 */
+            queryPeer = getQueryEngine();
             
         } else if (serviceUUID.equals(queryControllerUUID)) {
         

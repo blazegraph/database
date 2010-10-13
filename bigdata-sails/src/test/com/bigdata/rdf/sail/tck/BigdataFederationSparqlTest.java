@@ -35,12 +35,16 @@ import org.openrdf.query.Dataset;
 import org.openrdf.query.parser.sparql.ManifestTest;
 import org.openrdf.query.parser.sparql.SPARQLQueryTest;
 import org.openrdf.repository.Repository;
+import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.dataset.DatasetRepository;
 
+import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.jini.JiniClient;
@@ -52,6 +56,7 @@ import com.bigdata.service.jini.JiniFederation;
  * in its own bigdata namespace.
  * 
  * @author <a href="mailto:dmacgbr@users.sourceforge.net">David MacMillan</a>
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class BigdataFederationSparqlTest extends SPARQLQueryTest
@@ -123,14 +128,29 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
         throws Exception
     {
         super.tearDown () ;
-        _ts.destroy () ;
-        _ts = null ;
-    }
+		/*
+		 * @todo We should destroy the triple store here, but this is causing
+		 * problems with tear down of the query while it is still running. Once
+		 * that issue has been fixed, uncomment both the line to destroy the
+		 * triple store and the line to shutdown the federation (the latter is
+		 * really optional - it should be Ok to leave the federation up across
+		 * the test runs, but then we will never take it down cleanly when the
+		 * test suite is done. Again, that should be Ok.)
+		 */
+		if (_ts != null) {
+//			_ts.destroy();
+			_ts = null;
+		}
+//		if (_fed != null) {
+//			_fed.shutdownNow();
+//			_fed = null;
+//		}
+	}
 
     @Override protected Repository newRepository ()
         throws Exception
     {
-        return new DatasetRepository ( new BigdataSailRepository ( new BigdataSail ( newTripleStore () ) ) ) ;
+        return new DatasetRepository ( new BigdataSailRepository ( _sail = new BigdataSail ( newTripleStore () ) ) ) ;
     }
 
     @Override
@@ -139,6 +159,15 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
         repo.initialize();
         return repo;
     }
+
+	protected RepositoryConnection getQueryConnection(Repository dataRep)
+			throws Exception {
+		// return dataRep.getConnection();
+		final BigdataSailRepositoryConnection con = new BigdataSailRepositoryConnection(new BigdataSailRepository(
+				_sail), _sail.getReadOnlyConnection());
+		System.err.println(_sail.getDatabase().dumpStore());
+		return con;
+	}
 
     private ScaleOutTripleStore newTripleStore ()
         throws Exception
@@ -176,163 +205,105 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
 	/**
 	 * Configuration options for the KB instances used to run the SPARQL
 	 * compliance test suite.
+	 * <p>
+	 * Note: These properties can not be cached across tests since they have to
+	 * be slightly different for some of the tests to handle things like tests
+	 * which will fail with inlining enabled ot tests which require Unicode
+	 * collation strength of IDENTICAL.
 	 */
     private Properties getProperties () throws Exception
     {
-//    	Note: This approach does not work because we are using a different namespace for each test.
-//        /*
-//         * Pick up properties configured for the client as defaults.
-//         * 
-//         * You can specify those properties using NV[] for the component.
-//         */
-//        final String component = System.getProperty ( COMPONENT_PROPERTY, DEFAULT_COMPONENT_PROPERTY ) ;
-//        final Properties properties = getFederation().getClient().getProperties(
-//                component);
-//        return properties;
-        if ( null == _properties )
-        {
-        	
-//    	    /* Multiplier for the scatter effect.
-//    	     */
-//    	    final int scatterFactor = 1;
-//    	    final int scatterFactor_term2id = 1;
-//    	    final int dataServiceCount = 2;
-//
-//    	    /* The #of index partitions to allocate on a scatter split.  ZERO
-//    	     * (0) means that 2 index partitions will be allocated per
-//    	     * data service which partiticpates in the scatter split.
-//    	     * Non-zero values directly give the #of index partitions to
-//    	     * create.  
-//    	     */
-//    	    final int scatterSplitIndexPartitionCount = ConfigMath.multiply
-//    		( scatterFactor,
-//    		  dataServiceCount
-//    		  );
-//    	    final int scatterSplitIndexPartitionCount_term2id = ConfigMath.multiply
-//    		( scatterFactor_term2id,
-//    		  dataServiceCount
-//    		  );
-//
-//    	    // Use all discovered data services when scattering an index.
-//    	    final int scatterSplitDataServiceCount = 0;
-//
-//    	    /* Scatter split trigger point.  The scatter split will not be
-//    	     * triggered until the initial index partition has reached
-//    	     * this percentage of a nominal index partition in size.
-//    	     */
-//    	    final double scatterSplitPercentOfSplitThreshold = 0.5;//was .5
-//
-//    		/* 
-//    		 * Multipliers that compensate for the consumer/producer ratio for
-//    		 * the asynchronous index write API.  These are empirical factors
-//    		 * based on observing the ratio (chunkWritingTime/chunkWaitingTime).
-//    		 * Assuming a constant chunk writing time, if the chunk size for each
-//    		 * index is adjusted by its multiplier then this ratio would be 1:1.
-//    		 * In practice, the chunk writing time is not a linear function of
-//    		 * the chunk size, which is one reason why we prefer larger chunks
-//    		 * and why the asynchronous write API is a win.
-//    		 *
-//    		 * Note: These factors were set relative to TERM2ID.  However, when
-//    		 * I reduced the scatterFactor for TERM2ID by 1/2, I doubled its
-//    		 * chunk size to keep up the same throughput so it is now at 2.00
-//    		 * rather than 1.00.
-//    		 */
-//    	    final double chunkSizeFactor_id2term =  1.79;
-//    		final double chunkSizeFactor_term2id =  2.00;
-//    		final double chunkSizeFactor_stmts   =  8.00;
-//    		
-//    		/* The nominal sink chunk size.  For each index, this is adjusted
-//    		 * by the factor specified above.
-//    		 */
-////        		static private sinkChunkSize = 10000;
-//    		final int sinkChunkSize = 1000;
-        		 
-    	    /*
-    	     * Specify / override some triple store properties.
-    	     *
-    	     * Note: You must reference this object in the section for the
-    	     * component which will actually create the KB instance, e.g.,
-    	     * either the RDFDataLoadMaster or the LubmGeneratorMaster.
-    	     */
-            _properties = new Properties ();
-            
-            /*
-             * Setup for quads.
-             */
-            _properties.put ( BigdataSail.Options.QUADS_MODE, "true" );
-            _properties.put ( BigdataSail.Options.TRUTH_MAINTENANCE, "false" );
-            _properties.put ( BigdataSail.Options.QUERY_TIME_EXPANDER, "false" );
-            
-			/*
-			 * The Sesame TCK forces statement level connection auto-commit so
-			 * we set a flag to permit that here. However, auto-commit and this
-			 * flag SHOULD NOT be used outside of the test suite as they provide
-			 * an extreme performance penalty.
-			 */
-            //_properties.put ( BigdataSail.Options.ALLOW_AUTO_COMMIT, "true" ) ;
-
-			/*
-			 * Provide Unicode support for keys with locale-based string
-			 * collation. This is more expensive in key creation during loading,
-			 * but allows key comparison and sorting in the specified locale in
-			 * queries.
-			 * 
-			 * @see com.bigdata.btree.keys.CollatorEnum
-			 */
-    	    _properties.put(KeyBuilder.Options.COLLATOR,"ICU");
-    	    _properties.put(KeyBuilder.Options.USER_LANGUAGE,"en");
-    	    _properties.put(KeyBuilder.Options.USER_COUNTRY,"US");
-    	    _properties.put(KeyBuilder.Options.USER_VARIANT,"");
-
-			/*
-			 * Turn off the full text index (search for literals by keyword).
-			 */
-			_properties.put(BigdataSail.Options.TEXT_INDEX, "false");
-
-			/*
-			 * Turn on bloom filter for the SPO index (good up to ~2M index
-			 * entries for scale-up -or- for any size index for scale-out). This
-			 * is a big win for some queries on scale-out indices since we can
-			 * avoid touching the disk if the bloom filter reports "false" for a
-			 * key.
-			 */
-			_properties.put(BigdataSail.Options.BLOOM_FILTER, "true");
-
-			/*
-			 * The #of low order bits from the TERM2ID index partition local
-			 * counter that will be reversed and written into the high-order
-			 * bits of the term identifier. This has a strong effect on the
-			 * distribution of bulk index read/write operations for the triple
-			 * store. For a given value of N, a bulk write will tend to touch
-			 * 2^N index partitions. Therefore if this is even roughly on the
-			 * order of the number of index partitions, each bulk write will
-			 * tend to be scattered to all index partitions.
-			 * 
-			 * Note: If this value is too large then the writes WITHIN the index
-			 * partitions will become uniformly distributed, which will
-			 * negatively impact index performance.
-			 */
-			_properties.put(BigdataSail.Options.TERMID_BITS_TO_REVERSE,"0"); // was 2.
-        	        
-			/*
-			 * Option may be enabled to store blank nodes such that they are
-			 * stable (they are not stored by default).
-			 */
-			// new NV(BigdataSail.Options.STORE_BLANK_NODES,"true");
-
-        }
+		final Properties _properties;
 
 		/*
-		 * Turn inlining on or off depending on _this_ test. This is outside of
-		 * the if block above because _properties is cached.
+		 * Specify / override some triple store properties.
+		 * 
+		 * Note: You must reference this object in the section for the component
+		 * which will actually create the KB instance, e.g., either the
+		 * RDFDataLoadMaster or the LubmGeneratorMaster.
 		 */
-        if (BigdataSparqlTest.cannotInlineTests.contains(testURI)) {
-            _properties.setProperty(Options.INLINE_LITERALS, "false");
-        } else {
-        	_properties.setProperty(Options.INLINE_LITERALS, "true");
-        }
-        
-        return _properties ;
+		_properties = new Properties();
+
+		/*
+		 * Setup for quads.
+		 */
+		_properties.put(BigdataSail.Options.QUADS_MODE, "true");
+		_properties.put(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
+		_properties.put(BigdataSail.Options.QUERY_TIME_EXPANDER, "false");
+
+		/*
+		 * The Sesame TCK forces statement level connection auto-commit so we
+		 * set a flag to permit that here. However, auto-commit and this flag
+		 * SHOULD NOT be used outside of the test suite as they provide an
+		 * extreme performance penalty.
+		 */
+		// _properties.put ( BigdataSail.Options.ALLOW_AUTO_COMMIT, "true" ) ;
+
+		/*
+		 * Provide Unicode support for keys with locale-based string collation.
+		 * This is more expensive in key creation during loading, but allows key
+		 * comparison and sorting in the specified locale in queries.
+		 * 
+		 * @see com.bigdata.btree.keys.CollatorEnum
+		 */
+		_properties.put(KeyBuilder.Options.COLLATOR, "ICU");
+		_properties.put(KeyBuilder.Options.USER_LANGUAGE, "en");
+		_properties.put(KeyBuilder.Options.USER_COUNTRY, "US");
+		_properties.put(KeyBuilder.Options.USER_VARIANT, "");
+
+		/*
+		 * Turn off the full text index (search for literals by keyword).
+		 */
+		_properties.put(BigdataSail.Options.TEXT_INDEX, "false");
+
+		/*
+		 * Turn on bloom filter for the SPO index (good up to ~2M index entries
+		 * for scale-up -or- for any size index for scale-out). This is a big
+		 * win for some queries on scale-out indices since we can avoid touching
+		 * the disk if the bloom filter reports "false" for a key.
+		 */
+		_properties.put(BigdataSail.Options.BLOOM_FILTER, "true");
+
+		/*
+		 * The #of low order bits from the TERM2ID index partition local counter
+		 * that will be reversed and written into the high-order bits of the
+		 * term identifier. This has a strong effect on the distribution of bulk
+		 * index read/write operations for the triple store. For a given value
+		 * of N, a bulk write will tend to touch 2^N index partitions. Therefore
+		 * if this is even roughly on the order of the number of index
+		 * partitions, each bulk write will tend to be scattered to all index
+		 * partitions.
+		 * 
+		 * Note: If this value is too large then the writes WITHIN the index
+		 * partitions will become uniformly distributed, which will negatively
+		 * impact index performance.
+		 */
+		_properties.put(BigdataSail.Options.TERMID_BITS_TO_REVERSE, "0");
+
+		/*
+		 * Option may be enabled to store blank nodes such that they are stable
+		 * (they are not stored by default).
+		 */
+		// new NV(BigdataSail.Options.STORE_BLANK_NODES,"true");
+
+		/*
+		 * Turn inlining on or off depending on _this_ test.
+		 */
+		if (BigdataSparqlTest.cannotInlineTests.contains(testURI)) {
+			_properties.setProperty(Options.INLINE_LITERALS, "false");
+		} else {
+			_properties.setProperty(Options.INLINE_LITERALS, "true");
+		}
+
+		if (BigdataSparqlTest.unicodeStrengthIdentical.contains(testURI)) {
+			// Force identical Unicode comparisons.
+			_properties.setProperty(Options.COLLATOR, CollatorEnum.JDK
+					.toString());
+			_properties.setProperty(Options.STRENGTH, StrengthEnum.Identical
+					.toString());
+		}
+
+		return _properties;
     }
 
 	/**
@@ -340,21 +311,11 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
 	 */
 	public static final String CONFIG_PROPERTY = "bigdata.configuration";
 	
-//	/**
-//	 * The name of the component in that configuration file whose "properties"
-//	 * field will be used to initialize the KB.
-//	 */
-//    public static final String COMPONENT_PROPERTY = "bigdata.component" ;
-//
-//    /**
-//     * The default value for {@link #COMPONENT_PROPERTY}.
-//     */
-//    public static final String DEFAULT_COMPONENT_PROPERTY = "SparqlQuadsTestSuite";
-    
     private static final Logger _logger = Logger.getLogger ( BigdataFederationSparqlTest.class ) ;
 
     private static JiniFederation<Object> _fed = null ;
-    private static Properties _properties = null ;
 
     private ScaleOutTripleStore _ts = null ;
+    private BigdataSail _sail = null;
+    
 }

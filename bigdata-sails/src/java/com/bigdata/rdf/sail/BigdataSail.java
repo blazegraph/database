@@ -114,11 +114,11 @@ import org.openrdf.sail.SailException;
 
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.internal.IV;
@@ -153,6 +153,7 @@ import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.IChunkedIterator;
@@ -1163,7 +1164,7 @@ public class BigdataSail extends SailBase implements Sail {
     public BigdataSailConnection getReadOnlyConnection() {
         
         final long timestamp = database.getIndexManager().getLastCommitTime();
-        
+
         return getReadOnlyConnection(timestamp);
         
     }
@@ -1178,14 +1179,117 @@ public class BigdataSail extends SailBase implements Sail {
      * 
      * @return The view.
      */
-    public BigdataSailConnection getReadOnlyConnection(long timestamp) {
+    public BigdataSailConnection getReadOnlyConnection(final long timestamp) {
         
-        AbstractTripleStore view = (AbstractTripleStore) database
-            .getIndexManager().getResourceLocator().locate(
-                    database.getNamespace(),
-                    TimestampUtility.asHistoricalRead(timestamp));
+//        AbstractTripleStore view = (AbstractTripleStore) database
+//            .getIndexManager().getResourceLocator().locate(
+//                    database.getNamespace(),
+//                    TimestampUtility.asHistoricalRead(timestamp));
+//
+//        return new BigdataSailConnection(view, null);
 
-        return new BigdataSailConnection(view, null);
+    	try {
+			return _getReadOnlyConnection(timestamp);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+    	
+    }
+        
+    /**
+     * Return a read-only connection backed by a read-only transaction.  The
+     * transaction will be closed when the connection is closed.
+     * @param timestamp The timestamp.
+     * @return The transaction.
+     * @throws IOException
+     * @see ITransactionService#newTx(long)
+     */
+    private BigdataSailConnection _getReadOnlyConnection(final long timestamp) throws IOException {
+    	
+        final String namespace = database.getNamespace();
+
+        final IIndexManager indexManager = database.getIndexManager();
+
+        final ITransactionService txService = getTxService();
+        
+        return new BigdataSailConnection(null/*lock*/) {
+
+            /**
+             * The transaction id.
+             */
+            private long tx;
+
+            /**
+             * Constructor starts a new transaction.
+             */
+            {
+                newTx();
+            }
+            
+            /**
+             * Obtain a new read-only transaction from the journal's
+             * transaction service, and attach this SAIL connection to the new
+             * view of the database. 
+             */
+            protected void newTx() throws IOException {
+                
+                this.tx = txService.newTx(timestamp);
+
+                final AbstractTripleStore txView = (AbstractTripleStore) indexManager
+                        .getResourceLocator().locate(namespace, tx);
+                
+                attach(txView);
+                
+            }
+
+            /**
+             * NOP
+             */
+            @Override
+            public synchronized void commit() throws SailException {
+
+            	// NOP.
+            	
+            }
+            
+            /**
+             * NOP
+             */
+            @Override
+            public synchronized void rollback() throws SailException {
+
+            	// NOP
+            	
+            }
+            
+            /**
+             * A specialized close that will also abort the current read-only
+             * transaction.
+             */
+            @Override
+            public synchronized void close() throws SailException {
+
+                if (!isOpen()) {
+                    
+                    return;
+                    
+                }
+                
+                super.close();
+                
+                try {
+
+                    txService.abort(tx);
+                
+                } catch(IOException ex) {
+                        
+                    throw new SailException(ex);
+                    
+                }
+                
+            }
+
+        };
         
     }
     
@@ -1204,9 +1308,13 @@ public class BigdataSail extends SailBase implements Sail {
         
         final IIndexManager indexManager = database.getIndexManager();
 
-        // @todo no way to get the txService here w/o a cast?
-        final ITransactionService txService = ((Journal) indexManager)
-                .getTransactionManager().getTransactionService();
+        if(indexManager instanceof IBigdataFederation<?>) {
+
+        	throw new UnsupportedOperationException("Read/write transactions are not yet supported in scale-out.");
+        	
+        }
+        
+        final ITransactionService txService = getTxService();
         
         final String namespace = database.getNamespace();
         
@@ -1344,12 +1452,36 @@ public class BigdataSail extends SailBase implements Sail {
         
     }
     
+    /**
+     * Return the {@link ITransactionService}.
+     */
+	protected ITransactionService getTxService() {
+
+		final IIndexManager indexManager = database.getIndexManager();
+
+		final ITransactionService txService;
+
+		if (indexManager instanceof AbstractJournal) {
+
+			txService = ((Journal) indexManager).getTransactionManager()
+					.getTransactionService();
+
+		} else {
+
+			txService = ((AbstractFederation<?>) indexManager)
+					.getTransactionService();
+
+		}
+
+		return txService;
+
+	}
+    
     public QueryEngine getQueryEngine() {
         
         return queryEngine;
         
     }
-    
     
     /**
      * Inner class implements the {@link SailConnection}. Some additional

@@ -43,9 +43,9 @@ import net.jini.lookup.entry.Name;
 
 import org.apache.log4j.MDC;
 
+import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.DataService.DataServiceFederationDelegate;
 import com.sun.jini.start.LifeCycle;
@@ -300,6 +300,28 @@ public class MetadataServer extends DataServer {
             
         }
 
+        /**
+         * Extends the base behavior to return an RMI compatible proxy for the
+         * {@link IQueryEngine}.
+         */
+        @Override
+        public IQueryPeer getQueryEngine() {
+            
+			synchronized (this) {
+				if (queryPeerProxy == null) {
+					/*
+					 * Note: DGC is not necessary since the DataService has a
+					 * hard reference to the QueryEngine.
+					 */
+					queryPeerProxy = getFederation().getProxy(
+							super.getQueryEngine(), false/* enableDGC */);
+				}
+				return queryPeerProxy;
+			}
+
+        }
+        private IQueryPeer queryPeerProxy = null;
+        
         /**
          * Extends the base behavior to return an RMI compatible proxy for the
          * {@link Future}.
