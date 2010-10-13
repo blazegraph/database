@@ -128,15 +128,6 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
         throws Exception
     {
         super.tearDown () ;
-		/*
-		 * @todo We should destroy the triple store here, but this is causing
-		 * problems with tear down of the query while it is still running. Once
-		 * that issue has been fixed, uncomment both the line to destroy the
-		 * triple store and the line to shutdown the federation (the latter is
-		 * really optional - it should be Ok to leave the federation up across
-		 * the test runs, but then we will never take it down cleanly when the
-		 * test suite is done. Again, that should be Ok.)
-		 */
 		if (_ts != null) {
 			_ts.destroy();
 			_ts = null;
@@ -313,8 +304,11 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
 	
     private static final Logger _logger = Logger.getLogger ( BigdataFederationSparqlTest.class ) ;
 
-    private static JiniFederation<Object> _fed = null ;
-
+    /*
+     * Instance fields for the current test.
+     */
+    
+    private JiniFederation<Object> _fed = null ;
     private ScaleOutTripleStore _ts = null ;
     private BigdataSail _sail = null;
     
