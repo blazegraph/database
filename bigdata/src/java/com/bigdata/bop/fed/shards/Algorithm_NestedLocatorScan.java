@@ -1,10 +1,12 @@
 package com.bigdata.bop.fed.shards;
 
+import java.util.Arrays;
 import java.util.Iterator;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -31,8 +33,48 @@ class Algorithm_NestedLocatorScan<E extends IBindingSet, F> implements
 
     public void mapOverShards(final Bundle<F>[] bundles) {
 
-        for (Bundle<F> bundle : bundles) {
+		/*
+		 * Sort the binding sets in the chunk by the fromKey associated with
+		 * each asBound predicate.
+		 */
+		Arrays.sort(bundles);
 
+		// The most recently discovered locator.
+		PartitionLocator current = null;
+		
+//		// The list of binding sets which are bound for the current locator.
+//		List<IBindingSet> list = new LinkedList<IBindingSet>();
+		
+		final Iterator<Bundle<F>> bitr = Arrays.asList(bundles).iterator();
+
+		while(bitr.hasNext()) {
+			
+			final Bundle<F> bundle = bitr.next();
+
+			if (current != null
+					&& BytesUtil.rangeCheck(bundle.fromKey, current
+							.getLeftSeparatorKey(), current
+							.getRightSeparatorKey())
+					&& BytesUtil.rangeCheck(bundle.toKey, current
+							.getLeftSeparatorKey(), current
+							.getRightSeparatorKey())) {
+
+				/*
+				 * Optimization when the bundle fits inside of the last index
+				 * partition scanned (this optimization is only possible when
+				 * the asBound predicate will be mapped onto a single index
+				 * partition, but this is a very common case since we try to
+				 * choose selective indices for access paths).
+				 */
+				
+                final IBuffer<IBindingSet[]> sink = op.getBuffer(current);
+
+                sink.add(new IBindingSet[] { bundle.bindingSet });
+
+                continue;
+                
+			}
+			
             /*
              * Locator scan for the index partitions for that predicate as
              * bound.
@@ -42,11 +84,12 @@ class Algorithm_NestedLocatorScan<E extends IBindingSet, F> implements
 
             while (itr.hasNext()) {
 
-                final PartitionLocator locator = itr.next();
+                final PartitionLocator locator = current = itr.next();
 
                 if (log.isTraceEnabled())
-					log.trace("adding bindingSet to buffer" + ": partitionId="
-							+ locator.getPartitionId() + "dataService="
+					log.trace("adding bindingSet to buffer" + ": asBound="
+							+ bundle.asBound + ", partitionId="
+							+ locator.getPartitionId() + ", dataService="
 							+ locator.getDataServiceUUID() + ", bindingSet="
 							+ bundle.bindingSet);
 
@@ -57,6 +100,7 @@ class Algorithm_NestedLocatorScan<E extends IBindingSet, F> implements
             }
 
         }
+        
     }
 
 }

@@ -8,6 +8,7 @@ package org.openrdf.query.parser.sparql;
 import info.aduna.io.IOUtil;
 import info.aduna.iteration.Iterations;
 import info.aduna.text.StringUtil;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -17,8 +18,10 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -61,8 +64,8 @@ import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.sail.memory.MemoryStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import com.bigdata.rdf.sail.BigdataSailQuery;
-import com.bigdata.rdf.sail.BigdataSailRepository;
 
 public abstract class SPARQLQueryTest extends TestCase {
 
@@ -295,7 +298,7 @@ public abstract class SPARQLQueryTest extends TestCase {
 			}
 
             RepositoryConnection con = ((DatasetRepository)dataRep).getDelegate().getConnection();
-            System.err.println(con.getClass());
+//            System.err.println(con.getClass());
             try {
                 String queryString = readQueryString();
                 Query query = con.prepareQuery(QueryLanguage.SPARQL, queryString, queryFileURL);
