@@ -55,6 +55,10 @@ public class BufferedWrite {
 		m_data = DirectBufferPool.INSTANCE.acquire();
 	}
 	
+	public void release() throws InterruptedException {
+		DirectBufferPool.INSTANCE.release(m_data);
+	}
+	
 	public int write(final long offset, final ByteBuffer data, final IReopenChannel<FileChannel> opener) throws IOException {
 		int nwrites = 0;
 		
