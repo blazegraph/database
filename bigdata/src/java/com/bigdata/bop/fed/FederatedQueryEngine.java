@@ -540,7 +540,13 @@ public class FederatedQueryEngine extends QueryEngine {
      */
     protected IQueryPeer getQueryPeer(final UUID serviceUUID) {
 
+		if (serviceUUID == null)
+			throw new IllegalArgumentException();
+
         IQueryPeer proxy = proxyMap.get(serviceUUID);
+
+//		if(log.isTraceEnabled()) log.trace("serviceUUID=" + serviceUUID
+//				+ (proxy != null ? "cached=" + proxy : " not cached."));
 
         if (proxy == null) {
 
@@ -556,7 +562,14 @@ public class FederatedQueryEngine extends QueryEngine {
                 throw new RuntimeException(e);
             }
 
-            proxyMap.put(serviceUUID, proxy);
+            IQueryPeer tmp = proxyMap.putIfAbsent(serviceUUID, proxy);
+            
+			if (tmp != null) {
+				proxy = tmp;
+			}
+
+//			if(log.isTraceEnabled()) log.trace("serviceUUID=" + serviceUUID + ", addedToCache="
+//					+ (tmp == null) + ", proxy=" + proxy);
 
         }
 

@@ -292,26 +292,36 @@ public abstract class MapBindingSetsOverShardsBuffer<E extends IBindingSet, F>
         @SuppressWarnings("unchecked")
         final Bundle<F>[] bundles = new Bundle[chunk.length];
 
-        /*
-         * Create the asBound version of the predicate and the associated
-         * fromKey for each bindingSet in the chunk.
-         */
-        for (int i = 0; i < chunk.length; i++) {
+		/*
+		 * Create the asBound version of the predicate and the associated
+		 * fromKey for each bindingSet in the chunk.
+		 */
+		for (int i = 0; i < chunk.length; i++) {
 
-            final IKeyOrder<F> keyOrder = relation.getKeyOrder(pred);
+			// an intermediate solution.
+			final IBindingSet bindingSet = chunk[i];
 
-            final IKeyBuilder keyBuilder = relation.getIndex(keyOrder)
-                    .getIndexMetadata().getKeyBuilder();
-            
-            bundles[i] = new Bundle<F>(keyBuilder, pred, keyOrder, chunk[i]);
-            
-        }
+			// the asBound version of the predicate.
+			final IPredicate<F> asBound = pred.asBound(bindingSet);
 
-        /*
-         * Sort the binding sets in the chunk by the fromKey associated with
-         * each asBound predicate.
-         */
-        Arrays.sort(bundles);
+			// the index which will be used for that asBound predicate.
+			final IKeyOrder<F> keyOrder = relation.getKeyOrder(asBound);
+
+			// the key builder associated with that index.
+			final IKeyBuilder keyBuilder = relation.getIndex(keyOrder)
+					.getIndexMetadata().getKeyBuilder();
+
+			// save the bundle for processing.
+			bundles[i] = new Bundle<F>(keyBuilder, asBound, keyOrder,
+					bindingSet);
+
+		}
+
+//        /*
+//         * Sort the binding sets in the chunk by the fromKey associated with
+//         * each asBound predicate. [Sort is moved into the implementation.]
+//         */
+//        Arrays.sort(bundles);
 
         /*
          * Map the bundles over the shards.

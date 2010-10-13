@@ -138,13 +138,13 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
 		 * test suite is done. Again, that should be Ok.)
 		 */
 		if (_ts != null) {
-//			_ts.destroy();
+			_ts.destroy();
 			_ts = null;
 		}
-//		if (_fed != null) {
-//			_fed.shutdownNow();
-//			_fed = null;
-//		}
+		if (_fed != null) {
+			_fed.shutdownNow();
+			_fed = null;
+		}
 	}
 
     @Override protected Repository newRepository ()
@@ -188,7 +188,7 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
         return _fed ;
     }
 
-    private String getConfiguration ()
+    static private String getConfiguration ()
         throws Exception
     {
         String c = System.getProperty ( CONFIG_PROPERTY ) ;
@@ -318,4 +318,62 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
     private ScaleOutTripleStore _ts = null ;
     private BigdataSail _sail = null;
     
+//	/**
+//	 * Dumps the locators for an index of a relation.
+//	 * 
+//	 * @param fed
+//	 * @param namespace
+//	 *            The relation namespace.
+//	 * @param timestamp
+//	 *            The timestamp of the view.
+//	 * @param keyOrder
+//	 *            The index.
+//	 */
+//	private static void dumpMDI(AbstractScaleOutFederation<?> fed,
+//			final String namespace, final long timestamp,
+//			final IKeyOrder<?> keyOrder) {
+//
+//		final String name = namespace + "." + keyOrder.getIndexName();
+//
+//		final Iterator<PartitionLocator> itr = fed
+//				.locatorScan(name, timestamp, new byte[] {}/* fromKey */,
+//						null/* toKey */, false/* reverseScan */);
+//
+//		System.err.println("name=" + name + " @ "
+//				+ TimestampUtility.toString(timestamp));
+//		
+//		while (itr.hasNext()) {
+//		
+//			System.err.println(itr.next());
+//			
+//		}
+//
+//	}
+//	
+//	public static void main(String[] args) throws ConfigurationException,
+//			Exception {
+//
+//		String namespace = "SPARQLTest_14e097f5-eba9-4ff8-a250-a5f9f19b9c66.spo";
+//		
+//		long timestamp=1287001362979L;
+//		
+//		IKeyOrder<?> keyOrder = SPOKeyOrder.SPOC;
+//		
+//		JiniClient<Object> jc = new JiniClient<Object>(
+//				new String[] { getConfiguration() });
+//		
+//		try {
+//		
+//			final JiniFederation<?> fed = jc.connect();
+//			
+//			dumpMDI(fed, namespace, timestamp, keyOrder);
+//			
+//		} finally {
+//
+//			jc.disconnect(true/* immediate */);
+//			
+//		}
+//
+//	}
+
 }

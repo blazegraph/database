@@ -30,12 +30,12 @@ class Bundle<F> implements Comparable<Bundle<F>> {
     /** The toKey generated from that asBound predicate. */
     final byte[] toKey;
 
-    public Bundle(final IKeyBuilder keyBuilder, final IPredicate<F> pred,
+    public Bundle(final IKeyBuilder keyBuilder, final IPredicate<F> asBound,
             final IKeyOrder<F> keyOrder, final IBindingSet bindingSet) {
 
         this.bindingSet = bindingSet;
 
-        this.asBound = pred.asBound(bindingSet);
+        this.asBound = asBound;
 
         this.keyOrder = keyOrder;
         

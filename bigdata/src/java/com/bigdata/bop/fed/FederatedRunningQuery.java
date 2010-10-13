@@ -347,14 +347,21 @@ public class FederatedRunningQuery extends RunningQuery {
 			 */
             queryPeer = getQueryEngine();
             
+//            if(log.isTraceEnabled()) log.trace("Target is self: "+serviceUUID);
+            
         } else if (serviceUUID.equals(queryControllerUUID)) {
         
             // The target is the query controller.
             queryPeer = getQueryController();
-            
+
+//            if(log.isTraceEnabled()) log.trace("Target is controller: "+serviceUUID);
+
         } else {
             
             // The target is some data service.
+        	
+//            if(log.isTraceEnabled()) log.trace("Target is peer: "+serviceUUID);
+
             queryPeer = getQueryEngine().getQueryPeer(serviceUUID);
             
         }

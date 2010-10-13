@@ -254,50 +254,52 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
      */
     final protected boolean rangeCheck(final byte[] key) {
 
-        if (fromKey == null && toKey == null) {
-
-            // no range constraint.
-            return true;
-            
-        }
-
-        if (fromKey != null) {
-
-            if (BytesUtil.compareBytes(key, fromKey) < 0) {
-
-                if (DEBUG) {
-
-                    log.debug("key=" + BytesUtil.toString(key) + " LT fromKey"
-                            + BytesUtil.toString(fromKey));
-
-                }
-                
-                // key is LT then the optional inclusive lower bound.
-                return false;
-
-            }
-
-        }
-
-        if (toKey != null) {
-
-            if (BytesUtil.compareBytes(key, toKey) >= 0) {
-
-                if (DEBUG) {
-
-                    log.debug("key=" + BytesUtil.toString(key) + " GTE toKey"
-                            + BytesUtil.toString(toKey));
-
-                }
-
-                // key is GTE the optional exclusive upper bound
-                return false;
-
-            }
-
-        }
-
-        return true;
+    	return BytesUtil.rangeCheck(key, fromKey, toKey);
+    	
+//        if (fromKey == null && toKey == null) {
+//
+//            // no range constraint.
+//            return true;
+//            
+//        }
+//
+//        if (fromKey != null) {
+//
+//            if (BytesUtil.compareBytes(key, fromKey) < 0) {
+//
+//                if (DEBUG) {
+//
+//                    log.debug("key=" + BytesUtil.toString(key) + " LT fromKey"
+//                            + BytesUtil.toString(fromKey));
+//
+//                }
+//                
+//                // key is LT then the optional inclusive lower bound.
+//                return false;
+//
+//            }
+//
+//        }
+//
+//        if (toKey != null) {
+//
+//            if (BytesUtil.compareBytes(key, toKey) >= 0) {
+//
+//                if (DEBUG) {
+//
+//                    log.debug("key=" + BytesUtil.toString(key) + " GTE toKey"
+//                            + BytesUtil.toString(toKey));
+//
+//                }
+//
+//                // key is GTE the optional exclusive upper bound
+//                return false;
+//
+//            }
+//
+//        }
+//
+//        return true;
         
     }
 

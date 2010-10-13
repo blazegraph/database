@@ -740,6 +740,72 @@ public class BytesUtil {
         
     }
     
+	/**
+	 * Return <code>true</code> if the <i>key</i> lies inside of the optional
+	 * half-open range constraint.
+	 * 
+	 * @param key
+	 *            The key.
+	 * @param fromKey
+	 *            The inclusive lower bound -or- <code>null</code> if there is
+	 *            no lower bound.
+	 * @param toKey
+	 *            The exclusive upper bound -or- <code>null</code> if there is
+	 *            no upper bound.
+	 * 
+	 * @return <code>true</code> unless the <i>key</i> is LT [fromKey] or GTE
+	 *         [toKey].
+	 */
+	final static public boolean rangeCheck(final byte[] key,
+			final byte[] fromKey, final byte[] toKey) {
+
+        if (fromKey == null && toKey == null) {
+
+            // no range constraint.
+            return true;
+            
+        }
+
+        if (fromKey != null) {
+
+            if (BytesUtil.compareBytes(key, fromKey) < 0) {
+
+                if (log.isDebugEnabled()) {
+
+                    log.debug("key=" + BytesUtil.toString(key) + " LT fromKey"
+                            + BytesUtil.toString(fromKey));
+
+                }
+                
+                // key is LT then the optional inclusive lower bound.
+                return false;
+
+            }
+
+        }
+
+        if (toKey != null) {
+
+            if (BytesUtil.compareBytes(key, toKey) >= 0) {
+
+                if (log.isDebugEnabled()) {
+
+                    log.debug("key=" + BytesUtil.toString(key) + " GTE toKey"
+                            + BytesUtil.toString(toKey));
+
+                }
+
+                // key is GTE the optional exclusive upper bound
+                return false;
+
+            }
+
+        }
+
+        return true;
+        
+    }
+
     /**
      * This method forces the load of the JNI library and tries to execute the
      * JNI methods.

@@ -129,4 +129,11 @@ class DelegateIndexManager implements IIndexManager {
 
     }
 
+    public String toString() {
+
+    	return super.toString() + "{dataServiceUUID="
+				+ dataService.getServiceUUID() + "}";
+    	
+	}
+
 }
