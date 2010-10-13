@@ -108,7 +108,8 @@ public class TestPruneBindingSets extends ProxyBigdataSailTestCase {
              * statement buffers to the database before executing any operations
              * that go around the sail.
              */
-            cxn.flush();//commit();
+//            cxn.flush();//commit();
+            cxn.commit();
             
 /**/            
             if (log.isInfoEnabled()) {

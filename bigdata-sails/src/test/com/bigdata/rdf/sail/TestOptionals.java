@@ -161,7 +161,8 @@ public class TestOptionals extends QuadsTestCase {
              * statement buffers to the database before executing any operations
              * that go around the sail.
              */
-            cxn.flush();//commit();
+//            cxn.flush();//commit();
+            cxn.commit();
             
 /**/            
             if (log.isInfoEnabled()) {
@@ -221,6 +222,8 @@ public class TestOptionals extends QuadsTestCase {
             cxn.add(vf.createURI("u:1"), 
                     vf.createURI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"), 
                     vf.createURI("u:2"));
+
+            cxn.commit();
             
             String query = 
                 "SELECT REDUCED ?subj ?subj_class ?subj_label " +
