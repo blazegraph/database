@@ -165,7 +165,7 @@ public class BigdataFederationSparqlTest extends SPARQLQueryTest
 		// return dataRep.getConnection();
 		final BigdataSailRepositoryConnection con = new BigdataSailRepositoryConnection(new BigdataSailRepository(
 				_sail), _sail.getReadOnlyConnection());
-		System.err.println(_sail.getDatabase().dumpStore());
+//		System.err.println(_sail.getDatabase().dumpStore());
 		return con;
 	}
 
