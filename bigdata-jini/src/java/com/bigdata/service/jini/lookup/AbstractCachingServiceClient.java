@@ -341,24 +341,98 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
 
     }
 
-    /**
-     * Return the {@link ServiceItem} associated with the {@link UUID}.
-     * 
-     * @param serviceUUID
-     *            The service {@link UUID}.
-     * 
-     * @return The service item iff it is found in the cache and
-     *         <code>null</code> otherwise.
-     */
+	/**
+	 * Return the {@link ServiceItem} associated with the {@link UUID}. -or-
+	 * <code>null</code> if there is no such service in the cache and a remote
+	 * lookup times out.
+	 * 
+	 * @param serviceUUID
+	 *            The service {@link UUID}.
+	 * 
+	 * @return The service item iff it is found in the cache and
+	 *         <code>null</code> otherwise.
+	 */
     final public ServiceItem getServiceItem(final UUID serviceUUID) {
 
         if (serviceUUID == null)
             throw new IllegalArgumentException();
 
-        final ServiceItem serviceItem = serviceCache
-                .getServiceItemByID(JiniUtil.uuid2ServiceID(serviceUUID));
+		final ServiceID serviceId = JiniUtil.uuid2ServiceID(serviceUUID);
+
+		ServiceItem serviceItem = serviceCache
+				.getServiceItemByID(serviceId);
+		
+        if (serviceItem == null) {
+
+            if (log.isInfoEnabled())
+                log.info("Cache miss.");
+
+            serviceItem = handleCacheMiss(serviceId);
+
+            if (serviceItem == null) {
+
+                log.warn("No matching service.");
+
+                return null;
+
+            }
+
+        }
 
         return serviceItem;
+
+    }
+
+    /**
+     * Handles a cache miss by a remote query on the managed set of service
+     * registrars.
+     * 
+     * @param filter
+     *            The specific filter to be applied.
+     */
+    final private ServiceItem handleCacheMiss(final ServiceID serviceId) {
+
+        ServiceItem item = null;
+
+        try {
+
+			final ServiceTemplate template = new ServiceTemplate(serviceId,
+					null/* serviceTypes */, null/* attrSetTemplates */);
+        	
+            item = serviceDiscoveryManager.lookup(template, filter,
+                    cacheMissTimeout);
+
+        } catch (RemoteException ex) {
+
+            log.error(ex);
+
+            return null;
+
+        } catch (InterruptedException ex) {
+
+            if (log.isInfoEnabled())
+                log.info("Interrupted - no match.");
+
+            return null;
+
+        }
+
+        if (item == null) {
+
+            // Could not discover a matching service.
+
+			log.warn("Could not discover matching service: serviceID="
+					+ serviceId + ", template=" + template + ", filter="
+					+ filter + ", timeout=" + cacheMissTimeout);
+
+            return null;
+
+        }
+
+        if (log.isInfoEnabled())
+            log.info("Found: " + item);
+
+        return item;
 
     }
 
