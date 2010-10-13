@@ -242,7 +242,8 @@ public class TestQuadsAPI extends QuadsTestCase {
              * statement buffers to the database before executing any operations
              * that go around the sail.
              */
-            cxn.flush();//commit();
+//            cxn.flush();//commit();
+            cxn.commit();
             
             assertEquals(2, sail.database.getNamedGraphCount());
             
