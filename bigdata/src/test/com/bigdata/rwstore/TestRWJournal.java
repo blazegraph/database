@@ -960,56 +960,59 @@ public class TestRWJournal extends AbstractJournalTestCase {
          */
         public void test_allocationContexts() throws IOException {
             Journal store = (Journal) getStore();
+            try {
+            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 
-            RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+				RWStore rw = bs.getRWStore();
 
-            RWStore rw = bs.getRWStore();
-            
-            // JournalShadow shadow = new JournalShadow(store);
+				// JournalShadow shadow = new JournalShadow(store);
 
-            // Create a couple of contexts
-            IAllocationContext allocContext1 = new DummyAllocationContext();
-            IAllocationContext allocContext2 = new DummyAllocationContext();
-            
-            int sze = 650;
-            byte[] buf = new byte[sze+4]; // extra for checksum
-            r.nextBytes(buf);
-            
-            long addr1a = bs.write(ByteBuffer.wrap(buf), allocContext1);
-            long addr1b = bs.write(ByteBuffer.wrap(buf), allocContext1);
-            rw.detachContext(allocContext1);
-            
-            
-            long addr2a = bs.write(ByteBuffer.wrap(buf), allocContext2);
-            long addr2b = bs.write(ByteBuffer.wrap(buf), allocContext2);
-            rw.detachContext(allocContext2);           
- 
-            // Re-establish context
-            long addr1c = bs.write(ByteBuffer.wrap(buf), allocContext1);
-            
-            // By detaching contexts we end up using the same allocator
-            assertTrue("allocator re-use", bs.getPhysicalAddress(addr1c) > bs.getPhysicalAddress(addr2b));
-            
-            // Now, prior to commit, try deleting an uncommitted allocation
-            bs.delete(addr1c, allocContext1);
-            // and re-allocating it from the same context
-            long addr1d = bs.write(ByteBuffer.wrap(buf), allocContext1);
+				// Create a couple of contexts
+				IAllocationContext allocContext1 = new DummyAllocationContext();
+				IAllocationContext allocContext2 = new DummyAllocationContext();
 
-            assertTrue("re-allocation", addr1c==addr1d);
+				int sze = 650;
+				byte[] buf = new byte[sze + 4]; // extra for checksum
+				r.nextBytes(buf);
 
-            rw.detachContext(allocContext1);
-            
-            // Now commit
-            store.commit();
-            
-            // now try deleting and re-allocating again, but in a global context
-            bs.delete(addr1d); // this should call deferFree
-            long addr1e = bs.write(ByteBuffer.wrap(buf), allocContext1);
-            
-            assertTrue("deferred-delete", addr1e != addr1d);
-            
-            // Now commit
-            store.commit();
+				long addr1a = bs.write(ByteBuffer.wrap(buf), allocContext1);
+				long addr1b = bs.write(ByteBuffer.wrap(buf), allocContext1);
+				rw.detachContext(allocContext1);
+
+				long addr2a = bs.write(ByteBuffer.wrap(buf), allocContext2);
+				long addr2b = bs.write(ByteBuffer.wrap(buf), allocContext2);
+				rw.detachContext(allocContext2);
+
+				// Re-establish context
+				long addr1c = bs.write(ByteBuffer.wrap(buf), allocContext1);
+
+				// By detaching contexts we end up using the same allocator
+				assertTrue("allocator re-use", bs.getPhysicalAddress(addr1c) > bs.getPhysicalAddress(addr2b));
+
+				// Now, prior to commit, try deleting an uncommitted allocation
+				bs.delete(addr1c, allocContext1);
+				// and re-allocating it from the same context
+				long addr1d = bs.write(ByteBuffer.wrap(buf), allocContext1);
+
+				assertTrue("re-allocation", addr1c == addr1d);
+
+				rw.detachContext(allocContext1);
+
+				// Now commit
+				store.commit();
+
+				// now try deleting and re-allocating again, but in a global
+				// context
+				bs.delete(addr1d); // this should call deferFree
+				long addr1e = bs.write(ByteBuffer.wrap(buf), allocContext1);
+
+				assertTrue("deferred-delete", addr1e != addr1d);
+
+				// Now commit
+				store.commit();
+			} finally {
+            	store.destroy();
+            }
 
         }
         

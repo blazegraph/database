@@ -491,7 +491,7 @@ public class RWStore implements IStore {
 				m_minFixedAlloc = m_allocSizes[0]*64;
 
 				commitChanges();
-
+				
 			} else {
 				
 				initfromRootBlock();
@@ -509,6 +509,10 @@ public class RWStore implements IStore {
 
 	public void close() {
 		try {
+			if (m_bufferedWrite != null) {
+				m_bufferedWrite.release();
+				m_bufferedWrite = null;
+			}
 			m_writeCache.close();
 			m_raf.close();
 		} catch (IOException e) {
@@ -581,7 +585,8 @@ public class RWStore implements IStore {
 	 * @throws IOException
 	 */
 	private void initfromRootBlock() throws IOException {
-		m_rb = m_fmv.getRootBlock();
+		// m_rb = m_fmv.getRootBlock();
+		assert(m_rb != null);
 
 		m_commitCounter = m_rb.getCommitCounter();
 
