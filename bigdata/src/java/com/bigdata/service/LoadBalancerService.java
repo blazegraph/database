@@ -36,6 +36,7 @@ import com.bigdata.counters.IHostCounters;
 import com.bigdata.counters.IRequiredHostCounters;
 import com.bigdata.counters.PeriodEnum;
 import com.bigdata.counters.ICounterSet.IInstrumentFactory;
+import com.bigdata.counters.query.QueryUtil;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.ConcurrencyManager.IConcurrencyManagerCounters;
@@ -931,6 +932,8 @@ abstract public class LoadBalancerService extends AbstractService
      *       last reported counter value. e.g., do a counter scan for the
      *       service and report the largest value for lastModified() on any
      *       counter for that service.
+     * 
+     * @see QueryUtil#getRequiredPerformanceCountersFilter()
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$

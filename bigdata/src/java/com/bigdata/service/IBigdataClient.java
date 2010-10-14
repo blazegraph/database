@@ -34,6 +34,7 @@ import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.query.QueryUtil;
 import com.bigdata.journal.ITx;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.locator.ILocatableResource;
@@ -456,6 +457,19 @@ public interface IBigdataClient<T> {
          * The default {@link #REPORT_DELAY}.
          */
         String DEFAULT_REPORT_DELAY = ""+(60*1000);
+
+		/**
+		 * When <code>true</code>, all collected performance counters are
+		 * reported (default {@value #DEFAULT_REPORT_ALL)}. Otherwise only the
+		 * {@link QueryUtil#getRequiredPerformanceCountersFilter()} will be
+		 * reported. Reporting all performance counters is useful when
+		 * diagnosing the services in a cluster. However, only a small number of
+		 * performance counters are actually necessary for the functioning of
+		 * the {@link ILoadBalancerService}.
+		 */
+		String REPORT_ALL = IBigdataClient.class.getName() + ".reportAll";
+
+		String DEFAULT_REPORT_ALL = "false";
     
         /**
          * Integer option specifies the port on which an httpd service will be
