@@ -545,6 +545,8 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 	 * Calls through to store and then to WriteCacheService.reset
 	 */
 	public void abort() {
+		m_store.checkRootBlock(m_rb);
+		
 	    m_store.reset();
 	}
 	

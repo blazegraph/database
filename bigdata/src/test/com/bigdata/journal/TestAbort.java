@@ -169,7 +169,6 @@ public class TestAbort extends ProxyTestCase<Journal> {
             // make sure the offset has not been changed.
             assertEquals(firstOffset, store.getRootBlockView()
                     .getNextOffset());
-
             // write some data onto the store.
             for (int i = 0; i < nrecs; i++) {
 
@@ -268,7 +267,6 @@ public class TestAbort extends ProxyTestCase<Journal> {
             // verify the write.
             assertEquals(new byte[] { 2, 4 }, ndx
                     .lookup(new byte[] { 1, 3 }));
-
         } finally {
 
             store.destroy();
@@ -283,10 +281,10 @@ public class TestAbort extends ProxyTestCase<Journal> {
      */
     public void test_stressTestAbort() {
 
-        final int LIMIT = 100;
+        final int LIMIT = 10; // temporary reduction while fix to RWStore reopen
+        					  // that currently takes too long
 
         for (int i = 0; i < LIMIT; i++) {
-
             test_abort();
 
         }
