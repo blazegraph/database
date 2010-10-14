@@ -129,7 +129,7 @@ public class TestWORMWriteCacheService extends TestCase3 {
      * often absorb the data immediately. 100k is reasonable.
      */
 //    static final int nrecs = 10;
-    static final int nrecs = 100000;
+    static final int nrecs = 10000;
 
     /**
      * The #of records to write for an RW store.
