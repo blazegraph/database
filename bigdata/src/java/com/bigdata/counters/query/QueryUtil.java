@@ -56,12 +56,20 @@ import com.bigdata.counters.History;
 import com.bigdata.counters.HistoryInstrument;
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.ICounterNode;
+import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.IHostCounters;
+import com.bigdata.counters.IRequiredHostCounters;
 import com.bigdata.counters.PeriodEnum;
 import com.bigdata.counters.History.SampleIterator;
 import com.bigdata.counters.ICounterSet.IInstrumentFactory;
 import com.bigdata.counters.httpd.DummyEventReportingService;
+import com.bigdata.journal.ConcurrencyManager.IConcurrencyManagerCounters;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.resources.ResourceManager.IResourceManagerCounters;
+import com.bigdata.resources.StoreManager.IStoreManagerCounters;
 import com.bigdata.service.Event;
+import com.bigdata.service.DataService.IDataServiceCounters;
+import com.bigdata.util.concurrent.IQueueCounters.IThreadPoolExecutorTaskCounters;
 
 /**
  * Some static utility methods.
@@ -578,5 +586,79 @@ public class QueryUtil {
         return out;
         
     }
-    
+
+	/**
+	 * Return a {@link Pattern} which will match the minimum set of performance
+	 * counters required by the load balancer to perform its function.
+	 */
+	public static Pattern getRequiredPerformanceCountersFilter() {
+
+		return requiredPerformanceCountersFilter;
+
+	}
+
+	private static final String[] requiredPerformanceCounterPaths = new String[] {
+
+			IRequiredHostCounters.Memory_majorFaultsPerSecond,
+
+			IRequiredHostCounters.LogicalDisk_PercentFreeSpace,
+
+			IRequiredHostCounters.CPU_PercentProcessorTime,
+
+			IHostCounters.CPU_PercentIOWait,
+
+			IDataServiceCounters.concurrencyManager + ICounterSet.pathSeparator
+					+ IConcurrencyManagerCounters.writeService
+					+ ICounterSet.pathSeparator
+					+ IThreadPoolExecutorTaskCounters.AverageQueuingTime,
+
+			IDataServiceCounters.resourceManager + ICounterSet.pathSeparator
+					+ IResourceManagerCounters.StoreManager
+					+ ICounterSet.pathSeparator
+					+ IStoreManagerCounters.DataDirBytesAvailable,
+
+			IDataServiceCounters.resourceManager + ICounterSet.pathSeparator
+					+ IResourceManagerCounters.StoreManager
+					+ ICounterSet.pathSeparator
+					+ IStoreManagerCounters.TmpDirBytesAvailable, };
+
+	private static final Pattern requiredPerformanceCountersFilter = QueryUtil
+			.getPattern(
+					Arrays.asList(requiredPerformanceCounterPaths)/* strings */,
+					null/* regex */);
+
+	/**
+	 * Utility may be used to read the required performance counters for the
+	 * load balancer from zero or more files specified on the command line. The
+	 * results are written using the XML interchange format on stdout.
+	 * 
+	 * @param args The file(s).
+	 * 
+	 * @throws IOException
+	 * @throws SAXException
+	 * @throws ParserConfigurationException
+	 */
+	public static void main(String[] args) throws IOException, SAXException,
+			ParserConfigurationException {
+
+		final Pattern filter = getRequiredPerformanceCountersFilter();
+
+		System.err.println("required counter pattern: " + filter);
+
+		final CounterSet counterSet = new CounterSet();
+
+		for (String s : args) {
+
+			final File file = new File(s);
+
+			readCountersFromFile(file, counterSet, filter,
+					new DefaultInstrumentFactory(60/* slots */,
+							PeriodEnum.Minutes, false/* overwrite */));
+
+		}
+
+		System.out.println("counters: " + counterSet.asXML(null/* filter */));
+
+	}
+
 }

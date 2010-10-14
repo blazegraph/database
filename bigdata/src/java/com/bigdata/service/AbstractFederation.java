@@ -32,6 +32,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
@@ -45,6 +46,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 
@@ -57,12 +59,19 @@ import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.IHostCounters;
+import com.bigdata.counters.IRequiredHostCounters;
 import com.bigdata.counters.IServiceCounters;
 import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.counters.query.QueryUtil;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TemporaryStoreFactory;
+import com.bigdata.journal.ConcurrencyManager.IConcurrencyManagerCounters;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.locator.DefaultResourceLocator;
+import com.bigdata.resources.ResourceManager.IResourceManagerCounters;
+import com.bigdata.resources.StoreManager.IStoreManagerCounters;
+import com.bigdata.service.DataService.IDataServiceCounters;
 import com.bigdata.service.IBigdataClient.Options;
 import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.service.ndx.ScaleOutIndexCounters;
@@ -72,6 +81,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ShutdownHelper;
 import com.bigdata.util.concurrent.TaskCounters;
 import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
+import com.bigdata.util.concurrent.IQueueCounters.IThreadPoolExecutorTaskCounters;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
@@ -1391,25 +1401,38 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
             }
 
-            /*
-             * @todo this is probably worth compressing as there will be a lot
-             * of redundency.
-             * 
-             * @todo allow filter on what gets sent to the load balancer?
-             */
-            final ByteArrayOutputStream baos = new ByteArrayOutputStream(
-                    Bytes.kilobyte32 * 2);
+			/*
+			 * @todo When sending all counters, this is probably worth
+			 * compressing as there will be a lot of redundancy and a lot of
+			 * data.
+			 */
+			final ByteArrayOutputStream baos = new ByteArrayOutputStream(
+					Bytes.kilobyte32 * 2);
 
-            fed.getCounterSet().asXML(baos, "UTF-8", null/* filter */);
+			final Properties p = fed.getClient().getProperties();
+
+			final boolean reportAll = Boolean.valueOf(p.getProperty(
+					Options.REPORT_ALL, Options.DEFAULT_REPORT_ALL));
+
+			fed.getCounterSet().asXML(
+					baos,
+					"UTF-8",
+					reportAll ? null/* filter */: QueryUtil
+							.getRequiredPerformanceCountersFilter());
+
+			if (log.isInfoEnabled())
+				log.info("reportAll=" + reportAll + ", service="
+						+ fed.getServiceName() + ", #bytesReported="
+						+ baos.size());
 
             loadBalancerService.notify(serviceUUID, baos.toByteArray());
 
             if (log.isInfoEnabled())
                 log.info("Notified the load balancer.");
-            
-        }
 
-    }
+		}
+
+	}
 
     /**
      * @todo it may be possible to optimize this for the jini case.
