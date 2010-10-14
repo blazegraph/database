@@ -115,6 +115,8 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		m_store = new RWStore(m_fmv, false, quorum); // not read-only for now
 		m_open = true;
 		
+		m_rb = getRootBlock(); // ensure values correct from create/reopen
+		
 		m_rb0 = copyRootBlock(true);
 		m_rb1 = copyRootBlock(false);
 		
