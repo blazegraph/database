@@ -618,9 +618,11 @@ abstract public class AbstractTransactionService extends AbstractService
      */
     synchronized private final long _nextTimestamp() {
 
-        return MillisecondTimestampFactory.nextMillis();
+        return lastTimestamp = MillisecondTimestampFactory.nextMillis();
 
     }
+    /** The last timestamp issued. */
+    private volatile long lastTimestamp;
     
     /**
      * Note: There is an upper bound of one read-write transaction that may be
@@ -1232,16 +1234,18 @@ abstract public class AbstractTransactionService extends AbstractService
 
         final long lastCommitTime = getLastCommitTime();
 
-        if (timestamp > lastCommitTime) {
+//        if (timestamp > lastCommitTime) {
+		if (timestamp > lastTimestamp) {
 
             /*
              * You can't request a historical read for a timestamp which has not
              * yet been issued by this service!
              */
             
-            throw new IllegalStateException(
-                    "Timestamp is in the future: timestamp=" + timestamp
-                            + ", lastCommitTime=" + lastCommitTime);
+			throw new IllegalStateException(
+					"Timestamp is in the future: timestamp=" + timestamp
+							+ ", lastCommitTime=" + lastCommitTime
+							+ ", lastTimestamp=" + lastTimestamp);
 
         } else if (timestamp == lastCommitTime) {
             
