@@ -633,7 +633,7 @@ abstract public class AbstractTransactionService extends AbstractService
      * 
      * @throws RuntimeException
      *             Wrapping {@link TimeoutException} if a timeout occurs
-     *             awaiting a start time which would satisify the request for a
+     *             awaiting a start time which would satisfy the request for a
      *             read-only transaction (this can occur only for read-only
      *             transactions which must contend for start times which will
      *             read from the appropriate historical commit point).
@@ -658,7 +658,7 @@ abstract public class AbstractTransactionService extends AbstractService
              * Higher concurrency will require relaxing constraints on atomic
              * state transitions governed by [lock]. Perhaps by introducing
              * additional locks that are more specific. I don't want to relax
-             * those constaints until I have a better sense of what must be
+             * those constraints until I have a better sense of what must be
              * exclusive operations.
              */
 
@@ -1115,7 +1115,7 @@ abstract public class AbstractTransactionService extends AbstractService
 	 * (commitTime-1) then compute and set the new releaseTime.
 	 * <p>
 	 * Note: This method was historically part of {@link #notifyCommit(long)}.
-	 * It was moved into its own method so it can be overriden for some unit
+	 * It was moved into its own method so it can be overridden for some unit
 	 * tests.
 	 * 
 	 * @throws IllegalMonitorStateException
@@ -1203,10 +1203,10 @@ abstract public class AbstractTransactionService extends AbstractService
      * 
      * @throws InterruptedException
      *             if interrupted while awaiting a start time which would
-     *             satisify the request.
+     *             satisfy the request.
      * @throws InterruptedException
      *             if a timeout occurs while awaiting a start time which would
-     *             satisify the request.
+     *             satisfy the request.
      */
     protected long assignTransactionIdentifier(final long timestamp)
             throws InterruptedException, TimeoutException {
@@ -1217,7 +1217,7 @@ abstract public class AbstractTransactionService extends AbstractService
              * When timestamp is ZERO (0L), this simply returns the next
              * distinct timestamp (with its sign bit flipped).
              * 
-             * Note: This is guarenteed to be a valid start time since it is LT
+             * Note: This is guaranteed to be a valid start time since it is LT
              * the next possible commit point for the database.
              * 
              * Note: When we validate, we will read from [-startTime] and the
@@ -1338,7 +1338,7 @@ abstract public class AbstractTransactionService extends AbstractService
 
             /*
              * Note: If there is no successor of the desired commit point then
-             * we can just return the next timestamp. It is guarenteed to be GT
+             * we can just return the next timestamp. It is guaranteed to be GT
              * the desired commit time and LT the next commit point. [Note: this
              * case is in fact handled above so you should not get here.]
              */

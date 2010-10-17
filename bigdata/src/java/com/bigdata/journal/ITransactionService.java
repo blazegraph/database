@@ -65,7 +65,7 @@ import com.bigdata.service.ITxCommitProtocol;
  * global release time - the earliest commit time from which a transaction may
  * read. Under dire circumstances (disk shortage) the transaction manager MAY
  * choose to abort transactions and advance the release time in order to permit
- * the release of locked resources and the reclaimation of their space on local
+ * the release of locked resources and the reclamation of their space on local
  * disk.
  * </p>
  * <h2>Centralized transaction manager service</h2>
@@ -87,8 +87,8 @@ import com.bigdata.service.ITxCommitProtocol;
  * time, rendering views of earlier states of the database unavailable.
  * </p>
  * <p>
- * The transaction identifier is the transaction <em>start time</em>. The
- * transaction start time is choosen from among those distinct timestamps
+ * The transaction identifier codes the transaction <em>start time</em>. The
+ * transaction start time is chosen from among those distinct timestamps
  * available between the specified commit time and the next commit time on the
  * database. Successive read-write transactions must be assigned transaction
  * identifiers whose absolute value is strictly increasing - this requirement is
@@ -100,10 +100,10 @@ import com.bigdata.service.ITxCommitProtocol;
  * identifiers may be directly used as commit times when reading on a local
  * store. Read-write transaction identifiers must have their sign bit cleared in
  * order to read from their ground state (the commit point corresponding to
- * their transaction start time) and unmodified transaction identifier is used
- * to access their mutable view (the view comprised of the write set of the
+ * their transaction start time) but the unmodified transaction identifier is 
+ * used to access their mutable view (the view comprised of the write set of the
  * transaction super imposed on the ground state such that writes, overwrites,
- * and deletes are visible to the view).
+ * and deletes are visible in the view).
  * </p>
  * <p>
  * The symbolic value {@link ITx#READ_COMMITTED} and any <code>startTime</code>
@@ -257,7 +257,7 @@ public interface ITransactionService extends ITimestampService {
      * operation isolated by a read-write transaction to execute with access to
      * the named resources (this applies only to distributed databases). The
      * declared resources are used in the commit phase of the read-write tx to
-     * impose a partial order on commits. That partial order guarentees that
+     * impose a partial order on commits. That partial order guarantees that
      * commits do not deadlock in contention for the same resources.
      * 
      * @param tx
