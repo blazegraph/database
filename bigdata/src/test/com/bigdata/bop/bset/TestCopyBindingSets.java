@@ -178,14 +178,52 @@ public class TestCopyBindingSets extends TestCase2 {
     }
     
     /**
-     * {@link Tee} is just a specialized {@link CopyOp} which requires
-     * that the alternate sink is also specified.  Write a unit test of those
-     * semantics for {@link CopyOp}.
+     * Testing against {@link Tee} which is a specialized {@link CopyOp} which requires
+     * that the alternate sink is also specified. Gives us code coverage of {@link Tee}
+     * as well.
      */
-    public void test_copyToSinkAndAltSink() {
+    public void test_copyToSinkAndAltSink() throws InterruptedException, ExecutionException {
 
-        fail("write test");
-        
+        final int bopId = 1;
+
+        final Tee query = new Tee(new BOp[] {}, NV
+                .asMap(new NV[] {//
+                new NV(BOp.Annotations.BOP_ID, bopId),//
+                new NV(CopyOp.Annotations.ALT_SINK_REF, 2),
+                }));
+
+        // the expected solutions (default sink).
+        final IBindingSet[] expected = data.toArray(new IBindingSet[0]);
+
+        final BOpStats stats = query.newStats();
+
+        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { data.toArray(new IBindingSet[0]) });
+
+        final IBlockingBuffer<IBindingSet[]> sink = query.newBuffer(stats);
+        final IBlockingBuffer<IBindingSet[]> altSink = query.newBuffer(stats);
+
+        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                new MockRunningQuery(null/* fed */, null/* indexManager */),
+                -1/* partitionId */, stats, source, sink, altSink);
+
+        // get task.
+        final FutureTask<Void> ft = query.eval(context);
+
+        // execute task.
+        ft.run();
+
+        TestQueryEngine.assertSameSolutions(expected, sink.iterator());
+        TestQueryEngine.assertSameSolutions(expected, altSink.iterator());
+
+        assertTrue(ft.isDone());
+        assertFalse(ft.isCancelled());
+        ft.get(); // verify nothing thrown.
+
+        assertEquals(1L, stats.chunksIn.get());
+        assertEquals(6L, stats.unitsIn.get());
+        assertEquals(12L, stats.unitsOut.get());
+        assertEquals(2L, stats.chunksOut.get());      
     }
 
     /**
