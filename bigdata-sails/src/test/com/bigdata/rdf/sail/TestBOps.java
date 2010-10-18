@@ -44,6 +44,10 @@ import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.impl.BindingImpl;
+import org.openrdf.repository.sail.SailRepository;
+import org.openrdf.repository.sail.SailRepositoryConnection;
+import org.openrdf.sail.Sail;
+import org.openrdf.sail.memory.MemoryStore;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.store.BD;
@@ -444,6 +448,174 @@ public class TestBOps extends ProxyBigdataSailTestCase {
         } finally {
             cxn.close();
             sail.__tearDownUnitTest();
+        }
+
+    }
+    
+    public void testMultiGraphs() throws Exception {
+
+        final Sail sail;
+        final SailRepository repo;
+        final SailRepositoryConnection cxn;
+        
+        /*
+         * You'll get the same answer whether you run with Bigdata or Sesame. 
+         */
+        if (true) {
+            sail = getSail();
+            repo = new BigdataSailRepository((BigdataSail) sail);
+        } else {
+            sail = new MemoryStore();
+            repo = new SailRepository(sail);
+        }
+        
+        repo.initialize();
+        cxn = repo.getConnection();
+        cxn.setAutoCommit(false);
+        
+        try {
+    
+            final ValueFactory vf = sail.getValueFactory();
+            
+            final String ns = BD.NAMESPACE;
+            
+            URI mike = vf.createURI(ns+"Mike");
+            URI bryan = vf.createURI(ns+"Bryan");
+            URI person = vf.createURI(ns+"Person");
+            URI likes = vf.createURI(ns+"likes");
+            URI rdf = vf.createURI(ns+"RDF");
+            Literal l1 = vf.createLiteral("Mike");
+            Literal l2 = vf.createLiteral("Bryan");
+            URI g1 = vf.createURI(ns+"graph1");
+            URI g2 = vf.createURI(ns+"graph2");
+/**/
+            cxn.setNamespace("ns", ns);
+            
+            cxn.add(mike, RDF.TYPE, person, g1, g2);
+            cxn.add(mike, likes, rdf, g1, g2);
+            cxn.add(mike, RDFS.LABEL, l1, g1, g2);
+            cxn.add(bryan, RDF.TYPE, person, g1, g2);
+            cxn.add(bryan, likes, rdf, g1, g2);
+            cxn.add(bryan, RDFS.LABEL, l2, g1, g2);
+
+            /*
+             * Note: The either flush() or commit() is required to flush the
+             * statement buffers to the database before executing any operations
+             * that go around the sail.
+             */
+            cxn.commit();//
+            
+            if (log.isInfoEnabled()) {
+                if (sail instanceof BigdataSail)
+                    log.info("\n" + ((BigdataSail)sail).getDatabase().dumpStore());
+            }
+
+            {
+                
+                String query = 
+                    "PREFIX rdf: <"+RDF.NAMESPACE+"> " +
+                    "PREFIX rdfs: <"+RDFS.NAMESPACE+"> " +
+                    "PREFIX ns: <"+ns+"> " +
+                    
+                    "select ?p ?o " +
+                    "WHERE { " +
+                    "  ns:Mike ?p ?o . " +
+                    "}";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                TupleQueryResult result = tupleQuery.evaluate();
+                
+//                while (result.hasNext()) {
+//                    System.err.println(result.next());
+//                }
+ 
+                Collection<BindingSet> solution = new LinkedList<BindingSet>();
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("p", RDF.TYPE),
+                    new BindingImpl("o", person),
+                }));
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("p", likes),
+                    new BindingImpl("o", rdf),
+                }));
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("p", RDFS.LABEL),
+                    new BindingImpl("o", l1),
+                }));
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("p", RDF.TYPE),
+                    new BindingImpl("o", person),
+                }));
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("p", likes),
+                    new BindingImpl("o", rdf),
+                }));
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("p", RDFS.LABEL),
+                    new BindingImpl("o", l1),
+                }));
+                
+                compare(result, solution);
+                
+            }
+            
+            {
+                
+                String query = 
+                    "PREFIX rdf: <"+RDF.NAMESPACE+"> " +
+                    "PREFIX rdfs: <"+RDFS.NAMESPACE+"> " +
+                    "PREFIX ns: <"+ns+"> " +
+                    
+                    "select ?p ?o " +
+                    "from <"+g1+">" +
+                    "from <"+g2+">" +
+                    "WHERE { " +
+                    "  ns:Mike ?p ?o . " +
+                    "}";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                TupleQueryResult result = tupleQuery.evaluate();
+                
+//                while (result.hasNext()) {
+//                    System.err.println(result.next());
+//                }
+ 
+                Collection<BindingSet> solution = new LinkedList<BindingSet>();
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("p", RDF.TYPE),
+                    new BindingImpl("o", person),
+                }));
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("p", likes),
+                    new BindingImpl("o", rdf),
+                }));
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("p", RDFS.LABEL),
+                    new BindingImpl("o", l1),
+                }));
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("p", RDF.TYPE),
+                    new BindingImpl("o", person),
+                }));
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("p", likes),
+                    new BindingImpl("o", rdf),
+                }));
+                solution.add(createBindingSet(new Binding[] {
+                    new BindingImpl("p", RDFS.LABEL),
+                    new BindingImpl("o", l1),
+                }));
+                
+                compare(result, solution);
+                
+            }
+            
+        } finally {
+            cxn.close();
+            if (sail instanceof BigdataSail)
+                ((BigdataSail)sail).__tearDownUnitTest();
         }
 
     }
