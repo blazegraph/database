@@ -40,6 +40,13 @@ public class BSBundle {
 
     public final int shardId;
 
+    public String toString() {
+        
+        return super.toString() + "{bopId=" + bopId + ",shardId=" + shardId
+                + "}";
+        
+    }
+    
     public BSBundle(final int bopId, final int shardId) {
 
         this.bopId = bopId;
