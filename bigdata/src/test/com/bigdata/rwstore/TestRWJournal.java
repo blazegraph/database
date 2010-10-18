@@ -791,7 +791,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 
                 System.out.println("Now commit to disk");
                 
-                bs.commit();
+                store.commit();
                 
                 // Now reset - clears writeCache and reinits from disk
                 rw.reset();
@@ -836,7 +836,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
                 
                 System.out.println("Now commit to disk");
                 
-                bs.commit();
+                store.commit();
                               
                 // Now reset - clears writeCache and reinits from disk
                 rw.reset();
