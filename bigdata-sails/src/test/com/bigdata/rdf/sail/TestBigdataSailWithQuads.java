@@ -91,6 +91,8 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
         // unit tests for custom evaluation of high-level query
         suite.addTestSuite(TestBigdataSailEvaluationStrategyImpl.class);
 
+        suite.addTestSuite(TestOrderBy.class);
+        
         suite.addTestSuite(TestUnions.class);
         
         suite.addTestSuite(TestDescribe.class);
