@@ -94,6 +94,26 @@ public class BigdataRDFFullTextIndex extends FullTextIndex implements
 
     }
 
+    /**
+     * The full text index is currently located in the same namespace as the
+     * lexicon relation.  However, the distributed zookeeper locks (ZLocks)
+     * are not reentrant.  Therefore this method is overridden to NOT acquire
+     * the ZLock for the namespace of the relation when destroying the full
+     * text index -- that lock is already held for the same namespace by the
+     * {@link LexiconRelation}.
+     */
+    @Override
+    public void destroy() {
+
+        if (log.isInfoEnabled())
+            log.info("");
+    
+        assertWritable();
+        
+        getIndexManager().dropIndex(getNamespace() + "." + NAME_SEARCH);
+
+    }
+
     public void index(int capacity, Iterator<BigdataValue> valuesIterator) {
         final TokenBuffer buffer = new TokenBuffer(capacity, this);
 
