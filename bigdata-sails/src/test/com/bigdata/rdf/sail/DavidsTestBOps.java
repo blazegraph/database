@@ -57,7 +57,7 @@ import com.bigdata.rdf.vocab.NoVocabulary;
  */
 public class DavidsTestBOps extends ProxyBigdataSailTestCase {
 
-    protected static final Logger log = Logger.getLogger(TestBOps.class);
+    protected static final Logger log = Logger.getLogger(DavidsTestBOps.class);
     
     @Override
     public Properties getProperties() {
@@ -91,6 +91,10 @@ public class DavidsTestBOps extends ProxyBigdataSailTestCase {
         throws Exception
     {
         BigdataSail sail = getTheSail () ;
+        if(!((BigdataSail)sail).isQuads()) {
+            log.info("This test requires quads.");
+            return;
+        }
         final ValueFactory vf = sail.getValueFactory();
         RepositoryConnection cxn = getRepositoryConnection ( sail ) ;
 
@@ -139,8 +143,11 @@ public class DavidsTestBOps extends ProxyBigdataSailTestCase {
         finally
         {
             try { if ( null != rc ) rc.close () ; }
-            catch ( Exception e ) {}
-            if ( null != sail ) sail.__tearDownUnitTest () ;
+            catch ( Exception e ) {
+                throw new RuntimeException(e);
+            } finally {
+                if ( null != sail ) sail.__tearDownUnitTest () ;
+            }
         }
     }
 
