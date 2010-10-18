@@ -447,6 +447,10 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 			
 			// Current rootBlock is retained
 			m_rb = rootBlock;
+			if (m_rb.isRootBlock0())
+				m_rb0 = m_rb;
+			else
+				m_rb1 = m_rb;
 
 		}
 
@@ -525,17 +529,6 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy, IHA
 		m_commitLock.lock();
 		try {
 			m_store.commitChanges(); // includes a force(false)
-			IRootBlockView rb = getRootBlock();
-			
-			writeRootBlock(rb, ForceEnum.No);
-	
-			m_rb = rb;
-			
-			if (m_rb.isRootBlock0()) {
-				m_rb0 = m_rb;
-			} else {
-				m_rb1 = m_rb;
-			}
 		} finally {
 			m_commitLock.unlock();
 		}

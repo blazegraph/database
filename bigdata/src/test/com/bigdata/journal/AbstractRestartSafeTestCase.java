@@ -425,6 +425,9 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
     public void test_closeForWrites() {
         
         Journal store = (Journal) getStore();
+        
+        if (store.getBufferStrategy() instanceof RWStrategy)
+        	return; // void test
 
         try {
 
