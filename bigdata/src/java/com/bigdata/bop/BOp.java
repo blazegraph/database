@@ -108,6 +108,18 @@ public interface BOp extends Cloneable, Serializable, IPropertySet {
     <T> T getProperty(final String name, final T defaultValue);
 
     /**
+     * Unconditionally sets the property.
+     * 
+     * @param name
+     *            The name.
+     * @param value
+     *            The value.
+     *            
+     * @return A copy of this {@link BOp} on which the property has been set.
+     */
+    BOp setProperty(final String name, final Object value);
+    
+    /**
      * Return the value of the named annotation.
      * 
      * @param name
