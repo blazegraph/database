@@ -87,7 +87,7 @@ public class DavidsTestBOps extends ProxyBigdataSailTestCase {
         super(arg0);
     }
     
-    public void testDefaultGraph ()
+    public void testImplementationDefinedDefaultGraph ()
         throws Exception
     {
         BigdataSail sail = getTheSail () ;
@@ -108,6 +108,100 @@ public class DavidsTestBOps extends ProxyBigdataSailTestCase {
                                                                          , new BindingImpl ( "o", new URIImpl ( String.format ( "%so", ns ) ) )
                                                                          )
                                                       ) ;
+        run ( sail, cxn, kb, graphs, qs, expected ) ;
+    }
+
+    public void testExplicitDefaultGraph ()
+        throws Exception
+    {
+        BigdataSail sail = getTheSail () ;
+        if(!((BigdataSail)sail).isQuads()) {
+            log.info("This test requires quads.");
+            return;
+        }
+
+        final ValueFactory vf = sail.getValueFactory();
+        RepositoryConnection cxn = getRepositoryConnection ( sail ) ;
+
+        String ns = "http://xyz.com/test#" ;
+        String kb = String.format ( "<%ss> <%sp> <%so> .", ns, ns, ns ) ;
+        String qs = String.format ( "select ?p ?o from <%sg1> from <%sg2> where { <%ss> ?p ?o .}", ns, ns, ns ) ;
+
+        Resource graphs [] = new Resource [] { vf.createURI ( String.format ( "%sg1", ns ) ), vf.createURI ( String.format ( "%sg2", ns ) ) } ;
+
+        Collection<BindingSet> expected = getExpected ( createBindingSet ( new BindingImpl ( "p", new URIImpl ( String.format ( "%sp", ns ) ) )
+                                                                         , new BindingImpl ( "o", new URIImpl ( String.format ( "%so", ns ) ) )
+                                                                         )
+                                                      ) ;
+        run ( sail, cxn, kb, graphs, qs, expected ) ;
+    }
+
+    public void testNamedGraphNoGraphKeyword1 ()
+        throws Exception
+    {
+        BigdataSail sail = getTheSail () ;
+        if(!((BigdataSail)sail).isQuads()) {
+            log.info("This test requires quads.");
+        return;
+        }
+
+        final ValueFactory vf = sail.getValueFactory();
+        RepositoryConnection cxn = getRepositoryConnection ( sail ) ;
+
+        String ns = "http://xyz.com/test#" ;
+        String kb = String.format ( "<%ss> <%sp> <%so> .", ns, ns, ns ) ;
+        String qs = String.format ( "select ?s from named <%sg2> where { ?s ?p ?o .}", ns ) ;
+
+        Resource graphs [] = new Resource [] { vf.createURI ( String.format ( "%sg1", ns ) ), vf.createURI ( String.format ( "%sg2", ns ) ) } ;
+
+        Collection<BindingSet> expected = getExpected ( createBindingSet ( new BindingImpl ( "s", new URIImpl ( String.format ( "%ss", ns ) ) ) ) ) ;
+
+        run ( sail, cxn, kb, graphs, qs, expected ) ;
+    }
+
+    public void testNamedGraphNoGraphKeyword2 ()
+        throws Exception
+    {
+        BigdataSail sail = getTheSail () ;
+        if(!((BigdataSail)sail).isQuads()) {
+            log.info("This test requires quads.");
+        return;
+        }
+
+        final ValueFactory vf = sail.getValueFactory();
+        RepositoryConnection cxn = getRepositoryConnection ( sail ) ;
+
+        String ns = "http://xyz.com/test#" ;
+        String kb = String.format ( "<%ss> <%sp> <%so> .", ns, ns, ns ) ;
+        String qs = String.format ( "select ?s from named <%sg1> from named <%sg2> where { ?s ?p ?o .}", ns, ns ) ;
+
+        Resource graphs [] = new Resource [] { vf.createURI ( String.format ( "%sg1", ns ) ), vf.createURI ( String.format ( "%sg2", ns ) ) } ;
+
+        Collection<BindingSet> expected = getExpected ( createBindingSet ( new BindingImpl ( "s", new URIImpl ( String.format ( "%ss", ns ) ) ) ) ) ;
+
+        run ( sail, cxn, kb, graphs, qs, expected ) ;
+    }
+
+    public void testExplicitDefaultAndNamedGraphNoGraphKeyword ()
+        throws Exception
+    {
+        BigdataSail sail = getTheSail () ;
+        if(!((BigdataSail)sail).isQuads()) {
+            log.info("This test requires quads.");
+        return;
+        }
+
+        final ValueFactory vf = sail.getValueFactory();
+        RepositoryConnection cxn = getRepositoryConnection ( sail ) ;
+
+        String ns = "http://xyz.com/test#" ;
+        String kb = String.format ( "<%ss> <%sp> <%so> .", ns, ns, ns ) ;
+        String qs = String.format ( "select ?s from <%sg1> from named <%sg2> where { ?s ?p ?o .}", ns, ns ) ;
+
+        Resource graphs [] = new Resource [] { vf.createURI ( String.format ( "%sg1", ns ) ), vf.createURI ( String.format ( "%sg2", ns ) ) } ;
+
+        Collection<BindingSet> expected = getExpected ( createBindingSet ( new BindingImpl ( "s", new URIImpl ( String.format ( "%ss", ns ) ) ) ) ) ;
+
         run ( sail, cxn, kb, graphs, qs, expected ) ;
     }
 
