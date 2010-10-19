@@ -279,6 +279,23 @@ public class BOpContext<E> extends BOpContextBase {
 
                 }
 
+            } else {
+
+                final IVariable<?> var = (IVariable<?>) t
+                        .getProperty(Constant.Annotations.VAR);
+
+                if (var != null) {
+
+                    final Object val = e.get(i);
+
+                    if (val != null) {
+
+                        bindingSet.set(var, new Constant(val));
+
+                    }
+
+                }
+
             }
 
         }
