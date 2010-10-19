@@ -154,7 +154,7 @@ public class DavidsTestBOps extends ProxyBigdataSailTestCase {
 
         Resource graphs [] = new Resource [] { vf.createURI ( String.format ( "%sg1", ns ) ), vf.createURI ( String.format ( "%sg2", ns ) ) } ;
 
-        Collection<BindingSet> expected = getExpected ( createBindingSet ( new BindingImpl ( "s", new URIImpl ( String.format ( "%ss", ns ) ) ) ) ) ;
+        Collection<BindingSet> expected = getExpected () ;
 
         run ( sail, cxn, kb, graphs, qs, expected ) ;
     }
@@ -177,7 +177,7 @@ public class DavidsTestBOps extends ProxyBigdataSailTestCase {
 
         Resource graphs [] = new Resource [] { vf.createURI ( String.format ( "%sg1", ns ) ), vf.createURI ( String.format ( "%sg2", ns ) ) } ;
 
-        Collection<BindingSet> expected = getExpected ( createBindingSet ( new BindingImpl ( "s", new URIImpl ( String.format ( "%ss", ns ) ) ) ) ) ;
+        Collection<BindingSet> expected = getExpected () ;
 
         run ( sail, cxn, kb, graphs, qs, expected ) ;
     }
