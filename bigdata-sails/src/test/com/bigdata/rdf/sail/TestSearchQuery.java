@@ -57,6 +57,10 @@ import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
+import org.openrdf.query.algebra.Projection;
+import org.openrdf.query.algebra.ProjectionElem;
+import org.openrdf.query.algebra.ProjectionElemList;
+import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.Var;
@@ -246,11 +250,16 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
       
         try {
 
-            final TupleExpr tupleExpr = new StatementPattern(//
+            final StatementPattern sp = new StatementPattern(//
                     new Var("X"),//
                     new Var("1", BD.SEARCH),//
                     new Var("2", new LiteralImpl("Yellow"))//
                     );
+            final TupleExpr tupleExpr = 
+                new QueryRoot(
+                        new Projection(
+                                sp, 
+                                new ProjectionElemList(new ProjectionElem("X"))));
 
             /*
              * Create a data set consisting of the contexts to be queried.
