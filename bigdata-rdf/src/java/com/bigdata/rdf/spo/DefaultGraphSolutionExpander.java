@@ -271,7 +271,7 @@ public class DefaultGraphSolutionExpander implements IAccessPathExpander<ISPO> {
         if(!(accessPath1 instanceof SPOAccessPath)) {
             
             // The logic relies on wrapping an SPOAccessPath, at least for now.
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException(accessPath1.getClass().toString());
             
         }
 

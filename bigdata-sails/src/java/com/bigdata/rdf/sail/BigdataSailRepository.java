@@ -34,7 +34,8 @@ public class BigdataSailRepository extends SailRepository {
 //    }
 
     @Override
-    public SailRepositoryConnection getConnection() throws RepositoryException {
+    public BigdataSailRepositoryConnection getConnection() 
+            throws RepositoryException {
         
         try {
         
